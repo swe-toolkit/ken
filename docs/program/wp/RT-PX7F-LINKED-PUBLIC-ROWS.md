@@ -561,3 +561,66 @@ undetermined because it turns on `(A)` versus `(B)`, and under `(A)` the
 successor is a planner-side node that does not exist — a Steward filing call.
 Nine commits, all measurement; the frame's own yardstick says that is not the
 rows moving, and it is not.
+
+## The Architect's closing check, RUN — the mapping is fixed by the artifact
+
+@architect ruled fork `(A)` normative and handed over a check that could
+refute their own mapping. Run at my base:
+
+    RTPROBE FSOp total=21  named=10  unnamed=11
+
+    named     AppendFile ChangeMode CreateDirectory Metadata ReadDirectory
+              ReadFile RemoveDirectory RemoveFile Rename WriteFile
+    unnamed   ctor_541 .. ctor_551, contiguous
+
+**Exactly the predicted partition**, and the named ten are exactly the ten
+public operations named in the ruling, with none of the eleven `Private*`
+among them. That is the name-strip set confirmed from the arena rather than
+from the prelude read.
+
+⇒ **`ctor_543` is `PrivateResourceRelease`.**
+
+### The half of the check I could NOT run, said rather than glossed
+
+The ruling also asked that the eleven ids sit **strictly above every named
+one**. The arena stores the named entries by **spelling**, not by id, so their
+ids are not recoverable from this buffer. What is confirmed is the `21 = 10 +
+11` partition, the exact membership of the named ten, and the contiguity of
+the unnamed eleven. The id-ordering leg rests on the prelude read, not on
+this artifact.
+
+**And my earlier roster scan was keyed on `::FSOp::ctor_`** — which by
+construction could only ever find the unnamed eleven. It reported `n=11` and
+read as a complete roster. **A key naming the thing you expect cannot see the
+case that omits it**, and re-keying on `::FSOp::` is what produced the 21.
+(Cosmetic: the scan's end-detection bleeds into the next entry — `ReadFilector`
+is `ReadFile` followed by the next record. The arena is unseparated.)
+
+### What it settles
+
+    right-denial     origin PrivateFsHandleMetadata (542)   runtime K op 543
+    double-release   origin PrivateResourceRelease  (543)   runtime K op 543
+
+**`right-denial` is the row that departs, and it departs onto the bracket's
+own release** — which composition predicts *specifically* and a selection
+defect gives no reason for. **The discriminator returns positive.**
+
+`double-release` discriminates nothing: its `K` operation equals its origin's
+by **value**, not identity, because in that program the composed continuation
+also reaches a `PrivateResourceRelease`. The whole discrimination rests on
+`right-denial`, and it is sufficient. That is this node's recurring trap —
+value equality read as identity — appearing one last time, and named.
+
+### Mechanism, now normative
+
+> **The planner derives `k_ret_identity` from a continuation the spec does not
+> let the runtime invoke.** `exact_response_ret_identity` reads one syntactic
+> occurrence and composes nothing; `42 §6.4` requires the grafted spine.
+
+`(B)` is foreclosed, not merely outweighed: an emission-side change making the
+runtime invoke the immediate continuation would make a conformant runtime
+non-conformant.
+
+**No label is written**, per the ruling: the START token differs between the
+filed-successor and no-successor branches, and only one is correct at write
+time. Everything else in the label is determined.
