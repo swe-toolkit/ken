@@ -171,7 +171,7 @@ The Steward is prohibited from authoring or modifying:
 
 - `agent/COORDINATION.md`, `agent/MODELS.md`, `agent/playbooks/**`, and
   `agent/memory/**`;
-- `.agents/skills/**`, `.claude/skills/**`, `moot.toml`, and startup prompts;
+- `.agents/skills/**`, `.claude/skills/**`;
 - `.github/workflows/**` and scripts for publishing, routing, watchdogs, or
   workflow enforcement.
 
