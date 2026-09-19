@@ -124,14 +124,27 @@ display_name = "spec-author"
 # via the pi harness. This seat was stranded on a hard 402 on openrouter/deepseek
 # and could not post its T1 semantic-faithfulness rulings. T1 enclave seat, so
 # gpt-5.6-sol at high, mirroring conformance-validator. OPENROUTER_API_KEY dropped.
-model = "claude-opus-5"
+# 2026-09-19 reseat (operator directive, Steward-executed at the clean seam). Claude
+# Code Opus 5 -> pi/OpenAI gpt-5.6-sol. TIER-PRESERVING (T1 enclave seat, high).
+# HARNESS SHAPE CHANGES: gains `harness = "pi"` and the PI_* env block.
+# NOTE FOR MODELS.md (Steward is barred from editing it, §7): MODELS.md maps T1 to
+# Opus-class and states there is no T1 seat on the GPT backend. This seat and the
+# architect now contradict that. Surfaced to the operator 2026-09-19.
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's spec author (clean-room enclave). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/spec-author.md and CLEAN-ROOM.md, set your status, and await the spec leader's kickoff. Do not poll."
 
 [agents.conformance-validator]
 display_name = "conformance-validator"
-model = "claude-sonnet-5"
+# 2026-09-19 reseat (operator directive, Steward-executed at the clean seam). Claude
+# Code Sonnet 5 -> pi/OpenAI gpt-5.6-terra. TIER-PRESERVING (T2, medium).
+# HARNESS SHAPE CHANGES: gains `harness = "pi"` and the PI_* env block.
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's conformance validator (clean-room enclave). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/conformance-validator.md and CLEAN-ROOM.md, set status, await kickoff. Do not poll."
 
 [agents.steward]
@@ -173,8 +186,16 @@ display_name = "spec-leader"
 # 2026-08-23 reseat (operator): openrouter ABANDONED -> OpenAI via the pi harness.
 # Coordinator/leader tier, so gpt-5.6-terra at medium, matching the other pi
 # leaders (kernel/verify/language/foundation). OPENROUTER_API_KEY dropped.
-model = "claude-sonnet-5"
+# 2026-09-19 reseat (operator directive "reseat architect, spec-leader, spec-author,
+# conformance-validator, and lieutenant to openai/pi"; Steward-executed at the clean
+# seam). Claude Code Sonnet 5 -> pi/OpenAI gpt-5.6-terra. TIER-PRESERVING (T2 leader,
+# medium). HARNESS SHAPE CHANGES: gains `harness = "pi"` and the PI_* env block; the
+# Claude Code notes elsewhere in this file (no harness key, tmux send-keys to resume a
+# compacted seat) NO LONGER APPLY to this seat — a pi seat wakes on convo mention.
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's spec enclave. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/leader.md, set status, and await the Steward's kickoff. Do not poll."
 
 [agents.librarian]
@@ -601,6 +622,13 @@ display_name = "lieutenant"
 # stays live on the same subscription. pi/OpenAI gpt-5.6-terra (T2) -> Claude Code
 # Anthropic Sonnet 5 (T2 — the merge executor is coordination/mechanical). Claude
 # Code seat: NO harness key, uses `effort`, NO env.
-model = "claude-sonnet-5"
+# 2026-09-19 reseat (operator directive, Steward-executed at the clean seam, taken
+# immediately after this seat published CAT-NAT-ORDER-LAWS D2 a68434812 and went idle
+# — never through a publish). Claude Code Sonnet 5 -> pi/OpenAI gpt-5.6-terra.
+# TIER-PRESERVING (T2; the merge executor is coordination/mechanical). The 2026-09-14
+# "Claude Code seat: NO harness key, NO env" note directly above is SUPERSEDED.
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law, especially the merge split at §14b) and agent/MODELS.md first. Then read your playbook at agent/playbooks/federation/lieutenant.md and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument; M1-M4 are the Steward's routing, M5-M9 are yours). Set your status via update_status and await the Steward's ROUTED authorization. Do not poll."
