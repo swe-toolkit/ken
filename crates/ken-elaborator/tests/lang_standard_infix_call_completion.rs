@@ -45,14 +45,15 @@
 //! cannot be failed.
 //!
 //! `resolve_instance_dictionary` and `resolve_instance_dictionary_by_head_id`
-//! differ only in HOW THEY NAME THE CARRIER: one takes a surface spelling,
-//! the other a `GlobalId` it must first turn into a spelling by scanning the
+//! differ only in HOW THEY CARRY THE REQUEST: one has a surface type, the
+//! other has an inferred core carrier plus its peeled `GlobalId` head. The
+//! latter turns the head identity into a registry spelling by scanning the
 //! registered names. They agree completely on SELECTION -- both funnel into
 //! `resolve_instance_dictionary_inner`, which reaches the registry through a
-//! single `class_env.instances.get()` keyed on `(class, head_name)`, and
-//! `_inner`'s own recursion for superclass constraints re-enters that same
-//! point. For one `(class, key)` the two are therefore identical by
-//! construction.
+//! single `class_env.instances.get()` keyed on `(class, head_name)`, then
+//! matches a parameterized head inside `_inner`. Its recursion for superclass
+//! constraints re-enters that same point. For one `(class, key)` the two are
+//! therefore identical by construction.
 //!
 //! The by-head-id path is NOT a thin wrapper -- it carries a real forward
 //! scan and three refusals the other lacks. That is the argument rather than
@@ -507,6 +508,116 @@ fn ac1_a_bare_comparison_completes_its_omitted_prefix() {
 /// Asserted on the de Bruijn indices of the last two arguments rather than on
 /// a rendering: under `\a b.` the source order is `Var(1)` then `Var(0)`, and
 /// a double-reverse is precisely the swap.
+#[test]
+fn a_parameterized_carrier_resolves_from_its_inferred_core_application() {
+    let mut env = catalog_env();
+    env.elaborate_file(
+        "import Core.Operators.Standard (≤) \
+         fn ordered_lists (xs : List Nat) (ys : List Nat) : Bool = xs ≤ ys",
+    )
+    .expect(
+        "the inferred `List Nat` carrier must match the registered `List a` \
+         instance head and recursively resolve its `Ord Nat` prerequisite",
+    );
+
+    assert_eq!(
+        spine_len(under_binders(body_of(&env, "ordered_lists"), 2)),
+        4,
+        "the parameterized carrier must reach the same completed four-argument \
+         call as a nullary carrier",
+    );
+}
+
+#[test]
+fn a_fixed_instance_argument_matches_an_alias_by_global_identity() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         module Original {{ pub data Marker : Type where {{ MkMarker : Marker }} }} \
+         module Alias {{ export Original (Marker as AliasMarker) }} \
+         import Original (Marker) \
+         import Alias (AliasMarker) \
+         data Carrier (a : Type) (tag : Type) : Type where {{ \
+           MkCarrier : Carrier a tag \
+         }} \
+         instance Ord (Carrier a AliasMarker) {{ leq = \\x y. True }} \
+         import Core.Operators.Standard (≤) \
+         fn by_original_name \
+           (x : Carrier Bool Marker) \
+           (y : Carrier Bool Marker) : Bool = x ≤ y"
+    ))
+    .expect(
+        "the fixed `AliasMarker` pattern and inferred `Marker` argument name \
+         the same GlobalId and must match by identity",
+    );
+}
+
+#[test]
+fn a_rebound_fixed_argument_is_refused_by_full_carrier_confirmation() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         data Marker : Type where {{ MkMarker : Marker }} \
+         data Carrier (a : Type) (tag : Type) : Type where {{ \
+           MkCarrier : Carrier a tag \
+         }} \
+         instance Ord (Carrier a Marker) {{ leq = \\x y. True }}"
+    ))
+    .expect("the first file registers the generic fixed-argument instance");
+
+    let result = env.elaborate_file(
+        "data Marker : Type where { MkMarker2 : Marker } \
+         import Core.Operators.Standard (≤) \
+         fn rebound \
+           (x : Carrier Bool Marker) \
+           (y : Carrier Bool Marker) : Bool = x ≤ y",
+    );
+
+    assert!(
+        matches!(
+            result,
+            Err(ken_elaborator::ElabError::InstanceCarrierIdentityMismatch { .. })
+        ),
+        "the current `Marker` spelling makes the core matcher select and \
+         instantiate the old instance, but its kernel-inferred carrier still \
+         contains the original Marker identity; full-carrier confirmation must \
+         catch that mismatch before the downstream application does: {result:?}",
+    );
+}
+
+#[test]
+fn two_registered_head_spellings_rebound_to_one_identity_are_refused() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         data Foo (a : Type) : Type where {{ MkFoo : a -> Foo a }} \
+         data Bar (a : Type) : Type where {{ MkBar : a -> Bar a }} \
+         instance Ord (Foo a) {{ leq = \\x y. True }} \
+         instance Ord (Bar a) {{ leq = \\x y. True }}"
+    ))
+    .expect("the first file registers two distinct instance heads");
+
+    // Manufacture the post-registration collision directly in the public name
+    // table. The registry still has distinct `Foo` and `Bar` keys, while both
+    // now resolve forward to the same `Foo` identity. This is the exact state
+    // the adapter must refuse without relying on source-import ambiguity.
+    let foo_id = env.globals["Foo"];
+    env.globals.insert("Bar".to_string(), foo_id);
+    let result = env.elaborate_file(
+        "import Core.Operators.Standard (≤) \
+         fn ambiguous (x : Foo Bool) (y : Foo Bool) : Bool = x ≤ y",
+    );
+
+    assert!(
+        matches!(
+            result,
+            Err(ken_elaborator::ElabError::InstanceHeadSpellingsShareAnIdentity { .. })
+        ),
+        "two registry keys resolving to one carrier identity must refuse rather \
+         than let hash-map order select a dictionary: {result:?}",
+    );
+}
+
 #[test]
 fn ac4_completion_applies_operands_in_source_order_for_both_roles() {
     let mut env = ElabEnv::new().expect("base environment");
