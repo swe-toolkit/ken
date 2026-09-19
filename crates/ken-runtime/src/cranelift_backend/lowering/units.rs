@@ -3429,7 +3429,15 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             })?;
             Lowering::require_i64(&mut builder, ret_tag, expected_ret);
             let ret_fields = compiler.emit_carrier_field_count(&mut builder, returned)?;
-            Lowering::require_i64(&mut builder, ret_fields, 1);
+            let expected_ret_fields = i64::try_from(
+                compiler
+                    .static_transition_plan
+                    .constructor_arity(emission.row.k_ret_identity())?,
+            )
+            .map_err(|_| {
+                backend_module("response K result arity exceeds the runtime field count".to_string())
+            })?;
+            Lowering::require_i64(&mut builder, ret_fields, expected_ret_fields);
             let ret_validation_end = builder
                 .func
                 .layout

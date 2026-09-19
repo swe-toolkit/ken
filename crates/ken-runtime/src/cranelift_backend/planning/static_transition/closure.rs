@@ -1206,6 +1206,35 @@ impl<'src> StaticTransitionPlan<'src> {
         self.semantic.constructor_symbol_identity(origin)
     }
 
+    /// The field arity shared by every source `Construct` occurrence carrying
+    /// one artifact-static constructor identity.
+    pub(in crate::cranelift_backend) fn constructor_arity(
+        &self,
+        identity: ConstructorIdentity,
+    ) -> Result<usize, CraneliftBackendError> {
+        let mut arity = None;
+        for occurrence in self.source_occurrences.iter().flatten() {
+            let RuntimeExpr::Construct { args, .. } = occurrence.expr else {
+                continue;
+            };
+            if self.constructor_symbol_identity(occurrence.static_origin)? != identity {
+                continue;
+            }
+            match arity {
+                Some(expected) if expected != args.len() => {
+                    return Err(planner_error(
+                        "one constructor identity has inconsistent source arities",
+                    ));
+                }
+                Some(_) => {}
+                None => arity = Some(args.len()),
+            }
+        }
+        arity.ok_or_else(|| {
+            planner_error("constructor identity has no source Construct occurrence")
+        })
+    }
+
     /// The existing semantic-plane identity for one compiler-synthesized
     /// constructor role.
     ///
