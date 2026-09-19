@@ -1,7 +1,7 @@
 ---
 id: SPEC-MEMBERSHIP-CLASS-CONTRACT
 title: "the L2 membership-operator typeclass contract: specify a standard Membership class and the standard binding of the (already glyph-admitted) `∈` to it -- a unary `class Membership (container) { Query : Type; member : Query -> container -> Bool }` with `member_holds := IsTrue (member ..)` as the Prop view, dispatched at use-site through the SAME class resolver A1 factors (no second operator dispatcher), over nominal witness-bound carrier VIEWS (a list view, one ordered-key view serving Map and Set, a distinct relation-edge view) so distinct roles do not collide under today's outer-head-name registry key and the comparator/validity witness lives in the view value not an implicit lookup; a shared `SameMembers` observational law plus a per-provider adapter-fidelity obligation, with container-specific laws kept container-specific; NO multi-parameter class machinery, NO `Membership Tree` instance, NO Prop-to-Bool elimination, NO new trust-root/TCB"
-status: active
+status: merged
 owner: spec
 size: M
 gate: none

@@ -263,15 +263,68 @@ language-capability finding and it precedes everything else in this node.
 **NOT a second dispatcher.** A1's `D3` exists so this reuse needs none; if the
 resolver cannot serve `∈` as landed, that is `D0-2` and it comes back.
 
-## 5a. PINNED AT RELEASE, deliberately left open here
+## 5a. PINNED AT RELEASE — A1 HAS LANDED AND THESE ARE NOW MEASURED
 
-**These depend on A1's landed shape and the Steward pins them when it lands.**
-They are listed so the gap is visible rather than discovered:
+**A1 landed at `origin/main` `e2e40e2b404d9775b3cd1fee049b3ecaab481bba`.** The
+four items below were left open at framing because they are A1's landed shape;
+they are pinned here, **read out of the tree at that SHA rather than off A1's
+approval posts**. Navigate by symbol — every line number is current at that SHA
+only.
 
-    the facade's module PATH and name           A1 D2
-    the role vocabulary's variant spelling      A1 D1a
-    the required-roles/shape declaration site   A1 D1c
-    the resolver's exposed entry point          A1 D3
+    facade module PATH and name       A1 D2   Core.Operators.Standard
+      catalog  catalog/packages/Core/Operators/Standard.ken.md
+      const    standard_operators.rs  STANDARD_OPERATOR_HOME
+      test     is_standard_operator_home(module: &str) -> bool
+
+    role vocabulary variant spelling  A1 D1a  StandardOperatorRole
+      enum     And, Or, Leq, Geq, Neq          (pub(crate))
+      const    StandardOperatorRole::ALL: [Self; 5]
+      accessor glyph(self) -> &'static str
+
+    required-roles / shape site       A1 D1c
+      const    StandardOperatorRole::BINDING_BACKED: [Self; 4]
+                 = [And, Or, Leq, Geq]
+      fn       expected_shape(role) -> &'static str
+      fn       shape_matches(role, ty, bool_id) -> bool
+      error    ElabError::StandardOperatorRoleWrongShape
+
+    resolver exposed entry point      A1 D3
+      fn       certify_roles(env, exports, globals, home, bool_id, span)
+                 -> Result<HashMap<StandardOperatorRole, GlobalId>, ElabError>
+                 (pub(crate))
+
+**THE VOCABULARY AND THE CERTIFIED SET ALREADY DIFFER, FIVE AGAINST FOUR, AND
+THAT IS NOT AN ARTEFACT OF `∈` BEING ABSENT.** `Neq` is in `ALL` and not in
+`BINDING_BACKED`: `§6.1` names a binding for four roles and *describes* the
+fifth, so an export-table check has nothing to look up for `≠` and requiring it
+there would hard-error on a correct tree. **So this node adds `Member` to
+`ALL`, and whether it also enters `BINDING_BACKED` is a separate act** — A1's
+own comment anticipates exactly this and rules that if the two need to diverge
+for `Member`, that is a third set which **"should arrive with the caller that
+distinguishes them, not before it."** Do not mint that third set speculatively.
+
+**`D0-2` IS ANSWERED IN A1'S LANDED CODE, NOT LEFT TO THIS NODE.**
+`expected_shape`'s own doc states that a domain which is a PROJECTION from an
+earlier binder (`d.Query`, `§6.3`) is the same kind of back-reference as one
+that is an APPLICATION to it, **"which is why this shape extends to the
+membership role without widening."** The measurement this node still owes is
+narrower than the frame implied: whether `d.Query` is representable at the point
+the check runs. Not representable ⇒ name it and stop.
+
+**`D0-1`'s VERIFY CONDITION IS ENFORCED BY THE COMPILER, SO DO NOT DISCHARGE IT
+BY INSPECTION.** The condition was that A1's role type must not leak through any
+`pub` signature. `StandardOperatorRole` is `pub(crate)`, and
+`crates/ken-elaborator/src/lib.rs` carries `#![deny(private_interfaces)]`, which
+makes a leak a compile error rather than a review finding. **This node's
+obligation is therefore not to re-audit the surface but to not weaken that
+attribute** — removing or downgrading it is a hard stop, and adding `Member`
+must leave the role type crate-internal.
+
+**Adding a variant is a compiler-generated checklist.** `StandardOperatorRole`
+is exhaustively matched with no `_ =>` arm at every consumer (`COORDINATION
+§7`), so the new variant reds at each site that must handle it. **A candidate
+that reaches green by adding a catch-all arm anywhere has defeated the
+checklist** — that is a hard stop, not a style point.
 
 **Nothing else in this frame waits on A1.** `§3` is entirely landed-spec.
 
