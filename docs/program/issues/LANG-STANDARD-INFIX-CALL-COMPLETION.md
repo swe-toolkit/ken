@@ -208,9 +208,15 @@ review.
 `NoInstance`; the construction sites are in `crates/ken-elaborator/src/elab.rs`
 and the variant is `ElabError::NoInstance { class, ty, span }` in
 `crates/ken-elaborator/src/error.rs`. A generic `where Ord a` binding
-therefore fails at definition time against the abstract tyvar `a`. **Repair
-it or split it explicitly — see AC-6. Do not claim the generic case
-delivered either way without discharging AC-6.**
+therefore fails at definition time against the abstract tyvar `a`.
+
+**SETTLED 2026-09-19, and FI-3 is HALF the picture — read AC-6 before acting
+on this paragraph.** The definition-time refusal FI-3 names is real, is
+`main`'s behaviour independently of this WP, and is **NOT a defect**: it is
+implicit resolution requiring a concrete registered head by construction. The
+gap that IS this WP's is a different program with a different refusal site.
+Both are dispositioned in AC-6 and carried by
+`[[LANG-STANDARD-OP-GENERIC-CARRIER]]`. **Do not repair either one here.**
 
 **FI-4. `membership_member_at` is NOT a catalog binding today.** It appears
 only as a test fixture string in
@@ -419,12 +425,41 @@ would have to manufacture is the one to raise, not to skip.
   the SAME unsupported-carrier refusal. **Report the inventory you measured and
   the SHA you measured it at.** No automatic DecEq fallback and no
   numeric-order substitute for `Ord`.
-- **AC-6 (the `NoInstance` disposition, FI-3).** EITHER the generic
-  `where Ord a` binding elaborates with the local `where` dictionary threaded
-  as the given — with a case proving it is threaded as a given and NOT resolved
-  as a global instance named "a" — OR the gap is split into its own node and
-  this frame's generic case is recorded as NOT DELIVERED. **Report which.
-  A silent third outcome is the failure this AC exists to catch.**
+- **AC-6 (the `NoInstance` disposition, FI-3). DISCHARGED 2026-09-19 BY
+  ARCHITECT RULING (`evt_2nbvmrwfv055y`). SPLIT, and the split node is
+  `[[LANG-STANDARD-OP-GENERIC-CARRIER]]`. Nothing further is owed here — do
+  not re-open it, and do not write generic-carrier code in this WP.**
+
+  The original text is kept below because the ruling's finding is that **this
+  AC's fork was FALSE AS POSED**, and that is only legible against the words:
+
+  > EITHER the generic `where Ord a` binding elaborates with the local `where`
+  > dictionary threaded as the given — with a case proving it is threaded as a
+  > given and NOT resolved as a global instance named "a" — OR the gap is split
+  > into its own node and this frame's generic case is recorded as NOT
+  > DELIVERED. **Report which.** A silent third outcome is the failure this AC
+  > exists to catch.
+
+  **"The generic case" names TWO programs, with two refusal sites and two
+  owners, and neither branch of the fork is right for both:**
+
+      ROW 1  `fn f ... where Ord a`   REFUSED AT DECLARATION TIME, at
+             elab.rs:11125 -> :9680 (main d272e361), before this WP's
+             completion arm is reachable at all. PRE-EXISTING, and NOT A BUG:
+             implicit resolution needs a concrete registered head by
+             construction. NOT caused by this WP and NOT this WP's to repair.
+      ROW 2  `fn f (a : Type) (d : Ord a) ...`  the dictionary IS in scope;
+             refused only by THIS WP's own head-identity match. A1-CAUSED and
+             a real repair. Split out for ORDERING reasons, not ownership —
+             see the split node.
+      ROW 3  concrete carriers. DELIVERED under this WP's other ACs.
+
+  ⇒ **This frame's generic case is recorded as NOT DELIVERED for Rows 1 and 2,
+  with the causes distinguished.** Reporting a single undifferentiated
+  "not delivered" would have satisfied the struck text while losing which row
+  this WP caused — which is exactly the mistake the AC was written to prevent,
+  reached through its own wording. **The split node's acceptance therefore
+  makes the unit of disposition the ROW.**
 - **AC-7 (Boolean truth tables).** Complete truth tables for `∧` and `∨` at the
   stated fixities, plus a case proving no short-circuit was invented (both
   operands evaluate even when the first settles the result). **The case is

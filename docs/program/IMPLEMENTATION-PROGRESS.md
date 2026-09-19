@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-19 02:17:38Z — from 683 issue file(s) in `docs/program/issues/`.
+2026-09-19 02:26:15Z — from 684 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -298,6 +298,7 @@ the committed file matches the generator's output.
 | `LANG-SPACE-PRESTATE-BIND` | `old` in a block-space operation's `ensures` still fails closed, though the cell environment it was waiting for now exists -- bind s_pre/s_post and elaborate the Hoare pair against the state transformer | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1848 |
 | `LANG-STACK-ARC-EVIDENCE-USABILITY` | The trusted-base guard now localizes the bracket but reports a bare GlobalId, so it names no offender; and both frame-size figures this arc produced cite objdump without naming the artifact, so neither is reproducible by the next reader -- three repairs that make the arc's own evidence usable | merged | language | S | none | — |
 | `LANG-STANDARD-INFIX-CALL-COMPLETION` | A1 of the reserved-infix-glyph objective: the reusable use-site standard-call completion adapter that spec 39 section 6.9 specifies and that ships un-implemented, co-landing its first standard consumers ∧ ∨ ≤ ≥ ≠ bound to ordinary checked functions; ∧ ∨ ≤ bind to the ALREADY-LANDED `Core.Classes.LawfulClasses` identities, reached through a separate standard-operator facade that RE-EXPORTS them rather than defining second copies, because 6.9 keys completion on ONE defining GlobalId and 33 section 6.1 requires exactly that home; ord_geq_at and ≠ are the genuinely new bindings; the completion resolver is factored so later membership (6.10) reuses the SAME scoped/coherent dictionary resolver, not a second operator dispatcher; results Bool, single left-to-right eval, no short-circuit; the definition-time NoInstance gap for a generic `where Ord a` binding is repaired or explicitly split before the generic case is claimed delivered | ready | language | L | none | — |
+| `LANG-STANDARD-OP-GENERIC-CARRIER` | Standard-operator completion over an ABSTRACT carrier. AC-6's fork was FALSE AS POSED -- `the generic where Ord a case` names TWO programs with two refusal sites and two owners. Row 1 (the `where`-clause sugar) refuses at DECLARATION time in `resolve_instance_dictionary_inner`, before A1's completion arm is reachable at all: pre-existing, by construction, NOT a bug. Row 2 (the explicit `(d : Ord a)` encoding) has its dictionary genuinely in scope and is refused only by A1's own head-identity match, whose arms are `Term::Const` and `Term::IndFormer` while a Pi-bound carrier infers to a de Bruijn variable: A1-caused, a real repair. D0 gates Row 2 and must run BEFORE any code -- its grounding is a July 2026 enclave probe against a September tree. | draft | language | S | none | — |
 | `LANG-STRUCTURAL-RESULT-ELAB` | Implement the structural-result selector in the elaborator -- derive the field/evidence/result association from the kernel method telescope and elaborate `structural result of x` to the hidden recursive method result | merged | language | L | none | — |
 | `LANG-SURFACE-BLOCK-COMMENTS` | `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate | merged | language | M | none | — |
 | `LANG-SURFACE-DECIMAL-PRECISION` | `Decimal` is specified with an arbitrary-precision coefficient and the spec explicitly forecloses a fixed-width one, but the surface caps it at `i64` across three carriers -- `Token::DecimalLit(i64, i32)`, `NumLit::Decimal(i64, i32)`, and `NumericLitVal::Decimal { coeff: i64 }` -- and the lexer refuses a wider coefficient outright | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1876 |
@@ -778,6 +779,7 @@ is itself not yet `merged`/`closed`:
 - `F4` blocked by `A3` (status: draft)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: active)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `LANG-STANDARD-INFIX-CALL-COMPLETION` (status: ready)
+- `LANG-STANDARD-OP-GENERIC-CARRIER` blocked by `LANG-STANDARD-INFIX-CALL-COMPLETION` (status: ready)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
