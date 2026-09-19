@@ -63,25 +63,42 @@ identity. Do not read it as a second confirmation.
 - The repair lands and `right-denial` still fails — that is a finding that the
   mechanism statement is incomplete, and it **outranks** finishing the node.
 
-## 4a. One check is owed at the top of this node, and it is cheap
+## 4a. The mapping check — RUN AND PASSED before this node started
 
-The Architect's operation-to-ordinal mapping rests on one link **they named
+**Nothing is owed here. This section records a discharged check rather than
+asking for one, and it is kept precisely because it passed.**
+
+The Architect's operation-to-ordinal mapping rested on one link **they named
 rather than glossed**: that `declare_inductive` allocates constructor ids
-sequentially in declaration order. They did not read the allocator.
+sequentially in declaration order. They did not read the allocator, and said so.
 
-**The check, on a buffer already dumped** — count the `FSOp`-parented entries in
-the same `names` buffer. Expect **21**: ten carrying real spellings
-(`…::FSOp::ReadFile` and the rest) and eleven carrying `ctor_NNN`, with the
-eleven ids strictly above every named one. If that is what the buffer says, the
-window's position is fixed by the artifact rather than by a read of the prelude.
+**The check, run by runtime-implementer at
+`29e6b21e1f8c5b80557428693a66eb61c19ea4c4`** — count the `FSOp`-parented entries
+in the `names` buffer already dumped. Predicted 21: ten carrying real spellings
+and eleven carrying `ctor_NNN`, the eleven strictly above every named one.
+Measured:
 
-**If it says anything else, STOP and report it** — the mapping is then wrong,
-and `ctor_543 = PrivateResourceRelease` with it. This is a re-read, not a probe:
-no new fixture, no accessor, nothing that can trip a hard stop.
+    FSOp total = 21    named = 10    unnamed = 11
 
-**The ruling does not depend on this.** `§1`'s two sentences are normative and
-stand whatever the buffer says. What the check protects is the *row-level*
-reading in `§1` of the node file — which row departs.
+    named     AppendFile ChangeMode CreateDirectory Metadata ReadDirectory
+              ReadFile RemoveDirectory RemoveFile Rename WriteFile
+    unnamed   ctor_541 .. ctor_551, contiguous
+
+**Exactly the predicted partition**, and the named ten are exactly the public FS
+operations. ⇒ The window's position is fixed **by the artifact**, not by a read
+of the prelude, and `ctor_543 = PrivateResourceRelease` stands on a measurement.
+
+**Why this section survives having passed.** A discharged check deleted from a
+frame leaves the mapping looking *assumed* to every later reader, and the next
+seat cannot tell the difference between a thing that was verified and a thing
+nobody thought to question. **Keep passed checks; mark them passed.** The
+prediction is recorded alongside the measurement so the agreement is legible as
+an agreement rather than as a lone number.
+
+**The ruling never depended on this.** `§1`'s two sentences are normative and
+would stand whatever the buffer said. What the check protected is the
+*row-level* reading in `§1` of the node file — **which row departs** — and that
+reading is now measured: `right-denial`.
 
 ## 5. Symptom inventory — ARMED AT FILING
 
