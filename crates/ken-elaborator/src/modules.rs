@@ -486,7 +486,7 @@ fn certify_standard_operator_home(
     module: &str,
     at: Option<&Span>,
 ) -> Result<(), ElabError> {
-    if module != crate::standard_operators::STANDARD_OPERATOR_HOME {
+    if !crate::standard_operators::is_standard_operator_home(module) {
         return Ok(());
     }
     // An inline `module M { … }` knows its own span; a loaded source unit is
@@ -2676,7 +2676,7 @@ fn expand_scope(
                 // span from `decl` only on the path that consumes it. `decls`
                 // outlives the call, so the span never has to cross it.
                 let is_standard_operator_home =
-                    child_prefix == crate::standard_operators::STANDARD_OPERATOR_HOME;
+                    crate::standard_operators::is_standard_operator_home(&child_prefix);
                 elab.module_state
                     .exports
                     .insert(child_prefix, child_exports);
