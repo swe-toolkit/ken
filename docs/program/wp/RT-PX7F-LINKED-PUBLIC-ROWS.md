@@ -354,3 +354,51 @@ Mapping `StaticOriginId(190)` and `(198)` to their source terms. Until that
 lands, the `withResource`-plus-`bind` hypothesis is untested and **no label
 can be written** — the branch is undetermined and `D1` has not established
 whether a live successor exists.
+
+## `D1` LOCALIZED — the failing `K` is the INNER effect's, and outcome (1) inverts
+
+Measured, by printing the emission's own effect term at the firing site rather
+than inferring the site from program shape:
+
+    row              origin               effect at that origin
+    right-denial     StaticOriginId(198)  FsHandleMetadata, args [Var(0)]
+                                          -- `resourceMetadata` inside metadata_body
+    double-release   StaticOriginId(190)  ResourceRelease,  args [Var(1)]
+                                          -- the release inside the bracket
+
+**Both are INNER effects. Neither is main's continuation**, which is what the
+falsified localization claimed and what `RET_ONLY_OUTER` already refuted.
+
+### This inverts the earlier "the row is correct to refuse"
+
+For `right-denial` the inner effect's syntactic continuation is
+`metadata_after`, which returns **`Ret` in both arms**. So the planner's
+expectation of `Ret` **agrees with the source**, and it is the **carried
+value** that is wrong — the opposite of the reading recorded under `D0`, which
+said the carried `Vis` was real and the refusal correct. **That reading is
+withdrawn.**
+
+### The hypothesis that now fits all three programs, labelled as one
+
+`bind (Vis op k') k` is `Vis op (\x. bind (k' x) k)`. So the `K` invoked at
+runtime after the inner effect is the **composed** continuation, not the
+immediate one. In all three programs the composition reaches the bracket's own
+release — an effect — so the composed `K` is a `Vis` even where the immediate
+continuation is a `Ret`.
+
+⇒ **Candidate mechanism: the planner derives `k_ret_identity` from the
+IMMEDIATE syntactic continuation while the runtime `K` returns the COMPOSED
+one.** That would make the check compare two different continuations, and it
+explains why `RET_ONLY_OUTER` did not escape it — flattening the *outer*
+continuation leaves the bracket release in the composition untouched.
+
+**This is a hypothesis, not a measurement.** It is consistent with all three
+observations and with the two refuted localizations, and nothing here tests it
+directly. It is falsifiable: a program whose inner effect's composed
+continuation reaches no further effect should not exhibit the mismatch — which
+is **not** what `RET_ONLY_OUTER` was, since the bracket release sits below the
+axis that fixture varied.
+
+**Still no label.** `AC-2`'s second branch needs a mechanism statement, and
+what is above is a candidate. Whether a live successor exists is still
+unestablished.
