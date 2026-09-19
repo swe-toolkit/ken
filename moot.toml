@@ -223,7 +223,8 @@ display_name = "research"
 # window because this seat reads the permissive references under local/refs/ and
 # synthesizes long cited reports.
 # Claude Code harness = NO harness key, uses `effort`, NO env.
-model = "opus[1m]"
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
 effort = "high"
 startup_prompt = "You are Ken's Research agent (ad hoc external-knowledge dispatch; research is not a standing team — see the Steward playbook §5). Read agent/COORDINATION.md (federation law) and MODELS.md first. Set your status and await the Steward's research dispatch, then gather sources and synthesize a cited report back to the Steward. Do not poll."
 
@@ -327,11 +328,8 @@ startup_prompt = "You are the Verify team QA. Read agent/COORDINATION.md (federa
 
 [agents.language-leader]
 display_name = "Language leader"
-# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
-# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
-# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
-# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
-# `model_reasoning_effort` key (that is the codex harness).
+# 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
+# credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
 model = "openai-codex/gpt-5.6-terra"
 harness = "pi"
 effort = "medium"
@@ -406,11 +404,8 @@ display_name = "Language implementer"
 # seat, reseat back to Anthropic (standing operator authority). Current work
 # (item-8 LANG-TRUNC D1 grammar) is not that subject. RESEAT TIMING: this seat is
 # ACTIVE, so it relaunches at its next seam (candidate or hard-stop), not now.
-# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
-# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
-# and L2 at the next convenient seam." Anthropic Opus 5 1M (T1) -> pi + openai-codex/gpt-5.6-sol,
-# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
-# `model_reasoning_effort` key (that is the codex harness).
+# 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
+# credits reset. "opus[1m]" -> pi, TIER-PRESERVING.
 model = "openai-codex/gpt-5.6-sol"
 harness = "pi"
 effort = "high"
@@ -419,11 +414,8 @@ startup_prompt = "You are the Language team implementer. Read agent/COORDINATION
 
 [agents.language-qa]
 display_name = "Language QA"
-# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
-# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
-# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
-# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
-# `model_reasoning_effort` key (that is the codex harness).
+# 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
+# credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
 model = "openai-codex/gpt-5.6-terra"
 harness = "pi"
 effort = "medium"
@@ -446,11 +438,8 @@ display_name = "Runtime leader"
 # priority L1 lane on the HS18 upstream repair. pi/OpenAI gpt-5.6-terra (T2) ->
 # Claude Code Anthropic Sonnet 5 (T2 — MODELS.md-sanctioned for this ring's
 # leader). Claude Code seat: NO harness key, uses `effort`, NO env.
-# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
-# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
-# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
-# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
-# `model_reasoning_effort` key (that is the codex harness).
+# 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
+# credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
 model = "openai-codex/gpt-5.6-terra"
 harness = "pi"
 effort = "medium"
@@ -514,11 +503,8 @@ display_name = "Runtime implementer"
 # Opus 5, so the Architect's independent soundness vote is same-model review with
 # correlated blind spots. Surfaced to the operator 2026-09-14. To restore
 # independence, move the Architect (not this seat) to a different model.
-# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
-# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
-# and L2 at the next convenient seam." Anthropic Opus 5 1M (T1) -> pi + openai-codex/gpt-5.6-sol,
-# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
-# `model_reasoning_effort` key (that is the codex harness).
+# 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
+# credits reset. "opus[1m]" -> pi, TIER-PRESERVING.
 model = "openai-codex/gpt-5.6-sol"
 harness = "pi"
 effort = "high"
@@ -537,11 +523,8 @@ display_name = "Runtime QA"
 # limit (~7000 min to reset). pi/OpenAI gpt-5.6-terra (T2) -> Claude Code Anthropic
 # Sonnet 5 (T2 — MODELS.md-sanctioned for this ring's QA). Claude Code seat: NO
 # harness key, uses `effort`, NO env.
-# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
-# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
-# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
-# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
-# `model_reasoning_effort` key (that is the codex harness).
+# 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
+# credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
 model = "openai-codex/gpt-5.6-terra"
 harness = "pi"
 effort = "medium"
@@ -620,4 +603,4 @@ display_name = "lieutenant"
 # Code seat: NO harness key, uses `effort`, NO env.
 model = "claude-sonnet-5"
 effort = "medium"
-startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law, especially the merge split at §14b) and agent/MODELS.md first. Then read your playbook at agent/playbooks/federation/lieutenant.md and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument; M1-M3a are the Steward's routing, M4-M9 are yours -- M4 is the token mint). Set your status via update_status and await the Steward's ROUTED authorization. Do not poll."
+startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law, especially the merge split at §14b) and agent/MODELS.md first. Then read your playbook at agent/playbooks/federation/lieutenant.md and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument; M1-M4 are the Steward's routing, M5-M9 are yours). Set your status via update_status and await the Steward's ROUTED authorization. Do not poll."

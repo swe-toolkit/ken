@@ -835,12 +835,11 @@ model- and operator-agnostic, and validated across at least three runs or two
 teams. An explicit operator correction may promote on one observation.
 
 **The Steward does not author or edit workflow files.** It may report a workflow
-defect and its product impact to the operator, but it does not patch
-`agent/**`, workflow or publisher scripts, startup prompts, `moot.toml`, or CI
-workflow files; it does not open a workflow WP; and it does not run a promotion
-cadence. The operator assigns any accepted change to another seat. The sole
-exception is the short current-state roster
-`agent/playbooks/federation/steward/lanes.md`.
+defect and its product impact to the operator, but it does not patch `agent/**`,
+workflow or publisher scripts, startup prompts, or CI workflow files; it does
+not open a workflow WP; and it does not run a promotion cadence. The operator
+assigns any accepted change to another seat. The sole exception is the short
+current-state roster `agent/playbooks/federation/steward/lanes.md`.
 
 A designated non-Steward author applies `skill-style`, edits the operative rule,
 deletes the retired source text, and lets git preserve history. Any change that
