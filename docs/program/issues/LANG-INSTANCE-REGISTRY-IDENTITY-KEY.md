@@ -79,14 +79,46 @@ not measured**, and a reader must not promote this paragraph to the finding.
 
 # D0 DOES NOT GATE A1. DO NOT RECORD A1 AS BLOCKED ON IT.
 
-**A1's bounded scan is sound under BOTH answers** (Architect,
-`evt_4mfatt232egep`):
+**The conclusion stands. The ARGUMENT for it was withdrawn and replaced**
+(Architect, `evt_zfwss6hz79ct`, amending `evt_4mfatt232egep`).
 
-    names collide    two entries resolve to the carrier's id -> REFUSE
-    names unique     exactly one resolves -> proceed
+    WITHDRAWN   "the scan consults only globals.get(name), never the reverse,
+                so it has no injectivity premise to be wrong about."
+                FALSE. The scan assumes globals[head_name] TODAY is the
+                binding head_name had at REGISTRATION time -- a mutable-state
+                premise, cited rather than tested.
+    STANDS      A1 confirms the carrier's identity IN CORE after the kernel
+                infer, so NEITHER answer to D0 can reach it.
 
-It consults only `globals.get(name)` and never the reverse, **so it has no
-injectivity premise to be wrong about.**
+> ### THE REFRAMED D0 BROKE THE ARCHITECT'S OWN MECHANISM, NOT JUST THIS NODE.
+>
+> Under the **two IDS -> one NAME** direction the original scan is unsound:
+>
+>     entry registered as ("Ord","Foo") when Foo meant T1
+>     globals["Foo"] now resolves to T2  (a later Foo shadowed it)
+>     scan with head_id = id(T1)  ->  no match  ->  NoInstance, fails closed
+>     scan with head_id = id(T2)  ->  MATCHES   ->  hands T1's DICTIONARY
+>                                                   to a T2 carrier
+>
+> **Silent, wrong, and the two-match ambiguity arm never fires because there is
+> only ONE match.** The detector is blind to the case by construction.
+>
+> **The amended mechanism, which is what gets built:** scan finds the
+> candidate; require the class to be carrier-parameterised (`projection
+> .head_param.is_some()`), else refuse; then after `kernel_infer_raw`, require
+> the head `GlobalId` of the class type's argument to equal the carrier's head
+> `GlobalId`, else refuse naming both identities. **One comparison on a term
+> the resolver already computes.** It demotes the NAME from a decision to a
+> hint, and a wrong hint fails closed at a core-level check.
+
+**Why the two directions are not symmetric — state it this way, it is
+load-bearing beyond this node.** `cx.globals` is keyed BY NAME and holds at
+most one id per name. So:
+
+    two NAMES -> one ID    an AMBIGUITY. Detectable: both candidates are
+                           still present to be counted.
+    two IDS -> one NAME    a SUBSTITUTION. NOT detectable, because the map
+                           has already forgotten the other one.
 
 **And if D0 returns INJECTIVE, the Architect's rejection of the synthesised
 `RType` still stands — on its second reason, not its first.** Recovering a
