@@ -62,9 +62,9 @@ ring starts without an operator lane change.
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-KRET-GRAFTED-SPINE` | Repair determined by the grounded zero-match fact | Replacement seat live and working the fail-closed site-1 guard. Grounded next fact is a terminal zero-match at exact origin 503, not the prior `-1`. Hard stop 5; leader owns the next direction. |
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-KRET-GRAFTED-SPINE` | Repair determined by the origin-503 variant probe | Hard stop 6 ruled `evt_1nhhdt2jhfjdk`: the zero-match is a variant-domain mismatch, not a missing row, and the closure is narrowing `base_owner`'s type. Ring is running the one-variant probe, no repair. Scope for the narrowing ruled `evt_57z4tvfwgs0gs`. Next §1a/§1b trigger at 9. |
 | L2 | language | Deliver `LANG-ACTIVE-PREMISE-KERNEL-VIEW` under the 2026-09-12 Route-B ruling | `LANG-REWRITE-DESCENT-FRAME-TAX` | `LANG-ACTIVE-PREMISE-KERNEL-VIEW` | Complete the already-requested AC-4 targeted rerun, then finish exact-SHA review and route. |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-COLLECTIONS-NTH-LAWS` | `CAT-NAT-ORDER-LAWS` D2 | No blocker. D1 landed `47b811be4`; NTH-LAWS kicked `evt_r7nn7bgyksqz`, leader confirmed working. D2 is framed in its node and releasable; `CAT-PARSING-CURSOR-LAWS` waits on NTH-LAWS. |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-NAT-ORDER-LAWS` D2 | `CAT-PARSING-CURSOR-LAWS` | NTH-LAWS `2bd127cf7` routed `evt_751k6k3ar2jnr`, publishing. D2 kicked, anchor `evt_2fgt1eb7hd8sq`; ring hard-stopped on a vacuous `AC-D2-1` mutation arm and this commit amends it. `CAT-PARSING-CURSOR-LAWS` is framed and goes ready once both land. |
 
 ## Update rule
 
