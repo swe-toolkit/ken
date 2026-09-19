@@ -1,7 +1,7 @@
 ---
 id: LANG-MEMBERSHIP-OPERATOR-SURFACE
 title: "the membership BUILD (re-cut 2026-09-13): define the Membership class and its three provider views (list; one ordered-key view serving Map and Set; relation-edge) in catalog and wire glyph-only ∈ elaboration to member-dispatch through A1's shared use-site resolver; ∈ is glyph-only so there is no let ... in ASCII collision and no standard in alias; HELD on SPEC-MEMBERSHIP-CLASS-CONTRACT + LANG-RESERVED-INFIX-NAMES + LANG-STANDARD-INFIX-CALL-COMPLETION, then the Steward frames full ACs and releases to the language ring"
-status: draft
+status: ready
 owner: language
 size: L
 gate: none
@@ -12,19 +12,31 @@ tier: T1
 origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. RE-CUT AGAIN 2026-09-13 (Steward) on the operator directive (Pat, this session): the deferred split-(B) trigger has fired -- the typeclass-method-dispatch capability is now being cut for real demand (A1's factored resolver LANG-STANDARD-INFIX-CALL-COMPLETION + the SPEC-MEMBERSHIP-CLASS-CONTRACT contract), so this node is re-cut as the membership BUILD against them. Stays draft, HELD until its three deps land; then the Steward frames the full ACs and releases. See the 2026-09-13 banner."
 ---
 
-> # FRAMED 2026-09-17. Frame: `docs/program/wp/LANG-MEMBERSHIP-OPERATOR-SURFACE.md`.
-> # STILL `draft`, AND HELD ON EXACTLY ONE THING.
+> # RELEASED 2026-09-19. ALL FOUR DEPENDENCIES LANDED; `§5a` IS PINNED.
+> # Frame: `docs/program/wp/LANG-MEMBERSHIP-OPERATOR-SURFACE.md`.
 >
-> **Three of the four dependencies are landed, verified in the TREE at
-> `origin/main` `4bc5f0eee` rather than read off a status field:** `58b` is
-> present with `membership_member_at` (its node's `active` is unflipped M7, not
-> unlanded work), `Token::Member` is in `lexer.rs` and `parser.rs`, and
-> `LANG-TYPE-PROJECTION-SURFACE-FORM` merged at `294cb5e28`.
+> **The hold was [[LANG-STANDARD-INFIX-CALL-COMPLETION]] (A1). It landed at
+> `origin/main` `e2e40e2b404d9775b3cd1fee049b3ecaab481bba`**, verified in the
+> tree on the `modules.rs` blob rather than read off a status field.
 >
-> **The hold is [[LANG-STANDARD-INFIX-CALL-COMPLETION]] (A1), which is being
-> built right now.** The frame's `§3` is entirely landed-spec and is final;
-> `§5a` lists the four items that are deliberately left unpinned because they
-> are A1's landed shape, and the Steward pins them at release.
+> **`§5a`'s four items are now pinned against A1's landed shape** — facade home
+> `Core.Operators.Standard`, the `StandardOperatorRole` vocabulary, the
+> `BINDING_BACKED` required-roles list with `expected_shape`/`shape_matches`,
+> and `certify_roles` as the entry point. Read them there; they were measured
+> out of the tree at that SHA, not off A1's approval posts.
+>
+> **Two things `§5a` settles that change what this node owes.** `D0-1`'s verify
+> condition is enforced by `#![deny(private_interfaces)]`, so it is a compile
+> error rather than an audit — the obligation is to not weaken it. And `D0-2` is
+> largely answered in A1's landed code: `expected_shape`'s doc states the
+> membership shape extends **without widening**, leaving this node the narrower
+> measurement of whether `d.Query` is representable where the check runs.
+>
+> **The other three dependencies were verified landed at `4bc5f0eee`:** `58b`
+> with `membership_member_at`, `Token::Member` in `lexer.rs` and `parser.rs`,
+> and `LANG-TYPE-PROJECTION-SURFACE-FORM` at `294cb5e28`.
+> `SPEC-MEMBERSHIP-CLASS-CONTRACT`'s `active` was an unflipped M7 and is
+> corrected in this same commit, not a residual.
 >
 > **THE FRAME'S TWO INTERFACE QUESTIONS ARE ANSWERED, 2026-09-17, and they are
 > answers rather than open D0s.** Raised to the language ring while A1 was still
