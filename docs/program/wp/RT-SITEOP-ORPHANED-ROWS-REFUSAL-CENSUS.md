@@ -344,11 +344,21 @@ increment. What is delivered is its boundary.
     CLOSED  the elaborator: eight non-test process_input_constructor sites,
             all field plumbing or admission-time resolution
             (program_admission's get("MkProcessInput")). None builds a Match.
-    OPEN    the entry-wrapping route. UNEXAMINED.
+    CLOSED  the entry-wrapping route in lowering/core.rs -- EXAMINED in
+            increment 1a. All ten sites are the SAME value THREADED, not
+            consumed: `staged_process_input: Option<&RuntimeValue>` in four
+            signature positions and the matching forwarding arguments, ending
+            in compile_expr_into_module_with_root_projection, which forwards
+            it onward again. No Match, no destructure, no unwrap of the
+            Option anywhere in the file. core.rs carries the staged value; it
+            does not validate it.
+    OPEN    the forward target of that last call, plus artifact/api.rs,
+            artifact/mod.rs and platform_runtime_support.rs. The consumer of
+            the Option is downstream of core.rs and has not been located.
 
-**The open route is handed over as the predicate that generated it, not as a
-list**, so the next reader can re-run the enumeration and learn whether it is
-still the same size:
+**The remaining routes are handed over as the predicate that generated them,
+not as a list**, so the next reader can re-run the enumeration and learn
+whether it is still the same size:
 
     git grep -ln 'staged_process_input\|STARTER_ENTRY_SYMBOL' \
       -- 'crates/*/src/*' | grep -v test
