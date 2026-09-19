@@ -47,7 +47,65 @@ opposite direction: test uses span `cat1_constructor_classes`,
 > a dead path is a tidiness item, a live second selector is a soundness-adjacent
 > one.
 
-# D0, and it gates both this node's SIZE and its CLAIM
+# D0 IS ANSWERED: IT READS. The node is the smaller branch.
+
+**Architect, `evt_14epkeqjam4q2`, classified off the producer at `0b2f327e9`.
+The chain is short and single-caller at every hop:**
+
+    elab.rs:10083  projected_instance_id -> Option<GlobalId>   ONE caller
+    elab.rs:10126    inside projected_field_row_type (:10113)   ONE caller
+    elab.rs:10262      infer_expr_row_type's RProj arm
+
+**What the `GlobalId` is used for, in full:** recover the class name, the
+`ClassInfo`, a field index, and then `field_effect_rows[idx]` (falling back to
+`field_purities[idx]`) — returning a `crate::effects::RowType`.
+
+⇒ **The id never becomes a `Term`, is never applied, and never enters the
+elaborated term.** It is a lookup key for a field's EFFECT ROW.
+
+    TWO live production CALLERS. ZERO live production SELECTIONS.
+
+**So this node is the READS branch: stale-and-false doc comments plus a
+visibility question. Size `S` stands and is no longer provisional.**
+
+# THE DOC COMMENTS ARE FALSE, NOT MERELY UNQUALIFIED
+
+**An earlier revision of this node said they "assert it without
+qualification."** That undersold it, and `D0`'s answer is what makes them false.
+
+**Steward re-measured independently at `a710759f4`:** `instance_search` has
+exactly THREE code occurrences in all of `crates/**/src` — the definition at
+`classes.rs:331` and the two calls at `elab.rs:10090`/`:10101`. Every other hit
+is a comment. **`elaborate_rdecl_v1` does not call it** (measured: zero
+occurrences in its body). The `where`-clause path goes through
+`resolve_instance_dictionary` at `elab.rs:9634`.
+
+    resolve.rs:165    "checked against `instance_search` in
+                       `elaborate_rdecl_v1`"                      FALSE
+    prelude.rs:21/:23 the `where DecEq K` path resolves "via the
+                       Lc-landed `instance_search`"               FALSE
+    prelude.rs:21     cites `classes.rs:91`; it is at `:331`      STALE
+
+⇒ **They name the wrong mechanism for a path that has a different one**, so a
+reader chasing the `where` path is sent to a function it does not call. That is
+a bigger doc defect than a missing qualifier, and it is the node's main content.
+
+# TWO FURTHER FINDINGS IN `projected_instance_id`, from the Architect
+
+Both surfaced while classifying `D0` and both belong to this node:
+
+1. **It keys on `rtype_head_name(&constraint.head_type)` — a carrier
+   SPELLING**, the same predicate A1 just closed on the completion path. The
+   consequence here is a wrong EFFECT ROW rather than a wrong dictionary, **so
+   the blast radius is smaller and the defect is the same one in smaller
+   clothes.**
+2. **Its first arm matches `name == "d"`** — a hardcoded one-letter binder
+   spelling — firing whenever the decl has exactly one local constraint and the
+   projected base is a constant named literally `d`. **A global constant named
+   `d` in such a decl is attributed the constraint's instance row.**
+   Misattribution keyed on a name the user chose.
+
+# The original D0, kept for the record
 
     Classify elab.rs:10090 and :10101 at a NAMED SHA.
 

@@ -155,6 +155,38 @@ ruling. Sound for A1's scope. **It is explicitly not a fix**, and this node must
 not be closed by pointing at it — a local refusal at one call site does not
 re-key a registry that four other paths read.
 
+# ROUTED HERE 2026-09-19: the `RVarTy` spelling row. ONE HOME, THIS ONE.
+
+**The Architect surfaced this while grounding AC-6 and offered it to either this
+node or the generic-carrier split node, asking for one home (`evt_14epkeqjam4q2`).
+Steward ruling: it lives HERE, and is dropped from the other.** Carrier keying
+is this node's subject; over there it would be one row among several about a
+different question.
+
+    rtype_head_name's  RVarTy(_, name, _) => name.clone()
+
+⇒ **`where Ord a` over an abstract `a` keys the registry on THE TYPE
+PARAMETER'S SPELLING, not on "abstract".** An exact spelling collision between
+a type parameter and a registered instance head **resolves the abstract carrier
+to that concrete instance, and the dictionary reaches the elaborated term.** Low
+likelihood, silent when it fires.
+
+> ### WHY THIS IS THE STRONGEST EXHIBIT THIS NODE HAS, AND WHY IT IS STILL NOT D0.
+>
+> **It is on the path that PRODUCES dictionaries**, which is what separates it
+> from the sibling finding in `[[LANG-INSTANCE-SEARCH-SECOND-PATH]]`, where the
+> same spelling predicate costs only a wrong effect row. Here the wrong
+> dictionary is elaborated.
+>
+> **But it is not `D0` and must not be recorded as discharging it.** `D0` asks
+> for a `GlobalId` whose reconstructed name is absent or unfaithful — a defect
+> at the RECONSTRUCTION end. This is a collision at the KEY-CONSTRUCTION end: a
+> name that selects an instance it should not. **Same family, opposite end of
+> the same map, and the node's title is about the key.** It raises this node's
+> grounding from "no guarantee was written down" to "here is a mechanism by
+> which a wrong dictionary reaches a term" — which is most of what `D0` was
+> asked to establish, without being the exhibit `D0` names.
+
 # Blast radius, from the Architect
 
     coherence           module re-export
