@@ -82,10 +82,119 @@ identity. Do not read it as a second confirmation.
   one and not the other leaves the row red with no correction upstream able to
   move it. **This is `D0` finished, not `D0` widened** — the expectation was
   written in two places by an author who had one answer for both.
+> **`M1` AND `M2` ARE DISCHARGED** (runtime-implementer `evt_13acrd0jy9r7f`,
+> ruled at `evt_5s3q6v3a53v7r`, 2026-09-19). They were the two measurements the
+> Architect ordered — not repairs, and **not a fourth hard stop.** What remains
+> is `M3`, then `D1`.
+
+- **`M1` — THE RECORDED-OUTCOME COUNT. DISCHARGED: THE COUNT IS 1.** For
+  `ResourceTraceIdentityV1(1)` exactly one settlement outcome is recorded. The
+  native trace carries two `ResourceRelease` dispatch events, but only the first
+  carries `Success(ResourceSettlement(... outcome: Released))`; the second is
+  `Error(Resource(Closed))` with no resource binding and no settlement
+  observation. ⇒ **`spec/60-security/62-authority.md:325` is SATISFIED.**
+
+  > **THE TWO-WAY DISJUNCTION THIS DELIVERABLE ORIGINALLY CARRIED WAS
+  > INCOMPLETE, AND THE ARCHITECT SAID SO OF THEIR OWN TEXT.** As written it
+  > read: *"recorded outcomes == 1 ⇒ the duplicate dispatch is CONFORMING, a
+  > cost-and-clarity finding."* **That keyed "defect" to the settlement clause
+  > when the envelope clause is the one that binds here.** Verbatim from
+  > `spec/40-runtime/42-evaluation.md`: `§6.8` judges a native backend by
+  > *"requiring the same envelope and observations"*, and `§6.4`'s
+  > retained-constraint table requires *"One structural event per `Vis` in
+  > sequence"*, whose stated failure mode is *"Dropping or reordering an
+  > interaction makes the recorded run false."* **Native envelope: 4 events.
+  > Interpreter envelope: 3.** `§5`: the interpreter is right by definition.
+  >
+  > ⇒ **THE DUPLICATE DISPATCH IS A CONFORMANCE DEFECT AGAINST `§6.4` AND
+  > `§6.8`.** It is not a settlement violation, and it is **not** a
+  > cost-and-clarity finding.
+  >
+  > Recorded rather than deleted: a disjunction that was wrong is exactly what a
+  > later reader re-derives if only the corrected conclusion survives. **One
+  > satisfied clause is not conformance** — ask which other clauses the same
+  > observation answers to before reading a pass as a disposition.
+
+- **`M2` — THE ORACLE DIFFERENTIAL. DISCHARGED: THE INTERPRETER RETURNS 0.**
+  The oracle is reachable. The same `RIGHT_NOT_HELD` source and seeded
+  `held.bin`, through `ken_cli::run_program_effect_observation`, produced
+  `terminal_error: None`, `terminal_exit: NormalReturn`, `exit_status: 0`, and
+  exactly three events: `FsOpen` success, `FsHandleMetadata` with the exact
+  `RightNotHeld { required: 32, held: 1 }`, and one successful `ResourceRelease`
+  settlement for identity 1. The native run at the same checkpoint returns 82
+  and carries a fourth event, `ResourceRelease -> Closed`. ⇒ Per `42 §5` the
+  fixture's first assertion is **correct** and the blocker is a native defect.
+
+- **`M3` — THE PRODUCER OF THE SECOND `ResourceRelease` DISPATCH.** Find what
+  emits it and **what it is keyed on**. Report and stop; **no repair on that
+  read.** This is also the read that decides the (A) filing trigger — `§7`,
+  which carries the source facts to aim it with.
+
+  **`release_if_live` IS `M3`'s SUBJECT, AND IT IS NOT CASE-SPECIFIC.**
+  `crates/ken-elaborator/src/prelude.rs:2488-2501` — its body is **exactly one
+  `Vis`** carrying `PrivateResourceRelease`, with a `Ret` continuation — and
+  `:2518` `private_with_resource_after_open` calls it **exactly once**, in the
+  `bind` continuation over `body resource`. ⇒ **It is the release that every
+  `withResource` bracket runs, `right-denial`'s included.** It is not
+  background and it is not a `DOUBLE_RELEASE` helper.
+
+  **DO NOT SCOPE THE READ TO `release_if_live`'s BODY.** A second, near-identical
+  emitter exists that this path does not call — `proc release` at `:2366`, whose
+  `Vis` at `:2371` carries the same `PrivateResourceRelease a FsHandle resource`
+  head and differs only in its continuation. **`M3` must check whether the
+  native path reaches `prelude.rs:2371`**; looking only inside `release_if_live`
+  would miss it.
 - **`D1`** — the two rows above un-ignored and green, or a grounded statement of
   what still stops each one.
 
+## 2a. The causal chain — SETTLED. DO NOT REPAIR THE CLASSIFICATION PATH.
+
+Architect `evt_5s3q6v3a53v7r`, read verbatim from
+`crates/ken-cli/tests/px7f_resource_native.rs` (`const RIGHT_NOT_HELD` begins at
+`:92`). Two sites decide the whole row: `bracket_has_right_denial` (`:133-139`)
+and `after_right_outer` (`:141-149`).
+
+    interpreter  one release, settles Released
+                 => ResourceBracketBodyError (RightNotHeld 32 1)
+                 => :136 right_masks True => :147 Success => 0
+
+    native       the second release returns Closed, so the bracket carries a
+                 release error AS WELL AS the body error
+                 => ResourceBracketBodyAndReleaseError
+                 => :138, a hardcoded False => :148 Failure 82 => 82
+
+**82 IS THE FIXTURE'S OWN LITERAL AT `:148`.** There is no exit-status mapping
+defect on this row ⇒ **the deferred exit-mapping filing call stays deferred, and
+this row hands it no owner.**
+
+**`bracket_has_right_denial` IS CORRECT** — it classified a different bracket,
+faithfully. **Do not repair it, and do not repair anything on the classification
+path.** *"The native path computes a different bracket classification"* is true
+only in the sense that it was handed a different bracket to classify; nothing
+computes a wrong classification.
+
+**ONE UNREAD LINK, AND IT IS A ZERO-COST CHECK — RUN IT BEFORE ACTING ON THIS
+CHAIN.** That the native bracket is `ResourceBracketBodyAndReleaseError` and not
+`ResourceBracketReleaseError`. Both map to `False` at `:137`/`:138`, so **exit
+82 alone does not discriminate them**; the native trace carries both the
+`RightNotHeld` and the `Closed`, and only `BodyAndReleaseError` can hold both.
+**Name the constructor the native run actually built.** If it is neither, the
+chain above is wrong, and the Architect wants that inside one message.
+
 ## 3. Acceptance criteria
+
+> **NO AC ON THIS NODE OR ANY SUCCESSOR MAY QUANTIFY OVER THE ABSENCE OF
+> OCCURRENCE-KEYED DERIVATIONS** — not *"no occurrence-keyed derivation
+> remains"*, and not any variant of it. **Such an AC cannot be failed.** By
+> `bind_bind` at `≅` (`§7`), the only evidence against it is a witness needing a
+> source bracketing nobody wrote, so its absence from the corpus is a fact about
+> the corpus and not about the planner. An AC you cannot fail is not a gate, and
+> this one would read as coverage for exactly the property that is now known not
+> to be established. **ACs on this class are positive and per-property:**
+> *"property P is derived from the grafted object at site S"* — one property at
+> a time, each independently checkable. That is honest about what a per-site
+> repair buys: it fixes P and says nothing about Q. Architect
+> `evt_5gja8y3y23nt4`.
 
 - **`AC-1` — `right-denial` GREEN IN CI.** The discriminating witness passes.
   *(Control: the row FAILS at this node's base — run it before the repair and
@@ -100,6 +209,27 @@ identity. Do not read it as a second confirmation.
 - **`AC-3` — NO REGRESSION.** Green in CI, never a local `--workspace` run
   (`COORDINATION §12`). Local work is `scripts/ken-cargo -p ken-runtime` and
   `-p ken-cli --test px7f_resource_native`, nothing wider.
+- **`AC-4` — THE ACCEPTANCE EVIDENCE IS THE ENVELOPE, NOT THE EXIT STATUS.**
+  The native and interpreter envelopes must match: **three events, not four.**
+  State the envelope match as the evidence.
+  *Rationale, and two false passes the Architect ruled out in advance*
+  (`evt_5s3q6v3a53v7r`) — **both turn `AC-1` green while leaving the defect:**
+
+  - making the second release **settle successfully** leaves 4 events against
+    the reference's 3, and silently re-decides the bracket constructor as well;
+  - **suppressing the event** while still dispatching matches the envelope by
+    hiding a performed effect, which is the same falsehood `§6.4` names.
+
+  **The repair is to NOT DISPATCH it.**
+
+  ⇒ **`AC-1` is necessary and by itself NOT SUFFICIENT**, which is exactly what
+  those two false passes mean. The other direction also holds, and the pair is
+  only legible with both: under `§2a`'s chain **`AC-4` IMPLIES `AC-1`** — no
+  fourth event means `BodyError`, so `right_masks` is True and the exit is 0.
+  **`AC-1` nevertheless stays an independent AC precisely because that chain
+  carries an unread link** (`§2a`): if the native constructor turns out not to
+  be `BodyAndReleaseError`, `AC-4` could hold with `AC-1` still red. Keep both,
+  and that is the reason. Architect `evt_5tth40ek8zv60`.
 
 ## 4. Hard stops — report, do not work around
 
@@ -191,12 +321,25 @@ count in `§5`.
   path overwrites them. A fail-closed default and a measurement are the same
   symbol at the point of reading — the same shape as the `-1` this node already
   learned not to attribute.
-- **Do not chase a salient symptom before establishing it is anomalous.** A
-  second `ResourceRelease` returning `Closed` is the DESIGNED behaviour the
-  sibling row `linked_public_second_release_is_closed_and_the_handle_closes_once`
-  exists to test, and `release_if_live` exists for exactly that case. Chasing
-  the salient-but-normal is this node's own recurring failure: span length,
-  then continuation shape, then the arena ordinals.
+- **Do not chase a salient symptom before establishing it is anomalous — and
+  establish it ON THE FIXTURE IN FRONT OF YOU.** Chasing the salient-but-normal
+  is this node's own recurring failure: span length, then continuation shape,
+  then the arena ordinals.
+
+  **THE INSTANCE THIS BULLET ORIGINALLY NAMED HAS BEEN REFUTED, AND HOW IT
+  FAILED IS THE DISCIPLINE.** It read: *"a second `ResourceRelease` returning
+  `Closed` is the DESIGNED behaviour the sibling row
+  `linked_public_second_release_is_closed_and_the_handle_closes_once` exists to
+  test."* **That sibling row runs a DIFFERENT PROGRAM.** `right-denial` runs
+  `RIGHT_NOT_HELD` (`px7f_resource_native.rs:316`, const `:92`); the sibling
+  runs `DOUBLE_RELEASE` (`:350`, const `:165`), which releases twice on purpose.
+  `RIGHT_NOT_HELD` has no second source-level release at all — the interpreter
+  emits three events for it (`M2`, `§2`). **The bullet imported one program's
+  designed behaviour onto another program.**
+
+  ⇒ **On `right-denial` the second dispatch is the DEFECT, not the
+  distraction** (`§2`'s `M1` blockquote, `§2a`, `AC-4`). **Nothing in this
+  bullet licenses deferring or softening `M3`.**
 
 ## 5. Symptom inventory — ARMED AT FILING
 
@@ -218,10 +361,64 @@ NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
    expectation repaired the program executes and returns exit 82 where 0
    is asserted -- keyed on a fail-closed check hiding every downstream
    state from observation
+3. 82 is the program's own value: after_right_outer returns
+   host_exit (Failure 82) only when bracket_has_right_denial is FALSE,
+   while the trace carries the exact RightNotHeld -- and the native run
+   performs TWO PrivateResourceRelease dispatches where the reference
+   interpreter performs ONE (M2) -- keyed, ON THE ARCHITECT'S READING
+   AND NOT YET ON A MEASUREMENT, on a source occurrence standing for the
+   runtime object grafting actually produced. M3 is what would measure it.
 ```
 
-**Hard-stop count on this WP: 2.** **The parent node's count of 2 does NOT
-carry** — different WP, different question.
+> **ENTRY 3 STANDS; THAT WORDING NARROWS WHAT IT CLAIMS RATHER THAN
+> WITHDRAWING IT.** As first written it said *"one source-level bracket release
+> path produced TWO runtime dispatches"* — **which is exactly what `M3` is
+> assigned to find out**, and which `§7` of this same frame calls open. **The
+> two standards are deliberately different:** an inventory entry is a reading,
+> meant to be cheap and revisable; the (A) trigger in `§7` needs the keying
+> **established**, because it authorizes a structural change. Stating the
+> reading as fact collapsed them.
+
+**Hard-stop count on this WP: 3.** **The parent node's count of 2 does NOT
+carry** — different WP, different question. Both acts have now FIRED at three
+(`§1a` at `evt_7d3h7mtff5acd`, `§1b` at `evt_1mv0phbj0zcn7`); **the next `§1a`
+re-trigger is at 6**, and the Architect will scope that one to whatever new
+fork the next stop surfaces rather than re-asking this question.
+
+### The `§1b` answer, and a pre-commitment the Architect declined to discharge
+
+Entries **1 and 3** share a predicate: **a source-level occurrence is being used
+to name a runtime object, and grafting makes that correspondence not
+one-to-one.** **Entry 2 is NOT an instance** and was deliberately not forced in
+— it says a fail-closed check hid everything downstream of itself, which is a
+statement about what we could OBSERVE, not about what was WRONG. *"Forcing it in
+would give a three-for-three that reads stronger and means less."*
+
+**INVENTORY ENTRY 3 STANDS, WITH ITS EVIDENCE UPGRADED** from the Architect's
+reading to an oracle differential (`evt_5s3q6v3a53v7r`).
+
+The Architect had pre-committed: *"if `M1` returns one recorded outcome, the
+duplicate dispatch is conforming and is NOT an instance of the predicate."*
+**`M1` returned one, and they declined to draw that consequence** — stating the
+refusal out loud rather than quietly keeping the entry, because the convenient
+move was to take `M1` and shed half their own predicate.
+
+**The defect in the pre-commitment: it tied instance-hood to conformance with a
+single clause.** The predicate is a claim about the planner's KEYING, not about
+which spec clause the result happens to trip. And `M2` arrived in the same
+breath and bears on the keying directly — **the reference spine has one `Vis`
+where the native path performs two.** That is *better* evidence for entry 3 than
+existed when the amendment was written, not worse.
+
+> **A pre-commitment discharged mechanically against evidence it did not
+> contemplate is worse than no pre-commitment.** The guard is DIRECTION:
+> declining was legitimate here only because honouring it was the CONVENIENT
+> move — it would have shed half the Architect's own predicate. **Where
+> honouring a pre-commitment is the INCONVENIENT move, unanticipated evidence
+> is not a licence to drop it.**
+
+**The associativity theorem in `§7` is independent of all of this** and does not
+need entry 3 at all.
 
 **TWO ACTS FIRE AT THREE, BOTH THE ARCHITECT'S, BOTH BEFORE THEY RULE**
 (`evt_3t3ynhwbr8jv`). **They are driven by two different counters and the
@@ -261,3 +458,109 @@ the runtime-leader rather than both editing
 `RT-COMPOSED-RETURN-PRODUCER-SINK-COLOCATION` is **not** this subject — the
 Architect read its row and it is producer/sink placement at the true
 `StaticWorker` producer. Same family, different question.
+
+## 7. The (A)/(B) fork — RULED. (A) IS NOT ORDERED, AND ITS TRIGGER IS STATED.
+
+Architect ruling `evt_5gja8y3y23nt4` on research advisory `evt_3yz2ek90jrnkt`,
+2026-09-19. **The fork was decided by a theorem in the formalism the spec
+already cites, not by precedent.**
+
+**THE THEOREM, WHICH IS A STATEMENT ABOUT THE METHOD AND NOT ABOUT THE THREE
+SITES HIT SO FAR.** Spec `42 §6.4` fixes the spine by ITree grafting, and
+`bind_bind` holds at `≅` — **strong bisimulation, not up to taus**. So **two
+different source bracketings produce the SAME grafted object**, and therefore
+*"the source occurrence that textually produced this continuation"* **is not a
+function of the grafted object.** It is not a fragile key and not a key with
+exceptions: it is undefined on the domain the semantics quantifies over.
+
+    (B)  derive each property from a worker-body / closure lookup AT EACH SITE
+    (A)  represent the grafted spine explicitly in the IR, so that deriving a
+         property from a source occurrence is not expressible
+
+**(B) IS DEAD AS A CLOSURE AND ALIVE AS A REPAIR.** Per-site derivation from
+the object is correct and is exactly what `D0` did — it is what makes the
+property a function of the object again. What the theorem kills is the claim
+that finishing a list of such sites finishes the class: a failing witness needs
+a particular source bracketing, so the enumeration could never be shown closed.
+**The Architect has WITHDRAWN the enumeration half of their own `§1b` recut on
+this basis, naming it a withdrawal rather than quietly replacing it. No node is
+to be filed around it.**
+
+**(A) is the only known closure in this space** — a closure by construction
+rather than a sweep. GHC's **join points** are the precedent in shape: the IR
+represents the thing and Lint enforces the invariant, rather than each analysis
+re-deriving it. **The ruling takes the associativity argument and NOT the
+history** — the advisory flagged the (B)-to-(A) narrative as its own
+characterisation rather than something it verified, and the ruling does not
+need it.
+
+**THE TRIGGER FOR FILING (A), stated so it is not a matter of mood:** a **live
+occurrence-keyed derivation that the immediate repair does not reach.** When it
+is met, **(A) gets its own node, framed by the Architect and priced before it is
+scoped.** The Steward files it when the Architect says the condition is met,
+**and not before.**
+
+**STATUS AFTER `M1`/`M2`: NOT MET YET — AND "NOT YET" IS NOT "NO"**
+(`evt_5s3q6v3a53v7r`). There is now a **live divergence**: the reference spine
+has one `Vis` where the native path performs two. What is not yet known is that
+it arises from occurrence-keying — **an extra dispatch can equally come from a
+duplicated lowering path with nothing to do with the spine.**
+
+**`M3` IS THE ONE READ THAT DECIDES IT:** what emits the second
+`ResourceRelease` on the native path, and **on what key.**
+
+    the second dispatch is derived from something that is NOT a function of
+    the grafted object -- a source or continuation occurrence, a syntactic
+    site, any key a different bracketing would change
+        => the trigger IS met; the Architect frames and prices (A)
+
+    the second dispatch is derived from the grafted object, or from anything
+    that IS a function of it, and is simply wrong
+        => a local defect; (A) stays unordered
+
+> **THIS DISCRIMINATOR REPLACED ONE THAT COULD BE DISCHARGED BY ELIMINATION,
+> AND THE ARCHITECT BLOCKED ON THEIR OWN SENTENCE TO DO IT**
+> (`evt_3rzp5wh3bnvva`). The first table's met-arm read *"one release emitted
+> twice because two source occurrences each name it"* — **already refuted at
+> the source**, because `RIGHT_NOT_HELD` calls only `withResource` and never the
+> standalone `release`, so there is exactly one source-level occurrence on this
+> path. `M3` could not have returned that arm. **Left standing, it would have
+> answered the fork by elimination and landed on "a local defect; (A) stays
+> unordered" — the Architect's own trigger discharged in the direction that
+> relieves them of filing (A), by an arm they wrote wrong.** The second arm was
+> mis-sorted the same way: reaching `prelude.rs:2371` on a path that never calls
+> it is not a benign "second emission site", it is a keying failure of exactly
+> the kind the theorem is about.
+>
+> **Counting occurrences was the wrong axis.** The replacement is the theorem's
+> own criterion, so it is stable however many emission sites exist — and it
+> cannot be satisfied by elimination.
+
+**SOURCE FACTS TO AIM `M3` WITH — these are inputs, NOT `M3`'s answer.** What
+the native lowering emits and what it keys on is still unread.
+
+    ONE SOURCE OCCURRENCE ON THIS PATH:
+      prelude.rs:2518   private_with_resource_after_open calls
+                        release_if_live ONCE, in the bind continuation
+                        over `body resource`
+      prelude.rs:2496   release_if_live's single Vis carries
+                        PrivateResourceRelease; its continuation is a Ret
+      px7f_resource_native.rs:92-163   RIGHT_NOT_HELD calls only
+                        withResource; never the standalone release
+
+    A SECOND, NEAR-IDENTICAL EMITTER EXISTS THAT THIS PATH DOES NOT CALL:
+      prelude.rs:2366   proc release, Vis at :2371, same
+                        PrivateResourceRelease a FsHandle resource head,
+                        different continuation
+
+    M3 MUST CHECK WHETHER THE NATIVE PATH REACHES prelude.rs:2371.
+    Looking only inside release_if_live would miss it.
+
+Neither of these is a hard stop and neither is a new inventory entry — **this
+ruling increments neither counter in `§5`.** (Stated as a delta rather than as
+a value: `§5` is where the count lives, and a second copy of the number here
+would go stale the moment it changes.)
+
+Worth recording: the spec's exactly-once obligation is **already keyed on
+resource identity rather than on occurrence**, so on that axis the semantics
+has taken (A)'s shape and it is the planner that diverges from it.
