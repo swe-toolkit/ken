@@ -328,21 +328,70 @@ hand."*
   **A check that refuses nothing has been deleted rather than satisfied**, and
   a silent deletion is exactly how this cluster's labels went wrong the first
   time.
+
+  **AC-8 IS NOT DISCHARGED BY AC-11's FLAT RESULT, AND THAT IS THE HALF THAT
+  BITES (Architect, `evt_7sj5xmgcxwk5f`).** The flat partition measurement is
+  not a licence to relax the guard. **One observable measured flat is not every
+  observable measured flat** — the identical reason the implementer refused to
+  sign *"the duplication is inert in production."* Inertness is a universal
+  over the readers of `producer_call_origin`, and that set is not closed.
+  ⇒ **On the evidence as of 2026-09-19, NEITHER repair is justified: not the
+  key change, not the relaxation.** This is the node's state, not a stall.
+  What decides it in either direction is a bounded, source-decidable
+  classification — for every reader of `producer_call_origin` and
+  `response_origin`, does it **USE** the value (key, group, compare, branch) or
+  **CARRY** it (diagnostic, sort tiebreak, residual-row label)? **ALL CARRY** ⇒
+  the duplication cannot reach codegen, relaxation IS the repair, and this node
+  closes on clauses 1 and 2. **ANY USE** ⇒ that consumer's observable is the
+  exhibit, and the key change is justified on it rather than on §8.9a's
+  inference. Known starting points: `:3326-3328` (`repeated_producer`,
+  unmeasured), the sort keys at `:2069` and `:2286-2291` (obvious CARRY
+  candidates), and `:2824`/`:2851` (the measured USE that is gated out).
 - **AC-9. The crate set is DERIVED, not named.** Compute the reverse-dependency
   closure over your touched set to a fixpoint and test that set. **Never
   `--workspace`** (`COORDINATION §12`) — the workspace build and the
   conformance suite run in CI. **State your target selection beside the
   claim:** `cargo check` does not compile `#[cfg(test)]`, so a green `check` is
   **not** evidence that any test built.
-- **AC-11. CLAUSE 3 OF THE BAR — THE CONSUMER SELECTS BY THE KEY THE PRODUCER
-  INSERTED UNDER, AND AN ABSENT COPY REFUSES RATHER THAN FALLS BACK.**
-  Show that a `Vis` site whose route copy is absent **refuses**; a fallback to
-  the last-written route is the silent wrong-continuation mis-route the ruling
-  identifies as the thing the invariant is currently the only barrier against.
-  **Control — and building it is part of the AC:** revert clause 3 alone,
-  keeping the de-duplication, and **exhibit the mis-route.** If the exhibit
-  cannot be built, **that failure is itself the finding and is reported**, not
-  treated as the control passing.
+- **AC-11. DISCHARGED BY MEASUREMENT, 2026-09-19. CLAUSE 3 IS STRUCK FROM THE
+  BAR — Architect ruling `evt_7sj5xmgcxwk5f`. THE BAR FOR THIS NODE IS CLAUSES
+  1 AND 2.** Do not build the exhibit; do not re-cut the clause.
+
+  It asked that a `Vis` site whose route copy is absent **refuse** rather than
+  fall back to the last-written route, with the mis-route exhibited under a
+  clause-3-only revert. **"The wrong copy" does not denote**, in either
+  available form, across the whole censused population:
+
+      per-Vis form     the subject has no witness. No Vis both routes and has
+                       a copy of its own.
+      partition form   the subject exists, but the observable is gated out
+                       BEFORE the partition forms, and cannot move under any
+                       producer-side re-keying.
+
+  **The two dispositions are UNEQUAL and are recorded unequal.** Leveling the
+  second up to the first is the specific error this entry exists to prevent:
+
+      px7n         exhibit UNBUILDABLE, HARD. No Vis selects any route.
+                   A closed property of these programs.
+      esc 653/713  the exhibit PROPOSED for it is measured and FLAT, and the
+                   consumer enumeration behind any further attempt is OPEN.
+                   NOT "unbuildable" — that would be a universal over a set
+                   nobody has closed.
+
+  The partition result is a proof, not a pair of agreeing numbers: every input
+  to `k_identity` (`responses.rs:2164-2169`) is route-independent, transitively
+  — unit selection itself keys on the `Vis` origin (`:2101-2102`) — so no
+  producer-side re-keying can admit an entry at the `:2820` gate. Its
+  provenance control holds: `transport_sources` derives from
+  `plan.checked_ih_environment_transports` (`aggregates.rs:4456`), while
+  `routes` is a local of `host_response_routes`, so the zero is not the
+  collapse confirming itself.
+
+  **This AC's own escape clause is what carried it.** *"If the exhibit cannot
+  be built, that failure is itself the finding and is reported, not treated as
+  the control passing"* — written against the possibility that the exhibit was
+  unreachable, and that is exactly what happened. The AC worked; it is retired
+  satisfied, not deleted.
 
 > **WHY THIS AC EXISTS AND WHY IT WAS MISSING. Every producer-side control
 > passes on a repair that mis-routes.** `AC-0`-`AC-10` are census,
@@ -849,10 +898,19 @@ input is not thereby validated**, and calling it working is the sentence that
 would stop anyone looking at it again — which is the same reading error, one
 level up, that this whole node has spent the day on.
 
-The inverted clause is the Architect's finding, not mine, and it is **live on
-`main`** at this frame's `:181` after a race between their review and the
-Steward's commit. Its repair is the Steward's follow-up, not this candidate's:
-nothing here edits section 4.
+The inverted clause is the Architect's finding, not mine. **REPAIRED — it is
+no longer live. Verified on `origin/main` 2026-09-19: `D1'` is STRUCK at
+`:239`, with the inverted gate recorded as a defect distinct from its being
+spent at `:244`.** Nothing is owed here.
+
+**This paragraph previously read "live on `main` ... its repair is the
+Steward's follow-up", and stayed that way after the repair landed.** A
+resident claim that something is broken and owed does not retire itself when
+the thing is fixed — it keeps re-surfacing as an open item, and it did: the
+Steward's own watchdog re-raised this as owed work on 2026-09-19 and a line
+number from a superseded revision (`:181`) was the only coordinate it offered.
+**The blob at `origin/main` settles it; a claim about `main` in a frame is a
+measurement with a timestamp, not a standing fact.**
 
 **`D4` — VACUOUS, and said so rather than skipped.** It asks for a registry
 row in `.github/ignored-test-exemptions.toml` **for any row readmitted with an
