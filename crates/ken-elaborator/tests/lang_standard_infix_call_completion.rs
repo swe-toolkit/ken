@@ -36,6 +36,67 @@
 //! direction. It is written down because it is real, because it is invisible
 //! from any single walker, and because the next reader of AC-8 will not be
 //! reading the thread it was found in.
+//!
+//! AC-3 -- ONE RESOLVER WITH TWO ADAPTERS, NOT TWO DISPATCHERS.
+//!
+//! Written down because this AC is discharged by an ARGUMENT and not by a
+//! test, and an argument that lives only in review traffic cannot be
+//! inherited by whoever picks this up, cannot be checked at review, and
+//! cannot be failed.
+//!
+//! `resolve_instance_dictionary` and `resolve_instance_dictionary_by_head_id`
+//! differ only in HOW THEY NAME THE CARRIER: one takes a surface spelling,
+//! the other a `GlobalId` it must first turn into a spelling by scanning the
+//! registered names. They agree completely on SELECTION -- both funnel into
+//! `resolve_instance_dictionary_inner`, which reaches the registry through a
+//! single `class_env.instances.get()` keyed on `(class, head_name)`, and
+//! `_inner`'s own recursion for superclass constraints re-enters that same
+//! point. For one `(class, key)` the two are therefore identical by
+//! construction.
+//!
+//! The by-head-id path is NOT a thin wrapper -- it carries a real forward
+//! scan and three refusals the other lacks. That is the argument rather than
+//! an objection to it: every one of those refusals can only SUBTRACT. The
+//! second entry point can produce a refusal the first would not, and never a
+//! RESOLUTION the first would not. That is what makes it an adapter instead
+//! of a second dispatcher, and it holds specifically because of the
+//! carrier-identity confirmation. Without that confirmation the by-head-id
+//! path could return a dictionary the name-keyed path never would, and the
+//! two would genuinely be two dispatchers.
+//!
+//! WHAT WOULD REFUTE THIS: any dictionary SELECTION reading
+//! `class_env.instances` outside `_inner`. Two other reads exist today,
+//! `instance_class_for_global` and `projected_field_row_type`, and neither
+//! selects a dictionary. A third that did would void this paragraph.
+//!
+//! AC-5 -- DEFERRED ON D2, WITH ITS MEASUREMENT KEPT SO IT IS NOT REDONE.
+//!
+//! `≠` cannot be exercised until D2 authors it: the home cannot certify a
+//! role it does not publish, so the node is never minted and there is nothing
+//! to test. Pulling D2 forward is a separate seat's authoring call and the
+//! leader ruled against it.
+//!
+//! Measured and standing while it waits -- FIVE equality carriers, at two
+//! different registration sites, which is why a census of either site alone
+//! undercounts:
+//!
+//! - at construction in `numbers.rs`: `int_id`, `float_id`, `float32_id`
+//! - later via `set_eq_entry` from `decimal_char::register_decimal_char`:
+//!   `decimalpair_id` and `char_id`
+//!
+//! Note `decimalpair_id`, NOT `decimal_id`. Both ids exist and are assigned
+//! adjacently, so the wrong one reads as correct.
+//!
+//! The enumeration is closed by the PRIVACY of `eq_table` rather than by a
+//! scan: the field is private and the only other way in is the `pub(crate)`
+//! `set_eq_entry`, so the list is complete for this crate and a sixth carrier
+//! cannot be introduced from outside it.
+//!
+//! AC-0 and AC-6 are OPEN and deliberately have no discharge text here. AC-0
+//! is a run at the final base, so its evidence is a named SHA in the handoff.
+//! AC-6 -- the `NoInstance` fork, where a silent third outcome is the failure
+//! the criterion exists to catch -- is routed to the Architect and is not
+//! this seat's to settle.
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{Decl, ElabEnv, ExportForm};
