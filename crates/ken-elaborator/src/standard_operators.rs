@@ -26,10 +26,19 @@ use crate::error::{ElabError, Span};
 ///
 /// Acquisition itself reads the catalog: this module's own `export` line is
 /// the glyph-to-identity declaration, so nothing here names `ord_leq_at` or
-/// any other meaning. What remains is the path at which to look, and it
-/// **fails closed and loud** — if the home moves or is absent, every
-/// binding-backed role is unfilled and a standard-operator occurrence is
-/// refused naming the role, rather than silently completing to nothing.
+/// any other meaning. What remains is the path at which to look.
+///
+/// **IT DOES NOT FAIL CLOSED WHEN THE HOME IS ABSENT, and this comment
+/// claimed it did.** The role-naming refusal fires only when the home is
+/// PRESENT and a role is missing from its export table. If the home moves or
+/// is absent, `certify_roles` returns an EMPTY map, no occurrence is ever
+/// recognised as a standard operator, and each is left as an ordinary
+/// application — caught downstream by the kernel check, or by ordinary name
+/// resolution, and in neither case named as a role.
+///
+/// That is exactly what the completion adapter's own residual says about the
+/// non-certified arm, so the two comments were asserting opposite things
+/// about one path. Each read fine alone, which is why it survived.
 ///
 /// A fully self-declaring home would remove even this; that is recorded as a
 /// deferred, non-blocking improvement and is deliberately not built here.
@@ -102,21 +111,22 @@ impl StandardOperatorRole {
     ///
     /// **So the vocabulary and the certified set genuinely differ TODAY**, at
     /// five against four, rather than only once the membership track lands.
+    ///
+    /// **A `required()` accessor used to sit beside this and has been
+    /// removed.** It returned the whole vocabulary, had no callers anywhere in
+    /// the tree, and its stated value was that it would earn its keep "when
+    /// the two sets diverge". They already diverge — five against four, per
+    /// the paragraph above — and when that happened the required-roles check
+    /// reached for THIS constant instead. A distinction bypassed at the exact
+    /// moment it was written for is not a distinction the code has, so the
+    /// reasoning lives here, on the list the check actually iterates.
+    ///
+    /// If the membership track later needs `Member` to enter the vocabulary
+    /// and to enter the required list as two separate acts, that is a third
+    /// set — and it should arrive with the caller that distinguishes them,
+    /// not before it.
     pub(crate) const BINDING_BACKED: [Self; 4] =
         [Self::And, Self::Or, Self::Leq, Self::Geq];
-
-    /// The roles a program must actually supply.
-    ///
-    /// **Today this is the whole vocabulary, so the separation is not
-    /// load-bearing yet** — and it is written as a distinct question anyway
-    /// rather than as a second copy of the list, so it cannot drift from it.
-    /// It earns its keep when the two sets diverge, which is precisely the
-    /// membership track's edit: `Member` entering the vocabulary and entering
-    /// the required list are two separate acts, and a design that cannot say
-    /// them separately forces them to happen together.
-    pub(crate) fn required() -> &'static [Self] {
-        &Self::ALL
-    }
 
     /// The canonical glyph spelling, as `31 §1c` admits it.
     ///
@@ -277,8 +287,11 @@ pub(crate) fn certify_roles(
     span: &Span,
 ) -> Result<HashMap<StandardOperatorRole, GlobalId>, ElabError> {
     let Some(published) = exports.get(home) else {
-        // The home is not in this program at all. Completion then fails at the
-        // occurrence instead, naming the role -- see the completion adapter.
+        // The home is not in this program at all, so nothing is certified.
+        // No occurrence is then recognised as a standard operator: each is
+        // left as an ordinary application and caught downstream by the kernel
+        // check or by name resolution, and NOT named as a role. See the
+        // completion adapter's residual on the non-certified arm.
         return Ok(HashMap::new());
     };
 
