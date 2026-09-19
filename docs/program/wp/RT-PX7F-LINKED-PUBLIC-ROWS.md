@@ -402,3 +402,58 @@ axis that fixture varied.
 **Still no label.** `AC-2`'s second branch needs a mechanism statement, and
 what is above is a candidate. Whether a live successor exists is still
 unestablished.
+
+## The operation-level probe — strong support, and the gap that remains
+
+@runtime-leader authorized going past the constructor tag to the operation.
+`ITree::Vis` is `Vis(op, k)`, so field 0 was projected and decoded.
+
+**First projection landed a level too shallow**, and that is worth keeping:
+
+    right-denial     "ctor:right-denial::Coproduct::InL"
+    double-release   "ctor:double-release::Coproduct::InL"
+
+Field 0 is the **coproduct injection**, not the operation. But `InL` is the FS
+side and `host_exit` is an `AmbientOp`, which injects `InR` — so this alone
+already says **the runtime `Vis` is an FS operation, not the ambient exit**,
+independently corroborating that the site is not main's continuation.
+
+**Second projection reaches the operation:**
+
+    right-denial     "ctor:right-denial::FSOp::ctor_543"
+    double-release   "ctor:double-release::FSOp::ctor_543"
+
+### Why this supports the composed reading
+
+The two rows' **origins differ** — `FsHandleMetadata` for right-denial,
+`ResourceRelease` for double-release — yet their runtime `Vis` operations are
+**the same constructor ordinal**. If the runtime `K` were the immediate
+continuation, the operations would differ between the programs the way the
+origins do. They do not.
+
+And double-release's origin **is** `ResourceRelease`, which places
+`ctor_543` = the release operation in that arena. On the same ordinal,
+right-denial's response `K` — the continuation of its **metadata** effect —
+returns a `Vis` performing the **release**. That is the bracket's own release
+appearing in a continuation it is not the immediate successor of, which is
+what "composed" predicts.
+
+### The gap, stated rather than glossed
+
+**`ctor_543` is a per-arena ordinal and its identity ACROSS the two arenas is
+not established.** The two programs have separate `names` arenas, and equal
+ordinals in different arenas are equal only if `FSOp`'s constructor order is
+the same in both. That is plausible — same `FSOp` declaration — and it is
+**not measured**. This is the same shape as the `len` error recorded above:
+an ordinal is a *value*, and matching values across two tables is not identity
+unless the tables agree.
+
+⇒ **Strong support, not closure.** Closing it needs the `FSOp` constructor
+order compared across the two arenas, or the operation resolved by a key that
+is not arena-relative.
+
+**Probe defect worth recording:** the first version emitted `return_` mid-block
+and Cranelift panicked with *"you cannot add an instruction to a block already
+filled"* — the surrounding emission continued into a filled block. `require_i64`
+shows the pattern: switch to a fresh block after the return. A probe that
+changes control flow must restore a block for the code it interrupts.
