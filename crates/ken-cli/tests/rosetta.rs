@@ -106,32 +106,6 @@ fn flattened_braced_declaration(source: &str, owner: &str, start: &str) -> std::
     panic!("{owner} declaration `{start}` must close");
 }
 
-fn remove_flattened_segment(source: &mut String, owner: &str, start: &str, next: &str) {
-    let declaration = flattened_braced_declaration(source, owner, start);
-    let mut nexts = source.match_indices(next);
-    let (next_offset, _) = nexts
-        .next()
-        .unwrap_or_else(|| panic!("{owner} must carry following declaration `{next}`"));
-    assert!(
-        nexts.next().is_none(),
-        "{owner} must carry exactly one following declaration `{next}`"
-    );
-    assert!(
-        declaration.end <= next_offset && source[declaration.end..next_offset].trim().is_empty(),
-        "{owner}: `{next}` must immediately follow `{start}`"
-    );
-    source.replace_range(declaration.start..next_offset, "");
-}
-
-fn remove_flattened_tail(source: &mut String, owner: &str, start: &str) {
-    let declaration = flattened_braced_declaration(source, owner, start);
-    assert!(
-        source[declaration.end..].trim().is_empty(),
-        "{owner} declaration `{start}` must be last"
-    );
-    source.replace_range(declaration, "");
-}
-
 fn collections_prelude() -> String {
     let transport = catalog_source("catalog/packages/Core/Logic/Transport.ken.md");
     let or_source = catalog_source("catalog/packages/Core/Logic/Or.ken.md");
@@ -146,7 +120,17 @@ fn collections_prelude() -> String {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let mut nat_order = catalog_source("catalog/packages/Data/Numeric/Nat/Order.ken.md");
+    let nat_order_source = catalog_source("catalog/packages/Data/Numeric/Nat/Order.ken.md");
+    // This hand-maintained allowlist selects the consumer's operation inventory.
+    // New Order exports are excluded instead of entering flat source without dependencies.
+    let nat_order = ["pub fn min", "pub fn sub"]
+        .into_iter()
+        .map(|start| {
+            let declaration = flattened_braced_declaration(&nat_order_source, "Nat.Order", start);
+            &nat_order_source[declaration]
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
 
     // `ken run` consumes one flat source unit here. Remove every import whose
@@ -159,16 +143,6 @@ fn collections_prelude() -> String {
     ] {
         remove_flattened_import(&mut compare, "Compare", import);
     }
-    for flattened_edge in [
-        "import Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)",
-        "export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)",
-        "data OrdResult = Lt | Eq | Gt",
-    ] {
-        remove_flattened_import(&mut nat_order, "Nat.Order", flattened_edge);
-    }
-    remove_flattened_segment(&mut nat_order, "Nat.Order", "pub fn max", "pub fn sub");
-    remove_flattened_tail(&mut nat_order, "Nat.Order", "pub fn compare");
-
     for import in [
         "import Core.Classes.LawfulClasses (bool_and, bool_leq)",
         "import Core.Logic.Compare (list_compare, list_eq)",

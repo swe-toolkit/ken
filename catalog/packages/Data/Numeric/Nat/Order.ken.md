@@ -194,6 +194,8 @@ for an abstract `n` matched against itself, so `Refl` alone cannot close the
 goal. That is asserted here, not merely asserted about:
 
 ```ken reject
+-- Fails: `Refl` cannot prove `sub n n = Zero` for abstract `n`, because
+-- `sub` does not reduce until induction exposes `n`.
 proof self_is_zero_wrong for sub (n : Nat) : Equal Nat (sub n n) Zero = Refl
 ```
 
