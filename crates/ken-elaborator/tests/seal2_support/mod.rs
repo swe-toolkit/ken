@@ -112,10 +112,10 @@ pub struct Producer {
 ///
 /// The walk is bound to `ElabEnv`'s own fields by an exhaustive struct
 /// destructuring which **was written with no `..` and now carries one**.
-/// AS INTENDED, adding a field to `ElabEnv` fails to compile
+/// THE INTENT is that adding a field to `ElabEnv` fails to compile
 /// here, forcing whoever adds it to classify the new namespace as either a
 /// producer source (walked below) or a justified non-source (added to the
-/// discard with its reason). This is the AC-2 gate, and **it is currently
+/// discard with its reason). That is the AC-2 gate, and **it is currently
 /// DEFEATED by the `..` at the destructure** -- see the notice at the top. As
 /// written today a new namespace IS a silent pass; the sentence that used to
 /// stand here said it could never be one, and changing the claim rather than

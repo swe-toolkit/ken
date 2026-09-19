@@ -420,9 +420,14 @@ fn ac2b_an_unrelated_local_operator_with_the_same_glyph_is_left_alone() {
 /// spelling, instead of a raw kernel mismatch on two opaque dictionary
 /// identities that points at the whole declaration.
 ///
-/// That is worth having and it is not what the amendment was justified by.
-/// Recorded here rather than quietly enjoyed, because the next reader
-/// weighing this check's cost should weigh the benefit it actually has.
+/// That is worth having, and it is not what the check was justified by. The
+/// justification was that a wrong dictionary would otherwise be accepted
+/// SILENTLY; on this fixture it is not, because the kernel refuses it. What
+/// the confirmation changes here is WHICH refusal the author sees, not
+/// WHETHER there is one. Recorded rather than quietly enjoyed, because the
+/// next reader weighing this check's cost should weigh the benefit it
+/// actually has, and a justification that has been measured away should not
+/// go on being cited.
 ///
 /// **RESIDUAL, and it is the reason the check still earns its place.** These
 /// two carriers are distinct inductives, so their dictionary types differ and
