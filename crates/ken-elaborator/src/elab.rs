@@ -8565,17 +8565,12 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         RExpr::RByteStr(bytes, span) => elab_bytes_lit(cx, bytes, span),
 
         RExpr::RBinOp(op, lhs, rhs, span) => elab_binop(cx, op, lhs, rhs, span),
-        // `39 §6.9` completion lands here. NOTHING MINTS THIS NODE YET -- the
-        // minting half is the next commit -- so this arm is unreachable today
-        // and says so by failing closed rather than by a comment. A silent
-        // fallback to an ordinary application is precisely the behaviour
-        // `§6.9` forbids ("never a silent fallback to a different meaning"),
-        // so the placeholder must refuse, not approximate.
-        RExpr::RStandardOp { op, span, .. } => Err(ElabError::Internal(format!(
-            "standard-operator completion for identity {:?} is not wired yet; \
-             this node is unreachable until the minting half lands ({:?})",
-            op, span
-        ))),
+        RExpr::RStandardOp {
+            op,
+            lhs,
+            rhs,
+            span,
+        } => elab_standard_operator(cx, *op, lhs, rhs, span),
 
         RExpr::RInfixSpine { span, .. } => unassociated_infix_error(span),
 
@@ -10513,7 +10508,109 @@ fn resolved_operator_fixity(
     }
 }
 
-fn reduce_resolved_operator(values: &mut Vec<RExpr>, operator: RInfixOperator) {
+/// Reduce one operator against the two operands on top of the value stack.
+///
+/// **THIS IS THE ONLY PLACE OPERATOR POSITION IS STILL VISIBLE**, and the only
+/// place [`RExpr::RStandardOp`] is minted. Its two call sites are both inside
+/// `reassociate_rexpr`'s spine arm, so an explicit application never reaches
+/// it -- which is what makes AC-2(c) (`ord_leq_at Nat d` stays partial) a
+/// property of the tree rather than of a guard.
+/// `39 §6.9` standard-operator call completion, at the occurrence.
+///
+/// **The role is recovered from the IDENTITY, by reverse lookup in the
+/// certified map.** That is what makes `§6.9`'s *"binds to the defining
+/// `GlobalId`, never to the occurrence's glyph text"* true of the
+/// implementation and not just of the node: an alias reaching the same binding
+/// completes identically, and the lookup is a function because
+/// `certify_roles` refuses a home that binds two roles to one identity.
+fn elab_standard_operator(
+    cx: &mut ElabCtx,
+    op: GlobalId,
+    lhs: &RExpr,
+    rhs: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let role = cx
+        .standard_operators
+        .and_then(|roles| {
+            roles
+                .iter()
+                .find_map(|(&role, &id)| (id == op).then_some(role))
+        })
+        .ok_or_else(|| {
+            // Minting consulted the same map, so reaching here means the map
+            // changed between reduction and elaboration. Fail closed and say
+            // which invariant broke rather than guessing a role.
+            ElabError::Internal(format!(
+                "standard-operator occurrence at {}-{} carries identity {:?}, \
+                 which the certified map no longer contains",
+                span.start, span.end, op
+            ))
+        })?;
+
+    match role {
+        // `∧` and `∨` bind `bool_and` / `bool_or`, whose telescope is already
+        // `Bool -> Bool -> Bool`. THERE IS NO OMITTED PREFIX TO SUPPLY, so
+        // completion here is the saturated application itself.
+        //
+        // **Both operands are CHECKED, which is AC-7's no-short-circuit
+        // property holding by construction rather than by a guard.** Under
+        // call-by-value both are evaluated before the body runs; `bool_and`'s
+        // body matching on its first argument is about the body's ARMS, which
+        // `33 §6.1` names as the conflation to avoid.
+        StandardOperatorRole::And | StandardOperatorRole::Or => {
+            let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+            let lhs_core = check(cx, lhs, &bool_ty, span)?;
+            let rhs_core = check(cx, rhs, &bool_ty, span)?;
+            let applied = Term::app(Term::app(Term::const_(op, vec![]), lhs_core), rhs_core);
+            Ok((applied, bool_ty))
+        }
+        // `≤` and `≥` bind `ord_leq_at` / `ord_geq_at`, whose telescope is
+        // `(a : Type) -> Ord a -> a -> a -> Bool`. Completion must infer the
+        // carrier and resolve the `Ord` dictionary by `§6.2`'s ordinary
+        // instance search before the saturated application exists.
+        //
+        // **NOT YET WIRED, AND THE REASON IS STRUCTURAL RATHER THAN
+        // UNFINISHED WORK.** `resolve_instance_dictionary` -- the single
+        // resolver entry point D1 must reuse, per AC-3 -- takes
+        // `&mut GlobalEnv` and `&mut ClassEnv`, while `ElabCtx` carries
+        // `class_env: Option<&ClassEnv>`. An expression site cannot hand the
+        // resolver what it needs without changing how the context holds the
+        // registry, and that is a shape decision rather than a local edit.
+        //
+        // Refusing is the correct interim: `§6.9` forbids a silent fallback to
+        // a different meaning, and an under-applied four-argument binding is
+        // exactly such a fallback. The sound subset above ships; this one
+        // fails closed and names why.
+        StandardOperatorRole::Leq | StandardOperatorRole::Geq => {
+            Err(ElabError::Internal(format!(
+                "standard operator '{}' at {}-{} needs an `Ord` dictionary, and \
+                 dictionary resolution is not reachable from an expression site \
+                 yet: `resolve_instance_dictionary` requires `&mut ClassEnv` and \
+                 `ElabCtx` holds `Option<&ClassEnv>`",
+                role.glyph(),
+                span.start,
+                span.end
+            )))
+        }
+        // `≠` is authored rather than re-exported (D2), so the home does not
+        // publish it and `certify_roles` never admits it -- this node is not
+        // minted for it. Unreachable via the certified map, and it fails
+        // closed rather than pretending otherwise.
+        StandardOperatorRole::Neq => Err(ElabError::Internal(format!(
+            "standard operator '≠' at {}-{} reached completion, but it is not a \
+             binding-backed role and the home cannot certify it",
+            span.start, span.end
+        ))),
+    }
+}
+
+fn reduce_resolved_operator(
+    values: &mut Vec<RExpr>,
+    operator: RInfixOperator,
+    globals: &HashMap<String, GlobalId>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) {
     let rhs = values.pop().expect("an infix operator has a right operand");
     let lhs = values.pop().expect("an infix operator has a left operand");
     let span = Span::merge(lhs.span(), rhs.span());
@@ -10522,10 +10619,44 @@ fn reduce_resolved_operator(values: &mut Vec<RExpr>, operator: RInfixOperator) {
             RExpr::RBinOp(operator, Box::new(lhs), Box::new(rhs), span)
         }
         RInfixOperator::User(name, operator_span) => {
-            let head = RExpr::RCon(name, operator_span.clone());
-            let first_span = Span::merge(head.span(), lhs.span());
-            let applied = RExpr::RApp(Box::new(head), Box::new(lhs), first_span);
-            RExpr::RApp(Box::new(applied), Box::new(rhs), span)
+            // KEYED ON THE RESOLVED IDENTITY, NOT ON `name`. `39 §6.9` binds
+            // completion to the defining `GlobalId` "never to the occurrence's
+            // glyph text", so this resolves the surface name first and then
+            // asks whether that identity is one the home certified. An alias
+            // reaching the same binding under a different spelling mints the
+            // same node; an unrelated local `≤` resolves elsewhere and does
+            // not (AC-2(b)).
+            let certified = standard_operators.and_then(|roles| {
+                let id = *globals.get(&name)?;
+                roles.values().any(|&certified| certified == id).then_some(id)
+            });
+            match certified {
+                Some(op) => RExpr::RStandardOp {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                    span,
+                },
+                // The ordinary user-operator spine, unchanged.
+                //
+                // **RESIDUAL, stated because it is the one case I could not
+                // construct rather than one I have closed.** When
+                // `standard_operators` is `None` -- the paths that elaborate
+                // no user body -- a standard occurrence would take this arm
+                // and be left as a two-argument application of a four-argument
+                // binding, caught downstream by the kernel check rather than
+                // named as a role. Deciding it here without the map would mean
+                // keying on the glyph, which is the thing `§6.9` forbids. I
+                // could not build an input that reaches it, because the map is
+                // absent exactly where no user body elaborates; that is an
+                // argument, not a proof, and it is QA's to attack.
+                None => {
+                    let head = RExpr::RCon(name, operator_span.clone());
+                    let first_span = Span::merge(head.span(), lhs.span());
+                    let applied = RExpr::RApp(Box::new(head), Box::new(lhs), first_span);
+                    RExpr::RApp(Box::new(applied), Box::new(rhs), span)
+                }
+            }
         }
     };
     values.push(combined);
@@ -10635,13 +10766,15 @@ fn reassociate_rexpr(
                     reduce_resolved_operator(
                         &mut values,
                         pending.pop().expect("pending operator exists"),
+                        globals,
+                        standard_operators,
                     );
                 }
                 pending.push(operator);
                 values.push(rhs?);
             }
             while let Some(operator) = pending.pop() {
-                reduce_resolved_operator(&mut values, operator);
+                reduce_resolved_operator(&mut values, operator, globals, standard_operators);
             }
             values.pop().expect("reassociation produces one expression")
         }
