@@ -20,6 +20,12 @@ has no cursor structure left to induct on at the point it needs them.
 
 # Frame
 
+**LANDED 2026-09-19 at `a86ee0ca54268d7900d686ec95cb1d7cbf7c81b3`** as
+`some_below_length` and `at_or_beyond_is_none`; Adversary returned NO DEFECT;
+closed by M7 `35c533eff`. Nothing below is open — it is the frame as written,
+kept as history. The successor it unblocks, `CAT-PARSING-CURSOR-LAWS`, is
+released.
+
 Releasable now. Nothing blocks it: the facts it needs already exist.
 
 ## Why this is a node and not a stop condition
