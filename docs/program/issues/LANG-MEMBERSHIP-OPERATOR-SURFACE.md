@@ -1,7 +1,7 @@
 ---
 id: LANG-MEMBERSHIP-OPERATOR-SURFACE
 title: "the membership BUILD (re-cut 2026-09-13): define the Membership class and its three provider views (list; one ordered-key view serving Map and Set; relation-edge) in catalog and wire glyph-only ∈ elaboration to member-dispatch through A1's shared use-site resolver; ∈ is glyph-only so there is no let ... in ASCII collision and no standard in alias; HELD on SPEC-MEMBERSHIP-CLASS-CONTRACT + LANG-RESERVED-INFIX-NAMES + LANG-STANDARD-INFIX-CALL-COMPLETION, then the Steward frames full ACs and releases to the language ring"
-status: ready
+status: draft
 owner: language
 size: L
 gate: none
@@ -12,8 +12,33 @@ tier: T1
 origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. RE-CUT AGAIN 2026-09-13 (Steward) on the operator directive (Pat, this session): the deferred split-(B) trigger has fired -- the typeclass-method-dispatch capability is now being cut for real demand (A1's factored resolver LANG-STANDARD-INFIX-CALL-COMPLETION + the SPEC-MEMBERSHIP-CLASS-CONTRACT contract), so this node is re-cut as the membership BUILD against them. Stays draft, HELD until its three deps land; then the Steward frames the full ACs and releases. See the 2026-09-13 banner."
 ---
 
-> # RELEASED 2026-09-19. ALL FOUR DEPENDENCIES LANDED; `§5a` IS PINNED.
+> # HELD AGAIN 2026-09-19, ON A HARD STOP THE RELEASE DID NOT ANTICIPATE.
 > # Frame: `docs/program/wp/LANG-MEMBERSHIP-OPERATOR-SURFACE.md`.
+>
+> **This node is NOT buildable as framed, and the frame is the Steward's.**
+> Hard stop `evt_4ehtrakx2ftdb`, verified at the object by the Steward and the
+> Architect independently: `elab_standard_operator` extracts a carrier head
+> only from `Term::Const`/`Term::IndFormer`, so a parameterized carrier
+> (`Term::App`) is refused before lookup; and `resolve_instance_dictionary_inner`
+> refuses every `head_param_count > 0` instance when `requested` is `None`,
+> which is what the by-head-id path passes. **All three mandated views are
+> parameterized, so `∈` could not resolve a single one of its own providers.**
+>
+> **The new blocker is [[LANG-CORE-INSTANCE-HEAD-MATCH]]** — `P1` spine peeling
+> plus `P2` a core-side instance-head matcher inside `_inner`. Architect ruling
+> `evt_1bgpexfk5e79q`. **`§3a` is why this could not be dodged by a
+> non-parameterized view:** `Query` is a dictionary field, fixed at
+> instance-registration time, so one non-parameterized head would fix one query
+> type for every element type. Parameterization is forced by the class shape,
+> not merely observed in `§3b`'s telescopes — and `§3b` names no carrier head
+> at all, so record it here.
+>
+> **`§5a`'s pins remain correct and are not the gap.** They are about the shape
+> contract. **The Steward pinned four items against A1's landed tree and never
+> asked whether the resolver could serve B's carriers at all** — the question
+> one step to the side of the one the frame named. The Architect records the
+> mirror of it: they verified A1 against A1's claims and read that as bearing
+> on what A1 can serve.
 >
 > **The hold was [[LANG-STANDARD-INFIX-CALL-COMPLETION]] (A1). It landed at
 > `origin/main` `e2e40e2b404d9775b3cd1fee049b3ecaab481bba`**, verified in the
