@@ -5,11 +5,23 @@
 
 > ## THE DELIVERABLE IS THE ROWS, NOT A REPORT.
 >
-> This node closes when `px7f_resource_native.rs:314` and `:348` are
-> un-ignored and green, or when one of them carries a grounded terminal
-> refusal. **Finding which adapter check fires is step one inside this node,
-> not its product.** A candidate whose roster contains no change under
-> `crates/` has not advanced it.
+> This node closes when `px7f_resource_native.rs:314` and `:348` are each
+> either un-ignored and green in CI, or still `#[ignore]`d under `AC-2`'s
+> START-TOKEN RULE: the reason string OPENS with the ID of whoever owns the
+> row NEXT — the successor's ID where a live successor exists, otherwise
+> this node's own ID stating which check fires and why it is terminal.
+> **The successor-relabel branch is first-class and is NOT a
+> terminal refusal.** **Finding which adapter check fires is step one
+> inside this node, not its product.** A candidate whose roster contains
+> no change under `crates/` has not advanced it.
+>
+> **THE LINE BREAK BEFORE "terminal refusal" IS LOAD-BEARING — DO NOT REFLOW
+> IT.** The phrase is kept whole on one line so a line-scoped grep can see it.
+> This defect survived a three-of-four correction precisely because the old
+> wording wrapped `terminal`/`refusal` across two lines, so
+> `git grep "terminal refusal"` returned **zero hits in this file** while
+> returning only correct usages elsewhere — a false zero that reads as a
+> completed sweep.
 
 ## 1. Fixed inputs, measured at `38b4ee598`
 
@@ -42,7 +54,9 @@ SHA and re-derive by symbol, not by line.
 
 - **`D0`** — which of the four checks fires, **per row**, named from the tree.
 - **`D1`** — the repair, or a grounded ruling that a row's refusal is correct.
-- **`D2`** — the rows: un-ignored and green, or relabelled with the mechanism.
+- **`D2`** — the rows, disposed of **per `AC-2`**. Deliberately NOT restated
+  here: `AC-2` is the single operative statement of the closure condition, and
+  this line is a pointer to it, not a second copy of it.
 
 ## 3. Acceptance criteria
 
