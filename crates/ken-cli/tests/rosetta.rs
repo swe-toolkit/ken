@@ -75,6 +75,35 @@ fn remove_flattened_import(source: &mut String, owner: &str, import: &str) {
     source.replace_range(start..start + import.len(), "");
 }
 
+fn flattened_exact_line_declaration(
+    source: &str,
+    owner: &str,
+    declaration: &str,
+) -> std::ops::Range<usize> {
+    assert_eq!(
+        declaration.split('\n').count(),
+        1,
+        "{owner} exact line declaration must not contain a newline"
+    );
+
+    let mut offset = 0usize;
+    let mut declaration_range = None;
+    for line in source.split_inclusive('\n') {
+        let line_without_newline = line.strip_suffix('\n').unwrap_or(line);
+        if line_without_newline == declaration {
+            assert!(
+                declaration_range.is_none(),
+                "{owner} must carry exactly one line declaration `{declaration}`"
+            );
+            declaration_range = Some(offset..offset + declaration.len());
+        }
+        offset += line.len();
+    }
+
+    declaration_range
+        .unwrap_or_else(|| panic!("{owner} must carry line declaration `{declaration}`"))
+}
+
 fn flattened_braced_declaration(source: &str, owner: &str, start: &str) -> std::ops::Range<usize> {
     let mut starts = source.match_indices(start);
     let (start_offset, _) = starts
@@ -112,12 +141,24 @@ fn collections_prelude() -> String {
     let ord_result = catalog_source("catalog/packages/Core/Logic/OrdResult.ken.md");
     let mut compare = catalog_source("catalog/packages/Core/Logic/Compare.ken.md");
     let lawful_classes = catalog_source("catalog/packages/Core/Classes/LawfulClasses.ken.md");
-    let canonical_bool_ops = ["pub fn bool_leq", "pub fn bool_and"]
-        .into_iter()
-        .map(|start| {
-            let declaration = flattened_braced_declaration(&lawful_classes, "LawfulClasses", start);
-            &lawful_classes[declaration]
-        })
+    // `IsTrue` is a braceless transparent alias in the canonical provider.
+    // Extract its exact complete line instead of letting the braced scanner
+    // consume the next unrelated declaration that happens to contain `{`.
+    let is_true = flattened_exact_line_declaration(
+        &lawful_classes,
+        "LawfulClasses",
+        "pub fn IsTrue (b : Bool) : Prop = Equal Bool b True",
+    );
+    let canonical_lawful_ops = std::iter::once(&lawful_classes[is_true])
+        .chain(
+            ["pub fn bool_leq", "pub fn bool_and", "pub fn leq_nat"]
+                .into_iter()
+                .map(|start| {
+                    let declaration =
+                        flattened_braced_declaration(&lawful_classes, "LawfulClasses", start);
+                    &lawful_classes[declaration]
+                }),
+        )
         .collect::<Vec<_>>()
         .join("\n");
     let nat_order_source = catalog_source("catalog/packages/Data/Numeric/Nat/Order.ken.md");
@@ -144,7 +185,7 @@ fn collections_prelude() -> String {
         remove_flattened_import(&mut compare, "Compare", import);
     }
     for import in [
-        "import Core.Classes.LawfulClasses (bool_and, bool_leq)",
+        "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_leq, leq_nat)",
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
@@ -155,7 +196,7 @@ fn collections_prelude() -> String {
     }
 
     format!(
-        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_bool_ops}\n{nat_order}\n{collections}"
+        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{collections}"
     )
 }
 

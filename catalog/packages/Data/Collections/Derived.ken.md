@@ -63,7 +63,7 @@ import Data.Numeric.Nat.Order (min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
 
-import Core.Classes.LawfulClasses (bool_and, bool_leq)
+import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_leq, leq_nat)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
@@ -141,7 +141,9 @@ or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `length_take_min` are the three proof-returning laws this slice ships. The
 `filter` membership characterization is deliberately held out until its
 comparator/Iff statement is pinned — no bare `Prop`-returning wrapper is
-shipped for it prematurely.
+shipped for it prematurely. The two attached `nth` laws connect successful
+lookup and out-of-bounds lookup to the structural `length` fold in both
+directions.
 
 Migrated here per the attached-proof ownership rule — an attached proof
 `f::law` belongs to the module that defines `f` — the three `list_append`
@@ -170,6 +172,32 @@ pub fn length (a : Type) (xs : List a) : Nat =
   match xs {
     Nil ↦ Zero;
     Cons h t ↦ Suc (length a t)
+  }
+
+pub proof some_below_length for nth
+      (a : Type) (n : Nat) (xs : List a)
+    : (v : a)
+      → Equal (Option a) (nth a n xs) (Some a v)
+      → IsTrue (leq_nat (Suc n) (length a xs)) =
+  match xs {
+    Nil ↦ λv. λh. absurd h;
+    Cons head tail ↦
+      match n {
+        Zero ↦ λv. λh. Proved;
+        Suc n2 ↦ λv. λh. (proof some_below_length for nth) a n2 tail v h
+      }
+  }
+
+pub proof at_or_beyond_is_none for nth
+      (a : Type) (n : Nat) (xs : List a)
+    : IsTrue (leq_nat (length a xs) n) → Equal (Option a) (nth a n xs) (None a) =
+  match xs {
+    Nil ↦ λh. Proved;
+    Cons head tail ↦
+      match n {
+        Zero ↦ λh. absurd h;
+        Suc n2 ↦ λh. (proof at_or_beyond_is_none for nth) a n2 tail h
+      }
   }
 
 theorem take_drop_decomposition
@@ -960,7 +988,9 @@ reference implementation.
 2. **Public API.** `OrdResult`, `list_append`, `nth`, `take`, `drop`,
    `sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
    `filter`, `mem`, `length`, `min`, `take_drop_decomposition`,
-   `map_length`, `length_take_min` (CAT-3 D1); `reverse`, `reverse::involutive`,
+   `map_length`, `length_take_min` (CAT-3 D1); `nth::some_below_length`,
+   `nth::at_or_beyond_is_none` (the two lookup bounds); `reverse`,
+   `reverse::involutive`,
    `zip`, `concat_map`, `range`, `foldl` and their proofs (DS-4); `count`,
    `Perm`, `insert`, `sort`, `sort_bool`, `sort_bool_sorted`,
    `sort_bool_perm` (CAT-3 D2); `View`, `Lens`, `Iso`, `Representation`,
@@ -988,7 +1018,9 @@ reference implementation.
    genuine, kernel-checked term; no law field is postulated anywhere.
 6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
    lifting the tail IH under the head constructor, the same shape
-   throughout. `§4.3`: full case-split specialized to `List Bool`/`bool_leq`,
+   throughout. The `nth` bounds proofs split the list before the index so
+   lookup, length, and order reduce together. `§4.3`: full case-split
+   specialized to `List Bool`/`bool_leq`,
    closing by `Proved`/`Refl`/`cong`/`trans`/`sym` per branch — no postulate
    anywhere in the verified-sort slice. `§4.4`: every law field closes by
    `Refl` (each concrete operation reduces definitionally once applied, no
