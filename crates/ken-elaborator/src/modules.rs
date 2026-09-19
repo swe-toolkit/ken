@@ -1230,6 +1230,16 @@ fn rewrite_rexpr(
     rewrite_rexpr_inner(scope, exports, e, kernel_head)
 }
 
+/// Keep per-variant temporaries out of the recursive dispatcher's stack frame.
+/// Each closure monomorphizes to its own non-inlined call, so adding a large
+/// `RExpr` arm no longer taxes every level of every unrelated descent.
+#[inline(never)]
+fn rewrite_rexpr_arm(
+    rewrite: impl FnOnce() -> Result<RExpr, ElabError>,
+) -> Result<RExpr, ElabError> {
+    rewrite()
+}
+
 fn rewrite_rexpr_inner(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
@@ -1258,69 +1268,89 @@ fn rewrite_rexpr_inner(
             span,
         },
         RExpr::RUniv(l, s) => RExpr::RUniv(l, s),
-        RExpr::RApp(f, a, s) => RExpr::RApp(
-            Box::new(rewrite_rexpr_inner(scope, exports, *f, kernel_head)?),
-            Box::new(rewrite_rexpr(scope, exports, *a)?),
-            s,
-        ),
-        RExpr::RLam(n, b, s) => RExpr::RLam(n, Box::new(rewrite_rexpr(scope, exports, *b)?), s),
-        RExpr::RLet(x, ty, rhs, body, s) => RExpr::RLet(
-            x,
-            ty.map(|t| rewrite_rtype(scope, exports, t)).transpose()?,
-            Box::new(rewrite_rexpr(scope, exports, *rhs)?),
-            Box::new(rewrite_rexpr(scope, exports, *body)?),
-            s,
-        ),
-        RExpr::RAsc(e, t, s) => RExpr::RAsc(
-            Box::new(rewrite_rexpr(scope, exports, *e)?),
-            Box::new(rewrite_rtype(scope, exports, *t)?),
-            s,
-        ),
-        RExpr::ROld(e, s) => RExpr::ROld(Box::new(rewrite_rexpr(scope, exports, *e)?), s),
+        RExpr::RApp(f, a, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RApp(
+                Box::new(rewrite_rexpr_inner(scope, exports, *f, kernel_head)?),
+                Box::new(rewrite_rexpr(scope, exports, *a)?),
+                s,
+            ))
+        })?,
+        RExpr::RLam(n, b, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RLam(
+                n,
+                Box::new(rewrite_rexpr(scope, exports, *b)?),
+                s,
+            ))
+        })?,
+        RExpr::RLet(x, ty, rhs, body, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RLet(
+                x,
+                ty.map(|t| rewrite_rtype(scope, exports, t)).transpose()?,
+                Box::new(rewrite_rexpr(scope, exports, *rhs)?),
+                Box::new(rewrite_rexpr(scope, exports, *body)?),
+                s,
+            ))
+        })?,
+        RExpr::RAsc(e, t, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RAsc(
+                Box::new(rewrite_rexpr(scope, exports, *e)?),
+                Box::new(rewrite_rtype(scope, exports, *t)?),
+                s,
+            ))
+        })?,
+        RExpr::ROld(e, s) => {
+            rewrite_rexpr_arm(|| Ok(RExpr::ROld(Box::new(rewrite_rexpr(scope, exports, *e)?), s)))?
+        }
         RExpr::RCell(index, name, span) => RExpr::RCell(index, name, span),
-        RExpr::RBecomes(index, name, value, span) => RExpr::RBecomes(
-            index,
-            name,
-            Box::new(rewrite_rexpr(scope, exports, *value)?),
-            span,
-        ),
+        RExpr::RBecomes(index, name, value, span) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RBecomes(
+                index,
+                name,
+                Box::new(rewrite_rexpr(scope, exports, *value)?),
+                span,
+            ))
+        })?,
         RExpr::RNumLit(l, s) => RExpr::RNumLit(l, s),
         RExpr::RStr(v, s) => RExpr::RStr(v, s),
         RExpr::RCharLit(c, s) => RExpr::RCharLit(c, s),
         RExpr::RByteStr(v, s) => RExpr::RByteStr(v, s),
-        RExpr::RBinOp(op, l, r, s) => RExpr::RBinOp(
-            op,
-            Box::new(rewrite_rexpr(scope, exports, *l)?),
-            Box::new(rewrite_rexpr(scope, exports, *r)?),
-            s,
-        ),
+        RExpr::RBinOp(op, l, r, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RBinOp(
+                op,
+                Box::new(rewrite_rexpr(scope, exports, *l)?),
+                Box::new(rewrite_rexpr(scope, exports, *r)?),
+                s,
+            ))
+        })?,
         RExpr::RInfixSpine {
             operands,
             operators,
             span,
-        } => RExpr::RInfixSpine {
-            operands: operands
-                .into_iter()
-                .map(|operand| rewrite_rexpr(scope, exports, operand))
-                .collect::<Result<Vec<_>, _>>()?,
-            operators: operators
-                .into_iter()
-                .map(|operator| match operator {
-                    RInfixOperator::Builtin(op, span) => Ok(RInfixOperator::Builtin(op, span)),
-                    RInfixOperator::User(name, span) => Ok(RInfixOperator::User(
-                        resolve_ref(scope, exports, &name, &span)?,
-                        span,
-                    )),
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?,
-            span,
-        },
+        } => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RInfixSpine {
+                operands: operands
+                    .into_iter()
+                    .map(|operand| rewrite_rexpr(scope, exports, operand))
+                    .collect::<Result<Vec<_>, _>>()?,
+                operators: operators
+                    .into_iter()
+                    .map(|operator| match operator {
+                        RInfixOperator::Builtin(op, span) => Ok(RInfixOperator::Builtin(op, span)),
+                        RInfixOperator::User(name, span) => Ok(RInfixOperator::User(
+                            resolve_ref(scope, exports, &name, &span)?,
+                            span,
+                        )),
+                    })
+                    .collect::<Result<Vec<_>, ElabError>>()?,
+                span,
+            })
+        })?,
         RExpr::RMatch {
             scrut,
             equation,
             arms,
             span,
-        } => {
+        } => rewrite_rexpr_arm(|| {
             let scrut = Box::new(rewrite_rexpr(scope, exports, *scrut)?);
             // Keep recursive match descent free of per-arm iterator frames. The
             // iterator/Result collection adds a chain of adapter frames
@@ -1339,69 +1369,94 @@ fn rewrite_rexpr_inner(
                 });
             }
             let arms = rewritten_arms;
-            RExpr::RMatch {
+            Ok(RExpr::RMatch {
                 scrut,
                 equation,
                 arms,
                 span,
-            }
-        }
+            })
+        })?,
         RExpr::RIf {
             condition,
             then_branch,
             else_branch,
             span,
-        } => RExpr::RIf {
-            condition: Box::new(rewrite_rexpr(scope, exports, *condition)?),
-            then_branch: Box::new(rewrite_rexpr(scope, exports, *then_branch)?),
-            else_branch: Box::new(rewrite_rexpr(scope, exports, *else_branch)?),
-            span,
-        },
-        RExpr::RPair(components, span) => RExpr::RPair(
-            components
-                .into_iter()
-                .map(|component| rewrite_rexpr(scope, exports, component))
-                .collect::<Result<Vec<_>, _>>()?,
-            span,
-        ),
-        RExpr::RRecord { base, fields, span } => RExpr::RRecord {
-            base: base
-                .map(|base| rewrite_rexpr(scope, exports, *base).map(Box::new))
-                .transpose()?,
-            fields: fields
-                .into_iter()
-                .map(|(name, value, name_span)| {
-                    Ok((name, rewrite_rexpr(scope, exports, value)?, name_span))
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?,
-            span,
-        },
-        RExpr::RPosProj(e, index, span) => {
-            RExpr::RPosProj(Box::new(rewrite_rexpr(scope, exports, *e)?), index, span)
-        }
-        RExpr::RProj(e, field, s) => {
-            RExpr::RProj(Box::new(rewrite_rexpr(scope, exports, *e)?), field, s)
-        }
-        RExpr::RPi(x, a, b, s) => RExpr::RPi(
-            x,
-            Box::new(rewrite_rtype(scope, exports, *a)?),
-            Box::new(rewrite_rexpr(scope, exports, *b)?),
-            s,
-        ),
-        RExpr::RArrow(a, b, s) => RExpr::RArrow(
-            Box::new(rewrite_rexpr(scope, exports, *a)?),
-            Box::new(rewrite_rexpr(scope, exports, *b)?),
-            s,
-        ),
+        } => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RIf {
+                condition: Box::new(rewrite_rexpr(scope, exports, *condition)?),
+                then_branch: Box::new(rewrite_rexpr(scope, exports, *then_branch)?),
+                else_branch: Box::new(rewrite_rexpr(scope, exports, *else_branch)?),
+                span,
+            })
+        })?,
+        RExpr::RPair(components, span) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RPair(
+                components
+                    .into_iter()
+                    .map(|component| rewrite_rexpr(scope, exports, component))
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            ))
+        })?,
+        RExpr::RRecord { base, fields, span } => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RRecord {
+                base: base
+                    .map(|base| rewrite_rexpr(scope, exports, *base).map(Box::new))
+                    .transpose()?,
+                fields: fields
+                    .into_iter()
+                    .map(|(name, value, name_span)| {
+                        Ok((name, rewrite_rexpr(scope, exports, value)?, name_span))
+                    })
+                    .collect::<Result<Vec<_>, ElabError>>()?,
+                span,
+            })
+        })?,
+        RExpr::RPosProj(e, index, span) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RPosProj(
+                Box::new(rewrite_rexpr(scope, exports, *e)?),
+                index,
+                span,
+            ))
+        })?,
+        RExpr::RProj(e, field, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RProj(
+                Box::new(rewrite_rexpr(scope, exports, *e)?),
+                field,
+                s,
+            ))
+        })?,
+        RExpr::RPi(x, a, b, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RPi(
+                x,
+                Box::new(rewrite_rtype(scope, exports, *a)?),
+                Box::new(rewrite_rexpr(scope, exports, *b)?),
+                s,
+            ))
+        })?,
+        RExpr::RArrow(a, b, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RArrow(
+                Box::new(rewrite_rexpr(scope, exports, *a)?),
+                Box::new(rewrite_rexpr(scope, exports, *b)?),
+                s,
+            ))
+        })?,
         RExpr::RAttachedProofRef {
             subject,
             proof_name,
             span,
-        } => RExpr::RCon(
-            resolve_attached_ref(scope, exports, &subject, &proof_name, &span)?,
-            span,
-        ),
-        RExpr::RTrunc(e, s) => RExpr::RTrunc(Box::new(rewrite_rexpr(scope, exports, *e)?), s),
+        } => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RCon(
+                resolve_attached_ref(scope, exports, &subject, &proof_name, &span)?,
+                span,
+            ))
+        })?,
+        RExpr::RTrunc(e, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RTrunc(
+                Box::new(rewrite_rexpr(scope, exports, *e)?),
+                s,
+            ))
+        })?,
     })
 }
 
