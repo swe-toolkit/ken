@@ -1075,14 +1075,26 @@ whole censused population:
 **AN OBLIGATION THIS CANDIDATE DOES NOT DISCHARGE, NAMED WITH ITS OWNER. THERE
 ARE TWO COPIES AND THE SECOND IS THE DANGEROUS ONE.**
 
-    issues/RT-HOST-RESPONSE-OCCURRENCE-KEY.md:196-215
-        THREE clauses, "THE ACCEPTANCE BAR, SET BY THE ARCHITECT".
+**Located by HEADING, not by line, because one of these coordinates went stale
+between the review and this amendment** — see the note below the table.
+
+    issues/RT-HOST-RESPONSE-OCCURRENCE-KEY.md
+        heading "# THE ACCEPTANCE BAR, SET BY THE ARCHITECT"
+        THREE clauses, the third "MUST NOT MIS-ROUTE".
         Now carries a struck clause. Reads as WRONG, so it will get fixed.
 
-    wp/RT-HOST-RESPONSE-OCCURRENCE-KEY.md:130
-        section 3b, "THE ACCEPTANCE BAR (Architect, 2026-09-18)".
+    wp/RT-HOST-RESPONSE-OCCURRENCE-KEY.md
+        heading "### 3b. THE ACCEPTANCE BAR (Architect, 2026-09-18)"
         TWO clauses, no marker. After the strike it is content-correct BY
         COINCIDENCE. Reads as RIGHT, so it will NOT get fixed.
+
+**The line numbers this obligation first carried are already stale, which is
+why it now cites headings.** The three-clause copy was at `:196-215` when the
+Architect verified it during review (`evt_76jqgvmhdtnpq`); `bd454ee04` landed
+between that review and this amendment and moved it to `:267-296`. The `wp`
+copy is at `:130` in both. **Measured at `bd454ee040d04518369450855344748d2ded42da`,
+and stated as a heading so the next reader does not inherit a third reading of
+the same coordinate.**
 
 **The second copy is the one that loses the record.** Anyone later reconciling
 the two finds them agreeing at two clauses and concludes the bar was always two
