@@ -1,13 +1,184 @@
 # `RT-PLANNER-KRET-GRAFTED-SPINE` — frame
 
-**Owner:** runtime. **Size:** M. **Tier:** T1. **Gate:** none.
+**Owner:** runtime. **Size:** XL. **Tier:** T1. **Gate:** none.
 **Ground SHA:** `origin/main` `ddbc803228dbb56f73df31a906ec1fe9a413910e`.
 
-> ## THE DELIVERABLE IS THE REPAIR AND THE TWO ROWS IT CLEARS.
+> ## RECUT 2026-09-19. THE LIVE DELIVERABLE IS `§0`. EVERYTHING FROM `§1` ON IS
+> ## THE DIAGNOSIS THAT PRODUCED IT — HISTORY, NOT WORK.
 >
-> The diagnosis is **finished** and is not this node's work. `D0` is a repair,
-> not a measurement. A candidate whose roster contains no change under
-> `crates/` has not advanced this node.
+> **The deliverable is still the two ignored rows, and a candidate whose roster
+> contains no change under `crates/` has not advanced this node.** That banner
+> survives the recut unchanged.
+>
+> **Size M → XL. The M was not a mis-estimate of the repair** — it was correct
+> for the defect as understood at stop one. Nine hard stops are what established
+> that **the defect is not at a site**, and a node cannot be sized for a
+> conclusion its own investigation had not yet reached.
+
+# 0. The recut — the live frame
+
+Architect rulings `evt_3ynad2h315w1v` and `evt_64d51mf464fmw`, on the research
+advisory `evt_5ny4tmskqx3n4`. Cut and sizing are the Steward's
+(`evt_5whemb2pkgzsp`).
+
+## Settled inputs — measured. Do not re-derive.
+
+**1. Six dispatches, ONE resource token, residual zero** (runtime-leader
+`evt_5dbc20bwkmym1`). **The under-release reading is DROPPED.** It was live for
+one exchange: decomposed by disposition the aggregate reads 1 `Released`
+against 3 expected, which would have meant two resources silently never
+released. One measurement closed it rather than an argument. **The defect is
+over-emission.**
+
+**2. The 1-`Released`/5-`Closed` split is arrival order at one central host
+authority**, not two families disagreeing about disposition. Inventory entry
+10. `request_release` admits only a `Live` slot and refuses every later arrival
+with `Closed`.
+
+**3. Carrying an existing coordinate has already been tried and is not
+enough.** At `bc4764fb8` `DeferredResponseRow` **already carries**
+`owner_pair: Option<DeferredResponseOwnerPair>` with a live accessor, and
+lowering already consumes it — **and the over-emission persists.** Entry 4's
+discard was **necessary and measured NOT SUFFICIENT.** ⇒ What is missing is an
+identity **no coordinate in the system currently expresses**. The owner pair is
+emission *placement* and was never a release-obligation identity. **This is new
+substrate, not a threading exercise**, and that is a settled result rather than
+an open question.
+
+**4. The mechanism is STATIC cross-family claim reconciliation, not a
+compiler-level dynamic flag.** Ken already holds the dynamic authority and it is
+working, so a compiler-level consumption flag would install **a second owner for
+one property** — the defect shape being left, not a fix for it. And there is no
+control-flow uncertainty for a flag to resolve: **both sites execute in the same
+run**, one dispatch from `ken_static_response_0` and five from
+`ken_continuation_context_1`. A flag would hide the over-emission at runtime
+while leaving the planning defect in place, which is worse than the present
+state because the present state is at least loud.
+
+**5. A bare resource identity is not sufficient on its own.** It makes
+disagreement *expressible*; the **consumption state** is what enforces
+at-most-once. Rust's `MovePathIndex` plus drop flags and `resourcet`'s
+`ReleaseKey` plus registry are one representation under two enforcement
+regimes, and the advisory found no third shape.
+
+## Deliverables
+
+**`D0` — mint, carry, reconcile the observed two, and fail closed on the rest.**
+Releasable on its own (`steward.md §4a`).
+
+- One `ReleaseObligationId` **minted at bracket planning**, distinct from source
+  origin and from every family key, associated with the runtime operand and its
+  source provenance.
+- **Carried** demand → row → emission claim → dispatch claim.
+- The claims of `ken_static_response_0` and `ken_continuation_context_1`
+  **reconciled in ONE table keyed by that id.** Family keys place code and
+  never own disposition.
+- **A release claim that carries no obligation id is a COMPILE ERROR.**
+
+**`D1` — producer closure.** Enumerate **every family that can mint a release
+claim** and reconcile the roster. The closure is over **producers**, not over
+the two families that happened to be observed.
+
+## Why the fail-closed default sits in `D0` and not in `D1`
+
+Architect `evt_64d51mf464fmw`, and it is the sharpest thing in the recut.
+
+`D0` reconciles two families and leaves three. **That is not a regression** —
+those three behave exactly as they do today. But look at what `D0` does to the
+incentive: **`D0` clears the ignored rows, and the ignored rows are the only
+visible pressure for `D1`.** After `D0` the symptom is gone and the class is
+still open, and **a silently unreconciled family looks identical to a
+reconciled one.**
+
+⇒ **Make the unenumerated family a compile error rather than a silent pass.**
+Not a diagnostic, not a warning, not a table lookup that misses. The three
+families `D0` does not reconcile then announce themselves the moment they mint
+a claim, and `D1` becomes what it should be — enumerate the roster and
+reconcile it — **with the gap loud in the meantime instead of resting on `D1`
+being prioritised after its symptom has disappeared.**
+
+## Acceptance criteria
+
+**`AC-R1` — the two ignored rows clear, and the planner is what moved.**
+*Control:* `linked_public_right_denial_preserves_exact_masks`
+(`px7f_resource_native.rs:314`) goes green, **and** the native envelope matches
+the interpreter's — `exit_status: 0` and exactly three events, per the `M2`
+oracle differential. **A candidate that reaches green by changing the fixture,
+its assertions, or its ignore attribute has not advanced this node.** Do not
+read `:348`'s pass as a second confirmation; `§1` records that it discriminates
+nothing.
+
+**`AC-R2` — the fail-closed default is real, and this is the control that can
+fail.** *Control:* delete the obligation id from **one reconciled family's**
+claim minting; **the build must fail to COMPILE**, restored byte-exact
+afterwards. A diagnostic, a warning, a panic, or a runtime error **is not a
+pass** — the whole point is that the gap is caught before anything runs. Run
+this arm on a family `D0` actually reconciles; a mutation of an unreconciled
+family tests nothing, because those are expected to error already.
+
+**`AC-R3` — the five per-family injectivity guards survive unweakened.**
+*Control:* the roster shows **none of the five deleted, merged, or relaxed**,
+and each still reds on its own duplicate-identity input. See the does-not-touch
+section: removing one is an explicit **non**-discharge.
+
+**`AC-R4` — no new trust, and the host table is not the mechanism.** *Control:*
+the added lines contain no `Axiom`, postulate, primitive, `Omega` carrier, or
+kernel/TCB surface; **and the diff touches no resource-table code in
+`ken-host`.** `ResourceTableV1` stays exactly what it is. A candidate whose
+argument is that the host already enforces at-most-once has restated the
+problem rather than fixed it.
+
+## Stop condition
+
+**If `D0` cannot be built without either weakening one of the five guards or
+promoting the host table to the primary mechanism, stop and report.** Both are
+the recut being discharged by substitution rather than by addition, and a report
+that says so is worth more than a candidate that does it quietly.
+
+## What this recut does NOT touch
+
+This section is retained scope. Everything named here is already proved or
+already correct, and none of it is a deliverable of this WP. A candidate that
+changes any of it has exceeded the recut, not advanced it.
+
+**The five per-family injectivity guards stay exactly as they are.** One pass
+forward-declares five declaration families -- units, continuations, responses,
+contexts, fusions -- each keyed by its own typed identity, and each already
+fails closed when two descriptors claim one identity in its own key space.
+Those guards are sound, they remain live, and they remain fail-closed. What
+changes is only how they are READ: **they stop being read as the completeness
+argument, they are not deleted.** They were never wrong; they answer "do two X
+claim one X-identity?", and the property this WP installs -- exactly one
+release per acquisition -- ranges over a population none of their keys names.
+Local well-formedness and cross-family completeness are orthogonal, and this
+WP adds the second without weakening the first.
+
+**Removing, weakening, or merging any of those five guards is an explicit
+NON-discharge of this WP.** If a candidate's roster shows one of them deleted,
+that candidate has substituted the new mechanism for the old one instead of
+adding it, and the reviewer should reject on that alone.
+
+**The grafted-spine work already proved is retained.** The semantic mechanisms
+established on this node stand; the owner-pair repair at the
+`DeferredResponseRow` boundary stands and is not to be reverted. Carrying the
+owner pair was NECESSARY and was measured NOT SUFFICIENT -- that is a settled
+result, not an open question, and it is the reason this WP mints a new
+identity rather than threading an existing coordinate.
+
+**The narrowing is retained as a measured fact.** Of the eighteen compile-time
+claims, SIXTEEN have no executing dispatch site: origin 190's thirteen in
+Specialization(1) and origin 622's three in Predeclared(4). The executing
+population is exactly origin 190's two Specialization(0) claims, and it maps
+one-to-one onto the two observed dispatch sites. This WP does not re-open that
+measurement and does not need to re-derive it.
+
+**The host resource table is retained as the runtime backstop and is NOT the
+mechanism.** `ResourceTableV1` admits only a `Live` slot, refuses every later
+arrival with `Closed`, and settles `Released` once. It is working. It is the
+first common authority and it sits too late to prevent the dispatches, which
+is why this WP acts before dispatch. **This WP must not be discharged by
+leaning on the host table**, and a candidate whose argument is that the host
+already enforces at-most-once has restated the problem rather than fixed it.
 
 ## 1. Fixed inputs
 
