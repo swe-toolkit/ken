@@ -58,6 +58,14 @@ instance Membership (ListMembership a) {
   member = list_membership_member a
 }
 
+theorem list_membership_adapter_fidelity
+      (a : Type) (d : Ord a) (xs : List a) (query : a)
+    : Equal
+        Bool
+        (list_membership_member a query (MkListMembership a d xs))
+        (elem a d query xs) =
+  Refl
+
 fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
   match xs {
     Nil ↦ Top;
@@ -69,6 +77,11 @@ fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
 ```
 
 ## Laws and proofs
+
+`list_membership_adapter_fidelity` is the checked adapter obligation. It
+constructs the nominal view from arbitrary `d` and `xs`, then proves the actual
+adapter definitionally equal to `elem a d query xs`. Replacing the stored
+comparator in the adapter therefore breaks the proof.
 
 The four `elem_step` lemmas are the decision bridge. They rewrite the two
 ordering observations to the branch constructors and expose either the head
