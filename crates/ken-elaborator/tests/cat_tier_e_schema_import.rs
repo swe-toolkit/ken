@@ -44,6 +44,8 @@ fn public_surface() -> BTreeSet<String> {
         "schema_issue_origin",
         "schema_issue_code",
         "schema_validate_fields",
+        "schema_validate_fields::accepted_tail_invalid",
+        "schema_validate_fields::valid_coverage",
         "schema_validate",
         "schema_help",
     ])
@@ -202,7 +204,7 @@ fn schema_selective_import_ledger_is_exact() {
         ),
         (
             "Data.Collections.Derived".to_string(),
-            names(&["list_append"]),
+            names(&["list_append", "nth"]),
         ),
         (
             "Data.Collections.NonEmpty".to_string(),
@@ -237,7 +239,22 @@ fn schema_loader_visible_inventory_is_exact() {
         .iter()
         .map(|surface| (surface.clone(), env.globals[&format!("{SCHEMA}.{surface}")]))
         .collect::<BTreeMap<_, _>>();
-    let selections = expected
+    let direct_surfaces = expected
+        .iter()
+        .filter(|surface| !surface.contains("::"))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for attached in expected.iter().filter(|surface| surface.contains("::")) {
+        let subject = attached
+            .split_once("::")
+            .expect("attached Schema surface must name its subject")
+            .0;
+        assert!(
+            direct_surfaces.contains(subject),
+            "attached Schema surface {attached} requires direct subject {subject}"
+        );
+    }
+    let selections = direct_surfaces
         .iter()
         .enumerate()
         .map(|(index, surface)| format!("{surface} as cat_tier_e_schema_{index}"))
@@ -268,6 +285,7 @@ fn schema_checked_provider_identity_closure_is_exact() {
         "Capability.Formatting.Doc.Doc",
         "Capability.Formatting.Doc.Text",
         "Data.Collections.Derived.list_append",
+        "Data.Collections.Derived.nth",
         "Data.Collections.NonEmpty.NonEmpty",
         "Data.Collections.NonEmpty.nonempty_append",
         "Data.Collections.NonEmpty.nonempty_cons",

@@ -11,7 +11,7 @@ the clients.
 ```ken
 import Capability.Formatting.Doc (Doc, Text)
 
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, nth)
 
 import Data.Collections.NonEmpty (NonEmpty, nonempty_append, nonempty_cons)
 
@@ -140,7 +140,7 @@ fn schema_validation_cons
       }
   }
 
-fn schema_validate_fields
+pub fn schema_validate_fields
       (origin : Type)
       (value : Type)
       (inspect : SchemaField → SchemaFieldCheck origin value)
@@ -155,6 +155,515 @@ fn schema_validate_fields
         (inspect field)
         (schema_validate_fields origin value inspect rest)
   }
+
+theorem schema_some_injective
+      (a : Type) (left : a) (right : a) (same : Equal (Option a) (Some a left) (Some a right))
+    : Equal a left right =
+  same
+
+theorem schema_valid_injective
+      (e : Type)
+      (a : Type)
+      (left : a)
+      (right : a)
+      (same : Equal (Validation e a) (Valid e a left) (Valid e a right))
+    : Equal a left right =
+  same
+
+theorem schema_sym
+      (a : Type) (left : a) (right : a) (same : Equal a left right)
+    : Equal a right left =
+  J (λactual _. Equal a actual left) Refl same
+
+theorem schema_field_check_cases
+      (origin : Type) (value : Type) (outcome : SchemaFieldCheck origin value)
+    : (goal : Prop)
+      → ((issue : SchemaIssue origin)
+          → Equal
+          (SchemaFieldCheck origin value)
+          outcome
+          (SchemaFieldRejected origin value issue)
+          → goal)
+      → ((accepted : value)
+          → Equal
+          (SchemaFieldCheck origin value)
+          outcome
+          (SchemaFieldAccepted origin value accepted)
+          → goal)
+      → goal =
+  match outcome {
+    SchemaFieldRejected issue ↦ λgoal. λon_rejected. λon_accepted. on_rejected issue Refl;
+    SchemaFieldAccepted accepted ↦ λgoal. λon_rejected. λon_accepted. on_accepted accepted Refl
+  }
+
+theorem schema_validation_cases
+      (e : Type) (a : Type) (outcome : Validation e a)
+    : (goal : Prop)
+      → ((issues : e) → Equal (Validation e a) outcome (Invalid e a issues) → goal)
+      → ((values : a) → Equal (Validation e a) outcome (Valid e a values) → goal)
+      → goal =
+  match outcome {
+    Invalid issues ↦ λgoal. λon_invalid. λon_valid. on_invalid issues Refl;
+    Valid values ↦ λgoal. λon_invalid. λon_valid. on_valid values Refl
+  }
+
+theorem schema_validation_cons_transport
+      (origin : Type)
+      (value : Type)
+      (actual_head : SchemaFieldCheck origin value)
+      (known_head : SchemaFieldCheck origin value)
+      (same_head : Equal (SchemaFieldCheck origin value) actual_head known_head)
+      (actual_tail : SchemaValidation origin value)
+      (known_tail : SchemaValidation origin value)
+      (same_tail : Equal (SchemaValidation origin value) actual_tail known_tail)
+      (outcome : SchemaValidation origin value)
+      (same_result : Equal
+        (SchemaValidation origin value)
+        (schema_validation_cons origin value actual_head actual_tail)
+        outcome)
+    : Equal
+        (SchemaValidation origin value)
+        (schema_validation_cons origin value known_head known_tail)
+        outcome =
+  J
+    (λhead _.
+      Equal
+        (SchemaValidation origin value)
+        (schema_validation_cons origin value head known_tail)
+        outcome)
+    (J
+      (λtail _.
+        Equal
+          (SchemaValidation origin value)
+          (schema_validation_cons origin value actual_head tail)
+          outcome)
+      same_result
+      same_tail)
+    same_head
+
+theorem schema_nth_cons_zero_transport
+      (a : Type)
+      (head : a)
+      (tail : List a)
+      (values : List a)
+      (same : Equal (List a) (Cons a head tail) values)
+    : Equal (Option a) (nth a Zero values) (Some a head) =
+  J (λactual _. Equal (Option a) (nth a Zero actual) (Some a head)) Refl same
+
+theorem schema_nth_cons_suc_transport
+      (a : Type)
+      (head : a)
+      (tail : List a)
+      (values : List a)
+      (i : Nat)
+      (found : a)
+      (hfound : Equal (Option a) (nth a i tail) (Some a found))
+      (same : Equal (List a) (Cons a head tail) values)
+    : Equal (Option a) (nth a (Suc i) values) (Some a found) =
+  J (λactual _. Equal (Option a) (nth a (Suc i) actual) (Some a found)) hfound same
+
+theorem schema_inspect_transport
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (head : SchemaField)
+      (field : SchemaField)
+      (accepted : value)
+      (hhead : Equal
+        (SchemaFieldCheck origin value)
+        (inspect head)
+        (SchemaFieldAccepted origin value accepted))
+      (hfield : Equal (Option SchemaField) (Some SchemaField head) (Some SchemaField field))
+    : Equal
+        (SchemaFieldCheck origin value)
+        (inspect field)
+        (SchemaFieldAccepted origin value accepted) =
+  J
+    (λactual _.
+      Equal
+        (SchemaFieldCheck origin value)
+        (inspect actual)
+        (SchemaFieldAccepted origin value accepted))
+    hhead
+    (schema_some_injective SchemaField head field hfield)
+
+theorem schema_fields_valid_coverage_helper
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (fields : List SchemaField)
+    : (values : List value)
+      → Equal
+        (SchemaValidation origin value)
+        (schema_validate_fields origin value inspect fields)
+        (Valid (NonEmpty (SchemaIssue origin)) (List value) values)
+      → (goal : Prop)
+      → (i : Nat)
+      → (field : SchemaField)
+      → Equal (Option SchemaField) (nth SchemaField i fields) (Some SchemaField field)
+      → ((accepted : value)
+          → Equal
+          (Option value)
+          (nth value i values)
+          (Some value accepted)
+          → Equal
+          (SchemaFieldCheck origin value)
+          (inspect field)
+          (SchemaFieldAccepted origin value accepted)
+          → goal)
+      → goal =
+  match fields {
+    Nil ↦ λvalues. λhvalid. λgoal. λi. λfield. λhfield. λrecover. absurd hfield;
+    Cons head tail ↦
+      λvalues.
+        λhvalid.
+          λgoal.
+            λi.
+              match i {
+                Zero ↦
+                  λfield.
+                    λhfield.
+                      λrecover.
+                        schema_field_check_cases
+                          origin
+                          value
+                          (inspect head)
+                          goal
+                          (λissue.
+                            λhhead.
+                              schema_validation_cases
+                                (NonEmpty (SchemaIssue origin))
+                                (List value)
+                                (schema_validate_fields origin value inspect tail)
+                                goal
+                                (λissues.
+                                  λhtail.
+                                    absurd
+                                      (schema_validation_cons_transport
+                                        origin
+                                        value
+                                        (inspect head)
+                                        (SchemaFieldRejected origin value issue)
+                                        hhead
+                                        (schema_validate_fields origin value inspect tail)
+                                        (Invalid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          issues)
+                                        htail
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          values)
+                                        hvalid))
+                                (λtail_values.
+                                  λhtail.
+                                    absurd
+                                      (schema_validation_cons_transport
+                                        origin
+                                        value
+                                        (inspect head)
+                                        (SchemaFieldRejected origin value issue)
+                                        hhead
+                                        (schema_validate_fields origin value inspect tail)
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          tail_values)
+                                        htail
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          values)
+                                        hvalid)))
+                          (λaccepted.
+                            λhhead.
+                              schema_validation_cases
+                                (NonEmpty (SchemaIssue origin))
+                                (List value)
+                                (schema_validate_fields origin value inspect tail)
+                                goal
+                                (λissues.
+                                  λhtail.
+                                    absurd
+                                      (schema_validation_cons_transport
+                                        origin
+                                        value
+                                        (inspect head)
+                                        (SchemaFieldAccepted origin value accepted)
+                                        hhead
+                                        (schema_validate_fields origin value inspect tail)
+                                        (Invalid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          issues)
+                                        htail
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          values)
+                                        hvalid))
+                                (λtail_values.
+                                  λhtail.
+                                    recover
+                                      accepted
+                                      (schema_nth_cons_zero_transport
+                                        value
+                                        accepted
+                                        tail_values
+                                        values
+                                        (schema_valid_injective
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          (Cons value accepted tail_values)
+                                          values
+                                          (schema_validation_cons_transport
+                                            origin
+                                            value
+                                            (inspect head)
+                                            (SchemaFieldAccepted origin value accepted)
+                                            hhead
+                                            (schema_validate_fields origin value inspect tail)
+                                            (Valid
+                                              (NonEmpty (SchemaIssue origin))
+                                              (List value)
+                                              tail_values)
+                                            htail
+                                            (Valid
+                                              (NonEmpty (SchemaIssue origin))
+                                              (List value)
+                                              values)
+                                            hvalid)))
+                                      (schema_inspect_transport
+                                        origin
+                                        value
+                                        inspect
+                                        head
+                                        field
+                                        accepted
+                                        hhead
+                                        hfield)));
+                Suc i2 ↦
+                  λfield.
+                    λhfield.
+                      λrecover.
+                        schema_field_check_cases
+                          origin
+                          value
+                          (inspect head)
+                          goal
+                          (λissue.
+                            λhhead.
+                              schema_validation_cases
+                                (NonEmpty (SchemaIssue origin))
+                                (List value)
+                                (schema_validate_fields origin value inspect tail)
+                                goal
+                                (λissues.
+                                  λhtail.
+                                    absurd
+                                      (schema_validation_cons_transport
+                                        origin
+                                        value
+                                        (inspect head)
+                                        (SchemaFieldRejected origin value issue)
+                                        hhead
+                                        (schema_validate_fields origin value inspect tail)
+                                        (Invalid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          issues)
+                                        htail
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          values)
+                                        hvalid))
+                                (λtail_values.
+                                  λhtail.
+                                    absurd
+                                      (schema_validation_cons_transport
+                                        origin
+                                        value
+                                        (inspect head)
+                                        (SchemaFieldRejected origin value issue)
+                                        hhead
+                                        (schema_validate_fields origin value inspect tail)
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          tail_values)
+                                        htail
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          values)
+                                        hvalid)))
+                          (λaccepted.
+                            λhhead.
+                              schema_validation_cases
+                                (NonEmpty (SchemaIssue origin))
+                                (List value)
+                                (schema_validate_fields origin value inspect tail)
+                                goal
+                                (λissues.
+                                  λhtail.
+                                    absurd
+                                      (schema_validation_cons_transport
+                                        origin
+                                        value
+                                        (inspect head)
+                                        (SchemaFieldAccepted origin value accepted)
+                                        hhead
+                                        (schema_validate_fields origin value inspect tail)
+                                        (Invalid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          issues)
+                                        htail
+                                        (Valid
+                                          (NonEmpty (SchemaIssue origin))
+                                          (List value)
+                                          values)
+                                        hvalid))
+                                (λtail_values.
+                                  λhtail.
+                                    schema_fields_valid_coverage_helper
+                                      origin
+                                      value
+                                      inspect
+                                      tail
+                                      tail_values
+                                      htail
+                                      goal
+                                      i2
+                                      field
+                                      hfield
+                                      (λfound.
+                                        λhfound.
+                                          λhinspect.
+                                            recover
+                                              found
+                                              (schema_nth_cons_suc_transport
+                                                value
+                                                accepted
+                                                tail_values
+                                                values
+                                                i2
+                                                found
+                                                hfound
+                                                (schema_valid_injective
+                                                  (NonEmpty (SchemaIssue origin))
+                                                  (List value)
+                                                  (Cons value accepted tail_values)
+                                                  values
+                                                  (schema_validation_cons_transport
+                                                    origin
+                                                    value
+                                                    (inspect head)
+                                                    (SchemaFieldAccepted origin value accepted)
+                                                    hhead
+                                                    (schema_validate_fields
+                                                      origin
+                                                      value
+                                                      inspect
+                                                      tail)
+                                                    (Valid
+                                                      (NonEmpty (SchemaIssue origin))
+                                                      (List value)
+                                                      tail_values)
+                                                    htail
+                                                    (Valid
+                                                      (NonEmpty (SchemaIssue origin))
+                                                      (List value)
+                                                      values)
+                                                    hvalid)))
+                                              hinspect)))
+              }
+  }
+
+pub proof valid_coverage for schema_validate_fields
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (fields : List SchemaField)
+      (values : List value)
+      (hvalid : Equal
+        (SchemaValidation origin value)
+        (schema_validate_fields origin value inspect fields)
+        (Valid (NonEmpty (SchemaIssue origin)) (List value) values))
+    : (i : Nat)
+      → (field : SchemaField)
+      → Equal (Option SchemaField) (nth SchemaField i fields) (Some SchemaField field)
+      → (goal : Prop)
+      → ((accepted : value)
+          → Equal
+          (Option value)
+          (nth value i values)
+          (Some value accepted)
+          → Equal
+          (SchemaFieldCheck origin value)
+          (inspect field)
+          (SchemaFieldAccepted origin value accepted)
+          → goal)
+      → goal =
+  λi.
+    λfield.
+      λhfield.
+        λgoal.
+          λrecover.
+            schema_fields_valid_coverage_helper
+              origin
+              value
+              inspect
+              fields
+              values
+              hvalid
+              goal
+              i
+              field
+              hfield
+              recover
+
+pub proof accepted_tail_invalid for schema_validate_fields
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (field : SchemaField)
+      (rest : List SchemaField)
+      (accepted : value)
+      (issues : NonEmpty (SchemaIssue origin))
+      (hfield : Equal
+        (SchemaFieldCheck origin value)
+        (inspect field)
+        (SchemaFieldAccepted origin value accepted))
+      (htail : Equal
+        (SchemaValidation origin value)
+        (schema_validate_fields origin value inspect rest)
+        (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues))
+    : Equal
+        (SchemaValidation origin value)
+        (schema_validate_fields origin value inspect (Cons SchemaField field rest))
+        (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues) =
+  schema_validation_cons_transport
+    origin
+    value
+    (SchemaFieldAccepted origin value accepted)
+    (inspect field)
+    (schema_sym
+      (SchemaFieldCheck origin value)
+      (inspect field)
+      (SchemaFieldAccepted origin value accepted)
+      hfield)
+    (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
+    (schema_validate_fields origin value inspect rest)
+    (schema_sym
+      (SchemaValidation origin value)
+      (schema_validate_fields origin value inspect rest)
+      (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
+      htail)
+    (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
+    Refl
 
 fn schema_validate
       (origin : Type)
