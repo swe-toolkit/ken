@@ -354,3 +354,24 @@ Relaxation is refuted by 8.11h-2's `ANY USE` return and must not be re-proposed
 as a shortcut. The sort-key residual (`:2069`, `:2286-2291`, `:2900`, `CARRY`
 only if `StaticResponseContinuationId::from_position` is label-only) is
 recorded unresolved and is not folded into this increment.
+
+# 2026-09-20 re-kick: the sort-key residual is classified CARRY
+
+Re-grounded on `origin/main` `cf4533b746a9c3141baa92b4e175e5a3b0896deb`.
+The current coordinates are `responses.rs:2064-2075`, `:2287-2296`, and
+`:2898-2907`. `StaticResponseContinuationId` is a dense internal pairing label:
+demand closure keys re-derived copies by it, resolution copies it into the
+response row, owner construction copies the row id into `owner.response()`, and
+planner/lowering compare those two copied endpoints. No production path reads
+its ordinal; the sole ordinal observation is test-support. The sort therefore
+renumbers both ends together and is CARRY, not route selection.
+
+This closes the recorded residual without changing the node's outcome.
+`producer_call_origin` still has real production USE sites; their observables
+are flat or unreached only on the four-row population. The classification stays
+ANY USE, so neither occurrence-keying nor relaxation is authorized. No
+production edit and no row readmission follow. The current scoped runtime
+baseline is **1036 passed / 0 failed / 1 ignored**, and all four named CLI rows
+were re-run individually; each still stops first at the construction-time
+collision. Full detail and the honest review-enforced residual are in work
+package section 8.11k.

@@ -1437,3 +1437,53 @@ last open candidate at that coordinate is closed **on these rows**.
 **The sort-key residual at `:2069`, `:2286-2291` and `:2900` was not settled and
 was not pursued** — the measurement did not happen to touch
 `StaticResponseContinuationId::from_position`, and the kickoff fenced it.
+
+#### 8.11k Re-kick readout: the sort-key residual is CARRY, not route selection
+
+**Re-grounded at `origin/main`
+`cf4533b746a9c3141baa92b4e175e5a3b0896deb`.** The current coordinates are
+`responses.rs:2064-2075`, `:2287-2296`, and `:2898-2907`. The first sort orders
+`response_vis`; the latter two assign dense `StaticResponseContinuationId`
+values after sorting the complete demand population and the Specialized
+subset.
+
+The result is **CARRY at current source**. `StaticResponseContinuationId` has a
+closed tuple field and exactly these production roles:
+
+- demand closure keys expected and reached copies by the same derived id;
+- resolution copies `demand.id` into its `StaticResponseContinuation`;
+- owner construction copies `row.id()` into `owner.response()`;
+- planner and lowering joins compare that copied owner response with the row id.
+
+No production branch, group, emitted ABI field, call target, or symbol reads the
+continuation-id ordinal. The sole ordinal projection outside its declaration is
+`static_transition.rs`'s `StaticResponseOwnerObservation`, under
+`px8-ds-test-support`. Lowering names emitted response functions by
+`StaticResponseOwnerId`, a separate identity minted only after the rows are
+closed. Reordering the sort therefore renumbers both ends of each internal join
+together; it cannot select a different route.
+
+**MEASURED:** every construction and reader of
+`StaticResponseContinuationId` in `crates/ken-runtime/src` has one of the roles
+above, and the only ordinal observation is test-support. **CLAIMED:** the
+`producer_call_origin` components of these three sort keys are deterministic
+label ordering, not production use of route provenance. **THE GAP:** this is a
+current-source classification, not a permanent mechanical closure. A future
+production call to `ordinal()` or independently minted owner response would
+make the ordering semantic; item visibility permits such a consumer, so review,
+not a repository-text test, guards that residual.
+
+This closes the last unclassified reader from section 8.11h without changing
+its decision. The classification remains **ANY USE**, because the stage
+partition and `repeated_producer` really branch on `producer_call_origin` even
+though their observables are respectively flat and unreached on these four
+rows. Therefore neither the occurrence-key repair nor relaxation is authorized
+by this readout. No production edit is made and no row is readmitted.
+
+The fresh targeted baseline moved from the historical **1035 passed / 0 failed
+/ 2 ignored** to **1036 passed / 0 failed / 1 ignored**. All four named CLI rows
+were then run individually at this base; each executed one test and still
+failed first at `two host response cases claim one operation constructor`.
+Their individual dispositions remain ignored, but their labels are shortened
+to the current two-clause ruling and no longer claim the struck clause 3 or
+production use of all three differing origins.
