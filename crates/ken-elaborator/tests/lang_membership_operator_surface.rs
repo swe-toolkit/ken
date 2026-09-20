@@ -237,6 +237,9 @@ const key_observed : Bool = Zero ∈ empty_key_view
 const relation_observed : Bool =
   mk_pair Nat Nat Zero (Suc Zero) ∈ down_relation_view
 const comparator_observed : Bool = Suc Zero ∈ down_key_view
+const comparator_absent_observed : Bool = Suc (Suc Zero) ∈ down_key_view
+const relation_absent_source_observed : Bool =
+  mk_pair Nat Nat (Suc (Suc Zero)) (Suc Zero) ∈ down_relation_view
 
 const wrong_comparator_observed : Bool =
   member Nat Unit (Ord_instance_Nat).leq (Suc Zero) down_tree
@@ -254,6 +257,12 @@ theorem stored_comparator_finds_the_key
 theorem fresh_canonical_comparator_misses_the_same_key
     : Equal Bool wrong_comparator_observed False = Proved
 
+theorem stored_comparator_rejects_an_absent_key
+    : Equal Bool comparator_absent_observed False = Proved
+
+theorem stored_relation_comparator_rejects_an_absent_source
+    : Equal Bool relation_absent_source_observed False = Proved
+
 theorem stored_relation_comparator_finds_the_edge
     : Equal Bool relation_observed True = Proved
 
@@ -269,12 +278,12 @@ theorem fresh_canonical_comparator_misses_the_same_edge
 /// use `Nat` queries, so their distinct result is the carrier-first
 /// discriminator: choosing from the query cannot distinguish them.
 ///
-/// The final four theorems are the comparator falsifiers. A lawful descending
+/// The comparator theorems form non-degenerate pairs. A lawful descending
 /// dictionary is stored in both ordered views while the canonical ascending
-/// `Ord Nat` remains available. The stored comparator finds a key and an edge
-/// which fresh canonical lookups miss on the same trees. The relation witness
-/// recursively proves its stored successor tree ordered under that same
-/// dictionary.
+/// `Ord Nat` remains available. The stored comparator finds a present key and
+/// edge, rejects an absent key and source, and disagrees with fresh canonical
+/// lookups on the same trees. The relation witness recursively proves its
+/// stored successor tree ordered under that same dictionary.
 #[test]
 fn three_named_providers_are_carrier_first_and_retain_their_own_comparator() {
     let mut env = catalog_env();
@@ -308,6 +317,8 @@ fn three_named_providers_are_carrier_first_and_retain_their_own_comparator() {
         "key_observed",
         "relation_observed",
         "comparator_observed",
+        "comparator_absent_observed",
+        "relation_absent_source_observed",
         "wrong_comparator_observed",
         "wrong_relation_comparator_observed",
     ] {
