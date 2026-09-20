@@ -1,7 +1,7 @@
 ---
 id: LANG-IMPORT-IDENTITY-ESCAPE
 title: "give bind_import's already-a-local arm the same-identity escape its already-imported arm already has, keyed on resolved GlobalId rather than on the surface spelling -- a module may not currently import a name it also reaches ambiently, even when both routes resolve to one declaration"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
