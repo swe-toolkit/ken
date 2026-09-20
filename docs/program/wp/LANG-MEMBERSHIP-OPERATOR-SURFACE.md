@@ -483,20 +483,31 @@ above is SPENT and its date has passed.** Last landed touches at
 > until they are placed in one of the three lists.** That much is a MIRRORING
 > update and you are authorized to make it.
 >
-> **WHICH list is not bookkeeping, and this is the part to get right.** The
-> `census` list is **migration debt** — its doc says *"every remaining name
-> still requires an explicit provider migration."* **Aim for `clean`**, which
-> means importing every name you use explicitly rather than taking it ambiently.
-> The concrete trap, because it is the one that just fired: `IsTrue` is
-> `pub fn IsTrue` at `Core/Classes/LawfulClasses.ken.md:54` and must be **named
-> in an import** — `Data/Numeric/Nat/Order.ken.md:37` does exactly that, uses it
-> eighteen times, and stays out of the census. You will use `IsTrue`: `§5` item
-> 4 defines `member_holds := IsTrue(member)`.
+> **WHICH list, ruled by the Steward 2026-09-20 (`evt_6hcan5dx5pyrr`): the
+> `census` list, NOT `clean`.** `clean` is unreachable for this module by
+> construction and is not a criterion here.
 >
-> **If a module of yours cannot reach `clean`, stop and say which name and
-> why.** Adding an ambient entry is recording new debt against a migration
-> program, and it is a Steward decision, not a test edit. Full reasoning:
-> `CAT-PARSING-CURSOR-LAWS` `AC-3c`, Steward ruling `evt_5f4qhhwqk1hye`.
+> That test is a **behavioral** census by its own doc comment, so a module
+> inherits the ambient residual of everything it roots-loads. `§5` item 4
+> requires `member_holds := IsTrue(member)`, `IsTrue` is `pub fn IsTrue` at
+> `Core/Classes/LawfulClasses.ken.md:54`, and importing it roots-loads
+> `LawfulClasses`. Measured at `051039fa0` in
+> `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs`:
+> `expected_clean` has exactly four members — `Core.Logic.Or`,
+> `Core.Logic.OrdResult`, `Core.Logic.Transport`,
+> `Tooling.Verification.ProofErasureBoundaryChecker` — none of which imports
+> from `LawfulClasses`, while `expected` has 47 rows including
+> `Core.Classes.LawfulClasses` and `Data.Numeric.Nat.Order`, both carrying
+> `[And, Bottom, Equal, Prop, Proved, and_fst, and_intro, and_snd]`.
+>
+> **The criterion is CONTRIBUTES NO NAME OF ITS OWN**, discharged by the
+> two-way set difference against the provider being empty. Add
+> `Core.Classes.Membership` to `expected` with exactly the observed vector,
+> placed where its path sorts, and leave `expected_clean` at its four members.
+>
+> **If adding your row moves any OTHER row's vector, stop and report it.** That
+> is a finding rather than a mirroring update, and it is the one outcome this
+> authorization does not cover.
 
 > **A branch scan is the WRONG instrument here and reports merged nodes as
 > live.** `git diff origin/main...<branch>` against a squash-merged branch still
