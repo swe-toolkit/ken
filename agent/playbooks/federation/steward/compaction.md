@@ -71,6 +71,31 @@ The Adversary is compacted at M8 before a code-merge notification. Compact,
 verify, notify, rouse. It does not self-compact and does not receive a periodic
 compaction schedule.
 
+**The mechanism is `moot compact adversary`** — a single-role compaction, the
+same form as the Steward's own `moot compact steward`. Run it as the first act
+of M8, before the notification.
+
+**Do NOT use `scripts/handoff-gate-compact.sh` for the Adversary.** It resets
+each named worktree to `origin/main` and refuses outright if that worktree has
+uncommitted changes. That reset is appropriate at a build team's new-WP seam,
+where old task context is disposable; it is wrong for a seat whose worktree
+state is its own, and the refusal turns a routine step into a dead end.
+
+**Verify by reading the pane, not by the command's exit status.** A context
+drop, an active compaction, or a queued one all count. `moot compact` returning
+zero means the request was sent, which is the same state as a request that was
+never acted on — see the whole-file rule: *a sent command without an observed
+result is not a completed gate.*
+
+> **This clause named no command until 2026-09-20, and that omission is why the
+> step silently degraded to notify-only.** The Adversary was found at 97%
+> context after numerous hunts with no compaction, while its notifications had
+> been arriving normally — notify has an obvious mechanism and compact did not,
+> so the half with an instrument ran and the half without it did not. **A
+> procedure step with an owner, an ordering, and a verification requirement but
+> no named instrument is not a weak step; it is an unexecutable one.** Operator
+> finding and repair authorization, same date.
+
 ## Failures
 
 - If a pane is working, leave it alone.
