@@ -253,16 +253,37 @@ impl Scope {
         }
     }
 
-    fn bind_import(&mut self, bare: &str, qualified: &str, span: &Span) -> Result<(), ElabError> {
+    fn bind_import(
+        &mut self,
+        globals: &HashMap<String, ken_kernel::GlobalId>,
+        bare: &str,
+        qualified: &str,
+        span: &Span,
+    ) -> Result<(), ElabError> {
         if self.locals.contains(bare) {
-            let local = self
-                .bindings
-                .get(bare)
-                .cloned()
-                .unwrap_or_else(|| bare.to_string());
+            let local_binding = self.bindings.get(bare).cloned();
+            let local_id = match local_binding.as_deref() {
+                Some(local) => globals.get(local),
+                None => globals.get(bare),
+            };
+            let imported_id = globals.get(qualified);
+            if local_id
+                .zip(imported_id)
+                .is_some_and(|(local, imported)| local == imported)
+            {
+                return Ok(());
+            }
+            let local_source = local_binding
+                .or_else(|| local_id.map(|id| format!("{id:?}")))
+                .ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "local import collision for `{bare}` has neither a canonical \
+                         binding nor a resolved identity"
+                    ))
+                })?;
             return Err(ElabError::AmbiguousReference {
                 name: bare.to_string(),
-                sources: vec![local, qualified.to_string()],
+                sources: vec![local_source, qualified.to_string()],
                 span: span.clone(),
             });
         }
@@ -464,7 +485,7 @@ fn apply_import(
                         });
                     }
                 }
-                scope.bind_import(bare, q, span)?;
+                scope.bind_import(globals, bare, q, span)?;
             }
         }
     }
@@ -3234,15 +3255,16 @@ pub fn expand_and_elaborate(
 
 #[cfg(test)]
 mod namespace_effect_tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeSet, HashMap};
     use std::fs;
     use std::path::PathBuf;
 
-    use super::{decl_namespace_effect, ConstructorNameSource, DeclNamespaceEffect};
+    use super::{decl_namespace_effect, ConstructorNameSource, DeclNamespaceEffect, Scope};
     use crate::ast::{Decl, ExplicitDataCtor};
-    use crate::error::Span;
+    use crate::error::{ElabError, Span};
     use crate::parser::parse_decls;
     use crate::ElabEnv;
+    use ken_kernel::GlobalId;
 
     #[derive(Debug, PartialEq, Eq)]
     enum OwnedNamespaceEffect {
@@ -3325,6 +3347,68 @@ mod namespace_effect_tests {
             },
             DeclNamespaceEffect::ReferenceOnly => OwnedNamespaceEffect::ReferenceOnly,
             DeclNamespaceEffect::NoBinding => OwnedNamespaceEffect::NoBinding,
+        }
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: an ambient local and a qualified import that resolve to one
+    /// `GlobalId` leave the private binding table byte-for-byte unchanged.
+    /// CLAIMED: importing a second route to one declaration is a no-op. THE
+    /// GAP: the distinct-identity control below proves this is identity
+    /// equality rather than an unconditional local-name escape.
+    #[test]
+    fn ambient_local_import_of_same_identity_is_a_binding_noop() {
+        let shared = GlobalId(90_001);
+        let globals = HashMap::from([
+            ("item".to_string(), shared),
+            ("Provider.item".to_string(), shared),
+        ]);
+        let mut scope = Scope::default();
+        scope.locals.insert("item".to_string());
+        let before = scope.bindings.clone();
+
+        scope
+            .bind_import(&globals, "item", "Provider.item", &Span::new(10, 20))
+            .expect("two routes to one resolved identity must be idempotent");
+
+        assert_eq!(
+            scope.bindings, before,
+            "the identity escape must not install or replace a binding"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: the same ambient-local shape with two distinct `GlobalId`s
+    /// returns the exact ambiguity variant and reports the resolved local id
+    /// beside the qualified source. CLAIMED: the escape cannot admit a real
+    /// collision. THE GAP: both ids are asserted distinct before the refusal.
+    #[test]
+    fn ambient_local_import_of_distinct_identity_refuses_with_honest_sources() {
+        let local_id = GlobalId(90_001);
+        let imported_id = GlobalId(90_002);
+        assert_ne!(
+            local_id, imported_id,
+            "the refusal fixture must be non-degenerate"
+        );
+        let globals = HashMap::from([
+            ("item".to_string(), local_id),
+            ("Provider.item".to_string(), imported_id),
+        ]);
+        let mut scope = Scope::default();
+        scope.locals.insert("item".to_string());
+
+        match scope.bind_import(&globals, "item", "Provider.item", &Span::new(10, 20)) {
+            Err(ElabError::AmbiguousReference { name, sources, .. }) => {
+                assert_eq!(name, "item");
+                assert_eq!(
+                    sources,
+                    vec![format!("{local_id:?}"), "Provider.item".to_string()],
+                    "a resolved identity must replace the old bare-name fallback"
+                );
+            }
+            other => panic!("distinct identities must remain ambiguous, got {other:?}"),
         }
     }
 
