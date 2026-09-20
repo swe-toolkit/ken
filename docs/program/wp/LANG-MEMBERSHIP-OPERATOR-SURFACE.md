@@ -49,6 +49,33 @@ deliverables attach to surfaces A1 is still authoring.
 deliberately left open until it lands (`§5a`), are separated below so the
 release step is a pin rather than a re-framing.
 
+> # BOTH HOLDS ARE DISCHARGED. RELEASED 2026-09-20.
+>
+> **There were TWO, and `§2` above only ever knew about the first.** A1 landed
+> at `e2e40e2b`, and the release that followed hit a hard stop this frame did
+> not anticipate (`evt_4ehtrakx2ftdb`): `elab_standard_operator` took a carrier
+> head only from `Term::Const`/`Term::IndFormer`, and
+> `resolve_instance_dictionary_inner` refused every `head_param_count > 0`
+> instance on the `requested: None` path. **All three mandated views are
+> parameterized, so `∈` could not resolve one of its own providers.** That
+> produced the second hold, `LANG-CORE-INSTANCE-HEAD-MATCH`.
+>
+> **It landed as squash `564e9e2cd6096fb9496569214b95dfcf946fb391`**, verified
+> by blob rather than by subject: both of its paths — `elab.rs` and
+> `lang_standard_infix_call_completion.rs` — are byte-identical between the
+> approved candidate `cb33f7fdc6a9fc73e6a744ebcc5baf9ff71eedca` and `main`.
+> Adversary returned NO DEFECT on the two named cruxes, the carrier-confirmation
+> widening and dispatcher uniqueness.
+>
+> **`§5` item 6 is the one that changes meaning.** "Wired through A1's `D3`
+> resolver" now means the resolver **as extended by `P2`'s core-side instance
+> head matcher, inside `resolve_instance_dictionary_inner`** — not beside it.
+> Two constraints bound there and they bind here: **match on `GlobalId`
+> identity, never spelling**, and **the carrier confirmation survives and
+> widens to the full instantiated carrier**. If the extended resolver still
+> cannot serve a parameterized view, that is `D0-2` returning and it is a hard
+> stop, not a local repair.
+
 ## 3. Fixed inputs — measured, all from the LANDED spec
 
 ### 3a. The class, `58b §1`. Unary, with an associated query type.
@@ -413,6 +440,12 @@ entry is needed. If this node appears to need one, that is a hard stop.
 Cut from a `main` containing A1's landed candidate. **Pin a literal SHA at the
 moment you adopt it, never the ref.**
 
+**PINNED AT RELEASE: `64d8aa755f505098c34a3caa8293922d9f5b0698`.** That tip
+contains A1 (`e2e40e2b`) and the second hold's squash (`564e9e2cd`), whose M7
+closeout it is. Adopt it or anything later that still contains both; re-pin
+literally if you cut later, and **never carry `origin/main` as the base** — it
+moves under you, and three lanes are landing into it tonight.
+
 ## 8. Contention
 
 **A1 is the live contention AND the dependency, which is why this node is held
@@ -421,12 +454,49 @@ facade and the `ken-elaborator` completion path — exactly the two surfaces
 `§5` items 5 and 6 touch. **Sequencing resolves it; there is nothing to
 negotiate.**
 
-Second surface, `catalog/`: the foundation ring's `CAT-*` branches touch it, and
-**all three foundation seats are hard-walled until ~2026-09-19 11:30 UTC**, so
-they are not moving. Last landed touches, measured at `4bc5f0eee`:
+Second surface, `catalog/`. **Re-measured at release; the hard-wall sentence
+above is SPENT and its date has passed.** Last landed touches at
+`64d8aa755`:
 
-    catalog/                 7663ad9b9   2026-09-13   CAT-PRIORITY-QUEUE-LAWS
-    crates/ken-elaborator/   294cb5e28   2026-09-17   LANG-TYPE-PROJECTION-SURFACE-FORM
+    catalog/                 e2e40e2b4   2026-09-19   LANG-STANDARD-INFIX-CALL-COMPLETION
+    crates/ken-elaborator/   564e9e2cd   2026-09-20   LANG-CORE-INSTANCE-HEAD-MATCH
+
+> **FOUNDATION IS LIVE ON `catalog/` RIGHT NOW — the opposite of the framing-time
+> situation.** L3 is respinning `CAT-PARSING-CURSOR-LAWS` against a CI red. Its
+> surface is `catalog/packages/Capability/Parsing/Cursor.ken.md` plus
+> `crates/ken-elaborator/tests/cat_tier_d_cursor_import.rs`. **File-disjoint from
+> yours** — your class lands beside `LawfulClasses.ken.md` in
+> `catalog/packages/Core/Classes/`, and `Membership` appears in no catalog module
+> today. Coordinate rather than wait, and **do not touch Parsing.**
+
+> # THE SHARED INVENTORY THAT WILL RED ON YOU, and it is NOT in `§6`.
+>
+> **Adding any catalog module changes a whole-catalog census, and L3 lost a
+> full CI cycle to exactly this an hour before you were released.**
+> `catalog_ambient_passthrough_migration_census`
+> (`crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs:369`) walks
+> every catalog leaf and asserts
+>
+>     partition(ambient, clean, residual) == discovered
+>
+> **Your new modules enter `discovered` the moment they exist, so this test reds
+> until they are placed in one of the three lists.** That much is a MIRRORING
+> update and you are authorized to make it.
+>
+> **WHICH list is not bookkeeping, and this is the part to get right.** The
+> `census` list is **migration debt** — its doc says *"every remaining name
+> still requires an explicit provider migration."* **Aim for `clean`**, which
+> means importing every name you use explicitly rather than taking it ambiently.
+> The concrete trap, because it is the one that just fired: `IsTrue` is
+> `pub fn IsTrue` at `Core/Classes/LawfulClasses.ken.md:54` and must be **named
+> in an import** — `Data/Numeric/Nat/Order.ken.md:37` does exactly that, uses it
+> eighteen times, and stays out of the census. You will use `IsTrue`: `§5` item
+> 4 defines `member_holds := IsTrue(member)`.
+>
+> **If a module of yours cannot reach `clean`, stop and say which name and
+> why.** Adding an ambient entry is recording new debt against a migration
+> program, and it is a Steward decision, not a test edit. Full reasoning:
+> `CAT-PARSING-CURSOR-LAWS` `AC-3c`, Steward ruling `evt_5f4qhhwqk1hye`.
 
 > **A branch scan is the WRONG instrument here and reports merged nodes as
 > live.** `git diff origin/main...<branch>` against a squash-merged branch still
