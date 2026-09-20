@@ -99,3 +99,34 @@ WP. Do not change coherence, orphan, re-export, or derive behavior while D0 is
 running.
 
 Use only targeted `scripts/ken-cargo` runs; CI owns full-workspace validation.
+
+## 7. As-built outcome
+
+D0 exhibited the substitution at the construction prerequisite: a surface
+spelling selected an old `Pick Foo` dictionary for a different `Foo` carrier,
+while A1 refused the same carrier pair with
+`InstanceCarrierIdentityMismatch`. That established a missing carrier
+confirmation rather than an invalid carrier.
+
+The landed repair is Architect-authorized arm (b), not a registry re-key. At
+squash `83f30f5e8526a357785a0f82681c862dfbff6b77` from candidate
+`d7eafb4b463dcddf2b89a5e89f9c8e448de161ba`,
+`InstanceHeadRequest` carries an independently derived expected core carrier.
+`resolve_instance_dictionary` derives it in the occurrence context, and the
+construction-prerequisite path derives it by substituting stored constraint
+core types with the selected outer instance's core arguments.
+
+`confirm_instance_dictionary_carrier` is the single common return-path check.
+For carrier-parameterized classes it compares the kernel-inferred candidate
+carrier with that expected core carrier after `kernel_infer_raw` and before
+provenance append or dictionary return. Nullary classes retain their existing
+behavior. A1 delegates its STEP 3 to the same check while preserving its
+selection and ambiguity refusals.
+
+The rejected re-key remains informative. `ClassEnv::instances` admits named,
+variable, and structural heads, including applications, universes, arrows,
+Sigma, refinements, and headless projections. A bare `(class GlobalId, head
+GlobalId)` key cannot represent that population. Making it honest would require
+a closed head-key algebra plus wildcard and overlap rules, changing registry
+semantics outside this WP. Surface spelling is therefore a candidate hint; core
+carrier identity remains the authority for every term-producing return.
