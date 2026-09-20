@@ -1,7 +1,7 @@
 ---
 id: LANG-MEMBERSHIP-OPERATOR-SURFACE
 title: "the membership BUILD (re-cut 2026-09-13): define the Membership class and its three provider views (list; one ordered-key view serving Map and Set; relation-edge) in catalog and wire glyph-only ∈ elaboration to member-dispatch through A1's shared use-site resolver; ∈ is glyph-only so there is no let ... in ASCII collision and no standard in alias; HELD on SPEC-MEMBERSHIP-CLASS-CONTRACT + LANG-RESERVED-INFIX-NAMES + LANG-STANDARD-INFIX-CALL-COMPLETION, then the Steward frames full ACs and releases to the language ring"
-status: draft
+status: ready
 owner: language
 size: L
 gate: none
@@ -333,7 +333,24 @@ one token for both spellings — collides with `let … in` as literally stated.
 **That collision is the node.** It is why this is not a one-line lexer arm and
 why it is filed `M`.
 
-## Deliverables
+## Deliverables and acceptance — SUPERSEDED, SEE THE FRAME
+
+> **RELEASED 2026-09-20. The deliverables and acceptance criteria below are the
+> PRE-2026-09-13 operator-surface node and DO NOT describe what is being built.**
+> They ask whether ASCII `in` collides with `let ... in` and route a three-way
+> verdict to the Architect. **That question is settled and gone:** `∈` is
+> glyph-only (A0), so there is no collision and no `in` alias. The frame records
+> them as subsumed at its `§9`.
+>
+> **BUILD FROM `docs/program/wp/LANG-MEMBERSHIP-OPERATOR-SURFACE.md`** — `§5`
+> deliverables (the `Membership` class, three provider views,
+> `membership_member_at`, `member_holds`/`same_members`, the `∈` facade entry,
+> and the wiring through the extended resolver), `§6` `AC-1`..`AC-9`, `§4` `D0`.
+>
+> **They are kept rather than deleted because `D2`/`D3` record a question that
+> was genuinely open and was genuinely answered**, and a reader who finds the
+> ASCII question elsewhere should be able to see where it was closed. **A reader
+> deciding what to build must not use them.**
 
 **`D1` — the parser arm, glyph spelling first.** Make `∈` parse as a membership
 expression. **This half has no keyword collision and is the part that is
