@@ -227,3 +227,39 @@ resolver that accepts export-only subjects would be a real language change, but
 nothing needs it: the one-keyword marking reaches the same place, and inventing
 an L2 precursor to avoid a keyword would put a lane's objective behind a
 constraint this node created for itself.
+
+## RESCOPED IN PLACE 2026-09-20 at the second boundary (`evt_78ten32r28fm`)
+
+**`D0` SUCCEEDED.** With `schema_validate_fields` marked `pub fn`, public
+attached proofs resolve. The amendment above was correct and the elaborator
+precursor it declined was correctly declined.
+
+**This node now delivers `D0` plus TWO laws: positional coverage and
+accept-over-Invalid no-masking.** Both elaborate. They are committed and routed
+to QA as their own cut rather than held behind the third law.
+
+**The first-rejection law is DEFERRED, not weakened or dropped.** Its
+rejected-head/Invalid-tail arm must establish
+`nonempty_head (nonempty_append (nonempty_cons issue Nil) tail) = issue`. Under
+an abstract `NonEmpty` holding only the four authorized selectors this is
+neither definitional (`Refl`: the two sides are not convertible) nor
+destructible (`UnresolvedCon { name: "NonEmptyCons" }`), and a structural CPS
+recovery over the traversal is rejected as `NotAFunction`. The ring measured
+all three and did not downgrade the law.
+
+**It returns after `[[CAT-NONEMPTY-APPEND-HEAD-LEFT]]`**, which publishes the
+missing law where the type lives. That precursor needs no selector widening
+here: this package already imports `nonempty_append`, and an attached
+`pub proof` is measured to travel with the function selector.
+
+**`AC-2`'s `nonempty_append` argument-swap mutation travels with the deferred
+law**, not with this cut. `AC-1`, `AC-3`, and `AC-4` are unchanged and remain
+this cut's obligations; `AC-4`'s census delta is still a Steward stop if the
+added-name count is non-zero.
+
+**On the cut, since this is the second boundary on one unit.** The first was my
+broken premise about `pub proof`. This one is not a framing error: the missing
+law is a real absence in another package that no amount of framing could have
+reached from inside this one, and the ring found it by measurement rather than
+by working around it. The unit was correctly sized for what was knowable; it is
+being narrowed at a boundary, not recut for mis-sizing.
