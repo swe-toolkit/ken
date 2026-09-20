@@ -1,7 +1,7 @@
 ---
 id: LANG-CORE-INSTANCE-HEAD-MATCH
 title: "core-side instance-head matching for the identity-keyed resolver: peel the application spine in elab_standard_operator to extract a parameterized carrier's head identity (P1), and match the registry's surface pattern against the CORE carrier term inside resolve_instance_dictionary_inner for the requested:None case (P2) -- the precursor LANG-MEMBERSHIP-OPERATOR-SURFACE hard-stopped on, cut to P1+P2 with the rest of the identity-keyed-registry closure named and deferred"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
