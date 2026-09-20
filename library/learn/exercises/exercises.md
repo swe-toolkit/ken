@@ -39,10 +39,10 @@ rather than to a whole file at once.
    "Zero new trust category." Are these the same claim? If not, what
    specifically does EmptyDec's own wording keep open that Combinators'
    does not?
-2. `catalog/packages/Tooling/Testing/Property.ken.md`'s own Motivation
-   section draws a line between "computations" and "propositions." Does
-   this fragment exhibit the spec's formal, tagged `tested` construct, or
-   something else? Name what it actually shows, precisely.
+2. `catalog/packages/Tooling/Testing/Property.ken.md` distinguishes concrete
+   executable witnesses from private checked runner laws. Does this fragment
+   exhibit the spec's formal, tagged `tested` construct, or something else?
+   Name what it actually shows, precisely.
 
 ## 04 — Effects, capabilities, and authority
 

@@ -46,12 +46,12 @@ the answer yourself rather than take it on this page's authority.
    (`catalog/packages/Core/Logic/EmptyDec.ken.md`, and
    `crates/ken-elaborator/tests/ds1_empty_dec_acceptance.rs`,
    `ac3_trusted_base_delta_is_ordinary_inductive_admission_only`).
-2. Something else: it is real, current, checked prose that shows *why*
-   testing and proving are different activities — useful groundwork for
-   understanding the concept `tested` names — but it is not an instance of
-   the spec's formal, tagged `tested` construct (an `assume`/`test`-tagged
-   clause), which remains proposal-level and unexhibited by any registered
-   fragment
+2. Something else: concrete executable witnesses are computations, while
+   private checked runner laws state what successful and failing runs imply
+   for finite sample lists. That distinction is useful groundwork for
+   understanding the concept `tested` names, but it is not an instance of the
+   spec's formal, tagged `tested` construct (an `assume`/`test`-tagged clause),
+   which remains proposal-level and unexhibited by any registered fragment
    (`catalog/packages/Tooling/Testing/Property.ken.md`, and
    `spec/20-verification/21-spec-syntax.md` §5.2, §5.5).
 

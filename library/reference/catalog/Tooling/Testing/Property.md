@@ -9,8 +9,8 @@ Canonical source: [checked package](../../../../../catalog/packages/Tooling/Test
 | Fact class | Disposition | Result and grounding |
 |---|---|---|
 | Subject | `generated` | `catalog/packages/Tooling/Testing/Property.ken.md` — “`Tooling.Testing.Property` — deterministic finite property checks,” from the [subject index](../../subjects.md). |
-| Declaration/type | `authored` | The public surface is `Gen`, `gen_from_list`, `gen_samples`, `gen_map`, `check`, `gen_bytes`, and three executable witnesses. Results use the ordinary `Result a Unit` carrier. |
-| Law | `none-declared` | The canonical checked fences contain no `law`, `proof`, or `theorem` declaration. The Laws and proofs section instead records executable `Bool` witness constants and explicitly says properties are computations, not propositions. |
+| Declaration/type | `authored` | The package declares no public surface. Its private implementation provides deterministic finite generators and checking over the ordinary `Result a Unit` carrier, with concrete executable witnesses. |
+| Law | `authored` | Private attached laws for the runner establish successful-lookup soundness, success completeness, first-counterexample recovery, and the two `gen_from_list` coherences. They are checked implementation laws, not public declarations. |
 | Effect/capability | `none-declared` | The canonical checked fences declare no effect row, `proc`, `visits`, or capability value; the design explicitly omits effects. |
 | Assurance | `authored` | The checked implementation has zero trusted-base delta and introduces no primitive, postulate, axiom, proof hole, effect, or assumed proposition. Its deterministic finite samples make the first counterexample reproducible. |
 | Platform | `held` | No checked per-package facet is available; owner: catalog campaign. See the [held-class disclosure](../../card-format.md#held-class-disclosure). |
