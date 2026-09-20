@@ -163,7 +163,7 @@ pub struct RInstanceConstraint {
 pub enum RDeclKind {
     /// A definition using legacy `view` or SURF-1 `const`/`fn`/`proc`.
     /// `constraints` shares the instance-path binder representation and is
-    /// checked against `instance_search` in `elaborate_rdecl_v1`.
+    /// resolved through `resolve_instance_dictionary` before body elaboration.
     View {
         keyword: DefKeyword,
         is_space_op: bool,

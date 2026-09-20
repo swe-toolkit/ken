@@ -18,11 +18,10 @@
 //! **L-classes staging boundary (`37 §6`, crossed by L3b).** `DecEq` / `Ord`
 //! are *named* here (postulated predicates) so the refinement shapes elaborate.
 //! L3b wires **user-type instancing + constraint resolution** (`where Ord a`,
-//! `where DecEq K`) via the Lc-landed `instance_search` (`classes.rs:91`):
-//! the `where` clause on a `view` declaration is checked against
-//! `instance_search` before the body elaborates, emitting `NoInstance` on
-//! failure. `Map`/`Set` are abstract postulates declared here; the `DecEq`
-//! gate is enforced at elaboration time (`37 §6`).
+//! `where DecEq K`) through `resolve_instance_dictionary`: the `where` clause
+//! on a `view` declaration is resolved before the body elaborates, emitting
+//! `NoInstance` on failure. `Map`/`Set` are abstract postulates declared here;
+//! the `DecEq` gate is enforced at elaboration time (`37 §6`).
 
 use ken_kernel::{
     declare_def, declare_inductive, declare_primitive, env::PrimReduction, subst::weaken, CtorSpec,
