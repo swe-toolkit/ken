@@ -306,10 +306,15 @@ fn decoder_loader_visible_inventory_is_exact_and_usable() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every non-prelude, non-owned identity in checked Decoder terms is
-/// exactly one of the 29 D0 identities, and all 15 Schema identities belong to
-/// Schema's published 26-name surface. CLAIMED: Decoder has no undeclared
-/// provider, mis-cut Schema dependency, or unexpected Tier-E edge. THE GAP:
-/// unused source imports are covered by the exact parsed ledger.
+/// exactly one of the 29 D0 identities, and all 15 consumed Schema identities
+/// belong to its published surface. That provider publication has 26 direct
+/// names plus exactly the two attached schema_validate_fields proofs. CLAIMED:
+/// Decoder has no undeclared provider, mis-cut Schema dependency, or unexpected
+/// Tier-E edge. THE GAP: unused source imports are covered by the exact parsed
+/// ledger. This two-name provider-publication growth is distinct from AC-4's
+/// ambient public-surface census, whose separately measured delta remains added
+/// `[]`, removed `[]`; the census measures ambient reachability, not declared
+/// provider publication.
 #[test]
 fn decoder_checked_provider_and_schema_closure_is_exact() {
     let (mut env, owned, base_ids) = load_decoder();
@@ -378,7 +383,19 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
     assert_eq!(schema_names, schema_imports());
     let schema_public =
         catalog_publication::published_module_surfaces(SCHEMA_SOURCE, SCHEMA, "decoder_schema");
-    assert_eq!(schema_public.len(), 26);
+    let attached_schema_proofs = schema_public
+        .iter()
+        .filter(|surface| surface.contains("::"))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        attached_schema_proofs,
+        names(&[
+            "schema_validate_fields::accepted_tail_invalid",
+            "schema_validate_fields::valid_coverage",
+        ])
+    );
+    assert_eq!(schema_public.len() - attached_schema_proofs.len(), 26);
     assert!(schema_names.is_subset(&schema_public));
     env.elaborate_file(&format!(
         "import {SCHEMA} ({})",
