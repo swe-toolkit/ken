@@ -106,8 +106,15 @@ belongs to `CAT-ARGPARSE-LAWS`, which is the node that actually needs it.
 
 ## Deliverable
 
-Public attached proofs on `schema_validate_fields` stating three quantified
-laws, over the existing traversal and carriers.
+**D0 -- mark the subject `pub fn`, keeping its existing `export` entry.**
+`schema_validate_fields` (`:143`) is declared plain `fn` and is published only
+by the `export` list. `pub proof` does not resolve such a subject; that is
+measured, not predicted -- see the amendment note below. Add the `pub` keyword
+to that one declaration and leave the `export` list byte-unchanged. This is
+the only production edit outside the proofs.
+
+**D1 -- public attached proofs on `schema_validate_fields`** stating three
+quantified laws, over the existing traversal and carriers.
 
 - **coverage** -- if `schema_validate_fields inspect fields = Valid values`,
   then for every index `i`, `nth SchemaField i fields = Some field` implies
@@ -151,19 +158,26 @@ one arm of `schema_validation_cons` to return `Valid` with the accepted value
 consed onto an empty list, and show the no-masking proof reds there
 specifically. Restore byte-exact and report which arm was mutated.
 
-**AC-4 -- the census row does not move.** Re-run
+**AC-4 -- the census measures whether D0 moved the public surface, and the
+expected delta is ZERO added names.** Re-run
 `catalog_ambient_passthrough_migration_census` and report the exact added and
-removed names for `Application.Input.Schema` against the 14 named above. That
-row MAY move -- report its exact delta and why. Any OTHER row moving is a
-Steward stop.
+removed names for `Application.Input.Schema` against the 14 named above.
+`schema_validate_fields` is ALREADY in this package's `export` list, so marking
+it `pub fn` should publish nothing new. **Report the delta rather than
+asserting it**: this AC exists because the Steward's no-surface-growth claim is
+an expectation about elaborator visibility rules that was NOT measured when the
+amendment was written, and the census is the instrument that settles it. A
+non-zero added-name delta is a Steward stop, not a finding to fold. Any OTHER
+row moving is a Steward stop.
 
 ## Stop condition
 
 Hand back rather than work around if any holds:
 
-- **The elaborator refuses `pub proof` on an `export`-listed subject that
-  carries no `pub` keyword.** Report the exact diagnostic and stop. Do not
-  silently deliver private proofs instead: the posture question is the
+- **D0 does not resolve the refusal.** If `pub proof` still fails with the
+  subject marked `pub fn`, the constraint is not the one measured on
+  2026-09-20 and D0 is the wrong fix. Report the exact diagnostic and stop.
+  Do not silently deliver private proofs instead: the posture question is the
   deliverable's interface claim, and a quiet downgrade would restate the method
   error that CAT-PROPERTY-LAWS had to have corrected by the Architect.
 - **A law cannot be stated without a new function.** In particular, "the issue
@@ -184,3 +198,32 @@ Hand back rather than work around if any holds:
 - Duplicate-key, schema-wellformedness, or field-uniqueness policy. The
   traversal does not claim it.
 - Machine-checked complexity bounds.
+
+## AMENDED 2026-09-20 after the ring's hard stop at `evt_57pppnzv9ahfk`
+
+`foundation-implementer` hit this frame's first stop condition on exact base
+`dcbb9648f` and stopped correctly: a minimal `pub proof` probe on
+`schema_validate_fields` failed `UnboundName`, a differential control changing
+only `pub proof` to private `proof` checked with exit 0, the production blob
+was restored byte-exact (`7df4bb6f` on both sides), and no candidate was cut.
+The ring did not downgrade the deliverable, which is what the stop condition
+asked for.
+
+**The premise that broke was mine.** This frame asked for public attached
+proofs without establishing that the subject could carry one. Measured across
+the whole catalog afterwards: every `pub proof ... for X` in
+`catalog/packages/**` has `pub fn X`, with zero exceptions, so the elaborator
+has never resolved an export-only subject and nothing in the corpus depends on
+it. `Capability/Process/Arguments.ken.md`, the exemplar this frame copied its
+posture from, carries no `export` list at all and publishes purely with `pub`.
+
+**The fix is precedented rather than novel.** Ten catalog packages already mix
+`pub fn` with an `export` list, and `Data/Numeric/Nat/Order.ken.md` is the
+exact template: `pub fn compare`, `max`, `min`, and `sub` are each also in its
+export list and each carries a `pub proof`. D0 adopts that shape.
+
+**What this amendment does NOT do.** It does not add an elaborator node. A
+resolver that accepts export-only subjects would be a real language change, but
+nothing needs it: the one-keyword marking reaches the same place, and inventing
+an L2 precursor to avoid a keyword would put a lane's objective behind a
+constraint this node created for itself.
