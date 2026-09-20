@@ -120,3 +120,38 @@ Hand back rather than work around if either holds:
 - Generalizing the reservation technique to other stack detectors.
 - `RUST_MIN_STACK` or ambient machine configuration; the explicit
   `Builder::stack_size` exists to make this independent of that.
+
+## STANDING LOW ON THE LANDED CONSTANT (Steward, 2026-09-20)
+
+Adversary M8 on the squash `6a36cfbdd` returned NO SOUNDNESS DEFECT and one LOW,
+UNREPRODUCED -- predicted from the recorded numbers, not run. Recorded here
+rather than left in the channel, and **not** actioned as a node: the instrument
+works, this is a trade-off to accept or tighten, and §4c does not let a
+robustness preference create one.
+
+**The observation.** `49_152` is the TOP confirmed detecting value of the three
+recorded samples. Nothing was sampled in `(49_152, 53_248]`, and the nearest
+recorded both-abort neighbour is one page (4,096 B) above, so the
+candidate-abort edge could be as low as `49_153`. A CANDIDATE-side abort is not
+an ordinary red: by this same file's sibling comment at
+`cat4_union_intersection_difference_execute_over_nat` (~`:1380`), a SIGABRT here
+aborts the process, so cargo stops and every remaining suite in the run goes
+unexecuted. Modest legitimate frame growth -- a rustc or codegen bump, a
+deeper-but-correct arm -- or CI-worker variance could therefore turn this from a
+durable sentinel into a process-killing false RED that takes the whole
+`map_build_acceptance` binary down with it. A center-of-window pick (~`43_008`)
+would give symmetric margins at the cost of detection sensitivity.
+
+**The origin is this frame's own AC-1, which is mine.** AC-1 required three
+probe points "in the shape the existing comment uses" -- both-pass, the
+discriminating value, both-abort -- and said nothing about WHICH detecting value
+to choose or about margin. Asked for three points, the implementer correctly
+supplied three points and took the most sensitive one. **An AC that specifies
+the shape of the evidence does not thereby specify the choice the evidence is
+used to make**, and that gap is the whole finding.
+
+**Triage value, which is why this is worth a durable line at all.** If
+`map_build_acceptance` ever fails with a process abort rather than an assertion
+failure, this constant is the first suspect, and the discriminator is cheap: a
+candidate-side abort at an unchanged reservation means headroom moved, not that
+a regression was caught. Do not read that red as the sentinel firing.

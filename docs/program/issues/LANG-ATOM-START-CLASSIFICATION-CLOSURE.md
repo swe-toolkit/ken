@@ -144,6 +144,39 @@ The candidate SHA is recorded only to say *which* candidate this squash
 carries. It is **not** an ancestor of `main` and never will be — cite
 `20ddc558f`.
 
+### FIVE FURTHER INCREMENTS LANDED AND WERE NOT RECORDED HERE (Steward, 2026-09-20)
+
+    increment A   35cf12bac1db67d18de48cd8680fe2140a2774e0  09-18  2 files +301
+    B1  (AC-1)    2bcccd0dfae580b823a3a14dcb3f312e7494960c  09-18  1 file +347/-34
+    B2a (AC-3)    7cb535be574da11e37deac79080e1c6c6ec68101  09-18  1 file +108/-25
+    B2b           6c9770a530fbd72214f311609ffb3c59e69afa57  09-18  3 files +1233/-245
+    B2c           dfd4ce423b57315b165fa37b25b5e978723992c6  09-19  1 file +252/-83
+
+**Evidence class, stated because it is WEAKER than the four rows above and the
+difference matters.** Those four were blob-verified against a named candidate at
+merge. These five are read directly off `origin/main`'s history — they ARE main
+commits, so their landedness is established by construction rather than by a
+blob comparison, but **no candidate SHA is recorded for any of them** and none
+was re-verified here. A later reader wanting candidate provenance must recover
+it from the WP thread.
+
+**Why this omission is not bookkeeping — it defeats AC-0's own guard.** AC-0
+tells the next implementer that if a bare case PARSES at their base they must
+stop and return to the Steward *unless a landed increment of this node closed
+it*, and to **name that increment as recorded in this table**. The table stopped
+at `20ddc558f`. An implementer cutting from current `main` therefore inherits
+five increments' behaviour, finds rows that parse, looks here for the accounting
+increment, does not find one, and stops — **reporting this node's own success as
+a premise failure.** That is precisely the outcome the 2026-09-18 UNLESS
+amendment was added to prevent, and the amendment did not fail: **its wording
+held and its DATA went stale underneath it.**
+
+⇒ **A guard that reads from a ledger is only as live as the ledger.** The
+amendment made the AC correct; nothing made the table current, and the gap
+between those two is invisible to everyone whose base is recent enough to be
+affected. Record the squash here at the merge that creates it, not at the next
+one that trips over it.
+
 ### THE AC-0 LEDGER — CORRECTED, AND THE FIRST VERSION WAS WRONG
 
     PARSED    f ‖x‖                  closed by 20ddc558f, EXPRESSION position

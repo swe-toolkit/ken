@@ -1,7 +1,7 @@
 ---
 id: LANG-INSTANCE-REGISTRY-IDENTITY-KEY
 title: "Re-key the class-instance registry on IDENTITY (GlobalId) rather than on surface type NAME. classes.rs:202 declares `pub instances: HashMap<(String, String), InstanceInfo>`, registration builds the key from surface syntax, and any elaborate-side consumer holding an identity but not a name must reverse-lookup id -> name, for which NOTHING GUARANTEES a well-defined answer. D0 gates this node: exhibit a GlobalId whose reconstructed name is absent or resolves back to a different id, or close it. Reaches coherence, the orphan check, module re-export and the derive path, so it is deliberately NOT paid by LANG-STANDARD-INFIX-CALL-COMPLETION."
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
@@ -204,10 +204,104 @@ narrows. **Different axes — that node changes visibility, this one changes a
 key type — but the same file.** Whichever runs second re-grounds its
 coordinates; neither blocks the other, and they must not be folded.
 
-# Why this is `draft`
+# RELEASED 2026-09-20. Coordinates re-grounded at `6a36cfbdd`.
 
-**QUEUED by priority, not unframed**, and additionally **gated on its own D0**.
-L1 (clearing the ignored tests) is the operator's top priority as of
-2026-09-17, and the language lane's objective is `LANG-MODULE-IMPORT-SYSTEM`.
-Not released, not to be started until the Steward releases it. The leader
-confirms A1 is not blocked on it.
+The filing above was measured at `b2d186ef7`; four of its coordinates have
+moved. Use these. Treat them as perishable: if one is false on your own base,
+stop and report the mismatch rather than building around it.
+
+    was :208   classes.rs:210   pub global_modules: HashMap<GlobalId, u32>
+    was :331   classes.rs:327   pub fn instance_search(class_name, head_name)
+    was :757   elab.rs:800      RType::RCon(name, _) => globals.get(name)
+    was :10090 elab.rs:10453    projected_instance_id, first instance_search
+    was :10101 elab.rs:10464    projected_instance_id, second instance_search
+    unmoved    classes.rs:202   pub instances: HashMap<(String,String),InstanceInfo>
+    new        elab.rs:9598     fn rtype_head_name, and its RVarTy arm at :9602
+
+## A1 landed MORE than the bounded scan, and that changes this node's shape
+
+`resolve_instance_dictionary_from_identity` (elab.rs:9854) is three steps, not
+a scan: the bounded scan with its `InstanceHeadSpellingsShareAnIdentity`
+two-match refusal; a carrier-parameterised precondition; and **STEP 3, a
+`convert_type` confirmation of the resolved dictionary's carrier against the
+occurrence's core carrier, refusing with `InstanceCarrierIdentityMismatch`.**
+That is the Architect's amended mechanism (`evt_zfwss6hz79ct`), built. **The
+two-ids-to-one-name substitution is already closed there.**
+
+**It is closed on exactly one path.** `rtype_head_name` keys a carrier lookup
+at four other sites, none of which confirms in core:
+
+    elab.rs:9811    resolve_instance_dictionary -- the surface/declaration entry
+    elab.rs:10087   the superclass/constraint head inside instance construction
+    elab.rs:10455   projected_instance_id, first instance_search
+    elab.rs:10466   projected_instance_id, second instance_search
+
+`elab.rs:10551` also calls `rtype_head_name` and is **not** in that set: it
+keys on the CLASS name, not a carrier head. Stated so a sweep does not add it.
+
+⇒ **D0 is no longer an abstract question about the reverse lookup.** Ask it of
+these four: does a spelling that keys the registry wrongly reach an elaborated
+term at a site with no core confirmation?
+
+## Deliverable
+
+**D0 first, and it gates the rest.** At a SHA you name, exhibit a carrier
+spelling that selects the wrong instance at one of the four sites above.
+
+The `RVarTy` arm (`elab.rs:9602`) is the mechanism to try first, because it is
+the one already measured: `where Ord a` keys the registry on the type
+parameter's SPELLING, so a parameter spelled exactly as a registered instance
+head resolves an abstract carrier to that concrete instance. Try the
+declaration entry (`:9811`) before the projection sites -- a wrong dictionary
+there is elaborated into the term, which is the grave form; at `:10455`/`:10466`
+the same predicate costs an effect row, which belongs to
+[[LANG-INSTANCE-SEARCH-SECOND-PATH]].
+
+**If D0 exhibits, build the repair.** Two mechanisms are already measured and
+the choice between them is the Architect's, not the ring's and not mine: (a)
+re-key the registry on `GlobalId`, which is easy in itself and whose real cost
+is the four consumers' behaviour under a changed key; (b) extend A1's landed
+STEP 3 pattern -- demote the name to a hint and confirm the carrier in core --
+to the sites that can carry it. Route the mechanism question with the D0
+exhibit attached, in one message, and do not build (a) or (b) before it is
+ruled.
+
+**If D0 cannot exhibit at any of the four, close this node and say so.** That
+is a result, not a failed turn, and it is cheaper found now than after a
+re-keying is built.
+
+## Acceptance criteria
+
+**AC-1 -- D0 is an exhibit, not an argument.** A checked Ken source that
+elaborates, plus the resolved dictionary's identity, showing the selected
+instance is not the one the carrier's identity names. A demonstration that no
+guarantee is written down does not satisfy this; neither does a unit test
+constructed by inserting a registry entry no surface syntax could produce.
+
+**AC-2 -- the refusal is attributed to the right site.** Name which of the four
+sites produced it, and show the same input succeeding through
+`resolve_instance_dictionary_from_identity` where STEP 3 refuses it. The pair
+is what establishes that the gap is the missing confirmation and not the
+carrier being genuinely wrong.
+
+**AC-3 -- if a repair lands, the two-match arm must still be reachable.**
+`InstanceHeadSpellingsShareAnIdentity` exists for the two-names-to-one-id
+ambiguity. Mutation, restored byte-exact: a repair that makes that arm
+unreachable has replaced a detector rather than added one; report it.
+
+## Stop condition
+
+Hand back rather than work around if either holds:
+
+- the exhibit requires editing `classes.rs`'s registry directly, or any input a
+  user could not write. The claim is about surface programs.
+- the mechanism ruling does not arrive, or arrives as neither (a) nor (b). Do
+  not pick one to keep moving.
+
+## Not this node
+
+- `[[LANG-INSTANCE-SEARCH-SECOND-PATH]]`'s two projection call sites as an
+  effect-row question. Same predicate, different consequence, its own node.
+- `[[LANG-R-LAYER-EXPORT-RETRACTION]]`'s visibility narrowing in `classes.rs`.
+  Same file, different axis; whichever runs second re-grounds its coordinates.
+- Any change to A1's landed three-step mechanism.
