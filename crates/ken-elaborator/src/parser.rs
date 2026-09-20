@@ -5258,6 +5258,30 @@ impl Parser {
             // `old e` — pre-state reference (`21 §6.4`)
             ExprAtomForm::Old => {
                 self.advance(); // consume 'old'
+                // Unlike the ordinary application loop, `old` has consumed
+                // its prefix and still owes an operand. Every expression
+                // exclusion must therefore reject locally rather than inherit
+                // `ProofSelector`'s declaration-boundary yield.
+                if self
+                    .atom_start_exclusion(AtomPosition::Expression)
+                    .is_some()
+                {
+                    return Err(ElabError::ParseError {
+                        msg: "`old` requires an application_atom operand; group it as \
+                              `old (...)`"
+                            .to_string(),
+                        span: self.peek_span().clone(),
+                    });
+                }
+                if !self.can_start_atom_expr() {
+                    return Err(ElabError::ParseError {
+                        msg: format!(
+                            "expected an application_atom after `old`, found {:?}",
+                            self.peek()
+                        ),
+                        span: self.peek_span().clone(),
+                    });
+                }
                 let arg = self.parse_atom_expr()?;
                 let end = arg.span().end;
                 Ok(Expr::EOld(Box::new(arg), Span::new(start, end)))
