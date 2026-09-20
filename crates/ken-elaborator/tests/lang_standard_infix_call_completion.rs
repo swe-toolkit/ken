@@ -45,14 +45,15 @@
 //! cannot be failed.
 //!
 //! `resolve_instance_dictionary` and `resolve_instance_dictionary_by_head_id`
-//! differ only in HOW THEY NAME THE CARRIER: one takes a surface spelling,
-//! the other a `GlobalId` it must first turn into a spelling by scanning the
+//! differ only in HOW THEY CARRY THE REQUEST: one has a surface type, the
+//! other has an inferred core carrier plus its peeled `GlobalId` head. The
+//! latter turns the head identity into a registry spelling by scanning the
 //! registered names. They agree completely on SELECTION -- both funnel into
 //! `resolve_instance_dictionary_inner`, which reaches the registry through a
-//! single `class_env.instances.get()` keyed on `(class, head_name)`, and
-//! `_inner`'s own recursion for superclass constraints re-enters that same
-//! point. For one `(class, key)` the two are therefore identical by
-//! construction.
+//! single `class_env.instances.get()` keyed on `(class, head_name)`, then
+//! matches a parameterized head inside `_inner`. Its recursion for superclass
+//! constraints re-enters that same point. For one `(class, key)` the two are
+//! therefore identical by construction.
 //!
 //! The by-head-id path is NOT a thin wrapper -- it carries a real forward
 //! scan and three refusals the other lacks. That is the argument rather than
@@ -507,6 +508,220 @@ fn ac1_a_bare_comparison_completes_its_omitted_prefix() {
 /// Asserted on the de Bruijn indices of the last two arguments rather than on
 /// a rendering: under `\a b.` the source order is `Var(1)` then `Var(0)`, and
 /// a double-reverse is precisely the swap.
+// Promise class: durable invariant. Parameterized standard-operator carriers
+// resolve through the same registry path as nullary carriers.
+#[test]
+fn a_parameterized_carrier_resolves_from_its_inferred_core_application() {
+    let mut env = catalog_env();
+    env.elaborate_file(
+        "import Core.Operators.Standard (≤) \
+         fn ordered_lists (xs : List Nat) (ys : List Nat) : Bool = xs ≤ ys",
+    )
+    .expect(
+        "the inferred `List Nat` carrier must match the registered `List a` \
+         instance head and recursively resolve its `Ord Nat` prerequisite",
+    );
+
+    assert_eq!(
+        spine_len(under_binders(body_of(&env, "ordered_lists"), 2)),
+        4,
+        "the parameterized carrier must reach the same completed four-argument \
+         call as a nullary carrier",
+    );
+}
+
+// Promise class: durable invariant. Matching a multi-parameter core carrier
+// preserves the telescope's outermost-first order when its prerequisites are
+// instantiated.
+//
+// MEASURED: the completed call's dictionary applies `Ord Nat` and then
+// `Ord Bool`, the two prerequisite identities selected for `Result Nat Bool`.
+// CLAIMED: the core matcher's argument vector and `subst_tel` agree on the
+// index order for every head parameter. THE GAP: this fixture closes only the
+// two-parameter boundary, so the two carrier arguments and prerequisite ids
+// are asserted distinct before their order is checked.
+#[test]
+fn two_parameter_head_preserves_prerequisite_instantiation_order() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         instance Ord Nat {{ leq = \\x y. True }} \
+         instance Ord Bool {{ leq = \\x y. False }} \
+         fn result_ord_leq \
+           (a : Type) (b : Type) (da : Ord a) (db : Ord b) \
+           (x : Result a b) (y : Result a b) : Bool = True \
+         instance Ord (Result a b) where (da : Ord a), (db : Ord b) {{ \
+           leq = result_ord_leq a b da db \
+         }} \
+         import Core.Operators.Standard (≤) \
+         fn ordered_result \
+           (x : Result Nat Bool) \
+           (y : Result Nat Bool) : Bool = x ≤ y"
+    ))
+    .expect(
+        "matching `Result Nat Bool` must instantiate its prerequisites as \
+         `Ord Nat` followed by `Ord Bool`",
+    );
+
+    let body = under_binders(body_of(&env, "ordered_result"), 2);
+    let Term::App(completed, _) = body else {
+        panic!("the completed call must apply its right operand");
+    };
+    let Term::App(completed, _) = *completed else {
+        panic!("the completed call must apply its left operand");
+    };
+    let Term::App(_, dictionary) = *completed else {
+        panic!("the completed call must apply an inferred dictionary");
+    };
+
+    let mut head = *dictionary;
+    let mut dictionary_args = Vec::new();
+    while let Term::App(function, argument) = head {
+        dictionary_args.push(*argument);
+        head = *function;
+    }
+    dictionary_args.reverse();
+
+    let nat = env.globals["Nat"];
+    let bool_ = env.globals["Bool"];
+    let nat_ord = env.globals["Ord_instance_Nat"];
+    let bool_ord = env.globals["Ord_instance_Bool"];
+    assert_ne!(
+        nat, bool_,
+        "positive control: the carrier argument identities must be distinct"
+    );
+    assert_ne!(
+        nat_ord, bool_ord,
+        "positive control: the prerequisite identities must be distinct"
+    );
+    assert_eq!(
+        head,
+        Term::const_(env.globals["Ord_instance_Result"], vec![]),
+        "the completed dictionary must be the generic `Ord (Result a b)` instance"
+    );
+    assert_eq!(
+        dictionary_args.len(),
+        4,
+        "the generic dictionary takes two type arguments and two prerequisites"
+    );
+    assert_eq!(
+        dictionary_args[0],
+        Term::indformer(nat, vec![]),
+        "the first type argument must retain the matcher's outermost slot"
+    );
+    assert_eq!(
+        dictionary_args[1],
+        Term::indformer(bool_, vec![]),
+        "the second type argument must retain the matcher's innermost slot"
+    );
+    assert_eq!(
+        dictionary_args[2],
+        Term::const_(nat_ord, vec![]),
+        "the `a` prerequisite must resolve to `Ord Nat`, not `Ord Bool`"
+    );
+    assert_eq!(
+        dictionary_args[3],
+        Term::const_(bool_ord, vec![]),
+        "the `b` prerequisite must resolve to `Ord Bool`, not `Ord Nat`"
+    );
+}
+
+// Promise class: durable invariant. Fixed instance-head constructors are
+// compared by canonical identity rather than by their surface spelling.
+#[test]
+fn a_fixed_instance_argument_matches_an_alias_by_global_identity() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         module Original {{ pub data Marker : Type where {{ MkMarker : Marker }} }} \
+         module Alias {{ export Original (Marker as AliasMarker) }} \
+         import Original (Marker) \
+         import Alias (AliasMarker) \
+         data Carrier (a : Type) (tag : Type) : Type where {{ \
+           MkCarrier : Carrier a tag \
+         }} \
+         instance Ord (Carrier a AliasMarker) {{ leq = \\x y. True }} \
+         import Core.Operators.Standard (≤) \
+         fn by_original_name \
+           (x : Carrier Bool Marker) \
+           (y : Carrier Bool Marker) : Bool = x ≤ y"
+    ))
+    .expect(
+        "the fixed `AliasMarker` pattern and inferred `Marker` argument name \
+         the same GlobalId and must match by identity",
+    );
+}
+
+// Promise class: durable invariant. The post-selection check confirms the
+// whole instantiated carrier, not only its application head.
+#[test]
+fn a_rebound_fixed_argument_is_refused_by_full_carrier_confirmation() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         data Marker : Type where {{ MkMarker : Marker }} \
+         data Carrier (a : Type) (tag : Type) : Type where {{ \
+           MkCarrier : Carrier a tag \
+         }} \
+         instance Ord (Carrier a Marker) {{ leq = \\x y. True }}"
+    ))
+    .expect("the first file registers the generic fixed-argument instance");
+
+    let result = env.elaborate_file(
+        "data Marker : Type where { MkMarker2 : Marker } \
+         import Core.Operators.Standard (≤) \
+         fn rebound \
+           (x : Carrier Bool Marker) \
+           (y : Carrier Bool Marker) : Bool = x ≤ y",
+    );
+
+    assert!(
+        matches!(
+            result,
+            Err(ken_elaborator::ElabError::InstanceCarrierIdentityMismatch { .. })
+        ),
+        "the current `Marker` spelling makes the core matcher select and \
+         instantiate the old instance, but its kernel-inferred carrier still \
+         contains the original Marker identity; full-carrier confirmation must \
+         catch that mismatch before the downstream application does: {result:?}",
+    );
+}
+
+// Promise class: durable invariant. An ambiguous identity-to-registry-key
+// adapter refuses rather than selecting by map iteration order.
+#[test]
+fn two_registered_head_spellings_rebound_to_one_identity_are_refused() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         data Foo (a : Type) : Type where {{ MkFoo : a -> Foo a }} \
+         data Bar (a : Type) : Type where {{ MkBar : a -> Bar a }} \
+         instance Ord (Foo a) {{ leq = \\x y. True }} \
+         instance Ord (Bar a) {{ leq = \\x y. True }}"
+    ))
+    .expect("the first file registers two distinct instance heads");
+
+    // Manufacture the post-registration collision directly in the public name
+    // table. The registry still has distinct `Foo` and `Bar` keys, while both
+    // now resolve forward to the same `Foo` identity. This is the exact state
+    // the adapter must refuse without relying on source-import ambiguity.
+    let foo_id = env.globals["Foo"];
+    env.globals.insert("Bar".to_string(), foo_id);
+    let result = env.elaborate_file(
+        "import Core.Operators.Standard (≤) \
+         fn ambiguous (x : Foo Bool) (y : Foo Bool) : Bool = x ≤ y",
+    );
+
+    assert!(
+        matches!(
+            result,
+            Err(ken_elaborator::ElabError::InstanceHeadSpellingsShareAnIdentity { .. })
+        ),
+        "two registry keys resolving to one carrier identity must refuse rather \
+         than let hash-map order select a dictionary: {result:?}",
+    );
+}
+
 #[test]
 fn ac4_completion_applies_operands_in_source_order_for_both_roles() {
     let mut env = ElabEnv::new().expect("base environment");

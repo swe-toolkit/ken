@@ -9703,6 +9703,79 @@ fn match_instance_head(
     }
 }
 
+/// The identity at the head of a core type application spine.
+fn core_type_head_id(ty: &Term) -> Option<GlobalId> {
+    match ty {
+        Term::App(f, _) => core_type_head_id(f),
+        Term::Const { id, .. } | Term::IndFormer { id, .. } => Some(*id),
+        _ => None,
+    }
+}
+
+/// Match a registered surface instance-head pattern against an inferred core
+/// carrier. Fixed constructors are compared by resolved identity, never by the
+/// surface spelling retained in the registry.
+fn match_instance_head_core(
+    env: &GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    ctx: &Context,
+    pattern: &RType,
+    requested: &Term,
+    param_count: usize,
+    args: &mut [Option<Term>],
+) -> bool {
+    match pattern {
+        RType::RVarTy(index, _, _) if *index < param_count => {
+            let slot = param_count - 1 - index;
+            match &args[slot] {
+                Some(previous) => convert_type(env, ctx, previous, requested),
+                None => {
+                    args[slot] = Some(requested.clone());
+                    true
+                }
+            }
+        }
+        RType::RCon(name, _) => {
+            let Some(pattern_id) = globals.get(name).copied() else {
+                return false;
+            };
+            matches!(
+                requested,
+                Term::Const { id, .. } | Term::IndFormer { id, .. }
+                    if *id == pattern_id
+            )
+        }
+        RType::RApp(pattern_f, pattern_a, _) => match requested {
+            Term::App(requested_f, requested_a) => {
+                match_instance_head_core(
+                    env,
+                    globals,
+                    ctx,
+                    pattern_f,
+                    requested_f,
+                    param_count,
+                    args,
+                ) && match_instance_head_core(
+                    env,
+                    globals,
+                    ctx,
+                    pattern_a,
+                    requested_a,
+                    param_count,
+                    args,
+                )
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+enum InstanceHeadRequest<'a> {
+    Surface(&'a RType),
+    Core(&'a Term),
+}
+
 /// Resolve an instance and recursively apply every prerequisite dictionary.
 /// The returned candidate is immediately kernel-inferred, so an elaborator
 /// wiring error fails closed before it can become a local dictionary binding.
@@ -9736,7 +9809,7 @@ fn resolve_instance_dictionary(
         ctx,
         class_name,
         &rtype_head_name(requested),
-        Some(requested),
+        InstanceHeadRequest::Surface(requested),
         span,
         owner_label,
         true,
@@ -9772,9 +9845,11 @@ fn resolve_instance_dictionary_by_head_id(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
+    carrier: &Term,
     head_id: GlobalId,
     span: &Span,
     owner_label: &str,
+    enforce_direct_use: bool,
 ) -> Result<(Term, Term), ElabError> {
     let mut hit: Option<&str> = None;
     for (registered_class, registered_head) in class_env.instances.keys() {
@@ -9829,10 +9904,10 @@ fn resolve_instance_dictionary_by_head_id(
         ctx,
         class_name,
         &head_name,
-        None,
+        InstanceHeadRequest::Core(carrier),
         span,
         owner_label,
-        true,
+        enforce_direct_use,
     )?;
 
     // STEP 3 -- CONFIRM IN CORE, which is what demotes the name from a
@@ -9851,10 +9926,9 @@ fn resolve_instance_dictionary_by_head_id(
     // and the carrier is there in CORE with no name anywhere. One comparison
     // on a term that already exists closes the direction the scan cannot see.
     let confirmed = match &resolved.1 {
-        Term::App(_, carrier) => match carrier.as_ref() {
-            Term::Const { id, .. } | Term::IndFormer { id, .. } => *id == head_id,
-            _ => false,
-        },
+        Term::App(_, resolved_carrier) => {
+            convert_type(env, ctx, resolved_carrier.as_ref(), carrier)
+        }
         _ => false,
     };
     if !confirmed {
@@ -9881,14 +9955,12 @@ fn resolve_instance_dictionary_inner(
     // registry is keyed on a surface type NAME (`classes.rs:202`) and an
     // expression site does not hold one -- it holds the carrier's identity.
     //
-    // `requested` is the surface carrier, when the caller has one. **`None`
-    // records a fact about the WORLD, not a wiring gap.** One caller holds
-    // surface syntax and one does not; that difference is real, and the
-    // refusal it forces below IS the V1 boundary. Contrast an `Option` that
-    // records that we might have forgotten to wire something, which should be
-    // made unrepresentable rather than detected.
+    // `requested` preserves the caller's real representation: the declaration
+    // path supplies surface syntax, while an inferred expression carrier
+    // supplies core. Parameterized matching is selected here, inside the sole
+    // registry dispatcher; the identity adapter never selects a dictionary.
     head_name: &str,
-    requested: Option<&RType>,
+    requested: InstanceHeadRequest<'_>,
     span: &Span,
     owner_label: &str,
     enforce_direct_use: bool,
@@ -9927,38 +9999,69 @@ fn resolve_instance_dictionary_inner(
             }
         }
     }
-    let type_args = if info.head_param_count == 0 {
-        Vec::new()
+    let (type_args, core_args) = if info.head_param_count == 0 {
+        (Some(Vec::new()), Vec::new())
     } else if let Some(pattern) = &info.head_type {
-        // A PARAMETERISED CARRIER NEEDS THE SURFACE PATTERN, and an
-        // identity-keyed caller has none. Refusing is the V1 boundary rather
-        // than a stopgap: widening it means matching instance heads against
-        // CORE terms, which is the identity-keyed-registry closure and a
-        // different node. If you are about to write a core-side
-        // `match_instance_head`, you have crossed into it.
-        let Some(requested) = requested else {
-            return Err(ElabError::NoInstance {
-                class: class_name.to_string(),
-                ty: head_name.clone(),
-                span: span.clone(),
-            });
-        };
-        let mut matched = vec![None; info.head_param_count];
-        if !match_instance_head(pattern, requested, info.head_param_count, &mut matched) {
-            return Err(ElabError::NoInstance {
-                class: class_name.to_string(),
-                ty: head_name.clone(),
-                span: span.clone(),
-            });
+        match requested {
+            InstanceHeadRequest::Surface(requested) => {
+                let mut matched = vec![None; info.head_param_count];
+                if !match_instance_head(pattern, requested, info.head_param_count, &mut matched) {
+                    return Err(ElabError::NoInstance {
+                        class: class_name.to_string(),
+                        ty: head_name.clone(),
+                        span: span.clone(),
+                    });
+                }
+                let type_args = matched
+                    .into_iter()
+                    .collect::<Option<Vec<_>>>()
+                    .ok_or_else(|| ElabError::NoInstance {
+                        class: class_name.to_string(),
+                        ty: head_name.clone(),
+                        span: span.clone(),
+                    })?;
+                let core_args = {
+                    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
+                    for ty in &ctx.types {
+                        cx.ctx.push(ty.clone());
+                    }
+                    let mut args = Vec::with_capacity(type_args.len());
+                    for arg in &type_args {
+                        let core = elab_type(&mut cx, arg)?;
+                        args.push(cx.metas.zonk_term(&core));
+                    }
+                    args
+                };
+                (Some(type_args), core_args)
+            }
+            InstanceHeadRequest::Core(requested_core) => {
+                let mut matched = vec![None; info.head_param_count];
+                if !match_instance_head_core(
+                    env,
+                    globals,
+                    ctx,
+                    pattern,
+                    requested_core,
+                    info.head_param_count,
+                    &mut matched,
+                ) {
+                    return Err(ElabError::NoInstance {
+                        class: class_name.to_string(),
+                        ty: head_name.clone(),
+                        span: span.clone(),
+                    });
+                }
+                let core_args = matched
+                    .into_iter()
+                    .collect::<Option<Vec<_>>>()
+                    .ok_or_else(|| ElabError::NoInstance {
+                        class: class_name.to_string(),
+                        ty: head_name.clone(),
+                        span: span.clone(),
+                    })?;
+                (None, core_args)
+            }
         }
-        matched
-            .into_iter()
-            .collect::<Option<Vec<_>>>()
-            .ok_or_else(|| ElabError::NoInstance {
-                class: class_name.to_string(),
-                ty: head_name.clone(),
-                span: span.clone(),
-            })?
     } else {
         return Err(ElabError::NoInstance {
             class: class_name.to_string(),
@@ -9966,38 +10069,64 @@ fn resolve_instance_dictionary_inner(
             span: span.clone(),
         });
     };
-    let core_args = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
-        for ty in &ctx.types {
-            cx.ctx.push(ty.clone());
-        }
-        let mut args = Vec::with_capacity(type_args.len());
-        for arg in &type_args {
-            let core = elab_type(&mut cx, arg)?;
-            args.push(cx.metas.zonk_term(&core));
-        }
-        args
-    };
     let mut candidate =
         ken_kernel::subst::apply_args(Term::const_(info.instance_id, vec![]), &core_args);
     for constraint in &info.constraints {
-        let required_head =
-            instantiate_instance_rtype(&constraint.head_type, &type_args, info.head_param_count);
-        let (dictionary, _) = resolve_instance_dictionary_inner(
-            env,
-            globals,
-            num_values,
-            numeric_env,
-            class_env,
-            provenance,
-            ctx,
-            &constraint.class_name,
-            &rtype_head_name(&required_head),
-            Some(&required_head),
-            span,
-            owner_label,
-            false,
-        )?;
+        let (dictionary, _) = if let Some(type_args) = &type_args {
+            let required_head =
+                instantiate_instance_rtype(&constraint.head_type, type_args, info.head_param_count);
+            resolve_instance_dictionary_inner(
+                env,
+                globals,
+                num_values,
+                numeric_env,
+                class_env,
+                provenance,
+                ctx,
+                &constraint.class_name,
+                &rtype_head_name(&required_head),
+                InstanceHeadRequest::Surface(&required_head),
+                span,
+                owner_label,
+                false,
+            )?
+        } else {
+            let required_type =
+                ken_kernel::subst::subst_tel(&constraint.core_type, &core_args);
+            let required_carrier = match required_type {
+                Term::App(_, carrier) => *carrier,
+                _ => {
+                    return Err(ElabError::NoInstance {
+                        class: constraint.class_name.clone(),
+                        ty: format!("{required_type:?}"),
+                        span: span.clone(),
+                    })
+                }
+            };
+            let required_carrier = whnf(env, ctx, &required_carrier);
+            let Some(required_head_id) = core_type_head_id(&required_carrier) else {
+                return Err(ElabError::NoInstance {
+                    class: constraint.class_name.clone(),
+                    ty: format!("{required_carrier:?}"),
+                    span: span.clone(),
+                });
+            };
+            resolve_instance_dictionary_by_head_id(
+                env,
+                globals,
+                num_values,
+                numeric_env,
+                class_env,
+                provenance,
+                ctx,
+                &constraint.class_name,
+                &required_carrier,
+                required_head_id,
+                span,
+                owner_label,
+                false,
+            )?
+        };
         candidate = Term::app(candidate, dictionary);
     }
     let ty = kernel_infer_raw(env, ctx, &candidate).map_err(|error| ElabError::KernelRejected {
@@ -10772,19 +10901,16 @@ fn elab_standard_operator(
             let (lhs_core, lhs_ty) = infer(cx, lhs)?;
             let carrier = whnf(cx.env, &cx.ctx, &lhs_ty);
 
-            // THE CARRIER'S HEAD IDENTITY. A carrier that is not a type
-            // constant has no registry key and no instance; refusing here is
+            // THE CARRIER'S HEAD IDENTITY, peeled through every core
+            // application. A carrier whose spine has no type constant at its
+            // head has no registry key and no instance; refusing here is
             // `§6.9`'s "carrier un-inferable" step failing at the occurrence.
-            let head_id = match &carrier {
-                Term::Const { id, .. } => *id,
-                Term::IndFormer { id, .. } => *id,
-                _ => {
-                    return Err(ElabError::NoInstance {
-                        class: "Ord".to_string(),
-                        ty: format!("{carrier:?}"),
-                        span: span.clone(),
-                    })
-                }
+            let Some(head_id) = core_type_head_id(&carrier) else {
+                return Err(ElabError::NoInstance {
+                    class: "Ord".to_string(),
+                    ty: format!("{carrier:?}"),
+                    span: span.clone(),
+                });
             };
 
             // The right operand is CHECKED at the carrier, which is what makes
@@ -10836,9 +10962,11 @@ fn elab_standard_operator(
                     provenance,
                     ctx,
                     "Ord",
+                    &carrier,
                     head_id,
                     span,
                     owner_label,
+                    true,
                 )?
             };
 
