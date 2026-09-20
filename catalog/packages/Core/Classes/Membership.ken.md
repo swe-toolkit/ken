@@ -67,7 +67,7 @@ carrier heads select different providers without consulting the query.
 
 ## 4. Laws and observations
 
-`member_holds` lifts the provider's `Bool` result into `Prop` through `IsTrue`.
+`member_holds` lifts the provider's `Bool` result into `Omega` through `IsTrue`.
 It never eliminates a proposition back into runtime data.
 
 `same_members` is observational agreement for one provider. It is a definition,

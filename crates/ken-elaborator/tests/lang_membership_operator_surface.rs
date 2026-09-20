@@ -114,14 +114,6 @@ const list_view : ListMembership Nat =
 const empty_key_view : OrderedKeyMembership Nat Unit =
   MkOrderedKeyMembership Nat Unit Ord_instance_Nat (Leaf Nat Unit) Proved
 
-const empty_relation_view : RelationEdgeMembership Nat =
-  MkRelationEdgeMembership
-    Nat
-    Ord_instance_Nat
-    (Leaf Nat (Tree Nat Unit))
-    Proved
-    Proved
-
 const down_left : Tree Nat Unit =
   Node Nat Unit (Leaf Nat Unit) (Suc Zero) MkUnit (Leaf Nat Unit)
 
@@ -187,19 +179,86 @@ theorem down_tree_ordered : Ordered Nat Unit down_leq down_tree =
 const down_key_view : OrderedKeyMembership Nat Unit =
   MkOrderedKeyMembership Nat Unit down_ord down_tree down_tree_ordered
 
+const down_adjacency : Tree Nat (Tree Nat Unit) =
+  Node
+    Nat
+    (Tree Nat Unit)
+    (Leaf Nat (Tree Nat Unit))
+    Zero
+    down_tree
+    (Leaf Nat (Tree Nat Unit))
+
+theorem down_adjacency_ordered
+    : Ordered Nat (Tree Nat Unit) down_leq down_adjacency =
+  and_intro
+    (all_keys Nat (Tree Nat Unit) down_below_zero (Leaf Nat (Tree Nat Unit)))
+    (And
+      (all_keys Nat (Tree Nat Unit) down_above_zero (Leaf Nat (Tree Nat Unit)))
+      (And
+        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))))
+    Proved
+    (and_intro
+      (all_keys Nat (Tree Nat Unit) down_above_zero (Leaf Nat (Tree Nat Unit)))
+      (And
+        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit))))
+      Proved
+      (and_intro
+        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
+        Proved
+        Proved))
+
+theorem down_successors_ordered
+    : successors_ordered Nat down_ord down_adjacency =
+  and_intro
+    (ordered_by Nat Unit down_ord down_tree)
+    (And
+      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit))))
+    down_tree_ordered
+    (and_intro
+      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit)))
+      Proved
+      Proved)
+
+const down_relation_view : RelationEdgeMembership Nat =
+  MkRelationEdgeMembership
+    Nat
+    down_ord
+    down_adjacency
+    down_adjacency_ordered
+    down_successors_ordered
+
 const list_observed : Bool = Zero ∈ list_view
 const key_observed : Bool = Zero ∈ empty_key_view
-const relation_observed : Bool = mk_pair Nat Nat Zero Zero ∈ empty_relation_view
+const relation_observed : Bool =
+  mk_pair Nat Nat Zero (Suc Zero) ∈ down_relation_view
 const comparator_observed : Bool = Suc Zero ∈ down_key_view
 
 const wrong_comparator_observed : Bool =
   member Nat Unit (Ord_instance_Nat).leq (Suc Zero) down_tree
+
+const wrong_relation_comparator_observed : Bool =
+  set_member
+    Nat
+    (Ord_instance_Nat).leq
+    (Suc Zero)
+    (succ Nat (Ord_instance_Nat).leq Zero down_adjacency)
 
 theorem stored_comparator_finds_the_key
     : Equal Bool comparator_observed True = Proved
 
 theorem fresh_canonical_comparator_misses_the_same_key
     : Equal Bool wrong_comparator_observed False = Proved
+
+theorem stored_relation_comparator_finds_the_edge
+    : Equal Bool relation_observed True = Proved
+
+theorem fresh_canonical_comparator_misses_the_same_edge
+    : Equal Bool wrong_relation_comparator_observed False = Proved
 "#
 }
 
@@ -210,10 +269,12 @@ theorem fresh_canonical_comparator_misses_the_same_key
 /// use `Nat` queries, so their distinct result is the carrier-first
 /// discriminator: choosing from the query cannot distinguish them.
 ///
-/// The final two theorems are the comparator falsifier. A lawful descending
-/// dictionary is stored in the ordered-key view while the canonical ascending
-/// `Ord Nat` remains available. The stored comparator finds a key which a
-/// fresh canonical lookup misses on the same tree.
+/// The final four theorems are the comparator falsifiers. A lawful descending
+/// dictionary is stored in both ordered views while the canonical ascending
+/// `Ord Nat` remains available. The stored comparator finds a key and an edge
+/// which fresh canonical lookups miss on the same trees. The relation witness
+/// recursively proves its stored successor tree ordered under that same
+/// dictionary.
 #[test]
 fn three_named_providers_are_carrier_first_and_retain_their_own_comparator() {
     let mut env = catalog_env();
@@ -248,6 +309,7 @@ fn three_named_providers_are_carrier_first_and_retain_their_own_comparator() {
         "relation_observed",
         "comparator_observed",
         "wrong_comparator_observed",
+        "wrong_relation_comparator_observed",
     ] {
         let id = env.globals[name];
         let ty = match env.env.lookup(id).expect("declared result") {
@@ -449,7 +511,7 @@ fn overlap_and_unadmitted_provider_are_ordinary_instance_errors() {
 ///
 /// The new class, binding, views, and instances are ordinary checked
 /// declarations. None enters the trusted base; `member_holds` goes from Bool
-/// to Prop through `IsTrue`, never from Prop back to Bool.
+/// to Omega through `IsTrue`, never from Omega back to Bool.
 #[test]
 fn membership_surface_adds_no_trusted_declaration() {
     let env = catalog_env();
