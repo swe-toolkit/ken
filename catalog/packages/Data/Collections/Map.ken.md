@@ -85,7 +85,9 @@ and closes with `Proved` — the same non-inductive shape as
 immediate since `empty = Leaf`. Neither needs induction or a comparison.
 
 ```ken
-import Core.Classes.LawfulClasses (Ord, bool_and)
+import Core.Classes.LawfulClasses (bool_and)
+
+import Core.Classes.LawfulClasses (Ord)
 
 import Core.Classes.Membership (Membership)
 
@@ -201,17 +203,11 @@ fn Ordered (k : Type) (v : Type) (leq : k → k → Bool) (m : Tree k v) : Prop 
 theorem ordered_empty (k : Type) (v : Type) (leq : k → k → Bool) : Ordered k v leq (empty k v) =
   Proved
 
-fn ordered_by
-      (k : Type) (v : Type) (d : Ord k) (m : Tree k v)
-    : Prop =
-  Ordered k v d.leq m
+fn ordered_by (k : Type) (v : Type) (d : Ord k) (m : Tree k v) : Prop = Ordered k v d.leq m
 
 pub data OrderedKeyMembership (k : Type) (v : Type) : Type where {
   MkOrderedKeyMembership :
-    (d : Ord k) →
-    (tree : Tree k v) →
-    ordered_by k v d tree →
-    OrderedKeyMembership k v
+    (d : Ord k) → (tree : Tree k v) → ordered_by k v d tree → OrderedKeyMembership k v
 }
 
 export MkOrderedKeyMembership
@@ -235,13 +231,8 @@ theorem ordered_key_membership_adapter_fidelity
       (tree : Tree k v)
       (ordered : ordered_by k v d tree)
       (query : k)
-    : Equal
-        Bool
-        (ordered_key_membership_member
-          k
-          v
-          query
-          (MkOrderedKeyMembership k v d tree ordered))
+    : Equal Bool
+        (ordered_key_membership_member k v query (MkOrderedKeyMembership k v d tree ordered))
         (member k v d.leq query tree) =
   Refl
 
@@ -15226,26 +15217,22 @@ fn rel_member
     : Prop =
   Equal Bool (set_member k leq y (succ k leq x r)) True
 
-fn successors_ordered
-      (k : Type) (d : Ord k) (adjacency : Tree k (Tree k Unit))
-    : Prop =
+fn successors_ordered (k : Type) (d : Ord k) (adjacency : Tree k (Tree k Unit)) : Prop =
   match adjacency {
     Leaf ↦ Top;
     Node left key successors right ↦
       And
         (ordered_by k Unit d successors)
-        (And
-          (successors_ordered k d left)
-          (successors_ordered k d right))
+        (And (successors_ordered k d left) (successors_ordered k d right))
   }
 
 pub data RelationEdgeMembership (k : Type) : Type where {
   MkRelationEdgeMembership :
-    (d : Ord k) →
-    (adjacency : Tree k (Tree k Unit)) →
-    ordered_by k (Tree k Unit) d adjacency →
-    successors_ordered k d adjacency →
-    RelationEdgeMembership k
+    (d : Ord k)
+    → (adjacency : Tree k (Tree k Unit))
+    → ordered_by k (Tree k Unit) d adjacency
+    → successors_ordered k d adjacency
+    → RelationEdgeMembership k
 }
 
 export MkRelationEdgeMembership
@@ -15255,11 +15242,7 @@ fn relation_edge_membership_member
     : Bool =
   match view {
     MkRelationEdgeMembership d adjacency outer_ordered inner_ordered ↦
-      set_member
-        k
-        d.leq
-        (pair_snd k k query)
-        (succ k d.leq (pair_fst k k query) adjacency)
+      set_member k d.leq (pair_snd k k query) (succ k d.leq (pair_fst k k query) adjacency)
   }
 
 instance Membership (RelationEdgeMembership k) {
@@ -15275,17 +15258,11 @@ theorem relation_edge_membership_adapter_fidelity
       (inner_ordered : successors_ordered k d adjacency)
       (source : k)
       (target : k)
-    : Equal
-        Bool
+    : Equal Bool
         (relation_edge_membership_member
           k
           (mk_pair k k source target)
-          (MkRelationEdgeMembership
-            k
-            d
-            adjacency
-            outer_ordered
-            inner_ordered))
+          (MkRelationEdgeMembership k d adjacency outer_ordered inner_ordered))
         (set_member k d.leq target (succ k d.leq source adjacency)) =
   Refl
 

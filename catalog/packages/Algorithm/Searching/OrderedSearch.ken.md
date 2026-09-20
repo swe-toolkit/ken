@@ -46,9 +46,7 @@ pub data ListMembership a = MkListMembership (Ord a) (List a)
 
 export MkListMembership
 
-fn list_membership_member
-      (a : Type) (query : a) (view : ListMembership a)
-    : Bool =
+fn list_membership_member (a : Type) (query : a) (view : ListMembership a) : Bool =
   match view {
     MkListMembership d xs ↦ elem a d query xs
   }
@@ -60,8 +58,7 @@ instance Membership (ListMembership a) {
 
 theorem list_membership_adapter_fidelity
       (a : Type) (d : Ord a) (xs : List a) (query : a)
-    : Equal
-        Bool
+    : Equal Bool
         (list_membership_member a query (MkListMembership a d xs))
         (elem a d query xs) =
   Refl

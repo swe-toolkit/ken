@@ -42,6 +42,12 @@ fn mk_env_with_map() -> ElabEnv {
         "Data.Numeric.Nat.Arithmetic",
     )
     .expect("Map's canonical Nat addition provider must roots-load");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.Membership")
+        .expect("Map's canonical Membership provider must roots-load");
+    assert!(
+        env.globals.remove("Membership").is_some(),
+        "the legacy Map fixture must withhold an unqualified Membership alias"
+    );
     for imported in ["add", "cong", "sym", "trans", "list_append"] {
         assert!(
             !env.globals.contains_key(imported),

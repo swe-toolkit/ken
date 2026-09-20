@@ -39,19 +39,13 @@ pub class Membership (container : Type) {
   member : Query → container → Bool
 }
 
-pub fn membership_member_at
-      (c : Type) (d : Membership c) (q : d.Query) (x : c)
-    : Bool =
+pub fn membership_member_at (c : Type) (d : Membership c) (q : d.Query) (x : c) : Bool =
   d.member q x
 
-pub fn member_holds
-      (c : Type) (d : Membership c) (q : d.Query) (x : c)
-    : Omega =
+pub fn member_holds (c : Type) (d : Membership c) (q : d.Query) (x : c) : Omega =
   IsTrue (d.member q x)
 
-pub fn same_members
-      (c : Type) (d : Membership c) (x : c) (y : c)
-    : Omega =
+pub fn same_members (c : Type) (d : Membership c) (x : c) (y : c) : Omega =
   (q : d.Query) → Eq Bool (d.member q x) (d.member q y)
 ```
 
