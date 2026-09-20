@@ -3361,12 +3361,15 @@ mod namespace_effect_tests {
     fn ambient_local_import_of_same_identity_is_a_binding_noop() {
         let shared = GlobalId(90_001);
         let globals = HashMap::from([
-            ("item".to_string(), shared),
+            ("Owner.item".to_string(), shared),
             ("Provider.item".to_string(), shared),
         ]);
         let mut scope = Scope::default();
-        scope.locals.insert("item".to_string());
+        scope
+            .bind_local("item", "Owner.item", &Span::new(0, 4))
+            .expect("the local producer installs both local and canonical binding state");
         let before = scope.bindings.clone();
+        assert_eq!(before.get("item").map(String::as_str), Some("Owner.item"));
 
         scope
             .bind_import(&globals, "item", "Provider.item", &Span::new(10, 20))
@@ -3374,15 +3377,15 @@ mod namespace_effect_tests {
 
         assert_eq!(
             scope.bindings, before,
-            "the identity escape must not install or replace a binding"
+            "the identity escape must not install or replace the canonical local binding"
         );
     }
 
     /// Promise class: durable invariant.
     ///
     /// MEASURED: the same ambient-local shape with two distinct `GlobalId`s
-    /// returns the exact ambiguity variant and reports the resolved local id
-    /// beside the qualified source. CLAIMED: the escape cannot admit a real
+    /// returns the exact ambiguity variant and reports the canonical local
+    /// source beside the qualified source. CLAIMED: the escape cannot admit a real
     /// collision. THE GAP: both ids are asserted distinct before the refusal.
     #[test]
     fn ambient_local_import_of_distinct_identity_refuses_with_honest_sources() {
@@ -3393,23 +3396,133 @@ mod namespace_effect_tests {
             "the refusal fixture must be non-degenerate"
         );
         let globals = HashMap::from([
-            ("item".to_string(), local_id),
+            ("Owner.item".to_string(), local_id),
             ("Provider.item".to_string(), imported_id),
         ]);
         let mut scope = Scope::default();
-        scope.locals.insert("item".to_string());
+        scope
+            .bind_local("item", "Owner.item", &Span::new(0, 4))
+            .expect("the local producer installs both local and canonical binding state");
 
         match scope.bind_import(&globals, "item", "Provider.item", &Span::new(10, 20)) {
             Err(ElabError::AmbiguousReference { name, sources, .. }) => {
                 assert_eq!(name, "item");
                 assert_eq!(
                     sources,
-                    vec![format!("{local_id:?}"), "Provider.item".to_string()],
-                    "a resolved identity must replace the old bare-name fallback"
+                    vec!["Owner.item".to_string(), "Provider.item".to_string()],
+                    "the canonical local source must replace the old bare-name fallback"
                 );
             }
             other => panic!("distinct identities must remain ambiguous, got {other:?}"),
         }
+    }
+
+    fn env_with_ambient_item_and_facade() -> (ElabEnv, GlobalId) {
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_file(
+            "const item : Nat = Zero \
+             module Provider { export item }",
+        )
+        .expect("establish an ambient local and a facade route to its identity");
+        let item = env.globals["item"];
+        assert_eq!(
+            env.module_state
+                .root_scope
+                .bindings
+                .get("item")
+                .map(String::as_str),
+            Some("item")
+        );
+        assert_eq!(
+            env.module_state.exports["Provider"]
+                .get("item")
+                .map(String::as_str),
+            Some("item")
+        );
+        (env, item)
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: an actual `.ken` selective import reaches `apply_import`,
+    /// accepts a facade route to the ambient local's existing `GlobalId`, and
+    /// preserves the complete root binding table. CLAIMED: the identity escape
+    /// is reachable through its production caller. THE GAP: the replay and
+    /// source-order variants below drive the two other ordered-pass shapes.
+    #[test]
+    fn apply_import_accepts_an_ambient_local_at_the_same_identity() {
+        let (mut env, item) = env_with_ambient_item_and_facade();
+        let before = env.module_state.root_scope.bindings.clone();
+
+        env.elaborate_file("import Provider (item)")
+            .expect("the second route to the ambient identity must elaborate");
+
+        assert_eq!(env.globals["item"], item);
+        assert_eq!(
+            env.module_state.root_scope.bindings, before,
+            "apply_import must leave the ambient binding table unchanged"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: adding an instance makes the prebinding synthesis replay run,
+    /// and the same-identity import still elaborates before the dictionary is
+    /// produced. CLAIMED: replay reaches the identity escape without turning a
+    /// no-op import into an ambiguity. THE GAP: the dictionary-presence check
+    /// proves the fixture did not return before instance elaboration.
+    #[test]
+    fn apply_import_accepts_the_same_identity_during_instance_replay() {
+        let (mut env, item) = env_with_ambient_item_and_facade();
+        let before_item_binding = env.module_state.root_scope.bindings["item"].clone();
+
+        env.elaborate_file(
+            "class Marker a {} \
+             import Provider (item) \
+             instance Marker Nat {}",
+        )
+        .expect("synthesis replay and ordered import both accept the same identity");
+
+        assert_eq!(env.globals["item"], item);
+        assert_eq!(
+            env.module_state.root_scope.bindings["item"],
+            before_item_binding
+        );
+        assert!(
+            env.globals.contains_key("Marker_instance_Nat"),
+            "the instance must elaborate after the replayed import"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: `apply_import` accepts the facade route when its import is
+    /// textually above a local redeclaration prebound for the complete scope,
+    /// and the later declaration allocates a fresh identity. CLAIMED: ordered
+    /// application does not mistake the prebound same-identity local for a
+    /// distinct source. THE GAP: the changed id proves the later local ran.
+    #[test]
+    fn apply_import_accepts_the_same_identity_above_the_local() {
+        let (mut env, item_before) = env_with_ambient_item_and_facade();
+
+        env.elaborate_file(
+            "import Provider (item) \
+             const item : Nat = Zero",
+        )
+        .expect("an import above the prebound local must accept its ambient identity");
+
+        assert_ne!(
+            env.globals["item"], item_before,
+            "the local below the import must still elaborate"
+        );
+        assert_eq!(
+            env.module_state
+                .root_scope
+                .bindings
+                .get("item")
+                .map(String::as_str),
+            Some("item")
+        );
     }
 
     /// Promise class: normative compatibility vector.
