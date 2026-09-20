@@ -1,7 +1,7 @@
 ---
 id: LANG-OLD-OPERAND-START-ADMISSION
 title: "`old`'s operand is parsed by a direct `parse_atom_expr()` call that consults no atom-start roster and no exclusion, so forms refused in ordinary argument position -- `old if a then b else c`, `old proof p for s` -- are admitted after `old`. A live over-admission on main. The repair direction needs a design ruling first: whether `old`'s operand is an application_atom position at all (`21 §6.4`, `32 §3`)."
-status: ready
+status: merged
 owner: language
 size: S
 gate: none

@@ -1,7 +1,7 @@
 ---
 id: LANG-DESCENT-STACK-DETECTOR-RECALIBRATION
 title: "local_prebinding_preserves_legacy_map_union_stack_budget is calibrated to a tree that no longer exists: its 512-byte discriminating reservation was bisected BEFORE LANG-REWRITE-DESCENT-FRAME-TAX removed the whole-surface frame tax that the margin was made of. Re-measure the discriminating range on the repaired descent and restate the constants to what it measures -- or establish that no reservation discriminates, which retires the instrument's claim rather than its boundary. This is the remeasure half of the operator's 'g then remeasure'."
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
