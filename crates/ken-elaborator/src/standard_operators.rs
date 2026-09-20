@@ -60,31 +60,15 @@ pub(crate) fn is_standard_operator_home(module: &str) -> bool {
 
 /// The standard operator roles of `33 §6.1`'s fixity table.
 ///
-/// **CLOSED AT FIVE, and `∈` is deliberately absent.** `§6.1`'s table names
-/// six glyph-fixity pairs; this realises the five whose bindings exist.
+/// The table's six glyphs are all represented. Five roles name one ordinary
+/// catalog binding, while `≠` remains a carrier-directed comparator selection.
+/// `Member` arrived together with `membership_member_at`, its facade re-export,
+/// shape certification, fixity, and completion path; it was never a dead arm.
 ///
-/// The tempting reading — *"the table names `∈`, so the vocabulary must carry
-/// it"* — does not survive contact with how the fixities are installed. **A
-/// role's fixity attaches to the `GlobalId` the required-roles check
-/// certified.** `∈`'s meaning (`membership_member_at`, `§6.3`) is not authored
-/// yet, so it has no identity, so **its fixity cannot be installed either.** A
-/// sixth variant here would be an arm nothing produces: no binding, no
-/// required-role entry, no completion path, no fixity. A dead arm reads as
-/// coverage to every later reader, and a vocabulary carrying a role it never
-/// requires is a population that overstates itself.
-///
-/// **The membership track adds the variant together with its binding**, and
-/// because this type is crate-internal that widening is an ordinary edit
-/// inside `ken-elaborator` rather than a change to anything A1 publishes —
-/// A1's published surface is the facade's export table and the completion
-/// behaviour, and neither moves. Exhaustive matching then makes the widening a
-/// compiler-generated checklist rather than a tax.
-///
-/// **Crate-internal on purpose.** Nothing outside this crate names a role, so
-/// adding the row that fills `Member` is an ordinary internal edit rather than
-/// a change to a published surface. What A1 publishes is the facade's export
-/// table and the completion behaviour; neither moves when the required list
-/// grows.
+/// **Crate-internal on purpose.** Nothing outside this crate names a role.
+/// What the layer publishes is the facade's export table and completion
+/// behaviour, not this enum. Exhaustive matching makes a later widening a
+/// compiler-generated checklist rather than a silent omission.
 ///
 /// Exhaustively matched with no `_ =>` arm at every consumer (`COORDINATION
 /// §7`), so a seventh role is a compile error at each site rather than a
@@ -100,6 +84,8 @@ pub(crate) enum StandardOperatorRole {
     /// `≥` — `ord_geq_at`, which reverses its two ALREADY-EVALUATED argument
     /// values inside its own body (`§6.1`), never the operand expressions.
     Geq,
+    /// `∈` — `membership_member_at`, completed from the right-hand carrier.
+    Member,
     /// `≠` — the negation of the comparator the `==` path selects for the
     /// operand carrier (`§6.2`). Unlike the other five this names no single
     /// binding: it is a carrier-directed selection.
@@ -108,39 +94,30 @@ pub(crate) enum StandardOperatorRole {
 
 impl StandardOperatorRole {
     /// The role vocabulary — every role this compiler can name.
-    pub(crate) const ALL: [Self; 5] =
-        [Self::And, Self::Or, Self::Leq, Self::Geq, Self::Neq];
+    pub(crate) const ALL: [Self; 6] = [
+        Self::And,
+        Self::Or,
+        Self::Leq,
+        Self::Geq,
+        Self::Member,
+        Self::Neq,
+    ];
 
     /// The roles whose meaning is ONE binding published by the
     /// standard-operator home, and which the required-roles check therefore
     /// certifies against that home's export table.
     ///
-    /// **`≠` is absent, and it is absent for a different reason than `∈` is
-    /// absent from [`Self::ALL`].** `§6.1`'s table names a binding for four
-    /// roles and *describes* the fifth: `≠` is "the negation of the comparator
-    /// the `==` path selects", a carrier-directed selection over the registry
-    /// `§6.2` closes by construction. It has no single identity for a home to
-    /// publish, so an export-table check has nothing to look up for it — and
-    /// requiring it there would hard-error on a correct tree.
+    /// `≠` is absent because `§6.1` describes it as the negation of the
+    /// comparator selected for `==`, not as one binding. It has no identity for
+    /// the home to publish. The other five roles, including `Member`, each name
+    /// one binding and therefore must be present and shape-correct.
     ///
-    /// **So the vocabulary and the certified set genuinely differ TODAY**, at
-    /// five against four, rather than only once the membership track lands.
-    ///
-    /// **A `required()` accessor used to sit beside this and has been
-    /// removed.** It returned the whole vocabulary, had no callers anywhere in
-    /// the tree, and its stated value was that it would earn its keep "when
-    /// the two sets diverge". They already diverge — five against four, per
-    /// the paragraph above — and when that happened the required-roles check
-    /// reached for THIS constant instead. A distinction bypassed at the exact
-    /// moment it was written for is not a distinction the code has, so the
-    /// reasoning lives here, on the list the check actually iterates.
-    ///
-    /// If the membership track later needs `Member` to enter the vocabulary
-    /// and to enter the required list as two separate acts, that is a third
-    /// set — and it should arrive with the caller that distinguishes them,
-    /// not before it.
-    pub(crate) const BINDING_BACKED: [Self; 4] =
-        [Self::And, Self::Or, Self::Leq, Self::Geq];
+    /// The vocabulary and certified set deliberately differ at six against
+    /// five. Keeping that distinction on the exact list the check iterates
+    /// prevents a whole-vocabulary helper from overstating what a facade can
+    /// certify.
+    pub(crate) const BINDING_BACKED: [Self; 5] =
+        [Self::And, Self::Or, Self::Leq, Self::Geq, Self::Member];
 
     /// The canonical glyph spelling, as `31 §1c` admits it.
     ///
@@ -153,6 +130,7 @@ impl StandardOperatorRole {
             Self::Or => "∨",
             Self::Leq => "≤",
             Self::Geq => "≥",
+            Self::Member => "∈",
             Self::Neq => "≠",
         }
     }
@@ -172,7 +150,7 @@ impl StandardOperatorRole {
                 associativity: FixityAssoc::Right,
                 precedence: 2,
             },
-            Self::Leq | Self::Geq | Self::Neq => Fixity {
+            Self::Leq | Self::Geq | Self::Member | Self::Neq => Fixity {
                 associativity: FixityAssoc::NonAssociative,
                 precedence: 4,
             },
@@ -184,8 +162,8 @@ impl StandardOperatorRole {
 /// diagnostic can print.
 ///
 /// Stated over the ELABORATED TELESCOPE rather than as a surface signature
-/// template, and that is forced by the five rather than granted to a later
-/// role. `ord_leq_at`'s own type is
+/// template, and that is forced by the existing comparison roles rather than
+/// granted specially to membership. `ord_leq_at`'s own type is
 ///
 /// ```text
 /// Π Type 0. (Π (Ord @0). (Π @1. (Π @2. Bool)))
@@ -199,12 +177,11 @@ impl StandardOperatorRole {
 /// this shape extends to the membership role without widening.
 fn expected_shape(role: StandardOperatorRole) -> &'static str {
     match role {
-        StandardOperatorRole::And | StandardOperatorRole::Or => {
-            "(a : Bool) (b : Bool) : Bool"
-        }
+        StandardOperatorRole::And | StandardOperatorRole::Or => "(a : Bool) (b : Bool) : Bool",
         StandardOperatorRole::Leq | StandardOperatorRole::Geq => {
             "(a : Type) (d : <class> a) (x : a) (y : a) : Bool"
         }
+        StandardOperatorRole::Member => "(c : Type) (d : <class> c) (q : d.Query) (x : c) : Bool",
         // Not binding-backed; never certified against an export table.
         StandardOperatorRole::Neq => "a comparator selection (`33 §6.2`)",
     }
@@ -273,6 +250,25 @@ fn shape_matches(role: StandardOperatorRole, ty: &Term, bool_id: GlobalId) -> bo
             let operands_are_the_carrier =
                 matches!(domains[2], Term::Var(1)) && matches!(domains[3], Term::Var(2));
             carrier_is_universe && dictionary_depends_on_carrier && operands_are_the_carrier
+        }
+        StandardOperatorRole::Member => {
+            if domains.len() != 4 {
+                return false;
+            }
+            let carrier_is_universe = matches!(domains[0], Term::Type(_));
+            let dictionary_depends_on_carrier = matches!(
+                domains[1],
+                Term::App(_, ref argument) if matches!(argument.as_ref(), Term::Var(0))
+            );
+            let query_is_dictionary_projection = matches!(
+                domains[2],
+                Term::Proj1(ref dictionary) if matches!(dictionary.as_ref(), Term::Var(0))
+            );
+            let container_is_the_carrier = matches!(domains[3], Term::Var(2));
+            carrier_is_universe
+                && dictionary_depends_on_carrier
+                && query_is_dictionary_projection
+                && container_is_the_carrier
         }
         StandardOperatorRole::Neq => false,
     }

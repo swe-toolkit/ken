@@ -11,6 +11,11 @@ order: two values are equal exactly when each is below the other. The checked
 membership proposition is `Equal Bool (elem a d x xs) True`, so it fits the
 standard `Dec` carrier without turning proof evidence into runtime data.
 
+`ListMembership` is the nominal provider view for ordinary list membership. It
+stores the exact `Ord` dictionary used by `elem`, so an `∈` occurrence never
+resolves a fresh comparator. Its `Membership` instance selects query type `a`
+and delegates directly to `elem`.
+
 `sorted_for_search` is stronger than adjacent-pair sortedness. At every head it
 carries the fact that the head is below every member of the tail, together with
 the recursively sorted tail. This is the exact invariant used by the pruning
@@ -18,6 +23,8 @@ branch.
 
 ```ken
 import Core.Classes.LawfulClasses (Ord, ord_leq_at)
+
+import Core.Classes.Membership (Membership)
 
 fn elem_step (tail_member : Bool) (x_before_head : Bool) (head_before_x : Bool) : Bool =
   match x_before_head {
@@ -35,6 +42,27 @@ fn elem (a : Type) (d : Ord a) (x : a) (xs : List a) : Bool =
     Cons head tail ↦ elem_step (elem a d x tail) (ord_leq_at a d x head) (ord_leq_at a d head x)
   }
 
+pub data ListMembership a = MkListMembership (Ord a) (List a)
+
+export MkListMembership
+
+fn list_membership_member (a : Type) (query : a) (view : ListMembership a) : Bool =
+  match view {
+    MkListMembership d xs ↦ elem a d query xs
+  }
+
+instance Membership (ListMembership a) {
+  Query = a;
+  member = list_membership_member a
+}
+
+theorem list_membership_adapter_fidelity
+      (a : Type) (d : Ord a) (xs : List a) (query : a)
+    : Equal Bool
+        (list_membership_member a query (MkListMembership a d xs))
+        (elem a d query xs) =
+  Refl
+
 fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
   match xs {
     Nil ↦ Top;
@@ -46,6 +74,11 @@ fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
 ```
 
 ## Laws and proofs
+
+`list_membership_adapter_fidelity` is the checked adapter obligation. It
+constructs the nominal view from arbitrary `d` and `xs`, then proves the actual
+adapter definitionally equal to `elem a d query xs`. Replacing the stored
+comparator in the adapter therefore breaks the proof.
 
 The four `elem_step` lemmas are the decision bridge. They rewrite the two
 ordering observations to the branch constructors and expose either the head
@@ -228,12 +261,13 @@ fn search
 
 ## Trust and derivation
 
-`elem` and `search` recurse structurally over `List`. Membership evidence is the
-checked proposition that the transparent membership observation reduces to
-`True`; the `Yes` constructor carries that proof, while `No` carries its
-refutation into `Empty`. The ordering dictionary supplies only its checked
-`refl`, `antisym`, and comparison fields. The package introduces no axiom,
-postulate, primitive, foreign declaration, or unresolved hole, so its
+`elem` and `search` recurse structurally over `List`. `ListMembership` is an
+ordinary inductive view, and its instance is a transparent adapter to `elem`.
+Membership evidence is the checked proposition that the transparent membership
+observation reduces to `True`; the `Yes` constructor carries that proof, while
+`No` carries its refutation into `Empty`. The ordering dictionary supplies only
+its checked `refl`, `antisym`, and comparison fields. The package introduces no
+axiom, postulate, primitive, foreign declaration, or unresolved hole, so its
 `trusted_base()` delta is zero.
 
 ## References

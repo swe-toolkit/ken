@@ -234,16 +234,19 @@ fn a_facade_glyph_rename_republishes_the_defining_globalid() {
 // `readelf` on one box.
 // ---------------------------------------------------------------------------
 
-/// A provider whose four binding-backed roles all have the shape `33 §6.1`
+/// A provider whose five binding-backed roles all have the shape `33 §6.1`
 /// fixes. `{LEQ}` is the one hole the wrong-shape case fills differently.
 fn provider_with_leq(leq: &str) -> String {
     format!(
         "class Ord a {{ leq : a -> a -> Bool }} \
+         class Membership c {{ Query : Type; member : Query -> c -> Bool }} \
          module Provider {{ \
            pub fn bool_and (a : Bool) (b : Bool) : Bool = a \
            pub fn bool_or (a : Bool) (b : Bool) : Bool = a \
            {leq} \
            pub fn ord_geq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq y x \
+           pub fn membership_member_at \
+             (c : Type) (d : Membership c) (q : d.Query) (x : c) : Bool = d.member q x \
          }}"
     )
 }
@@ -251,9 +254,10 @@ fn provider_with_leq(leq: &str) -> String {
 const GOOD_LEQ: &str =
     "pub fn ord_leq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y";
 
-/// The home, publishing all four roles from `Provider`.
+/// The home, publishing all five binding-backed roles from `Provider`.
 const HOME: &str = "module Core.Operators.Standard { \
-     export Provider (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, ord_geq_at as ≥) }";
+     export Provider (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, \
+                      ord_geq_at as ≥, membership_member_at as ∈) }";
 
 fn elaborate(source: &str) -> Result<(), ken_elaborator::ElabError> {
     let mut env = ElabEnv::new().expect("base environment");
@@ -296,7 +300,7 @@ fn ac9_a_role_bound_to_a_wrong_shaped_binding_is_refused_naming_the_role() {
 #[test]
 fn ac9_positive_control_the_same_home_with_the_right_shape_is_accepted() {
     // The discriminating half: without this, "refused" and "never looked"
-    // read identically. Same home, same four roles, correct `≤`.
+    // read identically. Same home, same five roles, correct `≤`.
     let source = format!("{} {HOME}", provider_with_leq(GOOD_LEQ));
     elaborate(&source).expect("a correctly shaped home certifies");
 }
@@ -309,7 +313,8 @@ fn ac9_an_unfilled_role_is_refused_naming_the_role_and_is_a_DISTINCT_refusal() {
     // fixing the binding already published. Different states, different
     // remedies, so different variants.
     let home_without_leq = "module Core.Operators.Standard { \
-         export Provider (bool_and as ∧, bool_or as ∨, ord_geq_at as ≥) }";
+         export Provider (bool_and as ∧, bool_or as ∨, ord_geq_at as ≥, \
+                          membership_member_at as ∈) }";
     let source = format!("{} {home_without_leq}", provider_with_leq(GOOD_LEQ));
 
     match elaborate(&source) {
@@ -375,14 +380,18 @@ fn the_real_catalog_facade_certifies_against_the_shape_contract() {
 // ---------------------------------------------------------------------------
 
 const PROVIDER_AND_HOME: &str = "class Ord a { leq : a -> a -> Bool } \
+     class Membership c { Query : Type; member : Query -> c -> Bool } \
      module Provider { \
        pub fn bool_and (a : Bool) (b : Bool) : Bool = a \
        pub fn bool_or (a : Bool) (b : Bool) : Bool = a \
        pub fn ord_leq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y \
        pub fn ord_geq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq y x \
+       pub fn membership_member_at \
+         (c : Type) (d : Membership c) (q : d.Query) (x : c) : Bool = d.member q x \
      } \
      module Core.Operators.Standard { \
-       export Provider (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, ord_geq_at as ≥) }";
+       export Provider (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, \
+                        ord_geq_at as ≥, membership_member_at as ∈) }";
 
 fn body_of(env: &ElabEnv, name: &str) -> ken_kernel::Term {
     let (_, body) = env
@@ -876,15 +885,19 @@ fn ac2a_a_renaming_hop_to_the_same_identity_completes_identically() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_file(&format!(
         "class Ord a {{ leq : a -> a -> Bool }} \
+         class Membership c {{ Query : Type; member : Query -> c -> Bool }} \
          module Provider {{ \
            pub fn bool_and (a : Bool) (b : Bool) : Bool = a \
            pub fn bool_or (a : Bool) (b : Bool) : Bool = a \
            pub fn ord_leq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y \
            pub fn ord_geq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq y x \
+           pub fn membership_member_at \
+             (c : Type) (d : Membership c) (q : d.Query) (x : c) : Bool = d.member q x \
          }} \
          module Core.Operators.Standard {{ \
            export Provider (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, \
-                            ord_leq_at as <+>, ord_geq_at as ≥) }} \
+                            ord_leq_at as <+>, ord_geq_at as ≥, \
+                            membership_member_at as ∈) }} \
          {ORD_BOOL} \
          import Core.Operators.Standard (≤, <+>) \
          fn viaGlyph (a : Bool) (b : Bool) : Bool = a ≤ b \

@@ -70,6 +70,14 @@ a `Node`'s left subtree is below its own key, every key in its right
 subtree is above it, and both subtrees are themselves `Ordered`,
 recursively.
 
+`OrderedKeyMembership` is the nominal key-membership view. Its value stores an
+`Ord k`, a tree, and `Ordered` evidence tied to that exact dictionary through
+`ordered_by`. Its `Membership` instance uses query type `k` and delegates to
+this package's `member`; no use-site comparator is resolved.
+`ordered_key_membership_adapter_fidelity` constructs the view from arbitrary
+stored `d`, tree, and evidence, and checks the adapter against `member` using
+that same `d.leq`.
+
 Two base laws close the Definition: `ordered_empty` (`Ordered empty`)
 unfolds to `Top`
 and closes with `Proved` — the same non-inductive shape as
@@ -78,6 +86,10 @@ immediate since `empty = Leaf`. Neither needs induction or a comparison.
 
 ```ken
 import Core.Classes.LawfulClasses (bool_and)
+
+import Core.Classes.LawfulClasses (Ord)
+
+import Core.Classes.Membership (Membership)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
@@ -190,6 +202,39 @@ fn Ordered (k : Type) (v : Type) (leq : k → k → Bool) (m : Tree k v) : Prop 
 
 theorem ordered_empty (k : Type) (v : Type) (leq : k → k → Bool) : Ordered k v leq (empty k v) =
   Proved
+
+fn ordered_by (k : Type) (v : Type) (d : Ord k) (m : Tree k v) : Prop = Ordered k v d.leq m
+
+pub data OrderedKeyMembership (k : Type) (v : Type) : Type where {
+  MkOrderedKeyMembership :
+    (d : Ord k) → (tree : Tree k v) → ordered_by k v d tree → OrderedKeyMembership k v
+}
+
+export MkOrderedKeyMembership
+
+fn ordered_key_membership_member
+      (k : Type) (v : Type) (query : k) (view : OrderedKeyMembership k v)
+    : Bool =
+  match view {
+    MkOrderedKeyMembership d tree ordered ↦ member k v d.leq query tree
+  }
+
+instance Membership (OrderedKeyMembership k v) {
+  Query = k;
+  member = ordered_key_membership_member k v
+}
+
+theorem ordered_key_membership_adapter_fidelity
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (tree : Tree k v)
+      (ordered : ordered_by k v d tree)
+      (query : k)
+    : Equal Bool
+        (ordered_key_membership_member k v query (MkOrderedKeyMembership k v d tree ordered))
+        (member k v d.leq query tree) =
+  Refl
 
 theorem lookup_empty_is_none
       (k : Type) (v : Type) (leq : k → k → Bool) (key : k)
@@ -15134,11 +15179,19 @@ reflexive-transitive closure.
 The computation is total on raw trees and performs no runtime well-formedness
 check. Its correspondence with mathematical positive closure requires one
 shared lawful comparator, an `Ordered` outer tree, and `Ordered` evidence for
-every stored successor tree. Comparator lawfulness alone is insufficient: in an
-unordered successor tree, `fold` can visit a misplaced key that `set_member`
-lookup rejects, creating a path that is absent from the lookup-defined relation.
-The faithfulness and saturation proofs under the full representation premises
-remain separate from this computational definition.
+every stored successor tree. `RelationEdgeMembership` stores exactly that
+comparator, adjacency tree, outer witness, and recursively defined inner-tree
+witness. Its `Pair k k` query delegates to the same `succ` and `set_member`
+computation as relation membership.
+`relation_edge_membership_adapter_fidelity` constructs the nominal view from
+arbitrary shared evidence and checks source/target order and both `d.leq`
+consumption sites against that computation.
+
+Comparator lawfulness alone is insufficient: in an unordered successor tree,
+`fold` can visit a misplaced key that `set_member` lookup rejects, creating a
+path that is absent from the lookup-defined relation. The faithfulness and
+saturation proofs under the full representation premises remain separate from
+this computational definition.
 
 ```ken
 pub fn size (k : Type) (v : Type) (m : Tree k v) : Nat =
@@ -15163,6 +15216,55 @@ fn rel_member
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
     : Prop =
   Equal Bool (set_member k leq y (succ k leq x r)) True
+
+fn successors_ordered (k : Type) (d : Ord k) (adjacency : Tree k (Tree k Unit)) : Prop =
+  match adjacency {
+    Leaf ↦ Top;
+    Node left key successors right ↦
+      And
+        (ordered_by k Unit d successors)
+        (And (successors_ordered k d left) (successors_ordered k d right))
+  }
+
+pub data RelationEdgeMembership (k : Type) : Type where {
+  MkRelationEdgeMembership :
+    (d : Ord k)
+    → (adjacency : Tree k (Tree k Unit))
+    → ordered_by k (Tree k Unit) d adjacency
+    → successors_ordered k d adjacency
+    → RelationEdgeMembership k
+}
+
+export MkRelationEdgeMembership
+
+fn relation_edge_membership_member
+      (k : Type) (query : Pair k k) (view : RelationEdgeMembership k)
+    : Bool =
+  match view {
+    MkRelationEdgeMembership d adjacency outer_ordered inner_ordered ↦
+      set_member k d.leq (pair_snd k k query) (succ k d.leq (pair_fst k k query) adjacency)
+  }
+
+instance Membership (RelationEdgeMembership k) {
+  Query = Pair k k;
+  member = relation_edge_membership_member k
+}
+
+theorem relation_edge_membership_adapter_fidelity
+      (k : Type)
+      (d : Ord k)
+      (adjacency : Tree k (Tree k Unit))
+      (outer_ordered : ordered_by k (Tree k Unit) d adjacency)
+      (inner_ordered : successors_ordered k d adjacency)
+      (source : k)
+      (target : k)
+    : Equal Bool
+        (relation_edge_membership_member
+          k
+          (mk_pair k k source target)
+          (MkRelationEdgeMembership k d adjacency outer_ordered inner_ordered))
+        (set_member k d.leq target (succ k d.leq source adjacency)) =
+  Refl
 
 pub fn reachable_within
       (k : Type) (leq : k → k → Bool) (fuel : Nat) (x : k) (y : k) (r : Tree k (Tree k Unit))

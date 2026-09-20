@@ -940,6 +940,24 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Membership explicitly imports IsTrue and contributes no ambient
+            // name beyond its LawfulClasses provider's existing residual.
+            "Core.Classes.Membership".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Core.Logic.Compare".to_string(),
             ["And", "Equal", "Proved", "and_intro"]
                 .into_iter()
