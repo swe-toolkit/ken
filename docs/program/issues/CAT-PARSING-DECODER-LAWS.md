@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-DECODER-LAWS
 title: "inhabit DecoderManyConsumesAllLaw for the existing decoder_many, and give the pure/fail/bind/seq/alt/recursive combinators their general semantic equations -- the next of the seventeen proof-backfill follow-ons, selected after CAT-PARSING-CURSOR-LAWS on a measured absence of dependency rather than a chain"
-status: draft
+status: ready
 owner: foundation
 size: L
 gate: none
@@ -41,6 +41,28 @@ as the **hypothesis** `DecoderProgress`, not from any `CursorLaws` inhabitant.
 > is worth writing down is that every circumstantial signal pointed at a chain
 > that the type does not contain.** `depends_on` is empty because the law says
 > so, not because nothing was checked.
+
+> **RELEASED 2026-09-20, AND THE SCHEDULING HALF OF INPUT 2 HAS INVERTED.**
+> `CAT-PARSING-CURSOR-LAWS` is **parked**, not landing: its candidate
+> `b62d091ec` is byte-clean and correct but cannot merge until
+> `LANG-IMPORT-IDENTITY-ESCAPE` lands in the language lane. **So the bridge
+> lemmas below are KNOWN-ABSENT from `main`, not pending arrival** — measured,
+> `cursor_nat_lt_from_leq_suc` / `cursor_nat_lt_to_leq_suc` /
+> `cursor_nat_not_lt_to_reverse_leq` appear nowhere under `catalog/` on
+> `origin/main`. Input 2's "report a missing bridge, never widen into
+> `Cursor.ken.md`" is now the **expected** path rather than the contingency.
+> Build the decoder side and report what you needed; do not wait and do not
+> reach into Cursor.
+>
+> **The earlier contention hold is DISCHARGED.** This node was held because
+> `b62d091ec` touches `crates/ken-elaborator/tests/cat_tier_d_cursor_import.rs`,
+> the file `AC-4` mandates editing, and that candidate looked minutes from
+> landing. It is not. **You reach that file first; Cursor rebases onto you.**
+>
+> **One thing measured in your favour:** `Decoder.ken.md` uses `IsTrue` **zero**
+> times today, so you do not inherit Cursor's blocker as written. If your new
+> proofs introduce it, you will hit the same wall — say so and stop rather than
+> working around it.
 
 **2. `CAT-PARSING-CURSOR-LAWS` is still the right predecessor, for SCHEDULING
 and for LEMMAS, neither of which is a gate.** `Decoder.ken.md:19` imports
