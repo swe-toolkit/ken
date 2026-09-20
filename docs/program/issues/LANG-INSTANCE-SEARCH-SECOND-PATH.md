@@ -1,7 +1,7 @@
 ---
 id: LANG-INSTANCE-SEARCH-SECOND-PATH
 title: "`projected_instance_id` (`elab.rs:10446`) misattributes instance rows two ways and both are keyed on a SPELLING. Its first arm fires when the projected base is a constant literally named `d` even when `d` is NOT the constraint binder, so a user global named `d` is attributed the constraint's effect row instead of its own. Both of its `instance_search` calls key on `rtype_head_name(&constraint.head_type)` -- the same carrier-spelling predicate LANG-INSTANCE-REGISTRY-IDENTITY-KEY is closing on the term-producing path, which the Architect explicitly left here. Delete the `d` disjunct; then measure whether this path can be keyed on identity WITHOUT kernel state. The Architect forbade threading kernel state into this function, so a requirement for it is a STOP, not an implementer choice."
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -302,3 +302,70 @@ Hold the release until `LANG-INSTANCE-REGISTRY-IDENTITY-KEY` lands. Both touch
 `elab.rs`, that candidate is in review, and there is no reason to create a
 same-file intersection while it is in flight. The two repairs are independent;
 this is contention avoidance, not a dependency, and `depends_on` stays empty.
+
+## `D0` WITHDRAWN 2026-09-20 — REFUTED by the ring at `evt_zh6jg8q0693f`
+
+**Do not delete the `name == "d"` disjunct. The settled input that authorized
+`D0` was mine and it was false in both directions.**
+
+**What I did wrong.** I read both arms of `projected_instance_id`, observed that
+arm 2 performs the identical `instance_search` when `binder == name`, and
+concluded the `d` disjunct was the only behavior arm 1 adds. I never read
+`resolve_instance_constraints`. I wrote a predicate over the name `d` without
+reading the producer of its meaning.
+
+**What `d` actually is.** `resolve_instance_constraints` registers `d` as a
+local-dictionary alias whenever a declaration has exactly one explicitly named
+constraint whose binder is not `d`, and `elaborate_rdecl_v1` installs the same
+alias in `local_dicts`. So an unqualified `d` in a sole-constraint declaration
+IS that alias. The disjunct is the purity-side counterpart of a real aliasing
+rule, not a stray hardcoded spelling.
+
+**Deleting it is an OVER-ACCEPTANCE, measured.** With a pure global
+`const d : Quiet Bool` and one `(effect : Effectful Bool)` constraint:
+
+    disjunct present    d.step x  rejects: TypeMismatch, EffectEscapes, FS
+    disjunct deleted    d.step x  becomes Ok(g648)
+    disjunct restored   both controls green, 2/2
+
+Resolution still binds `d` to the effectful constraint alias while purity falls
+through to the pure global, so an effect escape is silently admitted -- in a
+node whose entire subject is misattributed effect rows.
+
+**And the witness I named is unreachable.** The alias shadows the global at that
+spelling, so the "user global named `d` is misattributed the constraint's row"
+case cannot arise through unqualified `d` in a sole-constraint declaration.
+There was no defect there to fix.
+
+**Keep the diagnostic checkpoint `3a6f64494f29b081292a14f96101c49181be36b8`.**
+Its two behavioral controls pin a real aliasing invariant that nothing else
+pins. They should outlive the refuted deliverable.
+
+## The node is now `D1`, and `D1` opens with a measurement
+
+**`D1` is untouched by the refutation and is sharpened by it.** The two
+`instance_search` calls still key on `rtype_head_name(&constraint.head_type)`, a
+carrier SPELLING, and a wrong hit is a wrong effect row. That this function must
+AGREE with `resolve_instance_constraints` about what a name means is precisely
+why a spelling key is fragile.
+
+**FIRST, establish what the landed sibling changed at these two exact calls, and
+report before proposing any repair.** `LANG-INSTANCE-REGISTRY-IDENTITY-KEY`
+landed as `83f30f5e8` and routes term-producing resolution through
+`confirm_instance_dictionary_carrier`. Its M8 report asserts all four named D0
+consumers including the Ord and Membership projections reach that confirmation,
+yet `projected_instance_id` calls `ClassEnv::instance_search` directly rather
+than through `resolve_instance_dictionary_inner`. **Which of those holds at
+these two calls is unmeasured, and the Steward is not asserting it.** The answer
+may shrink this node or close it outright.
+
+**`D2` (the three false doc comments) is unchanged and remains a rider.** AC-1
+and AC-2 as originally written are withdrawn with `D0`; AC-3's requirement --
+that a mutation reverting the key to `rtype_head_name` must RED a control
+distinguishing two head spellings sharing one identity -- survives and applies
+to whatever `D1` returns.
+
+**Stop conditions are unchanged**, and the kernel-state one is now the more
+likely of the two: threading kernel state into `projected_instance_id` is
+forbidden by the Architect's sibling ruling, so a repair needing it is a stop
+and a frame amendment that is the Steward's to author.
