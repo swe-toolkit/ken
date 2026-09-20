@@ -23,8 +23,9 @@ use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, KernelError, Te
 
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
 
-/// The stated stack for the D1 legacy-frame budget instrument. Two MiB is the
-/// measured candidate-green / inline-parent-SIGABRT boundary. An explicit
+/// The stated stack for the D1 legacy-frame budget instrument. Two MiB remains
+/// the fixed boundary at base `d23a65021359741c59809ec9d24de9af6fe262e1`;
+/// recalibration changed only the live reservation below. An explicit
 /// `Builder::stack_size` overrides the spawned-thread default that
 /// `RUST_MIN_STACK` would otherwise select, making the control independent of
 /// the ambient machine configuration.
@@ -32,9 +33,10 @@ const D1_LEGACY_MAP_STACK_BYTES: usize = 2 * 1024 * 1024;
 
 /// The local `Builder` thread omits the libtest entry frames present when the
 /// two-MiB boundary was first measured. This live reservation normalizes that
-/// headroom. Bisection at the stated stack found 512 bytes candidate-green and
-/// inline-parent-SIGABRT; zero let both pass and 2,048 made both abort.
-const D1_LEGACY_MAP_STACK_RESERVATION_BYTES: usize = 512;
+/// headroom. Re-bisection at base `d23a65021359741c59809ec9d24de9af6fe262e1`
+/// found 32,768 bytes both-green, 49,152 bytes candidate-green and
+/// inline-parent-SIGABRT, and 53,248 bytes both-abort.
+const D1_LEGACY_MAP_STACK_RESERVATION_BYTES: usize = 49_152;
 
 fn term_reference_count(term: &Term, target: GlobalId) -> usize {
     let here = usize::from(matches!(term, Term::Const { id, .. } if *id == target));
