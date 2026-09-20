@@ -9771,9 +9771,68 @@ fn match_instance_head_core(
     }
 }
 
+#[derive(Clone, Copy)]
 enum InstanceHeadRequest<'a> {
-    Surface(&'a RType),
-    Core(&'a Term),
+    Surface {
+        requested: &'a RType,
+        expected_carrier: Option<&'a Term>,
+    },
+    Core {
+        expected_carrier: &'a Term,
+    },
+}
+
+impl<'a> InstanceHeadRequest<'a> {
+    fn expected_carrier(self) -> Option<&'a Term> {
+        match self {
+            Self::Surface {
+                expected_carrier, ..
+            } => expected_carrier,
+            Self::Core { expected_carrier } => Some(expected_carrier),
+        }
+    }
+}
+
+/// Confirm that a selected carrier-parameterized dictionary still names the
+/// occurrence carrier in core. Surface names select candidates; conversion of
+/// the independently derived carrier is the authority.
+fn confirm_instance_dictionary_carrier(
+    env: &mut GlobalEnv,
+    class_env: &ClassEnv,
+    ctx: &Context,
+    class_name: &str,
+    spelling: &str,
+    candidate_type: &Term,
+    expected_carrier: Option<&Term>,
+    span: &Span,
+) -> Result<(), ElabError> {
+    let class = class_env.class(class_name).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "instance resolution selected an unregistered class `{class_name}`"
+        ))
+    })?;
+    if class.projection.head_param.is_none() {
+        return Ok(());
+    }
+    let expected_carrier = expected_carrier.ok_or_else(|| {
+        ElabError::Internal(format!(
+            "carrier-parameterized class `{class_name}` reached dictionary return without an expected core carrier"
+        ))
+    })?;
+    let confirmed = match candidate_type {
+        Term::App(_, resolved_carrier) => {
+            convert_type(env, ctx, resolved_carrier.as_ref(), expected_carrier)
+        }
+        _ => false,
+    };
+    if !confirmed {
+        return Err(ElabError::InstanceCarrierIdentityMismatch {
+            class: class_name.to_string(),
+            spelling: spelling.to_string(),
+            span: span.clone(),
+        });
+    }
+    Ok(())
 }
 
 /// Resolve an instance and recursively apply every prerequisite dictionary.
@@ -9799,6 +9858,20 @@ fn resolve_instance_dictionary(
     span: &Span,
     owner_label: &str,
 ) -> Result<(Term, Term), ElabError> {
+    let expected_carrier = if class_env
+        .class(class_name)
+        .map(|class| class.projection.head_param.is_some())
+        .unwrap_or(false)
+    {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
+        for ty in &ctx.types {
+            cx.ctx.push(ty.clone());
+        }
+        let carrier = elab_type(&mut cx, requested)?;
+        Some(cx.metas.zonk_term(&carrier))
+    } else {
+        None
+    };
     resolve_instance_dictionary_inner(
         env,
         globals,
@@ -9809,7 +9882,10 @@ fn resolve_instance_dictionary(
         ctx,
         class_name,
         &rtype_head_name(requested),
-        InstanceHeadRequest::Surface(requested),
+        InstanceHeadRequest::Surface {
+            requested,
+            expected_carrier: expected_carrier.as_ref(),
+        },
         span,
         owner_label,
         true,
@@ -9894,7 +9970,10 @@ fn resolve_instance_dictionary_by_head_id(
         });
     }
 
-    let resolved = resolve_instance_dictionary_inner(
+    // STEP 3 is enforced by the common resolver after kernel inference and
+    // before provenance or return. The scan and its ambiguity refusal remain
+    // the identity adapter's independent steps 1 and 2.
+    resolve_instance_dictionary_inner(
         env,
         globals,
         num_values,
@@ -9904,41 +9983,13 @@ fn resolve_instance_dictionary_by_head_id(
         ctx,
         class_name,
         &head_name,
-        InstanceHeadRequest::Core(carrier),
+        InstanceHeadRequest::Core {
+            expected_carrier: carrier,
+        },
         span,
         owner_label,
         enforce_direct_use,
-    )?;
-
-    // STEP 3 -- CONFIRM IN CORE, which is what demotes the name from a
-    // decision to a hint (Architect, amending their own ruling in
-    // `evt_zfwss6hz79ct`).
-    //
-    // The scan asks which registered spelling resolves to this identity TODAY.
-    // `globals` is a flat mutable name table holding at most one id per name,
-    // so a spelling that meant one type at registration can mean another now:
-    // two names to one id is an ambiguity the two-match arm above detects, but
-    // two ids to one NAME is a substitution it cannot see, because the map has
-    // already forgotten the other. That direction would hand one carrier's
-    // dictionary to a different carrier, silently.
-    //
-    // The kernel-inferred type of the candidate is `ClassType <carrier-core>`,
-    // and the carrier is there in CORE with no name anywhere. One comparison
-    // on a term that already exists closes the direction the scan cannot see.
-    let confirmed = match &resolved.1 {
-        Term::App(_, resolved_carrier) => {
-            convert_type(env, ctx, resolved_carrier.as_ref(), carrier)
-        }
-        _ => false,
-    };
-    if !confirmed {
-        return Err(ElabError::InstanceCarrierIdentityMismatch {
-            class: class_name.to_string(),
-            spelling: head_name,
-            span: span.clone(),
-        });
-    }
-    Ok(resolved)
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -9999,11 +10050,12 @@ fn resolve_instance_dictionary_inner(
             }
         }
     }
+    let expected_carrier = requested.expected_carrier();
     let (type_args, core_args) = if info.head_param_count == 0 {
         (Some(Vec::new()), Vec::new())
     } else if let Some(pattern) = &info.head_type {
         match requested {
-            InstanceHeadRequest::Surface(requested) => {
+            InstanceHeadRequest::Surface { requested, .. } => {
                 let mut matched = vec![None; info.head_param_count];
                 if !match_instance_head(pattern, requested, info.head_param_count, &mut matched) {
                     return Err(ElabError::NoInstance {
@@ -10034,7 +10086,9 @@ fn resolve_instance_dictionary_inner(
                 };
                 (Some(type_args), core_args)
             }
-            InstanceHeadRequest::Core(requested_core) => {
+            InstanceHeadRequest::Core {
+                expected_carrier: requested_core,
+            } => {
                 let mut matched = vec![None; info.head_param_count];
                 if !match_instance_head_core(
                     env,
@@ -10072,6 +10126,26 @@ fn resolve_instance_dictionary_inner(
     let mut candidate =
         ken_kernel::subst::apply_args(Term::const_(info.instance_id, vec![]), &core_args);
     for constraint in &info.constraints {
+        let required_type = ken_kernel::subst::subst_tel(&constraint.core_type, &core_args);
+        let constraint_is_parameterized = class_env
+            .class(&constraint.class_name)
+            .map(|class| class.projection.head_param.is_some())
+            .unwrap_or(false);
+        let required_carrier = if constraint_is_parameterized {
+            let carrier = match &required_type {
+                Term::App(_, carrier) => carrier.as_ref().clone(),
+                _ => {
+                    return Err(ElabError::NoInstance {
+                        class: constraint.class_name.clone(),
+                        ty: format!("{required_type:?}"),
+                        span: span.clone(),
+                    })
+                }
+            };
+            Some(whnf(env, ctx, &carrier))
+        } else {
+            None
+        };
         let (dictionary, _) = if let Some(type_args) = &type_args {
             let required_head =
                 instantiate_instance_rtype(&constraint.head_type, type_args, info.head_param_count);
@@ -10085,25 +10159,22 @@ fn resolve_instance_dictionary_inner(
                 ctx,
                 &constraint.class_name,
                 &rtype_head_name(&required_head),
-                InstanceHeadRequest::Surface(&required_head),
+                InstanceHeadRequest::Surface {
+                    requested: &required_head,
+                    expected_carrier: required_carrier.as_ref(),
+                },
                 span,
                 owner_label,
                 false,
             )?
         } else {
-            let required_type =
-                ken_kernel::subst::subst_tel(&constraint.core_type, &core_args);
-            let required_carrier = match required_type {
-                Term::App(_, carrier) => *carrier,
-                _ => {
-                    return Err(ElabError::NoInstance {
-                        class: constraint.class_name.clone(),
-                        ty: format!("{required_type:?}"),
-                        span: span.clone(),
-                    })
-                }
+            let Some(required_carrier) = required_carrier else {
+                return Err(ElabError::NoInstance {
+                    class: constraint.class_name.clone(),
+                    ty: format!("{required_type:?}"),
+                    span: span.clone(),
+                });
             };
-            let required_carrier = whnf(env, ctx, &required_carrier);
             let Some(required_head_id) = core_type_head_id(&required_carrier) else {
                 return Err(ElabError::NoInstance {
                     class: constraint.class_name.clone(),
@@ -10133,6 +10204,16 @@ fn resolve_instance_dictionary_inner(
         error,
         span: span.clone(),
     })?;
+    confirm_instance_dictionary_carrier(
+        env,
+        class_env,
+        ctx,
+        class_name,
+        &head_name,
+        &ty,
+        expected_carrier,
+        span,
+    )?;
     if enforce_direct_use {
         provenance.push(crate::classes::InstanceResolution {
                 instance_id: info.instance_id,
