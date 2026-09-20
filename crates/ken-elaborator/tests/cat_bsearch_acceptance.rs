@@ -15,9 +15,6 @@ use ken_kernel::{convert_type, Context, Decl, GlobalId, Term};
 mod catalog_or;
 
 const MODULE: &str = "Algorithm.Searching.OrderedSearch";
-const ORDERED_SEARCH_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Algorithm/Searching/OrderedSearch.ken.md");
-
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -68,34 +65,6 @@ fn collect_order_call_providers(
     for child in term.children() {
         collect_order_call_providers(env, child, provider_type, providers);
     }
-}
-
-fn legacy_env() -> ElabEnv {
-    let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
-
-    let extracted = ken_elaborator::literate::extract_ken_md(ORDERED_SEARCH_KEN_MD)
-        .expect("OrderedSearch literate source must extract");
-    let mut removed_import = 0;
-    let source = extracted
-        .source
-        .lines()
-        .filter(|line| {
-            let is_import = line.trim() == "import Core.Classes.LawfulClasses (Ord, ord_leq_at)";
-            removed_import += usize::from(is_import);
-            !is_import
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert_eq!(
-        removed_import, 1,
-        "the legacy harness removes exactly the declared order import"
-    );
-    env.elaborate_file(&source)
-        .expect("OrderedSearch body must elaborate against the loaded Ord provider");
-    env
 }
 
 fn evaluate_bool(env: &ElabEnv, name: &str) -> bool {
@@ -180,7 +149,9 @@ fn entry_adds_no_trusted_declarations() {
 
 #[test]
 fn generic_decision_and_yes_no_evidence_instantiate() {
-    let mut env = legacy_env();
+    let mut env = roots_env();
+    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
+    catalog_or::expose_module(&mut env, MODULE);
     env.elaborate_file(
         "fn cat_bsearch_decision \
              (a : Type) (d : Ord a) (x : a) (xs : List a) \
