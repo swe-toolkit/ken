@@ -1,7 +1,7 @@
 ---
 id: CAT-PROCESS-ARGUMENTS-LAWS
 title: "give argument_slice_location the two-way characterization its package's round_trip already models for process_arguments: an ArgLocation is produced exactly when the argument exists and the endpoints are ordered and in bounds, and the produced location carries index/start/end unchanged -- the next of the seventeen proof-backfill follow-ons, selected while CAT-PARSING-CURSOR-LAWS is parked"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none
