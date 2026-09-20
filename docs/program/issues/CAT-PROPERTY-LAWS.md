@@ -1,7 +1,7 @@
 ---
 id: CAT-PROPERTY-LAWS
 title: "check_samples stops at the first false predicate, and that FIRST is the whole claim -- yet nothing in the package states it: give the runner soundness, success completeness, and a first-counterexample characterization whose strict-ordering premise is shown to be load-bearing, over the existing Gen list and error-biased Result, with no new trust"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
