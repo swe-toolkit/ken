@@ -1,7 +1,7 @@
 ---
 id: LANG-INSTANCE-REGISTRY-IDENTITY-KEY
 title: "Re-key the class-instance registry on IDENTITY (GlobalId) rather than on surface type NAME. classes.rs:202 declares `pub instances: HashMap<(String, String), InstanceInfo>`, registration builds the key from surface syntax, and any elaborate-side consumer holding an identity but not a name must reverse-lookup id -> name, for which NOTHING GUARANTEES a well-defined answer. D0 gates this node: exhibit a GlobalId whose reconstructed name is absent or resolves back to a different id, or close it. Reaches coherence, the orphan check, module re-export and the derive path, so it is deliberately NOT paid by LANG-STANDARD-INFIX-CALL-COMPLETION."
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
