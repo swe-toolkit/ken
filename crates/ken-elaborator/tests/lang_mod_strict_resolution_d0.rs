@@ -1290,6 +1290,7 @@ fn catalog_ambient_passthrough_migration_census() {
         .map(|(entry, _)| entry.clone())
         .collect::<BTreeSet<_>>();
     let expected_clean = [
+        "Core.Classes.Membership",
         "Core.Logic.Or",
         "Core.Logic.OrdResult",
         "Core.Logic.Transport",

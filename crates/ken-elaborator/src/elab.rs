@@ -10984,6 +10984,81 @@ fn elab_standard_operator(
             );
             Ok((applied, Term::indformer(cx.numeric_env.bool_id, vec![])))
         }
+        // `∈` binds `membership_member_at`, whose telescope is
+        // `(c : Type) -> Membership c -> d.Query -> c -> Bool`. The provider
+        // is selected from the RIGHT-HAND carrier before the left query is
+        // checked; the query never participates in provider selection.
+        StandardOperatorRole::Member => {
+            let (rhs_core, rhs_ty) = infer(cx, rhs)?;
+            let carrier = whnf(cx.env, &cx.ctx, &rhs_ty);
+            let Some(head_id) = core_type_head_id(&carrier) else {
+                return Err(ElabError::NoInstance {
+                    class: "Membership".to_string(),
+                    ty: format!("{carrier:?}"),
+                    span: span.clone(),
+                });
+            };
+
+            let (dictionary, _) = {
+                let ElabCtx {
+                    env,
+                    globals,
+                    num_values,
+                    numeric_env,
+                    ctx,
+                    class_env,
+                    provenance,
+                    owner_label,
+                    ..
+                } = &mut *cx;
+                let class_env = class_env.ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "standard operator '{}' at {}-{} reached completion with \
+                         no class registry; `with_classes` was not applied on \
+                         this path",
+                        role.glyph(),
+                        span.start,
+                        span.end
+                    ))
+                })?;
+                let provenance = provenance.as_deref_mut().ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "standard operator '{}' at {}-{} reached completion with \
+                         no provenance sink; `with_classes` takes the registry \
+                         and the sink together so this cannot happen singly",
+                        role.glyph(),
+                        span.start,
+                        span.end
+                    ))
+                })?;
+                resolve_instance_dictionary_by_head_id(
+                    env,
+                    globals,
+                    num_values,
+                    numeric_env,
+                    class_env,
+                    provenance,
+                    ctx,
+                    "Membership",
+                    &carrier,
+                    head_id,
+                    span,
+                    owner_label,
+                    true,
+                )?
+            };
+
+            let query_ty = whnf(cx.env, &cx.ctx, &Term::proj1(dictionary.clone()));
+            let lhs_core = check(cx, lhs, &query_ty, span)?;
+            let applied = Term::app(
+                Term::app(
+                    Term::app(Term::app(Term::const_(op, vec![]), carrier), dictionary),
+                    lhs_core,
+                ),
+                rhs_core,
+            );
+            Ok((applied, Term::indformer(cx.numeric_env.bool_id, vec![])))
+        }
         // `≠` is authored rather than re-exported (D2), so the home does not
         // publish it and `certify_roles` never admits it -- this node is not
         // minted for it. Unreachable via the certified map, and it fails

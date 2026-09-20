@@ -17,12 +17,13 @@ checked functions that give them meaning.
 
 `31 §1c` admits `≤`/`<=`, `≥`/`>=`, `≠`/`/=`, `∧`/`/\`, `∨`/`\/` and `∈` as
 ordinary symbolic names. Admission fixes names, not meanings. `33 §6.1` fixes
-the meanings, and every one of them is an ordinary public function that already
-exists: `bool_and`, `bool_or`, `ord_leq_at` and `ord_geq_at` all live in
-`Core.Classes.LawfulClasses`, beside the `Ord` class whose vocabulary they
-belong to.
+the meanings, and every binding-backed one is an ordinary public function.
+`bool_and`, `bool_or`, `ord_leq_at` and `ord_geq_at` live in
+`Core.Classes.LawfulClasses`, beside the
+`Ord` class whose vocabulary they belong to. `membership_member_at` lives in
+`Core.Classes.Membership`, beside its provider class.
 
-This entry is the **path**, not the definitions. It re-exports those four
+This entry is the **path**, not the definitions. It re-exports those five
 identities under the operator spellings, so a reader writing `x ≤ y` and a
 reader writing `ord_leq_at a d x y` are naming the same binding by two surface
 routes.
@@ -43,6 +44,8 @@ the spelling `33 §6.1` assigns it:
 ```ken
 export Core.Classes.LawfulClasses
   (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, ord_geq_at as ≥)
+
+export Core.Classes.Membership (membership_member_at as ∈)
 ```
 
 There is no `import` above that `export`, and that is deliberate rather than an
@@ -92,21 +95,14 @@ call-by-value the operands are already evaluated when `bool_and`'s body runs,
 and its `match` then ranges over values. Non-forcing of an untaken arm yields no
 operand short-circuiting at a use site.
 
-**Held, and named rather than quietly omitted.** Two parts of `33 §6.1`'s
-surface are not in this entry yet:
+The compiler certifies these re-exported identities against their dependent
+function shapes and installs the standard fixities from `33 §6.1`. `∈` is
+non-associative at precedence 4. Its completion infers the right-hand carrier,
+resolves that carrier's `Membership` dictionary, projects the dictionary's
+`Query`, and only then checks the left operand.
 
-- The **five fixity declarations** (`∧ infixr 3`, `∨ infixr 2`, `≤ ≥ ≠ infix
-  4`). `33 §6` makes fixity a property of canonical identity that travels with
-  re-export, and the travel half is landed. The declaration half has no surface
-  form for a binding defined elsewhere: a fixity target must be defined in the
-  declaring module, so the only expressible declaration is one that also defines
-  the operator — which is the duplicate this entry exists to avoid.
-- **`≠`**, whose meaning is the negation of the comparator the `==` path selects
-  (`33 §6.2`) rather than a binding to re-export.
-
-Both are held pending a ruling on how the elaborator learns these identities.
-Absent a declared fixity the normative default `infixl 9` applies, so the
-spellings parse and mean the right thing at the wrong precedence.
+`≠` remains distinct: its meaning is the negation of the comparator the `==`
+path selects (`33 §6.2`) rather than one binding to re-export.
 
 **Why this is a separate entry and not part of `LawfulClasses`.** A module
 cannot re-export what it defines — `33 §4.3` makes `export foo` on a local name
@@ -137,11 +133,12 @@ surface-and-elaboration only — fixity guides parsing into the same core term t
 kernel re-checks regardless of which path named the operator. A module with no
 definitions cannot add an `Axiom`, a postulate, or an opaque constant.
 
-**Derivation path.** Every identity published here derives through
+**Derivation path.** The Boolean and ordering identities derive through
 `Core.Classes.LawfulClasses`: `bool_and` and `bool_or` are match-based `Bool`
-functions over the canonical `Bool`; `ord_leq_at` and `ord_geq_at` project
-`leq` out of an `Ord` dictionary. None is a built-in, a kernel rule, or a
-primitive.
+functions, while `ord_leq_at` and `ord_geq_at` project `leq` from an `Ord`
+dictionary. `membership_member_at` derives through `Core.Classes.Membership`
+and projects `member` from a `Membership` dictionary. None is a built-in, a
+kernel rule, or a primitive.
 
 **Consumers.** None yet at the operator spellings. `ord_leq_at` itself is
 heavily consumed under its ordinary name — `Data.Collections.PriorityQueue`
