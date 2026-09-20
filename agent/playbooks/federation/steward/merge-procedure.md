@@ -151,20 +151,7 @@ batch. Close only nodes whose product content was verified in M6.
 For a merge carrying product code, compact the Adversary, verify the drop, then
 notify it once with the landed squash SHA and changed paths. Rouse its pane.
 Docs-only merges skip M8. Do not ask for a verdict and do not reply to reports
-(`COORDINATION.md §10⁻a`).
-
-**The compaction command is `moot compact adversary`**, and the verification is
-an observed context drop in its pane — not the command's exit status. **Not
-`scripts/handoff-gate-compact.sh`**, which resets the worktree to `origin/main`
-and refuses on uncommitted changes; see `steward/compaction.md` under
-*Adversary* for why that substitution is wrong.
-
-**M8 is four steps and the notification is the third.** Sending it without a
-verified drop leaves M8 incomplete, and because the Adversary neither
-self-compacts nor holds a periodic schedule, no later step recovers it. Measured
-2026-09-20: this clause named no command, the notify half ran on every code
-merge, the compact half ran on none, and the seat reached 97% context across
-numerous hunts before an operator caught it by hand.
+(`COORDINATION.md §10⁻a`). Mechanism: `lieutenant.md`.
 
 ## M9 — Close the loop
 

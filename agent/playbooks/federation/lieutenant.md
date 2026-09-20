@@ -79,16 +79,15 @@ token mint:
 - **Node lifecycle (M7).** Record verified closeouts and batch issue-status plus
   generated-progress updates. Never publish one management commit per product
   merge; follow M7's bounded batch rule.
-- **The Adversary hook (M8) for code merges.** Compact the Adversary FIRST with
-  **`moot compact adversary`**, **verify the drop in its pane**, then notify it
-  naming the landed **squash** SHA (not the tip), the paths, and the shortstat,
-  then rouse its pane. Docs-only merges skip M8. **Not
-  `scripts/handoff-gate-compact.sh`** — that resets the worktree to
-  `origin/main` and refuses on uncommitted changes; it is the build-team seam
-  tool, not this one. **The notification is not the hook — it is the third of
-  four steps.** A merge whose M8 sent a notification without an observed context
-  drop has not completed M8; the Adversary does not self-compact, so nothing
-  else recovers the skipped half.
+- **The Adversary hook (M8) for code merges.** Four steps, in order:
+  `moot compact adversary`; verify the context drop in its pane; notify once,
+  naming the landed **squash** SHA (not the tip), the paths, and the shortstat;
+  rouse the pane. Docs-only merges skip M8. **Not
+  `scripts/handoff-gate-compact.sh`** — it resets the worktree to `origin/main`
+  and refuses on uncommitted changes; that is the build-team seam tool. **The
+  tell that you are skipping this is that you are about to notify.** The
+  Adversary never self-compacts, so a notification sent without an observed drop
+  leaves M8 half-run and nothing downstream recovers it.
 - **Next-slice handback.** When a slice lands and the next node is already
   framed and dependency-clear, report that fact to the Steward. The Steward
   releases and kicks through `release-and-handoff.md`; you do not publish a
