@@ -1387,3 +1387,74 @@ implementation correction, stands.
   representation was not followed.
 - **A second governed context claim resolved by any tiebreak at all.** Fail
   closed and report; a chosen winner here is a silent wrong edge.
+
+# 9. PARKED AT HARD STOP 15 PENDING A STRUCTURAL PRECURSOR (Steward, 2026-09-20)
+
+**Architect ruling `evt_7bff93f1zg2jh`, on Research advisory `evt_10jtxhnwq2mdj`
+(the fifth trigger on this chain). Read the ruling for the mechanism; this
+section records only the frame-level contract, deliberately, so that a
+paraphrase of the Architect's typed-graph and affine-token design cannot drift
+away from what they actually ruled.**
+
+## The disposition
+
+**Another direct-edge respin is REJECTED.** The adopted faithful form is a
+typed, well-nested interprocedural control graph plus the existing
+`AbiSlotKind::Control` word as an affine member token. **Do not invent a second
+token.**
+
+**What the exact non-candidate `7b03f258c` proved, and its limit.** It proves a
+direct source-to-terminal call. It cannot represent
+call-entry-return-later-call, cannot match a callee exit to that call's own
+return site, and cannot distinguish context entry/body identity from a terminal
+dispatch inside it. **Taking the transitive closure of the current
+function-level edges would admit unmatched-return paths**, and selecting context
+1, 3, or 0 by number is the same forbidden projection as before. This is a sound
+fail-closed UNDERSPECIFICATION of the adopted family, not evidence the family
+failed.
+
+## THE PARK, and what it is conditioned on
+
+**This WP is PARKED at hard stop 15.** It does not get another implementation
+attempt until a structural precursor bounded by the component
+`GraftedSpineControlGraph` is landed on current `main`. That precursor is
+behavior-inert, is produced independently of `D0`, clears no ignored row, and
+carries no `D0`/`D1`/`D2` behavior repair.
+
+**Runtime must not implement from the ruling thread alone, and must not spend
+the Steward's one-attempt bound before the precursor exists.** Release comes
+from the Steward, after the precursor is on `main`, not from this section.
+
+**`D0`+`D1`+`D2` remains ATOMIC after the precursor.** The park does not split
+it, and the earlier measurement that the split condition is false twice stands.
+
+## The one-attempt bound, and the Architect's correction to my accounting
+
+**The bound is unchanged in substance:** after the precursor lands, this WP gets
+ONE implementation attempt. A further structural stop parks it again and the
+lane reallocates to the remaining ignored-row repairs.
+
+**My phrasing of it was wrong in one respect and the Architect corrected it.**
+I wrote the bound as though parking would end the accounting. It does not.
+Parking prevents hard stop 17 and symptom entry 18; **it cannot erase a stop 16,
+and section 1b would still owe symptom entry 17 for it.** Counts stay at hard
+stops 15 and entries 16, because the ruling is a held ruling and not another
+build stop.
+
+**The precursor is a separate WP and carries its OWN counter.** Filing it is not
+a reset of this chain.
+
+## Why the bound survived a ruling that lengthened the work
+
+I set the bound expecting one attempt. The Architect answered that the faithful
+form is **more than one mergeable increment** -- one green precursor, then one
+final atomic attempt here -- which is exactly the reprice I invited rather than
+a breach of the bound. **A bound whose author refuses to reprice it when the
+measured work turns out larger is not a bound, it is a deadline**, and it would
+have been discharged by building something cheaper and wrong.
+
+The reason the bound still binds: it was never about the number of increments,
+it was about ending the habit of treating "one more attempt" as a prediction
+after fifteen of them. Gating the attempt behind an independently verifiable,
+behavior-inert precursor is a stronger version of the same discipline, because
+the precursor can fail on its own evidence without consuming the attempt.
