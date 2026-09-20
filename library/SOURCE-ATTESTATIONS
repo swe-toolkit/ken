@@ -16,7 +16,7 @@ ebc8487855ddad83496af932829e13412c4190e8	catalog/packages/Capability/Parsing/Cur
 50b3c2b654f6d61c35d6b3d4fc4622db274a8bf3	catalog/packages/Capability/Parsing/Decoder.ken.md
 7623901b0858c7ea54f70ab45ef551a42eac4845	catalog/packages/Capability/Parsing/Numeric.ken.md
 c23dd723b26cb5aea6ffeb774d7cb7f8917989f7	catalog/packages/Capability/Parsing/Parsing.ken.md
-f6b3c110a7b5ce3b55dc47f37aef66ad5870318a	catalog/packages/Capability/Process/Arguments.ken.md
+27684d5c7aca3a5c0882976442c9d5ef8e5da711	catalog/packages/Capability/Process/Arguments.ken.md
 b07753552838b567a947e888ca52c8864df03e13	catalog/packages/Capability/Process/Environment.ken.md
 e477bc997e75629613089f053048c463baca1481	catalog/packages/Capability/Process/Exit.ken.md
 16239af82ddc250a3f087532ad0ff8ccef507d4a	catalog/packages/Capability/Process/WorkingDirectory.ken.md
@@ -89,7 +89,7 @@ b931aeeb2a0f492a8736d5b13101a92a6dffeb00	library/reference/catalog/Capability/Fi
 d30bcb38dd77665fd57cbf2ffd5939516e456b63	library/reference/catalog/Capability/Parsing/Decoder.md
 98802c5d75b6023e8c6b3fa7d4308bcbd1886568	library/reference/catalog/Capability/Parsing/Numeric.md
 730ff07a807e0043b58a7060e04d4f52113b3f78	library/reference/catalog/Capability/Parsing/Parsing.md
-dcbd392a3fc627d2b63af4e4bebb3173a4423c1e	library/reference/catalog/Capability/Process/Arguments.md
+4803ea64c4a35d58fbc4a54fed3737721d531d5e	library/reference/catalog/Capability/Process/Arguments.md
 11d095dfcde6622c95cf8c1a13cbf1815cda8e91	library/reference/catalog/Capability/Process/Environment.md
 596cc68024b9e57c81e15fda893ab86d181b1e5f	library/reference/catalog/Capability/Process/Exit.md
 6497e4ee230eab524c313366818117166c10a247	library/reference/catalog/Capability/Process/WorkingDirectory.md

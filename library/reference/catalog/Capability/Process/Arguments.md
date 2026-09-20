@@ -10,7 +10,7 @@ Canonical source: [checked package](../../../../../catalog/packages/Capability/P
 |---|---|---|
 | Subject | `generated` | `catalog/packages/Capability/Process/Arguments.ken.md` — “Capability.Process.Arguments,” from the [subject index](../../subjects.md). |
 | Declaration/type | `authored` | The public surface supplies raw-byte argv projection and replacement, positional and byte lookup, structural bounds comparison, and checked `ArgLocation` construction; `argument_bytes_at` remains private. |
-| Law | `authored` | The checked `round_trip` proof shows that projecting arguments after replacement returns the replacement list. |
+| Law | `authored` | The checked `round_trip` proof recovers replacement arguments. Attached `argument_slice_location` proofs establish sound construction from an existing argument with ordered, in-bounds endpoints; completeness recovers that lookup, both guards, and the exact location from success. Named proofs refuse a missing argument, unordered endpoints, and an out-of-bounds end. |
 | Effect/capability | `none-declared` | The canonical checked fences declare no effect row, `proc`, `visits`, or capability value for this package. |
 | Assurance | `authored` | All declarations are transparent checked terms over landed `ProcessInput`, `List`, `Bytes`, and `ArgLocation`; there is no primitive, postulate, opaque constant, or `Axiom`, and the `trusted_base()` delta is zero. |
 | Platform | `held` | No checked per-package facet is available; owner: catalog campaign. See the [held-class disclosure](../../card-format.md#held-class-disclosure). |
