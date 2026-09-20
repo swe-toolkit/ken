@@ -79,6 +79,7 @@ fn run_checked_bounded_nat_fixture(
         assumptions: BTreeSet::new(),
         unsupported: Vec::new(),
         continuation_claims: None,
+        release_claims: None,
         fusion_compositions: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,

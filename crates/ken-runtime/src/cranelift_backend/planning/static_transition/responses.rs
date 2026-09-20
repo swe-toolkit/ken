@@ -134,10 +134,6 @@ impl ReleaseObligationId {
             planner_capacity_error("release obligation identity exhausted")
         })?))
     }
-
-    pub(in crate::cranelift_backend) const fn ordinal(self) -> u32 {
-        self.0
-    }
 }
 
 /// One logical release demand belonging to a bracket obligation.
@@ -150,16 +146,8 @@ pub(in crate::cranelift_backend) struct ReleaseObligationMember {
 }
 
 impl ReleaseObligationMember {
-    pub(in crate::cranelift_backend) const fn obligation(self) -> ReleaseObligationId {
-        self.obligation
-    }
-
     pub(in crate::cranelift_backend) const fn vis_origin(self) -> StaticOriginId {
         self.vis_origin
-    }
-
-    pub(in crate::cranelift_backend) const fn resource_operand_origin(self) -> StaticOriginId {
-        self.resource_operand_origin
     }
 
     pub(in crate::cranelift_backend) const fn claim_word(self) -> u64 {
@@ -227,6 +215,44 @@ struct ReleaseObligationRecord {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct ReleaseObligationPlan {
     obligations: Vec<ReleaseObligationRecord>,
+}
+
+fn close_release_obligation_plan(
+    mut obligations: Vec<ReleaseObligationRecord>,
+) -> Result<ReleaseObligationPlan, CraneliftBackendError> {
+    obligations.sort_by_key(|record| record.id);
+    for (position, record) in obligations.iter_mut().enumerate() {
+        if record.id != ReleaseObligationId::from_position(position)? {
+            return Err(planner_error(
+                "release obligation identities are not dense in planner order",
+            ));
+        }
+        record.members.sort_by_key(|member| member.member.ordinal);
+        for (ordinal, member) in record.members.iter_mut().enumerate() {
+            if member.member.ordinal as usize != ordinal {
+                return Err(planner_error(
+                    "release obligation member identities are not dense in source order",
+                ));
+            }
+            member.claims.sort_by_key(|claim| claim.site);
+            let dispatch_sites = member
+                .claims
+                .iter()
+                .filter(|claim| claim.dispatch_claimant.is_some())
+                .count();
+            if member.claims.is_empty() {
+                return Err(planner_error(
+                    "a release obligation member has no dispatch site",
+                ));
+            }
+            if dispatch_sites != 1 {
+                return Err(planner_error(
+                    "a release obligation member does not have exactly one consuming dispatch claim",
+                ));
+            }
+        }
+    }
+    Ok(ReleaseObligationPlan { obligations })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3541,40 +3567,7 @@ impl StaticTransitionPlan<'_> {
             )?;
         }
 
-        let mut obligations = records.into_values().collect::<Vec<_>>();
-        obligations.sort_by_key(|record| record.id);
-        for (position, record) in obligations.iter_mut().enumerate() {
-            if record.id != ReleaseObligationId::from_position(position)? {
-                return Err(planner_error(
-                    "release obligation identities are not dense in planner order",
-                ));
-            }
-            record.members.sort_by_key(|member| member.member.ordinal);
-            for (ordinal, member) in record.members.iter_mut().enumerate() {
-                if member.member.ordinal as usize != ordinal {
-                    return Err(planner_error(
-                        "release obligation member identities are not dense in source order",
-                    ));
-                }
-                member.claims.sort_by_key(|claim| claim.site);
-                let dispatch_sites = member
-                    .claims
-                    .iter()
-                    .filter(|claim| claim.dispatch_claimant.is_some())
-                    .count();
-                if member.claims.is_empty() {
-                    return Err(planner_error(
-                        "a release obligation member has no dispatch site",
-                    ));
-                }
-                if dispatch_sites != 1 {
-                    return Err(planner_error(
-                        "a release obligation member does not have exactly one consuming dispatch claim",
-                    ));
-                }
-            }
-        }
-        Ok(ReleaseObligationPlan { obligations })
+        close_release_obligation_plan(records.into_values().collect())
     }
 
     pub(in crate::cranelift_backend) fn release_emission_claim_for_static_response(
@@ -3654,6 +3647,12 @@ impl StaticTransitionPlan<'_> {
                 "one context call carries more than one release dispatch claim",
             )),
         }
+    }
+
+    pub(in crate::cranelift_backend) fn release_emission_claims(
+        &self,
+    ) -> BTreeSet<ReleaseEmissionClaim> {
+        self.all_release_emission_claims().collect()
     }
 
     pub(in crate::cranelift_backend) fn release_obligation_members(
@@ -5141,6 +5140,80 @@ mod tests {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: "static response fixture is total".to_string(),
         }
+    }
+
+    /// Durable invariant: a logical member is not publishable merely because
+    /// its obligation exists; at least one generated-family site must claim it.
+    #[test]
+    fn release_obligation_member_without_a_site_is_refused() {
+        let obligation = ReleaseObligationId(0);
+        let member = ReleaseObligationMember {
+            obligation,
+            ordinal: 0,
+            vis_origin: StaticOriginId::for_test(11),
+            resource_operand_origin: StaticOriginId::for_test(12),
+        };
+        let error = close_release_obligation_plan(vec![ReleaseObligationRecord {
+            id: obligation,
+            producer_call_origin: StaticOriginId::for_test(13),
+            effect_origin: StaticOriginId::for_test(14),
+            resource_operand_origin: member.resource_operand_origin,
+            members: vec![ReleaseObligationMemberRecord {
+                member,
+                effect_origin: StaticOriginId::for_test(14),
+                claims: Vec::new(),
+            }],
+        }])
+        .expect_err("a member with no dispatch site must fail compilation");
+        assert!(format!("{error:?}").contains("member has no dispatch site"));
+    }
+
+    /// Durable invariant: several family emissions may carry one member, but
+    /// exactly one of those claims owns dispatch for that member.
+    #[test]
+    fn release_obligation_reconciles_family_claims_per_member() {
+        let obligation = ReleaseObligationId(0);
+        let member = ReleaseObligationMember {
+            obligation,
+            ordinal: 0,
+            vis_origin: StaticOriginId::for_test(21),
+            resource_operand_origin: StaticOriginId::for_test(22),
+        };
+        let effect_origin = StaticOriginId::for_test(23);
+        let plan = close_release_obligation_plan(vec![ReleaseObligationRecord {
+            id: obligation,
+            producer_call_origin: StaticOriginId::for_test(24),
+            effect_origin,
+            resource_operand_origin: member.resource_operand_origin,
+            members: vec![ReleaseObligationMemberRecord {
+                member,
+                effect_origin,
+                claims: vec![
+                    ReleaseEmissionClaim {
+                        member,
+                        effect_origin,
+                        site: ReleaseEmissionSite::ContinuationSpecialization(
+                            ContinuationSpecializationId(1),
+                        ),
+                        dispatch_claimant: None,
+                    },
+                    ReleaseEmissionClaim {
+                        member,
+                        effect_origin,
+                        site: ReleaseEmissionSite::ContinuationContext(
+                            ContinuationContextId(2),
+                        ),
+                        dispatch_claimant: Some(ReleaseDispatchClaimant::StaticResponse(
+                            StaticResponseOwnerId(3),
+                        )),
+                    },
+                ],
+            }],
+        }])
+        .expect("one consuming claim reconciles the family emissions");
+        assert_eq!(plan.obligations.len(), 1);
+        assert_eq!(plan.obligations[0].members.len(), 1);
+        assert_eq!(plan.obligations[0].members[0].claims.len(), 2);
     }
 
     /// A real opaque recursive field, not a population mutation: the Vis K is

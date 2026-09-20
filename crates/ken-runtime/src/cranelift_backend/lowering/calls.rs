@@ -1859,6 +1859,14 @@ impl<'a> Lowering<'a> {
                 })
                 .transpose()?
                 .flatten();
+            if let Some(claim) = release_dispatch_claim {
+                self.release_claims
+                    .as_mut()
+                    .ok_or_else(|| {
+                        backend_module("the release claim ledger is not open".to_string())
+                    })?
+                    .record_context_dispatch(claim)?;
+            }
             let mut input = 0usize;
             let mut result_offset = None;
             let mut trap_offset = None;

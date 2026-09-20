@@ -3096,6 +3096,11 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     .release_emission_claims
                     .insert(claim.member().vis_origin(), claim);
             }
+            if let Some(ledger) = compiler.release_claims.as_mut() {
+                ledger.record_emissions(
+                    function_local.release_emission_claims.values().copied(),
+                )?;
+            }
             compiler.function_local = function_local;
 
             let frame_operand = |binding: &StaticResponseEnvironmentBinding| {
@@ -4032,6 +4037,11 @@ pub(super) fn define_continuation_bodies<M: Module>(
                     ));
                 }
             }
+            if let Some(ledger) = compiler.release_claims.as_mut() {
+                ledger.record_emissions(
+                    function_local.release_emission_claims.values().copied(),
+                )?;
+            }
             compiler.function_local = function_local;
 
             // Descriptor-only loads. Each operand is read from the slot the
@@ -4566,6 +4576,11 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                         "one context carries two release claims for one Vis member".to_string(),
                     ));
                 }
+            }
+            if let Some(ledger) = compiler.release_claims.as_mut() {
+                ledger.record_emissions(
+                    function_local.release_emission_claims.values().copied(),
+                )?;
             }
             #[cfg(feature = "px8-ds-test-support")]
             if let Some(access) = &function_local.checked_ih_generated_entry_access {
@@ -7230,6 +7245,98 @@ pub(in crate::cranelift_backend) fn reset_d1_dispositions() {
     D1_LAST_DISPOSITIONS.with(|cell| cell.borrow_mut().clear());
 }
 
+pub(super) struct ReleaseClaimLedger {
+    expected_emissions: BTreeSet<crate::cranelift_backend::planning::ReleaseEmissionClaim>,
+    expected_members: BTreeSet<crate::cranelift_backend::planning::ReleaseObligationMember>,
+    expected_context_dispatches:
+        BTreeSet<crate::cranelift_backend::planning::ReleaseObligationMember>,
+    emissions: BTreeSet<crate::cranelift_backend::planning::ReleaseEmissionClaim>,
+    host_dispatch_sites: BTreeSet<crate::cranelift_backend::planning::ReleaseObligationMember>,
+    context_dispatches: BTreeSet<crate::cranelift_backend::planning::ReleaseObligationMember>,
+}
+
+impl ReleaseClaimLedger {
+    fn open(plan: &StaticTransitionPlan<'_>) -> Self {
+        Self {
+            expected_emissions: plan.release_emission_claims(),
+            expected_members: plan.release_obligation_members(),
+            expected_context_dispatches: plan.release_context_members(),
+            emissions: BTreeSet::new(),
+            host_dispatch_sites: BTreeSet::new(),
+            context_dispatches: BTreeSet::new(),
+        }
+    }
+
+    pub(super) fn record_emissions(
+        &mut self,
+        claims: impl IntoIterator<Item = crate::cranelift_backend::planning::ReleaseEmissionClaim>,
+    ) -> Result<(), CraneliftBackendError> {
+        for claim in claims {
+            if !self.expected_emissions.contains(&claim) {
+                return Err(backend_module(
+                    "a generated family emitted an unplanned release claim".to_string(),
+                ));
+            }
+            if !self.emissions.insert(claim) {
+                return Err(backend_module(
+                    "one generated family emitted the same release claim twice".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn record_host_dispatch_site(
+        &mut self,
+        claim: crate::cranelift_backend::planning::ReleaseEmissionClaim,
+    ) -> Result<(), CraneliftBackendError> {
+        if claim.dispatch_claimant().is_none() {
+            return Err(backend_module(
+                "a non-selected release emission reached a host dispatch site".to_string(),
+            ));
+        }
+        self.host_dispatch_sites.insert(claim.member());
+        Ok(())
+    }
+
+    pub(super) fn record_context_dispatch(
+        &mut self,
+        claim: crate::cranelift_backend::planning::ReleaseEmissionClaim,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.expected_context_dispatches.contains(&claim.member()) {
+            return Err(backend_module(
+                "a context call carries an unplanned release dispatch claim".to_string(),
+            ));
+        }
+        if !self.context_dispatches.insert(claim.member()) {
+            return Err(backend_module(
+                "one release obligation member was claimed by two context calls".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn close(self) -> Result<(), CraneliftBackendError> {
+        if self.emissions != self.expected_emissions {
+            return Err(backend_module(
+                "release emission claims do not equal the planner obligation table".to_string(),
+            ));
+        }
+        if self.host_dispatch_sites != self.expected_members {
+            return Err(backend_module(
+                "release host-dispatch claims do not equal the obligation members".to_string(),
+            ));
+        }
+        if self.context_dispatches != self.expected_context_dispatches {
+            return Err(backend_module(
+                "release context-dispatch claims do not equal the selected member sites"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 pub(super) fn open_continuation_claim_ledger(
     compiler: &mut Lowering<'_>,
     bundle: &UnitBundle,
@@ -7244,6 +7351,14 @@ pub(super) fn open_continuation_claim_ledger(
         &compiler.static_transition_plan,
         bundle,
     )?);
+    if compiler.release_claims.is_some() {
+        return Err(backend_module(
+            "the release claim ledger is already open".to_string(),
+        ));
+    }
+    compiler.release_claims = Some(ReleaseClaimLedger::open(
+        &compiler.static_transition_plan,
+    ));
     // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local sibling opens on
     // the SAME boundary and for the same reason: one artifact has exactly one
     // of it, and every composition seat consumes into it. Sharing the lifetime
@@ -7284,6 +7399,11 @@ pub(super) fn open_continuation_claim_ledger(
 pub(super) fn close_continuation_claim_ledger(
     compiler: &mut Lowering<'_>,
 ) -> Result<(), CraneliftBackendError> {
+    compiler
+        .release_claims
+        .take()
+        .ok_or_else(|| backend_module("the release claim ledger went missing".to_string()))?
+        .close()?;
     // The candidate ledger is taken on the same boundary as the claim ledger,
     // and `D2` closes it FIRST: totality, then the derived subset, then the
     // claim ledger's exact laws over that subset.

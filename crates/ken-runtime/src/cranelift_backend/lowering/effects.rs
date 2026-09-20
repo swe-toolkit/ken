@@ -2782,6 +2782,12 @@ impl<'a> Lowering<'a> {
         static_origin: StaticOriginId,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        // D0: a release effect is never allowed to infer ownership from its
+        // shared effect origin. The enclosing Vis scopes the exact member while
+        // its operation is lowered; a response owner with one direct release
+        // claim is the only case where the function-local table is unambiguous
+        // without that scope. More than one matching claim deliberately yields
+        // no answer and reaches the compile refusal below.
         let release_claim = if operation == ken_host::HostOpV1::ResourceRelease {
             self.function_local.active_release_emission_claim.or_else(|| {
                 let mut matching = self
@@ -2796,6 +2802,10 @@ impl<'a> Lowering<'a> {
         } else {
             None
         };
+        // A non-selected family claim preserves the source operation as
+        // compiler control. It does not dispatch, synthesize a HostResult, or
+        // consult host resource state. The one selected claimant reaches the
+        // ordinary response-owner drive and supplies the real HostResult to K.
         if release_claim.is_some_and(|claim| claim.dispatch_claimant().is_none()) {
             return Ok(LoweringOperand::Specialized(
                 Lowered::StaticResponseDeferred,
@@ -2851,10 +2861,7 @@ impl<'a> Lowering<'a> {
                 unsupported(
                     "ReleaseObligation",
                     format!(
-                        "a ResourceRelease dispatch claim carries no obligation id (effect {static_origin:?}, response owner {:?}, emission owner {:?}, claims {:?})",
-                        self.function_local.static_response_owner,
-                        self.defining_emission_owner,
-                        self.function_local.release_emission_claims,
+                        "a ResourceRelease dispatch claim at {static_origin:?} carries no obligation id",
                     ),
                 )
             })?;
@@ -2864,6 +2871,15 @@ impl<'a> Lowering<'a> {
                     "a ResourceRelease dispatch claim names a different effect origin",
                 ));
             }
+            self.release_claims
+                .as_mut()
+                .ok_or_else(|| {
+                    unsupported(
+                        "ReleaseObligation",
+                        "the release claim ledger is not open",
+                    )
+                })?
+                .record_host_dispatch_site(claim)?;
         }
         if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation) {
             // `RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the SECOND refusal site, and

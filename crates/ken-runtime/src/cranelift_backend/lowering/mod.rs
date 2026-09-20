@@ -3091,6 +3091,9 @@ struct Lowering<'a> {
     /// the whole unit-definition pass so a token claimed at one producer
     /// occurrence cannot be claimed again at another.
     continuation_claims: Option<units::ContinuationClaimLedger>,
+    /// One artifact-wide reconciliation of planner-issued release members,
+    /// generated-family emission claims, and selected dispatch claims.
+    release_claims: Option<units::ReleaseClaimLedger>,
     /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3`** — the SIBLING affine ledger for
     /// the fusion-local realizations `F`, held over the same span as
     /// `continuation_claims` and opened and closed on the same boundary.

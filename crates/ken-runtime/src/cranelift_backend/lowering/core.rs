@@ -2657,6 +2657,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let root_function_local = helpers.declare_in_func(&mut module, &mut ctx.func, None);
     let mut compiler = Lowering {
         continuation_claims: None,
+        release_claims: None,
         fusion_compositions: None,
         static_worker_fields: StaticWorkerFieldLedger::default(),
         // `D2f` — the preflighted ledger, moved in whole. Handed over rather
@@ -15048,6 +15049,10 @@ impl<'a> Lowering<'a> {
                         )?,
                     ));
                 }
+                // Scope the planner-issued member around its operation descent.
+                // All bracket members share the release Effect occurrence, so
+                // effect origin alone cannot recover which logical demand this
+                // copy belongs to.
                 let release_claim = self
                     .function_local
                     .release_emission_claims
@@ -15088,6 +15093,12 @@ impl<'a> Lowering<'a> {
                         if !handler_owned_deferred_response_mutation_applies(
                             HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
                         ) {
+                            // The table chooses one caller of this shared
+                            // generated context. Its nonzero claim word drives
+                            // the real host effect; every other caller preserves
+                            // the Vis residual for its ordinary continuation.
+                            // This is static call-site disposition carried as a
+                            // value, not a runtime consumption flag.
                             if let Some(claim) = self
                                 .function_local
                                 .release_emission_claims
@@ -15098,6 +15109,12 @@ impl<'a> Lowering<'a> {
                                     return Err(unsupported(
                                         "ReleaseObligation",
                                         "a release emission claim names a different Vis member",
+                                    ));
+                                }
+                                if claim.dispatch_claimant().is_none() {
+                                    return Err(unsupported(
+                                        "ReleaseObligation",
+                                        "a non-selected release claim reached its handler drive",
                                     ));
                                 }
                                 let control = self.function_local.release_dispatch_control.ok_or_else(|| {
