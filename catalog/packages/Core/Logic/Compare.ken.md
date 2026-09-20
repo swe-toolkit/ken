@@ -404,7 +404,429 @@ pub fn list_compare
           }
       }
   }
+
+theorem list_eq_cons_true_tail
+      (a : Type)
+      (eqf : a → a → Bool)
+      (x : a)
+      (y : a)
+      (xs : List a)
+      (ys : List a)
+      (h : Equal Bool (list_eq a eqf (Cons a x xs) (Cons a y ys)) True)
+      (heqf : Equal Bool (eqf x y) True)
+    : Equal Bool (list_eq a eqf xs ys) True =
+  J
+    (λb _.
+      Equal
+        Bool
+        (match b {
+          True ↦ list_eq a eqf xs ys;
+          False ↦ False
+        })
+        True)
+    h
+    heqf
+
+theorem list_compare_cons_eq_lift
+      (a : Type)
+      (cmp : a → a → OrdResult)
+      (x : a)
+      (y : a)
+      (xs : List a)
+      (ys : List a)
+      (hcmp : Equal OrdResult (cmp x y) ord_eq)
+      (htail : Equal OrdResult (list_compare a cmp xs ys) ord_eq)
+    : Equal OrdResult (list_compare a cmp (Cons a x xs) (Cons a y ys)) ord_eq =
+  J
+    (λr _.
+      Equal
+        OrdResult
+        (match r {
+          Eq ↦ list_compare a cmp xs ys;
+          Lt ↦ Lt;
+          Gt ↦ Gt
+        })
+        ord_eq)
+    htail
+    (sym OrdResult (cmp x y) ord_eq hcmp)
+
+pub proof eq for list_compare
+      (a : Type)
+      (eqf : a → a → Bool)
+      (cmp : a → a → OrdResult)
+      (compatible : (x : a)
+        → (y : a)
+        → Equal
+        Bool
+        (eqf x y)
+        True
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_eq)
+      (xs : List a)
+    : (ys : List a)
+      → Equal Bool (list_eq a eqf xs ys) True
+      → Equal OrdResult (list_compare a cmp xs ys) ord_eq =
+  match xs {
+    Nil ↦
+      λys.
+        match ys {
+          Nil ↦ λh. Proved;
+          Cons y ys2 ↦ λh. absurd h
+        };
+    Cons x xs2 ↦
+      λys.
+        match ys {
+          Nil ↦ λh. absurd h;
+          Cons y ys2 ↦
+            λh.
+              match eqf x y eqn : heqf {
+                True ↦
+                  list_compare_cons_eq_lift
+                    a
+                    cmp
+                    x
+                    y
+                    xs2
+                    ys2
+                    (compatible x y heqf)
+                    ((proof eq for list_compare)
+                      a
+                      eqf
+                      cmp
+                      compatible
+                      xs2
+                      ys2
+                      (list_eq_cons_true_tail a eqf x y xs2 ys2 h heqf));
+                False ↦
+                  absurd
+                    (J
+                      (λb _.
+                        Equal
+                          Bool
+                          (match b {
+                            True ↦ list_eq a eqf xs2 ys2;
+                            False ↦ False
+                          })
+                          True)
+                      h
+                      heqf)
+              }
+        }
+  }
+
+pub proof eq_cases for list_compare
+      (a : Type)
+      (eqf : a → a → Bool)
+      (cmp : a → a → OrdResult)
+      (compatible : (x : a)
+        → (y : a)
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_eq
+        → Equal
+        Bool
+        (eqf x y)
+        True)
+      (xs : List a)
+    : (ys : List a)
+      → Equal OrdResult (list_compare a cmp xs ys) ord_eq
+      → Equal Bool (list_eq a eqf xs ys) True =
+  match xs {
+    Nil ↦
+      λys.
+        match ys {
+          Nil ↦ λh. Proved;
+          Cons y ys2 ↦ λh. absurd h
+        };
+    Cons x xs2 ↦
+      λys.
+        match ys {
+          Nil ↦ λh. absurd h;
+          Cons y ys2 ↦
+            λh.
+              match cmp x y eqn : hcmp {
+                Eq ↦
+                  J
+                    (λb _.
+                      Equal
+                        Bool
+                        (match b {
+                          True ↦ list_eq a eqf xs2 ys2;
+                          False ↦ False
+                        })
+                        True)
+                    ((proof eq_cases for list_compare)
+                      a
+                      eqf
+                      cmp
+                      compatible
+                      xs2
+                      ys2
+                      (J
+                        (λr _.
+                          Equal
+                            OrdResult
+                            (match r {
+                              Eq ↦ list_compare a cmp xs2 ys2;
+                              Lt ↦ Lt;
+                              Gt ↦ Gt
+                            })
+                            ord_eq)
+                        h
+                        hcmp))
+                    (sym Bool (eqf x y) True (compatible x y hcmp));
+                Lt ↦
+                  absurd
+                    (J
+                      (λr _.
+                        Equal
+                          OrdResult
+                          (match r {
+                            Eq ↦ list_compare a cmp xs2 ys2;
+                            Lt ↦ Lt;
+                            Gt ↦ Gt
+                          })
+                          ord_eq)
+                      h
+                      hcmp);
+                Gt ↦
+                  absurd
+                    (J
+                      (λr _.
+                        Equal
+                          OrdResult
+                          (match r {
+                            Eq ↦ list_compare a cmp xs2 ys2;
+                            Lt ↦ Lt;
+                            Gt ↦ Gt
+                          })
+                          ord_eq)
+                      h
+                      hcmp)
+              }
+        }
+  }
+
+pub proof lexicographic for list_compare
+      (a : Type) (cmp : a → a → OrdResult)
+    : And
+        ((px : a)
+          → (py : a)
+          → (xs : List a)
+          → (ys : List a)
+          → (outcome : OrdResult)
+          → Equal
+          OrdResult
+          (cmp px py)
+          ord_eq
+          → Equal
+          OrdResult
+          (list_compare a cmp xs ys)
+          outcome
+          → Equal
+          OrdResult
+          (list_compare a cmp (Cons a px xs) (Cons a py ys))
+          outcome)
+        (And
+          ((x : a)
+            → (y : a)
+            → (xs : List a)
+            → (ys : List a)
+            → Equal
+            OrdResult
+            (cmp x y)
+            ord_lt
+            → Equal
+            OrdResult
+            (list_compare a cmp (Cons a x xs) (Cons a y ys))
+            ord_lt)
+          ((x : a)
+            → (y : a)
+            → (xs : List a)
+            → (ys : List a)
+            → Equal
+            OrdResult
+            (cmp x y)
+            ord_gt
+            → Equal
+            OrdResult
+            (list_compare a cmp (Cons a x xs) (Cons a y ys))
+            ord_gt)) =
+  and_intro
+    ((px : a)
+      → (py : a)
+      → (xs : List a)
+      → (ys : List a)
+      → (outcome : OrdResult)
+      → Equal
+      OrdResult
+      (cmp px py)
+      ord_eq
+      → Equal
+      OrdResult
+      (list_compare a cmp xs ys)
+      outcome
+      → Equal
+      OrdResult
+      (list_compare a cmp (Cons a px xs) (Cons a py ys))
+      outcome)
+    (And
+      ((x : a)
+        → (y : a)
+        → (xs : List a)
+        → (ys : List a)
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_lt
+        → Equal
+        OrdResult
+        (list_compare a cmp (Cons a x xs) (Cons a y ys))
+        ord_lt)
+      ((x : a)
+        → (y : a)
+        → (xs : List a)
+        → (ys : List a)
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_gt
+        → Equal
+        OrdResult
+        (list_compare a cmp (Cons a x xs) (Cons a y ys))
+        ord_gt))
+    (λpx.
+      λpy.
+        λxs.
+          λys.
+            λoutcome.
+              λhprefix.
+                λhtail.
+                  J
+                    (λr _.
+                      Equal
+                        OrdResult
+                        (match r {
+                          Eq ↦ list_compare a cmp xs ys;
+                          Lt ↦ Lt;
+                          Gt ↦ Gt
+                        })
+                        outcome)
+                    htail
+                    (sym OrdResult (cmp px py) ord_eq hprefix))
+    (and_intro
+      ((x : a)
+        → (y : a)
+        → (xs : List a)
+        → (ys : List a)
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_lt
+        → Equal
+        OrdResult
+        (list_compare a cmp (Cons a x xs) (Cons a y ys))
+        ord_lt)
+      ((x : a)
+        → (y : a)
+        → (xs : List a)
+        → (ys : List a)
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_gt
+        → Equal
+        OrdResult
+        (list_compare a cmp (Cons a x xs) (Cons a y ys))
+        ord_gt)
+      (λx.
+        λy.
+          λxs.
+            λys.
+              λhdiff.
+                J
+                  (λr _.
+                    Equal
+                      OrdResult
+                      (match r {
+                        Eq ↦ list_compare a cmp xs ys;
+                        Lt ↦ Lt;
+                        Gt ↦ Gt
+                      })
+                      ord_lt)
+                  Proved
+                  (sym OrdResult (cmp x y) ord_lt hdiff))
+      (λx.
+        λy.
+          λxs.
+            λys.
+              λhdiff.
+                J
+                  (λr _.
+                    Equal
+                      OrdResult
+                      (match r {
+                        Eq ↦ list_compare a cmp xs ys;
+                        Lt ↦ Lt;
+                        Gt ↦ Gt
+                      })
+                      ord_gt)
+                  Proved
+                  (sym OrdResult (cmp x y) ord_gt hdiff)))
+
+pub proof compare_eq for list_eq
+      (a : Type)
+      (eqf : a → a → Bool)
+      (cmp : a → a → OrdResult)
+      (eqf_implies_cmp : (x : a)
+        → (y : a)
+        → Equal
+        Bool
+        (eqf x y)
+        True
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_eq)
+      (cmp_implies_eqf : (x : a)
+        → (y : a)
+        → Equal
+        OrdResult
+        (cmp x y)
+        ord_eq
+        → Equal
+        Bool
+        (eqf x y)
+        True)
+      (xs : List a)
+      (ys : List a)
+    : And
+        (Equal
+          Bool
+          (list_eq a eqf xs ys)
+          True
+          → Equal
+          OrdResult
+          (list_compare a cmp xs ys)
+          ord_eq)
+        (Equal
+          OrdResult
+          (list_compare a cmp xs ys)
+          ord_eq
+          → Equal
+          Bool
+          (list_eq a eqf xs ys)
+          True) =
+  and_intro
+    (Equal Bool (list_eq a eqf xs ys) True → Equal OrdResult (list_compare a cmp xs ys) ord_eq)
+    (Equal OrdResult (list_compare a cmp xs ys) ord_eq → Equal Bool (list_eq a eqf xs ys) True)
+    ((proof eq for list_compare) a eqf cmp eqf_implies_cmp xs ys)
+    ((proof eq_cases for list_compare) a eqf cmp cmp_implies_eqf xs ys)
 ```
 
-The attached proofs are declared with their defining `pair_compare` subject.
-All declarations are ordinary checked Ken and add no trusted assumption.
+Each attached proof is declared with its defining `pair_compare`, `list_compare`,
+or `list_eq` subject. All declarations are ordinary checked Ken and add no
+trusted assumption.
