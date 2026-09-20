@@ -177,8 +177,19 @@ display_name = "architect"
 # Seating history: 2026-09-12 gpt-6-astra (pi); 2026-08-25 gpt-5.6-sol (high) pi;
 # 2026-08-19 Anthropic Opus (subscription spend-down); 2026-08-17 gpt-5.6-sol codex
 # (stranded); 2026-08-13 Opus.
-model = "claude-opus-5"
+# 2026-09-20 reseat (operator directive; Steward-executed): "The architect
+# should be reseated to openai/pi." Claude Code Opus 5 -> pi + openai-codex/gpt-5.6-sol
+# (high), TIER-PRESERVING at T1 and the same shape spec-author runs.
+# THE 2026-09-13 CYBER-GATE TRIGGER BELOW WAS MODEL-SCOPED, NOT PLATFORM-SCOPED, on the
+# evidence available: the wedge hit `gpt-6-astra`, and this seat had previously run
+# `gpt-5.6-sol` on pi (2026-08-25) without wedging. If it wedges again on the Trusted
+# Access classifier, that REFUTES the model-scoped reading and the seat reverts to
+# Claude Code Opus -- reseat back rather than tier-swapping within OpenAI.
+# HARNESS SHAPE: gains `harness = "pi"` and the PI_* env block; keeps `effort`.
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
