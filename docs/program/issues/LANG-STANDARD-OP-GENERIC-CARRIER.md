@@ -234,9 +234,10 @@ its auditing gate is un-landed is the wrong order.
 
 # ROW 3 -- CONCRETE CARRIERS. DELIVERED, AND NOT THIS NODE'S.
 
-Delivered under A1's eight acceptance criteria. **Recorded here so the row set
-is complete and so nobody reads this node as "generic carriers are unsupported"
-when the concrete case is done.** No work here.
+Delivered under A1's NINE acceptance criteria, `AC-1` through `AC-9` (the
+"eight" this line carried was wrong; measured at `e8ab799b5`). **Recorded here
+so the row set is complete and so nobody reads this node as "generic carriers
+are unsupported" when the concrete case is done.** No work here.
 
 # D0 -- THE PROBE THAT MUST RUN BEFORE ANY CODE. BOTH OUTCOMES PRE-COMMITTED.
 
@@ -446,3 +447,101 @@ and I have still not ruled that it needs one.
 - **The repair looks foldable without a new `ElabCtx` field.** That contradicts
   the frame's measured premise. Report the mechanism and stop; do not build it.
 - **Anything wants a fourth row.** The row set is closed at three.
+
+# D0 HAS RUN. THE ROW DISPOSITIONS ARE RECORDED (Steward, 2026-09-20)
+
+**Authored by the Steward, not folded in by the ring.** The ring measured and
+reported; a row disposition is a change to this node's acceptance record, and
+`COORDINATION §14a` puts that with the Steward. The language leader asked for
+it that way at `evt_2b54w91ecffpj` and was right to.
+
+**Base:** `origin/main` `e8ab799b58996fc210501f3952aeb5717c1e5706`, tree
+`18dad43f6b7f68fb101c2cc9f83f5d095f438fb1`. Leader report `evt_7x37147ejs0t9`;
+independent validation `evt_1mb09b2pdnekc`. Every symbol named below was
+verified by the Steward to exist at that base.
+
+## `AC-1` — DISCHARGED. `D0` ran, and the site is named BY SYMBOL.
+
+    fn f (a : Type) (d : Ord a) (x : a) (y : a) : Bool = x ≤ y
+
+refuses with `NoInstance { class: "Ord", ty: "@3" }`, CLI exit 1, the
+diagnostic's span falling on the standard-operator USE rather than on
+declaration constraint admission.
+
+**The refusing site is `elab_standard_operator`.** Its `Leq | Geq` arm infers
+`x`, WHNFs the carrier, calls `core_type_head_id`, and emits that `NoInstance`
+for a variable-headed carrier **before** reaching
+`resolve_instance_dictionary_by_head_id`. That is A1's own carrier-head-identity
+refusal, so A1's completion path is present on this tree and the run counts
+under this frame's tree guard.
+
+**Cited by symbol deliberately.** The report first named a line range, and this
+frame's own Row 1 evidence carries three different coordinate sets for the same
+two sites across `d272e361`, `18f3452fc` and `main`. A coordinate read off one
+tree is not a coordinate in the next one and the drift is silent; a symbol
+survives the rebase that breaks the number.
+
+## `AC-1`'s second guard — THE NEGATIVE HORN WAS REACHABLE, NOT MERELY UNSEEN.
+
+The frame pre-commits two outcomes, and the one measured is the one it
+predicted. **That is the reading that earns extra scrutiny, not less**, so the
+discriminator is on the record rather than assumed.
+
+`elaborate_rdecl_v1` performs declaration-time `where` resolution in its
+`RDeclKind::View { constraints, .. }` loop through
+`resolve_instance_dictionary`, then installs the sole-constraint `d` alias. The
+explicit `(d : Ord a)` declaration **passes that stage** and execution proceeds
+to the use-site refusal above. So the collapse branch was live and did not
+fire — it was not skipped, unreached, or unavailable.
+
+## `AC-2` — DISCHARGED. Row 1 is PRE-EXISTING AND NOT A BUG.
+
+Re-grounded at the landing base BY SYMBOL, replacing the three coordinate sets
+this file previously carried:
+
+    rtype_head_name                       its `RVarTy(_, name, _)` arm
+    elaborate_rdecl_v1 `RDeclKind::View`  -> resolve_instance_dictionary
+
+Both present at `e8ab799b5`. The mechanism is unchanged: implicit resolution
+needs a concrete registered head by construction, the registry holds no
+`("Ord", "a")`, and A1's completion arm is unreachable for this program. **Not
+caused by A1 and not a defect.** The standing prohibition on writing a Row 1
+repair into this node is unaffected.
+
+## `AC-3` — Row 2 STANDS. Recorded as STANDING-AND-DEFERRED, not repaired.
+
+`D0` did not collapse Row 2, so the release section's operative branch is the
+second one it names: Row 2 stands and is recorded as deferred behind the field
+gate. **Recording it is the deliverable; repairing it is not.**
+
+`[[LANG-SEAL2-GATE-INCRATE-RELOCATION]]` is still `draft`, so there is still no
+gate that would audit a new `ElabCtx` field, and adding one is still the wrong
+order. The ring wrote no field and no code. **A repair folded in later without a
+Steward release remains a Steward stop.**
+
+## `AC-4` — Row 3 delivered under A1. **A1 HAS NINE ACs, NOT EIGHT.**
+
+    AC-1  AC-2  AC-3  AC-4  AC-5  AC-6  AC-7  AC-8  AC-9
+
+Measured at `e8ab799b5` by counting A1's acceptance-criterion definition
+bullets: nine, with no id absent and none doubled.
+
+**This file says "eight" twice and both are wrong.** One is this node's own
+prose; the other sits inside a quotation of the ruling and is left standing,
+because a quotation that is silently corrected stops being evidence of what was
+said. The error is plausibly a reading artifact: A1 lists `AC-9` BEFORE `AC-8`,
+so a reader following the page order sees the sequence end at `AC-8`.
+
+**AC-4 asks for the AC IDS, not a count, and this is why.** A count agrees with
+the frame that produced it and cannot report its own omission; the id set names
+what it ranges over and fails loudly when one is missing. This file already
+carries one correction of exactly this shape — an `AC-0` attributed to A1 that
+A1 does not have. Same file, same subject, second occurrence.
+
+## What this record does NOT do
+
+The `instance_search` residual inherited from
+`[[LANG-INSTANCE-SEARCH-SECOND-PATH]]` stays OUT of scope: unrepaired,
+ownerless, and expressly not closed as safe. It is not absorbed into any row
+disposition here, and the three-site closure across (i), (ii) and (iii) still
+has no node.
