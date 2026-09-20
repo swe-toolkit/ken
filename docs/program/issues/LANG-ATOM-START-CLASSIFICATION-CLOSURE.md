@@ -366,3 +366,36 @@ the roster, not of the test, and a later roster change moves it silently.**
 
 **This obligation rides `B2`. It is not a node** — it closes when `B2` closes,
 and `B2` states which arm it took.
+
+### THIS FILE'S `active` STATUS CONTRADICTS A LATER RULING (Steward, 2026-09-20)
+
+**Do not re-kick this node off the frontmatter or off the "REMAINS OWED"
+paragraph above. Both predate a ruling that supersedes them.**
+
+    2026-09-18   this file:  "The node stays `active`. AC-0 REMAINS OWED"
+                             owed: AC-0 (KwProof half), AC-1, AC-2, AC-3,
+                             AC-5, AC-7, AC-8, AC-10
+    2026-09-19   evt_1n4k31gecsfty (Steward):
+                             "RECONCILED AS CORPUS CLOSEOUT. THE NODE IS
+                             COMPLETE. No further code work is authorized
+                             on it"
+    2026-09-20   this file:  five further increments recorded as landed;
+                             AC-1 as B1, AC-3 as B2a; the KwProof row
+                             corrected to a NEGATIVE CONTROL, discharged by
+                             explicit classification as refused
+
+**The later two records agree with each other and against the first.** The
+09-20 ledger correction alone retires the "AC-0 (KwProof half)" entry, and the
+increments table retires AC-1 and AC-3.
+
+**What is NOT established here, stated so it is not mistaken for settled.** I
+have the 09-19 ruling only as the fragment quoted above, recovered by search;
+I did not read its full text, and it is that text -- not this note -- which
+accounts for AC-2, AC-5, AC-7, AC-8 and AC-10. **So the status flip is OWED,
+not performed**, and this note exists to stop the node being re-kicked as live
+work in the meantime.
+
+**The failure mode this guards against is the one the node already documented
+about itself:** a guard that reads from a ledger is only as live as the ledger,
+and an implementer cutting from current `main` can read this node's own success
+as a premise failure. A stale `active` is the same defect one level up.

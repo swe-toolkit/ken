@@ -369,3 +369,82 @@ to whatever `D1` returns.
 likely of the two: threading kernel state into `projected_instance_id` is
 forbidden by the Architect's sibling ruling, so a repair needing it is a stop
 and a frame amendment that is the Steward's to author.
+
+## `D1` REACHES ITS FRAMED STOP 2026-09-20. The node CLOSES on a capped closeout cut.
+
+**The stop condition this frame named as the more likely one is the one that
+fired**, and it fired honestly: the ring measured before proposing, and returned
+an absence rather than a workaround.
+
+**What `D1` measured** (implementer `evt_6hpxy4qe1n4nk`, Architect confirming on
+exact base `e4df15c48`): identity-grade carrier material sufficient to repair
+either purity read is ABSENT from `ProjectionPurityCtx`. The complete material
+there is `globals: name -> GlobalId`, the name-keyed `ClassEnv::instances` and
+its `InstanceInfo`, the local `(class_name, head_type, binder)` constraints, and
+string-only bound dictionary pairs. `RType::RCon` retains a spelling, the
+registry key is a spelling, and `InstanceInfo` stores the dictionary
+`instance_id` plus an optional surface head pattern but no captured core carrier.
+
+**Why that is insufficient rather than merely awkward.** On the exact rebound
+boundary, the requested `RCon("Foo")` and the stale registry key `"Foo"` consult
+the SAME current `globals["Foo"]`. Resolving either through that map blesses the
+stale row instead of distinguishing it -- **the instrument reinterprets both
+operands through the one mapping whose staleness is the question.** The only
+honest discriminator is kernel inference of the candidate dictionary type
+compared against an independently derived expected carrier, and
+`ProjectionPurityCtx` carries neither operand nor the `GlobalEnv` to derive them.
+
+**And the sibling supplies no authority here.**
+`LANG-INSTANCE-REGISTRY-IDENTITY-KEY`'s
+M8 named four D0 consumers reaching `confirm_instance_dictionary_carrier`. Those
+are the term-producing `Ord` and `Membership` sites, which route through
+`resolve_instance_dictionary_by_head_id`. `projected_instance_id` holds the only
+two direct production calls to `ClassEnv::instance_search` and enters neither the
+resolver nor the confirmation helper. **The M8 statement is true and covers
+different consumers**; this was measured rather than inferred from the name.
+
+### The residual is RECORDED, NOT CLOSED AS SAFE
+
+**I am not adopting the phrase "fail-closed behind term-producing
+confirmation."** The Architect offered it; I decline it because I have not
+measured it and the two consumers are distinct by the Architect's own finding.
+Confirmation on the term-producing path catches a wrong CARRIER. It does not
+obviously catch a wrong EFFECT ROW verdict reached before dictionary-term
+resolution, and the reachability of the rebound-carrier case at these two exact
+calls is unmeasured.
+
+⇒ **The residual is real in shape, unmeasured in reach, and unrepairable under
+the current frame.** A closed node reads as resolved; this one is closed for
+lack of an authorized remedy, which is a different thing, and the difference is
+recorded here so nobody cites this closure as a safety result.
+
+**No successor node is framed for it.** The Architect forbade the identity-keyed
+repair, the re-keying, and the representation change. If the operator's objective
+ever demands it, it is a new node and a new frame.
+
+### The closeout cut, capped
+
+Authorized at `evt_4wj4aa400zsh0`. Two items, both already measured, one turn:
+
+    1. The two behavioral controls from diagnostic checkpoint
+       3a6f64494f29b081292a14f96101c49181be36b8, landed as ordinary tests.
+    2. D2's three false doc comments: resolve.rs, prelude.rs (two sites).
+
+    AC-C1  both controls green on the candidate
+    AC-C2  deleting the `name == "d"` disjunct REDs the `d.step` control and
+           leaves the binder-named control green -- re-run on the candidate,
+           not carried from the checkpoint
+    AC-C3  corrected comments cite BY SYMBOL, no line numbers
+    AC-C4  the diff over `crates/**/src` is comment lines and test files only
+
+**AC-C3 is the one with a reason behind it.** `prelude.rs` cited
+`classes.rs:91` for a function at `:331`, and that stale coordinate is the
+cheapest evidence the prose was never re-grounded. Replacing one line number
+with another only resets the clock on the same defect.
+
+**Scope stop:** if re-grounding a comment turns up anything beyond the mechanism
+name, land the tests and leave that comment alone. A three-comment rider does
+not become a prose pass.
+
+**The node flips to closed when this cut lands. Not before, and no further
+deliverable is authorized on it.**
