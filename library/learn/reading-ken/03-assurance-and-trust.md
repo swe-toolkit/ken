@@ -121,22 +121,17 @@ in this curriculum's checked fragments, even though the concept it names
 is stated plainly in corpus prose.
 
 The [Property fragment](../../../catalog/packages/Tooling/Testing/Property.ken.md)
-draws a related but
-different line, in its own Motivation section: "Properties here are
-computations, not propositions. They test the executable shadow of a
-contract without assuming or proving that contract." That illustrates why
-testing and proving are different activities
-— useful groundwork for reading `tested` — but it is not the same thing as
-an example of the spec's formal `tested` epistemic status, which is
-produced by an `assume`/`test`-tagged clause lowering a `requires`/`ensures`
-to a runtime assertion. That concrete clause grammar is still
-proposal-level
+draws a related but different line. Its concrete witnesses are computations,
+while private checked runner laws state what successful and failing runs imply
+for every finite sample list. That distinguishes exercising code from exporting
+a formal `tested` status, but it is not an example of the spec's formal,
+tagged `tested` epistemic status, which is produced by an `assume`/`test`-
+tagged clause lowering a `requires`/`ensures` to a runtime assertion. That
+concrete clause grammar is still proposal-level
 ([§§5.2, 5.5](../../../spec/20-verification/21-spec-syntax.md#52-the-epistemic-status-per-claim-export-facing--oq-spec-decided)),
-and none of this curriculum's registered fragments exhibit it. So:
-read `Property.ken.md` for the *concept* `tested` names — a check that
-exercises code rather than proving a claim about it — and take the formal
-tagged construct itself as **unavailable** in the fragment set,
-rather than assume the two are the same thing because they rhyme.
+and none of this curriculum's registered fragments exhibit it. So: read
+`Property.ken.md` for the concept `tested` names, while taking the formal tagged
+construct itself as **unavailable** in the fragment set.
 
 `EmptyDec.ken.md`'s own Design notes section states a caveat about an
 instantiation the entry itself never builds as a **worked example**:
