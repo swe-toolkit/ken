@@ -1,7 +1,7 @@
 ---
 id: LANG-INSTANCE-SEARCH-SECOND-PATH
-title: "`ClassEnv::instance_search` (classes.rs:331) is a second reader of the instance registry with TWO production call sites in `projected_instance_id` (elab.rs:10090, :10101), and three doc comments (prelude.rs:21, :23, resolve.rs:165) describe it as the mechanism the `where`-clause path uses. D0 gates the node's size and its claim: classify those two calls as a RESOLUTION that reaches elaboration or a READ that classifies projection purity. If they resolve, main carries two live selection paths and this is a defect node; if they read, it is three stale doc comments plus a visibility question. The filing's premise -- zero production callers, live only in tests -- is measured FALSE and is not what this node rests on."
-status: draft
+title: "`projected_instance_id` (`elab.rs:10446`) misattributes instance rows two ways and both are keyed on a SPELLING. Its first arm fires when the projected base is a constant literally named `d` even when `d` is NOT the constraint binder, so a user global named `d` is attributed the constraint's effect row instead of its own. Both of its `instance_search` calls key on `rtype_head_name(&constraint.head_type)` -- the same carrier-spelling predicate LANG-INSTANCE-REGISTRY-IDENTITY-KEY is closing on the term-producing path, which the Architect explicitly left here. Delete the `d` disjunct; then measure whether this path can be keyed on identity WITHOUT kernel state. The Architect forbade threading kernel state into this function, so a requirement for it is a STOP, not an implementer choice."
+status: ready
 owner: language
 size: S
 gate: none
@@ -182,3 +182,123 @@ releases it. Pre-existing, no contention, and it blocks nothing.
 **Size `S` is provisional and is `D0`'s to overturn** — it is sized for the
 READS branch. If `D0` returns RESOLVES, re-size before starting rather than
 absorbing the growth silently.
+
+# AMENDED 2026-09-20 (Steward): the grounding is INVERTED and the node is `ready`
+
+**What changed.** This node previously declared the three false doc comments
+"the node's main content." That is backwards and `steward.md` §1 forbids it: a
+documentation correction is not a lane deliverable. The node's content is the
+**two measured misattribution defects** the Architect surfaced while
+classifying `D0`. They were already in this file, filed under a heading that
+read as an aside. The doc comments become a rider on the repair, not its
+justification.
+
+**Every coordinate below was re-measured at `origin/main`
+`1bd3ad8f15bdfee72e6fb16ce7c187191bb6d415`.** The coordinates this node was
+filed with are two revisions stale (`:10083`, `:10090`, `:10101`) and must not
+be used. Cite by symbol; `elab.rs` moves under this node again when
+`LANG-INSTANCE-REGISTRY-IDENTITY-KEY` lands.
+
+    elab.rs:10446   fn projected_instance_id
+    elab.rs:10450     arm 1 guard: local_constraints.len() == 1
+                      && (name == "d" || name == &local_constraints[0].binder)
+    elab.rs:10453/:10455   instance_search on rtype_head_name(head_type)
+    elab.rs:10464/:10466   instance_search on rtype_head_name(head_type)
+
+## The settled inputs. Do not re-derive any of these.
+
+**`D0` is answered and stays answered: this path READS.** The `GlobalId` never
+becomes a `Term`, is never applied, and never enters the elaborated term. It is
+a lookup key for a field's EFFECT ROW. Today's `LANG-INSTANCE-REGISTRY-IDENTITY-KEY`
+`D0` measured the same thing independently at these exact sites: both branches
+consume the old instance's stored row in pre-elaboration purity analysis and
+refuse before dictionary-term resolution, with provenance empty. Two live
+production callers, zero live production selections.
+
+**Arm 1 is subsumed by arm 2 once the `d` disjunct is removed, and this is
+measured, not predicted.** Arm 2 (`:10458`) searches `local_constraints` for a
+constraint whose `binder == name` and performs the identical
+`instance_search`; falling back to `ctx.globals.get(name)`. So with `len() == 1`
+and `name == binder`, the two arms compute the same value. The `d` disjunct is
+therefore the ONLY behavior arm 1 adds, and that behavior is the defect.
+
+**The defect is decidable in one sentence.** When a declaration has exactly one
+local constraint whose binder is not `d`, and the projected base is a global
+constant named `d`, arm 1 returns the constraint's instance; the correct answer
+is `ctx.globals.get("d")`. Misattribution keyed on a name the user chose.
+
+**The sibling WP is closing the same predicate on the other path, and left this
+one deliberately.** The Architect's arm (b) ruling (`evt_2vg7yn39wg0ge`)
+instructs: "Do not thread kernel state into `projected_instance_id` or absorb
+`elab.rs:10455/10466` here ... their separate consequence remains
+LANG-INSTANCE-SEARCH-SECOND-PATH." When that candidate lands, `main` carries the
+carrier-spelling predicate REPAIRED on the term-producing path and UNREPAIRED at
+these two calls. That asymmetry is this node's subject.
+
+## Deliverables
+
+**`D0` -- delete the `d` disjunct.** One guard. Prove by control, not by
+inspection, that a global named `d` is no longer attributed a constraint's row.
+If the measurement above holds, arm 1 becomes wholly redundant; removing the
+whole arm is permitted but is not required and must not change any other
+behavior.
+
+**`D1` -- measure whether these two `instance_search` calls can be keyed on
+identity WITHOUT kernel state, then repair or stop.** `rtype_head_name` returns
+a spelling. The question is whether the purity context already carries, or can
+cheaply derive, an identity-grade key at this point in pre-elaboration. Report
+what the context holds before proposing any repair.
+
+**`D2` -- correct the three false doc comments** (`resolve.rs:165`,
+`prelude.rs:21`, `prelude.rs:23`). They name `instance_search` as the mechanism
+the `where`-clause path uses; that path goes through
+`resolve_instance_dictionary`. `prelude.rs:21` also cites `classes.rs:91` for a
+function at `classes.rs:331`. This is a rider on `D0`/`D1`, never a substitute
+for them, and it does not close this node on its own.
+
+## Acceptance criteria
+
+**AC-1 -- the `d` misattribution has a behavioral control that RED-s on
+restoration.** One declaration, exactly one local constraint whose binder is
+NOT `d`, a global constant named `d`, and a projection off that constant.
+Assert the effect row is the global's own. Then restore the `d` disjunct: the
+control MUST go red. A control that passes with the disjunct restored is
+testing something else.
+
+**AC-2 -- the binder path is unchanged.** A declaration whose single
+constraint's binder IS the projected name must produce the same effect row
+before and after `D0`. This is the arm-1-is-subsumed claim, and it must be
+executed rather than argued.
+
+**AC-3 -- `D1` reports the context contents before any repair.** State what
+identity-grade key material `ProjectionPurityCtx` carries at the call. If a
+repair is built, a mutation reverting the key to `rtype_head_name` must RED a
+control that distinguishes two head spellings sharing one identity. If no
+repair is built, AC-3 is discharged by the report.
+
+## Stop conditions
+
+Hand back rather than work around if either holds:
+
+- **Identity keying requires threading kernel state into
+  `projected_instance_id`.** The Architect forbade exactly that in the sibling
+  WP. It is not an implementer choice and not a thing to do quietly here; it is
+  a frame amendment and it is mine to author. Report what is missing and stop.
+- **`D0`'s removal changes any behavior beyond the `d` case.** That refutes the
+  subsumption measurement above, which is mine. Report the differing case.
+
+## Not this node
+
+- `ClassEnv::instances` re-keying. Refuted for the sibling WP by the Architect
+  on the grounds that a bare `(class GlobalId, head GlobalId)` key cannot
+  represent the admitted variable and structural heads; nothing here revives it.
+- Any change to `resolve_instance_dictionary`, the A1 confirmation helper, or
+  the ambiguity refusal.
+- Coherence, orphan, re-export, derive, kernel, trust, or public interface.
+
+## Release note
+
+Hold the release until `LANG-INSTANCE-REGISTRY-IDENTITY-KEY` lands. Both touch
+`elab.rs`, that candidate is in review, and there is no reason to create a
+same-file intersection while it is in flight. The two repairs are independent;
+this is contention avoidance, not a dependency, and `depends_on` stays empty.
