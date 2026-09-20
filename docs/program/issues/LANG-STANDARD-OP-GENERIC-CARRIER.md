@@ -1,7 +1,7 @@
 ---
 id: LANG-STANDARD-OP-GENERIC-CARRIER
 title: "Standard-operator completion over an ABSTRACT carrier. AC-6's fork was FALSE AS POSED -- `the generic where Ord a case` names TWO programs with two refusal sites and two owners. Row 1 (the `where`-clause sugar) refuses at DECLARATION time in `resolve_instance_dictionary_inner`, before A1's completion arm is reachable at all: pre-existing, by construction, NOT a bug. Row 2 (the explicit `(d : Ord a)` encoding) has its dictionary genuinely in scope and is refused only by A1's own head-identity match, whose arms are `Term::Const` and `Term::IndFormer` while a Pi-bound carrier infers to a de Bruijn variable: A1-caused, a real repair. D0 gates Row 2 and must run BEFORE any code -- its grounding is a July 2026 enclave probe against a September tree."
-status: draft
+status: ready
 owner: language
 size: S
 gate: none
@@ -380,3 +380,69 @@ be started until the Steward releases it.**
 
 **It is additionally not startable yet on its own terms**, which is the rarer
 reason: `D0` needs a tree carrying A1's completion path, and `main` has none.
+
+# RELEASED 2026-09-20 (Steward), SCOPED TO `D0` AND THE ROW DISPOSITIONS
+
+**Both reasons this node was `draft` are discharged, and one of them was
+discharged by main moving rather than by anyone acting on it.**
+
+**The tree gate is GONE, and it was a mutable-state claim.** This file said
+*"`D0` needs a tree carrying A1's completion path, and `main` has none."*
+Measured at `origin/main` `cf4533b74`: `LANG-STANDARD-INFIX-CALL-COMPLETION`
+is `merged`, landed at `e2e40e2b4` and closed at `3e15a7df4`, and
+`collect_bound_dictionary_params` plus the `bound_dict_classes` channel are
+both in `crates/ken-elaborator/src/elab.rs` on `main`. **`main` IS now a
+qualifying `D0` tree.** That sentence was true when written and became false
+without anything editing it, which is the whole reason the frame demands the
+tree be shown present at the run rather than argued from this paragraph.
+
+**The priority gate does not apply.** It read *"queued by priority, L1 is the
+operator's top priority."* L1 and L2 are separate authorized lanes running
+concurrently under the three-lane roster; L2 does not queue behind L1. L2 has
+no live operator objective and works its backlog under the campaign root's
+standing surface-syntax direction.
+
+## SCOPE AT RELEASE: `D0` plus AC-1, AC-2, AC-4. **AC-3's REPAIR is DEFERRED.**
+
+**Do not add a field to `ElabCtx` under this release.** Row 2's repair needs a
+bound-dictionary channel into `ElabCtx`, and this frame's own ordering rule
+governs: the node that would AUDIT a new field,
+`[[LANG-SEAL2-GATE-INCRATE-RELOCATION]]`, is still `draft` and unreleased at
+`cf4533b74`. **I re-asked the question rather than inheriting the paragraph, as
+the frame instructs, and the precondition has NOT dissolved.** There is still no
+field gate, so adding a field is still the wrong order.
+
+**AC-3 is therefore discharged in this release ONLY by its second branch** --
+recording Row 2 as collapsed into Row 1, if that is what `D0` returns. If `D0`
+returns REFUSES-AT-the-head-identity-match, Row 2 STANDS and is recorded as
+standing-and-deferred behind the field gate. **Recording it is the deliverable;
+repairing it is not, and a repair folded in anyway is a Steward stop.**
+
+**This ordering is not a delay tactic and `D0` is why.** `D0` can collapse Row 2
+outright, in which case the field question never needed answering. Running the
+probe before touching the gate is the cheap order, not the cautious one.
+
+## A CROSS-REFERENCE IN THIS FILE IS NOW STALE. Site (ii) is NOT carried.
+
+The "NAMED, DELIBERATELY NOT RULED" section says site (ii), the `instance_search`
+carrier-spelling reads, is *"already carried by
+`[[LANG-INSTANCE-SEARCH-SECOND-PATH]]`."* **That is no longer true.** That node
+closed 2026-09-20 with the residual MEASURED AND UNREPAIRED: identity-grade
+carrier material is absent from `ProjectionPurityCtx`, and supplying it needs
+either kernel-state inference at the read or a new stored identity field, both
+of which the Architect forbade there. Site (ii) is a recorded residual with no
+owner, not an obligation someone else is discharging.
+
+**This changes nothing about this node's scope and must not be absorbed into
+it.** It is corrected here so the next reader does not treat site (ii) as
+handled. The three-site closure across (i), (ii), and (iii) still has no node
+and I have still not ruled that it needs one.
+
+## Stop conditions at release
+
+- **`D0` cannot be run because the tree lacks A1's completion path.** Do not
+  work around it and do not run it anyway -- a run against such a tree is not a
+  `D0` run by this frame's own guard. Name the tree and stop.
+- **The repair looks foldable without a new `ElabCtx` field.** That contradicts
+  the frame's measured premise. Report the mechanism and stop; do not build it.
+- **Anything wants a fourth row.** The row set is closed at three.
