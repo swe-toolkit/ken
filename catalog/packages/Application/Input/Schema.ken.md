@@ -156,6 +156,89 @@ pub fn schema_validate_fields
         (schema_validate_fields origin value inspect rest)
   }
 
+pub proof valid_coverage for schema_validate_fields
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (fields : List SchemaField)
+      (values : List value)
+      (hvalid : Equal
+        (SchemaValidation origin value)
+        (schema_validate_fields origin value inspect fields)
+        (Valid (NonEmpty (SchemaIssue origin)) (List value) values))
+    : (i : Nat)
+      → (field : SchemaField)
+      → Equal (Option SchemaField) (nth SchemaField i fields) (Some SchemaField field)
+      → (goal : Prop)
+      → ((accepted : value)
+          → Equal
+          (Option value)
+          (nth value i values)
+          (Some value accepted)
+          → Equal
+          (SchemaFieldCheck origin value)
+          (inspect field)
+          (SchemaFieldAccepted origin value accepted)
+          → goal)
+      → goal =
+  λi.
+    λfield.
+      λhfield.
+        λgoal.
+          λrecover.
+            schema_fields_valid_coverage_helper
+              origin
+              value
+              inspect
+              fields
+              values
+              hvalid
+              goal
+              i
+              field
+              hfield
+              recover
+
+pub proof accepted_tail_invalid for schema_validate_fields
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (field : SchemaField)
+      (rest : List SchemaField)
+      (accepted : value)
+      (issues : NonEmpty (SchemaIssue origin))
+      (hfield : Equal
+        (SchemaFieldCheck origin value)
+        (inspect field)
+        (SchemaFieldAccepted origin value accepted))
+      (htail : Equal
+        (SchemaValidation origin value)
+        (schema_validate_fields origin value inspect rest)
+        (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues))
+    : Equal
+        (SchemaValidation origin value)
+        (schema_validate_fields origin value inspect (Cons SchemaField field rest))
+        (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues) =
+  schema_validation_cons_transport
+    origin
+    value
+    (SchemaFieldAccepted origin value accepted)
+    (inspect field)
+    (schema_sym
+      (SchemaFieldCheck origin value)
+      (inspect field)
+      (SchemaFieldAccepted origin value accepted)
+      hfield)
+    (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
+    (schema_validate_fields origin value inspect rest)
+    (schema_sym
+      (SchemaValidation origin value)
+      (schema_validate_fields origin value inspect rest)
+      (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
+      htail)
+    (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
+    Refl
+
 theorem schema_some_injective
       (a : Type) (left : a) (right : a) (same : Equal (Option a) (Some a left) (Some a right))
     : Equal a left right =
@@ -581,89 +664,6 @@ theorem schema_fields_valid_coverage_helper
                                               hinspect)))
               }
   }
-
-pub proof valid_coverage for schema_validate_fields
-      (origin : Type)
-      (value : Type)
-      (inspect : SchemaField → SchemaFieldCheck origin value)
-      (fields : List SchemaField)
-      (values : List value)
-      (hvalid : Equal
-        (SchemaValidation origin value)
-        (schema_validate_fields origin value inspect fields)
-        (Valid (NonEmpty (SchemaIssue origin)) (List value) values))
-    : (i : Nat)
-      → (field : SchemaField)
-      → Equal (Option SchemaField) (nth SchemaField i fields) (Some SchemaField field)
-      → (goal : Prop)
-      → ((accepted : value)
-          → Equal
-          (Option value)
-          (nth value i values)
-          (Some value accepted)
-          → Equal
-          (SchemaFieldCheck origin value)
-          (inspect field)
-          (SchemaFieldAccepted origin value accepted)
-          → goal)
-      → goal =
-  λi.
-    λfield.
-      λhfield.
-        λgoal.
-          λrecover.
-            schema_fields_valid_coverage_helper
-              origin
-              value
-              inspect
-              fields
-              values
-              hvalid
-              goal
-              i
-              field
-              hfield
-              recover
-
-pub proof accepted_tail_invalid for schema_validate_fields
-      (origin : Type)
-      (value : Type)
-      (inspect : SchemaField → SchemaFieldCheck origin value)
-      (field : SchemaField)
-      (rest : List SchemaField)
-      (accepted : value)
-      (issues : NonEmpty (SchemaIssue origin))
-      (hfield : Equal
-        (SchemaFieldCheck origin value)
-        (inspect field)
-        (SchemaFieldAccepted origin value accepted))
-      (htail : Equal
-        (SchemaValidation origin value)
-        (schema_validate_fields origin value inspect rest)
-        (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues))
-    : Equal
-        (SchemaValidation origin value)
-        (schema_validate_fields origin value inspect (Cons SchemaField field rest))
-        (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues) =
-  schema_validation_cons_transport
-    origin
-    value
-    (SchemaFieldAccepted origin value accepted)
-    (inspect field)
-    (schema_sym
-      (SchemaFieldCheck origin value)
-      (inspect field)
-      (SchemaFieldAccepted origin value accepted)
-      hfield)
-    (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
-    (schema_validate_fields origin value inspect rest)
-    (schema_sym
-      (SchemaValidation origin value)
-      (schema_validate_fields origin value inspect rest)
-      (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
-      htail)
-    (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
-    Refl
 
 fn schema_validate
       (origin : Type)
