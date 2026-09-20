@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-DECODER-LAWS
 title: "inhabit DecoderManyConsumesAllLaw for the existing decoder_many, and give the pure/fail/bind/seq/alt/recursive combinators their general semantic equations -- the next of the seventeen proof-backfill follow-ons, selected after CAT-PARSING-CURSOR-LAWS on a measured absence of dependency rather than a chain"
-status: ready
+status: merged
 owner: foundation
 size: L
 gate: none
