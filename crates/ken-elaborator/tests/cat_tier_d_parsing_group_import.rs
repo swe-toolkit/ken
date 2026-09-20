@@ -671,13 +671,18 @@ fn parsing_module_implementation_siblings_remain_private() {
 /// public API. A strict client imports the operations together and constructs
 /// their built-in input carriers. CLAIMED: the final Parsing-group partial
 /// publishes only usable argv projection, replacement, lookup, and location
-/// operations. THE GAP: later additive API changes must deliberately update
-/// this compatibility vector.
+/// operations together with their authorized laws. THE GAP: later additive API
+/// changes must deliberately update this compatibility vector.
 #[test]
 fn process_arguments_loader_visible_inventory_is_exact_and_coherent() {
     let expected = names(&[
         "argument_at",
         "argument_slice_location",
+        "argument_slice_location::completeness",
+        "argument_slice_location::refuses_missing_argument",
+        "argument_slice_location::refuses_out_of_bounds",
+        "argument_slice_location::refuses_unordered_endpoints",
+        "argument_slice_location::soundness",
         "process_argument_at",
         "process_arguments",
         "process_arguments::round_trip",
