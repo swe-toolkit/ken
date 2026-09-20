@@ -1266,3 +1266,124 @@ would go stale the moment it changes.)
 Worth recording: the spec's exactly-once obligation is **already keyed on
 resource identity rather than on occurrence**, so on that axis the semantics
 has taken (A)'s shape and it is the planner that diverges from it.
+
+# 8. AMENDED 2026-09-20 — `D2b` is an INTER-FUNCTION typed context-edge join
+
+**Authored by the Steward on the Architect's ruling `evt_7wrm5pencaw2a`, which
+explicitly assigned this amendment to this seat and told Runtime to hold
+implementation routing until it lands.** The ruling is binding for MECHANISM and
+is cited, not paraphrased; restating sixty lines of representation in other
+words is how membership and modality drift. This section carries the frame-level
+contract: what died, what is owed, what must fail, and the scope.
+
+## What the measurement killed. Settled inputs -- do not re-derive.
+
+Measured at durable non-candidate `daa4b7d6d677b43d6f65f857fe6ec59ce5912330`
+(NOT a candidate; no approval is implied by citing it):
+
+    closed D0 governed-source map        exactly [StaticOriginId(328)]
+    lower_computational_producer_call    entered only for 1409, never 328
+      => the authorized governed transaction opens ZERO times
+    real ordinary Call at source 328     emits TWICE, in finished funcs 57, 58
+    member 1092's dispatch               is in a THIRD function, 62
+
+**A Cranelift `Inst` is function-local**, so neither copy of source 328 can
+dominate, or even inhabit, function 62's CFG. **The same-function reroute is
+exhausted by measurement, not by preference.** No relabel, no host-call
+placement authority, and no cross-function raw-`Inst` transport is permitted;
+each was tried or ruled out and each is now a stop, not an option.
+
+## The `§1b` predicate, which is the part worth carrying
+
+Hard-stop count advances 13 -> 14 and symptom entry 15 is added, so `§1b` fires
+(`§1a` does not). **Entries 13-15 share one predicate: a projection that is not
+injective over emitted member edges is being used as placement identity.**
+
+    aggregate count                 drops member pairing
+    enclosing generated-family id   drops the exact edge
+    source origin 328               drops the typed caller/callee copy
+
+Three successive attempts failed for one reason, and it was not that the worker
+picked badly: each time the thing reached for as an identity was a projection
+that collapses distinctions the placement decision depends on. **The closure is
+one explicit relation keyed by the obligation member, carrying the
+independently observed source plus typed emitted caller and callee sites.** No
+count, family label, source occurrence, or function-local `Inst` alone
+authorizes placement. That sentence is the acceptance test for any future
+proposal here: if it nominates a single projection as identity, it is entry 16.
+
+Inventory child `c9a69b715110fe45c4db3373e8ee851feab5e808` (one-file child of
+`daa4b7d6d`) holds entries 14-15, counts 14/15, and this predicate answer. It is
+adopted, and its entries must arrive in the eventual candidate rather than
+living only on a checkpoint. Next `§1a` is stop 15; next `§1b` is entry 18.
+
+## What `D2` still requires, and what changes
+
+**`D2`'s requirement is UNCHANGED**: every member's release site is on an
+outgoing edge of its own bracket, and placement is predecessor-specific -- work
+belongs on one incoming edge, never unconditionally in a body shared by several
+predecessors.
+
+**`D2b`/`D2c`'s REPRESENTATION is replaced.** Per the ruling: extend the
+existing `PendingReleaseContextEdge` to carry the independently observed source;
+validate the raw `Inst` against its own function in `record_finished_function`
+and convert to the durable member-keyed relation over typed sites, storing no
+cross-function instruction identity; move the governed-source observation to the
+real ordinary `RuntimeExpr::Call` descent that emits 328; join D0's ownership
+with lowering's existence/endpoints through a query that returns zero or one and
+hard-fails on more than one member; drive only from the edge via the existing
+`release_dispatch_control == member.claim_word()` branch. **The five-step
+validation order in that ruling is binding and its order is load-bearing:**
+source equality precedes reachability, callee validation, and ledger insertion.
+
+Two operands, independently produced, is the whole point. The rejected
+`9da58e996` collapsed them before comparing; a representation that recovers one
+operand from the other is the same defect in new clothes regardless of shape.
+
+## Acceptance -- what must FAIL
+
+**AC-D2b-1 -- `SubstituteBracketSourceOrigin` must red the SOURCE-EQUALITY step
+specifically.** Select the claim with the real source and target first, then
+substitute another genuine governed D0 source in `observed_source` ONLY. The
+real call, context claim word, and dispatch all remain, so step 1 is the only
+thing that can fail. **A mutation that suppresses the dispatch or changes the
+target while claiming to test source equality is not a discharge** -- it reds
+for the wrong reason and certifies nothing.
+
+**AC-D2b-2 -- ambiguity must fail closed, and be exercised.** Source 328 emits
+twice. If both copies target the governed context, the second context claim must
+fail closed. Never resolve by function number, emission order, symbol, or first
+match. If neither targets it, closeout must fail missing-edge. Both arms are
+reachable states of the measured program, so neither is hypothetical.
+
+**Retained unchanged and still owed:** reachable-wrong-edge relocation, edge
+suppression, duplicate-context-claim, exact-target checks, five-family
+reconciliation and injectivity, D2a historical reds, both PX7F rows unignored
+with `{609x1, 598x1, 517x1}`, host-table exclusion, zero trust delta.
+
+## Scope -- ATOMIC, amended in place, NOT split
+
+**`D0`+`D1`+`D2` remains ONE candidate and this node is NOT recut.** The
+Architect measured the split condition FALSE twice: at `b0041c959` the honest
+D0+D1 validation is non-green precisely because D2 placement is unsatisfied, so
+there is no state in which D0+D1 are green with the member unplaced. This is the
+concrete representation closure of a join `D2` already required, not new work
+bolted on.
+
+**This disposes of my own second WIP audit.** I fired it naming the repeat as
+evidence that the cut, not the worker, was the problem. That was a reasonable
+prior and it was wrong: the unit is correctly sized, and what the repeats were
+actually evidence of is the `§1b` predicate above -- a recurring wrong choice of
+identity inside a correctly drawn boundary. **A repeated stop implicates the
+cut only until something better explains it; here something does.** Outcome (b),
+implementation correction, stands.
+
+## Stop conditions
+
+- **Any proposal that nominates a single projection as placement identity.**
+  That is entry 16 and it comes back to the Architect, not into a candidate.
+- **Any need to transport or compare a raw `Inst` across functions.** The
+  representation exists to make that unnecessary; needing it means the
+  representation was not followed.
+- **A second governed context claim resolved by any tiebreak at all.** Fail
+  closed and report; a chosen winner here is a silent wrong edge.

@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-KRET-GRAFTED-SPINE
 title: "The planner derives k_ret_identity from a continuation the spec does not let the runtime invoke. exact_response_ret_identity (ken-runtime cranelift_backend/planning/static_transition/responses.rs:1379) takes the continuation_origin, destructures that ONE syntactic occurrence as a ComputationalMatch, filters its own cases for the one ending ::ITree::Ret and returns that identity -- it composes nothing. Spec 42 §6.4 fixes the effect spine by bind's grafting (36 §2.2: bind (Vis e f) k = Vis e (\\r. bind (f r) k)), so the tree a driver walks is ALREADY grafted and the node's continuation IS the composition; after grafting the immediate syntactic continuation of a source occurrence is not an object in the tree at all. Make the planner's derivation follow the grafted spine rather than the immediate occurrence. NOT an emission-side change: 42 §6.4 makes resuming the immediate continuation observable and wrong, so a runtime altered to invoke it would become non-conformant."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
