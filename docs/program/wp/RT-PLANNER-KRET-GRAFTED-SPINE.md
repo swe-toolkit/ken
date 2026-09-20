@@ -1421,6 +1421,24 @@ attempt until a structural precursor bounded by the component
 behavior-inert, is produced independently of `D0`, clears no ignored row, and
 carries no `D0`/`D1`/`D2` behavior repair.
 
+**That precursor is now FILED and PRICED: `RT-GRAFTED-SPINE-CONTROL-GRAPH`,
+`ready`, size L, tier T1, `blocks` this WP and `depends_on` nothing.** It is a
+NEW node, not the existing XL `RT-GRAFTED-SPINE-IR-REPRESENTATION`, whose
+subject is emission ownership and whose own section 5 forbids using it to
+finish this WP; the Architect confirmed that reading at `evt_1demsw13b66rm`,
+and that node's status, dependency, frame and ownership subject are untouched.
+**The precursor has its OWN hard-stop counter. A stop on it is not a stop
+here, and it does not spend this WP's one attempt.**
+
+**One measurement the precursor frame carries, because it changes what can be
+built.** The ruling quotes `7b03f258c` to show the boundary, and the names it
+uses there -- `ReleaseEmissionSite`, `claim_word`, `PendingReleaseContextEdge`,
+`ReleasePlacementLedger`, `record_finished_function` -- occur **zero** times
+under `crates/` on `main`. They exist only on that rejected candidate. So
+provision 1's "`ReleaseEmissionSite` *stays* a function/body identity" is a
+constraint on the scoping type the precursor **introduces**, not a reference to
+an existing one. Nothing the ruling asserted is lost by reading it that way.
+
 **Runtime must not implement from the ruling thread alone, and must not spend
 the Steward's one-attempt bound before the precursor exists.** Release comes
 from the Steward, after the precursor is on `main`, not from this section.
