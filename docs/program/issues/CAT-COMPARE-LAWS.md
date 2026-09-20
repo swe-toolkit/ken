@@ -1,7 +1,7 @@
 ---
 id: CAT-COMPARE-LAWS
 title: "give list_compare the equality soundness/completeness and first-difference lexicographic laws that pair_compare already has for equality, and bridge list_eq to them -- the next of the seventeen proof-backfill follow-ons, selected by Foundation while CAT-PARSING-CURSOR-LAWS is parked"
-status: ready
+status: merged
 owner: foundation
 size: L
 gate: none
