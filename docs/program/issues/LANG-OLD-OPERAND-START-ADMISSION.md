@@ -1,7 +1,7 @@
 ---
 id: LANG-OLD-OPERAND-START-ADMISSION
 title: "`old`'s operand is parsed by a direct `parse_atom_expr()` call that consults no atom-start roster and no exclusion, so forms refused in ordinary argument position -- `old if a then b else c`, `old proof p for s` -- are admitted after `old`. A live over-admission on main. The repair direction needs a design ruling first: whether `old`'s operand is an application_atom position at all (`21 §6.4`, `32 §3`)."
-status: draft
+status: ready
 owner: language
 size: S
 gate: none
@@ -77,7 +77,7 @@ neither the implementer nor the node owns.
 **It is live on `main` today**, independently of whether the closure node ever
 lands, so it has its own urgency and its own acceptance criteria.
 
-## THE OPEN DESIGN QUESTION -- ANSWER THIS BEFORE BUILDING
+## THE DESIGN QUESTION -- ANSWERED 2026-09-20. THE YES ARM IS RELEASED.
 
 **Is `old`'s operand an application_atom position?**
 
@@ -92,6 +92,61 @@ lands, so it has its own urgency and its own acceptance criteria.
 
 **Do not pick one to get started.** The two answers have disjoint deliverables
 and opposite tests. Routed to the Architect and the Spec enclave by the Steward.
+
+> ### RULED YES (Architect, `evt_5x6r1tsgvjwsc`). Released by the Steward 2026-09-20.
+>
+> **`old`'s operand IS an `application_atom` position.** The YES arm above is
+> live, this node is language-owned parser repair, and **no Spec ruling or spec
+> amendment is a prerequisite.** AC-1 is satisfied by citing
+> `evt_5x6r1tsgvjwsc`; do not re-open the category question.
+>
+> Determined by the published grammar rather than by preference:
+> `21 §6.1` makes a proposition an ordinary `expr` and `old` an ordinary
+> identifier at parse time, so `old e` is ordinary application; `32 §3` defines
+> application as `expr application_atom`, whose production is `primary` plus
+> projections, and **`if` is a leading `expr` form and `proof_ref` is its own
+> `expr` alternative -- neither is a primary**, so `old if ...` and
+> `old proof ...` have no derivation while the grouped forms do. `21 §6.4`
+> changes the meaning and scope of `old`, not the syntactic category of its
+> operand: a pre-state capture is not a second unrestricted-application
+> production.
+>
+> **This EXTENDS a settled boundary rather than drawing a new one.** The
+> Architect's earlier B3 ruling `evt_1zm0d3waytsxt` already found `old`'s
+> operand atom-tight -- dropping the parentheses in `old (f x)` changes the tree
+> to `(old f) x` -- and the accepted repair `c68ef42a4` introduced
+> `ExprContext::OldOperand` with the atom-tight `< 8` boundary, pinned today by
+> `ac4_old_atom_boundary_parentheses_preserve_meaning`. The dedicated
+> `Expr::EOld` arm is an implementation shortcut for that syntax and must
+> preserve the same boundary; its direct `parse_atom_expr()` call bypassing the
+> argument-position classification is therefore a parser defect, not a design
+> choice.
+>
+> ### Implementation envelope (Architect, binding)
+>
+> - After consuming `old`, consult the **same expression-position atom-start
+>   classification used for application arguments** before parsing exactly one
+>   atom.
+> - Any expression-position exclusion is a rejection in this consuming position:
+>   reject bare `if` and bare `proof` at their leading token and direct the
+>   author to grouping.
+> - **Do NOT change `StartExclusion::ProofSelector`'s ordinary application-loop
+>   `argument_diagnostic()` from `None` globally.** Its quiet yield is
+>   load-bearing for `proof` beginning the next declaration. `old` has already
+>   consumed its prefix and still owes an operand, so it must speak LOCALLY
+>   rather than change declaration-boundary behaviour elsewhere.
+> - Preserve `old (f x)`, `(old x).field`, ordinary atomic operands, and the
+>   existing `ExprAtomForm::Old` head/argument classification.
+> - AC-2 carries BOTH bare rejections and grouped admissions; AC-3's revert to
+>   the current direct unguarded call must red those rows.
+>
+> **Anchors are perishable.** The defect is measured at `b53dd9fcf` and the
+> call-site population of one at `parser.rs:3773`. The closure node has since
+> landed five further increments and is complete. **Re-measure the
+> call site and re-confirm the two bare forms are still admitted at YOUR base
+> before repairing.** If either is already refused there, stop and report: the
+> defect would have been closed by that node's own work, which changes this
+> node's scope rather than merely shrinking it.
 
 ## Acceptance criteria
 
