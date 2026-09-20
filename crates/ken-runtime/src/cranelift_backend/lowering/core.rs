@@ -2598,6 +2598,29 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     } else {
         None
     };
+    let release_dispatch_observer: Option<FuncId> = if process_mode {
+        #[cfg(feature = "px8-ds-test-support")]
+        {
+            let mut observe_sig = module.make_signature();
+            observe_sig.params.push(AbiParam::new(types::I64));
+            observe_sig.returns.push(AbiParam::new(types::I64));
+            Some(
+                module
+                    .declare_function(
+                        "ken_release_dispatch_observe_v1",
+                        Linkage::Import,
+                        &observe_sig,
+                    )
+                    .map_err(|err| backend_module(err.to_string()))?,
+            )
+        }
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        {
+            None
+        }
+    } else {
+        None
+    };
     // ⭐ `RT-FNSPLIT-B2F` `D1` — forward-declare the WHOLE target-unit bundle
     // before any body (root or unit) is defined. A unit body may call any other
     // unit, so declaring every signature first is what makes the call graph
@@ -2651,6 +2674,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let helpers = ArtifactHelpers {
         seed_material: &seed_material,
         host_dispatch,
+        release_dispatch_observer,
         native_int: &native_int,
         boundary_value_abi: &boundary_value_abi,
     };

@@ -907,6 +907,7 @@ impl OwnedSourceOccurrence {
 struct ArtifactHelpers<'h> {
     seed_material: &'h seed_material::SeedMaterial,
     host_dispatch: Option<FuncId>,
+    release_dispatch_observer: Option<FuncId>,
     native_int: &'h crate::native_int_clif::NativeIntLocalFuncs,
     boundary_value_abi: &'h crate::boundary_value_clif::BoundaryLocalFuncs,
 }
@@ -927,6 +928,9 @@ impl ArtifactHelpers<'_> {
             seed_material: self.seed_material.declare_in_func(module, func),
             host_dispatch: self
                 .host_dispatch
+                .map(|id| module.declare_func_in_func(id, func)),
+            release_dispatch_observer: self
+                .release_dispatch_observer
                 .map(|id| module.declare_func_in_func(id, func)),
             // ⛔ Dataflow results, not identities: `None` here is correct, and
             // each function derives its own from its entry block.
@@ -1105,6 +1109,7 @@ struct FunctionLocalRefs {
     /// `D3` removes).
     seed_material: seed_material::SeedMaterialRefs,
     host_dispatch: Option<FuncRef>,
+    release_dispatch_observer: Option<FuncRef>,
     host_dispatch_context: Option<cranelift_codegen::ir::Value>,
     services_pointer: Option<cranelift_codegen::ir::Value>,
     native_int_arena: Option<cranelift_codegen::ir::Value>,

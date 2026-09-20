@@ -3799,6 +3799,32 @@ impl<'a> Lowering<'a> {
             .ins()
             .iconst(types::I64, i64::from(wire.request_size));
         let reply_pointer = builder.ins().stack_addr(pointer_type, reply, 0);
+        #[cfg(feature = "px8-ds-test-support")]
+        let observe_release_dispatch = {
+            let observer = self.function_local.release_dispatch_observer;
+            move |builder: &mut FunctionBuilder<'_>| -> Result<(), CraneliftBackendError> {
+                if operation != ken_host::HostOpV1::ResourceRelease {
+                    return Ok(());
+                }
+                let claim = release_claim.ok_or_else(|| {
+                    unsupported(
+                        "ReleaseObligation",
+                        "the test observer reached a release without a member claim",
+                    )
+                })?;
+                let observer = observer.ok_or_else(|| {
+                    backend_module("the test release-dispatch observer is not declared".to_string())
+                })?;
+                let vis_origin = builder.ins().iconst(
+                    types::I64,
+                    i64::from(claim.member().vis_origin().observation_ordinal()),
+                );
+                let call = builder.ins().call(observer, &[vis_origin]);
+                let status = builder.inst_results(call)[0];
+                Self::require_i64(builder, status, 0);
+                Ok(())
+            }
+        };
         if let Some((invalid, failure_tag, detail)) = narrow_failure {
             let dispatch = builder.create_block();
             let synthesize = builder.create_block();
@@ -3806,6 +3832,8 @@ impl<'a> Lowering<'a> {
             builder.ins().brif(invalid, synthesize, &[], dispatch, &[]);
 
             builder.switch_to_block(dispatch);
+            #[cfg(feature = "px8-ds-test-support")]
+            observe_release_dispatch(builder)?;
             let call = builder.ins().call(
                 self.function_local
                     .host_dispatch
@@ -3862,6 +3890,8 @@ impl<'a> Lowering<'a> {
             builder.ins().jump(decoded, &[]);
             builder.switch_to_block(decoded);
         } else {
+            #[cfg(feature = "px8-ds-test-support")]
+            observe_release_dispatch(builder)?;
             let call = builder.ins().call(
                 self.function_local
                     .host_dispatch

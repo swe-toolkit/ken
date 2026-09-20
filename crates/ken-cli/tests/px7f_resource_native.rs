@@ -37,6 +37,41 @@ fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
     observation
 }
 
+fn observe_double_release_dispatch_members() -> (ken_runtime::NativeEffectRunErrorV1, Vec<u64>) {
+    let dir = output_dir("double-release-member-sites");
+    std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
+    let output = ken_cli::build_native_program(
+        DOUBLE_RELEASE,
+        ken_cli::SourceFormat::Ken,
+        "double-release-member-sites",
+        dir.path(),
+    )
+    .expect("the D0 witness compiles to a linked native program");
+    let sink = tempfile::NamedTempFile::new().expect("the observation sidecar is available");
+    let result = ken_runtime::run_bound_process_effect_observation(
+        &output.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: vec![(
+                "KEN_RELEASE_DISPATCH_OBSERVATION_PATH".into(),
+                sink.path().as_os_str().to_owned(),
+            )],
+            cwd: dir.path().to_owned(),
+            plan_hash: output.plan_transport_hash,
+        },
+    );
+    let error = result.expect_err("D0 still stops before the D2 placement repair");
+    let observed = std::fs::read_to_string(sink.path())
+        .expect("the executed release-dispatch sidecar is readable")
+        .lines()
+        .map(|line| {
+            line.parse::<u64>()
+                .expect("each release-dispatch record is one Vis origin")
+        })
+        .collect();
+    (error, observed)
+}
+
 const ESCAPE_CLOSED: &str = r#"program capabilities FS AFull
 fn escape_body (resource : Resource FsHandle)
   : HostIO AFull (ResourceBodyResult Unit (Resource FsHandle)) =
@@ -324,6 +359,46 @@ fn linked_public_right_denial_preserves_exact_masks() {
             }
         ))
     )));
+}
+
+#[cfg(target_os = "linux")]
+/// Transition sentinel for D0's at-most-once boundary. D2 retires this exact
+/// zero-at-517 expectation when it restores the third member's dynamic reach.
+#[test]
+#[ignore = "RT-PLANNER-KRET-GRAFTED-SPINE D0 execution evidence; D2 restores Vis 517"]
+fn linked_public_double_release_dispatches_once_per_reaching_member() {
+    let (error, executed_members) = observe_double_release_dispatch_members();
+    assert!(
+        matches!(
+            error,
+            ken_runtime::NativeEffectRunErrorV1::UnclassifiedRuntimeTrap { terminal_value: -1 }
+        ),
+        "the D0 witness must retain its ruled pre-D2 terminal: {error:?}"
+    );
+
+    let expected = [(609_u64, 1_usize), (598, 1), (517, 0)];
+    assert!(
+        executed_members
+            .iter()
+            .all(|member| expected.iter().any(|(vis, _)| vis == member)),
+        "an unclassified release member dispatched: {executed_members:?}"
+    );
+    let observed = expected.map(|(vis, _)| {
+        (
+            vis,
+            executed_members
+                .iter()
+                .filter(|member| **member == vis)
+                .count(),
+        )
+    });
+    eprintln!(
+        "D0 executed release member multiset: {observed:?}; raw sequence: {executed_members:?}"
+    );
+    assert_eq!(
+        observed, expected,
+        "D0 must execute exactly the reconciled member-site multiset"
+    );
 }
 
 #[cfg(target_os = "linux")]

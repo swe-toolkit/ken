@@ -38,6 +38,34 @@ pub mod hash;
 pub mod ir;
 #[cfg(test)]
 mod native_effect_v1;
+
+/// Test-only runtime witness for a release dispatch's planner-issued Vis member.
+///
+/// Only `px8-ds-test-support` generated code imports this symbol. The symbol is
+/// present in the default staticlib so the ordinary native-suite prerequisite
+/// (`ken-cargo build -p ken-runtime --lib`) remains link-compatible with that
+/// test-feature object. Production generated code never calls it. An absent
+/// sink is a no-op; the D0 acceptance row supplies a private sidecar path and
+/// asserts the executed sequence against a literal multiset after termination.
+#[doc(hidden)]
+#[no_mangle]
+pub extern "C" fn ken_release_dispatch_observe_v1(vis_origin: u64) -> i64 {
+    use std::io::Write as _;
+
+    let Some(path) = std::env::var_os("KEN_RELEASE_DISPATCH_OBSERVATION_PATH") else {
+        return 0;
+    };
+    let result = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .and_then(|mut sink| writeln!(sink, "{vis_origin}"));
+    if result.is_ok() {
+        0
+    } else {
+        1
+    }
+}
 pub mod native_execution_differential;
 pub mod native_int;
 mod native_int_clif;
