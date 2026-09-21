@@ -27,6 +27,8 @@ pub struct SourceToken {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaKind {
     Whitespace,
+    /// U+FEFF consumed as a byte-order mark at source byte offset zero.
+    Bom,
     /// `-- …` (`31 §5`).
     LineComment,
     /// `--- …` (`31 §5`, D2) -- a line comment attaching to the following
@@ -91,13 +93,17 @@ impl TriviaKind {
         )
     }
 
-    /// Every comment kind (excluding pure whitespace) participates in
-    /// attachment -- widening this, and not just the doc kinds, is what
-    /// keeps `attach_comments`/`validate_attachment_totality` from silently
-    /// losing block comments the way an unwidened `LineComment`-only filter
-    /// would (LANG-SURFACE-BLOCK-COMMENTS D3).
+    /// Every actual comment kind participates in attachment. Keep this an
+    /// explicit roster: the leading BOM is lossless trivia, never a comment
+    /// home (`31 §1f`).
     fn is_comment(self) -> bool {
-        !matches!(self, TriviaKind::Whitespace)
+        matches!(
+            self,
+            TriviaKind::LineComment
+                | TriviaKind::DocLineComment
+                | TriviaKind::BlockComment
+                | TriviaKind::DocBlockComment
+        )
     }
 }
 
@@ -320,6 +326,25 @@ fn append_trivia(
 ) -> Result<(), ElabError> {
     let mut cursor = start;
     while cursor < end {
+        // The only accepted raw `Cf` spelling is the leading U+FEFF BOM.
+        // Account for its exact bytes before ordinary trivia classification;
+        // root source validation makes a later U+FEFF unreachable here.
+        if cursor == 0 && src[..end].starts_with('\u{FEFF}') {
+            let next = '\u{FEFF}'.len_utf8();
+            let trivia_index = trivia.len();
+            let span = Span::new(cursor, next);
+            trivia.push(Trivia {
+                kind: TriviaKind::Bom,
+                span: span.clone(),
+            });
+            pieces.push(SourcePiece {
+                kind: SourcePieceKind::Trivia(trivia_index),
+                span,
+            });
+            cursor = next;
+            continue;
+        }
+
         // Comment classification and both end-scanners are the shared
         // `classify_comment` (LANG-COMMENT-CLASSIFIER-SHARED D1/D3), the
         // same function `Lexer::skip_ws_comments` calls -- the two scanners

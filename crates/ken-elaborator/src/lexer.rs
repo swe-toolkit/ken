@@ -146,10 +146,114 @@ enum EscapeShape {
     Byte(u8),
 }
 
+/// The complete Unicode general-category `Cf` range table from
+/// `UnicodeData.txt` in UCD 17.0.0. The source file's SHA-256 is
+/// `2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c`.
+/// This is generated category data, not the illustrative codepoint roster in
+/// `31 §1f`; the workspace's `unicode-normalization` data is pinned to the
+/// same Unicode version but does not expose general-category membership.
+const UNICODE_FORMAT_CHARACTER_RANGES: &[(char, char)] = &[
+    ('\u{AD}', '\u{AD}'),
+    ('\u{600}', '\u{605}'),
+    ('\u{61C}', '\u{61C}'),
+    ('\u{6DD}', '\u{6DD}'),
+    ('\u{70F}', '\u{70F}'),
+    ('\u{890}', '\u{891}'),
+    ('\u{8E2}', '\u{8E2}'),
+    ('\u{180E}', '\u{180E}'),
+    ('\u{200B}', '\u{200F}'),
+    ('\u{202A}', '\u{202E}'),
+    ('\u{2060}', '\u{2064}'),
+    ('\u{2066}', '\u{206F}'),
+    ('\u{FEFF}', '\u{FEFF}'),
+    ('\u{FFF9}', '\u{FFFB}'),
+    ('\u{110BD}', '\u{110BD}'),
+    ('\u{110CD}', '\u{110CD}'),
+    ('\u{13430}', '\u{1343F}'),
+    ('\u{1BCA0}', '\u{1BCA3}'),
+    ('\u{1D173}', '\u{1D17A}'),
+    ('\u{E0001}', '\u{E0001}'),
+    ('\u{E0020}', '\u{E007F}'),
+];
+
+fn is_unicode_format_character(character: char) -> bool {
+    UNICODE_FORMAT_CHARACTER_RANGES
+        .binary_search_by(|&(start, end)| {
+            if character < start {
+                std::cmp::Ordering::Greater
+            } else if character > end {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        })
+        .is_ok()
+}
+
+/// The single decoded-codepoint guard for raw Ken source (`31 §1f`). It scans
+/// the whole source before token, comment, or literal dispatch, so even the
+/// byte-walking comment classifier and the later lossless trivia rescan see
+/// only source that has passed this check. Escape results are not part of this
+/// raw stream. U+FEFF at byte offset zero is the sole exception.
+fn first_raw_format_character(src: &str) -> Option<(char, Span)> {
+    src.char_indices().find_map(|(offset, character)| {
+        (is_unicode_format_character(character) && !(offset == 0 && character == '\u{FEFF}'))
+            .then(|| (character, Span::new(offset, offset + character.len_utf8())))
+    })
+}
+
+/// An opaque view into a complete source whose decoded-codepoint stream has
+/// passed `31 §1f`. Every lexer construction requires this capability, so no
+/// token/comment/literal context can bypass the one whole-source validation.
+#[derive(Clone, Copy)]
+pub(crate) struct ValidatedSource<'s> {
+    complete: &'s str,
+    absolute_start: usize,
+}
+
+impl<'s> ValidatedSource<'s> {
+    /// The sole root constructor. Validation completes before any lexer exists.
+    pub(crate) fn new(complete: &'s str) -> Result<Self, ElabError> {
+        if let Some((character, span)) = first_raw_format_character(complete) {
+            return Err(ElabError::RawFormatCharacter { character, span });
+        }
+        Ok(Self {
+            complete,
+            absolute_start: 0,
+        })
+    }
+
+    /// Derive an origin-preserving suffix view without re-running validation.
+    pub(crate) fn suffix_from(self, cursor: usize) -> Self {
+        assert!(cursor >= self.absolute_start);
+        assert!(self.complete.is_char_boundary(cursor));
+        Self {
+            complete: self.complete,
+            absolute_start: cursor,
+        }
+    }
+
+    fn remaining(self) -> &'s str {
+        &self.complete[self.absolute_start..]
+    }
+}
+
+/// One formatter-only repair over original source coordinates. This sealed
+/// observation exposes neither an unchecked lexer nor any token or AST data.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FormatCharacterEdit {
+    pub(crate) span: Span,
+    pub(crate) replacement: String,
+}
+
 pub struct Lexer<'s> {
     src: &'s str,
     pos: usize,
     previous_token_was_dot: bool,
+    /// Present only inside [`formatter_format_character_repairs`]. Ordinary
+    /// semantic, lossless, and recovery lexers are constructible only from a
+    /// [`ValidatedSource`] and never enter this observation mode.
+    format_character_edits: Option<Vec<FormatCharacterEdit>>,
 }
 
 /// One classified comment form (`31 §5`), returned by [`classify_comment`]
@@ -307,12 +411,45 @@ fn scan_doc_block_comment_end(
 }
 
 impl<'s> Lexer<'s> {
-    pub fn new(src: &'s str) -> Self {
+    pub(crate) fn new(source: ValidatedSource<'s>) -> Self {
+        let src = source.remaining();
+        let pos = if source.absolute_start == 0 && src.starts_with('\u{FEFF}') {
+            '\u{FEFF}'.len_utf8()
+        } else {
+            0
+        };
+        Self {
+            src,
+            pos,
+            previous_token_was_dot: false,
+            format_character_edits: None,
+        }
+    }
+
+    /// The formatter's sole pre-validation observation constructor. It is
+    /// private to this module, and its enclosing API returns only source edits.
+    fn new_format_character_observer(src: &'s str) -> Self {
         Self {
             src,
             pos: 0,
             previous_token_was_dot: false,
+            format_character_edits: Some(Vec::new()),
         }
+    }
+
+    fn observing_format_character_repairs(&self) -> bool {
+        self.format_character_edits.is_some()
+    }
+
+    fn record_format_character_edit(&mut self, start: usize, character: char, replacement: String) {
+        let edits = self
+            .format_character_edits
+            .as_mut()
+            .expect("format-character edits exist only in repair observation mode");
+        edits.push(FormatCharacterEdit {
+            span: Span::new(start, start + character.len_utf8()),
+            replacement,
+        });
     }
 
     fn cur(&self) -> Option<char> {
@@ -623,15 +760,31 @@ impl<'s> Lexer<'s> {
                 Some('\\') => {
                     let backslash_start = self.pos;
                     self.advance();
-                    match self.scan_escape(backslash_start, '"')? {
-                        EscapeShape::Common(c) | EscapeShape::Unicode(c) => s.push(c),
-                        EscapeShape::Byte(_) => {
+                    match self.scan_escape(backslash_start, '"') {
+                        Ok(EscapeShape::Common(c) | EscapeShape::Unicode(c)) => s.push(c),
+                        Ok(EscapeShape::Byte(_)) if self.observing_format_character_repairs() => {}
+                        Ok(EscapeShape::Byte(_)) => {
                             return Err(ElabError::InvalidEscape {
                                 span: Span::new(backslash_start, self.pos),
                                 reason: "\\xHH is only valid in a byte string".to_string(),
                             });
                         }
+                        Err(_) if self.observing_format_character_repairs() => {}
+                        Err(error) => return Err(error),
                     }
+                }
+                Some(c)
+                    if self.observing_format_character_repairs()
+                        && is_unicode_format_character(c) =>
+                {
+                    let character_start = self.pos;
+                    self.advance();
+                    self.record_format_character_edit(
+                        character_start,
+                        c,
+                        format!("\\u{{{:X}}}", c as u32),
+                    );
+                    s.push(c);
                 }
                 Some(c) => {
                     self.advance();
@@ -662,15 +815,31 @@ impl<'s> Lexer<'s> {
                 Some('\\') => {
                     let backslash_start = self.pos;
                     self.advance();
-                    match self.scan_escape(backslash_start, '\'')? {
-                        EscapeShape::Common(c) | EscapeShape::Unicode(c) => s.push(c),
-                        EscapeShape::Byte(_) => {
+                    match self.scan_escape(backslash_start, '\'') {
+                        Ok(EscapeShape::Common(c) | EscapeShape::Unicode(c)) => s.push(c),
+                        Ok(EscapeShape::Byte(_)) if self.observing_format_character_repairs() => {}
+                        Ok(EscapeShape::Byte(_)) => {
                             return Err(ElabError::InvalidEscape {
                                 span: Span::new(backslash_start, self.pos),
                                 reason: "\\xHH is only valid in a byte string".to_string(),
                             });
                         }
+                        Err(_) if self.observing_format_character_repairs() => {}
+                        Err(error) => return Err(error),
                     }
+                }
+                Some(c)
+                    if self.observing_format_character_repairs()
+                        && is_unicode_format_character(c) =>
+                {
+                    let character_start = self.pos;
+                    self.advance();
+                    self.record_format_character_edit(
+                        character_start,
+                        c,
+                        format!("\\u{{{:X}}}", c as u32),
+                    );
+                    s.push(c);
                 }
                 Some(c) => {
                     self.advance();
@@ -711,16 +880,38 @@ impl<'s> Lexer<'s> {
                 Some('\\') => {
                     let backslash_start = self.pos;
                     self.advance();
-                    match self.scan_escape(backslash_start, '"')? {
-                        EscapeShape::Common(c) => bytes.push(c as u8),
-                        EscapeShape::Byte(b) => bytes.push(b),
-                        EscapeShape::Unicode(_) => {
+                    match self.scan_escape(backslash_start, '"') {
+                        Ok(EscapeShape::Common(c)) => bytes.push(c as u8),
+                        Ok(EscapeShape::Byte(b)) => bytes.push(b),
+                        Ok(EscapeShape::Unicode(_))
+                            if self.observing_format_character_repairs() => {}
+                        Ok(EscapeShape::Unicode(_)) => {
                             return Err(ElabError::InvalidEscape {
                                 span: Span::new(backslash_start, self.pos),
                                 reason: "\\u{...} is not valid in a byte string".to_string(),
                             });
                         }
+                        Err(_) if self.observing_format_character_repairs() => {}
+                        Err(error) => return Err(error),
                     }
+                }
+                Some(c)
+                    if self.observing_format_character_repairs()
+                        && is_unicode_format_character(c) =>
+                {
+                    let character_start = self.pos;
+                    self.advance();
+                    if let Ok(byte) = u8::try_from(c as u32) {
+                        self.record_format_character_edit(
+                            character_start,
+                            c,
+                            format!("\\x{byte:02X}"),
+                        );
+                        bytes.push(byte);
+                    }
+                    // A non-representable `Cf` deliberately produces no edit.
+                    // The token value is observation-internal and discarded;
+                    // ordinary post-rewrite validation reports the raw source.
                 }
                 Some(c) if c.is_ascii() => {
                     self.advance();
@@ -729,6 +920,9 @@ impl<'s> Lexer<'s> {
                 Some(c) => {
                     let char_start = self.pos;
                     self.advance();
+                    if self.observing_format_character_repairs() {
+                        continue;
+                    }
                     return Err(ElabError::ParseError {
                         msg: format!("non-ASCII character '{c}' in byte string literal"),
                         span: Span::new(char_start, self.pos),
@@ -1351,7 +1545,7 @@ fn hex_mantissa_to_f64(m: &BigInt, shift: i32) -> Option<f64> {
     /// Lex the entire source into a token+span list (including the `Eof`
     /// sentinel).
     pub fn lex(src: &'s str) -> Result<Vec<(Token, Span)>, ElabError> {
-        let mut lx = Self::new(src);
+        let mut lx = Self::new(ValidatedSource::new(src)?);
         let mut out = Vec::new();
         loop {
             let (tok, span) = lx.next_token()?;
@@ -1362,5 +1556,74 @@ fn hex_mantissa_to_f64(m: &BigInt, shift: i32) -> Option<f64> {
             }
         }
         Ok(out)
+    }
+}
+
+/// Observe formatter-repairable raw `Cf` occurrences using the lexer's own
+/// comment and literal context machinery. The unchecked scanner never escapes
+/// this function; callers receive only edit spans over the original source.
+pub(crate) fn formatter_format_character_repairs(src: &str) -> Vec<FormatCharacterEdit> {
+    let mut lexer = Lexer::new_format_character_observer(src);
+    loop {
+        let attempt_start = lexer.pos;
+        match lexer.next_token() {
+            Ok((Token::Eof, _)) => break,
+            Ok(_) => {}
+            Err(error) => {
+                let first_character_end = src[attempt_start..]
+                    .chars()
+                    .next()
+                    .map(|character| attempt_start + character.len_utf8())
+                    .unwrap_or(src.len());
+                let error_end = match &error {
+                    ElabError::ParseError { span, .. }
+                    | ElabError::NonAsciiIdentifierCharacter { span, .. }
+                    | ElabError::RawFormatCharacter { span, .. }
+                    | ElabError::InvalidEscape { span, .. } => Some(span.end),
+                    _ => None,
+                };
+                let mut next = error_end
+                    .unwrap_or(first_character_end)
+                    .max(first_character_end)
+                    .min(src.len());
+                while next < src.len() && !src.is_char_boundary(next) {
+                    next += 1;
+                }
+                if next <= attempt_start {
+                    break;
+                }
+                lexer.pos = next;
+                lexer.previous_token_was_dot = false;
+            }
+        }
+    }
+    lexer
+        .format_character_edits
+        .take()
+        .expect("the repair observer always owns an edit sink")
+}
+
+#[cfg(test)]
+mod validated_source_tests {
+    use super::*;
+
+    #[test]
+    fn suffix_view_cannot_reacquire_the_root_bom_exception() {
+        // White-box fixture: root validation intentionally cannot produce a
+        // capability over this later U+FEFF. Constructing it here isolates the
+        // origin-preservation law that `suffix_from` itself must maintain.
+        let complete = "x\u{FEFF}fn f : Type = Type";
+        let root = ValidatedSource {
+            complete,
+            absolute_start: 0,
+        };
+        let mut lexer = Lexer::new(root.suffix_from(1));
+
+        match lexer.next_token() {
+            Err(ElabError::ParseError { span, .. }) => {
+                assert_eq!(span, Span::new(0, '\u{FEFF}'.len_utf8()));
+            }
+            other => panic!("later U+FEFF must not be consumed as a suffix BOM: {other:?}"),
+        }
     }
 }
