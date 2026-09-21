@@ -19,11 +19,27 @@ Base: `3de9a5030a91ab7133817157617c2705d4e1cfbd`. `lexer.rs` is blob-identical
 inputs were first measured.
 
 `spec/30-surface/31-lexical.md §1f` (`:514`, landed `2d72bd7e7`) is the design
-authority: the predicate is the closed category `Cf`, not an enumerated roster;
-the error is hard; the guard sits on the decoded source codepoint before context
-dispatch and upstream of escape decoding; U+FEFF as a byte-order mark at offset
-0 is the sole exception. Operator, 2026-09-06: "concur. reframe as whole-source
-lexical policy."
+authority, and it has **five** operative properties, not four:
+
+1. the predicate is the closed category `Cf`, not an enumerated roster;
+2. the error is hard, not advisory;
+3. the guard sits on the decoded source codepoint before context dispatch and
+   upstream of escape decoding;
+4. U+FEFF as a byte-order mark at offset 0 is the sole exception;
+5. **the mandated formatter (`§1c`) auto-escapes on save as the exact inverse**
+   -- "a raw in-scope `Cf` codepoint in a literal's source spelling is rewritten
+   to its escape, value unchanged -- so the hard error is in practice a
+   save-time auto-fix, not a barrier."
+
+**Property 5 was missing from this frame until 2026-09-21 and its absence made
+AC-1 demand the opposite of the spec.** It is not incidental prose: Architect
+component ruling `evt_7yywkwkgrfttj` required the formatter inverse, the
+spec-author delivery `evt_261teccj0bw55` recorded it as delivered, and the exact
+spec approval `evt_7nsaxdg1y5n18` approved both the escape value identity and
+the formatter auto-escape inverse. Read `§1f` whole; a four-property summary of
+it is this frame's own recorded defect.
+
+Operator, 2026-09-06: "concur. reframe as whole-source lexical policy."
 
 Measured at the base:
 
@@ -64,7 +80,8 @@ Expected to change: `crates/ken-elaborator/src/lexer.rs`, `format.rs`,
 `literate.rs`, `lossless.rs`, and their tests.
 
 The former "no `kenfmt` change" boundary was a defect I authored. It is
-withdrawn: closing the formatter bypass is in scope and is required.
+withdrawn twice over: closing the formatter bypass is required, **and so is
+building the formatter's auto-escape inverse** (`§1f` property 5).
 
 Boundaries that must not move:
 
@@ -74,7 +91,13 @@ Boundaries that must not move:
   `SPEC-IDENT-BLESSED`) stay unimplemented; `§1f` covers them later on the same
   guard, which is a property of the placement, not work here.
 - **No output change for input that was already lexically clean**, in either
-  `kenfmt` route or in `parse_lossless`.
+  `kenfmt` route or in `parse_lossless`. Input carrying a raw `Cf` inside a
+  literal spelling is not clean, and the formatter is required to change it.
+- **The single whole-source guard does not move.** The repair pass is the
+  formatter's alone and runs *before* validation; every semantic, lossless and
+  recovery path still reaches `ValidatedSource` with raw `Cf` rejected before
+  context dispatch. Solving this by admitting raw `Cf` through the ordinary
+  lexer, or by adding per-context semantic checks, is a wrong implementation.
 - **No `conformance/` change.** CV owns a separately authored conformance
   witness for `§1f`. Keep this candidate's diff inside `crates/`.
 - No UCD table, escape semantics, public Ken package surface, primitive,
@@ -110,6 +133,30 @@ source/example route and the ignore/reject recovery route, exactly as the
 existing `ParseError` branch does. No fallback may convert it into recovery or
 return an unrebased body-local span.
 
+**The formatter's auto-escape inverse (`§1f` property 5).** Before semantic
+validation, and in the formatter alone, run a **sealed lexer-internal
+repair observation** that returns only original-source edit spans for raw `Cf`
+occurring inside escape-processing literal spellings. It must not expose an
+unchecked `Lexer`, a token stream, an AST, or a second general parsing API, and
+it must reuse the lexer module's existing context machinery rather than
+hand-maintaining a second literal/comment grammar. Apply the resulting plan over
+original coordinates **in descending order**, then feed the rewritten source
+through the ordinary `ValidatedSource` pipeline, so the strict guard rechecks
+the result rather than being bypassed by it.
+
+The split the repair must honour:
+
+- ordinary **string** and **character** spellings are rewritten using their
+  existing visible Unicode escape, decoded value unchanged;
+- a **byte-string** spelling may use only its existing byte escape, and only
+  where the value is representable there;
+- **comments, the token stream, triple-quoted raw strings, and every
+  non-literal occurrence remain hard errors** -- no value-preserving escape
+  exists in those positions, and `§1f` says a raw string cannot carry an
+  in-scope `Cf` at all;
+- any later diagnostic keeps correct original and document coordinates across
+  the rewrite map.
+
 The accepted `0..3` BOM bytes are accounted for in the lossless partition as a
 dedicated `TriviaKind::Bom`, recognized by `append_trivia` only at span `0..3`
 at source start. **Not `Whitespace`** — U+FEFF is deliberately no longer Unicode
@@ -123,18 +170,18 @@ implementation**, and AC-2 is written to catch it.
 
 ## 5. Acceptance
 
-**AC-1 — whole-source coverage, through the real public routes.** A raw U+202E
+**AC-1 — the guard rejects everywhere it must, and the BOM boundary holds.**
+Through the semantic entry paths (`Lexer::lex`, `parse_lossless`), a raw U+202E
 rejects with the same error kind at the offending codepoint's offset in each of:
 a line comment body, a nestable block comment body, the token stream, an
-ordinary string literal body, and a **triple-quoted raw string body**. The raw
-string is load-bearing: it performs no escape processing, so it cannot carry an
-in-scope `Cf` at all, and it is the context a guard bolted onto the
-ordinary-string decoder misses. Separately, through `format_ken_md` itself
-and not a direct canonicalizer call: raw `Cf` in a comment body and in a string
-body, inside both a `ken ignore` and a `ken reject` fence, returns
-`RawFormatCharacter` for the first offender **at its exact document byte span**.
-A deliberately non-parseable ignore/reject fragment carrying visible `\u{202E}`
-escape data still reaches the recovery lexer and remains legal data.
+ordinary string literal body, and a **triple-quoted raw string body**. U+FEFF at
+offset 0 is consumed as a byte-order mark and U+FEFF at any later offset is the
+typed rejection; the BOM case is proved through `parse_lossless` and
+`layout::format_ken` together -- the token stream agrees with the BOM-free
+source, and token plus trivia pieces form an exact `0..source.len()` partition
+that reconstructs the original bytes with one `Bom` item at `0..3` that does not
+attach to a declaration. Two mutations must redden this: making `suffix_from`
+reset its absolute origin, and bypassing root validation for the recovery loop.
 
 **AC-2 — the predicate is the category, not `§1f`'s examples.** A `Cf` codepoint
 that `§1f` never names — U+00AD SOFT HYPHEN, and one of U+0600 or U+061C —
@@ -143,20 +190,28 @@ built from the codepoints `§1f` lists passes AC-1 and **fails here**, which is
 the point of the criterion. Name, in the candidate, where the category data
 comes from and which Unicode version it is pinned to.
 
-**AC-3 — the two boundary pairs, each on one codepoint.** Both halves of each
-pair must be exercised.
+**AC-3 — the escape round-trip, both directions, and the formatter's split.**
+Both halves of the round-trip must be exercised, and the split must be shown to
+be a split rather than a blanket.
 
-- **Escape round-trip.** `"\u{202E}"` accepts and the decoded `String` contains
-  exactly U+202E, unchanged from what a raw occurrence would have produced,
-  while the same literal spelled with a raw U+202E rejects. A guard placed after
-  escape decoding rather than upstream of it fails the accepting half.
-- **BOM, proved through `parse_lossless` and `layout::format_ken`.** U+FEFF at
-  offset 0 is consumed; the token stream agrees with the BOM-free source; token
-  plus trivia pieces still form an exact `0..source.len()` partition that
-  reconstructs the original bytes, with one `Bom` item at `0..3`; and U+FEFF at
-  any later offset is the typed rejection. Two mutations must redden this
-  control: making `suffix_from` reset its absolute origin, and bypassing root
-  validation for the recovery loop.
+- **Decode identity.** `"\u{202E}"` accepts and the decoded `String` contains
+  exactly U+202E, unchanged from what a raw occurrence would have produced. A
+  guard placed after escape decoding rather than upstream of it fails this half.
+- **Formatter inverse.** `layout::format_ken` and `format_ken_md` **succeed** on
+  a raw U+202E inside an ordinary string, rewriting it to visible `\u{202E}`,
+  and reparsing the output proves the decoded value is exactly U+202E. The
+  paired raw character-literal case follows its existing escape repertoire with
+  the same value identity.
+- **The split.** In the same formatter routes, a raw `Cf` in a comment body, in
+  the token stream, and in a triple-quoted raw string remains a typed hard error
+  at its exact source or document span. Under `ken ignore` / `ken reject`
+  recovery the split is identical: literal payloads auto-fix, comment,
+  raw-string and non-literal occurrences reject.
+
+Two mutations must redden AC-3 on opposite sides: **removing the
+formatter-only repair pass** must redden the success half, and **bypassing
+post-rewrite `ValidatedSource`** must redden the hard-error half. A candidate
+where one mutation reddens both has not built a split.
 
 ## 6. Stop condition
 
@@ -168,4 +223,8 @@ Hand back, rather than working around, on any of:
 - A construction path that cannot be closed: some route to a `Lexer` over
   unvalidated text survives that you cannot remove within this scope. Report the
   route; do not compensate with per-context checks.
+- The sealed repair observation being unbuildable without exposing an unchecked
+  `Lexer`, a token stream, an AST, or a second general parsing API. Report the
+  seam; do not ship the exposure and do not hand-maintain a second literal
+  grammar to avoid it.
 - Any fixed input above measuring false at the landed base.
