@@ -933,6 +933,8 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
 ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
     #[cfg(test)]
     reset_recursive_lowering_frame_count();
+    #[cfg(feature = "px8-ds-test-support")]
+    aggregates::begin_checked_ih_generated_entry_observation_epoch();
     let mut planner = Planner::new()?;
     let empty = PersistentNodeId(0);
     let context = PlanContext {

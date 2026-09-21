@@ -1944,6 +1944,16 @@ pub(super) fn checked_ih_generated_entry_context_permutation_is_active() -> bool
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+pub(super) fn begin_checked_ih_generated_entry_observation_epoch() {
+    if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    GENERATED_ENTRY_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    GENERATED_ENTRY_ADMISSION_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().clear());
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 pub fn with_checked_ih_generated_entry_observations<T>(
     f: impl FnOnce() -> T,
 ) -> (T, Vec<CheckedIhGeneratedEntryObservation>) {
