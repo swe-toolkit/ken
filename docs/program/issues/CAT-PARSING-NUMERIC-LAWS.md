@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-NUMERIC-LAWS
 title: "give parse_digits_at, parse_nat_chars, and parse_int_chars the structural success/failure characterization the package header already promises -- that decimal parsing reports the exact character index of the first non-digit -- stating every law over the guard's Boolean value rather than over opaque Int ordering, and confining the claim to control flow, position, and diagnostic identity because the accumulator is opaque"
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
