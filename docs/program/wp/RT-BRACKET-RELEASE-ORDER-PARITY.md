@@ -61,6 +61,24 @@
 > shared-predicate answer was **YES** across all three stops — an incidental
 > planner-classification outcome repeatedly read as a semantic boundary — so
 > **there will be no fourth local carve-out.**
+>
+> **HARD STOP 4 RULED 2026-09-21 — `evt_24nwhvgacvy28`. THE CLOSEOUT IS
+> CORRECT; ARM A CONFUSES BINDING AUTHORITY WITH CALL AUTHORITY.** On WIP
+> `aa1cfc6a1`, `fs_read_at_malformed_window_narrows_to_invalid_bounds` refuses
+> before execution with `a forward-declared response owner has no verified
+> selected incoming call`, while the same fixture passes on `c28bc8305`. Its
+> owner is selected from an exact ordinary checked-IH transport identity whose
+> diagnostic records `disposition=None`; that establishes the planner MAY
+> install the candidate's environment, **not** that this artifact emits its
+> call. At close the unsettled transport candidate becomes `TransportDormant`
+> and the response-owner closeout correctly refuses. **Production reached the
+> same guard `RestoreSelectedKTarget` targets, but by a different cause: no
+> selected call was formed at all.** This does NOT reopen the stop-3 ruling —
+> the px8ta path is live and lawfully replaced. It narrows Arm A's REACH: group
+> membership is necessary for the bounded authority seed and is **not** positive
+> evidence that each selected caller is live. **`D0` in §4 runs BEFORE any
+> implementation, and if no planning-available fact separates the sibling pair,
+> the work STOPS THERE and returns to the Steward.**
 
 ## 1. Objective
 
@@ -311,6 +329,67 @@ authorized. Fix the classification predicate.
 
 ## 4. Deliverables
 
+**D0 — STOP-4 LIVENESS ENUMERATION. RUN THIS BEFORE ANY IMPLEMENTATION, AND IT
+MAY END THE WORK.** Architect `evt_24nwhvgacvy28`. *(This is the ruling's own
+label. It is a NEW deliverable and is distinct from the discharged `D0a`, `D0c`
+and `D0c-2`, none of which it reopens.)*
+
+**Prove the boundary is available where Arm A classifies — do not assume it is.**
+On exact WIP `aa1cfc6a1002c969a5a6d4a33993a2a4f2c69f13`, enumerate **every**
+demand the single-exclusive Arm-A branch would newly admit, and record for the
+SAME exact identity:
+
+- the planning facts available **immediately before**
+  `static_response_phase_b_split`;
+- whether the shared continuation funnel is **structurally selected**; and
+- the eventual candidate disposition and verified response-owner call.
+
+**Report identities, not aggregate counts.** The population is the five §2.3
+composed-return fixtures, both `D2a` controls, px8ta depths 2 and 3, and
+`writeAll`.
+
+**The discriminating sibling pair is MANDATORY, and what it requires depends on
+which branch `D0` lands in.** Architect `evt_394w1nhcss7kh`.
+
+- **Implementation branch.** The admissible planning predicate must predict
+  `rt_read_offset_stage` **LIVE** and `rt_read_window_stage` **DORMANT**, with
+  offset still executing and window restored to main's passing path.
+- **Stop branch.** Report those same identities' **observed eventual
+  dispositions and direct-call evidence**, and state that **no admissible
+  planning-time fact predicts that split**. **Do not relabel those observations
+  as predictions.**
+
+A predicate that cannot separate the two has not been shown to work — but
+*establishing* that it cannot is the stop branch's deliverable, not its
+failure.
+
+**Admissibility.** A candidate predicate is admissible **only if** it is a
+structural planning fact **already authoritative over the emitted route**, and
+it agrees **identity-for-identity** with the final direct-call evidence.
+`ordinary_continuation_call_identities`, checked-IH transport membership, group
+shape, and operation kind are **already disproved as sufficient** — do not
+re-propose them.
+
+**`D0` mutation controls, stated over the ROUTE BOUNDARY** so they do not depend
+on a production predicate the stop branch may have just proved absent.
+Suppressing the read-offset **liveness authorization** must restore the prior
+Arm-A failure; forcing the dormant read-window identity through admission must
+reproduce the exact missing-selected-caller refusal `a forward-declared response
+owner has no verified selected incoming call`. **Both controls require positive
+application counts and byte-exact restoration**, and both are owed in either
+branch.
+
+> ### THE STOP CONDITION IS PART OF THE DELIVERABLE, NOT A FAILURE OF IT
+>
+> **If no planning-available fact distinguishes the sibling pair without
+> predicting an emission-time result, STOP AFTER `D0` AND HAND BACK.** That is
+> the historical phase-ordering obstruction, and it returns to the Steward to
+> size separately as a restructure that either hoists call liveness or delays
+> owner classification. **Do not approximate it with a proxy, and do not add a
+> fourth carve-out.** Reaching that stop is a correct and complete outcome of
+> `D0` — it is the measurement doing its job, and the operator's 2026-09-21
+> direction expressly admits restructuring as where this can land.
+
 **D0a — DISCHARGED.** The Spec enclave AFFIRMED at `evt_17kyxq7q5v8ar`:
 `spec/60-security/62-authority.md:325-326` §4.2 makes settlement normative under
 ADR 0021, whose delayed-body clause puts an inner bracket's settlement inside
@@ -400,6 +479,25 @@ let group_requires_execute_then_resume =
     composed_plane_authority || single_exclusive_group_authority;
 ```
 
+**REQUIRED SEMANTIC BOUNDARY, stop 4 (`evt_24nwhvgacvy28`). The predicate above
+is NECESSARY AND NOT SUFFICIENT.** For every demand **newly admitted by the
+single-exclusive Arm-A branch**, response-owner admission requires **BOTH**:
+
+1. the landed bounded plane/group law above — `ordinary_stage_count == 1`, with
+   the `(true,false)` seed and only P1-free `(true,true)` dependents; **and**
+2. **a positive planning-time proof that this exact `ContinuationCallIdentity`
+   will reach the shared continuation funnel and emit the verified direct call
+   retargeted to its response owner IN THIS ARTIFACT.**
+
+**Absence, uncertainty, `InlineNoCall` and `TransportDormant` all mean
+Deferred.** The proof is **per selected caller** — not per operation, producer
+origin, fixture, count, or whole group. So a live exclusive seed may be
+Specialized while a **dormant dependent stays Deferred**; the Arm-A suppression
+mutation still removes seed authority from every live seed and dependent
+together. Historical `ordinary_stage_count >= 2` behaviour remains
+byte-for-behavior and Arm B is unaffected. **Classification must leave the
+dormant demand Deferred BEFORE any owner is forward-declared.**
+
 **Keep the existing outer conditions unchanged:** the demand must be a
 checked-IH transport source; suppression restores P2; and in a P1-bearing plane
 every non-exclusive group stays Deferred unless the already-existing explicit
@@ -487,6 +585,16 @@ depth-2 controls and their mutations, `writeAll` as negative control, both
 composed depth-3 `[r3,r2,r1]` vectors, and every existing fail-closed closeout
 remain REQUIRED.**
 
+**DO NOT WEAKEN OR MOVE THE DETECTOR (stop 4, `evt_24nwhvgacvy28`).**
+`validate_response_owner_call_coverage`, `core.rs`, `units.rs`, the exact
+lookup and claim, owner-body verification, and claim/discharge equality all
+remain **unchanged**. Specifically prohibited: accepting an uncalled forward
+declaration; treating `TransportDormant` as owner coverage; adding a late
+fallback; keying on origins or on `FsReadAt`; and carving out the read-window
+fixture. **The closeout that produced stop 4 is CORRECT and is not the thing to
+repair** — it refused rather than emitting something wrong, which is the
+behaviour the fail-closed design exists to produce.
+
 ## 4a. Symptom inventory
 
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
@@ -508,12 +616,18 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
    although AC-6 requires that refusal to remain — keyed on preserving a prior
    planner-classification failure itself instead of distinguishing a genuinely
    function-local claim declaration from a bypassed declaration guard.
+4. Arm A forward-declares a response owner for the read-window fixture, but its
+   exact selected caller reaches no lowering settlement and would become
+   `TransportDormant`; owner coverage refuses before execution while the same
+   fixture passes on current main — keyed on treating checked-IH transport and
+   group membership as proof of a causal call although the candidate
+   representation separates binding authority from call obligation.
 
-**Count of record:** hard stops 3; symptom entries 3. Entry 1 was classified at
+**Count of record:** hard stops 4; symptom entries 4. Entry 1 was classified at
 `evt_177exqsxhvg5y`; entry 2 at `evt_76nkdg0h81xnw`; entry 3 at
-`evt_45qpftkx3s894`. **Both stop-3 triggers are DISCHARGED** — Research at
-`evt_5p5jn87bmwpcc`, the entry-3 shared-predicate question at
-`evt_6c900nagc7mn4`. Both next fire at six.
+`evt_45qpftkx3s894`; entry 4 was reported at `evt_59tt59x2mbbxg`. **Both stop-3
+triggers are DISCHARGED** — Research at `evt_5p5jn87bmwpcc`, the entry-3
+shared-predicate question at `evt_6c900nagc7mn4`. Both next fire at six.
 
 ## 5. Acceptance criteria
 
@@ -635,6 +749,44 @@ doc-only**.)*
 > second, so there is no successor owner to name and nothing is handed back to
 > `main` still ignored.
 
+**AC-10. `D0` IS EVIDENCE, AND IT IS REPORTED AS IDENTITIES.** The candidate —
+or the hand-back, if `D0` reaches its stop condition — gives the enumeration §4
+specifies: for every demand the single-exclusive Arm-A branch newly admits, the
+planning facts available immediately before `static_response_phase_b_split`,
+whether the shared funnel is structurally selected, and the eventual disposition
+and verified response-owner call. **Identities, not aggregate counts.**
+
+**The sibling pair is reported explicitly, in the form its branch allows.** In
+the **implementation** branch: offset **predicted** live and still executing,
+window **predicted** dormant and restored to main's passing path. In the
+**stop** branch: the same two identities' **observed** eventual dispositions and
+direct-call evidence, plus the statement that no admissible planning-time fact
+predicts that split. **A stop-branch hand-back must NOT dress observations up as
+predictions, and this criterion does not ask it to** — requiring predictions
+from a branch that exists because no predictor was found is a contradiction, and
+it was one this AC carried until `evt_394w1nhcss7kh`.
+
+Both `D0` mutation controls carry **positive application counts** in either
+branch, the forced-window control reproduces the exact refusal `a
+forward-declared response owner has no verified selected incoming call`, and the
+probe code is stated to have been restored byte-exactly.
+
+**AC-10a. A PREDICATE THAT CANNOT SEPARATE THE SIBLINGS IS NOT REPORTED AS ONE
+THAT CAN.** If the admissible predicate does not exist — no structural planning
+fact already authoritative over the emitted route that agrees
+identity-for-identity with the final direct-call evidence — **say so and stop**.
+Naming the obstruction IS the deliverable in that branch. A proxy that happens
+to separate these two fixtures, or any predicate that works by predicting an
+emission-time result, **fails this criterion even if every test is green.**
+
+**AC-11. NO COMPOSED-RETURN FIXTURE REGRESSES, AND EACH IS NAMED.** All five
+`§2.3` composed-return fixtures pass on the final candidate —
+`fs_read_at_malformed_window_narrows_to_invalid_bounds` **included**, since it
+passes on `c28bc8305` and a repair that reddens it has traded a violation for a
+new one. Report each fixture's result individually. **A green aggregate does not
+satisfy this**, and neither does excluding, ignoring, or carving out the
+read-window fixture.
+
 ## 6. What this WP is NOT
 
 - **It DOES clear the px8ta row — that changed under a ruling, and the earlier
@@ -651,11 +803,36 @@ doc-only**.)*
   premise -- that interp violates on the composed-return nests -- measures
   FALSE at `89d2bfb57`. **State this in the bounded form and no wider: there is
   no MEASURED interp defect. Interp is correct on all FOUR measured composed
-  programs. No interp repair is authorized. TWO of the five existing fixtures
-  remain UNMEASURED and would be a finding if they disagree** (`§2.3` names
-  which). No `D1b` node exists and none is to be filed on the refuted premise.
-  If a measurement in this WP shows interp violating anywhere, return it to the
-  Steward.
+  programs. No interp repair is authorized.** No `D1b` node exists and none is
+  to be filed on the refuted premise. If a measurement in this WP shows interp
+  violating anywhere, return it to the Steward.
+
+  **THE UNMEASURED-RESIDUE CLAUSE FIRED, AND THAT IS WHAT PRODUCED STOP 4.**
+  `§2.3`'s two unmeasured fixtures were run on WIP `aa1cfc6a1` and returned to
+  the Steward exactly as this clause required; ruled at `evt_24nwhvgacvy28`.
+
+  **A PASS IS NOT A RELEASE-ORDER MEASUREMENT, AND READING IT AS ONE COST A
+  CORRECTION** (`evt_1p5c8y14aj3r3`, adopted `evt_3t2enjn08xft1`). At
+  `89d2bfb57` the oracle `assert_narrowed_alike` (`rt_parity_native.rs:632`)
+  compares bracket releases **as a SET with relative ORDER excluded** — that is
+  the b2 exclusion `D2` exists to remove — so a fixture passing through it has
+  had its release order observed **not at all**. State the two results with that
+  distinction attached:
+
+      fs_write_at_malformed_offset_without_write_right_  GENUINE 4th post-repair
+        ordered cross-engine observation. The WIP deletes BOTH order-excluding
+        helpers, so `assert_narrowed_alike` compares `effect_trace` directly and
+        relative ResourceRelease order is inside the equality. Confirmed at
+        `evt_7553qsjww5ve6`. It is not a concrete-vector assertion of its own.
+      fs_read_at_malformed_window_narrows_to_invalid_bounds  NO release-order
+        observation on EITHER tree. WIP refuses before execution; the named
+        baseline passed only through the order-excluding oracle.
+
+  ⇒ **The fixture that broke is precisely the one no release-order reading has
+  ever covered.** **`§2.3`'s table is a PRE-REPAIR baseline at `89d2bfb57`,
+  stays 3 MEASURED / 2 UNMEASURED, and is unchanged by either run** — a result
+  measured on a repaired tree is not a reading of the tree that table describes.
+  Post-repair observations live in `§4`'s `D0` record and `§5`, never in `§2.3`.
 - **This is not a claim that the engines agree.** At measured depth 2 they
   plainly do not: native `[r1,r2]`, interp `[r2,r1]`. The engine contrast is
   real and is the defect. What is absent is a native-right-versus-native-wrong

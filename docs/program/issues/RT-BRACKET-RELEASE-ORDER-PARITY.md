@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-RELEASE-ORDER-PARITY
-title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: a BOUNDED AUTHORITY-SEED predicate in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong. ARM A CORRECTED at evt_76nkdg0h81xnw (hard stop 2 / symptom entry 2) after the ring measured that per-group exclusive eligibility does NOT fix its own control: the governed ResourceRelease responses sit in the MIXED group that the original text fenced at >= 2, and the causal probe worked by promoting exactly that P1-free mixed group, so one exclusive group now seeds authority for its P1-free mixed dependent on a single-exclusive plane only. HARD STOP 3 RULED at evt_6c900nagc7mn4 adopting Research advisory evt_5p5jn87bmwpcc: the complete two-arm repair makes the px8ta row pass strict LIFO at BOTH depths and removes its depth-3 ContinuationSpecialization refusal, and that is LAWFUL ELIMINATION of the route that formed the failing claim -- not a newly satisfied lookup and not a weakened guard, since Arm A cannot add the absent identity key to function_local.continuation_calls. RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED is therefore SUBSUMED and closes atomically with this product, THIS NODE NOW CLEARS LEDGER ROW 9, neither arm may be narrowed to preserve the refusal, and core.rs/units.rs stay outside production scope."
+title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: a BOUNDED AUTHORITY-SEED predicate in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong. ARM A CORRECTED at evt_76nkdg0h81xnw (hard stop 2 / symptom entry 2) after the ring measured that per-group exclusive eligibility does NOT fix its own control: the governed ResourceRelease responses sit in the MIXED group that the original text fenced at >= 2, and the causal probe worked by promoting exactly that P1-free mixed group, so one exclusive group now seeds authority for its P1-free mixed dependent on a single-exclusive plane only. HARD STOP 3 RULED at evt_6c900nagc7mn4 adopting Research advisory evt_5p5jn87bmwpcc: the complete two-arm repair makes the px8ta row pass strict LIFO at BOTH depths and removes its depth-3 ContinuationSpecialization refusal, and that is LAWFUL ELIMINATION of the route that formed the failing claim -- not a newly satisfied lookup and not a weakened guard, since Arm A cannot add the absent identity key to function_local.continuation_calls. RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED is therefore SUBSUMED and closes atomically with this product, THIS NODE NOW CLEARS LEDGER ROW 9, neither arm may be narrowed to preserve the refusal, and core.rs/units.rs stay outside production scope. HARD STOP 4 RULED at evt_24nwhvgacvy28: running the two fixtures section 2.3 named UNMEASURED found a real Arm-A regression -- fs_read_at_malformed_window_narrows_to_invalid_bounds refuses before execution with 'a forward-declared response owner has no verified selected incoming call' on WIP aa1cfc6a1 while passing on c28bc8305. The closeout is CORRECT and Arm A confuses BINDING authority with CALL authority: checked-IH transport membership and group shape establish that the planner MAY install the candidate environment, not that this artifact emits its call, and the unsettled candidate becomes TransportDormant. Arm A's reach is narrowed by a required per-selected-caller liveness proof, and D0 must prove that boundary is available at classification time BEFORE any implementation -- if no planning-available fact separates rt_read_offset_stage from rt_read_window_stage without predicting an emission-time result, the work STOPS and returns to the Steward as a separately sized restructure. Stop-3 is NOT reopened."
 status: ready
 owner: runtime
 size: M
@@ -71,6 +71,28 @@ origin: "Steward, 2026-09-03; RECUT 2026-09-18 twice. Original filing: scope-cal
 > # three stops -- an incidental planner-classification outcome repeatedly read
 > # as a semantic boundary -- so **there will be no fourth local carve-out**.
 > # Both stop-3 triggers are DISCHARGED and next fire at six.
+> #
+> # **HARD STOP 4 RULED 2026-09-21 -- `evt_24nwhvgacvy28`. THE CLOSEOUT IS
+> # CORRECT; ARM A CONFUSES BINDING AUTHORITY WITH CALL AUTHORITY.** Running
+> # the two fixtures this node named UNMEASURED found a real Arm-A regression:
+> # `fs_read_at_malformed_window_narrows_to_invalid_bounds` refuses before
+> # execution on WIP `aa1cfc6a1` with `a forward-declared response owner has no
+> # verified selected incoming call`, while passing on `c28bc8305`. Its owner is
+> # selected from an exact ordinary checked-IH transport identity recording
+> # `disposition=None`; that says the planner MAY install the candidate's
+> # environment, NOT that this artifact emits its call, and the unsettled
+> # candidate becomes `TransportDormant`. **Production reached the same guard
+> # `RestoreSelectedKTarget` targets, by a DIFFERENT cause: no selected call was
+> # formed at all.** Arm A now requires a positive per-selected-caller
+> # planning-time liveness proof in addition to the bounded plane/group law;
+> # absence, uncertainty, `InlineNoCall` and `TransportDormant` all mean
+> # Deferred. **`D0` runs BEFORE implementation and may END the work:** if no
+> # planning-available fact separates `rt_read_offset_stage` from
+> # `rt_read_window_stage` without predicting an emission-time result, that is
+> # the phase-ordering obstruction and it returns to the Steward as a separately
+> # sized restructure. **Stop 3 is NOT reopened** -- the px8ta path is live and
+> # lawfully replaced. Do not weaken or move the detector, and do not add a
+> # fourth carve-out. Counts stand at 4/4; both triggers still next fire at six.
 
 ## There is ONE shape. The surface cannot express the other one.
 
@@ -301,6 +323,50 @@ cheap fixture.
 
 ## Deliverables
 
+D0.  **STOP-4 LIVENESS ENUMERATION -- RUN BEFORE ANY IMPLEMENTATION; IT MAY END
+     THE WORK.** (`evt_24nwhvgacvy28`. The ruling's own label; NEW, and distinct
+     from the discharged `D0a`/`D0c`/`D0c-2`, none of which it reopens.) On
+     exact WIP `aa1cfc6a1002c969a5a6d4a33993a2a4f2c69f13`, enumerate EVERY
+     demand the single-exclusive Arm-A branch would newly admit and record, for
+     the same exact identity: the planning facts available immediately before
+     `static_response_phase_b_split`; whether the shared continuation funnel is
+     structurally selected; and the eventual candidate disposition and verified
+     response-owner call. **Report identities, not aggregate counts.**
+     Population: **all five fixtures enumerated in §2.3** (corrected wording,
+     `evt_3t2enjn08xft1`), both `D2a` controls, px8ta depths 2 and 3, and
+     `writeAll`.
+
+     **The discriminating sibling pair is MANDATORY, and what it requires
+     depends on the branch** (`evt_394w1nhcss7kh`). IMPLEMENTATION branch: the
+     admissible planning predicate must predict `rt_read_offset_stage` LIVE and
+     `rt_read_window_stage` DORMANT, with offset still executing and window
+     restored to main's passing path. STOP branch: report those same
+     identities' OBSERVED eventual dispositions and direct-call evidence, and
+     state that no admissible planning-time fact predicts that split. **Do not
+     relabel those observations as predictions.**
+
+     **Admissible only if** the predicate is a structural planning fact ALREADY
+     authoritative over the emitted route and agrees identity-for-identity with
+     the final direct-call evidence. `ordinary_continuation_call_identities`,
+     checked-IH transport membership, group shape and operation kind are
+     ALREADY DISPROVED as sufficient -- do not re-propose them.
+
+     **Mutation controls, stated over the ROUTE BOUNDARY** so they do not
+     depend on a production predicate the stop branch may have proved absent:
+     suppressing the read-offset LIVENESS AUTHORIZATION must restore the prior
+     Arm-A failure; forcing the dormant read-window identity through admission
+     must reproduce the exact missing-selected-caller refusal `a
+     forward-declared response owner has no verified selected incoming call`.
+     Both require positive application counts and byte-exact restoration, and
+     both are owed in EITHER branch.
+
+     **STOP CONDITION, which is part of the deliverable rather than a failure of
+     it:** if no planning-available fact distinguishes the pair without
+     predicting an emission-time result, STOP AFTER `D0` and hand back naming
+     the obstruction. It returns to the Steward to size as a restructure that
+     hoists call liveness or delays owner classification. **Do not approximate
+     it with a proxy and do not add a fourth carve-out.**
+
 D0a. **DISCHARGED.** Spec enclave AFFIRMED at `evt_17kyxq7q5v8ar`:
      `62-authority.md` §4.2 makes settlement normative under ADR 0021, whose
      delayed-body clause puts an inner bracket's settlement inside completion
@@ -424,12 +490,26 @@ D2b. **THREE depth-3 causal controls on the UNCHANGED px8ta program** -- no new
      claim-ledger closeout are byte-unchanged.
 
 D2.  Re-enable release-order parity on the five composed-return fixtures
-     (remove the b2 exclusion marker) once both engines agree. **THREE of the
-     five are measured; TWO remain UNMEASURED** -- see the accounting above for
-     which. Measured does NOT mean agreeing: at depth 2 the engines disagree,
-     and that disagreement is what `D1a` repairs. Re-enable only once they
-     agree, and treat a disagreement from either unmeasured fixture as a
-     finding to return to the Steward.
+     (remove the b2 exclusion marker) once both engines agree. The §2.3
+     accounting is a PRE-REPAIR baseline at `89d2bfb57` -- **THREE MEASURED,
+     TWO UNMEASURED there, and a post-repair run does not change it.** Measured
+     does NOT mean agreeing: at depth 2 the engines disagree, and that
+     disagreement is what `D1a` repairs.
+
+     **THIS CLAUSE HAS FIRED.** Both unmeasured fixtures were run on WIP
+     `aa1cfc6a1` and the disagreement returned to the Steward, producing stop 4.
+     **A PASS THROUGH THE BASE ORACLE IS NOT A RELEASE-ORDER MEASUREMENT** --
+     `assert_narrowed_alike` (`rt_parity_native.rs:632`) compares releases as a
+     SET with relative ORDER excluded, which is exactly the b2 exclusion this
+     deliverable removes. So:
+     `fs_write_at_malformed_offset_without_write_right_` is a GENUINE fourth
+     post-repair ordered cross-engine observation, because the WIP deletes both
+     order-excluding helpers and compares `effect_trace` directly
+     (`evt_7553qsjww5ve6`); `fs_read_at_malformed_window_narrows_to_invalid_bounds`
+     has **NO release-order observation on either tree**, since WIP refuses
+     before execution and the baseline passed only through the excluding oracle.
+     **The fixture that broke is the one no release-order reading has ever
+     covered.**
 
 ## Acceptance
 
