@@ -316,7 +316,13 @@ fn assert_private(surface: &str) {
 fn parsing_numeric_loader_visible_inventory_is_exact() {
     let expected = names(&[
         "char_to_digit",
+        "negate_parsed",
         "numeric_argument_origin",
+        "numeric_decimal_base",
+        "numeric_empty_input_code",
+        "numeric_invalid_digit_code",
+        "numeric_minus_code",
+        "numeric_zero_accumulator",
         "parse_digits_at",
         "parse_digits_at::accepted_digit",
         "parse_digits_at::empty",

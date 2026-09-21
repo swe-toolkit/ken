@@ -43,12 +43,18 @@ import Capability.Diagnostics.Core
 
 import Core.Logic.Transport (cong, trans)
 
+pub const numeric_empty_input_code : DiagnosticCode =
+  MkDiagnosticCode "text.numeric.empty-input"
+
+pub const numeric_invalid_digit_code : DiagnosticCode =
+  MkDiagnosticCode "text.numeric.invalid-digit"
+
 data NumericErrorKind = EmptyInput | InvalidDigit
 
 fn numeric_error_code (kind : NumericErrorKind) : DiagnosticCode =
   match kind {
-    EmptyInput ↦ MkDiagnosticCode "text.numeric.empty-input";
-    InvalidDigit ↦ MkDiagnosticCode "text.numeric.invalid-digit"
+    EmptyInput ↦ numeric_empty_input_code;
+    InvalidDigit ↦ numeric_invalid_digit_code
   }
 
 fn numeric_diagnostic
@@ -120,7 +126,7 @@ pub fn parse_nat_chars (locate : Nat → Origin) (chars : List Char) : Result Di
     Cons c rest ↦ parse_digits_at locate (Cons Char c rest) Zero (0 : Int)
   }
 
-fn negate_parsed (x : Result Diagnostic Int) : Result Diagnostic Int =
+pub fn negate_parsed (x : Result Diagnostic Int) : Result Diagnostic Int =
   match x {
     Err problem ↦ Err Diagnostic Int problem;
     Ok value ↦ Ok Diagnostic Int (sub_int (0 : Int) value)
@@ -156,11 +162,11 @@ empty input, a bare sign, signed digits, and unsigned digits. Primitive guards
 enter these laws only through their observed Boolean or `Option` values.
 
 ```ken
-const numeric_zero_accumulator : Int = 0
+pub const numeric_zero_accumulator : Int = 0
 
-const numeric_decimal_base : Int = 10
+pub const numeric_decimal_base : Int = 10
 
-const numeric_minus_code : Int = 45
+pub const numeric_minus_code : Int = 45
 
 pub proof empty for parse_digits_at
       (locate : Nat → Origin) (position : Nat) (accumulator : Int)
@@ -180,14 +186,14 @@ pub proof invalid_digit for parse_digits_at
     : Equal
         (Result Diagnostic Int)
         (parse_digits_at locate (Cons Char c rest) position accumulator)
-        (Err Diagnostic Int (numeric_diagnostic locate InvalidDigit position)) =
+        (Err Diagnostic Int (MkDiagnostic (locate position) numeric_invalid_digit_code)) =
   J
     (λchoice _.
       Equal
         (Result Diagnostic Int)
         (parse_digits_at locate (Cons Char c rest) position accumulator)
         (match choice {
-          None ↦ Err Diagnostic Int (numeric_diagnostic locate InvalidDigit position);
+          None ↦ Err Diagnostic Int (MkDiagnostic (locate position) numeric_invalid_digit_code);
           Some digit ↦
             parse_digits_at
               locate
@@ -236,7 +242,7 @@ pub proof empty for parse_nat_chars
     : Equal
         (Result Diagnostic Int)
         (parse_nat_chars locate (Nil Char))
-        (Err Diagnostic Int (numeric_diagnostic locate EmptyInput Zero)) =
+        (Err Diagnostic Int (MkDiagnostic (locate Zero) numeric_empty_input_code)) =
   Refl
 
 pub proof nonempty for parse_nat_chars
@@ -252,7 +258,7 @@ pub proof empty for parse_int_chars
     : Equal
         (Result Diagnostic Int)
         (parse_int_chars locate (Nil Char))
-        (Err Diagnostic Int (numeric_diagnostic locate EmptyInput Zero)) =
+        (Err Diagnostic Int (MkDiagnostic (locate Zero) numeric_empty_input_code)) =
   Refl
 
 pub proof bare_sign for parse_int_chars
@@ -262,14 +268,14 @@ pub proof bare_sign for parse_int_chars
     : Equal
         (Result Diagnostic Int)
         (parse_int_chars locate (Cons Char sign (Nil Char)))
-        (Err Diagnostic Int (numeric_diagnostic locate EmptyInput (Suc Zero))) =
+        (Err Diagnostic Int (MkDiagnostic (locate (Suc Zero)) numeric_empty_input_code)) =
   J
     (λchoice _.
       Equal
         (Result Diagnostic Int)
         (parse_int_chars locate (Cons Char sign (Nil Char)))
         (match choice {
-          True ↦ Err Diagnostic Int (numeric_diagnostic locate EmptyInput (Suc Zero));
+          True ↦ Err Diagnostic Int (MkDiagnostic (locate (Suc Zero)) numeric_empty_input_code);
           False ↦
             parse_digits_at locate (Cons Char sign (Nil Char)) Zero numeric_zero_accumulator
         }))
@@ -637,11 +643,14 @@ const parsed_negative_result : Result Diagnostic Int = parse_int example_numeric
 
 ## 6. Trust and derivation
 
-**Public API:** `numeric_argument_origin`, `char_to_digit`, `parse_digits_at`,
-its attached `empty`, `invalid_digit`, and `accepted_digit` laws,
-`parse_nat_chars`, its attached `empty` and `nonempty` laws, `parse_int_chars`,
-its attached `empty`, `bare_sign`, `signed`, and `unsigned` laws, `parse_nat`,
-`parse_int`, and `parse_formatted_digits`.
+**Public API:** the fourteen direct names are `char_to_digit`, `negate_parsed`,
+`numeric_argument_origin`, `numeric_decimal_base`, `numeric_empty_input_code`,
+`numeric_invalid_digit_code`, `numeric_minus_code`,
+`numeric_zero_accumulator`, `parse_digits_at`, `parse_formatted_digits`,
+`parse_int`, `parse_int_chars`, `parse_nat`, and `parse_nat_chars`. The nine
+attached laws are `parse_digits_at::{accepted_digit, empty, invalid_digit}`,
+`parse_int_chars::{bare_sign, empty, signed, unsigned}`, and
+`parse_nat_chars::{empty, nonempty}`.
 
 **Derivation.** Parsing uses structural recursion on `List Char`, positions use
 structural `Nat`, and values use the landed `charToInt`, `leq_int`, `eq_int`,
