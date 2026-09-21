@@ -139,8 +139,10 @@ objective.
 ## §4h. Estimate capability, not volume
 
 Estimate T1 versus T2 from the reasoning required, using `MODELS.md`. Record the
-tier in the frame and surface a seat mismatch to the operator in one short
-question. Do not turn tier checking into a separate investigation.
+tier in the frame. Where the seated tier does not match, observe the current
+seat and correct it through `steward/add-agent.md` — the seat change is yours,
+not a question for the operator. Route only a genuine unresolved capability or
+soundness fork. Do not turn tier checking into a separate investigation.
 
 ## §5. Procedures are point-of-use
 
@@ -202,7 +204,7 @@ handoff. See `steward/compaction.md`.
 | Compact at a work boundary | `steward/compaction.md` |
 | Handle hard stops or a WIP audit | `steward/escalation.md` |
 | Run the liveness backstop | `steward/watchdog.md` |
-| Request an operator-managed seat change | `steward/add-agent.md` |
+| Start, stop, reseat or re-tier a seat | `steward/add-agent.md` |
 | Reclaim abandoned worktrees | `steward/worktree-hygiene.md` |
 
 The briefing flush is not standing work. Run it only when the operator asks for
