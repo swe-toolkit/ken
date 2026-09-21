@@ -1,7 +1,7 @@
 ---
 id: CAT-NONEMPTY-APPEND-HEAD-LEFT
 title: "`nonempty_append` publishes no law about its head, so a client holding only the three authorized selectors cannot establish `nonempty_head (nonempty_append xs ys) = nonempty_head xs`. Measured: the equality is not definitional under an abstract carrier, and the carrier constructor is outside a selector-list import even though `NonEmpty` is `pub data`. Add one `pub proof head_left for nonempty_append` in the package that owns the type. Its subject is already `pub fn`, and an attached `pub proof` is measured to travel with the function selector, so no client import or selector list changes."
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none

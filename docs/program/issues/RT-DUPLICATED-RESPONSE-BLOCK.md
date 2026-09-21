@@ -1,7 +1,7 @@
 ---
 id: RT-DUPLICATED-RESPONSE-BLOCK
 title: "Four ignored rows stop at `two host response cases claim one operation constructor` because the plan carries the same host-response block twice, not because two cases compete: across three programs the colliding constructors ALL agree on their operation and their effect-origin deltas are a single constant. Locate where the duplication enters and decide whether the planner emits it or the collision check is measuring a legitimate shape."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
