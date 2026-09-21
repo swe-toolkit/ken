@@ -1,6 +1,6 @@
 //! CC6b `Capability.Filesystem.Path.Posix` acceptance.
 
-#[path = "support/catalog_or.rs"]
+#[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
 
 use std::collections::BTreeSet;
@@ -55,7 +55,7 @@ fn literal_value(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
         NumericLitVal::Decimal { coeff, exp } => {
             ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
         }
-        NumericLitVal::Str(s) => EvalVal::Str(s.clone()),
+        NumericLitVal::Str(s) => EvalVal::Str(s.as_str().into()),
         NumericLitVal::Bytes(b) => EvalVal::Bytes(b.clone()),
     }
 }

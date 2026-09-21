@@ -15,8 +15,8 @@ const STRING_KEYS: &str = "Data.Text.StringKeys";
 const EMPTY_DEC: &str = "Core.Logic.EmptyDec";
 const SUMS: &str = "Data.Sums.Combinators";
 const LAWFUL_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
-const SUMS_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Sums/Combinators.ken.md");
+    include_str!("../../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
+const SUMS_KEN_MD: &str = include_str!("../../../../catalog/packages/Data/Sums/Combinators.ken.md");
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

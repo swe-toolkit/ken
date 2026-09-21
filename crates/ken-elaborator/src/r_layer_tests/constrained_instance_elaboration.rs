@@ -1,7 +1,7 @@
 //! Constrained instance dictionaries bind in instance fields and are applied
 //! recursively when a concrete use-site resolves the instance.
 
-use ken_elaborator::{error::ElabError, RType, ElabEnv};
+use ken_elaborator::{error::ElabError, resolve::RType, ElabEnv};
 use ken_kernel::{Decl, Term};
 
 fn elab(env: &mut ElabEnv, source: &str) -> Result<ken_kernel::GlobalId, ElabError> {

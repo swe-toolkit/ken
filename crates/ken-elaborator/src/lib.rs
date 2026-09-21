@@ -55,6 +55,11 @@ pub mod trace;
 #[cfg(feature = "z3-process")]
 mod z3_process;
 
+#[cfg(test)]
+extern crate self as ken_elaborator;
+#[cfg(test)]
+mod r_layer_tests;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -66,15 +71,13 @@ pub use ast::{
     LetBinding, RecursiveResultSelector, SpaceCell, SpaceOperation, Type,
 };
 pub use bytes::BytesEnv;
-pub use classes::{
-    ClassEnv, ClassInfo, ClassKind, ClassView, InstanceInfo, InstanceResolution, ProjectionView,
-};
+pub use classes::{ClassEnv, ClassInfo, ClassKind, ClassView, InstanceResolution, ProjectionView};
 pub use diagnostics::{
     project_all, project_diagnostic, tv_and, tv_not, tv_or, tv_strict, Diagnostic, DiagnosticTag,
     FailureWitness, FormRef, HoleId, KripkeCountermodel, Region, SuggestedAction, ThirdValue,
     TypedHole, WorldId,
 };
-pub use elab::{elaborate_rdecl, elaborate_rexpr, ElabResult, Obligation, ObligationKind};
+pub use elab::{ElabResult, Obligation, ObligationKind};
 pub use error::{ArmDeadCause, ElabError, MissingPatternWitness, Span};
 pub use export::{
     canonical_host_perform_signature_v1, canonical_l5_perform_signature_v1,
@@ -111,7 +114,6 @@ pub use prover::{
 };
 #[cfg(feature = "z3-process")]
 pub use prover::{attempt_d_with_z3_process, Z3ProcessConfig};
-pub use resolve::{RDecl, RDeclKind, RExpr, RType};
 pub use strings::NfcString;
 pub use temporal::{
     closed, elaborate_temporal_expr, temporal_hoas_inductive_spec, temporal_inductive_spec, Pred,
@@ -533,7 +535,7 @@ impl ElabEnv {
     ) -> Result<(Term, Term), ElabError> {
         let expr = parser::parse_expr(src)?;
         let rexpr = resolve::resolve_expr_standalone(&expr)?;
-        elaborate_rexpr(
+        elab::elaborate_rexpr(
             &mut self.env,
             &self.globals,
             &mut self.num_values,

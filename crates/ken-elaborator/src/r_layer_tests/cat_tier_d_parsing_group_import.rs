@@ -1,8 +1,8 @@
 //! Tier-D Parsing-group publication, provider, and sibling-edge controls.
 
-#[path = "support/catalog_or.rs"]
+#[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
-#[path = "support/catalog_publication.rs"]
+#[path = "../../tests/support/catalog_publication.rs"]
 mod catalog_publication;
 
 use std::collections::BTreeSet;
@@ -18,11 +18,11 @@ const PARSING: &str = "Capability.Parsing.Parsing";
 const ARGUMENTS: &str = "Capability.Process.Arguments";
 const TRANSPORT: &str = "Core.Logic.Transport";
 const NUMERIC_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const PARSING_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
 const ARGUMENTS_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Process/Arguments.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()

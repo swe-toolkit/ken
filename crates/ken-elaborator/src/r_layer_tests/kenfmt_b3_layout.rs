@@ -264,7 +264,7 @@ fn ac6_representable_declaration_blocks_break_in_both_orientations() {
 
 #[test]
 fn ac6_reachable_fmt9_fences_remain_parse_preserved_after_horizontal_supersession() {
-    let oracle = include_str!("../../../conformance/surface/formatting/seed-canonical-format.md");
+    let oracle = include_str!("../../../../conformance/surface/formatting/seed-canonical-format.md");
     let fmt9 = oracle
         .split_once("## FMT9 —")
         .expect("FMT9 oracle section must exist")

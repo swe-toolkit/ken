@@ -16,7 +16,7 @@ const LAWFUL_FUNCTORS: &str = "Core.Classes.LawfulFunctors";
 const DERIVED: &str = "Data.Collections.Derived";
 const TRANSPORT: &str = "Core.Logic.Transport";
 const EFFECTFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
+    include_str!("../../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

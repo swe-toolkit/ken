@@ -1,8 +1,8 @@
 //! Tier-D DC + Doc -> Cursor publication and strict-import controls.
 
-#[path = "support/catalog_or.rs"]
+#[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
-#[path = "support/catalog_publication.rs"]
+#[path = "../../tests/support/catalog_publication.rs"]
 mod catalog_publication;
 
 use std::collections::BTreeSet;
@@ -12,13 +12,13 @@ use ken_kernel::{Decl as KernelDecl, GlobalId, Term};
 
 const DIAGNOSTICS_CORE: &str = "Capability.Diagnostics.Core";
 const DIAGNOSTICS_CORE_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const FORMATTING_DOC: &str = "Capability.Formatting.Doc";
 const FORMATTING_DOC_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Formatting/Doc.ken.md");
 const PARSING_CURSOR: &str = "Capability.Parsing.Cursor";
 const PARSING_CURSOR_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()

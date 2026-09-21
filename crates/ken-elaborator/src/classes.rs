@@ -144,7 +144,7 @@ struct NamedFieldInfo {
 
 /// Per-instance metadata.
 #[derive(Clone)]
-pub struct InstanceInfo {
+pub(crate) struct InstanceInfo {
     /// Kernel `GlobalId` of the instance's Σ-record value.
     pub instance_id: GlobalId,
     /// Class this instance inhabits. Used only by surface projection purity.
@@ -180,7 +180,7 @@ pub struct InstanceResolution {
 
 /// A prerequisite dictionary required by a polymorphic instance.
 #[derive(Clone)]
-pub struct InstanceConstraintInfo {
+pub(crate) struct InstanceConstraintInfo {
     pub class_name: String,
     /// Surface-resolved shape, used to select the recursively required head.
     pub head_type: RType,
@@ -199,7 +199,7 @@ pub struct ClassEnv {
     /// are accepted by Ω-PI, so no duplicate-key registration occurs — each
     /// instance is still a distinct value; the property check just waives the
     /// overlap error at the *second* registration).
-    pub instances: HashMap<(String, String), InstanceInfo>,
+    pub(crate) instances: HashMap<(String, String), InstanceInfo>,
     /// `RecordNil : Omega 0` — the Σ-chain prop terminator.
     pub record_nil_id: GlobalId,
     /// `record_nil_val : RecordNil` — the unique inhabitant.

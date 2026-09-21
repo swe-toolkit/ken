@@ -27,7 +27,7 @@ use crate::resolve::{RCtorDecl, RExplicitCtorDecl, RTelescopeEntry, RType};
 ///
 /// Registers D (the type former) and every constructor Cₖ in `globals`.
 /// Returns the `GlobalId` of the type former.
-pub fn elab_data_decl(
+pub(crate) fn elab_data_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     ctor_decl_spans: &mut HashMap<String, Span>,
@@ -197,7 +197,7 @@ fn empty_inductive_spec() -> InductiveSpec {
 /// Elaborate `data D (Δp) : (Δi) -> Type where { C : (Δk) -> D Δp t̄ }`
 /// (`34 §2`, `39 §2.2`) through the same kernel inductive-family admission path
 /// used by legacy simple data.
-pub fn elab_explicit_data_decl(
+pub(crate) fn elab_explicit_data_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     ctor_decl_spans: &mut HashMap<String, Span>,

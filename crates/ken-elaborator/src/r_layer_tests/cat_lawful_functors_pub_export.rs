@@ -15,7 +15,7 @@ use ken_kernel::{convert, convert_type, Context, Decl as KernelDecl, GlobalId, T
 const LAWFUL_CLASSES: &str = "Core.Classes.LawfulClasses";
 const LAWFUL_FUNCTORS: &str = "Core.Classes.LawfulFunctors";
 const LAWFUL_FUNCTORS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
+    include_str!("../../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

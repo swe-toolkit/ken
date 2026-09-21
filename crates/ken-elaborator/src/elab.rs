@@ -9519,7 +9519,7 @@ fn close_goal(ctx: &Context, goal: Term) -> Term {
 // ----- declaration elaboration -----
 
 /// V0-compatible elaboration (no spec clauses).
-pub fn elaborate_rdecl(
+pub(crate) fn elaborate_rdecl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
@@ -10263,7 +10263,7 @@ fn check_view_visits_row(rdecl: &RDecl) -> Result<Option<crate::effects::RowType
     Ok(Some(declared))
 }
 
-pub fn surface_declared_row_type(
+pub(crate) fn surface_declared_row_type(
     rdecl: &RDecl,
 ) -> Result<Option<crate::effects::RowType>, ElabError> {
     let visits = match &rdecl.kind {
@@ -10763,7 +10763,7 @@ fn infer_expr_row_type(
 
 /// SURF-1 D2 purity-keyword check (`36 §1.6`) over the current production
 /// declaration path. Legacy `view` stays unchecked until the D3/D4 migration.
-pub fn check_surface_purity(
+pub(crate) fn check_surface_purity(
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     globals: &HashMap<String, GlobalId>,
@@ -18222,7 +18222,7 @@ fn lower_by_inner(term: &Term, k: usize, cutoff: usize) -> Option<Term> {
 
 // ----- standalone expression elaboration -----
 
-pub fn elaborate_rexpr(
+pub(crate) fn elaborate_rexpr(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,

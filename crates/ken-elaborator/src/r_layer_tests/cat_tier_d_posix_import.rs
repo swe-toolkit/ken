@@ -1,8 +1,8 @@
 //! Tier-D Filesystem.Path.Posix publication and strict-import controls.
 
-#[path = "support/catalog_or.rs"]
+#[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
-#[path = "support/catalog_publication.rs"]
+#[path = "../../tests/support/catalog_publication.rs"]
 mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -15,7 +15,7 @@ const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const DERIVED: &str = "Data.Collections.Derived";
 const POSIX: &str = "Capability.Filesystem.Path.Posix";
 const POSIX_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Filesystem/Path/Posix.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Filesystem/Path/Posix.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()

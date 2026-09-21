@@ -16,7 +16,7 @@ use ken_kernel::GlobalId;
 const BYTES_KEYS: &str = "Data.Binary.BytesKeys";
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const BYTES_KEYS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
+    include_str!("../../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
