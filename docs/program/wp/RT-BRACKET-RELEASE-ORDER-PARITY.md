@@ -508,12 +508,18 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
    although AC-6 requires that refusal to remain — keyed on preserving a prior
    planner-classification failure itself instead of distinguishing a genuinely
    function-local claim declaration from a bypassed declaration guard.
+4. Arm A forward-declares a response owner for the read-window fixture, but its
+   exact selected caller reaches no lowering settlement and would become
+   `TransportDormant`; owner coverage refuses before execution while the same
+   fixture passes on current main — keyed on treating checked-IH transport and
+   group membership as proof of a causal call although the candidate
+   representation separates binding authority from call obligation.
 
-**Count of record:** hard stops 3; symptom entries 3. Entry 1 was classified at
+**Count of record:** hard stops 4; symptom entries 4. Entry 1 was classified at
 `evt_177exqsxhvg5y`; entry 2 at `evt_76nkdg0h81xnw`; entry 3 at
-`evt_45qpftkx3s894`. **Both stop-3 triggers are DISCHARGED** — Research at
-`evt_5p5jn87bmwpcc`, the entry-3 shared-predicate question at
-`evt_6c900nagc7mn4`. Both next fire at six.
+`evt_45qpftkx3s894`; entry 4 was reported at `evt_59tt59x2mbbxg`. **Both stop-3
+triggers are DISCHARGED** — Research at `evt_5p5jn87bmwpcc`, the entry-3
+shared-predicate question at `evt_6c900nagc7mn4`. Both next fire at six.
 
 ## 5. Acceptance criteria
 
