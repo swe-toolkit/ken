@@ -1,7 +1,7 @@
 ---
 id: CAT-CONFIGURATION-DECODER-LAWS
 title: "prove that a Valid decode never reaches env_config_values' empty-Bytes placeholder -- the decoder runs the schema traversal and the value traversal INDEPENDENTLY over the same fields and entries, discards the validation's own values, and recomputes them, so nothing today connects Valid to lookup success; if that agreement fails, a missing required field decodes to empty Bytes instead of an error. Instantiates the landed schema_validate_fields::valid_coverage at the two decoder entry points and carries raw-Bytes identity and per-entry-point provenance with it."
-status: draft
+status: ready
 owner: foundation
 size: M
 gate: none
