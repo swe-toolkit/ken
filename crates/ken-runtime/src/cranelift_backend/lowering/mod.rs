@@ -269,7 +269,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
-    ContinuationSpecializationId,
+    ContinuationSpecializationId, DeferredResponseRow,
     ContinuationUnitView, DirectOuterProjection, CheckedIhPostCallConsumer,
     CheckedIhPostCallConsumerStep, EmittableCallKind,
     FieldIdentity, JoinPlanToken,
@@ -293,6 +293,11 @@ pub(in crate::cranelift_backend) use super::planning::{
 pub(in crate::cranelift_backend) use super::surface::{
     backend, backend_module, unsupported, BackendFailure, CraneliftBackendError,
     NativeSeedEnvironment,
+};
+use super::grafted_spine_control_graph::{
+    GraftedSpineControlGraph, GraftedSpineControlGraphBuilder,
+    GraftedSpineFunctionScope, PendingGraftedSpineCall,
+    PendingGraftedSpineTerminal,
 };
 
 // `#[cfg(test)]`-only: an unconditional `use` of this breaks the non-test
@@ -922,6 +927,10 @@ impl ArtifactHelpers<'_> {
         trap_exit: Option<TrapExitAuthority>,
     ) -> FunctionLocalRefs {
         FunctionLocalRefs {
+            grafted_spine_scope: None,
+            grafted_spine_calls: Vec::new(),
+            grafted_spine_terminals: Vec::new(),
+            grafted_spine_call_source: None,
             seed_material: self.seed_material.declare_in_func(module, func),
             host_dispatch: self
                 .host_dispatch
@@ -1088,6 +1097,17 @@ struct GeneratedContextCaptures {
 }
 
 struct FunctionLocalRefs {
+    /// Typed identity of the generated body currently being lowered. Root
+    /// adapters are deliberately outside the five-family grafted-spine graph.
+    grafted_spine_scope: Option<GraftedSpineFunctionScope>,
+    /// Direct generated-unit calls emitted in this `Function`. Each `Inst` is
+    /// consumed and discarded when this one finished function is translated.
+    grafted_spine_calls: Vec<PendingGraftedSpineCall>,
+    /// Independently observed host terminal calls in this `Function`.
+    grafted_spine_terminals: Vec<PendingGraftedSpineTerminal>,
+    /// The ordinary source `RuntimeExpr::Call` whose direct unit call is being
+    /// emitted. Nested calls install and restore their own source.
+    grafted_spine_call_source: Option<StaticOriginId>,
     /// **`RT-FNSPLIT-B2F` `D3`** — the artifact-static seed material, resolved
     /// into this generated function.
     ///
@@ -2992,6 +3012,8 @@ struct Lowering<'a> {
     /// pins exactly that, by requiring `CompiledModule: 'static`; give the
     /// artifact a borrowed field and the pin stops compiling.
     static_transition_plan: StaticTransitionPlan<'a>,
+    grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
+    grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,
     next_token: i64,
     next_recursor_frame_provenance: u64,

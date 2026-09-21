@@ -43,6 +43,7 @@ use crate::RuntimeProgram;
 
 pub(crate) mod artifact;
 pub(crate) mod compiled;
+mod grafted_spine_control_graph;
 mod lowering;
 pub(crate) mod planning;
 pub(crate) mod surface;
@@ -99,6 +100,13 @@ pub use lowering::{
     CheckedIhFreshResultRoutePairingLeg, ComposedReturnRetSinkMutation,
     ComposedReturnRetSinkObservation,
 };
+#[cfg(feature = "px8-ds-test-support")]
+pub use grafted_spine_control_graph::{
+    with_grafted_spine_validation_mutation, GraftedSpineActualLoweringObservation,
+    GraftedSpineObservedTerminal, GraftedSpineValidationMutation,
+    GraftedSpineValidationObservation,
+};
+
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::source::{
     checked_ih_generated_entry_capsule_mutation_is_exact,

@@ -46,6 +46,8 @@ fn run_checked_bounded_nat_fixture(
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
     let seed_env = NativeSeedEnvironment::empty();
     let mut compiler = Lowering {
+        grafted_spine_builder: None,
+        grafted_spine_graph: None,
         seed_env: &seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan: inert_test_plan(),
@@ -98,6 +100,10 @@ fn run_checked_bounded_nat_fixture(
         native_int_mutation: NativeIntLoweringMutation::Exact,
         bounded_nat_mutation: mutation,
         function_local: FunctionLocalRefs {
+            grafted_spine_scope: None,
+            grafted_spine_calls: Vec::new(),
+            grafted_spine_terminals: Vec::new(),
+            grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),

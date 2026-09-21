@@ -979,6 +979,136 @@ const WRITE_ALL_CLASSIFIER_STACK_BYTES: usize =
     WRITE_ALL_CLASSIFIER_STACK_MEASURED_PEAK_BYTES + WRITE_ALL_CLASSIFIER_STACK_HEADROOM_BYTES;
 
 #[cfg(target_os = "linux")]
+/// Promise class: durable invariant.
+///
+/// MEASURED: two actual compilations of the same PX8-F source differ in exactly
+/// one planner-derived expected-source validation input. Their typed graph
+/// topology and independently observed terminal population are equal, while the
+/// selected query changes from the reached duplicate-terminal refusal to the
+/// missing-seed refusal.
+/// CLAIMED: a D0 expected source is an input to validation, never an input to
+/// graph construction or terminal observation.
+/// THE GAP: this does not decide placement or execute the later D0/D1/D2 repair.
+#[test]
+fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() {
+    std::thread::Builder::new()
+        .name("px8f-grafted-spine-ac3".to_string())
+        .stack_size(WRITE_ALL_CLASSIFIER_STACK_BYTES)
+        .spawn(|| {
+            let dir = tempfile::Builder::new()
+                .prefix("ken-px8f-grafted-spine-ac3-")
+                .tempdir()
+                .unwrap();
+            let (exact_compile, exact_observations, exact_applications) =
+                ken_runtime::with_grafted_spine_validation_mutation(
+                    ken_runtime::GraftedSpineValidationMutation::Exact,
+                    || {
+                        ken_cli::build_native_program(
+                            WRITE_ALL,
+                            ken_cli::SourceFormat::Ken,
+                            "px8f_grafted_spine_ac3_exact",
+                            dir.path(),
+                        )
+                    },
+                );
+            exact_compile.expect("the exact PX8-F fixture compiles");
+            assert_eq!(exact_applications, 0, "the exact arm applies no mutation");
+            let [exact] = exact_observations.as_slice() else {
+                panic!(
+                    "one actual compilation must produce one graph observation, got {}",
+                    exact_observations.len()
+                );
+            };
+            let [selected] = exact.validations.as_slice() else {
+                panic!(
+                    "PX8-F must carry one reached planner-derived validation: {:?}",
+                    exact.validations
+                );
+            };
+            let exact_refusal = selected
+                .outcome
+                .as_ref()
+                .expect_err("the current raw terminal population remains duplicated");
+            assert!(
+                exact_refusal.contains("independently observed terminals instead of one")
+                    && !exact_refusal.contains("no actual seed edge"),
+                "the baseline validation must reach past source selection: {exact_refusal}"
+            );
+            let replacement = u32::MAX;
+            assert_ne!(selected.expected_source, replacement);
+
+            let mutation = ken_runtime::GraftedSpineValidationMutation::SubstituteExpectedSource {
+                member: selected.member,
+                original: selected.expected_source,
+                replacement,
+            };
+            let (mutated_compile, mutated_observations, mutated_applications) =
+                ken_runtime::with_grafted_spine_validation_mutation(mutation, || {
+                    ken_cli::build_native_program(
+                        WRITE_ALL,
+                        ken_cli::SourceFormat::Ken,
+                        "px8f_grafted_spine_ac3_mutated",
+                        dir.path(),
+                    )
+                });
+            mutated_compile
+                .expect("changing a validation input must not change lowering acceptance");
+            assert_eq!(
+                mutated_applications, 1,
+                "the expected-source mutation must apply exactly once"
+            );
+            let [mutated] = mutated_observations.as_slice() else {
+                panic!(
+                    "one mutated compilation must produce one graph observation, got {}",
+                    mutated_observations.len()
+                );
+            };
+
+            assert_eq!(
+                mutated.topology, exact.topology,
+                "the D0 expected source must not shape emitted graph topology"
+            );
+            assert_eq!(
+                mutated.terminals, exact.terminals,
+                "the D0 expected source must not shape terminal observation"
+            );
+            assert_eq!(mutated.validations.len(), exact.validations.len());
+            let mut changed = 0usize;
+            for (before, after) in exact.validations.iter().zip(&mutated.validations) {
+                if before.member == selected.member
+                    && before.expected_source == selected.expected_source
+                {
+                    changed += 1;
+                    assert_eq!(after.member, before.member);
+                    assert_eq!(after.expected_source, replacement);
+                    let error = after
+                        .outcome
+                        .as_ref()
+                        .expect_err("the substituted source must change validation only");
+                    assert!(error.contains("no actual seed edge"), "{error}");
+                    eprintln!(
+                        "grafted-spine AC-3: member={} expected-source {} -> {}; \
+                         topology-edges={} terminals={}; exact={}; mutated={}",
+                        before.member,
+                        before.expected_source,
+                        after.expected_source,
+                        exact.topology.len(),
+                        exact.terminals.len(),
+                        exact_refusal,
+                        error,
+                    );
+                } else {
+                    assert_eq!(after, before, "an untargeted validation changed");
+                }
+            }
+            assert_eq!(changed, 1, "exactly one validation must differ");
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[cfg(target_os = "linux")]
 /// Promise class: durable invariant. The checked `writeAll` response plane
 /// promotes exactly its two exclusively-predeclared producer groups while the
 /// unit-less P1 and mixed-owner group retain their existing lowering paths.

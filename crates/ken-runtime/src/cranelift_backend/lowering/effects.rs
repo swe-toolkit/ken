@@ -2764,6 +2764,35 @@ impl<'a> Lowering<'a> {
         })
     }
 
+    fn grafted_spine_terminal_members_at_effect(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> Result<Vec<StaticOriginId>, CraneliftBackendError> {
+        let specialized = self
+            .static_transition_plan
+            .static_response_feasibility_ledger_all()?
+            .map_err(|infeasible| {
+                backend_module(format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?;
+        let mut members = specialized
+            .iter()
+            .filter(|row| row.effect_origin() == effect_origin)
+            .map(StaticResponseContinuation::vis_origin)
+            .collect::<BTreeSet<_>>();
+        members.extend(
+            self.static_transition_plan
+                .static_response_deferred()
+                .iter()
+                .filter(|row| row.effect_origin() == effect_origin)
+                .map(DeferredResponseRow::vis_origin),
+        );
+        Ok(members.into_iter().collect())
+    }
+
     /// `static_origin` is the `Effect` occurrence's own origin.
     ///
     /// ⚠ HAZARD 2 (D3): the planner plans `capability.value` **first when it is
@@ -3727,6 +3756,11 @@ impl<'a> Lowering<'a> {
             .ins()
             .iconst(types::I64, i64::from(wire.request_size));
         let reply_pointer = builder.ins().stack_addr(pointer_type, reply, 0);
+        // Independent terminal population: the static response rows supply
+        // member identity, while this actual lowering supplies the typed site
+        // and call node. No placement claim participates in either side.
+        let grafted_spine_terminal_members =
+            self.grafted_spine_terminal_members_at_effect(static_origin)?;
         if let Some((invalid, failure_tag, detail)) = narrow_failure {
             let dispatch = builder.create_block();
             let synthesize = builder.create_block();
@@ -3745,6 +3779,14 @@ impl<'a> Lowering<'a> {
                     request_size,
                     reply_pointer,
                 ],
+            );
+            self.function_local.grafted_spine_terminals.extend(
+                grafted_spine_terminal_members
+                    .iter()
+                    .copied()
+                    .map(|member| {
+                        PendingGraftedSpineTerminal::new(call, member, static_origin)
+                    }),
             );
             let status = builder.inst_results(call)[0];
             Self::require_i64(builder, status, 0);
@@ -3801,6 +3843,14 @@ impl<'a> Lowering<'a> {
                     request_size,
                     reply_pointer,
                 ],
+            );
+            self.function_local.grafted_spine_terminals.extend(
+                grafted_spine_terminal_members
+                    .iter()
+                    .copied()
+                    .map(|member| {
+                        PendingGraftedSpineTerminal::new(call, member, static_origin)
+                    }),
             );
             let status = builder.inst_results(call)[0];
             Self::require_i64(builder, status, 0);
