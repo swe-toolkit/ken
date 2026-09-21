@@ -448,10 +448,16 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
    mixed group too — keyed on treating group-local exclusive ownership as the
    whole settlement authority when the required closure is a P1-free plane
    seeded by exactly one exclusive group.
+3. The complete two-arm repair makes the px8ta depth-3 row pass strict LIFO and
+   removes its exact `ContinuationSpecialization` object-emission refusal,
+   although AC-6 requires that refusal to remain — keyed on preserving a prior
+   planner-classification failure itself instead of distinguishing a genuinely
+   function-local claim declaration from a bypassed declaration guard.
 
-**Count of record:** hard stops 2; symptom entries 2. Entry 1 was classified at
-`evt_177exqsxhvg5y`; entry 2 was classified at `evt_76nkdg0h81xnw`. The first
-Research and shared-predicate triggers remain stop 3 and entry 3.
+**Count of record:** hard stops 3; symptom entries 3. Entry 1 was classified at
+`evt_177exqsxhvg5y`; entry 2 at `evt_76nkdg0h81xnw`; entry 3 at
+`evt_45qpftkx3s894`. The stop-3 Research trigger and entry-3 shared-predicate
+trigger have fired; no ruling follows until both are discharged.
 
 ## 5. Acceptance criteria
 
