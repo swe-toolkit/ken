@@ -1,7 +1,7 @@
 ---
 id: LANG-STANDARD-OP-GENERIC-CARRIER
 title: "Standard-operator completion over an ABSTRACT carrier. AC-6's fork was FALSE AS POSED -- `the generic where Ord a case` names TWO programs with two refusal sites and two owners. Row 1 (the `where`-clause sugar) refuses at DECLARATION time in `resolve_instance_dictionary_inner`, before A1's completion arm is reachable at all: pre-existing, by construction, NOT a bug. Row 2 (the explicit `(d : Ord a)` encoding) has its dictionary genuinely in scope and is refused only by A1's own head-identity match, whose arms are `Term::Const` and `Term::IndFormer` while a Pi-bound carrier infers to a de Bruijn variable: A1-caused, a real repair. D0 gates Row 2 and must run BEFORE any code -- its grounding is a July 2026 enclave probe against a September tree."
-status: ready
+status: merged
 owner: language
 size: S
 gate: none

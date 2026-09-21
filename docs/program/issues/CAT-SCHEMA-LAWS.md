@@ -1,7 +1,7 @@
 ---
 id: CAT-SCHEMA-LAWS
 title: "Application/Input/Schema.ken.md owns the accumulation shape for BOTH of its clients and has zero proofs: prove the Valid-case indexed coverage law, the first-rejection head law that pins issue ORDER, and the law that an accepting field never masks a later rejection -- over the existing schema_validate_fields traversal, with the help traversal deliberately out of scope"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none

@@ -1,7 +1,7 @@
 ---
 id: LANG-INSTANCE-SEARCH-SECOND-PATH
 title: "`projected_instance_id` (`elab.rs:10446`) misattributes instance rows two ways and both are keyed on a SPELLING. Its first arm fires when the projected base is a constant literally named `d` even when `d` is NOT the constraint binder, so a user global named `d` is attributed the constraint's effect row instead of its own. Both of its `instance_search` calls key on `rtype_head_name(&constraint.head_type)` -- the same carrier-spelling predicate LANG-INSTANCE-REGISTRY-IDENTITY-KEY is closing on the term-producing path, which the Architect explicitly left here. Delete the `d` disjunct; then measure whether this path can be keyed on identity WITHOUT kernel state. The Architect forbade threading kernel state into this function, so a requirement for it is a STOP, not an implementer choice."
-status: active
+status: merged
 owner: language
 size: S
 gate: none
