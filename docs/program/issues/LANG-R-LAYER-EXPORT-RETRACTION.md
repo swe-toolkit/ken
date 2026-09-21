@@ -1,7 +1,7 @@
 ---
 id: LANG-R-LAYER-EXPORT-RETRACTION
 title: "Retract ken-elaborator's R layer from the crate's public surface. RExpr, RDecl, RDeclKind, RType, 15 further public types that carry them in their fields, 2 structs in classes.rs and 9 functions are public as ITEMS (the unit of retraction is item visibility -- `pub(crate)` on the items closes the path with the `pub mod` declarations untouched; deleting the `pub use` re-export narrows nothing) and measured at ZERO external consumers -- an internal IR that was never meant to be public. The retraction was built and compiles; the only obstruction is that six of the nine functions are consumed by this crate's own INTEGRATION tests, which are external to the lib target and so break under pub(crate). Architect's design ruling: move those tests into the crate as unit tests, NOT a #[doc(hidden)] pub seam."
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
