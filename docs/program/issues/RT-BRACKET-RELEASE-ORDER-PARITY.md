@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-RELEASE-ORDER-PARITY
-title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: per-group exclusive eligibility in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong."
+title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: a BOUNDED AUTHORITY-SEED predicate in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong. ARM A CORRECTED at evt_76nkdg0h81xnw (hard stop 2 / symptom entry 2) after the ring measured that per-group exclusive eligibility does NOT fix its own control: the governed ResourceRelease responses sit in the MIXED group that the original text fenced at >= 2, and the causal probe worked by promoting exactly that P1-free mixed group, so one exclusive group now seeds authority for its P1-free mixed dependent on a single-exclusive plane only."
 status: ready
 owner: runtime
 size: M
@@ -43,6 +43,17 @@ origin: "Steward, 2026-09-03; RECUT 2026-09-18 twice. Original filing: scope-cal
 > # `D0a` AFFIRMED `evt_17kyxq7q5v8ar`, AC-7 discharged. `D0c` and `D0c-2` are
 > # CLOSED -- do not re-run either. Historical prediction text below is retained
 > # under explicit historical labels only.
+> #
+> # **ARM A CORRECTED 2026-09-21 -- HARD STOP 2 / SYMPTOM ENTRY 2**
+> # (`evt_76nkdg0h81xnw`). The ring implemented Arm A literally and measured
+> # that it does not fix its own control: the governed `ResourceRelease`
+> # responses sit in the **mixed** group that the original text fenced at
+> # `>= 2`, so per-group exclusive eligibility never reached them, and Arm B
+> # cannot bridge that family because its bounded frontier there is empty. The
+> # Architect's own probe worked by promoting that P1-free mixed group. **The
+> # sentence "the mixed-owner law is preserved exactly" is FALSE and is
+> # removed.** Arm A is now a bounded authority-seed predicate. Arm B is
+> # unchanged and already green. No Research trigger until stop or entry 3.
 
 ## There is ONE shape. The surface cannot express the other one.
 
@@ -318,12 +329,33 @@ D0c-2. **RAN AND IS CLOSED** (`evt_pz0w7e8ae39w`; predictions pre-registered
 D1a. **Repair the planner classification, as TWO REQUIRED ARMS** (Architect
      `evt_4t14zmba83hjm`). Either arm alone leaves half the population wrong.
 
-     **A.** `StaticTransitionPlan::static_response_phase_b_split` -- stop using
-     the whole-plane `ordinary_stage_count >= 2` threshold to reject an
-     EXCLUSIVELY PREDECLARED transport group. **Per-group eligibility for the
-     exclusive case; do NOT globally change the threshold to `>= 1`.** The
-     mixed-owner law is preserved exactly, and the suppression mutation must
-     still restore P2.
+     **A. A BOUNDED AUTHORITY-SEED PREDICATE** (corrected
+     `evt_76nkdg0h81xnw`). `StaticTransitionPlan::static_response_phase_b_split`
+     -- stop using the whole-plane `ordinary_stage_count >= 2` threshold to
+     reject a single-exclusive plane, and let one exclusive group SEED
+     authority for its P1-free mixed DEPENDENT:
+
+         composed_plane_authority       = ordinary_stage_count >= 2
+         single_exclusive_plane         = ordinary_stage_count == 1
+         single_exclusive_group_authority =
+             single_exclusive_plane
+             && (exclusively_predeclared_stage
+                 || (!has_unitless_response && mixed_owner_stage))
+         group_requires_execute_then_resume =
+             composed_plane_authority || single_exclusive_group_authority
+
+     Outer conditions unchanged: checked-IH transport source; suppression
+     restores P2; in a P1-BEARING plane every non-exclusive group stays
+     Deferred unless the already-existing explicit overpromotion mutation
+     applies on its already-existing route. `>= 2` behavior is otherwise
+     byte-for-behavior. **This is NOT the forbidden global `>= 1` change:** the
+     single-exclusive case admits ONLY the one `(true,false)` exclusive seed
+     and a `(true,true)` mixed dependent on a P1-free plane. It admits no
+     `(false,true)` specialization-only group, no group without a predeclared
+     source, no plane with zero exclusive groups, and no mixed group in a
+     P1-bearing plane. **`writeAll` stays the negative control** -- P1
+     main-lowered, mixed `ResourceRelease` group P2, deliberate overpromotion
+     still reaching the owner-escape refusal.
 
      **B.** `StaticTransitionPlan::bounded_deferred_response_suffix` -- admit a
      third structural class `release_only_suffix` (non-empty, every row
@@ -373,13 +405,21 @@ D2.  Re-enable release-order parity on the five composed-return fixtures
   **No further discriminating fixture is authorized**, so this governs nothing
   live.
 - **TWO independent controls, one per `D1a` arm, and each mutation-proved.**
-  Restoring exclusive single-stage deferral must redden `D2a-A` with `[r1,r2]`;
-  suppressing release-only suffix admission must redden `D2a-B` with `[r1,r2]`.
-  Each mutation needs a positive application witness and must compile. **One
-  aggregate release-order test is not evidence for both arms.**
+  **Arm A's mutation must model removal of the AUTHORITY SEED** -- disabling the
+  whole `single_exclusive_group_authority` arm for BOTH the exclusive seed and
+  its P1-free mixed dependent -- not merely deferring the exclusive row after
+  the dependent has borrowed. It must restore `D2a-A` to `[r1,r2]` and leave the
+  ordinary `>= 2` path unchanged; rename or reshape the control if its name
+  implies the narrower exclusive-only mutation. Suppressing release-only suffix
+  admission must redden `D2a-B` with `[r1,r2]`. Each mutation needs a positive
+  application witness and must compile. **One aggregate release-order test is
+  not evidence for both arms.**
 - **Structural diagnostics, not pinned ids.** The composed arm must no longer
-  leave its governed releases as unowned Deferred P2, and the px8ta inner
-  release must acquire the unique bounded handler owner.
+  leave its governed releases as unowned Deferred P2 -- and because those
+  releases sit in the MIXED dependent group, **both the exclusive seed and its
+  P1-free mixed dependent must gain execute-then-resume ownership**, not the
+  seed alone. The px8ta inner release must acquire the unique bounded handler
+  owner.
 - The px8ta row is **not** un-ignored by this node alone — its depth-3 blocker
   is `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`'s.
 - **The native repair** is grounded in the settlement derivation affirmed at
