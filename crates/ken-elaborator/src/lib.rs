@@ -59,6 +59,8 @@ mod z3_process;
 extern crate self as ken_elaborator;
 #[cfg(test)]
 mod r_layer_tests;
+#[cfg(test)]
+mod seal2_tests;
 
 use std::collections::HashMap;
 use std::path::PathBuf;

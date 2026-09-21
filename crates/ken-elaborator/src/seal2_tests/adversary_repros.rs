@@ -11,7 +11,7 @@
 //! SEEN, and the assertions flip accordingly. If these two ever revert to the
 //! old "landed oracle is blind" shape, the enumeration is no longer closed.
 
-mod seal2_support;
+use super::support as seal2_support;
 
 use std::collections::BTreeSet;
 
@@ -20,8 +20,8 @@ use ken_elaborator::ElabEnv;
 use seal2_support::{closed_producers, conservative_deep_producers, head_only_producers};
 
 const BUFFER_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/System/Buffer.ken.md");
-const IO_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/System/IO.ken.md");
+    include_str!("../../../../catalog/packages/Capability/System/Buffer.ken.md");
+const IO_KEN_MD: &str = include_str!("../../../../catalog/packages/Capability/System/IO.ken.md");
 
 fn landed_surface() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude");

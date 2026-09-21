@@ -1,5 +1,5 @@
-//! SEAL-2 — the closed producer-closure oracle, shared by the two SEAL-2 test
-//! binaries (`seal2_producer_closure.rs` and `adversary_seal2_repros.rs`).
+//! SEAL-2 — the closed producer-closure oracle, shared by the two in-crate
+//! test modules (`producer_closure.rs` and `adversary_repros.rs`).
 //!
 //! # What this repairs
 //!
@@ -88,45 +88,18 @@ pub struct Producer {
     pub ty: Term,
 }
 
-/// **THIS GATE IS CURRENTLY DISABLED. READ THIS BEFORE THE DESCRIPTION BELOW,
-/// WHICH DESCRIBES HOW IT WORKED AND NO LONGER DOES.**
-///
-/// The pattern now carries `..`, so a new `ElabEnv` field -- public or not --
-/// is a SILENT PASS rather than a build break. Rust requires `..` once a
-/// pattern omits an inaccessible field, and `ElabEnv` gained its first
-/// non-`pub` field in `fa37c6ca6`; an integration test cannot name it. From
-/// that commit this file did not compile at all. `..` is what makes it build
-/// again, and it costs exactly the property the description claims.
-///
-/// **The description is left standing rather than softened.** Softening it
-/// would retire the obligation; leaving it true-of-the-intent and false-of-
-/// the-present is what keeps the repair owed. The repair is to move this
-/// enumeration where private fields are nameable -- a `#[cfg(test)]` module
-/// inside `ken-elaborator` -- which is a test-architecture change and not the
-/// WP that found it.
-///
-/// ---
-///
 /// Enumerate **every** namespace of `ElabEnv` in which a source-reachable
 /// producer can live.
 ///
 /// The walk is bound to `ElabEnv`'s own fields by an exhaustive struct
-/// destructuring which **was written with no `..` and now carries one**.
-/// THE INTENT is that adding a field to `ElabEnv` fails to compile
-/// here, forcing whoever adds it to classify the new namespace as either a
-/// producer source (walked below) or a justified non-source (added to the
-/// discard with its reason). That is the AC-2 gate, and **it is currently
-/// DEFEATED by the `..` at the destructure** -- see the notice at the top. As
-/// written today a new namespace IS a silent pass; the sentence that used to
-/// stand here said it could never be one, and changing the claim rather than
-/// annotating it is the point: a reader who skips the notice must not be able
-/// to pick up a false guarantee from the body.
+/// destructuring with no `..`. Adding a field to `ElabEnv` therefore fails to
+/// compile here, forcing whoever adds it to classify the new namespace as
+/// either a producer source (walked below) or a justified non-source (added to
+/// the discard with its reason). A new namespace can never be a silent pass.
 ///
 /// Do **not** rewrite this as field access (`env.globals`, `env.class_env`,
-/// …). Naming every field was the entire point — it is what WOULD make
-/// the enumeration closed rather than a hand list waiting for its next
-/// omission, and it is what the `..` currently costs. Field access would
-/// discard even the ability to restore it.
+/// …). Naming every field with no `..` is the entire point — it makes the
+/// enumeration closed rather than a hand list waiting for its next omission.
 pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
     let ElabEnv {
         // --- namespaces that hold carrier-bearing `Term`s of their own ---
@@ -143,6 +116,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         fixity_spans, // GlobalId -> diagnostic spans — carries no Term
         ctor_decl_spans, // constructor spelling -> first-decl span (dup diagnostic) — no Term
         numeric_env,  // GlobalId op / dispatch tables — types live in global_env
+        standard_operators, // role -> GlobalId identities — types live in global_env
         bytes_env,    // GlobalId type / op ids — types live in global_env
         foreign_env,  // FFI postulate GlobalIds — types live in global_env
         effect_rows,  // effect-row algebra — carries no Term
@@ -156,25 +130,6 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         // through `globals`/`global_env` above via that id. Verified by
         // reading the struct rather than inferred from the field's name.
         resolution_provenance,
-        // `..` IS HERE UNDER PROTEST, AND THE GATE ABOVE IS ALREADY DEFEATED.
-        //
-        // Rust requires `..` once a struct pattern omits an INACCESSIBLE
-        // field, and `ElabEnv` gained a `pub(crate)` field --
-        // `standard_operators` -- in `fa37c6ca6`. An integration test cannot
-        // name it, so from that commit this pattern could not compile without
-        // `..`, and `adversary_seal2_repros` has been RED on this branch ever
-        // since. The gate was not weakened by degrees; it stopped building.
-        //
-        // With `..` present the doc comment above is no longer true: a new
-        // field, public or not, is now a silent pass. **The claim is left
-        // standing rather than softened, because the repair is a real change
-        // and softening the text would retire the obligation instead.**
-        //
-        // WHAT RESTORES IT: this enumeration has to live where private fields
-        // are nameable -- a `#[cfg(test)]` module inside `ken-elaborator`
-        // rather than an integration test. That is a test-architecture change
-        // and is not this WP's; it is filed as the repair.
-        ..
     } = env;
     let _ = (
         num_values,
@@ -182,6 +137,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         fixity_spans,
         ctor_decl_spans,
         numeric_env,
+        standard_operators,
         bytes_env,
         foreign_env,
         effect_rows,
