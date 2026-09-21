@@ -336,6 +336,7 @@ fn nonempty_loader_visible_inventory_is_exact() {
         "NonEmpty",
         "Semigroup_instance_NonEmpty",
         "nonempty_append",
+        "nonempty_append::head_left",
         "nonempty_cons",
         "nonempty_head",
         "nonempty_map",

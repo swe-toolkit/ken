@@ -87,6 +87,21 @@ const ordinary_one_two : List Nat = nonempty_to_list Nat one_two
 
 ## 4. Laws & proofs
 
+Append preserves the left value's structural head. Exposing both constructors
+reduces the result head and the original left head to the same value.
+
+```ken
+pub proof head_left for nonempty_append
+      (a : Type) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal a (nonempty_head a (nonempty_append a xs ys)) (nonempty_head a xs) =
+  match xs {
+    NonEmptyCons x rest ↦
+      match ys {
+        NonEmptyCons y more ↦ Refl
+      }
+  }
+```
+
 Associativity follows from ordinary list append. After exposing the three
 heads, `list_append::assoc` proves the equality of the stored tails; `cong`
 lifts that equality beneath the shared `NonEmptyCons` head.
@@ -147,9 +162,9 @@ list-append associativity.
 
 **Public API (stable names):** abstract `NonEmpty`, `nonempty_singleton`,
 `nonempty_cons`, `nonempty_head`, `nonempty_tail`, `nonempty_to_list`,
-`nonempty_map`, `nonempty_append`, and `Semigroup_instance_NonEmpty`.
-`NonEmptyCons` is internal; the smart constructors are the public construction
-surface.
+`nonempty_map`, `nonempty_append`, its attached `head_left` law, and
+`Semigroup_instance_NonEmpty`. `NonEmptyCons` is internal; the smart
+constructors are the public construction surface.
 
 **Source map:**
 
@@ -168,8 +183,9 @@ append associativity proof.
 constant, postulate, or `Axiom`; its only class law is inhabited by a checked
 proof term.
 
-**Proof families.** The one law is a three-value structural case split followed
-by congruence over `list_append::assoc`.
+**Proof families.** The head law splits both values and closes by reflexivity.
+The semigroup law is a three-value structural case split followed by congruence
+over `list_append::assoc`.
 
 **Consumers.** `Validation` uses `NonEmpty e` as the canonical independently
 accumulating error carrier.
