@@ -103,7 +103,13 @@ and whose lookup is `None`, a `Valid` result has `nth i values = Some
 (list_to_bytes (Nil UInt8))`. State it as a published law rather than a comment,
 because it is the only thing that makes the conflation visible to a reader: an
 absent optional field and a present field holding empty bytes produce the same
-element, and nothing in the returned `List Bytes` distinguishes them.
+element, and nothing in the returned `List Bytes` distinguishes them. **This
+law characterizes the PREDECESSOR and is not a permanent semantic promise.**
+The Architect has ruled the placeholder a representation defect
+(`evt_43cf1x0808egr`); `CAT-CONFIGURATION-DECODER-PRESENCE-CARRIER` replaces
+the carrier with `List (Option Bytes)` and retires this law atomically. Write
+it as a true statement about today's behavior, not as an endorsement that
+empty means absent.
 
 **AC-3 -- the laws must be refutable, and by the right mutations.** Changing
 `env_config_field_check` to accept a missing field must turn AC-1 RED. Changing
