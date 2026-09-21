@@ -133,6 +133,375 @@ fn env_config_values
           (env_config_lookup (bytes_encode (schema_field_name field)) entries))
         (env_config_values rest entries)
   }
+```
+
+## 3. Schema-driven decoding
+
+Both entry points run the same shared accumulating traversal. Their origin
+construction remains local, and only this specialization injects issues into
+`Diagnostic`.
+
+```ken
+fn env_config_validation
+      (fields : List SchemaField)
+      (entries : List (Prod Bytes Bytes))
+      (checked : SchemaValidation EnvConfigOrigin Bool)
+    : Validation (NonEmpty Diagnostic) (List Bytes) =
+  match checked {
+    Valid values ↦ Valid (NonEmpty Diagnostic) (List Bytes) (env_config_values fields entries);
+    Invalid issues ↦
+      Invalid
+        (NonEmpty Diagnostic)
+        (List Bytes)
+        (nonempty_map
+          (SchemaIssue EnvConfigOrigin)
+          Diagnostic
+          env_config_issue_diagnostic
+          issues)
+  }
+
+fn decode_environment_entries
+      (schema : Schema) (entries : List (Prod Bytes Bytes))
+    : Validation (NonEmpty Diagnostic) (List Bytes) =
+  env_config_validation
+    (schema_fields schema)
+    entries
+    (schema_validate EnvConfigOrigin Bool (environment_field_check entries) schema)
+
+fn decode_process_environment
+      (schema : Schema) (input : ProcessInput)
+    : Validation (NonEmpty Diagnostic) (List Bytes) =
+  decode_environment_entries schema (process_environment input)
+
+fn decode_config_entries
+      (schema : Schema) (entries : List (Prod Bytes Bytes))
+    : Validation (NonEmpty Diagnostic) (List Bytes) =
+  env_config_validation
+    (schema_fields schema)
+    entries
+    (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
+
+fn env_config_help (schema : Schema) : Doc = schema_help schema
+
+export decode_process_environment, decode_config_entries, env_config_help
+```
+
+## 4. Laws and proofs
+
+The required-field laws instantiate the schema traversal's checked coverage.
+They then connect each accepted required field to the exact `env_config_lookup`
+result and to the second traversal's aligned output. The value is the selected
+raw `Bytes`; no text conversion or re-encoding occurs.
+
+The optional-absence laws separately characterize the predecessor
+representation. A valid decode whose optional lookup is `None` carries an empty
+`Bytes` value at the aligned index. This describes the existing lossy carrier;
+it does not make absence and a present empty value semantically identical.
+
+```ken
+pub proof required_lookup for decode_process_environment
+      (schema : Schema)
+      (input : ProcessInput)
+      (values : List Bytes)
+      (hdecode : Equal
+        (Validation (NonEmpty Diagnostic) (List Bytes))
+        (decode_process_environment schema input)
+        (Valid (NonEmpty Diagnostic) (List Bytes) values))
+      (i : Nat)
+      (field : SchemaField)
+      (hfield : Equal
+        (Option SchemaField)
+        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
+        (Some SchemaField field))
+      (hpresence : Equal
+        Application.Input.Schema.SchemaPresence
+        (schema_field_presence field)
+        Application.Input.Schema.SchemaRequired)
+      (goal : Prop)
+      (recover : (value : Bytes)
+        → Equal
+        (Option Bytes)
+        (env_config_lookup (bytes_encode (schema_field_name field)) (process_environment input))
+        (Some Bytes value)
+        → Equal
+        (Option Bytes)
+        (Data.Collections.Derived.nth Bytes i values)
+        (Some Bytes value)
+        → goal)
+    : goal =
+  env_config_schema_validation_cases
+    (schema_validate
+      EnvConfigOrigin
+      Bool
+      (environment_field_check (process_environment input))
+      schema)
+    goal
+    (λchecked_values.
+      λhchecked.
+        env_config_required_values
+          (environment_field_check (process_environment input))
+          (schema_fields schema)
+          (process_environment input)
+          checked_values
+          values
+          hchecked
+          (env_config_decode_valid_values
+            (schema_fields schema)
+            (process_environment input)
+            (schema_validate
+              EnvConfigOrigin
+              Bool
+              (environment_field_check (process_environment input))
+              schema)
+            checked_values
+            values
+            hchecked
+            hdecode)
+          (environment_required_check_lookup (process_environment input))
+          i
+          field
+          hfield
+          hpresence
+          goal
+          recover)
+    (λissues.
+      λhchecked.
+        absurd
+          (env_config_decode_invalid_impossible
+            (schema_fields schema)
+            (process_environment input)
+            (schema_validate
+              EnvConfigOrigin
+              Bool
+              (environment_field_check (process_environment input))
+              schema)
+            issues
+            values
+            hchecked
+            hdecode))
+
+pub proof optional_absence for decode_process_environment
+      (schema : Schema)
+      (input : ProcessInput)
+      (values : List Bytes)
+      (hdecode : Equal
+        (Validation (NonEmpty Diagnostic) (List Bytes))
+        (decode_process_environment schema input)
+        (Valid (NonEmpty Diagnostic) (List Bytes) values))
+      (i : Nat)
+      (field : SchemaField)
+      (hfield : Equal
+        (Option SchemaField)
+        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
+        (Some SchemaField field))
+      (hpresence : Equal
+        Application.Input.Schema.SchemaPresence
+        (schema_field_presence field)
+        Application.Input.Schema.SchemaOptional)
+      (hlookup : Equal
+        (Option Bytes)
+        (env_config_lookup (bytes_encode (schema_field_name field)) (process_environment input))
+        (None Bytes))
+    : Equal
+        (Option Bytes)
+        (Data.Collections.Derived.nth Bytes i values)
+        (Some Bytes (list_to_bytes (Nil UInt8))) =
+  env_config_schema_validation_cases
+    (schema_validate
+      EnvConfigOrigin
+      Bool
+      (environment_field_check (process_environment input))
+      schema)
+    (Equal
+      (Option Bytes)
+      (Data.Collections.Derived.nth Bytes i values)
+      (Some Bytes (list_to_bytes (Nil UInt8))))
+    (λchecked_values.
+      λhchecked.
+        env_config_optional_values
+          (schema_fields schema)
+          (process_environment input)
+          values
+          (env_config_decode_valid_values
+            (schema_fields schema)
+            (process_environment input)
+            (schema_validate
+              EnvConfigOrigin
+              Bool
+              (environment_field_check (process_environment input))
+              schema)
+            checked_values
+            values
+            hchecked
+            hdecode)
+          i
+          field
+          hfield
+          hpresence
+          hlookup)
+    (λissues.
+      λhchecked.
+        absurd
+          (env_config_decode_invalid_impossible
+            (schema_fields schema)
+            (process_environment input)
+            (schema_validate
+              EnvConfigOrigin
+              Bool
+              (environment_field_check (process_environment input))
+              schema)
+            issues
+            values
+            hchecked
+            hdecode))
+
+pub proof required_lookup for decode_config_entries
+      (schema : Schema)
+    : (entries : List (Prod Bytes Bytes))
+      → (values : List Bytes)
+      → Equal
+        (Validation (NonEmpty Diagnostic) (List Bytes))
+        (decode_config_entries schema entries)
+        (Valid (NonEmpty Diagnostic) (List Bytes) values)
+      → (i : Nat)
+      → (field : SchemaField)
+      → Equal
+        (Option SchemaField)
+        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
+        (Some SchemaField field)
+      → Equal Application.Input.Schema.SchemaPresence
+        (schema_field_presence field)
+        Application.Input.Schema.SchemaRequired
+      → (goal : Prop)
+      → ((value : Bytes)
+          → Equal
+          (Option Bytes)
+          (env_config_lookup (bytes_encode (schema_field_name field)) entries)
+          (Some Bytes value)
+          → Equal
+          (Option Bytes)
+          (Data.Collections.Derived.nth Bytes i values)
+          (Some Bytes value)
+          → goal)
+      → goal =
+  λentries.
+    λvalues.
+      λhdecode.
+        λi.
+          λfield.
+            λhfield.
+              λhpresence.
+                λgoal.
+                  λrecover.
+                    env_config_schema_validation_cases
+                      (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
+                      goal
+                      (λchecked_values.
+                        λhchecked.
+                          env_config_required_values
+                            (config_field_check entries)
+                            (schema_fields schema)
+                            entries
+                            checked_values
+                            values
+                            hchecked
+                            (env_config_decode_valid_values
+                              (schema_fields schema)
+                              entries
+                              (schema_validate
+                                EnvConfigOrigin
+                                Bool
+                                (config_field_check entries)
+                                schema)
+                              checked_values
+                              values
+                              hchecked
+                              hdecode)
+                            (config_required_check_lookup entries)
+                            i
+                            field
+                            hfield
+                            hpresence
+                            goal
+                            recover)
+                      (λissues.
+                        λhchecked.
+                          absurd
+                            (env_config_decode_invalid_impossible
+                              (schema_fields schema)
+                              entries
+                              (schema_validate
+                                EnvConfigOrigin
+                                Bool
+                                (config_field_check entries)
+                                schema)
+                              issues
+                              values
+                              hchecked
+                              hdecode))
+
+pub proof optional_absence for decode_config_entries
+      (schema : Schema)
+      (entries : List (Prod Bytes Bytes))
+      (values : List Bytes)
+      (hdecode : Equal
+        (Validation (NonEmpty Diagnostic) (List Bytes))
+        (decode_config_entries schema entries)
+        (Valid (NonEmpty Diagnostic) (List Bytes) values))
+      (i : Nat)
+      (field : SchemaField)
+      (hfield : Equal
+        (Option SchemaField)
+        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
+        (Some SchemaField field))
+      (hpresence : Equal
+        Application.Input.Schema.SchemaPresence
+        (schema_field_presence field)
+        Application.Input.Schema.SchemaOptional)
+      (hlookup : Equal
+        (Option Bytes)
+        (env_config_lookup (bytes_encode (schema_field_name field)) entries)
+        (None Bytes))
+    : Equal
+        (Option Bytes)
+        (Data.Collections.Derived.nth Bytes i values)
+        (Some Bytes (list_to_bytes (Nil UInt8))) =
+  env_config_schema_validation_cases
+    (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
+    (Equal
+      (Option Bytes)
+      (Data.Collections.Derived.nth Bytes i values)
+      (Some Bytes (list_to_bytes (Nil UInt8))))
+    (λchecked_values.
+      λhchecked.
+        env_config_optional_values
+          (schema_fields schema)
+          entries
+          values
+          (env_config_decode_valid_values
+            (schema_fields schema)
+            entries
+            (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
+            checked_values
+            values
+            hchecked
+            hdecode)
+          i
+          field
+          hfield
+          hpresence
+          hlookup)
+    (λissues.
+      λhchecked.
+        absurd
+          (env_config_decode_invalid_impossible
+            (schema_fields schema)
+            entries
+            (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
+            issues
+            values
+            hchecked
+            hdecode))
 
 theorem env_config_some_injective
       (a : Type) (left : a) (right : a) (same : Equal (Option a) (Some a left) (Some a right))
@@ -763,375 +1132,6 @@ theorem env_config_optional_values
         (Some Bytes (list_to_bytes (Nil UInt8))))
     ((proof lookup_none for env_config_values) fields entries i field hfield hlookup)
     hvalues
-```
-
-## 3. Schema-driven decoding
-
-Both entry points run the same shared accumulating traversal. Their origin
-construction remains local, and only this specialization injects issues into
-`Diagnostic`.
-
-```ken
-fn env_config_validation
-      (fields : List SchemaField)
-      (entries : List (Prod Bytes Bytes))
-      (checked : SchemaValidation EnvConfigOrigin Bool)
-    : Validation (NonEmpty Diagnostic) (List Bytes) =
-  match checked {
-    Valid values ↦ Valid (NonEmpty Diagnostic) (List Bytes) (env_config_values fields entries);
-    Invalid issues ↦
-      Invalid
-        (NonEmpty Diagnostic)
-        (List Bytes)
-        (nonempty_map
-          (SchemaIssue EnvConfigOrigin)
-          Diagnostic
-          env_config_issue_diagnostic
-          issues)
-  }
-
-fn decode_environment_entries
-      (schema : Schema) (entries : List (Prod Bytes Bytes))
-    : Validation (NonEmpty Diagnostic) (List Bytes) =
-  env_config_validation
-    (schema_fields schema)
-    entries
-    (schema_validate EnvConfigOrigin Bool (environment_field_check entries) schema)
-
-fn decode_process_environment
-      (schema : Schema) (input : ProcessInput)
-    : Validation (NonEmpty Diagnostic) (List Bytes) =
-  decode_environment_entries schema (process_environment input)
-
-fn decode_config_entries
-      (schema : Schema) (entries : List (Prod Bytes Bytes))
-    : Validation (NonEmpty Diagnostic) (List Bytes) =
-  env_config_validation
-    (schema_fields schema)
-    entries
-    (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
-
-fn env_config_help (schema : Schema) : Doc = schema_help schema
-
-export decode_process_environment, decode_config_entries, env_config_help
-```
-
-## 4. Laws and proofs
-
-The required-field laws instantiate the schema traversal's checked coverage.
-They then connect each accepted required field to the exact `env_config_lookup`
-result and to the second traversal's aligned output. The value is the selected
-raw `Bytes`; no text conversion or re-encoding occurs.
-
-The optional-absence laws separately characterize the predecessor
-representation. A valid decode whose optional lookup is `None` carries an empty
-`Bytes` value at the aligned index. This describes the existing lossy carrier;
-it does not make absence and a present empty value semantically identical.
-
-```ken
-pub proof required_lookup for decode_process_environment
-      (schema : Schema)
-      (input : ProcessInput)
-      (values : List Bytes)
-      (hdecode : Equal
-        (Validation (NonEmpty Diagnostic) (List Bytes))
-        (decode_process_environment schema input)
-        (Valid (NonEmpty Diagnostic) (List Bytes) values))
-      (i : Nat)
-      (field : SchemaField)
-      (hfield : Equal
-        (Option SchemaField)
-        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
-        (Some SchemaField field))
-      (hpresence : Equal
-        Application.Input.Schema.SchemaPresence
-        (schema_field_presence field)
-        Application.Input.Schema.SchemaRequired)
-      (goal : Prop)
-      (recover : (value : Bytes)
-        → Equal
-        (Option Bytes)
-        (env_config_lookup (bytes_encode (schema_field_name field)) (process_environment input))
-        (Some Bytes value)
-        → Equal
-        (Option Bytes)
-        (Data.Collections.Derived.nth Bytes i values)
-        (Some Bytes value)
-        → goal)
-    : goal =
-  env_config_schema_validation_cases
-    (schema_validate
-      EnvConfigOrigin
-      Bool
-      (environment_field_check (process_environment input))
-      schema)
-    goal
-    (λchecked_values.
-      λhchecked.
-        env_config_required_values
-          (environment_field_check (process_environment input))
-          (schema_fields schema)
-          (process_environment input)
-          checked_values
-          values
-          hchecked
-          (env_config_decode_valid_values
-            (schema_fields schema)
-            (process_environment input)
-            (schema_validate
-              EnvConfigOrigin
-              Bool
-              (environment_field_check (process_environment input))
-              schema)
-            checked_values
-            values
-            hchecked
-            hdecode)
-          (environment_required_check_lookup (process_environment input))
-          i
-          field
-          hfield
-          hpresence
-          goal
-          recover)
-    (λissues.
-      λhchecked.
-        absurd
-          (env_config_decode_invalid_impossible
-            (schema_fields schema)
-            (process_environment input)
-            (schema_validate
-              EnvConfigOrigin
-              Bool
-              (environment_field_check (process_environment input))
-              schema)
-            issues
-            values
-            hchecked
-            hdecode))
-
-pub proof optional_absence for decode_process_environment
-      (schema : Schema)
-      (input : ProcessInput)
-      (values : List Bytes)
-      (hdecode : Equal
-        (Validation (NonEmpty Diagnostic) (List Bytes))
-        (decode_process_environment schema input)
-        (Valid (NonEmpty Diagnostic) (List Bytes) values))
-      (i : Nat)
-      (field : SchemaField)
-      (hfield : Equal
-        (Option SchemaField)
-        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
-        (Some SchemaField field))
-      (hpresence : Equal
-        Application.Input.Schema.SchemaPresence
-        (schema_field_presence field)
-        Application.Input.Schema.SchemaOptional)
-      (hlookup : Equal
-        (Option Bytes)
-        (env_config_lookup (bytes_encode (schema_field_name field)) (process_environment input))
-        (None Bytes))
-    : Equal
-        (Option Bytes)
-        (Data.Collections.Derived.nth Bytes i values)
-        (Some Bytes (list_to_bytes (Nil UInt8))) =
-  env_config_schema_validation_cases
-    (schema_validate
-      EnvConfigOrigin
-      Bool
-      (environment_field_check (process_environment input))
-      schema)
-    (Equal
-      (Option Bytes)
-      (Data.Collections.Derived.nth Bytes i values)
-      (Some Bytes (list_to_bytes (Nil UInt8))))
-    (λchecked_values.
-      λhchecked.
-        env_config_optional_values
-          (schema_fields schema)
-          (process_environment input)
-          values
-          (env_config_decode_valid_values
-            (schema_fields schema)
-            (process_environment input)
-            (schema_validate
-              EnvConfigOrigin
-              Bool
-              (environment_field_check (process_environment input))
-              schema)
-            checked_values
-            values
-            hchecked
-            hdecode)
-          i
-          field
-          hfield
-          hpresence
-          hlookup)
-    (λissues.
-      λhchecked.
-        absurd
-          (env_config_decode_invalid_impossible
-            (schema_fields schema)
-            (process_environment input)
-            (schema_validate
-              EnvConfigOrigin
-              Bool
-              (environment_field_check (process_environment input))
-              schema)
-            issues
-            values
-            hchecked
-            hdecode))
-
-pub proof required_lookup for decode_config_entries
-      (schema : Schema)
-    : (entries : List (Prod Bytes Bytes))
-      → (values : List Bytes)
-      → Equal
-        (Validation (NonEmpty Diagnostic) (List Bytes))
-        (decode_config_entries schema entries)
-        (Valid (NonEmpty Diagnostic) (List Bytes) values)
-      → (i : Nat)
-      → (field : SchemaField)
-      → Equal
-        (Option SchemaField)
-        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
-        (Some SchemaField field)
-      → Equal Application.Input.Schema.SchemaPresence
-        (schema_field_presence field)
-        Application.Input.Schema.SchemaRequired
-      → (goal : Prop)
-      → ((value : Bytes)
-          → Equal
-          (Option Bytes)
-          (env_config_lookup (bytes_encode (schema_field_name field)) entries)
-          (Some Bytes value)
-          → Equal
-          (Option Bytes)
-          (Data.Collections.Derived.nth Bytes i values)
-          (Some Bytes value)
-          → goal)
-      → goal =
-  λentries.
-    λvalues.
-      λhdecode.
-        λi.
-          λfield.
-            λhfield.
-              λhpresence.
-                λgoal.
-                  λrecover.
-                    env_config_schema_validation_cases
-                      (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
-                      goal
-                      (λchecked_values.
-                        λhchecked.
-                          env_config_required_values
-                            (config_field_check entries)
-                            (schema_fields schema)
-                            entries
-                            checked_values
-                            values
-                            hchecked
-                            (env_config_decode_valid_values
-                              (schema_fields schema)
-                              entries
-                              (schema_validate
-                                EnvConfigOrigin
-                                Bool
-                                (config_field_check entries)
-                                schema)
-                              checked_values
-                              values
-                              hchecked
-                              hdecode)
-                            (config_required_check_lookup entries)
-                            i
-                            field
-                            hfield
-                            hpresence
-                            goal
-                            recover)
-                      (λissues.
-                        λhchecked.
-                          absurd
-                            (env_config_decode_invalid_impossible
-                              (schema_fields schema)
-                              entries
-                              (schema_validate
-                                EnvConfigOrigin
-                                Bool
-                                (config_field_check entries)
-                                schema)
-                              issues
-                              values
-                              hchecked
-                              hdecode))
-
-pub proof optional_absence for decode_config_entries
-      (schema : Schema)
-      (entries : List (Prod Bytes Bytes))
-      (values : List Bytes)
-      (hdecode : Equal
-        (Validation (NonEmpty Diagnostic) (List Bytes))
-        (decode_config_entries schema entries)
-        (Valid (NonEmpty Diagnostic) (List Bytes) values))
-      (i : Nat)
-      (field : SchemaField)
-      (hfield : Equal
-        (Option SchemaField)
-        (Data.Collections.Derived.nth SchemaField i (schema_fields schema))
-        (Some SchemaField field))
-      (hpresence : Equal
-        Application.Input.Schema.SchemaPresence
-        (schema_field_presence field)
-        Application.Input.Schema.SchemaOptional)
-      (hlookup : Equal
-        (Option Bytes)
-        (env_config_lookup (bytes_encode (schema_field_name field)) entries)
-        (None Bytes))
-    : Equal
-        (Option Bytes)
-        (Data.Collections.Derived.nth Bytes i values)
-        (Some Bytes (list_to_bytes (Nil UInt8))) =
-  env_config_schema_validation_cases
-    (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
-    (Equal
-      (Option Bytes)
-      (Data.Collections.Derived.nth Bytes i values)
-      (Some Bytes (list_to_bytes (Nil UInt8))))
-    (λchecked_values.
-      λhchecked.
-        env_config_optional_values
-          (schema_fields schema)
-          entries
-          values
-          (env_config_decode_valid_values
-            (schema_fields schema)
-            entries
-            (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
-            checked_values
-            values
-            hchecked
-            hdecode)
-          i
-          field
-          hfield
-          hpresence
-          hlookup)
-    (λissues.
-      λhchecked.
-        absurd
-          (env_config_decode_invalid_impossible
-            (schema_fields schema)
-            entries
-            (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
-            issues
-            values
-            hchecked
-            hdecode))
 ```
 
 ## 5. Trust and boundaries
