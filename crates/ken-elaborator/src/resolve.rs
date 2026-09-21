@@ -23,7 +23,7 @@ use num_bigint::BigInt;
 
 /// A resolved constructor declaration (from `data` decl resolution).
 #[derive(Clone, Debug)]
-pub struct RCtorDecl {
+pub(crate) struct RCtorDecl {
     pub name: String,
     pub args: Vec<RType>,
     pub field_labels: Option<Vec<String>>,
@@ -32,7 +32,7 @@ pub struct RCtorDecl {
 
 /// A resolved data-head parameter or constructor telescope entry.
 #[derive(Clone, Debug)]
-pub struct RTelescopeEntry {
+pub(crate) struct RTelescopeEntry {
     pub name: Option<String>,
     pub ty: RType,
     pub span: Span,
@@ -40,7 +40,7 @@ pub struct RTelescopeEntry {
 
 /// A resolved constructor in an explicit `data ... where` family declaration.
 #[derive(Clone, Debug)]
-pub struct RExplicitCtorDecl {
+pub(crate) struct RExplicitCtorDecl {
     pub name: String,
     pub args: Vec<RTelescopeEntry>,
     /// `None` means simple default-result sugar; only valid for non-indexed
@@ -51,20 +51,20 @@ pub struct RExplicitCtorDecl {
 
 /// A resolved pattern.
 #[derive(Clone, Debug)]
-pub struct RPattern {
+pub(crate) struct RPattern {
     pub kind: RPatKind,
     pub span: Span,
 }
 
 #[derive(Clone, Debug)]
-pub struct RRecordPatField {
+pub(crate) struct RRecordPatField {
     pub label: String,
     pub pattern: RPattern,
     pub label_span: Span,
 }
 
 #[derive(Clone, Debug)]
-pub enum RPatKind {
+pub(crate) enum RPatKind {
     Wild,
     /// The optional slot makes a record-contained variable occurrence-backed:
     /// declaration-order projection columns need not become lexical binders.
@@ -80,7 +80,7 @@ pub enum RPatKind {
 
 /// A resolved match arm.
 #[derive(Clone, Debug)]
-pub struct RMatchArm {
+pub(crate) struct RMatchArm {
     pub pat: RPattern,
     pub guard: Option<RExpr>,
     pub body: RExpr,
@@ -88,7 +88,7 @@ pub struct RMatchArm {
 }
 
 #[derive(Clone, Debug)]
-pub struct RSpaceCell {
+pub(crate) struct RSpaceCell {
     pub name: String,
     pub ty: RType,
     pub init: RExpr,
@@ -96,7 +96,7 @@ pub struct RSpaceCell {
 }
 
 #[derive(Clone, Debug)]
-pub struct RSpaceOperation {
+pub(crate) struct RSpaceOperation {
     pub name: String,
     pub params: Vec<(String, RType)>,
     pub ret_ty: RType,
@@ -108,7 +108,7 @@ pub struct RSpaceOperation {
 }
 
 #[derive(Clone, Debug)]
-pub struct RSpaceDecl {
+pub(crate) struct RSpaceDecl {
     pub name: String,
     pub cells: Vec<RSpaceCell>,
     pub operations: Vec<RSpaceOperation>,
@@ -120,7 +120,7 @@ pub struct RSpaceDecl {
 
 /// A resolved declaration (`21 §6.2`).
 #[derive(Clone, Debug)]
-pub struct RDecl {
+pub(crate) struct RDecl {
     pub name: String,
     pub ty: Option<RType>,
     pub body: RExpr,
@@ -137,7 +137,7 @@ pub struct RDecl {
 
 /// A resolved class field declaration, with optional SURF-2 purity metadata.
 #[derive(Clone, Debug)]
-pub struct RClassField {
+pub(crate) struct RClassField {
     pub purity: Option<DefKeyword>,
     pub name: String,
     pub ty: RType,
@@ -145,14 +145,14 @@ pub struct RClassField {
 
 /// A resolved named-field record entry.
 #[derive(Clone, Debug)]
-pub struct RRecordField {
+pub(crate) struct RRecordField {
     pub name: String,
     pub ty: RType,
 }
 
 /// A resolved prerequisite dictionary on an instance declaration.
 #[derive(Clone, Debug)]
-pub struct RInstanceConstraint {
+pub(crate) struct RInstanceConstraint {
     pub class_name: String,
     pub head_type: RType,
     pub binder: String,
@@ -160,7 +160,7 @@ pub struct RInstanceConstraint {
 
 /// Discriminates the declaration kind for elaboration dispatch.
 #[derive(Clone, Debug)]
-pub enum RDeclKind {
+pub(crate) enum RDeclKind {
     /// A definition using legacy `view` or SURF-1 `const`/`fn`/`proc`.
     /// `constraints` shares the instance-path binder representation and is
     /// resolved through `resolve_instance_dictionary` before body elaboration.
@@ -241,7 +241,7 @@ pub enum RDeclKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct RPropIntro {
+pub(crate) struct RPropIntro {
     pub name: String,
     pub ty: RType,
     pub span: Span,
@@ -250,7 +250,7 @@ pub struct RPropIntro {
 /// One operator in a resolved-but-still-flat infix spine. User names are
 /// canonicalized by `modules.rs` before the pre-body reassociation pass.
 #[derive(Clone, Debug)]
-pub enum RInfixOperator {
+pub(crate) enum RInfixOperator {
     Builtin(BinOp, Span),
     User(String, Span),
 }
@@ -265,7 +265,7 @@ impl RInfixOperator {
 
 /// A resolved expression — names replaced by de Bruijn indices.
 #[derive(Clone, Debug)]
-pub enum RExpr {
+pub(crate) enum RExpr {
     RVar(usize, String, Span),
     /// An as-pattern alias. The slot is its resolver-order position within
     /// the arm pattern; matrix-leaf elaboration supplies the corresponding
@@ -431,7 +431,7 @@ impl RExpr {
 
 /// A resolved type expression.
 #[derive(Clone, Debug)]
-pub enum RType {
+pub(crate) enum RType {
     RPi(String, Box<RType>, Box<RType>, Span),
     RSigma(String, Box<RType>, Box<RType>, Span),
     RArr(Box<RType>, Box<RType>, Span),
@@ -1008,9 +1008,9 @@ pub(crate) fn check_no_definition_collision(
     Ok(())
 }
 
-// ----- public entry points -----
+// ----- crate entry points -----
 
-pub fn resolve_decls(decls: &[Decl]) -> Result<Vec<RDecl>, ElabError> {
+pub(crate) fn resolve_decls(decls: &[Decl]) -> Result<Vec<RDecl>, ElabError> {
     let mut out = Vec::new();
     let mut unit_definitions = HashSet::new();
     for d in decls {
@@ -1019,7 +1019,7 @@ pub fn resolve_decls(decls: &[Decl]) -> Result<Vec<RDecl>, ElabError> {
     Ok(out)
 }
 
-pub fn resolve_decl(decl: &Decl) -> Result<RDecl, ElabError> {
+pub(crate) fn resolve_decl(decl: &Decl) -> Result<RDecl, ElabError> {
     resolve_decl_in_unit(decl, &mut HashSet::new(), None)
 }
 
@@ -1756,7 +1756,7 @@ pub(crate) fn resolve_decl_in_unit(
     }
 }
 
-pub fn resolve_expr_standalone(expr: &Expr) -> Result<RExpr, ElabError> {
+pub(crate) fn resolve_expr_standalone(expr: &Expr) -> Result<RExpr, ElabError> {
     let mut scope = Scope::new();
     resolve_expr(&mut scope, expr)
 }

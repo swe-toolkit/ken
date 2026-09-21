@@ -1,8 +1,8 @@
 //! Tier-D Diagnostics.Render publication and strict-import controls.
 
-#[path = "support/catalog_or.rs"]
+#[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
-#[path = "support/catalog_publication.rs"]
+#[path = "../../tests/support/catalog_publication.rs"]
 mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,7 +14,7 @@ const DIAGNOSTICS_CORE: &str = "Capability.Diagnostics.Core";
 const FORMATTING_DOC: &str = "Capability.Formatting.Doc";
 const DIAGNOSTICS_RENDER: &str = "Capability.Diagnostics.Render";
 const DIAGNOSTICS_RENDER_SOURCE: &str =
-    include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
+    include_str!("../../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()

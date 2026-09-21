@@ -12,7 +12,7 @@
 //! - **AC5** — the catalog entry's `` ```ken ``/`` ```ken example ``/
 //!   `` ```ken reject `` fences all check via the real literate extractor.
 
-#[path = "support/catalog_or.rs"]
+#[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
 
 use std::path::PathBuf;
@@ -231,7 +231,7 @@ fn ac2_empty_and_absurd_empty_elaborate() {
 // never `declare_primitive`/`declare_postulate`.
 #[test]
 fn ac3_trusted_base_delta_is_ordinary_inductive_admission_only() {
-    let prelude_src = include_str!("../src/prelude.rs");
+    let prelude_src = include_str!("../prelude.rs");
 
     // `Empty` is admitted via `data::elab_data_decl` (the same surface-data
     // machinery every other prelude `data` uses), NEVER a primitive/postulate.

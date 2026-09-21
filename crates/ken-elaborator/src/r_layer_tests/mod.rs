@@ -1,0 +1,34 @@
+//! Integration assertions relocated in-crate with the internal R layer.
+
+mod acceptance;
+mod cat_bool_pub_export;
+mod cat_bytes_keys_closeout;
+mod cat_effectful_classes_import;
+mod cat_effectful_classes_pub_export;
+mod cat_lawful_functors_pub_export;
+mod cat_ord_nat_canonical_owner;
+mod cat_order_pub_export;
+mod cat_priority_queue_acceptance;
+mod cat_tier_d_cursor_import;
+mod cat_tier_d_decoder_import;
+mod cat_tier_d_parsing_group_import;
+mod cat_tier_d_posix_import;
+mod cat_tier_d_process_environment_import;
+mod cat_tier_d_render_import;
+mod cat_tier_e_argparse_import;
+mod cat_tier_e_decoder_import;
+mod cat_tier_e_json_import;
+mod cat_tier_e_schema_import;
+mod cc6b_path_posix_acceptance;
+mod constrained_instance_elaboration;
+mod ds1_empty_dec_acceptance;
+mod effects;
+mod kenfmt_b3_layout;
+mod kenfmt_b4_splicing;
+mod kenfmt_let_layout;
+mod lang_fixity_decl_surface;
+mod lang_mod_catalog_evidence_frontier;
+mod lang_structural_result_elab;
+mod lc_acceptance;
+mod let4_multi_binding;
+mod n4_program_admits;

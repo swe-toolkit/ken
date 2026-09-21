@@ -1,8 +1,8 @@
 //! Tier-E configuration Decoder publication and strict-import controls.
 
-#[path = "support/catalog_or.rs"]
+#[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
-#[path = "support/catalog_publication.rs"]
+#[path = "../../tests/support/catalog_publication.rs"]
 mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -12,10 +12,10 @@ use ken_kernel::{Decl, GlobalId, Term};
 
 const DECODER: &str = "Application.Configuration.Decoder";
 const DECODER_SOURCE: &str =
-    include_str!("../../../catalog/packages/Application/Configuration/Decoder.ken.md");
+    include_str!("../../../../catalog/packages/Application/Configuration/Decoder.ken.md");
 const SCHEMA: &str = "Application.Input.Schema";
 const SCHEMA_SOURCE: &str =
-    include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
+    include_str!("../../../../catalog/packages/Application/Input/Schema.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()
