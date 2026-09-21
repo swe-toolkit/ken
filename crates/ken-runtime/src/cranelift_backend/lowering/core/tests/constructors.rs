@@ -191,6 +191,8 @@ fn run_dynamic_constructor_dispatch_fixture(
         default: default.clone(),
     };
     let mut compiler = Lowering {
+        grafted_spine_builder: None,
+        grafted_spine_graph: None,
         seed_env: &seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan: inert_test_plan(),
@@ -243,6 +245,10 @@ fn run_dynamic_constructor_dispatch_fixture(
         native_int_mutation: NativeIntLoweringMutation::Exact,
         bounded_nat_mutation: BoundedNatLoweringMutation::Exact,
         function_local: FunctionLocalRefs {
+            grafted_spine_scope: None,
+            grafted_spine_calls: Vec::new(),
+            grafted_spine_terminals: Vec::new(),
+            grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
@@ -1928,6 +1934,8 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
     plan: StaticTransitionPlan<'src>,
 ) -> Lowering<'src> {
     Lowering {
+        grafted_spine_builder: None,
+        grafted_spine_graph: None,
         seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan: plan,
@@ -1977,6 +1985,10 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
         native_int_mutation: NativeIntLoweringMutation::Exact,
         bounded_nat_mutation: BoundedNatLoweringMutation::Exact,
         function_local: FunctionLocalRefs {
+            grafted_spine_scope: None,
+            grafted_spine_calls: Vec::new(),
+            grafted_spine_terminals: Vec::new(),
+            grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),

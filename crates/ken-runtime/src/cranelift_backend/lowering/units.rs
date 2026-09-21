@@ -293,6 +293,10 @@ pub(in crate::cranelift_backend) fn b2f_units_declared_in_attempt(epoch: u64) ->
 /// removal), reintroduced one layer out.
 pub(in crate::cranelift_backend) struct UnitBundle {
     functions: BTreeMap<PredeclaredFunctionId, FuncId>,
+    /// Typed generated-function scope for every declared target. `FuncId` is
+    /// used only while declaring local `FuncRef`s; it never enters the finished
+    /// grafted-spine graph.
+    grafted_spine_scopes: BTreeMap<FuncId, GraftedSpineFunctionScope>,
     /// **`RT-CONTSPEC-ACTIVATE` `D2`** -- one declared target per planned
     /// continuation specialization, keyed by the planner's typed identity.
     ///
@@ -339,6 +343,19 @@ impl UnitBundle {
         unit: PredeclaredFunctionId,
     ) -> Option<FuncId> {
         self.functions.get(&unit).copied()
+    }
+
+    fn grafted_spine_scope(
+        &self,
+        function: FuncId,
+    ) -> Option<GraftedSpineFunctionScope> {
+        self.grafted_spine_scopes.get(&function).copied()
+    }
+
+    pub(super) fn grafted_spine_scope_population(
+        &self,
+    ) -> impl Iterator<Item = GraftedSpineFunctionScope> + '_ {
+        self.grafted_spine_scopes.values().copied()
     }
 
     /// The declared target for one continuation specialization.
@@ -404,6 +421,42 @@ impl UnitBundle {
     /// counts spellings and cannot see it.
     pub(in crate::cranelift_backend) fn len(&self) -> usize {
         self.functions.len()
+    }
+}
+
+impl Lowering<'_> {
+    fn record_finished_grafted_spine_function(
+        &mut self,
+        function: &Function,
+        bundle: &UnitBundle,
+    ) -> Result<(), CraneliftBackendError> {
+        let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
+            backend_module(
+                "a generated unit finished without a typed grafted-spine scope".to_string(),
+            )
+        })?;
+        let calls = std::mem::take(&mut self.function_local.grafted_spine_calls);
+        let terminals = std::mem::take(&mut self.function_local.grafted_spine_terminals);
+        self.grafted_spine_builder
+            .as_mut()
+            .ok_or_else(|| {
+                backend_module(
+                    "a generated unit finished after its grafted-spine builder closed".to_string(),
+                )
+            })?
+            .observe_emitted_function(scope, function, calls, terminals, |function| {
+                bundle.grafted_spine_scope(function)
+            })
+    }
+
+    pub(super) fn finish_grafted_spine_control_graph(
+        &mut self,
+    ) -> Result<(), CraneliftBackendError> {
+        let builder = self.grafted_spine_builder.take().ok_or_else(|| {
+            backend_module("the grafted-spine builder was already closed".to_string())
+        })?;
+        self.grafted_spine_graph = Some(builder.finish()?);
+        Ok(())
     }
 }
 
@@ -1442,6 +1495,7 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
 ) -> Result<UnitBundle, CraneliftBackendError> {
     let sig = unit_signature(module);
     let mut functions = BTreeMap::new();
+    let mut grafted_spine_scopes = BTreeMap::new();
     // `D5a` checkpoint 1: the EXECUTABLE population, not the template one. ⛔ A
     // template-only raw worker must not be declared here -- declaring it and
     // then not defining it is the undefined phantom the ruling names, and it
@@ -1454,6 +1508,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
             .map_err(|err| backend_module(err.to_string()))?;
+        if grafted_spine_scopes
+            .insert(id, GraftedSpineFunctionScope::Predeclared(unit.function()))
+            .is_some()
+        {
+            return Err(backend_module(
+                "two predeclared units share one module function target".to_string(),
+            ));
+        }
         if functions.insert(unit.function(), id).is_some() {
             // ⛔ Fails closed rather than overwriting. `B2R` gives exactly one
             // descriptor per `PredeclaredFunction`, so a duplicate here means
@@ -1481,6 +1543,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
             .map_err(|err| backend_module(err.to_string()))?;
+        if grafted_spine_scopes
+            .insert(id, GraftedSpineFunctionScope::Continuation(unit))
+            .is_some()
+        {
+            return Err(backend_module(
+                "two continuation units share one module function target".to_string(),
+            ));
+        }
         if continuations.insert(unit, id).is_some() {
             return Err(backend_module(
                 "two continuation descriptors claim one planned specialization".to_string(),
@@ -1505,6 +1575,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
             .map_err(|err| backend_module(err.to_string()))?;
+        if grafted_spine_scopes
+            .insert(id, GraftedSpineFunctionScope::Response(owner.id()))
+            .is_some()
+        {
+            return Err(backend_module(
+                "two response owners share one module function target".to_string(),
+            ));
+        }
         if responses.insert(owner.id(), id).is_some() {
             return Err(backend_module(
                 "two response-owner descriptors claim one response-owner identity".to_string(),
@@ -1521,6 +1599,17 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
             .map_err(|err| backend_module(err.to_string()))?;
+        if grafted_spine_scopes
+            .insert(
+                id,
+                GraftedSpineFunctionScope::ContinuationContext(context.id()),
+            )
+            .is_some()
+        {
+            return Err(backend_module(
+                "two continuation contexts share one module function target".to_string(),
+            ));
+        }
         if contexts.insert(context.id(), id).is_some() {
             return Err(backend_module(
                 "two generated context descriptors claim one planned context".to_string(),
@@ -1543,6 +1632,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
             .map_err(|err| backend_module(err.to_string()))?;
+        if grafted_spine_scopes
+            .insert(id, GraftedSpineFunctionScope::Fusion(fusion.id()))
+            .is_some()
+        {
+            return Err(backend_module(
+                "two fusion regions share one module function target".to_string(),
+            ));
+        }
         if fusions.insert(fusion.id(), id).is_some() {
             return Err(backend_module(
                 "two static continuation fusion descriptors claim one installed region".to_string(),
@@ -1553,6 +1650,7 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     B2F_UNIT_EMISSION.with(|cell| cell.set((functions.len(), 0)));
     Ok(UnitBundle {
         functions,
+        grafted_spine_scopes,
         continuations,
         responses,
         contexts,
@@ -2890,6 +2988,9 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(5, id.as_u32()), sig);
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
+        function_local.grafted_spine_scope = Some(GraftedSpineFunctionScope::Response(
+            emission.owner.id(),
+        ));
         let declared_calls = call_edges.declare_in_func(
             emission.row.operation_source_owner(),
             module,
@@ -3474,6 +3575,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         }
         ambient.release(compiler);
         frame_scope.close(compiler)?;
+        compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
         verify_static_response_finished_body(
             &func,
@@ -3772,6 +3874,9 @@ pub(super) fn define_continuation_bodies<M: Module>(
             })?;
 
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
+        function_local.grafted_spine_scope = Some(
+            GraftedSpineFunctionScope::Continuation(unit.id),
+        );
         // ONE lawful declaration per continuation `Function`, retained whole
         // and seated in BOTH existing roles. The worker constructor validates
         // through `unit_calls`; the later callee-only consumer resolves
@@ -4081,6 +4186,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
         }
         ambient.release(compiler);
         frame_scope.close(compiler)?;
+        compiler.record_finished_grafted_spine_function(&func, bundle)?;
         // Verify, then define THIS function -- a fresh context here would
         // define an empty body and silently discard everything emitted above.
         verify_cranelift_function(&func, module.isa())?;
@@ -4383,6 +4489,9 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(3, id.as_u32()), sig);
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
+        function_local.grafted_spine_scope = Some(
+            GraftedSpineFunctionScope::ContinuationContext(context.id),
+        );
         // The raw body's OWN call edges, declared into this function. They are
         // the raw owner's edges because the body is the raw owner's body; what
         // this context changes is the environment, never which callees the
@@ -4758,6 +4867,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             )?;
             ledger.record_response_owner_calls(response_owner_calls);
         }
+        compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
         let mut ctx = module.make_context();
@@ -4977,6 +5087,9 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(4, id.as_u32()), sig);
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
+        function_local.grafted_spine_scope = Some(
+            GraftedSpineFunctionScope::Fusion(fusion.id),
+        );
         // The PRODUCER's own call edges, declared into this function. This is
         // what carries the inherited producer edge: the producer's body still
         // names the callees the source named, and it is only its *host* that
@@ -5382,6 +5495,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             )?;
             ledger.record_response_owner_calls(response_owner_calls);
         }
+        compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
         if let Some(ledger) = compiler.fusion_claims.as_mut() {
@@ -7709,6 +7823,9 @@ fn define_unit_body<M: Module>(
     let unit_trap_authority = None;
     let mut function_local =
         helpers.declare_in_func(module, &mut func, unit_trap_authority);
+    function_local.grafted_spine_scope = Some(
+        GraftedSpineFunctionScope::Predeclared(unit.function),
+    );
     let declared_calls = call_edges.declare_in_func(unit.function, module, &mut func)?;
     // `D3` — this ordinary Function declares its OWN `FuncRef` for every causal
     // token it owns, keyed by the four-field identity. Minted here, into this
@@ -8234,6 +8351,7 @@ fn define_unit_body<M: Module>(
         }
         ledger.record_response_owner_calls(response_owner_calls);
     }
+    compiler.record_finished_grafted_spine_function(&func, bundle)?;
     verify_cranelift_function(&func, module.isa())?;
     compiler.commit_aggregate_events()?;
     #[cfg(test)]

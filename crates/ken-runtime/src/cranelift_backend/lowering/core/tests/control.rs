@@ -37,6 +37,8 @@ pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
 /// lower a fixture builds its own `Lowering` with that fixture's plan.
 pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowering<'a> {
     Lowering {
+        grafted_spine_builder: None,
+        grafted_spine_graph: None,
         seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan: inert_test_plan(),
@@ -92,6 +94,10 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
         native_int_mutation: NativeIntLoweringMutation::Exact,
         bounded_nat_mutation: BoundedNatLoweringMutation::Exact,
         function_local: FunctionLocalRefs {
+            grafted_spine_scope: None,
+            grafted_spine_calls: Vec::new(),
+            grafted_spine_terminals: Vec::new(),
+            grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
@@ -212,6 +218,8 @@ fn run_px8j_malformed_recursor_consumer(
     };
     let (static_transition_plan, fixture_origin) = planned_root_occurrence(lowered_fixture);
     let mut compiler = Lowering {
+        grafted_spine_builder: None,
+        grafted_spine_graph: None,
         seed_env: &seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan,
@@ -264,6 +272,10 @@ fn run_px8j_malformed_recursor_consumer(
         native_int_mutation: NativeIntLoweringMutation::Exact,
         bounded_nat_mutation: BoundedNatLoweringMutation::Exact,
         function_local: FunctionLocalRefs {
+            grafted_spine_scope: None,
+            grafted_spine_calls: Vec::new(),
+            grafted_spine_terminals: Vec::new(),
+            grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
@@ -2237,6 +2249,8 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
 fn distinguished_root_cannot_discharge_missing_match_site_marker() {
     let seed_env = NativeSeedEnvironment::empty();
     let mut lowering = Lowering {
+        grafted_spine_builder: None,
+        grafted_spine_graph: None,
         seed_env: &seed_env,
         declarations: BTreeMap::new(),
         static_transition_plan: inert_test_plan(),
@@ -2292,6 +2306,10 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         native_int_mutation: NativeIntLoweringMutation::Exact,
         bounded_nat_mutation: BoundedNatLoweringMutation::Exact,
         function_local: FunctionLocalRefs {
+            grafted_spine_scope: None,
+            grafted_spine_calls: Vec::new(),
+            grafted_spine_terminals: Vec::new(),
+            grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
@@ -3186,6 +3204,15 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_definitions: 0,
         },
         Census {
+            file: "grafted_spine_control_graph.rs",
+            source: include_str!("../../../grafted_spine_control_graph.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
+        Census {
             file: "surface.rs",
             source: include_str!("../../../surface.rs"),
             builders: 0,
@@ -3490,6 +3517,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     ("artifact/api.rs", include_str!("../../../artifact/api.rs")),
     ("artifact/mod.rs", include_str!("../../../artifact/mod.rs")),
     ("compiled.rs", include_str!("../../../compiled.rs")),
+    (
+        "grafted_spine_control_graph.rs",
+        include_str!("../../../grafted_spine_control_graph.rs"),
+    ),
     ("lowering/core.rs", include_str!("../../core.rs")),
     (
         "lowering/core/primitive.rs",
@@ -3826,6 +3857,7 @@ fn the_backend_production_surface_inventory_is_closed() {
         vec![
             ("cranelift_backend.rs", "artifact"),
             ("cranelift_backend.rs", "compiled"),
+            ("cranelift_backend.rs", "grafted_spine_control_graph"),
             ("cranelift_backend.rs", "lowering"),
             ("cranelift_backend.rs", "planning"),
             ("cranelift_backend.rs", "surface"),

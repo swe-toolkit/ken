@@ -2674,6 +2674,10 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         host_effect_seats: None,
         seed_env,
         declarations,
+        grafted_spine_builder: Some(GraftedSpineControlGraphBuilder::new(
+            unit_bundle.grafted_spine_scope_population(),
+        )?),
+        grafted_spine_graph: None,
         static_transition_plan,
         result_table: BTreeMap::new(),
         next_token: 0,
@@ -2857,6 +2861,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                      {expected_response_owners}, defined {defined_response_owners}",
                 )));
             }
+            compiler.finish_grafted_spine_control_graph()?;
             compiler.require_complete_join_plan_consumption()?;
             compiler.require_complete_dynamic_splice_edge_consumption()?;
             super::units::define_root_adapter(
@@ -3090,8 +3095,9 @@ impl<'a> Lowering<'a> {
                 // ⚠ No invocation segment is in scope on the pending-`Let`
                 // resumption, so no coordinates can be supplied. The callee
                 // fails closed if this body has a generated context.
-                let returned =
-                    self.call_declared_recursive_position_unit(builder, body, &inputs, None)?;
+                let returned = self.with_grafted_spine_call_source(call_origin, |this| {
+                    this.call_declared_recursive_position_unit(builder, body, &inputs, None)
+                })?;
                 return self.lower_computational_match_value_composed(
                     builder,
                     RoutedAnswer::direct(returned),
@@ -5858,9 +5864,11 @@ impl<'a> Lowering<'a> {
                         self.lower_expr(builder, argument, producer_env)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                self.call_declaration_closure_unit(
-                    builder, reference, &symbol, &params, captures, args,
-                )
+                self.with_grafted_spine_call_source(static_origin, |this| {
+                    this.call_declaration_closure_unit(
+                        builder, reference, &symbol, &params, captures, args,
+                    )
+                })
             }
             LoweringOperand::Specialized(Lowered::Closure {
                 captures,
@@ -5898,13 +5906,15 @@ impl<'a> Lowering<'a> {
                 // only the environment role crosses the binding
                 // authority -- there is no route back the other way.
                 call_inputs.extend(captures);
-                let returned = self.call_declared_unit(
-                    builder,
-                    body,
-                    &call_inputs,
-                    #[cfg(test)]
-                    None,
-                )?;
+                let returned = self.with_grafted_spine_call_source(static_origin, |this| {
+                    this.call_declared_unit(
+                        builder,
+                        body,
+                        &call_inputs,
+                        #[cfg(test)]
+                        None,
+                    )
+                })?;
                 if let Some(row) = self
                     .static_transition_plan
                     .deferred_no_unit_response_in_body(body)?
@@ -6039,12 +6049,14 @@ impl<'a> Lowering<'a> {
                         self.enter_oriented_semantic_region(installed.checked);
                         let coordinates = carried_coordinates;
                         let returned = self
-                            .call_declared_recursive_position_unit(
-                                builder,
-                                body,
-                                &inputs,
-                                Some(coordinates),
-                            )
+                            .with_grafted_spine_call_source(static_origin, |this| {
+                                this.call_declared_recursive_position_unit(
+                                    builder,
+                                    body,
+                                    &inputs,
+                                    Some(coordinates),
+                                )
+                            })
                             .and_then(|value| {
                                 self.lower_computational_match_value_composed(
                                     builder,
@@ -6139,13 +6151,15 @@ impl<'a> Lowering<'a> {
                 // crosses the binding authority.
                 call_inputs.extend(captures);
                 self.enter_oriented_semantic_region(installed.checked);
-                let returned = self.call_declared_unit(
-                    builder,
-                    body,
-                    &call_inputs,
-                    #[cfg(test)]
-                    None,
-                )?;
+                let returned = self.with_grafted_spine_call_source(static_origin, |this| {
+                    this.call_declared_unit(
+                        builder,
+                        body,
+                        &call_inputs,
+                        #[cfg(test)]
+                        None,
+                    )
+                })?;
                 let returned = self.lower_computational_match_value_composed(
                     builder,
                     RoutedAnswer::direct(returned),
@@ -15884,13 +15898,15 @@ impl<'a> Lowering<'a> {
                         // with the run's outcome before claiming emission.
                         #[cfg(test)]
                         SEED_CALLEE_UNIT_PORTS.with(|calls| calls.set(calls.get() + 1));
-                        return self.call_declared_unit(
-                            builder,
-                            body,
-                            &inputs,
-                            #[cfg(test)]
-                            None,
-                        );
+                        return self.with_grafted_spine_call_source(static_origin, |this| {
+                            this.call_declared_unit(
+                                builder,
+                                body,
+                                &inputs,
+                                #[cfg(test)]
+                                None,
+                            )
+                        });
                     }
                     if let RuntimeExpr::LexicalClosure {
                         captures,
@@ -15969,13 +15985,15 @@ impl<'a> Lowering<'a> {
                         let body = self
                             .child_occurrence(closure_origin, 0, body)?
                             .static_origin;
-                        return self.call_declared_unit(
-                            builder,
-                            body,
-                            &inputs,
-                            #[cfg(test)]
-                            None,
-                        );
+                        return self.with_grafted_spine_call_source(static_origin, |this| {
+                            this.call_declared_unit(
+                                builder,
+                                body,
+                                &inputs,
+                                #[cfg(test)]
+                                None,
+                            )
+                        });
                     }
                 }
                 let lowered_callee = self.lower_expr(builder, callee, env)?;
@@ -16001,9 +16019,11 @@ impl<'a> Lowering<'a> {
                                 self.lower_expr(builder, argument, env)
                             })
                             .collect::<Result<Vec<_>, _>>()?;
-                        self.call_declaration_closure_unit(
-                            builder, reference, &symbol, &params, captures, args,
-                        )
+                        self.with_grafted_spine_call_source(static_origin, |this| {
+                            this.call_declaration_closure_unit(
+                                builder, reference, &symbol, &params, captures, args,
+                            )
+                        })
                     }
                     LoweringOperand::Specialized(Lowered::Closure {
                         captures,
@@ -16046,20 +16066,24 @@ impl<'a> Lowering<'a> {
                         // enclosing spine behind it.
                         call_inputs.extend(captures);
                         if let Some(environment) = boundary_environment {
-                            return self.call_boundary_closure_environment(
+                            return self.with_grafted_spine_call_source(static_origin, |this| {
+                                this.call_boundary_closure_environment(
+                                    builder,
+                                    environment,
+                                    body,
+                                    &call_inputs,
+                                )
+                            });
+                        }
+                        self.with_grafted_spine_call_source(static_origin, |this| {
+                            this.call_declared_unit(
                                 builder,
-                                environment,
                                 body,
                                 &call_inputs,
-                            );
-                        }
-                        self.call_declared_unit(
-                            builder,
-                            body,
-                            &call_inputs,
-                            #[cfg(test)]
-                            None,
-                        )
+                                #[cfg(test)]
+                                None,
+                            )
+                        })
                     }
                     LoweringOperand::Specialized(
                         mut callee @ Lowered::ComputationalRecursorClosure { .. },
@@ -16114,12 +16138,14 @@ impl<'a> Lowering<'a> {
                                 self.enter_oriented_semantic_region(installed.checked);
                                 let coordinates = carried_coordinates;
                                 let result = self
-                                    .call_declared_recursive_position_unit(
-                                        builder,
-                                        body,
-                                        &inputs,
-                                        Some(coordinates),
-                                    )
+                                    .with_grafted_spine_call_source(static_origin, |this| {
+                                        this.call_declared_recursive_position_unit(
+                                            builder,
+                                            body,
+                                            &inputs,
+                                            Some(coordinates),
+                                        )
+                                    })
                                     .and_then(|value| {
                                         self.lower_computational_match_value_composed(
                                             builder,
@@ -16196,12 +16222,14 @@ impl<'a> Lowering<'a> {
                         self.enter_oriented_semantic_region(installed.checked);
                         let coordinates = carried_coordinates;
                         let result = self
-                            .call_declared_recursive_position_unit(
-                                builder,
-                                body,
-                                &call_inputs,
-                                Some(coordinates),
-                            )
+                            .with_grafted_spine_call_source(static_origin, |this| {
+                                this.call_declared_recursive_position_unit(
+                                    builder,
+                                    body,
+                                    &call_inputs,
+                                    Some(coordinates),
+                                )
+                            })
                             .and_then(|value| {
                                 self.lower_computational_match_value_composed(
                                     builder,

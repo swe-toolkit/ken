@@ -503,13 +503,15 @@ impl<'a> Lowering<'a> {
                 ));
             }
 
-            let emitted = self.call_declared_unit_target(
-                builder,
-                target,
-                &inputs,
-                #[cfg(test)]
-                None,
-            )?;
+            let emitted = self.with_grafted_spine_call_source(static_origin, |this| {
+                this.call_declared_unit_target(
+                    builder,
+                    target,
+                    &inputs,
+                    #[cfg(test)]
+                    None,
+                )
+            })?;
             // `D5a` -- the emission half of the marker's ordered log. ⛔ Recorded
             // AFTER the instruction exists, so "consumed before emitted" is a fact
             // about the log's order rather than about where the line was written.
@@ -1625,6 +1627,17 @@ impl<'a> Lowering<'a> {
             .map(|(operand, _)| operand)
         }
 
+        pub(super) fn with_grafted_spine_call_source<T>(
+            &mut self,
+            source: StaticOriginId,
+            operation: impl FnOnce(&mut Self) -> Result<T, CraneliftBackendError>,
+        ) -> Result<T, CraneliftBackendError> {
+            let prior = self.function_local.grafted_spine_call_source.replace(source);
+            let result = operation(self);
+            self.function_local.grafted_spine_call_source = prior;
+            result
+        }
+
         pub(super) fn call_declared_unit(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
@@ -2029,6 +2042,12 @@ impl<'a> Lowering<'a> {
             );
             let envelope = builder.ins().stack_addr(pointer_type, envelope, 0);
             let call = builder.ins().call(target.function, &[envelope, services]);
+            self.function_local.grafted_spine_calls.push(
+                PendingGraftedSpineCall::new(
+                    call,
+                    self.function_local.grafted_spine_call_source,
+                ),
+            );
             let [unit_status] = builder.inst_results(call) else {
                 return Err(backend_module(
                     "internal unit call did not return exactly one word".to_string(),

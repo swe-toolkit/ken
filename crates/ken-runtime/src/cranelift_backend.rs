@@ -43,6 +43,7 @@ use crate::RuntimeProgram;
 
 pub(crate) mod artifact;
 pub(crate) mod compiled;
+mod grafted_spine_control_graph;
 mod lowering;
 pub(crate) mod planning;
 pub(crate) mod surface;
