@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-21 03:16:05Z — from 702 issue file(s) in `docs/program/issues/`.
+2026-09-21 03:21:31Z — from 703 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -63,6 +63,7 @@ the committed file matches the generator's output.
 | `CAT-CC-ORACLE-BEHAVIORALIZE` | Behavioralize the pre-existing prohibited repository-text oracles in the cc3/cc4/cc5 catalog acceptance tests: replace the Axiom source scans with trusted-base delta checks, and the catalog data-declaration / fn text scans with loader-inventory / selective-resolution / elaboration controls. A test-only cleanup surfaced by CV during the CAT-MIGRATE-TIER-D-CURSOR review; pre-existing, non-blocking, queued behind the active lanes. | merged | foundation | S | none | — |
 | `CAT-COLLECTIONS-NTH-LAWS` | Land the nth/length pair in Data/Collections/Derived.ken.md: nth returning Some bounds the index below the length, and an index at or beyond the length returns None -- the general List facts CAT-PARSING-CURSOR-LAWS reaches in the base case of its first law and cannot discharge in-package. | merged | foundation | M | none | — |
 | `CAT-COMPARE-LAWS` | give list_compare the equality soundness/completeness and first-difference lexicographic laws that pair_compare already has for equality, and bridge list_eq to them -- the next of the seventeen proof-backfill follow-ons, selected by Foundation while CAT-PARSING-CURSOR-LAWS is parked | merged | foundation | L | none | — |
+| `CAT-CONFIGURATION-DECODER-LAWS` | prove that a Valid decode never reaches env_config_values' empty-Bytes placeholder -- the decoder runs the schema traversal and the value traversal INDEPENDENTLY over the same fields and entries, discards the validation's own values, and recomputes them, so nothing today connects Valid to lookup success; if that agreement fails, a missing required field decodes to empty Bytes instead of an error. Instantiates the landed schema_validate_fields::valid_coverage at the two decoder entry points and carries raw-Bytes identity and per-entry-point provenance with it. | draft | foundation | M | none | — |
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-DERIVED-PUB-EXPORT` | Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3079 |
 | `CAT-DERIVED-REUSE-CONSUMERS` | Drain catalog-reuse census group 4 (derived-list computational reuse) — replace six reimplementations of list_append, reverse, concat_map, and length across five packages with selective imports from Data.Collections.Derived. The consumer half of CAT-DERIVED-PUB-EXPORT, shaped on the landed CAT-NAT-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | M | none | — |
