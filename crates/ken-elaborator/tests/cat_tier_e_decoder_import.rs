@@ -63,7 +63,7 @@ fn public_surface() -> BTreeSet<String> {
     ])
 }
 
-fn private_surface() -> [&'static str; 17] {
+fn private_surface() -> [&'static str; 18] {
     [
         "EnvConfigOrigin",
         "EnvVariableOrigin",
@@ -79,6 +79,7 @@ fn private_surface() -> [&'static str; 17] {
         "env_config_missing_field",
         "env_config_origin_to_origin",
         "env_config_validation",
+        "env_config_value_or_empty",
         "env_config_values",
         "environment_field_check",
         "environment_field_origin",
@@ -456,7 +457,7 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: roots loading preserves trust, class, and instance populations
-/// while all 17 retained implementation names reject through real external imports.
+/// while all 18 retained implementation names reject through real external imports.
 /// CLAIMED: Decoder changes only declared dependencies and coherent driver
 /// visibility. THE GAP: exact body preservation is a one-shot object diff.
 #[test]

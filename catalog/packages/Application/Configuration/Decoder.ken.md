@@ -115,16 +115,23 @@ fn config_field_check
     : SchemaFieldCheck EnvConfigOrigin Bool =
   env_config_field_check (config_field_origin (schema_field_name field)) entries field
 
+fn env_config_value_or_empty (choice : Option Bytes) : Bytes =
+  match choice {
+    Some value ↦ value;
+    None ↦ list_to_bytes (Nil UInt8)
+  }
+
 fn env_config_values
       (fields : List SchemaField) (entries : List (Prod Bytes Bytes))
     : List Bytes =
   match fields {
     Nil ↦ Nil Bytes;
     Cons field rest ↦
-      match env_config_lookup (bytes_encode (schema_field_name field)) entries {
-        Some value ↦ Cons Bytes value (env_config_values rest entries);
-        None ↦ Cons Bytes (list_to_bytes (Nil UInt8)) (env_config_values rest entries)
-      }
+      Cons
+        Bytes
+        (env_config_value_or_empty
+          (env_config_lookup (bytes_encode (schema_field_name field)) entries))
+        (env_config_values rest entries)
   }
 
 theorem env_config_some_injective
@@ -212,56 +219,7 @@ theorem env_config_values_tail
           (Suc i)
           (env_config_values (Cons SchemaField head rest) entries))
         (Data.Collections.Derived.nth Bytes i (env_config_values rest entries)) =
-  env_config_lookup_cases
-    (bytes_encode (schema_field_name head))
-    entries
-    (Equal
-      (Option Bytes)
-      (Data.Collections.Derived.nth
-        Bytes
-        (Suc i)
-        (env_config_values (Cons SchemaField head rest) entries))
-      (Data.Collections.Derived.nth Bytes i (env_config_values rest entries)))
-    (λhlookup.
-      J
-        (λchoice _.
-          Equal
-            (Option Bytes)
-            (Data.Collections.Derived.nth
-              Bytes
-              (Suc i)
-              (match choice {
-                None ↦ Cons Bytes (list_to_bytes (Nil UInt8)) (env_config_values rest entries);
-                Some value ↦ Cons Bytes value (env_config_values rest entries)
-              }))
-            (Data.Collections.Derived.nth Bytes i (env_config_values rest entries)))
-        Refl
-        (env_config_sym
-          (Option Bytes)
-          (env_config_lookup (bytes_encode (schema_field_name head)) entries)
-          (None Bytes)
-          hlookup))
-    (λvalue.
-      λhlookup.
-        J
-          (λchoice _.
-            Equal
-              (Option Bytes)
-              (Data.Collections.Derived.nth
-                Bytes
-                (Suc i)
-                (match choice {
-                  None ↦
-                    Cons Bytes (list_to_bytes (Nil UInt8)) (env_config_values rest entries);
-                  Some found ↦ Cons Bytes found (env_config_values rest entries)
-                }))
-              (Data.Collections.Derived.nth Bytes i (env_config_values rest entries)))
-          Refl
-          (env_config_sym
-            (Option Bytes)
-            (env_config_lookup (bytes_encode (schema_field_name head)) entries)
-            (Some Bytes value)
-            hlookup))
+  Refl
 
 theorem env_config_head_lookup_some
       (head : SchemaField)
@@ -286,10 +244,7 @@ theorem env_config_head_lookup_some
         (Data.Collections.Derived.nth
           Bytes
           Zero
-          (match choice {
-            Some found ↦ Cons Bytes found (env_config_values rest entries);
-            None ↦ Cons Bytes (list_to_bytes (Nil UInt8)) (env_config_values rest entries)
-          }))
+          (Cons Bytes (env_config_value_or_empty choice) (env_config_values rest entries)))
         (Some Bytes value))
     Refl
     (env_config_sym
@@ -320,10 +275,7 @@ theorem env_config_head_lookup_none
         (Data.Collections.Derived.nth
           Bytes
           Zero
-          (match choice {
-            Some found ↦ Cons Bytes found (env_config_values rest entries);
-            None ↦ Cons Bytes (list_to_bytes (Nil UInt8)) (env_config_values rest entries)
-          }))
+          (Cons Bytes (env_config_value_or_empty choice) (env_config_values rest entries)))
         (Some Bytes (list_to_bytes (Nil UInt8))))
     Refl
     (env_config_sym
