@@ -94,9 +94,10 @@ pub(in crate::cranelift_backend) use immediate_bridge::{
     with_d5b_hs10_bridge_plan_mutation, D5bHs10BridgePlanMutation,
 };
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
+use responses::ArmALivenessPlanState;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
-    CheckedIhPostCallConsumer,
+    ArmALivenessPhase, ArmALivenessPlanningMode, ArmALivenessWitness, CheckedIhPostCallConsumer,
     DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
@@ -105,11 +106,15 @@ pub(in crate::cranelift_backend) use responses::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    arm_a_liveness_mutation_is_exact, mixed_owner_execute_then_resume_overpromotion_is_exact,
+    release_only_suffix_admission_suppressed_is_exact,
+    single_exclusive_plane_authority_suppressed_is_exact,
     static_response_context_demand_mutation_is_exact,
-    suppressed_execute_then_resume_response_is_exact,
+    suppressed_execute_then_resume_response_is_exact, with_arm_a_liveness_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
-    with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
+    with_release_only_suffix_admission_suppressed,
+    with_single_exclusive_plane_authority_suppressed,
+    with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response, ArmALivenessMutation,
     StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{
@@ -603,6 +608,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// Distinguishes a lawfully empty installed response population from the
     /// pre-install draft state; neither row count nor infeasibility can do so.
     static_response_plan_installed: bool,
+    /// Exact Arm-A structural eligibility plus the discovery/final selection
+    /// contract used by phase B and by final call-seat observation.
+    arm_a_liveness: Option<ArmALivenessPlanState>,
     /// The typed fail-closed result for a genuinely opaque/dynamic response K
     /// or a source that cannot be expressed in the existing typed schema.
     static_response_infeasible: Option<SsaInfeasible>,
@@ -902,6 +910,26 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
     root_ingress: AbiRootIngress,
     functionized_units: bool,
 ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
+    plan_static_transition_graph_with_symbols_and_arm_a_liveness(
+        entry,
+        declarations,
+        symbols,
+        root_ingress,
+        functionized_units,
+        ArmALivenessPlanningMode::LegacySinglePass,
+    )
+}
+
+pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_and_arm_a_liveness<
+    'src,
+>(
+    entry: &'src RuntimeExpr,
+    declarations: &BTreeMap<&str, &'src RuntimeDeclaration>,
+    symbols: &crate::NativeProcessSymbols,
+    root_ingress: AbiRootIngress,
+    functionized_units: bool,
+    arm_a_liveness: ArmALivenessPlanningMode,
+) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
     #[cfg(test)]
     reset_recursive_lowering_frame_count();
     let mut planner = Planner::new()?;
@@ -960,9 +988,11 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
         }
     }
     planner.connect_declaration_calls(&declaration_entries)?;
-    let plan = planner.finish(symbols, root_ingress, functionized_units)?;
+    let plan = planner.finish(symbols, root_ingress, functionized_units, arm_a_liveness)?;
     #[cfg(feature = "px8-ds-test-support")]
-    record_static_response_feasibility_diagnostic(&plan)?;
+    if plan.arm_a_liveness_phase()? != ArmALivenessPhase::Discovery {
+        record_static_response_feasibility_diagnostic(&plan)?;
+    }
     Ok(plan)
 }
 

@@ -157,7 +157,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 #[cfg(target_os = "linux")]
-fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
+fn nested_bracket_source(depth: usize) -> String {
     let body = match depth {
         1 => "leaf_body",
         2 => {
@@ -190,8 +190,12 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
         }
         _ => panic!("PX8-TA public control supports depths one through three"),
     };
-    let source = NESTED_BRACKET_PROGRAM.replace("__ROOT_BODY__", body);
-    let dir = output_dir(&format!("depth-{depth}"));
+    NESTED_BRACKET_PROGRAM.replace("__ROOT_BODY__", body)
+}
+
+#[cfg(target_os = "linux")]
+fn nested_bracket_output_dir(depth: usize, label: &str) -> tempfile::TempDir {
+    let dir = output_dir(&format!("depth-{depth}-{label}"));
     for index in 0..depth {
         std::fs::write(
             dir.path().join(format!("held-{index}.bin")),
@@ -199,13 +203,60 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
         )
         .unwrap();
     }
-    let output = ken_cli::build_native_program(
+    dir
+}
+
+#[cfg(target_os = "linux")]
+fn compile_nested_bracket(
+    depth: usize,
+    label: &str,
+) -> (
+    tempfile::TempDir,
+    Result<
+        ken_elaborator::compiler_driver::NativeProgramBuildOutput,
+        ken_elaborator::compiler_driver::NativeProgramBuildError,
+    >,
+) {
+    let source = nested_bracket_source(depth);
+    let dir = nested_bracket_output_dir(depth, label);
+    let result = ken_cli::build_native_program(
         &source,
         ken_cli::SourceFormat::Ken,
-        &format!("px8ta-depth-{depth}"),
+        &format!("px8ta-depth-{depth}-{label}"),
         dir.path(),
-    )
-    .unwrap_or_else(|error| {
+    );
+    (dir, result)
+}
+
+#[cfg(target_os = "linux")]
+fn compile_nested_bracket_with_diagnostics(
+    depth: usize,
+    label: &str,
+) -> (
+    tempfile::TempDir,
+    Result<
+        ken_elaborator::compiler_driver::NativeProgramBuildOutput,
+        ken_elaborator::compiler_driver::NativeProgramBuildError,
+    >,
+    Vec<ken_runtime::StaticResponseFeasibilityDiagnostic>,
+) {
+    let source = nested_bracket_source(depth);
+    let dir = nested_bracket_output_dir(depth, label);
+    let (result, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            &format!("px8ta-depth-{depth}-{label}"),
+            dir.path(),
+        )
+    });
+    (dir, result, diagnostics)
+}
+
+#[cfg(target_os = "linux")]
+fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
+    let (dir, output) = compile_nested_bracket(depth, "run");
+    let output = output.unwrap_or_else(|error| {
         panic!("depth {depth} checked nested bracket reaches native lowering: {error:?}")
     });
     let plan = output
@@ -229,6 +280,25 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
     )
     .expect("linked nested bracket emits its canonical observation");
     (observation, plan.frames.len())
+}
+
+#[cfg(target_os = "linux")]
+fn nested_bracket_resource_order(
+    observation: &ken_runtime::EffectObservation,
+) -> (Vec<u64>, Vec<u64>) {
+    let acquisitions = observation
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == ken_runtime::HostOpV1::FsOpen)
+        .map(|event| event.resource_bindings[0].1 .0)
+        .collect::<Vec<_>>();
+    let releases = observation
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
+        .map(|event| event.resource_bindings[0].1 .0)
+        .collect::<Vec<_>>();
+    (acquisitions, releases)
 }
 
 #[cfg(target_os = "linux")]
@@ -261,69 +331,87 @@ fn public_one_level_bracket_finishes_and_releases() {
 }
 
 #[cfg(target_os = "linux")]
-// Re-measured under RT-SUBCONTINUATION-LIFO-RELEASE-ORDER (failing-rows
-// ledger row 9) at main 5899268451d42e7c1337929a996921d6483b6541. The layers
-// below are STRUCK together rather than appended to, as the depth-1 row above
-// already does.
-//
-//   1. "Ignored pending RT-CLOSURE-BOUNDARY-LANE ... a closure cannot cross
-//      the boundary: it is runtime-local and live-domain only, and it has no
-//      durable lane" -- does not reproduce. The closure-lane signature
-//      appears at NEITHER depth.
-//   2. "It refuses at object emission, so the program never executes and no
-//      binding order is observable in it." -- half true, which is what made
-//      it misleading rather than merely stale. FALSE of depth 2, TRUE of
-//      depth 3. Which program it was written about is not recorded and is
-//      not established here: it is struck on the measurement, not on a
-//      reading of its author's intent.
-//   3. "depth 2 reaches the closure lane first" -- depth 2 reaches no refusal
-//      at all. It builds, links, executes and exits 0.
-//
-// WHAT THIS ROW DOES, MEASURED. The body runs `for depth in 2..=3`, so it is
-// two programs. Depth 2 panics, which is why the second has never been
-// observed by any measurement of this row, the ledger's included:
-//
-//   depth 2  EXECUTES. Exit 0, no terminal error, every bracket continuation
-//            retained. The strict-LIFO assertion below then fails:
-//              left  [ResourceTraceIdentityV1(1), ResourceTraceIdentityV1(2)]
-//              right [ResourceTraceIdentityV1(2), ResourceTraceIdentityV1(1)]
-//            LEFT is observed, RIGHT is expected -- read the assert_eq!, not
-//            the panic message. Releases come back in ACQUISITION order: the
-//            outer bracket's resource is released before the inner one's.
-//            Deterministic across 20 fresh processes, 20 identical results.
-//            That excludes instability at or above rate 0.15 at >= 96%; it is
-//            a bound, NOT a demonstration of stability, which repetition
-//            cannot return.
-//   depth 3  REFUSES at object emission, and not with the struck label's
-//            signature:
-//              unsupported runtime-IR lowering: ContinuationSpecialization:
-//              the claimed continuation target was not declared into this
-//              function
-//            Measured by running both depths under catch_unwind, and again
-//            with depth 3 first. The two programs use separate output
-//            directories and separate build_native_program calls, so the
-//            result is order-independent.
-//
-// SO THIS ROW IS TWO BLOCKERS UNDER ONE #[ignore] AND EITHER FIX ALONE LEAVES
-// IT RED. The ordering defect is a PRODUCT defect: it is escalated under
-// RT-SUBCONTINUATION-LIFO-RELEASE-ORDER D0 arm (i) rather than repaired here,
-// because the expectation is correct and editing it to match the observation
-// would encode the defect in the fixture. The depth-3 refusal is a separate
-// finding, reported with it and not owned by that node.
-//
-// RT-CLOSURE-BOUNDARY-LANE is cited for provenance only -- merged, no frame,
-// never names this row, and the ledger records its label as not agreeing with
-// what the row does.
-//
-// Both the panic and the refusal surface on the helper thread
-// 'px8ta-nested-brackets'; this test thread then fails only with the wrapper
-//   nested-bracket control thread: Any { .. }
-// which carries no signature of its own. The signatures above are the real
-// causes.
-//
-// Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-SUBCONTINUATION-LIFO-RELEASE-ORDER: depth 2 executes and releases in acquisition order rather than strict LIFO (product defect, escalated); depth 3 separately refuses at object emission on ContinuationSpecialization"]
+fn public_two_level_bracket_release_only_suffix_is_lifo() {
+    std::thread::Builder::new()
+        .name("px8ta-two-level-release-only".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            let ((observation, _planned_frames), diagnostics) =
+                ken_runtime::with_static_response_feasibility_diagnostics(|| run_depth(2));
+            assert_eq!(diagnostics.len(), 1);
+            let bounded_releases = diagnostics[0]
+                .static_response_deferred
+                .iter()
+                .filter(|row| {
+                    row.operation == "ResourceRelease"
+                        && row.sub_case == "UnconsumedTransportCaller"
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                bounded_releases
+                    .iter()
+                    .filter(|row| row.handler_owner.is_some())
+                    .count(),
+                1,
+                "the inner release did not acquire one unique bounded handler owner: \
+                 {bounded_releases:?}"
+            );
+            let (acquisitions, releases) = nested_bracket_resource_order(&observation);
+            assert_eq!(acquisitions.len(), 2);
+            assert_eq!(releases.len(), 2);
+            assert_eq!(
+                releases,
+                acquisitions.iter().rev().copied().collect::<Vec<_>>(),
+                "the release-only suffix must settle inner before outer"
+            );
+        })
+        .expect("spawn two-level release-only bracket control")
+        .join()
+        .expect("two-level release-only bracket control thread");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn public_two_level_bracket_release_only_suffix_mutation_reddens() {
+    std::thread::Builder::new()
+        .name("px8ta-two-level-release-only-mutation".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            let ((observation, _planned_frames), applications) =
+                ken_runtime::with_release_only_suffix_admission_suppressed(|| run_depth(2));
+            assert!(applications > 0, "release-only suppression did not apply");
+            let (acquisitions, releases) = nested_bracket_resource_order(&observation);
+            assert_eq!(releases, acquisitions, "mutation must restore [r1,r2]");
+            let red = std::panic::catch_unwind(|| {
+                assert_eq!(
+                    releases,
+                    acquisitions.iter().rev().copied().collect::<Vec<_>>()
+                );
+            });
+            assert!(red.is_err(), "release-only mutation did not redden D2a-B");
+            assert!(
+                ken_runtime::release_only_suffix_admission_suppressed_is_exact(),
+                "release-only suppression mutation did not restore"
+            );
+        })
+        .expect("spawn two-level release-only mutation control")
+        .join()
+        .expect("two-level release-only mutation control thread");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. Every nested bracket settles in reverse
+/// acquisition order before its enclosing bracket resumes, at both reaching
+/// depths represented by this public fixture.
+///
+/// MEASURED: each independently compiled depth emits one acquisition and one
+/// release per bracket, exits successfully, and releases in exact reverse.
+/// CLAIMED: native bracket settlement is lexical rather than an artifact of one
+/// planner classification or one depth.
+/// THE GAP: the three depth-3 replacement controls below independently break
+/// the selected-caller edge, the typed-K-context edge, and Arm A's route choice.
+#[test]
 fn public_two_three_level_brackets_finish_and_release_lifo() {
     // Lowering nested checked brackets is stack-hungry, and libtest hands a
     // test a 2 MiB (2048 KiB) worker thread. Bisected minimum passing stack
@@ -359,6 +447,233 @@ fn public_two_three_level_brackets_finish_and_release_lifo() {
         .expect("spawn large-stack nested-bracket control")
         .join()
         .expect("nested-bracket control thread");
+}
+
+#[cfg(target_os = "linux")]
+const DEPTH_THREE_MISSING_SELECTED_CALLER_ERROR: &str = r#"Packaging(ObjectLinkerPackagingError { stage: ObjectEmission, field: "checked_process_object", reason: "Cranelift backend failure: module operation failed: a forward-declared response owner has no verified selected incoming call: owner=StaticResponseOwnerId(0), context=ContinuationContextId(2), preexisting=false, caller=ContinuationCallIdentity { token: ContinuationSpecializationCallToken { producer_owner: PredeclaredFunctionId(5), emission_owner: Specialization(ContinuationSpecializationId(3)), producer_result_origin: StaticOriginId(896), producer_construct_origin: StaticOriginId(515), producer_alternative: 1, call_site_sequence: 0, target: ContinuationSpecializationId(4), worker: ContinuationWorkerProvenance { parent_origin: StaticOriginId(12), producer_origin: StaticOriginId(515), sibling_position: 1, closure_origin: StaticOriginId(510), body_origin: StaticOriginId(502), declared_arity: 1, captures: [ContinuationWorkerCaptureProvenance { ordinal: 0, owner: PredeclaredFunctionId(5), closure_origin: StaticOriginId(510), source: Lexical(StaticOriginId(509)), lifetime: ActivationOwned }, ContinuationWorkerCaptureProvenance { ordinal: 1, owner: PredeclaredFunctionId(5), closure_origin: StaticOriginId(510), source: Lexical(StaticOriginId(508)), lifetime: ActivationOwned }, ContinuationWorkerCaptureProvenance { ordinal: 2, owner: PredeclaredFunctionId(5), closure_origin: StaticOriginId(510), source: Lexical(StaticOriginId(507)), lifetime: ActivationOwned }, ContinuationWorkerCaptureProvenance { ordinal: 3, owner: PredeclaredFunctionId(5), closure_origin: StaticOriginId(510), source: Lexical(StaticOriginId(506)), lifetime: ActivationOwned }, ContinuationWorkerCaptureProvenance { ordinal: 4, owner: PredeclaredFunctionId(5), closure_origin: StaticOriginId(510), source: Lexical(StaticOriginId(505)), lifetime: ActivationOwned }, ContinuationWorkerCaptureProvenance { ordinal: 5, owner: PredeclaredFunctionId(5), closure_origin: StaticOriginId(510), source: Lexical(StaticOriginId(504)), lifetime: ActivationOwned }, ContinuationWorkerCaptureProvenance { ordinal: 6, owner: PredeclaredFunctionId(5), closure_origin: StaticOriginId(510), source: Lexical(StaticOriginId(503)), lifetime: ActivationOwned }] } }, recursive_position: 1 }, disposition=Some(InlineNoCall)" })"#;
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. Arm A's depth-3 route must enter the exact
+/// selected response owner rather than restoring the former ordinary K target.
+///
+/// MEASURED: changing only the selected-caller target applies positively,
+/// leaves the typed planner diagnostic byte-for-value unchanged, and reaches
+/// the finished-artifact selected-incoming-call refusal.
+/// CLAIMED: depth-3 success uses the selected-caller to response-owner edge.
+/// THE GAP: the mutation acts at real target resolution and restoration is
+/// checked by a fresh exact compile with the baseline typed diagnostic.
+#[test]
+fn public_depth_three_selected_caller_retarget_proves_replacement_edge() {
+    std::thread::Builder::new()
+        .name("px8ta-depth-three-selected-caller".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            let (_baseline_dir, baseline_result, baseline_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "selected-caller-baseline");
+            baseline_result.expect("the exact depth-three replacement route compiles");
+            assert_eq!(baseline_diagnostics.len(), 1);
+            assert!(
+                !baseline_diagnostics[0].static_response_owners.is_empty(),
+                "the depth-three program supplies no selected response owner"
+            );
+
+            let ((_mutated_dir, mutated_result, mutated_diagnostics), applications) =
+                ken_runtime::with_static_response_caller_retarget_mutation(
+                    ken_runtime::StaticResponseCallerRetargetMutation::RestoreSelectedKTarget,
+                    || {
+                        compile_nested_bracket_with_diagnostics(
+                            3,
+                            "selected-caller-restored-k-target",
+                        )
+                    },
+                );
+            assert!(applications > 0, "selected-caller mutation did not apply");
+            let error = mutated_result
+                .expect_err("restoring the former K target must leave the owner unentered");
+            let error = format!("{error:?}");
+            assert_eq!(error, DEPTH_THREE_MISSING_SELECTED_CALLER_ERROR);
+            assert_eq!(
+                mutated_diagnostics, baseline_diagnostics,
+                "selected-caller mutation changed the typed planner diagnostic"
+            );
+            assert!(
+                ken_runtime::static_response_caller_retarget_mutation_is_exact(),
+                "selected-caller mutation did not restore"
+            );
+
+            let (_restored_dir, restored_result, restored_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "selected-caller-restored");
+            restored_result.expect("the selected-caller route must restore");
+            assert_eq!(restored_diagnostics, baseline_diagnostics);
+        })
+        .expect("spawn depth-three selected-caller control")
+        .join()
+        .expect("depth-three selected-caller control thread");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. When the same selected caller is both
+/// uncalled and compositionally consumed, the unchanged final detector reports
+/// the complete missing-selected-caller diagnostic before overlap.
+#[test]
+fn public_depth_three_missing_caller_precedes_composed_overlap() {
+    std::thread::Builder::new()
+        .name("px8ta-depth-three-coverage-precedence".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            let (_baseline_dir, baseline_result, baseline_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "coverage-precedence-baseline");
+            baseline_result.expect("the exact depth-three replacement route compiles");
+            assert_eq!(baseline_diagnostics.len(), 1);
+
+            let ((_mutated_dir, mutated_result, mutated_diagnostics), applications) =
+                ken_runtime::with_static_response_caller_retarget_mutation(
+                    ken_runtime::StaticResponseCallerRetargetMutation::RestoreSelectedKTargetWithComposedOverlap,
+                    || {
+                        compile_nested_bracket_with_diagnostics(
+                            3,
+                            "coverage-precedence-dual-defect",
+                        )
+                    },
+                );
+            assert!(applications > 0, "dual-defect mutation did not apply");
+            let error = mutated_result
+                .expect_err("the dual defect must refuse at final owner coverage");
+            assert_eq!(
+                format!("{error:?}"),
+                DEPTH_THREE_MISSING_SELECTED_CALLER_ERROR,
+            );
+            assert_eq!(mutated_diagnostics, baseline_diagnostics);
+            assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
+
+            let (_restored_dir, restored_result, restored_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "coverage-precedence-restored");
+            restored_result.expect("final owner coverage precedence must restore");
+            assert_eq!(restored_diagnostics, baseline_diagnostics);
+        })
+        .expect("spawn depth-three coverage precedence control")
+        .join()
+        .expect("depth-three coverage precedence control thread");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. A selected depth-3 response owner calls
+/// its exact typed K context once before returning.
+///
+/// MEASURED: omitting only the K call applies positively, preserves the typed
+/// planner diagnostic, and reaches the finished-owner zero-K-call refusal.
+/// CLAIMED: route replacement retains the response-owner to typed-K edge.
+/// THE GAP: the mutation changes emitted owner-body structure rather than the
+/// classifier, and a fresh exact compile checks restoration.
+#[test]
+fn public_depth_three_owner_omit_k_call_proves_typed_context_edge() {
+    std::thread::Builder::new()
+        .name("px8ta-depth-three-owner-k".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            const REFUSAL: &str = "a response owner emitted 0 K calls instead of exactly one";
+
+            let (_baseline_dir, baseline_result, baseline_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "owner-k-baseline");
+            baseline_result.expect("the exact depth-three response-owner body compiles");
+            assert_eq!(baseline_diagnostics.len(), 1);
+            assert!(
+                !baseline_diagnostics[0].static_response_owners.is_empty(),
+                "the depth-three program supplies no response owner"
+            );
+
+            let ((_mutated_dir, mutated_result, mutated_diagnostics), applications) =
+                ken_runtime::with_static_response_owner_body_mutation(
+                    ken_runtime::StaticResponseOwnerBodyMutation::OmitKCall,
+                    || compile_nested_bracket_with_diagnostics(3, "owner-k-omitted"),
+                );
+            assert!(applications > 0, "owner K-call mutation did not apply");
+            let error = mutated_result
+                .expect_err("a selected response owner without its K call must refuse");
+            let error = format!("{error:?}");
+            assert!(
+                error.contains(REFUSAL),
+                "owner K-call mutation reached the wrong refusal: {error}"
+            );
+            assert_eq!(
+                error.matches(REFUSAL).count(),
+                1,
+                "owner K-call mutation must report one exact refusal: {error}"
+            );
+            assert_eq!(
+                mutated_diagnostics, baseline_diagnostics,
+                "owner K-call mutation changed the typed planner diagnostic"
+            );
+            assert!(
+                ken_runtime::static_response_owner_body_mutation_is_exact(),
+                "owner K-call mutation did not restore"
+            );
+
+            let (_restored_dir, restored_result, restored_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "owner-k-restored");
+            restored_result.expect("the exact response-owner K call must restore");
+            assert_eq!(restored_diagnostics, baseline_diagnostics);
+        })
+        .expect("spawn depth-three owner K-call control")
+        .join()
+        .expect("depth-three owner K-call control thread");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: transition sentinel. Removing Arm A's bounded authority seed
+/// must restore the old undeclared-target refusal on the unchanged depth-3
+/// program. That red proves route replacement; the refusal is not desired
+/// product behavior and this sentinel does not authorize preserving it.
+///
+/// MEASURED: suppressing the whole single-exclusive authority arm applies
+/// positively and restores the exact former refusal.
+/// CLAIMED: Arm A eliminates the ordinary path that formed the invalid claim.
+/// THE GAP: the production row above is the positive control, while a fresh
+/// post-mutation compile proves thread-local restoration.
+#[test]
+fn public_depth_three_authority_seed_suppression_proves_route_replacement() {
+    std::thread::Builder::new()
+        .name("px8ta-depth-three-authority-seed".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(|| {
+            const REFUSAL: &str = "ContinuationSpecialization: the claimed continuation target \
+                                   was not declared into this function";
+
+            let (_baseline_dir, baseline_result, baseline_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "authority-seed-baseline");
+            baseline_result.expect("Arm A's depth-three replacement route compiles");
+            assert_eq!(baseline_diagnostics.len(), 1);
+
+            let ((_mutated_dir, mutated_result, _mutated_diagnostics), applications) =
+                ken_runtime::with_single_exclusive_plane_authority_suppressed(|| {
+                    compile_nested_bracket_with_diagnostics(3, "authority-seed-suppressed")
+                });
+            assert!(applications > 0, "Arm A suppression did not apply");
+            let error = mutated_result
+                .expect_err("removing Arm A must restore the former ordinary-path refusal");
+            let error = format!("{error:?}");
+            assert!(
+                error.contains(REFUSAL),
+                "Arm A suppression reached the wrong refusal: {error}"
+            );
+            assert_eq!(
+                error.matches(REFUSAL).count(),
+                1,
+                "Arm A suppression must report one exact refusal: {error}"
+            );
+            assert!(
+                ken_runtime::single_exclusive_plane_authority_suppressed_is_exact(),
+                "Arm A suppression did not restore"
+            );
+
+            let (_restored_dir, restored_result, restored_diagnostics) =
+                compile_nested_bracket_with_diagnostics(3, "authority-seed-restored");
+            restored_result.expect("Arm A's replacement route must restore");
+            assert_eq!(restored_diagnostics, baseline_diagnostics);
+        })
+        .expect("spawn depth-three authority-seed control")
+        .join()
+        .expect("depth-three authority-seed control thread");
 }
 
 #[cfg(target_os = "linux")]

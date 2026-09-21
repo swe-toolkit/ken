@@ -1976,7 +1976,101 @@ enum FrameScopeHarnessMutation {
     DropUnion,
 }
 
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArmALoweringPass {
+    LegacySinglePass,
+    Discovery,
+    Final,
+    OnePass,
+}
 
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArmALoweringPassObservation {
+    pub pass: ArmALoweringPass,
+    pub response_owner_symbols: Vec<(String, String)>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static ARM_A_LOWERING_PASSES:
+        std::cell::RefCell<Option<Vec<ArmALoweringPassObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_arm_a_lowering_passes<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<ArmALoweringPassObservation>) {
+    ARM_A_LOWERING_PASSES.with(|slot| {
+        assert!(
+            slot.borrow().is_none(),
+            "Arm-A lowering-pass observation windows cannot nest"
+        );
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let passes = ARM_A_LOWERING_PASSES.with(|slot| {
+        slot.borrow_mut()
+            .take()
+            .expect("Arm-A lowering-pass observation window")
+    });
+    (result, passes)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn arm_a_lowering_pass_observation_is_exact() -> bool {
+    ARM_A_LOWERING_PASSES.with(|slot| slot.borrow().is_none())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_arm_a_lowering_pass(phase: ArmALivenessPhase) {
+    let pass = match phase {
+        ArmALivenessPhase::LegacySinglePass => ArmALoweringPass::LegacySinglePass,
+        ArmALivenessPhase::Discovery => ArmALoweringPass::Discovery,
+        ArmALivenessPhase::Final => ArmALoweringPass::Final,
+        ArmALivenessPhase::OnePass => ArmALoweringPass::OnePass,
+    };
+    ARM_A_LOWERING_PASSES.with(|slot| {
+        if let Some(passes) = slot.borrow_mut().as_mut() {
+            passes.push(ArmALoweringPassObservation {
+                pass,
+                response_owner_symbols: Vec::new(),
+            });
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn record_arm_a_response_owner_symbols(
+    phase: ArmALivenessPhase,
+    symbols: Vec<(String, String)>,
+) {
+    let expected = match phase {
+        ArmALivenessPhase::LegacySinglePass => ArmALoweringPass::LegacySinglePass,
+        ArmALivenessPhase::Discovery => ArmALoweringPass::Discovery,
+        ArmALivenessPhase::Final => ArmALoweringPass::Final,
+        ArmALivenessPhase::OnePass => ArmALoweringPass::OnePass,
+    };
+    ARM_A_LOWERING_PASSES.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        let Some(observations) = slot.as_mut() else {
+            return;
+        };
+        let observation = observations
+            .last_mut()
+            .expect("response-owner symbols are recorded after the pass begins");
+        assert_eq!(observation.pass, expected);
+        assert!(
+            observation.response_owner_symbols.is_empty(),
+            "response-owner symbols were recorded twice for one pass"
+        );
+        observation.response_owner_symbols = symbols;
+    });
+}
+
+#[cfg(test)]
 pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
     module: M,
     function_name: &str,
@@ -2016,12 +2110,51 @@ pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
         oriented_subcontinuation_plan,
         false,
         false,
+        ArmALivenessPlanningMode::LegacySinglePass,
+    )
+    .map(|(compiled, _)| compiled)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::cranelift_backend) fn compile_expr_into_module_two_pass<'a, M: Module>(
+    discovery_module: M,
+    final_module: M,
+    function_name: &str,
+    linkage: Linkage,
+    expr: &'a RuntimeExpr,
+    seed_env: &'a NativeSeedEnvironment,
+    declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
+    staged_process_input: Option<&RuntimeValue>,
+    process_mode: bool,
+    process_symbols: Option<&crate::NativeProcessSymbols>,
+    native_join_plan: Option<crate::NativeJoinPlanV1>,
+    oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    let resolved = process_symbols
+        .cloned()
+        .unwrap_or_else(seed_only_legacy_authority);
+    compile_expr_into_module_with_root_projection_two_pass(
+        discovery_module,
+        final_module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        declarations,
+        staged_process_input,
+        process_mode,
+        &resolved,
+        native_join_plan,
+        oriented_subcontinuation_plan,
+        false,
+        false,
     )
 }
 
 /// Compile an object entry whose public scalar launcher consumes a scalar,
 /// while generated-unit calls continue to exchange their planner-selected
 /// carrier words internally.
+#[cfg(test)]
 pub(in crate::cranelift_backend) fn compile_expr_into_object_module<'a, M: Module>(
     module: M,
     function_name: &str,
@@ -2057,6 +2190,44 @@ pub(in crate::cranelift_backend) fn compile_expr_into_object_module<'a, M: Modul
         oriented_subcontinuation_plan,
         !process_mode,
         process_mode,
+        ArmALivenessPlanningMode::LegacySinglePass,
+    )
+    .map(|(compiled, _)| compiled)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::cranelift_backend) fn compile_expr_into_object_module_two_pass<'a, M: Module>(
+    discovery_module: M,
+    final_module: M,
+    function_name: &str,
+    linkage: Linkage,
+    expr: &'a RuntimeExpr,
+    seed_env: &'a NativeSeedEnvironment,
+    declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
+    staged_process_input: Option<&RuntimeValue>,
+    process_mode: bool,
+    process_symbols: Option<&crate::NativeProcessSymbols>,
+    native_join_plan: Option<crate::NativeJoinPlanV1>,
+    oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    let resolved = process_symbols
+        .cloned()
+        .unwrap_or_else(seed_only_legacy_authority);
+    compile_expr_into_module_with_root_projection_two_pass(
+        discovery_module,
+        final_module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        declarations,
+        staged_process_input,
+        process_mode,
+        &resolved,
+        native_join_plan,
+        oriented_subcontinuation_plan,
+        !process_mode,
+        process_mode,
     )
 }
 
@@ -2076,6 +2247,7 @@ fn seed_only_legacy_authority() -> crate::NativeProcessSymbols {
 /// `seed_only_legacy_authority` -- a package that cannot produce an authority is
 /// refused by the validation lane before reaching this function.
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 pub(in crate::cranelift_backend) fn compile_program_expr_into_module<'a, M: Module>(
     module: M,
     function_name: &str,
@@ -2103,11 +2275,47 @@ pub(in crate::cranelift_backend) fn compile_program_expr_into_module<'a, M: Modu
         oriented_subcontinuation_plan,
         false,
         false,
+        ArmALivenessPlanningMode::LegacySinglePass,
+    )
+    .map(|(compiled, _)| compiled)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::cranelift_backend) fn compile_program_expr_into_module_two_pass<'a, M: Module>(
+    discovery_module: M,
+    final_module: M,
+    function_name: &str,
+    linkage: Linkage,
+    expr: &'a RuntimeExpr,
+    seed_env: &'a NativeSeedEnvironment,
+    declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
+    staged_process_input: Option<&RuntimeValue>,
+    process_mode: bool,
+    process_symbols: &crate::NativeProcessSymbols,
+    native_join_plan: Option<crate::NativeJoinPlanV1>,
+    oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    compile_expr_into_module_with_root_projection_two_pass(
+        discovery_module,
+        final_module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        declarations,
+        staged_process_input,
+        process_mode,
+        process_symbols,
+        native_join_plan,
+        oriented_subcontinuation_plan,
+        false,
+        false,
     )
 }
 
 /// Package-backed object compilation, against a resolved authority. See above.
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 pub(in crate::cranelift_backend) fn compile_program_expr_into_object_module<'a, M: Module>(
     module: M,
     function_name: &str,
@@ -2135,7 +2343,153 @@ pub(in crate::cranelift_backend) fn compile_program_expr_into_object_module<'a, 
         oriented_subcontinuation_plan,
         !process_mode,
         process_mode,
+        ArmALivenessPlanningMode::LegacySinglePass,
     )
+    .map(|(compiled, _)| compiled)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::cranelift_backend) fn compile_program_expr_into_object_module_two_pass<
+    'a,
+    M: Module,
+>(
+    discovery_module: M,
+    final_module: M,
+    function_name: &str,
+    linkage: Linkage,
+    expr: &'a RuntimeExpr,
+    seed_env: &'a NativeSeedEnvironment,
+    declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
+    staged_process_input: Option<&RuntimeValue>,
+    process_mode: bool,
+    process_symbols: &crate::NativeProcessSymbols,
+    native_join_plan: Option<crate::NativeJoinPlanV1>,
+    oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    compile_expr_into_module_with_root_projection_two_pass(
+        discovery_module,
+        final_module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        declarations,
+        staged_process_input,
+        process_mode,
+        process_symbols,
+        native_join_plan,
+        oriented_subcontinuation_plan,
+        !process_mode,
+        process_mode,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn compile_expr_into_module_with_root_projection_two_pass<'a, M: Module>(
+    discovery_module: M,
+    final_module: M,
+    function_name: &str,
+    linkage: Linkage,
+    expr: &'a RuntimeExpr,
+    seed_env: &'a NativeSeedEnvironment,
+    declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
+    staged_process_input: Option<&RuntimeValue>,
+    process_mode: bool,
+    process_symbols: &crate::NativeProcessSymbols,
+    native_join_plan: Option<crate::NativeJoinPlanV1>,
+    oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+    project_public_scalar_root: bool,
+    root_trap_process_sentinel: bool,
+) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    let eligibility_probe = plan_static_transition_graph_with_symbols_and_arm_a_liveness(
+        expr,
+        &declarations,
+        process_symbols,
+        if process_mode {
+            AbiRootIngress::Process
+        } else {
+            AbiRootIngress::Value
+        },
+        true,
+        ArmALivenessPlanningMode::Discovery,
+    )?;
+    let requires_discovery = !eligibility_probe.arm_a_liveness_eligible_is_empty()?;
+    drop(eligibility_probe);
+
+    if !requires_discovery {
+        drop(discovery_module);
+        let (compiled, witness) = compile_expr_into_module_with_root_projection(
+            final_module,
+            function_name,
+            linkage,
+            expr,
+            seed_env,
+            declarations,
+            staged_process_input,
+            process_mode,
+            process_symbols,
+            native_join_plan,
+            oriented_subcontinuation_plan,
+            project_public_scalar_root,
+            root_trap_process_sentinel,
+            ArmALivenessPlanningMode::FinalWithoutWitness,
+        )?;
+        if witness.is_some() {
+            return Err(backend_module(
+                "an empty Arm-A eligible set unexpectedly minted a discovery witness".to_string(),
+            ));
+        }
+        return Ok(compiled);
+    }
+
+    let final_declarations = declarations.clone();
+    let final_native_join_plan = native_join_plan.clone();
+    let final_oriented_plan = oriented_subcontinuation_plan.clone();
+    let (discovery, witness) = compile_expr_into_module_with_root_projection(
+        discovery_module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        declarations,
+        staged_process_input,
+        process_mode,
+        process_symbols,
+        native_join_plan,
+        oriented_subcontinuation_plan,
+        project_public_scalar_root,
+        root_trap_process_sentinel,
+        ArmALivenessPlanningMode::Discovery,
+    )?;
+    let witness = witness.ok_or_else(|| {
+        backend_module("the non-empty Arm-A discovery pass minted no witness".to_string())
+    })?;
+    // The disposable module and every symbol/body it contains are destroyed
+    // before final planning can consume the witness.
+    drop(discovery);
+
+    let (compiled, final_witness) = compile_expr_into_module_with_root_projection(
+        final_module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        final_declarations,
+        staged_process_input,
+        process_mode,
+        process_symbols,
+        final_native_join_plan,
+        final_oriented_plan,
+        project_public_scalar_root,
+        root_trap_process_sentinel,
+        ArmALivenessPlanningMode::Final(witness),
+    )?;
+    if final_witness.is_some() {
+        return Err(backend_module(
+            "final Arm-A lowering returned a second witness".to_string(),
+        ));
+    }
+    Ok(compiled)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2153,7 +2507,8 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
     project_public_scalar_root: bool,
     _root_trap_process_sentinel: bool,
-) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    arm_a_liveness: ArmALivenessPlanningMode,
+) -> Result<(CompiledModule<M>, Option<ArmALivenessWitness>), CraneliftBackendError> {
     #[cfg(test)]
     {
         scale_b_reset_emission_attempt();
@@ -2193,7 +2548,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // which derive their authority through the fail-closed validation lane, so
     // there is no longer any path by which a package silently lowers against
     // prelude spellings its own checked package never recorded.
-    let mut static_transition_plan = plan_static_transition_graph_with_symbols(
+    let mut static_transition_plan = plan_static_transition_graph_with_symbols_and_arm_a_liveness(
         expr,
         &declarations,
         process_symbols,
@@ -2203,7 +2558,10 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             AbiRootIngress::Value
         },
         true,
+        arm_a_liveness,
     )?;
+    #[cfg(feature = "px8-ds-test-support")]
+    record_arm_a_lowering_pass(static_transition_plan.arm_a_liveness_phase()?);
     // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the fusion identity plane is
     // built HERE, and this is the first production compile that has ever built
     // one.**
@@ -2740,7 +3098,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     };
     let unit_bundle = &unit_bundle;
     let call_edges = &call_edges;
-    let root_result = {
+    let (root_result, arm_a_liveness_witness) = {
             // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2, extended by
             // `RT-CONTINUATION-EDGE-DISPOSITION` `D2` — THE ONE ARTIFACT
             // LIFETIME, opened and closed HERE rather than inside any single
@@ -2920,7 +3278,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // question: an obligation opened in one descent whose discharge can
             // only be checked once every descent is done.
             compiler.require_complete_static_worker_disposition()?;
-            super::units::close_continuation_claim_ledger(&mut compiler)?;
+        let arm_a_call_seats = super::units::close_continuation_claim_ledger(&mut compiler)?;
             // `D2f` — the fused-region ledger's four-way closeout: ownership,
             // definition, redirect and takeover are each exactly the installed
             // population. Closed here, beside the causal ledger and after every
@@ -2945,7 +3303,14 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 super::units::close_aggregate_allocation_ledger(&mut compiler)?;
             // `D7` — planned seats against consumed seats, exactly.
             let _effect_seats = super::units::close_host_effect_seat_ledger(&mut compiler)?;
-            root_result
+        // The one-shot witness is minted only after every generated
+        // function and every non-coverage closeout above succeeded. Final
+        // lowering instead checks exact equality against the consumed
+        // witness at this same terminal artifact boundary.
+        let arm_a_liveness_witness = compiler
+            .static_transition_plan
+            .close_arm_a_liveness_observation(arm_a_call_seats)?;
+        (root_result, arm_a_liveness_witness)
     };
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
     let carrier_identity_catalog = compiler.static_transition_plan.carrier_identity_catalog()?;
@@ -2963,7 +3328,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     );
     #[cfg(test)]
     scale_b_finish_emission_attempt();
-    Ok(compiled)
+    Ok((compiled, arm_a_liveness_witness))
 }
 
 // The composed machine's completed return is separate from its trampoline

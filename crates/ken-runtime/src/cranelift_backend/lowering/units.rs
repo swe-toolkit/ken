@@ -521,6 +521,7 @@ pub fn retained_unit_call_target_mutation_is_exact() -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StaticResponseCallerRetargetMutation {
     RestoreSelectedKTarget,
+    RestoreSelectedKTargetWithComposedOverlap,
     RemoveSelectedCaller,
     RetargetToDifferentResponseOwner,
 }
@@ -1594,6 +1595,19 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             ));
         }
     }
+    #[cfg(feature = "px8-ds-test-support")]
+    super::core::record_arm_a_response_owner_symbols(
+        plan.arm_a_liveness_phase()?,
+        response_owners
+            .iter()
+            .map(|owner| {
+                (
+                    format!("ken_static_response_{}", owner.id().ordinal()),
+                    format!("{:?}", owner.selected_caller()),
+                )
+            })
+            .collect(),
+    );
     // `RT-DECL-CLOSURE-PORT` `D5a` -- forward-declare one target per planned
     // generated producer execution context, in the same pre-definition pass and
     // for the same reason: a context is called from the enclosing
@@ -1709,13 +1723,15 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
 ) -> Result<FuncId, CraneliftBackendError> {
     if let Some(response) = selected_response_owner_target(plan, bundle, identity)? {
         #[cfg(feature = "px8-ds-test-support")]
-        if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
+        if plan.arm_a_liveness_phase()? != ArmALivenessPhase::Discovery {
+            if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
             .with(std::cell::Cell::get)
         {
             STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
                 .with(|count| count.set(count.get() + 1));
             return match mutation {
-                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget => bundle
+                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget
+                    | StaticResponseCallerRetargetMutation::RestoreSelectedKTargetWithComposedOverlap => bundle
                     .continuation(identity.target())
                     .ok_or_else(|| {
                         backend_module(
@@ -1723,13 +1739,15 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
                                 .to_string(),
                         )
                     }),
-                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => Err(
+                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => {
+                        Err(
                     backend_module(
                         "the response-caller mutation removed one selected incoming caller"
                             .to_string(),
                     ),
-                ),
-                StaticResponseCallerRetargetMutation::RetargetToDifferentResponseOwner => {
+                )
+                    }
+                    StaticResponseCallerRetargetMutation::RetargetToDifferentResponseOwner => {
                     let owners = plan
                         .static_response_owner_specializations()?
                         .map_err(|infeasible| {
@@ -1738,7 +1756,8 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
                                 infeasible.vis_origin(),
                                 infeasible.reason(),
                             ))
-                        })?;
+                        },
+                        )?;
                     let substitute = owners
                         .iter()
                         .find(|owner| owner.selected_caller() != identity)
@@ -1756,6 +1775,7 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
                     })
                 }
             };
+            }
         }
         return Ok(response);
     }
@@ -3018,7 +3038,12 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 backend_module("a response owner's exact K context was never declared".to_string())
             })?;
         #[cfg(feature = "px8-ds-test-support")]
-        let body_mutation = claim_static_response_owner_body_mutation(
+        let body_mutation = if compiler.static_transition_plan.arm_a_liveness_phase()?
+            == ArmALivenessPhase::Discovery
+        {
+            None
+        } else {
+            claim_static_response_owner_body_mutation(
             |mutation| match mutation {
                 StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
                     .static_transition_plan
@@ -3037,7 +3062,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 }
                 _ => true,
             },
-        );
+        )
+        };
         #[cfg(feature = "px8-ds-test-support")]
         let selected_context = match body_mutation {
             Some(StaticResponseOwnerBodyMutation::SubstituteContextZero) => {
@@ -4851,10 +4877,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 emission_owner,
             )?;
         }
-        let response_owner_calls = verified_response_owner_calls(
-            &compiler.static_transition_plan,
-            bundle,
-            compiler
+        let arm_a_call_seats = compiler
                 .function_local
                 .continuation_emissions
                 .keys()
@@ -4864,9 +4887,16 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                         .checked_ih_transport_emissions
                         .iter()
                         .map(|(transport, _)| transport.source_call_identity()),
-                ),
+                )
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let response_owner_calls = verified_response_owner_calls(
+            &compiler.static_transition_plan,
+            bundle,
+            arm_a_call_seats.iter(),
         )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
+            ledger.record_arm_a_call_seats(arm_a_call_seats);
             ledger.record_emitted(
                 compiler.function_local.continuation_emissions.keys().cloned(),
             )?;
@@ -5479,10 +5509,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 causal_owner,
             )?;
         }
-        let response_owner_calls = verified_response_owner_calls(
-            &compiler.static_transition_plan,
-            bundle,
-            compiler
+        let arm_a_call_seats = compiler
                 .function_local
                 .continuation_emissions
                 .keys()
@@ -5492,9 +5519,16 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                         .checked_ih_transport_emissions
                         .iter()
                         .map(|(transport, _)| transport.source_call_identity()),
-                ),
+                )
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let response_owner_calls = verified_response_owner_calls(
+            &compiler.static_transition_plan,
+            bundle,
+            arm_a_call_seats.iter(),
         )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
+            ledger.record_arm_a_call_seats(arm_a_call_seats);
             ledger.record_emitted(
                 compiler.function_local.continuation_emissions.keys().cloned(),
             )?;
@@ -5934,6 +5968,11 @@ pub(super) struct ContinuationClaimLedger {
     /// accumulated across all generated functions after each one's CLIF has been
     /// checked.
     emitted: BTreeSet<ContinuationCallIdentity>,
+    /// The exact verified call-seat union over every generated function,
+    /// recorded immediately after finished-CLIF verification and before the
+    /// response-owner target filter. Final Arm-A validation intersects this
+    /// set with the planner's exact eligible identities.
+    arm_a_call_seats: BTreeSet<ContinuationCallIdentity>,
     /// Every response-selected incoming edge whose direct call was decoded and
     /// matched after finished CLIF, including checked-IH transport calls that
     /// lawfully remain outside the ordinary direct/composed discharge partition.
@@ -6386,6 +6425,7 @@ impl ContinuationClaimLedger {
             planned,
             declared: BTreeSet::new(),
             emitted: BTreeSet::new(),
+            arm_a_call_seats: BTreeSet::new(),
             response_owner_calls: BTreeMap::new(),
             composed: BTreeSet::new(),
         })
@@ -6426,6 +6466,13 @@ impl ContinuationClaimLedger {
             }
         }
         Ok(())
+    }
+
+    fn record_arm_a_call_seats(
+        &mut self,
+        calls: impl IntoIterator<Item = ContinuationCallIdentity>,
+    ) {
+        self.arm_a_call_seats.extend(calls);
     }
 
     fn record_response_owner_calls(
@@ -6639,6 +6686,21 @@ impl ContinuationClaimLedger {
     /// and every response-issued context key must therefore have at least one
     /// such verified direct call. A forward declaration alone never satisfies
     /// this gate.
+    fn missing_response_owner_call(
+        owner: &StaticResponseOwnerSpecialization,
+        dispositions: &BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+    ) -> CraneliftBackendError {
+        backend_module(format!(
+            "a forward-declared response owner has no verified selected incoming call: \
+             owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}",
+            owner.id(),
+            owner.k_context(),
+            owner.context_was_preexisting(),
+            owner.selected_caller(),
+            dispositions.get(owner.selected_caller()),
+        ))
+    }
+
     fn validate_response_owner_call_coverage(
         &self,
         plan: &StaticTransitionPlan<'_>,
@@ -6669,17 +6731,18 @@ impl ContinuationClaimLedger {
         let mut called_new_contexts = BTreeSet::new();
         for owner in owners {
             if !self.response_owner_calls.contains_key(owner.selected_caller()) {
-                return Err(backend_module(format!(
-                    "a forward-declared response owner has no verified selected incoming call: \
-                     owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}",
-                    owner.id(),
-                    owner.k_context(),
-                    owner.context_was_preexisting(),
-                    owner.selected_caller(),
-                    dispositions.get(owner.selected_caller()),
-                )));
+                return Err(Self::missing_response_owner_call(&owner,
+                    dispositions));
             }
-            if self.composed.contains(owner.selected_caller()) {
+            #[cfg(feature = "px8-ds-test-support")]
+            let composed = self.composed.contains(owner.selected_caller())
+                || STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get)
+                    == Some(
+                        StaticResponseCallerRetargetMutation::RestoreSelectedKTargetWithComposedOverlap,
+                );
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let composed = self.composed.contains(owner.selected_caller());
+            if composed {
                 return Err(backend_module(
                     "a selected response caller was both directly retargeted and compositionally consumed"
                         .to_string(),
@@ -6690,6 +6753,61 @@ impl ContinuationClaimLedger {
             }
         }
         if called_new_contexts != required_new_contexts {
+            return Err(backend_module(
+                "the response-issued context population is not covered by selected response-owner calls"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_discovery_response_owner_call_coverage(
+        &self,
+        plan: &StaticTransitionPlan<'_>,
+        dispositions: &BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+    ) -> Result<(), CraneliftBackendError> {
+        let owners = plan
+            .static_response_owner_specializations()?
+            .map_err(|infeasible| {
+                backend_module(format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?;
+        let required_new_contexts = plan
+            .static_response_feasibility_ledger_all()?
+            .map_err(|infeasible| {
+                backend_module(format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?
+            .into_iter()
+            .filter(|row| !row.context_was_preexisting())
+            .map(|row| row.k_context())
+            .collect::<BTreeSet<_>>();
+        let eligible = plan.arm_a_liveness_eligible()?;
+        let mut covered_new_contexts = BTreeSet::new();
+        for owner in owners {
+            let called = self
+                .response_owner_calls
+                .contains_key(owner.selected_caller());
+            if !called && !eligible.contains(owner.selected_caller()) {
+                return Err(Self::missing_response_owner_call(&owner, dispositions));
+            }
+            if self.composed.contains(owner.selected_caller()) {
+                return Err(backend_module(
+                    "a selected response caller was both directly retargeted and compositionally consumed"
+                        .to_string(),
+                ));
+            }
+            if !owner.context_was_preexisting() {
+                covered_new_contexts.insert(owner.k_context());
+            }
+        }
+        if covered_new_contexts != required_new_contexts {
             return Err(backend_module(
                 "the response-issued context population is not covered by selected response-owner calls"
                     .to_string(),
@@ -7330,7 +7448,7 @@ pub(super) fn open_continuation_claim_ledger(
 /// is the whole point of the derived subset.
 pub(super) fn close_continuation_claim_ledger(
     compiler: &mut Lowering<'_>,
-) -> Result<(), CraneliftBackendError> {
+) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
     // The candidate ledger is taken on the same boundary as the claim ledger,
     // and `D2` closes it FIRST: totality, then the derived subset, then the
     // claim ledger's exact laws over that subset.
@@ -7348,14 +7466,28 @@ pub(super) fn close_continuation_claim_ledger(
                 acc
             });
     });
-    compiler
+    let claims = compiler
         .continuation_claims
         .as_ref()
-        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?
-        .validate_response_owner_call_coverage(
+        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?;
+    // Final call-set equality is the first fail-closed net. It reads the raw
+    // verified call-seat union before response-owner target filtering; only
+    // after it agrees does the unchanged ordinary coverage detector run.
+    compiler
+        .static_transition_plan
+        .validate_final_arm_a_liveness_observation(&claims.arm_a_call_seats)?;
+    match compiler.static_transition_plan.arm_a_liveness_phase()? {
+        ArmALivenessPhase::Discovery => claims.validate_discovery_response_owner_call_coverage(
             &compiler.static_transition_plan,
             &candidates.settled,
-        )?;
+        )?,
+        ArmALivenessPhase::LegacySinglePass
+        | ArmALivenessPhase::Final
+        | ArmALivenessPhase::OnePass => claims.validate_response_owner_call_coverage(
+            &compiler.static_transition_plan,
+            &candidates.settled,
+        )?,
+    }
     // `D2` — the order, and it is the mechanism rather than a style choice.
     // Totality and disjointness FIRST, then the derived subset, then the
     // unchanged equality over it.
@@ -7380,11 +7512,13 @@ pub(super) fn close_continuation_claim_ledger(
             backend_module("the fusion-local composition ledger went missing".to_string())
         })?
         .close(&ordinary_touched)?;
-    compiler
+    let claims = compiler
         .continuation_claims
         .take()
-        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?
-        .close(&call_obligations)
+        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?;
+    let arm_a_call_seats = claims.arm_a_call_seats.clone();
+    claims.close(&call_obligations)?;
+    Ok(arm_a_call_seats)
 }
 
 /// **`D7` — close the aggregate allocation relation once, over the whole
@@ -8335,10 +8469,7 @@ fn define_unit_body<M: Module>(
         != ContinuationEmissionMutation::SuppressEmissionAccumulation;
     #[cfg(not(test))]
     let accumulate = true;
-    let response_owner_calls = verified_response_owner_calls(
-        &compiler.static_transition_plan,
-        bundle,
-        compiler
+    let arm_a_call_seats = compiler
             .function_local
             .continuation_emissions
             .keys()
@@ -8348,9 +8479,16 @@ fn define_unit_body<M: Module>(
                     .checked_ih_transport_emissions
                     .iter()
                     .map(|(transport, _)| transport.source_call_identity()),
-            ),
+            )
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let response_owner_calls = verified_response_owner_calls(
+        &compiler.static_transition_plan,
+        bundle,
+        arm_a_call_seats.iter(),
     )?;
     if let Some(ledger) = compiler.continuation_claims.as_mut() {
+        ledger.record_arm_a_call_seats(arm_a_call_seats);
         if accumulate {
             ledger.record_emitted(compiler.function_local.continuation_emissions.keys().cloned())?;
         }

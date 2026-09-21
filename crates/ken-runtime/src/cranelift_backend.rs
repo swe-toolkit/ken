@@ -122,16 +122,18 @@ pub use lowering::source::{
 // `RT-CAPTURE-PROJECTION-GROW` `D1` — the worker-prefix deferral ledger.
 #[cfg(feature = "px8-ds-test-support")]
 pub use planning::{
-    checked_ih_continuation_inheritance_mutation_is_exact,
+    arm_a_liveness_mutation_is_exact, checked_ih_continuation_inheritance_mutation_is_exact,
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,
     checked_ih_generated_entry_confluence_mutation_is_exact,
     composed_return_forward_ret_authority_mutation_is_exact,
+    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    release_only_suffix_admission_suppressed_is_exact,
     retained_result_closure_proof_mutation_applied,
     retained_result_closure_proof_mutation_is_exact,
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    single_exclusive_plane_authority_suppressed_is_exact,
     static_response_context_demand_mutation_is_exact,
-    suppressed_execute_then_resume_response_is_exact,
+    suppressed_execute_then_resume_response_is_exact, with_arm_a_liveness_mutation,
     with_checked_ih_continuation_inheritance_mutation,
     with_checked_ih_continuation_inheritance_observations,
     with_checked_ih_generated_entry_admission_mutation,
@@ -141,10 +143,12 @@ pub use planning::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
-    with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
+    with_composed_return_forward_ret_role_witnesses,
     with_mixed_owner_execute_then_resume_overpromotion,
+    with_release_only_suffix_admission_suppressed, with_retained_result_closure_proof_mutation,
+    with_single_exclusive_plane_authority_suppressed,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
-    with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals,
+    with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals, ArmALivenessMutation,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
@@ -160,10 +164,11 @@ pub use planning::{
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{
-    handler_owned_deferred_response_mutation_is_exact,
+    arm_a_lowering_pass_observation_is_exact, handler_owned_deferred_response_mutation_is_exact,
+    with_arm_a_lowering_passes,
     with_branched_scrutinee_unit_body_match_branch_entry_suppressed,
     with_branched_scrutinee_unit_body_route1, with_handler_owned_deferred_response_mutation,
-    with_match_recursor_census, BranchedScrutineeUnitBodyRoute1,
+    with_match_recursor_census, ArmALoweringPass, ArmALoweringPassObservation, BranchedScrutineeUnitBodyRoute1,
     HandlerOwnedDeferredResponseMutation, MatchRecursorCensusRow,
 };
 

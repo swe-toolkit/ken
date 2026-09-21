@@ -245,10 +245,11 @@ pub(in crate::cranelift_backend) use super::planning::{
     build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
     FusionCompositionLayer, FusionRegionClaim, FusionRegionClaimLedger,
     StaticContinuationFusionId, StaticContinuationFusionView,
+    plan_static_transition_graph_with_symbols_and_arm_a_liveness,
     validate_oriented_subcontinuation_transport,
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
     AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
-    expected_capture_slot,
+    expected_capture_slot, ArmALivenessPhase, ArmALivenessPlanningMode, ArmALivenessWitness,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout, now
     // reaching PRODUCTION rather than only lowering's test targets: the composed
     // eliminator checks its assembled run against it. ⛔ Ungated here and in

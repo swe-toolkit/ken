@@ -30,8 +30,8 @@ use crate::{RuntimeDeclaration, RuntimeExpr, RuntimeProgram, RuntimeValue};
 // planning, surface`). Never through the facade.
 use crate::cranelift_backend::compiled::{CompiledExpr, CompiledModule};
 use crate::cranelift_backend::lowering::core::{
-    compile_expr_into_module, compile_expr_into_object_module, compile_program_expr_into_module,
-    compile_program_expr_into_object_module,
+    compile_expr_into_module_two_pass, compile_program_expr_into_module_two_pass,
+    compile_program_expr_into_object_module_two_pass,
 };
 use crate::cranelift_backend::planning::{
     native_join_plan_for_program, oriented_subcontinuation_plan_for_program,
@@ -83,7 +83,8 @@ fn compile_program_expr(
     seed_env: &NativeSeedEnvironment,
     authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledExpr, CraneliftBackendError> {
-    compile_program_expr_into_module(
+    compile_program_expr_into_module_two_pass(
+        new_jit_module()?,
         new_jit_module()?,
         "ken_nc6_seed",
         Linkage::Local,
@@ -116,7 +117,8 @@ fn compile_expr_with_declarations_and_process_input<'a>(
     declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
     staged_process_input: Option<&RuntimeValue>,
 ) -> Result<CompiledExpr, CraneliftBackendError> {
-    compile_expr_into_module(
+    compile_expr_into_module_two_pass(
+        new_jit_module()?,
         new_jit_module()?,
         "ken_nc6_seed",
         Linkage::Local,
@@ -139,7 +141,8 @@ fn compile_program_expr_object(
     entry_symbol: &str,
     authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledModule<ObjectModule>, CraneliftBackendError> {
-    compile_program_expr_into_object_module(
+    compile_program_expr_into_object_module_two_pass(
+        new_object_module("ken-runtime-cranelift-object-discovery")?,
         new_object_module("ken-runtime-cranelift-object")?,
         entry_symbol,
         Linkage::Export,

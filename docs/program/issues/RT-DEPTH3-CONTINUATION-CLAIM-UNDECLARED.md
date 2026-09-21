@@ -1,7 +1,7 @@
 ---
 id: RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED
 title: "At depth 3 of the oriented-subcontinuation bracket row, object emission refuses with ContinuationSpecialization `the claimed continuation target was not declared into this function` (core.rs:11268) -- the claim's identity is absent from `function_local.continuation_calls`. This is the SECOND blocker on ledger row 9, invisible until now because depth 2 panics first, so no measurement of that row had ever executed depth 3."
-status: draft
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -25,12 +25,13 @@ origin: "Measured by runtime-implementer under RT-SUBCONTINUATION-LIFO-RELEASE-O
 > -> typed-K-context path, whose own claim, body and closeout checks all stay
 > live.
 >
-> **Status: `draft` until that repair LANDS, then `closed` in the SAME
-> candidate.** Closure is conditional on landing, and this node **must not
-> receive a separate implementation** — not a fallback, not a lookup widening,
-> not a new declaration lane, not a `Fusion` owner. The two prohibitions under
-> WHAT MUST NOT HAPPEN below are unchanged and are now also the ruling's own
-> scope fence.
+> **Status: `closed` by the same candidate as
+> `RT-BRACKET-RELEASE-ORDER-PARITY`.** Architect ruling
+> `evt_6c900nagc7mn4` establishes the mechanism: Arm A lawfully eliminates and
+> replaces the px8ta route that formed the undeclared claim. This node receives
+> no separate implementation — not a fallback, not a lookup widening, not a new
+> declaration lane, and not a `Fusion` owner. The two prohibitions under WHAT
+> MUST NOT HAPPEN below are unchanged and are also the ruling's scope fence.
 >
 > ### THE `(H)` PROBE IS NOT CLAIMED FIXED, AND CLOSING THIS NODE DOES NOT SAY IT IS
 >

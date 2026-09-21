@@ -1295,9 +1295,10 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 "the over-promoted plan must reach the lowering refusal"
             );
             assert_eq!(
-                applications, 6,
-                "the mutation must over-promote all three mixed-owner responses in both the \
-                 install and its closed re-derivation"
+                applications, 12,
+                "the mutation must over-promote all three mixed-owner responses in the \
+                 eligibility probe and final one-pass plan, at both install and closed \
+                 re-derivation"
             );
             assert!(
                 ken_runtime::mixed_owner_execute_then_resume_overpromotion_is_exact(),

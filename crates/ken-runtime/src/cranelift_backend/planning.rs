@@ -15,16 +15,18 @@ mod static_transition;
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use static_transition::{
-    checked_ih_continuation_inheritance_mutation_is_exact,
+    arm_a_liveness_mutation_is_exact, checked_ih_continuation_inheritance_mutation_is_exact,
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,
     checked_ih_generated_entry_confluence_mutation_is_exact,
     composed_return_forward_ret_authority_mutation_is_exact,
+    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    release_only_suffix_admission_suppressed_is_exact,
     retained_result_closure_proof_mutation_applied,
     retained_result_closure_proof_mutation_is_exact,
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    single_exclusive_plane_authority_suppressed_is_exact,
     static_response_context_demand_mutation_is_exact,
-    suppressed_execute_then_resume_response_is_exact,
+    suppressed_execute_then_resume_response_is_exact, with_arm_a_liveness_mutation,
     with_checked_ih_continuation_inheritance_mutation,
     with_checked_ih_continuation_inheritance_observations,
     with_checked_ih_generated_entry_admission_mutation,
@@ -34,10 +36,12 @@ pub use static_transition::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
-    with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
+    with_composed_return_forward_ret_role_witnesses,
     with_mixed_owner_execute_then_resume_overpromotion,
+    with_release_only_suffix_admission_suppressed, with_retained_result_closure_proof_mutation,
+    with_single_exclusive_plane_authority_suppressed,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
-    with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals,
+    with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals, ArmALivenessMutation,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
@@ -70,24 +74,6 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 /// checked-IH captured environment instead of duplicating its fixture.
 #[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
-pub(in crate::cranelift_backend) use static_transition::{
-    FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
-    FusionRegionClaimLedger,
-};
-/// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
-///
-/// Deliberately **not** in the `#[cfg(test)]` block below, and that is the
-/// whole distinction between this line and the next one. The emitter declares
-/// one target per `StaticContinuationFusionId` and defines its body from a
-/// `StaticContinuationFusionView`, so both names are needed on the real compile.
-/// An ungated *use* of a `cfg(test)`-gated re-export is an unresolved import in
-/// the production build that the test profile cannot see — the trap this file
-/// warns about three times below.
-pub(in crate::cranelift_backend) use static_transition::{
-    StaticContinuationFusionId, StaticContinuationFusionView,
-};
-/// `D2f` Deliverable 0 — the resolved plane's observation types, so a control
-/// downstream of a production compile can state which key resolved.
 #[cfg(any(test, feature = "r3-4b-observation"))]
 pub(in crate::cranelift_backend) use static_transition::{
     StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
@@ -100,7 +86,21 @@ pub(in crate::cranelift_backend) use static_transition::{
     with_fusion_producer_capture_mutation, D2jCause, FusionClaimParameterMutation,
     FusionProducerCaptureMutation, D2J_DECLARATION,
 };
-pub(super) use static_transition::plan_static_transition_graph_with_symbols;
+pub(super) use static_transition::{
+    dead_arm_effect_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
+    ArmALivenessPhase, ArmALivenessPlanningMode, ArmALivenessWitness, BoolMatchCaseOrdinals,
+    CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass, JoinPlanToken,
+    JoinResultRepresentation, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
+    SynthesizedFixedConstructorRole,
+};
+pub(super) use static_transition::{
+    plan_static_transition_graph_with_symbols,
+    plan_static_transition_graph_with_symbols_and_arm_a_liveness,
+};
+pub(in crate::cranelift_backend) use static_transition::{
+    FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
+    FusionRegionClaimLedger,
+};
 #[cfg(test)]
 pub(super) use static_transition::{
     contspec_nested_fixture, governed_nested_resource_bracket, plan_static_transition_graph,

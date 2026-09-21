@@ -823,6 +823,84 @@ pub(in crate::cranelift_backend) struct StaticResponsePhaseA {
     deferred: Vec<DeferredResponseRow>,
 }
 
+/// One-shot discovery result for Arm A. The artifact orchestrator owns this
+/// value between the disposable and final lowering passes; final planning
+/// consumes it and stores only the closed contract derived from it.
+pub(in crate::cranelift_backend) struct ArmALivenessWitness {
+    eligible: BTreeSet<ContinuationCallIdentity>,
+    live: BTreeSet<ContinuationCallIdentity>,
+}
+
+/// Which response-classification build the planner is producing.
+pub(in crate::cranelift_backend) enum ArmALivenessPlanningMode {
+    /// Retained for planner/lowering unit tests that construct a single module
+    /// directly. Production artifact entrypoints use one of the three modes
+    /// below.
+    LegacySinglePass,
+    /// Provisionally authorize the complete structural eligible set `A`.
+    Discovery,
+    /// Consume the one-shot witness and authorize exactly `A intersect L`.
+    Final(ArmALivenessWitness),
+    /// The ordinary one-pass path. It is valid only when the re-derived `A` is
+    /// empty.
+    FinalWithoutWitness,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum ArmALivenessPhase {
+    LegacySinglePass,
+    Discovery,
+    Final,
+    OnePass,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum ArmALivenessPlanState {
+    LegacySinglePass {
+        eligible: BTreeSet<ContinuationCallIdentity>,
+    },
+    Discovery {
+        eligible: BTreeSet<ContinuationCallIdentity>,
+    },
+    Final {
+        eligible: BTreeSet<ContinuationCallIdentity>,
+        live: BTreeSet<ContinuationCallIdentity>,
+    },
+    OnePass {
+        eligible: BTreeSet<ContinuationCallIdentity>,
+    },
+}
+
+impl ArmALivenessPlanState {
+    fn phase(&self) -> ArmALivenessPhase {
+        match self {
+            Self::LegacySinglePass { .. } => ArmALivenessPhase::LegacySinglePass,
+            Self::Discovery { .. } => ArmALivenessPhase::Discovery,
+            Self::Final { .. } => ArmALivenessPhase::Final,
+            Self::OnePass { .. } => ArmALivenessPhase::OnePass,
+        }
+    }
+
+    fn eligible(&self) -> &BTreeSet<ContinuationCallIdentity> {
+        match self {
+            Self::LegacySinglePass { eligible }
+            | Self::Discovery { eligible }
+            | Self::Final { eligible, .. }
+            | Self::OnePass { eligible } => eligible,
+        }
+    }
+
+    fn authorizes(&self, identity: &ContinuationCallIdentity) -> bool {
+        match self {
+            Self::LegacySinglePass { eligible } | Self::Discovery { eligible } => {
+                eligible.contains(identity)
+            }
+            Self::Final { live, .. } => live.contains(identity),
+            Self::OnePass { .. } => false,
+        }
+    }
+}
+
 /// Identity of one compile-time response-owner function. This domain is
 /// deliberately non-convertible to continuation/context identities: an owner
 /// implements one selected incoming edge and later calls a K context; it is not
@@ -1002,6 +1080,133 @@ pub fn with_suppressed_execute_then_resume_response<T>(operation: impl FnOnce() 
 #[cfg(feature = "px8-ds-test-support")]
 pub fn suppressed_execute_then_resume_response_is_exact() -> bool {
     SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
+}
+
+// RT-BRACKET-RELEASE-ORDER-PARITY arm A control. Production admits one
+// exclusive predeclared group as the authority seed and, only in a P1-free
+// plane, its mixed dependent. This compile-preserving mutation removes that
+// seed authority from both shapes without changing the composed >=2 path.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_single_exclusive_plane_authority_suppressed<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY.with(|slot| {
+        assert!(
+            !slot.replace(true),
+            "single-exclusive-plane authority suppression mutations cannot nest"
+        );
+    });
+    SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY_APPLICATIONS.with(|count| count.set(0));
+    let result = operation();
+    SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY.with(|slot| slot.set(false));
+    let applications =
+        SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn single_exclusive_plane_authority_suppressed_is_exact() -> bool {
+    SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY.with(|slot| !slot.get())
+}
+
+/// Test-only perturbations for the two independent exact-set boundaries.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArmALivenessMutation {
+    RemoveOneFinalEligible,
+    ForceOneDormantFinalOwner,
+    DropOneDiscoveryLive,
+    AddOneDiscoveryDormant,
+    SwapDiscoveryLiveForDormant,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static ARM_A_LIVENESS_MUTATION: std::cell::Cell<Option<ArmALivenessMutation>> =
+        const { std::cell::Cell::new(None) };
+    static ARM_A_LIVENESS_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_arm_a_liveness_mutation<T>(
+    mutation: ArmALivenessMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    ARM_A_LIVENESS_MUTATION.with(|slot| {
+        assert!(
+            slot.replace(Some(mutation)).is_none(),
+            "Arm-A liveness mutations cannot nest"
+        );
+    });
+    ARM_A_LIVENESS_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let result = operation();
+    let applications = ARM_A_LIVENESS_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    ARM_A_LIVENESS_MUTATION.with(|slot| {
+        assert_eq!(
+            slot.replace(None),
+            Some(mutation),
+            "Arm-A liveness mutation changed during its window"
+        );
+    });
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn arm_a_liveness_mutation_is_exact() -> bool {
+    ARM_A_LIVENESS_MUTATION.with(|slot| slot.get().is_none())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn arm_a_liveness_mutation() -> Option<ArmALivenessMutation> {
+    ARM_A_LIVENESS_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_arm_a_liveness_mutation_application() {
+    ARM_A_LIVENESS_MUTATION_APPLICATIONS.with(|count| count.set(count.get() + 1));
+}
+
+// RT-BRACKET-RELEASE-ORDER-PARITY arm B control. Production admits a bounded
+// all-release suffix after the existing frontier proofs. This mutation removes
+// only that third class while preserving the repeated-producer and Mapping
+// access classes.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static SUPPRESS_RELEASE_ONLY_SUFFIX: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static SUPPRESS_RELEASE_ONLY_SUFFIX_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_release_only_suffix_admission_suppressed<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    SUPPRESS_RELEASE_ONLY_SUFFIX.with(|slot| {
+        assert!(
+            !slot.replace(true),
+            "release-only suffix suppression mutations cannot nest"
+        );
+    });
+    SUPPRESS_RELEASE_ONLY_SUFFIX_APPLICATIONS.with(|count| count.set(0));
+    let result = operation();
+    SUPPRESS_RELEASE_ONLY_SUFFIX.with(|slot| slot.set(false));
+    let applications = SUPPRESS_RELEASE_ONLY_SUFFIX_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn release_only_suffix_admission_suppressed_is_exact() -> bool {
+    SUPPRESS_RELEASE_ONLY_SUFFIX.with(|slot| !slot.get())
 }
 
 // Route-B precision control for `RT-WRITEALL-SUCCESS-PLANE-CLOSE`. Production
@@ -1404,8 +1609,8 @@ fn exact_response_ret_identity(
     }
     Ok(Ok(
         plan.semantic
-            .case_constructor_identity(continuation_origin, matches[0])?,
-    ))
+            .case_constructor_identity(continuation_origin, matches[0],
+    )?))
 }
 
 fn free_environment_indices(
@@ -1413,9 +1618,7 @@ fn free_environment_indices(
     depth: u32,
     free: &mut BTreeSet<u32>,
 ) -> Result<(), CraneliftBackendError> {
-    let visit = |expr, depth, free: &mut BTreeSet<u32>| {
-        free_environment_indices(expr, depth, free)
-    };
+    let visit = |expr, depth, free: &mut BTreeSet<u32>| free_environment_indices(expr, depth, free);
     match expr {
         RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
@@ -1462,14 +1665,10 @@ fn free_environment_indices(
         } => {
             visit(scrutinee, depth, free)?;
             for case in cases {
-                let binders = u32::try_from(case.binders).map_err(|_| {
-                    planner_capacity_error("response match binder depth exhausted")
-                })?;
+                let binders = u32::try_from(case.binders).map_err(|_| planner_capacity_error("response match binder depth exhausted"))?;
                 visit(
                     &case.body,
-                    depth.checked_add(binders).ok_or_else(|| {
-                        planner_capacity_error("response match depth exhausted")
-                    })?,
+                    depth.checked_add(binders).ok_or_else(|| planner_capacity_error("response match depth exhausted"))?,
                     free,
                 )?;
             }
@@ -1630,9 +1829,7 @@ fn is_exact_bounded_nat_to_int(expr: &RuntimeExpr) -> bool {
             && case.binders == 0
             && matches!(case.body, RuntimeExpr::Value(crate::RuntimeValue::Int(crate::RuntimeIntV1::Small(0))))
     });
-    let suc = cases.iter().find(|case| {
-        case.constructor.as_str().ends_with("::Nat::Suc") && case.binders == 1
-    });
+    let suc = cases.iter().find(|case| case.constructor.as_str().ends_with("::Nat::Suc") && case.binders == 1);
     if zero.is_none() || suc.is_none() || cases.len() != 2 {
         return false;
     }
@@ -1676,8 +1873,7 @@ fn static_response_effect_environment(
         plan,
         source_root,
         effect_origin,
-        &entry_environment,
-    )?;
+        &entry_environment)?;
     let reached = reached.ok_or_else(|| {
         planner_error("a static response effect is outside its source owner subtree")
     })?;
@@ -2181,8 +2377,7 @@ impl StaticTransitionPlan<'_> {
                 // call. An open/single-stage plane or suppression retains P2.
                 let k_ret_identity = match exact_response_ret_identity(
                     self,
-                    unit.continuation_origin(),
-                )? {
+                    unit.continuation_origin())? {
                     Ok(identity) => identity,
                     Err(reason) => return Ok(Err(infeasible(reason))),
                 };
@@ -2633,8 +2828,7 @@ impl StaticTransitionPlan<'_> {
         {
             let prefix = contexts.first_mut().ok_or_else(|| {
                 planner_error(
-                    "the causal-prefix mutation found no pre-existing context",
-                )
+                    "the causal-prefix mutation found no pre-existing context")
             })?;
             prefix.worker_body_origin.0 = prefix
                 .worker_body_origin
@@ -2642,8 +2836,7 @@ impl StaticTransitionPlan<'_> {
                 .checked_add(1)
                 .ok_or_else(|| {
                     planner_capacity_error(
-                        "the causal-prefix mutation exhausted the body origin",
-                    )
+                        "the causal-prefix mutation exhausted the body origin")
                 })?;
             STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
                 .with(|count| count.set(1));
@@ -2749,6 +2942,97 @@ impl StaticTransitionPlan<'_> {
         Ok(())
     }
 
+    fn static_response_arm_a_eligible(
+        &self,
+        demands: &[StaticResponseContextDemand],
+        has_unitless_response: bool,
+    ) -> BTreeSet<ContinuationCallIdentity> {
+        let transport_sources = self.checked_ih_environment_transport_source_identities();
+        let mut transport_producer_owners = BTreeMap::new();
+        for demand in demands {
+            if !transport_sources.contains(&demand.k_identity) {
+                continue;
+            }
+            let owners = transport_producer_owners
+                .entry(demand.producer_call_origin)
+                .or_insert((false, false));
+            match demand.k_identity.emission_owner() {
+                ContinuationEmissionOwner::Predeclared(_) => owners.0 = true,
+                ContinuationEmissionOwner::Specialization(_)
+                | ContinuationEmissionOwner::Fusion(_) => owners.1 = true,
+            }
+        }
+        let ordinary_stage_count = transport_producer_owners
+            .values()
+            .filter(|(predeclared, specialization)| *predeclared && !*specialization)
+            .count();
+        if ordinary_stage_count != 1 {
+            return BTreeSet::new();
+        }
+        demands
+            .iter()
+            .filter(|demand| transport_sources.contains(&demand.k_identity))
+            .filter(|demand| {
+                let stage_owners = transport_producer_owners
+                    .get(&demand.producer_call_origin)
+                    .copied()
+                    .unwrap_or((false, false));
+                stage_owners == (true, false)
+                    || (!has_unitless_response && stage_owners == (true, true))
+            })
+            .map(|demand| demand.k_identity.clone())
+            .collect()
+    }
+
+    fn arm_a_liveness_state(
+        &self,
+        mode: ArmALivenessPlanningMode,
+        mut eligible: BTreeSet<ContinuationCallIdentity>,
+    ) -> Result<ArmALivenessPlanState, CraneliftBackendError> {
+        match mode {
+            ArmALivenessPlanningMode::LegacySinglePass => {
+                Ok(ArmALivenessPlanState::LegacySinglePass { eligible })
+            }
+            ArmALivenessPlanningMode::Discovery => {
+                Ok(ArmALivenessPlanState::Discovery { eligible })
+            }
+            ArmALivenessPlanningMode::FinalWithoutWitness => {
+                if !eligible.is_empty() {
+                    return Err(planner_error(
+                        "Arm-A final planning requires a discovery witness when its structural eligible set is non-empty",
+                    ));
+                }
+                Ok(ArmALivenessPlanState::OnePass { eligible })
+            }
+            ArmALivenessPlanningMode::Final(witness) => {
+                #[cfg(feature = "px8-ds-test-support")]
+                if arm_a_liveness_mutation() == Some(ArmALivenessMutation::RemoveOneFinalEligible) {
+                    if let Some(identity) = eligible.iter().next().cloned() {
+                        eligible.remove(&identity);
+                        record_arm_a_liveness_mutation_application();
+                    }
+                }
+                if eligible != witness.eligible {
+                    let missing = witness.eligible.difference(&eligible).count();
+                    let extra = eligible.difference(&witness.eligible).count();
+                    return Err(planner_error(format!(
+                        "the final Arm-A eligible set does not equal the discovery witness: \
+                         {missing} discovery identities absent, {extra} final identities extra"
+                    )));
+                }
+                if !witness.live.is_subset(&eligible) {
+                    return Err(planner_error(
+                        "the Arm-A discovery witness marks an identity live that is not structurally eligible",
+                    ));
+                }
+                Ok(ArmALivenessPlanState::Final {
+                    eligible,
+                    live: witness.live,
+                })
+            }
+        }
+    }
+
     /// PHASE B of the two-phase response context install. Runs after the first
     /// aggregate/transport derivation identifies transport-source callers.
     /// Execute-then-resume assigns owners only to exclusively-predeclared
@@ -2760,6 +3044,7 @@ impl StaticTransitionPlan<'_> {
     /// restores P2 in an eligible plane. Phase A entries are never retracted.
     pub(super) fn install_static_response_context_plan_phase_b(
         &mut self,
+        arm_a_liveness: ArmALivenessPlanningMode,
     ) -> Result<(), CraneliftBackendError> {
         if self.static_response_plan_installed {
             return Err(planner_error(
@@ -2768,7 +3053,9 @@ impl StaticTransitionPlan<'_> {
         }
         if self.static_response_infeasible.is_some() {
             // Phase A refused the whole plane on an opaque/dynamic K; there is no
-            // Specialized/Deferred population to split. Seal the install.
+            // Specialized/Deferred population to split. Seal the install with an
+            // exact empty Arm-A universe.
+            self.arm_a_liveness = Some(self.arm_a_liveness_state(arm_a_liveness, BTreeSet::new())?);
             self.static_response_plan_installed = true;
             return Ok(());
         }
@@ -2778,8 +3065,12 @@ impl StaticTransitionPlan<'_> {
             )
         })?;
         let has_unitless_response = !phase_a.deferred.is_empty();
+        let eligible = self.static_response_arm_a_eligible(&phase_a.demands, has_unitless_response);
+        let arm_a_liveness = self.arm_a_liveness_state(arm_a_liveness, eligible)?;
         let (specialized, mut deferred) =
-            self.static_response_phase_b_split(phase_a.demands, has_unitless_response)?;
+            self.static_response_phase_b_split(phase_a.demands, has_unitless_response,
+            &arm_a_liveness,
+        )?;
         deferred.extend(phase_a.deferred);
         deferred.sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
         let contexts = self.continuation_contexts.clone();
@@ -2790,6 +3081,7 @@ impl StaticTransitionPlan<'_> {
         )?;
         self.static_response_continuations = rows;
         self.static_response_deferred = deferred;
+        self.arm_a_liveness = Some(arm_a_liveness);
         self.static_response_plan_installed = true;
         Ok(())
     }
@@ -2804,17 +3096,16 @@ impl StaticTransitionPlan<'_> {
         &self,
         demands: Vec<StaticResponseContextDemand>,
         has_unitless_response: bool,
+        arm_a_liveness: &ArmALivenessPlanState,
     ) -> Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), CraneliftBackendError>
     {
         let transport_sources = self.checked_ih_environment_transport_source_identities();
-        // Execute-then-resume serves a composed response plane: at least two
-        // producer groups have exclusively predeclared transport sources.
-        // A producer that also has a specialization/fusion-owned source is a
-        // mixed-owner fan-out and does not increase the composition count. When
-        // P1 is present it also cannot borrow the ordinary groups' promotion
-        // authority; P1-free composed planes preserve their existing promotion.
-        // This keeps single-stage and P1-bearing mixed-owner residuals on their
-        // proven paths while admitting the ordinary read-then-write stages.
+        // Two exclusive predeclared producer groups authorize the established
+        // composed response plane. One exclusive group is also an authority
+        // seed for itself and, only while the plane is P1-free, its mixed-owner
+        // dependent. P1-bearing mixed groups retain P2 unless the explicit
+        // overpromotion control is active; specialization-only groups cannot
+        // seed or borrow this authority.
         let mut transport_producer_owners = BTreeMap::new();
         for demand in &demands {
             if !transport_sources.contains(&demand.k_identity) {
@@ -2833,7 +3124,16 @@ impl StaticTransitionPlan<'_> {
             .values()
             .filter(|(predeclared, specialization)| *predeclared && !*specialization)
             .count();
-        let requires_execute_then_resume = ordinary_stage_count >= 2;
+        let composed_plane_authority = ordinary_stage_count >= 2;
+        let single_exclusive_plane = ordinary_stage_count == 1;
+        #[cfg(feature = "px8-ds-test-support")]
+        let forced_dormant = match (arm_a_liveness, arm_a_liveness_mutation()) {
+            (
+                ArmALivenessPlanState::Final { eligible, live },
+                Some(ArmALivenessMutation::ForceOneDormantFinalOwner),
+            ) => eligible.difference(live).next().cloned(),
+            _ => None,
+        };
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {
@@ -2847,35 +3147,62 @@ impl StaticTransitionPlan<'_> {
             #[cfg(not(feature = "px8-ds-test-support"))]
             let overpromote_mixed = false;
             let transport_source = transport_sources.contains(&demand.k_identity);
-            let exclusively_predeclared_stage = transport_producer_owners
+            let stage_owners = transport_producer_owners
                 .get(&demand.producer_call_origin)
-                .is_some_and(|owners| *owners == (true, false));
+                .copied()
+                .unwrap_or((false, false));
+            let exclusively_predeclared_stage = stage_owners == (true, false);
+            let mixed_owner_stage = stage_owners == (true, true);
+            let single_exclusive_group_authority = single_exclusive_plane
+                && (exclusively_predeclared_stage || (!has_unitless_response && mixed_owner_stage));
+            let arm_a_eligible = arm_a_liveness.eligible().contains(&demand.k_identity);
+            if (transport_source && single_exclusive_group_authority) != arm_a_eligible {
+                return Err(planner_error(
+                    "Arm-A structural eligibility disagrees with its phase-B re-derivation",
+                ));
+            }
+            let mut arm_a_authorized = arm_a_liveness.authorizes(&demand.k_identity);
+            #[cfg(feature = "px8-ds-test-support")]
+            if forced_dormant.as_ref() == Some(&demand.k_identity) {
+                arm_a_authorized = true;
+                record_arm_a_liveness_mutation_application();
+            }
+            #[cfg(feature = "px8-ds-test-support")]
+            let suppress_single_exclusive_authority = arm_a_eligible
+                && SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY.with(std::cell::Cell::get);
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let suppress_single_exclusive_authority = false;
+            #[cfg(feature = "px8-ds-test-support")]
+            if transport_source && suppress_single_exclusive_authority {
+                SUPPRESS_SINGLE_EXCLUSIVE_PLANE_AUTHORITY_APPLICATIONS
+                    .with(|count| count.set(count.get() + 1));
+            }
+            let group_requires_execute_then_resume = composed_plane_authority || arm_a_authorized;
             #[cfg(feature = "px8-ds-test-support")]
             if overpromote_mixed
                 && has_unitless_response
-                && requires_execute_then_resume
+                && composed_plane_authority
                 && transport_source
                 && !exclusively_predeclared_stage
             {
                 OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS
                     .with(|count| count.set(count.get() + 1));
             }
-            // Execute-then-resume is admitted only for the composed ordinary
-            // has-K groups identified above. Unit-less P1 members are absent
-            // from `demands` and remain on main lowering, so this loop cannot
-            // replace their path. In a P1-bearing plane, mixed-owner groups may
-            // not borrow another group's authority; P1-free composed planes keep
-            // their prior promotion. Single-stage groups retain their existing
-            // route.
+            // Unit-less P1 members are absent from `demands` and remain on main
+            // lowering, so this loop cannot replace their path. In a P1-bearing
+            // plane, mixed-owner groups may not borrow the single exclusive
+            // group's authority. P1-free mixed dependents may borrow it, while
+            // the established >=2 composed authority remains unchanged.
             if transport_source
                 && (suppress_execute
-                    || !requires_execute_then_resume
+                    || suppress_single_exclusive_authority
+                    || !group_requires_execute_then_resume
                     || (has_unitless_response
                         && !exclusively_predeclared_stage
                         && !overpromote_mixed))
             {
-                // Population-side mutation restores P2 for an otherwise eligible
-                // plane; open and single-stage planes remain lawful residuals.
+                // Population-side mutations restore P2 at the classification
+                // producer; unseeded and P1-bearing residuals remain lawful.
                 deferred.push(DeferredResponseRow {
                     vis_origin: demand.vis_origin,
                     producer_call_origin: demand.producer_call_origin,
@@ -2925,6 +3252,9 @@ impl StaticTransitionPlan<'_> {
                 "the final plan carries no installed static response context plan",
             ));
         }
+        let arm_a_liveness = self.arm_a_liveness.as_ref().ok_or_else(|| {
+            planner_error("the final plan carries no installed Arm-A liveness contract")
+        })?;
         let (demands, p1_deferred) =
             match self.static_response_context_demands_filtered(None, false)? {
                 Ok(classified) => classified,
@@ -2934,6 +3264,7 @@ impl StaticTransitionPlan<'_> {
                         context.finalized_availability.clear();
                     }
                     if self.static_response_infeasible.as_ref() != Some(&infeasible)
+                        || !arm_a_liveness.eligible().is_empty()
                         || !self.static_response_continuations.is_empty()
                         || !self.static_response_deferred.is_empty()
                         || landed_contexts != causal_contexts
@@ -2953,13 +3284,20 @@ impl StaticTransitionPlan<'_> {
         // Phase A re-derivation: the owner-less context-entry plane over has-K-unit.
         let (mut expected_contexts, preexisting_count) =
             self.response_context_union(causal_contexts, &demands)?;
-        // Phase B re-derivation: a P1-bearing eligible plane gives each
-        // exclusively-predeclared group an owner while mixed-owner groups retain
-        // P2; P1-free composed planes preserve their existing promotion. A
-        // single-stage plane or the suppression control retains P2. P1 stays on
-        // main lowering outside the demand population.
+        // Phase B re-derivation: the same closed structural `A` is checked
+        // against the installed discovery/final contract before the split is
+        // replayed. The one-shot witness is consumed during installation; this
+        // validation reads the resulting contract rather than recomputing a
+        // second liveness authority.
+        let expected_eligible =
+            self.static_response_arm_a_eligible(&demands, !p1_deferred.is_empty());
+        if expected_eligible != *arm_a_liveness.eligible() {
+            return Err(planner_error(
+                "the installed Arm-A eligible set is not its exact closed re-derivation",
+            ));
+        }
         let (specialized, mut expected_deferred) =
-            self.static_response_phase_b_split(demands, !p1_deferred.is_empty())?;
+            self.static_response_phase_b_split(demands, !p1_deferred.is_empty(), arm_a_liveness)?;
         expected_deferred.extend(p1_deferred);
         expected_deferred
             .sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
@@ -3052,6 +3390,127 @@ impl StaticTransitionPlan<'_> {
     /// `evt_4ar3rxzrra5v4`), for congruence proofs and control fixtures.
     pub(in crate::cranelift_backend) fn static_response_deferred(&self) -> &[DeferredResponseRow] {
         &self.static_response_deferred
+    }
+
+    pub(in crate::cranelift_backend) fn arm_a_liveness_phase(
+        &self,
+    ) -> Result<ArmALivenessPhase, CraneliftBackendError> {
+        self.arm_a_liveness
+            .as_ref()
+            .map(ArmALivenessPlanState::phase)
+            .ok_or_else(|| planner_error("the Arm-A liveness contract was read before phase B"))
+    }
+
+    pub(in crate::cranelift_backend) fn arm_a_liveness_eligible_is_empty(
+        &self,
+    ) -> Result<bool, CraneliftBackendError> {
+        Ok(self.arm_a_liveness_eligible()?.is_empty())
+    }
+
+    pub(in crate::cranelift_backend) fn arm_a_liveness_eligible(
+        &self,
+    ) -> Result<&BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        Ok(self
+            .arm_a_liveness
+            .as_ref()
+            .ok_or_else(|| planner_error("the Arm-A eligible set was read before phase B"))?
+            .eligible())
+    }
+
+    /// Validate final call-seat equality before the ordinary response-owner
+    /// coverage detector runs. Discovery does not mint its witness here: it
+    /// must first survive every remaining closeout at the artifact boundary.
+    pub(in crate::cranelift_backend) fn validate_final_arm_a_liveness_observation(
+        &self,
+        observed_call_seats: &BTreeSet<ContinuationCallIdentity>,
+    ) -> Result<(), CraneliftBackendError> {
+        let state = self.arm_a_liveness.as_ref().ok_or_else(|| {
+            planner_error("the Arm-A call-seat observation closed without a phase-B contract")
+        })?;
+        if let ArmALivenessPlanState::Final {
+            eligible,
+            live: witnessed_live,
+        } = state
+        {
+            let live = observed_call_seats
+                .intersection(eligible)
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            if live != *witnessed_live {
+                let missing = witnessed_live.difference(&live).count();
+                let extra = live.difference(witnessed_live).count();
+                return Err(planner_error(format!(
+                    "the final Arm-A call-seat set does not equal the discovery witness: \
+                     {missing} witnessed identities absent, {extra} final identities extra"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Close the artifact's pre-target-filter call-seat observation. Discovery
+    /// mints the one-shot witness here after every other closeout passed.
+    pub(in crate::cranelift_backend) fn close_arm_a_liveness_observation(
+        &self,
+        observed_call_seats: BTreeSet<ContinuationCallIdentity>,
+    ) -> Result<Option<ArmALivenessWitness>, CraneliftBackendError> {
+        let state = self.arm_a_liveness.as_ref().ok_or_else(|| {
+            planner_error("the Arm-A call-seat observation closed without a phase-B contract")
+        })?;
+        let mut live = observed_call_seats
+            .intersection(state.eligible())
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        match state {
+            ArmALivenessPlanState::LegacySinglePass { .. } => Ok(None),
+            ArmALivenessPlanState::OnePass { eligible } => {
+                if !eligible.is_empty() || !live.is_empty() {
+                    return Err(planner_error(
+                        "the one-pass Arm-A path carried a non-empty eligible or live set",
+                    ));
+                }
+                Ok(None)
+            }
+            ArmALivenessPlanState::Discovery { eligible } => {
+                #[cfg(feature = "px8-ds-test-support")]
+                match arm_a_liveness_mutation() {
+                    Some(ArmALivenessMutation::DropOneDiscoveryLive) => {
+                        if let Some(identity) = live.iter().next().cloned() {
+                            live.remove(&identity);
+                            record_arm_a_liveness_mutation_application();
+                        }
+                    }
+                    Some(ArmALivenessMutation::AddOneDiscoveryDormant) => {
+                        if let Some(identity) = eligible.difference(&live).next().cloned() {
+                            live.insert(identity);
+                            record_arm_a_liveness_mutation_application();
+                        }
+                    }
+                    Some(ArmALivenessMutation::SwapDiscoveryLiveForDormant) => {
+                        let removed = live.iter().next().cloned();
+                        let added = eligible.difference(&live).next().cloned();
+                        if let (Some(removed), Some(added)) = (removed, added) {
+                            live.remove(&removed);
+                            live.insert(added);
+                            record_arm_a_liveness_mutation_application();
+                        }
+                    }
+                    Some(ArmALivenessMutation::RemoveOneFinalEligible)
+                    | Some(ArmALivenessMutation::ForceOneDormantFinalOwner)
+                    | None => {}
+                }
+                if !live.is_subset(eligible) {
+                    return Err(planner_error(
+                        "the discovery call-seat set contains an identity outside Arm-A eligibility",
+                    ));
+                }
+                Ok(Some(ArmALivenessWitness {
+                    eligible: eligible.clone(),
+                    live,
+                }))
+            }
+            ArmALivenessPlanState::Final { .. } => Ok(None),
+        }
     }
 
     /// The classify verdict for a response `Vis` keyed by its operation-root
@@ -3269,12 +3728,11 @@ impl StaticTransitionPlan<'_> {
     /// not owner multiplicity. P1 and already-
     /// Specialized nodes are existing owner boundaries. The installed finite
     /// response population is the bound; a cycle or opaque frontier leaves the
-    /// whole new suffix unowned rather than weakening exact-Ret. S7 admits only
-    /// the two evidenced new classes: one repeated producer call, or the frozen
-    /// Mapping read/write access family. A terminal `ResourceRelease` belongs
-    /// to the qualified bracket suffix but does not decide its operation class.
-    /// A heterogeneous sibling outside those classes retains its existing owner
-    /// and forward-edge route byte-for-behavior.
+    /// whole new suffix unowned rather than weakening exact-Ret. S7 admits three
+    /// evidenced classes: one repeated producer call, the frozen Mapping
+    /// read/write access family, or a non-empty all-`ResourceRelease` bracket
+    /// settlement suffix. A heterogeneous sibling outside those classes retains
+    /// its existing owner and forward-edge route byte-for-behavior.
     fn bounded_deferred_response_suffix(
         &self,
         response: &StaticResponseContinuation,
@@ -3338,10 +3796,24 @@ impl StaticTransitionPlan<'_> {
             && substantive
                 .iter()
                 .all(|candidate| mapping_access(candidate.operation()));
-        if repeated_producer || mapping_access_chain {
+        let release_only_suffix = !suffix.is_empty()
+            && suffix
+                .iter()
+                .all(|row| row.operation() == HostOpV1::ResourceRelease);
+        #[cfg(feature = "px8-ds-test-support")]
+        let suppress_release_only = SUPPRESS_RELEASE_ONLY_SUFFIX.with(std::cell::Cell::get);
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let suppress_release_only = false;
+        #[cfg(feature = "px8-ds-test-support")]
+        if release_only_suffix && suppress_release_only {
+            SUPPRESS_RELEASE_ONLY_SUFFIX_APPLICATIONS.with(|count| count.set(count.get() + 1));
+        }
+        if repeated_producer || mapping_access_chain
+            || (release_only_suffix && !suppress_release_only)
+        {
             Ok(suffix)
         } else {
-            // S7: a heterogeneous sequence outside the two newly evidenced
+            // S7: a heterogeneous sequence outside the three evidenced
             // classes keeps its existing owner/forward-edge route unchanged.
             Ok(Vec::new())
         }

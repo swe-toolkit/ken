@@ -114,6 +114,7 @@ use super::occurrences::{
 };
 use super::responses::{
     publish_checked_ih_post_call_consumers, validate_checked_ih_post_call_consumers,
+    ArmALivenessPlanningMode,
 };
 use super::semantic_ir::{
     build_bool_constructor_inventory, build_semantic_plane,
@@ -302,6 +303,7 @@ impl<'src> Planner<'src> {
                 continuation_contexts: Vec::new(),
                 static_response_continuations: Vec::new(),
                 static_response_plan_installed: false,
+                arm_a_liveness: None,
                 static_response_infeasible: None,
                 static_response_deferred: Vec::new(),
                 static_response_phase_a: None,
@@ -1298,6 +1300,7 @@ impl<'src> Planner<'src> {
         symbols: &crate::NativeProcessSymbols,
         root_ingress: AbiRootIngress,
         functionized_units: bool,
+        arm_a_liveness: ArmALivenessPlanningMode,
     ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
         self.reconcile_realized_checked_ih_recursors()?;
         let (synthesized_identities, synthesized_io_roles) =
@@ -1462,7 +1465,7 @@ impl<'src> Planner<'src> {
         // response phase B can decide whether an owner exists.
         self.plan.immediate_bridge_realizations =
             publish_immediate_bridge_realization_plan(&self.plan)?;
-        self.plan.install_static_response_context_plan_phase_b()?;
+        self.plan.install_static_response_context_plan_phase_b(arm_a_liveness)?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing

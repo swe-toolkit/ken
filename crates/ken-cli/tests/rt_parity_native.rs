@@ -521,16 +521,13 @@ struct Differential {
     native: ken_runtime::EffectObservation,
 }
 
-/// Compile the fixture at `entry` to a linked native artifact, run it, then run
-/// the identical source through the reference interpreter against the same
-/// root, and return both canonical observations.
-fn differential(case: &str, entry: &str) -> Differential {
+/// Compile checked source to a linked native artifact, run it, then run the
+/// identical source through the reference interpreter against the same root.
+fn differential_source(case: &str, source: &str) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("source"), b"ab").unwrap();
-    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-
     let output = ken_cli::build_native_program(
-        &source,
+        source,
         ken_cli::SourceFormat::Ken,
         &format!("rt_parity_{}", case.replace('-', "_")),
         root.path(),
@@ -549,7 +546,7 @@ fn differential(case: &str, entry: &str) -> Differential {
 
     let mut host = ken_interp::PosixHost::new_at(root.path());
     let interpreted = ken_cli::run_program_effect_observation(
-        &source,
+        source,
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
@@ -562,6 +559,35 @@ fn differential(case: &str, entry: &str) -> Differential {
         interpreted,
         native,
     }
+}
+
+/// Compile the fixture at `entry` through both engines and return their
+/// canonical observations.
+fn differential(case: &str, entry: &str) -> Differential {
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+    differential_source(case, &source)
+}
+
+fn compile_parity_entry(
+    case: &str,
+    entry: &str,
+) -> (
+    tempfile::TempDir,
+    Result<
+        ken_elaborator::compiler_driver::NativeProgramBuildOutput,
+        ken_elaborator::compiler_driver::NativeProgramBuildError,
+    >,
+) {
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+    let root = output_dir(case);
+    std::fs::write(root.path().join("source"), b"ab").unwrap();
+    let result = ken_cli::build_native_program(
+        &source,
+        ken_cli::SourceFormat::Ken,
+        &format!("rt_parity_{}", case.replace('-', "_")),
+        root.path(),
+    );
+    (root, result)
 }
 
 fn operation_events(
@@ -579,50 +605,45 @@ fn operation_events(
         .collect()
 }
 
-// RT-BRACKET-RELEASE-ORDER-PARITY split, shared by EVERY native/interpreter
-// effect-trace parity site. The interpreter and native disagree only on the
-// relative ORDER in which a nested/multi-resource bracket releases its resources
-// (outcome-independent, lives in bracket teardown, pre-existing, tracked as its
-// own node); the spec-correct order is not yet adjudicated, so a parity
-// assertion MUST compare non-release events IN ORDER and release events AS A SET
-// -- never pin a release order to either side. Both `assert_narrowed_alike` and
-// `assert_d1_route_control_child`'s specialized (native-returns) arm route
-// through these two helpers, so the exclusion cannot be applied at one site and
-// missed at the sibling. When RT-BRACKET-RELEASE-ORDER-PARITY fixes the
-// violating executor, delete both helpers and restore the full ordered
-// `effect_trace` equality at every caller.
-fn non_release_events(
-    observation: &ken_runtime::EffectObservation,
-) -> Vec<ken_runtime::EffectEvent> {
-    observation
+fn bracket_resource_order(
+    observation: &ken_runtime::EffectObservation) -> (Vec<u64>, Vec<u64>) {
+    let acquisitions = observation
         .effect_trace
         .iter()
-        .filter(|event| event.operation != ken_runtime::HostOpV1::ResourceRelease)
-        .cloned()
-        .collect()
-}
-
-fn release_set(observation: &ken_runtime::EffectObservation) -> Vec<String> {
-    // Order-insensitive: keyed on the Debug rendering of (resource_bindings,
-    // request, outcome) so no Ord bound is required on the canonical release
-    // payloads. Relative RELEASE ORDER is excluded per the note above.
-    let mut releases = observation
+        .filter(|event| {
+            matches!(
+                event.operation,
+                ken_runtime::HostOpV1::FsOpen | ken_runtime::HostOpV1::BufferAllocate
+            )
+        })
+        .map(|event| event.resource_bindings[0].1 .0)
+        .collect::<Vec<_>>();
+    let releases = observation
         .effect_trace
         .iter()
         .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
-        .map(|event| {
-            format!(
-                "{:?}",
-                (
-                    event.resource_bindings.clone(),
-                    event.request.clone(),
-                    event.outcome.clone(),
-                )
-            )
-        })
+        .map(|event| event.resource_bindings[0].1 .0)
         .collect::<Vec<_>>();
-    releases.sort();
-    releases
+    (acquisitions, releases)
+}
+
+fn assert_bracket_resources_release_in_reverse(
+    observation: &ken_runtime::EffectObservation,
+    expected_count: usize,
+    label: &str,
+) {
+    let (acquisitions, releases) = bracket_resource_order(observation);
+    assert_eq!(
+        acquisitions.len(),
+        expected_count,
+        "{label}: acquisition count"
+    );
+    assert_eq!(releases.len(), expected_count, "{label}: release count");
+    assert_eq!(
+        releases,
+        acquisitions.iter().rev().copied().collect::<Vec<_>>(),
+        "{label}: nested resources must settle inner before outer"
+    );
 }
 
 /// Assert both discriminators for one narrowing case.
@@ -652,20 +673,9 @@ fn assert_narrowed_alike(
     );
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
-    // Effect-trace parity with the bracket RELEASE ORDER excluded via the shared
-    // `non_release_events` / `release_set` split (see the helper note above;
-    // RT-BRACKET-RELEASE-ORDER-PARITY). Non-release events must agree in order;
-    // releases must agree as a set.
     assert_eq!(
-        non_release_events(&native),
-        non_release_events(&interpreted),
-        "{case}: complete ordered NON-release effects, requests, outcomes, and resource provenance must agree",
-    );
-    assert_eq!(
-        release_set(&native),
-        release_set(&interpreted),
-        "{case}: the SET of bracket releases (resources, requests, outcomes) must agree across \
-         executors; their relative ORDER is excluded here per RT-BRACKET-RELEASE-ORDER-PARITY",
+        native.effect_trace, interpreted.effect_trace,
+        "{case}: complete ordered effects, requests, outcomes, and resource provenance must agree",
     );
     assert_eq!(
         interpreted.terminal_exit, native.terminal_exit,
@@ -719,7 +729,7 @@ fn assert_narrowed_alike(
 ///
 /// Promise class: durable invariant. MEASURED: the fixture's sole successful
 /// branch is `Ok ReadEof`; both engines exit successfully without a terminal
-/// error, agree on non-release and release traces, and record no `FsReadAt`.
+/// error, agree on the complete ordered effect trace, and record no `FsReadAt`.
 /// CLAIMED: a valid endpoint window yields `ReadEof` without visiting the host.
 /// THE GAP: the internal `ReadProgress` is observed through the fixture's exact
 /// branch-to-exit discriminator rather than as a public effect event.
@@ -739,14 +749,8 @@ fn assert_read_eof_alike(case: &str, result: &Differential) {
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
     assert_eq!(
-        non_release_events(native),
-        non_release_events(interpreted),
-        "{case}: ordered non-release effects must agree"
-    );
-    assert_eq!(
-        release_set(native),
-        release_set(interpreted),
-        "{case}: release sets must agree"
+        native.effect_trace, interpreted.effect_trace,
+        "{case}: complete ordered effects must agree"
     );
     assert_eq!(
         interpreted.terminal_exit, native.terminal_exit,
@@ -1042,12 +1046,8 @@ fn fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness() {
             invalid_bounds.native.terminal_exit
         );
         assert_eq!(
-            non_release_events(&invalid_bounds.native),
-            non_release_events(&invalid_bounds.interpreted)
-        );
-        assert_eq!(
-            release_set(&invalid_bounds.native),
-            release_set(&invalid_bounds.interpreted)
+            invalid_bounds.native.effect_trace,
+            invalid_bounds.interpreted.effect_trace
         );
         assert!(
             operation_events(&invalid_bounds.interpreted, ken_runtime::HostOpV1::FsReadAt)
@@ -1076,12 +1076,8 @@ fn fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness() {
             rejected.native.terminal_exit
         );
         assert_eq!(
-            non_release_events(&rejected.native),
-            non_release_events(&rejected.interpreted)
-        );
-        assert_eq!(
-            release_set(&rejected.native),
-            release_set(&rejected.interpreted)
+            rejected.native.effect_trace,
+            rejected.interpreted.effect_trace
         );
         assert!(
             operation_events(&rejected.interpreted, ken_runtime::HostOpV1::FsReadAt).is_empty()
@@ -1698,34 +1694,43 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
 
         let read = compile("read", "rt_read_offset_stage");
         let write = compile("write", "rt_write_writable_stage");
-        // Structural totality for both products. The pure read plane retains its
-        // P2 transport sources so inc1's forward-Ret path remains live. The
-        // read-then-write plane has two producer groups whose transport sources
-        // are exclusively predeclared, so execute-then-resume specializes every
-        // has-K transport source. Each
-        // Specialized row owns one forward declaration, without baked ids/counts.
+        // Structural totality for both products. Each exclusively-predeclared
+        // transport group independently authorizes execute-then-resume; the
+        // read-then-write plane also retains its composed multi-stage authority.
+        // Every Specialized row owns one forward declaration, without baked
+        // ids/counts.
         for diagnostic in [&read, &write] {
             assert!(
                 !diagnostic.all_static_response_rows.is_empty(),
                 "each fixed product specializes at least one response"
             );
         }
-        assert!(
-            !read.static_response_deferred.is_empty()
-                && read
+        for (label, diagnostic) in [("read", &read), ("write", &write)] {
+            assert!(
+                diagnostic
+                    .all_static_response_rows
+                    .iter()
+                    .any(|row| row.operation == "FsReadAt"),
+                "{label}: the governed read group was not specialized"
+            );
+            assert!(
+                diagnostic
                     .static_response_deferred
                     .iter()
-                    .all(|row| row.sub_case == "UnconsumedTransportCaller"),
-            "the single-stage read plane must retain only P2: {:?}",
-            read.static_response_deferred
+                    .all(|row| row.operation != "FsReadAt"),
+                "{label}: the governed read group remained Deferred P2: {:?}",
+                diagnostic.static_response_deferred
         );
         assert!(
-            read.static_response_deferred
+                diagnostic.static_response_deferred
                 .iter()
-                .all(|row| row.handler_owner.is_none()),
-            "a P1-free plane acquired handler-owned Deferred execution: {:?}",
-            read.static_response_deferred
+                .all(|row| {
+                    row.operation != "ResourceRelease" || row.handler_owner.is_some()
+                }),
+                "{label}: a governed release remained unowned Deferred P2: {:?}",
+                diagnostic.static_response_deferred
         );
+        }
         assert!(
             write.static_response_deferred.is_empty(),
             "the eligible write plane must materialize every transport source: {:?}",
@@ -4851,23 +4856,9 @@ fn assert_d1_route_control_child() {
                 native.exit_status, interpreted.exit_status,
                 "{mode}: specialized-route native/interpreter exit parity"
             );
-            // RT-BRACKET-RELEASE-ORDER-PARITY: this specialized (native-returns)
-            // route now reaches a full effect-trace compare for the first time
-            // (base trapped here), so it hits the same pre-existing bracket
-            // release-order divergence that `assert_narrowed_alike` already
-            // excludes. Apply the identical split via the shared helpers: every
-            // NON-release event must agree IN ORDER; the releases must agree AS A
-            // SET, their relative order excluded. When the violating executor is
-            // fixed, restore the full ordered `effect_trace` equality here.
             assert_eq!(
-                non_release_events(&native),
-                non_release_events(&interpreted),
-                "{mode}: specialized-route native/interpreter complete ordered NON-release effects must agree",
-            );
-            assert_eq!(
-                release_set(&native),
-                release_set(&interpreted),
-                "{mode}: specialized-route the SET of bracket releases must agree; relative ORDER excluded per RT-BRACKET-RELEASE-ORDER-PARITY",
+                native.effect_trace, interpreted.effect_trace,
+                "{mode}: specialized-route native/interpreter complete ordered effects must agree",
             );
         }
     }
@@ -4942,6 +4933,368 @@ fn fs_read_at_malformed_window_narrows_to_invalid_bounds() {
             ken_runtime::HostOpV1::FsReadAt,
             "InvalidBounds",
         )
+    });
+}
+
+/// Promise class: durable invariant. A non-empty Arm-A eligible population is
+/// lowered first in a disposable object module and then in a distinct final
+/// object module whose response-owner symbol population excludes every
+/// discovery-only caller.
+#[test]
+fn arm_a_two_pass_final_symbol_census_excludes_discovery_only_owner() {
+    in_large_stack_thread("rt-arm-a-two-pass-symbol-census", || {
+        let (((_root, result), diagnostics), passes) =
+            ken_runtime::with_arm_a_lowering_passes(|| {
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    compile_parity_entry("arm-a-two-pass-symbol-census", "rt_read_window_stage")
+                })
+            });
+        result.expect("the dormant read-window caller must remain Deferred");
+        assert_eq!(
+            passes
+                .iter()
+                .map(|observation| observation.pass)
+                .collect::<Vec<_>>(),
+            vec![
+                ken_runtime::ArmALoweringPass::Discovery,
+                ken_runtime::ArmALoweringPass::Final,
+            ],
+            "non-empty Arm A must run exactly one disposable and one final lowering pass"
+        );
+        assert_eq!(
+            diagnostics.len(),
+            1,
+            "the disposable pass must not publish a diagnostic report"
+        );
+        let discovery = passes[0]
+            .response_owner_symbols
+            .iter()
+            .map(|(_, caller)| caller.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        let final_callers = passes[1]
+            .response_owner_symbols
+            .iter()
+            .map(|(_, caller)| caller.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        let discovery_only = discovery
+            .difference(&final_callers)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(
+            !discovery_only.is_empty(),
+            "the read-window fixture must discover at least one dormant provisional owner"
+        );
+        assert!(
+            discovery_only
+                .iter()
+                .all(|caller| !final_callers.contains(caller)),
+            "a dormant provisional owner escaped into the final symbol population"
+        );
+        let diagnostic_callers = diagnostics[0]
+            .static_response_owners
+            .iter()
+            .map(|owner| owner.selected_caller.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            final_callers, diagnostic_callers,
+            "the emitted final response-owner symbols must equal the final plan's exact owners"
+        );
+        assert_eq!(
+            passes[1].response_owner_symbols.len(),
+            final_callers.len(),
+            "the final module must declare one distinct symbol per final owner"
+        );
+        assert!(ken_runtime::arm_a_lowering_pass_observation_is_exact());
+    });
+}
+
+/// Promise class: durable invariant. An artifact with an empty structural
+/// Arm-A universe performs exactly one final lowering pass.
+#[test]
+fn arm_a_empty_eligible_artifact_uses_one_lowering_pass() {
+    in_large_stack_thread("rt-arm-a-empty-one-pass", || {
+        const SOURCE: &str = r#"program capabilities FS AFull
+
+fn pure_stage (_cap : Cap AFull) : HostIO AFull ExitCode =
+  host_exit AFull Success
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+MkProgramCaps cap |-> pure_stage cap
+  }
+"#;
+        let root = output_dir("arm-a-empty-one-pass");
+        let (result, passes) = ken_runtime::with_arm_a_lowering_passes(|| {
+            ken_cli::build_native_program(
+                SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "rt_arm_a_empty_one_pass",
+                root.path(),
+            )
+        });
+        result.expect("the empty-A artifact compiles");
+        assert_eq!(passes.len(), 1);
+        assert_eq!(passes[0].pass, ken_runtime::ArmALoweringPass::OnePass);
+        assert!(passes[0].response_owner_symbols.is_empty());
+        assert!(ken_runtime::arm_a_lowering_pass_observation_is_exact());
+    });
+}
+
+fn arm_a_mutation_error(
+    case: &str,
+    entry: &str,
+    mutation: ken_runtime::ArmALivenessMutation,
+) -> (String, usize) {
+    let ((_root, result), applications) =
+        ken_runtime::with_arm_a_liveness_mutation(mutation, || compile_parity_entry(case, entry));
+    let error = result.expect_err("the Arm-A liveness mutation must refuse");
+    (format!("{error:?}"), applications)
+}
+
+/// Promise class: durable invariant. Final planning re-derives exact structural
+/// eligibility and rejects a discovery/final set mismatch before emission.
+#[test]
+fn arm_a_final_eligible_set_mismatch_refuses() {
+    in_large_stack_thread("rt-arm-a-final-eligible-mismatch", || {
+        let (error, applications) = arm_a_mutation_error(
+            "arm-a-final-eligible-mismatch",
+            "rt_read_offset_stage",
+            ken_runtime::ArmALivenessMutation::RemoveOneFinalEligible,
+        );
+        assert!(applications > 0);
+        assert!(error.contains(
+            "the final Arm-A eligible set does not equal the discovery witness: 1 discovery identities absent, 0 final identities extra"
+        ));
+        assert!(ken_runtime::arm_a_liveness_mutation_is_exact());
+        compile_parity_entry("arm-a-final-eligible-restored", "rt_read_offset_stage")
+            .1
+            .expect("exact final eligibility must restore");
+    });
+}
+
+/// Promise class: durable invariant. Dropping one exact discovery-live identity
+/// makes final observation report one extra identity, rather than passing on a
+/// changed count.
+#[test]
+fn arm_a_final_call_set_extra_identity_refuses() {
+    in_large_stack_thread("rt-arm-a-final-extra", || {
+        let (error, applications) = arm_a_mutation_error(
+            "arm-a-final-extra",
+            "rt_read_offset_stage",
+            ken_runtime::ArmALivenessMutation::DropOneDiscoveryLive,
+        );
+        assert!(applications > 0);
+        assert!(error.contains(
+            "the final Arm-A call-seat set does not equal the discovery witness: 0 witnessed identities absent, 1 final identities extra"
+        ));
+        assert!(ken_runtime::arm_a_liveness_mutation_is_exact());
+        compile_parity_entry("arm-a-final-extra-restored", "rt_read_offset_stage")
+            .1
+            .expect("exact discovery live set must restore");
+    });
+}
+
+/// Promise class: durable invariant. Adding one exact dormant identity to the
+/// discovery witness makes final observation report one missing identity.
+#[test]
+fn arm_a_final_call_set_missing_identity_refuses() {
+    in_large_stack_thread("rt-arm-a-final-missing", || {
+        let (error, applications) = arm_a_mutation_error(
+            "arm-a-final-missing",
+            "rt_read_window_stage",
+            ken_runtime::ArmALivenessMutation::AddOneDiscoveryDormant,
+        );
+        assert!(applications > 0);
+        assert!(error.contains(
+            "the final Arm-A call-seat set does not equal the discovery witness: 1 witnessed identities absent, 0 final identities extra"
+        ));
+        assert!(ken_runtime::arm_a_liveness_mutation_is_exact());
+        compile_parity_entry("arm-a-final-missing-restored", "rt_read_window_stage")
+            .1
+            .expect("exact dormant classification must restore");
+    });
+}
+
+/// Promise class: durable invariant. Swapping one live identity for one dormant
+/// identity holds cardinality fixed and still fails exact final equality in
+/// both directions.
+#[test]
+fn arm_a_final_call_set_equal_cardinality_swap_refuses() {
+    in_large_stack_thread("rt-arm-a-final-swap", || {
+        let (error, applications) = arm_a_mutation_error(
+            "arm-a-final-swap",
+            "rt_read_window_stage",
+            ken_runtime::ArmALivenessMutation::SwapDiscoveryLiveForDormant,
+        );
+        assert!(applications > 0);
+        assert!(error.contains(
+            "the final Arm-A call-seat set does not equal the discovery witness: 1 witnessed identities absent, 1 final identities extra"
+        ));
+        assert!(ken_runtime::arm_a_liveness_mutation_is_exact());
+        compile_parity_entry("arm-a-final-swap-restored", "rt_read_window_stage")
+            .1
+            .expect("exact identity pairing must restore");
+    });
+}
+
+/// Promise class: durable invariant. Forcing a discovery-dormant caller into
+/// final authorization reaches the unchanged final selected-caller coverage
+/// detector and its exact diagnostic.
+#[test]
+fn arm_a_forced_dormant_owner_reaches_unchanged_final_detector() {
+    in_large_stack_thread("rt-arm-a-force-dormant", || {
+        const REFUSAL: &str =
+            "a forward-declared response owner has no verified selected incoming call";
+        let (error, applications) = arm_a_mutation_error(
+            "arm-a-force-dormant",
+            "rt_read_window_stage",
+            ken_runtime::ArmALivenessMutation::ForceOneDormantFinalOwner,
+        );
+        assert!(applications > 0);
+        assert_eq!(error.matches(REFUSAL).count(), 1, "{error}");
+        assert!(ken_runtime::arm_a_liveness_mutation_is_exact());
+        compile_parity_entry("arm-a-force-dormant-restored", "rt_read_window_stage")
+            .1
+            .expect("the dormant final owner mutation must restore");
+    });
+}
+
+#[test]
+fn bracket_release_order_composed_single_stage_is_lifo() {
+    in_large_stack_thread("rt-bracket-composed-single-stage", || {
+        let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
+        let root = output_dir("bracket-composed-single-stage");
+        let (compiled, diagnostics) =
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_bracket_composed_single_stage",
+                    root.path(),
+                )
+            });
+        compiled.expect("the composed single-stage bracket control compiles");
+        assert_eq!(diagnostics.len(), 1);
+        let diagnostic = &diagnostics[0];
+        assert!(
+            diagnostic
+                .all_static_response_rows
+                .iter()
+                .any(|row| row.operation == "FsReadAt"),
+            "the exclusively-predeclared read group was not specialized: {:?}",
+            diagnostic.all_static_response_rows
+        );
+        assert!(
+            diagnostic
+                .static_response_deferred
+                .iter()
+                .all(|row| row.operation != "FsReadAt"),
+            "the governed read group remained Deferred P2: {:?}",
+            diagnostic.static_response_deferred
+        );
+        assert!(
+            diagnostic
+                .static_response_deferred
+                .iter()
+                .all(|row| { row.operation != "ResourceRelease" || row.handler_owner.is_some() }),
+            "a governed release remained unowned Deferred P2: {:?}",
+            diagnostic.static_response_deferred
+        );
+        let Differential {
+            native,
+            interpreted,
+        } = differential("bracket-composed-single-stage", "rt_read_offset_stage");
+        assert_bracket_resources_release_in_reverse(&native, 2, "native composed single-stage");
+        assert_bracket_resources_release_in_reverse(
+            &interpreted,
+            2,
+            "interpreter composed single-stage",
+        );
+    });
+}
+
+#[test]
+fn bracket_release_order_composed_single_stage_mutation_reddens() {
+    in_large_stack_thread("rt-bracket-composed-single-stage-mutation", || {
+        let ((acquisitions, releases), applications) =
+            ken_runtime::with_single_exclusive_plane_authority_suppressed(|| {
+                let result = differential(
+                    "bracket-composed-single-stage-mutation",
+                    "rt_read_offset_stage",
+                );
+                bracket_resource_order(&result.native)
+            });
+        assert!(
+            applications > 0,
+            "single-stage deferral mutation did not apply"
+        );
+        assert_eq!(releases, acquisitions, "mutation must restore [r1,r2]");
+        let red = std::panic::catch_unwind(|| {
+            assert_eq!(
+                releases,
+                acquisitions.iter().rev().copied().collect::<Vec<_>>()
+            );
+        });
+        assert!(red.is_err(), "single-stage mutation did not redden D2a-A");
+        assert!(
+            ken_runtime::single_exclusive_plane_authority_suppressed_is_exact(),
+            "single-stage deferral mutation did not restore"
+        );
+    });
+}
+
+/// Promise class: durable invariant. The composed three-level write fixture
+/// retains exact LIFO settlement in both execution engines.
+#[test]
+fn bracket_release_order_composed_depth_three_write_is_lifo() {
+    in_large_stack_thread("rt-bracket-composed-depth-three-write", || {
+        let Differential {
+            interpreted,
+            native,
+        } = differential(
+            "bracket-composed-depth-three-write",
+            "rt_write_writable_stage",
+        );
+        assert_eq!(native.effect_trace, interpreted.effect_trace);
+        assert_bracket_resources_release_in_reverse(&native, 3, "native depth-three write");
+        assert_bracket_resources_release_in_reverse(
+            &interpreted,
+            3,
+            "interpreter depth-three write",
+        );
+    });
+}
+
+/// Promise class: durable invariant. Changing only the middle file bracket from
+/// write-create to read preserves exact LIFO settlement at composed depth 3.
+#[test]
+fn bracket_release_order_composed_depth_three_read_is_lifo() {
+    in_large_stack_thread("rt-bracket-composed-depth-three-read", || {
+        const WRITE_MIDDLE: &str = r#"(withResource AFull Unit Unit cap (bytes_encode "sink")
+  (ResourceWriteCreate CreateOrTruncate) (rt_write_pair_sink source))"#;
+        const READ_MIDDLE: &str = r#"(withResource AFull Unit Unit cap (bytes_encode "source")
+  ResourceRead (rt_write_pair_sink source))"#;
+
+        assert_eq!(
+            RT_PARITY_SOURCE.matches(WRITE_MIDDLE).count(),
+            1,
+            "the depth-three read control must change exactly one middle bracket"
+        );
+        let source = RT_PARITY_SOURCE
+            .replacen(WRITE_MIDDLE, READ_MIDDLE, 1)
+            .replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
+        let Differential {
+            interpreted,
+            native,
+        } = differential_source("bracket-composed-depth-three-read", &source);
+        assert_eq!(native.effect_trace, interpreted.effect_trace);
+        assert_bracket_resources_release_in_reverse(&native, 3, "native depth-three read");
+        assert_bracket_resources_release_in_reverse(
+            &interpreted,
+            3,
+            "interpreter depth-three read",
+        );
     });
 }
 
