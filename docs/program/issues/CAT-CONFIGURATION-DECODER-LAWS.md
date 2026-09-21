@@ -118,6 +118,64 @@ Authorized by the Architect at `evt_44c2n2qh6y1c1`, exhaustively:
 Add no wrapper, second traversal, proposition family, datatype, postulate,
 primitive, or trusted-base entry.
 
+### 3a. One authorized behavior-preserving refactor
+
+Ruled at `evt_7rd3bv9p81acm`. The required law is semantically independent of
+the optional placeholder, but its CERTIFICATE was not: a required field may
+follow absent optional fields, and the old `env_config_values_tail` certificate
+reconstructs both lookup arms, so the placeholder spelling entered AC-1's proof
+dependency closure. Factor the placeholder choice BELOW the list spine:
+
+```ken
+fn env_config_value_or_empty (choice : Option Bytes) : Bytes =
+  match choice {
+    Some value ↦ value;
+    None ↦ list_to_bytes (Nil UInt8)
+  }
+
+fn env_config_values
+      (fields : List SchemaField) (entries : List (Prod Bytes Bytes))
+    : List Bytes =
+  match fields {
+    Nil ↦ Nil Bytes;
+    Cons field rest ↦
+      Cons Bytes
+        (env_config_value_or_empty
+          (env_config_lookup (bytes_encode (schema_field_name field)) entries))
+        (env_config_values rest entries)
+  }
+```
+
+Use that exact helper name. Do NOT introduce a second helper or an alternate
+carrier. This is a refactor, not the presence repair: output bytes, field
+order, first-match lookup, shadowing, issue behavior, both entry points, and
+the second traversal are all unchanged. The helper is private, so the public
+population stays four direct plus four attached identities. Add it to the
+external private-refusal inventory; that private roster grows 17 -> 18. The
+helper is deleted together with `env_config_values` by the already-draft
+`CAT-CONFIGURATION-DECODER-PRESENCE-CARRIER`.
+
+The resulting proof boundary is structural, and it is the deliverable:
+
+1. `env_config_values_tail` proves ONLY that `nth (Suc i)` crosses the outer
+   `Cons`. It is `Refl` or a generic `nth`/`Cons` lemma. Its type and body must
+   not mention `None`, the empty placeholder, or either arm of
+   `env_config_value_or_empty`.
+2. The required head bridge uses only the `Some` equation of
+   `env_config_value_or_empty` plus the supplied lookup equality. Its
+   dependency closure contains no `None` equation, no empty-placeholder
+   literal, and no optional-law helper.
+3. The optional head bridge alone uses the `None` equation and the
+   empty-placeholder endpoint. The two public `optional_absence` laws depend on
+   it; the two public `required_lookup` laws do not.
+4. Do not replace `env_config_values` with the validation payload, change a
+   result type, widen the public surface, or add trust.
+
+Moving the match underneath the always-present `Cons` makes list position
+independent of head payload. A proof-only rewrite against the old body cannot
+achieve this separation, because its motive must reconstruct the neutral lookup
+match.
+
 ## 4. Acceptance criteria
 
 **AC-1 -- the required-field agreement, at both entry points.** For
@@ -143,23 +201,52 @@ the carrier with `List (Option Bytes)` and retires this law atomically. Write
 it as a true statement about today's behavior, not as an endorsement that
 empty means absent.
 
-**AC-3 -- the laws must be refutable, and by the right mutations.** Changing
-`env_config_field_check` to accept a missing field must turn AC-1 RED. Changing
-`env_config_values`' `None` branch to a different placeholder must turn AC-2 RED
-and leave AC-1 GREEN -- AC-1 must not be keyed on the placeholder's value, and
-AC-2 must be. A pair that does not split on that mutation is not measuring the
-two lanes separately. Provenance is retained from the prior frame: for an
-`Invalid` result the carried issues' origins are `EnvVariableOrigin` for
-`decode_environment_entries` and `ConfigEntryOrigin` for
-`decode_config_entries`, one per failing field, matching
+**AC-3 -- the split is measured by a two-observation campaign over ONE
+identical mutation.** AC-3 is preserved, not weakened: weakening it would hide
+the certificate coupling rather than measure it. It is population-side.
+
+1. Establish the full unmutated candidate GREEN.
+2. Mutate only `env_config_value_or_empty`'s production `None` result from
+   empty bytes to a compile-valid `[0]`. Record that the POPULATION operand
+   moved, not a test or an oracle.
+3. **Required observation.** In a scratch copy, remove only the two public
+   `optional_absence` declarations and the exact private dependency closure
+   exclusive to them, NAMING that removed set. Do not edit either required law,
+   its type, its body, the shared lookup/value machinery, or the mutation. Both
+   external `required_lookup` queries must elaborate GREEN. This is AC-1's
+   positive observation under the changed production value.
+4. **Optional observation.** From the full candidate, apply the identical
+   one-site production mutation. It must REJECT at the `None` equation or at an
+   `optional_absence` dependency, with the exact span and error recorded. A
+   generic package red is insufficient.
+5. Restore byte-exactly and rerun the full candidate. The existing
+   accept-missing-field mutation must still independently red AC-1.
+
+The scratch subtraction does not rewrite the detector. The kernel remains the
+detector and the required public claims and certificates stay byte-identical;
+the subtraction only isolates one promise class from the intentionally failing
+optional promise, exactly as separate test targets would. A staged certificate
+edit that merely substitutes `[0]` for the old placeholder is INVALID evidence:
+it edits the witness to follow the mutation without removing the coupling.
+
+Report the three mutation-discipline fields: property, operand moved, observed
+boundary.
+
+Provenance is retained: for an `Invalid` result the carried issues' origins are
+`EnvVariableOrigin` for `decode_environment_entries` and `ConfigEntryOrigin`
+for `decode_config_entries`, one per failing field, matching
 `crates/ken-elaborator/tests/cc8_env_config_decoder_acceptance.rs::config_failures_keep_config_key_origins_distinct_from_environment`.
 
 ## 5. Stop condition
 
 Stop and report if AC-1 or AC-2 cannot be discharged without a new primitive,
-postulate, `Axiom`, or trusted-base entry, or if either requires changing an
-existing function BODY. The section 3 visibility change is authorized and is
-not a body change; no further widening is. **Do not repair the
+postulate, `Axiom`, or trusted-base entry, or if either requires a production
+change beyond the two authorized in section 3: the `env_config_lookup`
+visibility change, and the section 3a `env_config_value_or_empty` refactor. No
+further widening and no further body change.
+
+**If the factored shape still cannot produce the split, STOP AGAIN.** Do not
+add another traversal and do not weaken either law. **Do not repair the
 optional/empty conflation in this node.** Whether an absent optional field may
 be represented by empty `Bytes` is a design question about the decoder's return
 type, and it is routed to the Architect separately. This node proves what is
@@ -179,8 +266,15 @@ Architect's to rule on.
 
 ## 7. Symptom inventory
 
-Architect hard-stop count for this chain stays at 0; entry 1 is a frame
-contradiction surfaced before any Architect technique ruling existed.
+Architect section 1a hard-stop count for this chain is 1. Entry 1 was a frame
+contradiction surfaced before any Architect technique ruling existed and did
+not advance the count; stop 1 is the genuinely new proof-structure wall hit
+while building the publication ruling. Neither the third-stop Research trigger
+nor the third-entry predicate review fires yet. A new wall after the section 3a
+ruling is stop 2 and entry 3, and entry 3 requires the section 1b
+shared-predicate check before another ruling.
 
 1. Public attached-law signatures could not close while their exact lookup
    authority remained private and visibility changes were forbidden.
+2. Required-index transport reconstructed the optional `None` arm, coupling
+   AC-1's certificate to the placeholder.
