@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-21 07:13:56Z — from 704 issue file(s) in `docs/program/issues/`.
+2026-09-21 08:48:10Z — from 704 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -593,7 +593,7 @@ the committed file matches the generator's output.
 | `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote | closed | runtime | TBD | none | — |
 | `RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION` | The PlannerInvariant rendering localizes every failure to the static transition planner, and 16 of its direct producers are resident in lowering -- the same false-localization defect this file already ruled on for its neighbour variant | draft | runtime | S | none | — |
 | `RT-PLANNER-JOINS-TRAPS-SPLIT` | Move the joins and traps domain out of planning/static_transition.rs -- the last named planner domain, and generated traps receive no fabricated source origin | merged | runtime | M | none | — |
-| `RT-PLANNER-KRET-GRAFTED-SPINE` | The planner derives k_ret_identity from a continuation the spec does not let the runtime invoke. exact_response_ret_identity (ken-runtime cranelift_backend/planning/static_transition/responses.rs:1379) takes the continuation_origin, destructures that ONE syntactic occurrence as a ComputationalMatch, filters its own cases for the one ending ::ITree::Ret and returns that identity -- it composes nothing. Spec 42 §6.4 fixes the effect spine by bind's grafting (36 §2.2: bind (Vis e f) k = Vis e (\\r. bind (f r) k)), so the tree a driver walks is ALREADY grafted and the node's continuation IS the composition; after grafting the immediate syntactic continuation of a source occurrence is not an object in the tree at all. Make the planner's derivation follow the grafted spine rather than the immediate occurrence. NOT an emission-side change: 42 §6.4 makes resuming the immediate continuation observable and wrong, so a runtime altered to invoke it would become non-conformant. | active | runtime | M | none | — |
+| `RT-PLANNER-KRET-GRAFTED-SPINE` | The planner derives k_ret_identity from a continuation the spec does not let the runtime invoke. exact_response_ret_identity (ken-runtime cranelift_backend/planning/static_transition/responses.rs:1379) takes the continuation_origin, destructures that ONE syntactic occurrence as a ComputationalMatch, filters its own cases for the one ending ::ITree::Ret and returns that identity -- it composes nothing. Spec 42 §6.4 fixes the effect spine by bind's grafting (36 §2.2: bind (Vis e f) k = Vis e (\\r. bind (f r) k)), so the tree a driver walks is ALREADY grafted and the node's continuation IS the composition; after grafting the immediate syntactic continuation of a source occurrence is not an object in the tree at all. Make the planner's derivation follow the grafted spine rather than the immediate occurrence. NOT an emission-side change: 42 §6.4 makes resuming the immediate continuation observable and wrong, so a runtime altered to invoke it would become non-conformant. | draft | runtime | M | none | — |
 | `RT-PLANNER-OCCURRENCES-SPLIT` | Move the occurrences domain out of planning/static_transition.rs -- StaticOriginId and source/child correspondence are occurrence-owned and must not be pulled into a shared identity drawer | merged | runtime | M | none | — |
 | `RT-PLANNER-ROOT-CLOSURE-SPLIT` | Remeasure the planner residue after the six domain moves and close static_transition.rs -- a fresh node, not a renamed item 3, and if the parent is already under 10k it records that and extracts nothing | closed | runtime | M | none | — |
 | `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | merged | runtime | L | none | — |
@@ -796,7 +796,7 @@ is itself not yet `merged`/`closed`:
 - `PX12` blocked by `PX11` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-D5B-POSTCALL-REFUSAL-MECHANISM` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
-- `RT-GRAFTED-SPINE-IR-REPRESENTATION` blocked by `RT-PLANNER-KRET-GRAFTED-SPINE` (status: active)
+- `RT-GRAFTED-SPINE-IR-REPRESENTATION` blocked by `RT-PLANNER-KRET-GRAFTED-SPINE` (status: draft)
 
 ## Gate progress
 
