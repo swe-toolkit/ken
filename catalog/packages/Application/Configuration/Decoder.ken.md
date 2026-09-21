@@ -76,7 +76,7 @@ fn env_config_lookup_choice
     False ↦ fallback
   }
 
-fn env_config_lookup (key : Bytes) (entries : List (Prod Bytes Bytes)) : Option Bytes =
+pub fn env_config_lookup (key : Bytes) (entries : List (Prod Bytes Bytes)) : Option Bytes =
   match entries {
     Nil ↦ None Bytes;
     Cons entry rest ↦ env_config_lookup_choice key entry (env_config_lookup key rest)
@@ -862,7 +862,21 @@ fn decode_config_entries
 fn env_config_help (schema : Schema) : Doc = schema_help schema
 
 export decode_process_environment, decode_config_entries, env_config_help
+```
 
+## 4. Laws and proofs
+
+The required-field laws instantiate the schema traversal's checked coverage.
+They then connect each accepted required field to the exact `env_config_lookup`
+result and to the second traversal's aligned output. The value is the selected
+raw `Bytes`; no text conversion or re-encoding occurs.
+
+The optional-absence laws separately characterize the predecessor
+representation. A valid decode whose optional lookup is `None` carries an empty
+`Bytes` value at the aligned index. This describes the existing lossy carrier;
+it does not make absence and a present empty value semantically identical.
+
+```ken
 pub proof required_lookup for decode_process_environment
       (schema : Schema)
       (input : ProcessInput)
@@ -1168,7 +1182,13 @@ pub proof optional_absence for decode_config_entries
             hdecode))
 ```
 
-## 4. Trust and boundaries
+## 5. Trust and boundaries
+
+The public surface consists of `decode_process_environment`,
+`decode_config_entries`, `env_config_help`, and `env_config_lookup`, together
+with the two attached laws on each decoder. The lookup's existing first-match
+behavior is the single authority used by both the validation and value
+traversals; its three implementation helpers remain private.
 
 The decoder consumes `process_environment`, shared `Schema`, `Validation`,
 `Diagnostic`, and the landed lawful `DecEq Bytes`. It adds no parser, renderer,

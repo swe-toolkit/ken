@@ -7,7 +7,7 @@ mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind, literate, parser};
+use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DECODER: &str = "Application.Configuration.Decoder";
@@ -41,15 +41,29 @@ fn schema_imports() -> BTreeSet<String> {
     ])
 }
 
-fn public_surface() -> BTreeSet<String> {
+fn direct_public_surface() -> BTreeSet<String> {
     names(&[
         "decode_config_entries",
         "decode_process_environment",
         "env_config_help",
+        "env_config_lookup",
     ])
 }
 
-fn private_surface() -> [&'static str; 18] {
+fn public_surface() -> BTreeSet<String> {
+    names(&[
+        "decode_config_entries",
+        "decode_config_entries::optional_absence",
+        "decode_config_entries::required_lookup",
+        "decode_process_environment",
+        "decode_process_environment::optional_absence",
+        "decode_process_environment::required_lookup",
+        "env_config_help",
+        "env_config_lookup",
+    ])
+}
+
+fn private_surface() -> [&'static str; 17] {
     [
         "EnvConfigOrigin",
         "EnvVariableOrigin",
@@ -61,7 +75,6 @@ fn private_surface() -> [&'static str; 18] {
         "env_config_entry_value",
         "env_config_field_check",
         "env_config_issue_diagnostic",
-        "env_config_lookup",
         "env_config_lookup_choice",
         "env_config_missing_field",
         "env_config_origin_to_origin",
@@ -240,10 +253,11 @@ fn decoder_selective_import_ledger_is_exact() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: loader queries resolve exactly the three D0-consumed driver names,
-/// and checked external wrappers retain all three canonical Decoder identities.
-/// CLAIMED: callers can decode process environments, decode config entries, and
-/// render matching schema help without access to implementation traversals. THE
+/// MEASURED: loader queries resolve exactly four direct names and four attached
+/// laws, while checked external wrappers retain all four direct canonical
+/// Decoder identities. CLAIMED: callers can decode process environments, decode
+/// config entries, render matching schema help, and name the exact lookup
+/// authority used by the attached laws without access to private traversals. THE
 /// GAP: provider provenance is measured independently by checked identity closure.
 #[test]
 fn decoder_loader_visible_inventory_is_exact_and_usable() {
@@ -253,8 +267,8 @@ fn decoder_loader_visible_inventory_is_exact_and_usable() {
         expected
     );
     let (mut env, _, _) = load_decoder();
-    let canonical = expected
-        .iter()
+    let canonical = direct_public_surface()
+        .into_iter()
         .map(|surface| {
             (
                 surface.clone(),
@@ -267,7 +281,8 @@ fn decoder_loader_visible_inventory_is_exact_and_usable() {
         import Application.Configuration.Decoder
           (decode_config_entries as decoder_client_config,
             decode_process_environment as decoder_client_process,
-            env_config_help as decoder_client_help)
+            env_config_help as decoder_client_help,
+            env_config_lookup as decoder_client_lookup)
         import Application.Input.Schema (Schema)
         import Capability.Diagnostics.Core (Diagnostic)
         import Capability.Formatting.Doc (Doc)
@@ -280,6 +295,9 @@ fn decoder_loader_visible_inventory_is_exact_and_usable() {
             : Validation (NonEmpty Diagnostic) (List Bytes) =
           decoder_client_config schema entries
         fn decoder_help_client (schema : Schema) : Doc = decoder_client_help schema
+        fn decoder_lookup_client
+            (key : Bytes) (entries : List (Prod Bytes Bytes)) : Option Bytes =
+          decoder_client_lookup key entries
         "#,
     )
     .expect("the complete Decoder driver surface must import and type-check together");
@@ -288,6 +306,7 @@ fn decoder_loader_visible_inventory_is_exact_and_usable() {
         "decoder_process_client",
         "decoder_config_client",
         "decoder_help_client",
+        "decoder_lookup_client",
     ] {
         let identity = env.globals[client];
         collect_decl_globals(
@@ -306,25 +325,29 @@ fn decoder_loader_visible_inventory_is_exact_and_usable() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every non-prelude, non-owned identity in checked Decoder terms is
-/// exactly one of the 29 D0 identities, and all 15 consumed Schema identities
-/// belong to its published surface. That provider publication has 26 direct
-/// names plus exactly the two attached schema_validate_fields proofs. CLAIMED:
-/// Decoder has no undeclared provider, mis-cut Schema dependency, or unexpected
-/// Tier-E edge. THE GAP: unused source imports are covered by the exact parsed
-/// ledger. This two-name provider-publication growth is distinct from AC-4's
-/// ambient public-surface census, whose separately measured delta remains added
-/// `[]`, removed `[]`; the census measures ambient reachability, not declared
-/// provider publication.
+/// exactly one of the 38 named provider identities. The original 15 direct
+/// Schema imports remain exact; eight additional Schema identities and `nth`
+/// are referenced by qualified public proof terms. Schema publication has 26
+/// direct names plus exactly two attached `schema_validate_fields` proofs.
+/// CLAIMED: Decoder has no undeclared provider, mis-cut dependency, or
+/// unexpected Tier-E edge. THE GAP: unused source imports are covered by the
+/// exact parsed ledger, independently of qualified proof dependencies.
 #[test]
 fn decoder_checked_provider_and_schema_closure_is_exact() {
     let (mut env, owned, base_ids) = load_decoder();
     let expected_names = names(&[
+        "Application.Input.Schema.MkSchemaField",
         "Application.Input.Schema.MkSchemaIssue",
         "Application.Input.Schema.Schema",
+        "Application.Input.Schema.SchemaFieldAccepted",
         "Application.Input.Schema.SchemaField",
         "Application.Input.Schema.SchemaFieldCheck",
         "Application.Input.Schema.SchemaIssue",
+        "Application.Input.Schema.SchemaOptional",
+        "Application.Input.Schema.SchemaPresence",
+        "Application.Input.Schema.SchemaRequired",
         "Application.Input.Schema.SchemaValidation",
+        "Application.Input.Schema.SchemaValueShape",
         "Application.Input.Schema.schema_check_presence",
         "Application.Input.Schema.schema_field_accept",
         "Application.Input.Schema.schema_field_name",
@@ -334,6 +357,8 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
         "Application.Input.Schema.schema_issue_code",
         "Application.Input.Schema.schema_issue_origin",
         "Application.Input.Schema.schema_validate",
+        "Application.Input.Schema.schema_validate_fields",
+        "Application.Input.Schema.schema_validate_fields::valid_coverage",
         "Capability.Diagnostics.Core.ConfigKeyOrigin",
         "Capability.Diagnostics.Core.Diagnostic",
         "Capability.Diagnostics.Core.EnvironmentOrigin",
@@ -343,6 +368,7 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
         "Capability.Formatting.Doc.Doc",
         "Capability.Process.Environment.process_environment",
         "Core.Classes.LawfulClasses.bytes_deceq_eq",
+        "Data.Collections.Derived.nth",
         "Data.Collections.NonEmpty.NonEmpty",
         "Data.Collections.NonEmpty.nonempty_map",
         "Data.Sums.Validation.Invalid",
@@ -380,7 +406,24 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
         .filter_map(|name| name.strip_prefix("Application.Input.Schema."))
         .map(str::to_owned)
         .collect::<BTreeSet<_>>();
-    assert_eq!(schema_names, schema_imports());
+    let qualified_schema_dependencies = names(&[
+        "MkSchemaField",
+        "SchemaFieldAccepted",
+        "SchemaOptional",
+        "SchemaPresence",
+        "SchemaRequired",
+        "SchemaValueShape",
+        "schema_validate_fields",
+        "schema_validate_fields::valid_coverage",
+    ]);
+    assert_eq!(
+        schema_names
+            .difference(&schema_imports())
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        qualified_schema_dependencies
+    );
+    assert!(schema_imports().is_subset(&schema_names));
     let schema_public =
         catalog_publication::published_module_surfaces(SCHEMA_SOURCE, SCHEMA, "decoder_schema");
     let attached_schema_proofs = schema_public
@@ -413,7 +456,7 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: roots loading preserves trust, class, and instance populations
-/// while all 18 implementation names reject through real external imports.
+/// while all 17 retained implementation names reject through real external imports.
 /// CLAIMED: Decoder changes only declared dependencies and coherent driver
 /// visibility. THE GAP: exact body preservation is a one-shot object diff.
 #[test]
