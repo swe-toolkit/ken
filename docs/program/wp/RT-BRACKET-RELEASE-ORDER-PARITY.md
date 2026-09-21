@@ -383,6 +383,27 @@ is not evidence for both.**
   bounded-suffix arm. **Do not rely on the still-ignored depth-2-plus-depth-3
   loop row.**
 
+## 4a. Symptom inventory
+
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. Every measured two-resource depth-2 native nest releases in acquisition
+   order across both kinds, both combinators, both modes, and homogeneous and
+   heterogeneous arrangements, while the sole then-reaching depth-3 composed
+   write nest released LIFO — keyed on a carried correct-versus-wrong contrast
+   that treated depth as controlled although depth, resource count, read/write,
+   and lowering path co-varied in its only correct observation.
+2. The first Arm A repair promoted the single exclusively-predeclared group but
+   left the P1-free mixed release group Deferred, so the composed depth-2
+   control remained `[r1,r2]`; the successful threshold probe had promoted that
+   mixed group too — keyed on treating group-local exclusive ownership as the
+   whole settlement authority when the required closure is a P1-free plane
+   seeded by exactly one exclusive group.
+
+**Count of record:** hard stops 2; symptom entries 2. Entry 1 was classified at
+`evt_177exqsxhvg5y`; entry 2 was classified at `evt_76nkdg0h81xnw`. The first
+Research and shared-predicate triggers remain stop 3 and entry 3.
+
 ## 5. Acceptance criteria
 
 **AC-0. This WP adds no `#[ignore]` attribute anywhere.** The ignored-row count
