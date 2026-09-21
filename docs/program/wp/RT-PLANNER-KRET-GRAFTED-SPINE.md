@@ -953,6 +953,27 @@ are deliberately not rewritten.
     reference requires one of each -- an over-emission and a dead member
     stacked, keyed on the aggregate count (6 against 3) which read as pure
     over-emission because the excess exactly hid the absence
+14. the Predeclared producer's semantic handler owner, phase-A base owner,
+    and actual emitted lowering context are three different identities;
+    selecting the base misses the lowering body, while selecting the shared
+    context forces its non-owning arm to preserve a closure-bearing Vis
+    residual whose K has no durable boundary lane -- keyed on an enclosing
+    generated-family identity standing for the member's bracket-exit placement
+15. governed producer source 328 emits direct calls in two different finished
+    functions while member 1092's dispatch is emitted in a third; no
+    function-local Inst can name, reach, or dominate that inter-function
+    placement -- keyed on one source occurrence standing for one emitted edge
+    although generated lowering maps it to multiple typed caller edges
+16. D0 selects source 328 and logical target context 0, but source 328's only
+    actual direct typed edges terminate at contexts 1 and 3; context 0 is a
+    separately emitted body containing the dispatch -- keyed on direct-edge
+    adjacency as if it were the whole semantic continuation relation
+17. the correct member guard first executes on a zero word in the shared
+    caller copy, but preserving that grafted Vis across the generated return
+    has no existing representation for its lexical K; full reconstruction adds
+    unprovisioned carrier state, while the two existing allocation-free words
+    erase either the Vis constructor or its K -- keyed on a placement repair
+    requiring a value representation the generated ABI does not carry
 ```
 
 > **THE TWO COUNTERS HAVE SEPARATED, AND THEY STAY SEPARATED. `§1a` FOLLOWS THE
@@ -1002,27 +1023,38 @@ are deliberately not rewritten.
 > clean, decisive facts — because *"it's making progress"* is the
 > rationalisation `§1a` exists to override.
 
-**Hard-stop count on this WP: 12; symptom entries: 13. Next `§1a` at stop 15;
-next `§1b` at entry 15.** **`§1b` FIRED AT ENTRY
-12 AND IS ANSWERED** (Architect `evt_6pgwgkp3pshbq`): entries 10, 11 and 12
-share one predicate — **a measurement is attributed to a subject it does not
-range over.** The host's disposition was read as evidence about the planner;
-effect origin 190 was read as the demand's identity; `M2`'s `RIGHT_NOT_HELD`
-envelope was read as `DOUBLE_RELEASE`'s requirement. Each measurement was
-correct; each was read as answering a question about a neighbouring object.
-**Entries 1-9 are defects in the compiler; 10-12 are defects in the EVIDENCE
-BASE this node reasons from**, so the closure is one sweep and not a fourth
-ruling: **every number in this frame names the fixture or the authority it was
-measured on.** That sweep is landed here. **Next `§1b` at entry 15.** **The
-parent node's count of 2 does NOT
-carry** — different WP, different question. `§1a` fired at three
-(`evt_7d3h7mtff5acd`), **re-fired at six** (`evt_3t5nq11ernjfa`), and has
-**re-fired at nine**, holding the ruling on the next locus and calling
-Research. **That ninth trigger is DISCHARGED** by the research advisory
-(`evt_5ny4tmskqx3n4`) and the ruling it produced (`evt_3ynad2h315w1v`); the
-hold on the locus is released. `§1b` fired at three (`evt_1mv0phbj0zcn7`), was
-re-run at six (`evt_734ccm2xzxp5r`), and was re-run at ten entries
-(`evt_3kx5y2nwqbxq9`).
+**Hard-stop count on this WP: 16; symptom entries: 17. `§1a` fired at stop 15
+and was discharged by Research advisory `evt_10jtxhnwq2mdj` plus Architect
+ruling `evt_7bff93f1zg2jh`; next `§1a` at stop 18. `§1b` fired at entry 15 and
+is answered below; next `§1b` at entry 18.** **`§1b` FIRED AT ENTRY 12 AND IS
+ANSWERED** (Architect `evt_6pgwgkp3pshbq`): entries 10, 11 and 12 share one
+predicate — **a measurement is attributed to a subject it does not range over.**
+The host's disposition was read as evidence about the planner; effect origin
+190 was read as the demand's identity; `M2`'s `RIGHT_NOT_HELD` envelope was
+read as `DOUBLE_RELEASE`'s requirement. Each measurement was correct; each was
+read as answering a question about a neighbouring object. **Entries 1-9 are
+defects in the compiler; 10-12 are defects in the EVIDENCE BASE this node
+reasons from**, so the closure is one sweep and not a fourth ruling: **every
+number in this frame names the fixture or the authority it was measured on.**
+That sweep is landed here. **The parent node's count of 2 does NOT carry** —
+different WP, different question. `§1a` fired at three
+(`evt_7d3h7mtff5acd`), **re-fired at six** (`evt_3t5nq11ernjfa`), and
+**re-fired at nine**. That ninth trigger is discharged by the research advisory
+`evt_5ny4tmskqx3n4` and ruling `evt_3ynad2h315w1v`. `§1b` fired at three
+(`evt_1mv0phbj0zcn7`), was re-run at six (`evt_734ccm2xzxp5r`), and was re-run
+at ten entries (`evt_3kx5y2nwqbxq9`).
+
+**`§1b` FIRED AT ENTRY 15 AND IS ANSWERED.** Entries 13, 14 and 15 share one
+predicate: **a projection that is not injective over emitted member edges is
+being used as the placement identity.** Entry 13's aggregate count discards
+member pairing; entry 14's enclosing generated-family identity discards the
+exact edge; entry 15's source origin discards the typed caller/callee copy.
+The structural closure is an explicit join keyed by the obligation member and
+carrying the observed source origin plus typed emitted caller and callee sites.
+No count, family label, source occurrence, or function-local `Inst` alone may
+authorize placement. `D2` already requires the D0-table × emitted-CFG join, so
+this is an in-place representation closure rather than a new deliverable.
+Entry 17 does not trigger `§1b`; the next predicate check is entry 18.
 
 > **THE COUNT IS 6 AND NOT 5, AND THE ADJUDICATION IS THE ARCHITECT'S.** The
 > implementer reported "count remains 5" and that reading is defensible — they
@@ -1313,9 +1345,10 @@ authorizes placement. That sentence is the acceptance test for any future
 proposal here: if it nominates a single projection as identity, it is entry 16.
 
 Inventory child `c9a69b715110fe45c4db3373e8ee851feab5e808` (one-file child of
-`daa4b7d6d`) holds entries 14-15, counts 14/15, and this predicate answer. It is
-adopted, and its entries must arrive in the eventual candidate rather than
-living only on a checkpoint. Next `§1a` is stop 15; next `§1b` is entry 18.
+`daa4b7d6d`) first held entries 14-15 and this predicate answer. Stop 15 then
+added entry 16. The final bounded attempt has now produced stop 16 and entry 17;
+all four entries are recorded in the live inventory above. Neither trigger fires
+at 16/17; next `§1a` is stop 18 and next `§1b` is entry 18.
 
 ## What `D2` still requires, and what changes
 

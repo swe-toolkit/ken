@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-KRET-GRAFTED-SPINE
 title: "The planner derives k_ret_identity from a continuation the spec does not let the runtime invoke. exact_response_ret_identity (ken-runtime cranelift_backend/planning/static_transition/responses.rs:1379) takes the continuation_origin, destructures that ONE syntactic occurrence as a ComputationalMatch, filters its own cases for the one ending ::ITree::Ret and returns that identity -- it composes nothing. Spec 42 §6.4 fixes the effect spine by bind's grafting (36 §2.2: bind (Vis e f) k = Vis e (\\r. bind (f r) k)), so the tree a driver walks is ALREADY grafted and the node's continuation IS the composition; after grafting the immediate syntactic continuation of a source occurrence is not an object in the tree at all. Make the planner's derivation follow the grafted spine rather than the immediate occurrence. NOT an emission-side change: 42 §6.4 makes resuming the immediate continuation observable and wrong, so a runtime altered to invoke it would become non-conformant."
-status: active
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -73,3 +73,34 @@ but that is **value equality, not identity** — in that program the composed
 continuation after the inner release also reaches `PrivateResourceRelease`, so
 immediate and composed agree there by coincidence of constructor. The whole
 discrimination rests on `right-denial`, and `right-denial` is sufficient.
+
+## Parked -- do not release from a successor search
+
+The single authorized atomic D0+D1+D2 attempt is SPENT. It ended at structural
+stop 16 (`evt_6freqarew56yh`): the preserve arm needs a durable preserved
+`Vis`/K representation across the generated boundary, and all four existing
+representation-shaped exits were exercised and denied. Full reconstruction adds
+unprovisioned carrier state; the two allocation-free words erase either the
+`Vis` constructor or its K.
+
+The remaining requirement is the closure lane that is explicitly WITHHELD, or a
+new return protocol, which is representation design beyond this node. That is
+why this node is `draft` and not `ready`: it is framed but not releasable, and
+it must not be picked up as available work.
+
+Architect disposition: **do not reopen the persistent/durable closure lane.**
+Stop 16 establishes that this path lacks a lawful existing carrier; it does not
+establish that reviving the retired `(PersistentClosure, Closure)` admission is
+the right representation. That lane remains recognized-but-never-admitted under
+`RT-CLOSURE-BOUNDARY-LANE`'s recorded `dec_21aa95jbsznfh` plus addendum
+`dec_6xffebwj4s347`. Nor does this node authorize a new return
+protocol: that is a separate representation component, and the one-attempt
+bound ends this node before such a component is designed. Reopening requires a
+separately framed architecture decision grounded on current `main`, not a
+successor search or another implementation attempt here.
+
+Durable branch state is clean at
+`4f6b2a454786dd66eb2a1eb9681913e1e4f69b9d`. No host logging, global diagnostic
+recoding, aggregate relaxation, or capacity change was retained. The frame's
+symptom inventory now records stop 16 as entry 17. Counts stand at hard stops
+16 / symptom entries 17; neither trigger fires, and both next fire at 18.
