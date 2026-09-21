@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-RELEASE-ORDER-PARITY
-title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: a BOUNDED AUTHORITY-SEED predicate in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong. ARM A CORRECTED at evt_76nkdg0h81xnw (hard stop 2 / symptom entry 2) after the ring measured that per-group exclusive eligibility does NOT fix its own control: the governed ResourceRelease responses sit in the MIXED group that the original text fenced at >= 2, and the causal probe worked by promoting exactly that P1-free mixed group, so one exclusive group now seeds authority for its P1-free mixed dependent on a single-exclusive plane only."
+title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: a BOUNDED AUTHORITY-SEED predicate in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong. ARM A CORRECTED at evt_76nkdg0h81xnw (hard stop 2 / symptom entry 2) after the ring measured that per-group exclusive eligibility does NOT fix its own control: the governed ResourceRelease responses sit in the MIXED group that the original text fenced at >= 2, and the causal probe worked by promoting exactly that P1-free mixed group, so one exclusive group now seeds authority for its P1-free mixed dependent on a single-exclusive plane only. HARD STOP 3 RULED at evt_6c900nagc7mn4 adopting Research advisory evt_5p5jn87bmwpcc: the complete two-arm repair makes the px8ta row pass strict LIFO at BOTH depths and removes its depth-3 ContinuationSpecialization refusal, and that is LAWFUL ELIMINATION of the route that formed the failing claim -- not a newly satisfied lookup and not a weakened guard, since Arm A cannot add the absent identity key to function_local.continuation_calls. RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED is therefore SUBSUMED and closes atomically with this product, THIS NODE NOW CLEARS LEDGER ROW 9, neither arm may be narrowed to preserve the refusal, and core.rs/units.rs stay outside production scope."
 status: ready
 owner: runtime
 size: M
@@ -53,7 +53,24 @@ origin: "Steward, 2026-09-03; RECUT 2026-09-18 twice. Original filing: scope-cal
 > # Architect's own probe worked by promoting that P1-free mixed group. **The
 > # sentence "the mixed-owner law is preserved exactly" is FALSE and is
 > # removed.** Arm A is now a bounded authority-seed predicate. Arm B is
-> # unchanged and already green. No Research trigger until stop or entry 3.
+> # unchanged and already green.
+> #
+> # **HARD STOP 3 RULED 2026-09-21 -- `evt_6c900nagc7mn4`, adopting Research
+> # advisory `evt_5p5jn87bmwpcc`. THE px8ta DEPTH-3 REFUSAL IS LAWFULLY
+> # ELIMINATED, NOT PRESERVED.** Arm A cannot make the old function-local
+> # lookup succeed -- the identity key is never added to
+> # `function_local.continuation_calls` -- so it instead REPLACES the ordinary
+> # route that formed the failing claim with an exact selected-caller ->
+> # response-owner -> typed-K-context path whose own checks stay live.
+> # **`RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED` is SUBSUMED** and closes
+> # atomically with this product; it gets no separate implementation.
+> # **THIS NODE NOW CLEARS LEDGER ROW 9.** Neither arm may be narrowed to
+> # preserve the refusal. `core.rs` and `units.rs` stay outside production
+> # scope: no fallback, no lookup widening, no new declaration lane, no
+> # `Fusion` owner. The entry-3 shared-predicate answer was **YES** across all
+> # three stops -- an incidental planner-classification outcome repeatedly read
+> # as a semantic boundary -- so **there will be no fourth local carve-out**.
+> # Both stop-3 triggers are DISCHARGED and next fire at six.
 
 ## There is ONE shape. The surface cannot express the other one.
 
@@ -270,11 +287,17 @@ cheap fixture.
 > at fourteen** — row 15 closed at `9c3a5f588` — and this is ledger **row 9**.
 > **`D1a` is what moves it.**
 >
-> **It does not clear the row.** That row carries a SECOND blocker at depth 3 —
-> an object-emission refusal owned by
-> `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED` — invisible until now because depth
-> 2 panics first and a loop body reports nothing past its first failure. **Both
-> are owed; neither subsumes the other.**
+> **IT NOW CLEARS THE ROW.** That row carried a SECOND blocker at depth 3 — an
+> object-emission refusal owned by `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`,
+> invisible until recently because depth 2 panics first and a loop body reports
+> nothing past its first failure. **Architect `evt_6c900nagc7mn4` ruled that
+> blocker LAWFULLY SUBSUMED by Arm A**, which replaces the route that formed
+> the failing claim rather than satisfying the old lookup. The superseded
+> sentences — *"It does not clear the row"* and *"Both are owed; neither
+> subsumes the other"* — are FALSE and are removed rather than qualified.
+> **This node clears ledger row 9 outright when its repair lands.** The second
+> blocker's node closes in the same candidate and receives no separate
+> implementation.
 
 ## Deliverables
 
@@ -372,10 +395,33 @@ D1a. **Repair the planner classification, as TWO REQUIRED ARMS** (Architect
 D2a. **TWO non-ignored controls, one per arm.** `D2a-A` for the composed
      single-stage arm (the reaching `rt_read_norights_stage` shape or a
      source-equivalent); `D2a-B`, distinct, for the px8ta release-only-suffix
-     arm -- **not the still-ignored depth-2-plus-depth-3 loop row.** Mutation
-     must redden each independently with `[r1,r2]`, each with a positive
-     application witness that compiles. **One aggregate release-order test is
-     not evidence for both arms.**
+     arm -- **not the px8ta depth-2-plus-depth-3 loop row**, which now clears
+     but exercises both arms at once and reports nothing past its first
+     failure. Mutation must redden each independently with `[r1,r2]`, each with
+     a positive application witness that compiles. **One aggregate
+     release-order test is not evidence for both arms.**
+
+D2b. **THREE depth-3 causal controls on the UNCHANGED px8ta program** -- no new
+     fixture, no edit to the program under test. Green at depth 3 is not by
+     itself evidence of the replacement route.
+     **(1) selected-caller edge:** existing
+     `StaticResponseCallerRetargetMutation::RestoreSelectedKTarget` -- positive
+     application count, typed planner diagnostics unchanged, exact refusal `a
+     forward-declared response owner has no verified selected incoming call`.
+     **(2) typed-K-context edge:** existing
+     `StaticResponseOwnerBodyMutation::OmitKCall` -- positive application count,
+     refusal `a response owner emitted 0 K calls instead of exactly one`.
+     **(3) route replacement:** suppressing the single-exclusive authority seed
+     at depth 3 restores the exact old undeclared-target refusal. **Say
+     explicitly that this proves ROUTE REPLACEMENT and does NOT make the
+     refusal desired behaviour.** Arm B is not applicable on this path
+     (`ARCHITECT_ARM_B_APPLICATIONS=0`).
+
+     **SCOPE FENCE (`evt_6c900nagc7mn4`):** `core.rs` and `units.rs` stay OUT of
+     production scope -- no fallback, no lookup widening, no new declaration
+     lane, no `Fusion` owner. The subsumption is lawful precisely because the
+     exact lookup, the affine claim, the response-owner body verifier and the
+     claim-ledger closeout are byte-unchanged.
 
 D2.  Re-enable release-order parity on the five composed-return fixtures
      (remove the b2 exclusion marker) once both engines agree. **THREE of the
@@ -396,8 +442,9 @@ D2.  Re-enable release-order parity on the five composed-return fixtures
   still do so after any repair** -- the composed three-deep WRITE and the
   `D0c-2`(D) three-deep READ. They are the only measured native-correct
   teardowns, so a repair that breaks either has traded violations for a new
-  one. **AC-6's exact depth-3 object-emission refusal on the ignored px8ta row
-  is preserved unchanged.** (This replaces the old clause naming the
+  one. **The px8ta depth-3 refusal is NOT among the preserved things** --
+  `AC-6` now requires it GONE, and the clause preserving it was withdrawn by
+  `evt_6c900nagc7mn4`. (This replaces the old clause naming the
   composed-return nest as native's working case; that clause was refuted by its
   own re-measurement -- the composed TWO-deep read is native-wrong.)
 - **DISCHARGED.** Both rounds registered predictions before their runs -- `D0c`
@@ -420,8 +467,13 @@ D2.  Re-enable release-order parity on the five composed-return fixtures
   P1-free mixed dependent must gain execute-then-resume ownership**, not the
   seed alone. The px8ta inner release must acquire the unique bounded handler
   owner.
-- The px8ta row is **not** un-ignored by this node alone — its depth-3 blocker
-  is `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`'s.
+- **The px8ta row IS un-ignored by this node, and passes strict LIFO at BOTH
+  depth 2 and depth 3.** Its depth-3 blocker is lawfully subsumed rather than
+  separately repaired (`evt_6c900nagc7mn4`), so
+  `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED` moves to `status: closed` in the
+  same candidate, with no separate implementation. The closeout must state that
+  the `(H)` probe on that node is **not** claimed fixed: signature was shared,
+  route identity was never established.
 - **The native repair** is grounded in the settlement derivation affirmed at
   `evt_17kyxq7q5v8ar`, **not in matching whichever engine was easier to
   change.** There is exactly ONE repair, and it is native-side: interp measures

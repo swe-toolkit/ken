@@ -46,6 +46,21 @@
 > mixed group. **The superseded sentence "mixed-owner groups keep their current
 > `>= 2`" is FALSE and has been removed.** Arm A is now a bounded
 > authority-seed predicate (`§4`). Arm B is unchanged and is already green.
+>
+> **HARD STOP 3 RULED 2026-09-21 — `evt_6c900nagc7mn4`, adopting Research
+> advisory `evt_5p5jn87bmwpcc`. THE px8ta DEPTH-3 REFUSAL IS LAWFULLY
+> ELIMINATED, NOT PRESERVED.** Arm A does not make the old function-local
+> lookup succeed — it cannot; the identity key is never added to
+> `function_local.continuation_calls`. It replaces the ordinary route that
+> formed the failing claim with an exact selected-caller → response-owner →
+> typed-K-context path whose own checks stay live.
+> **`RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED` is SUBSUMED**, closes atomically
+> with this product, and gets no separate implementation. **This node now
+> CLEARS ledger row 9.** Neither arm is to be narrowed to preserve the refusal,
+> and `core.rs`/`units.rs` stay outside production scope. The entry-3
+> shared-predicate answer was **YES** across all three stops — an incidental
+> planner-classification outcome repeatedly read as a semantic boundary — so
+> **there will be no fourth local carve-out.**
 
 ## 1. Objective
 
@@ -429,8 +444,48 @@ is not evidence for both.**
   using the existing reaching `rt_read_norights_stage` shape or a
   source-equivalent fixture. Assert acquisitions and exact reverse releases.
 - **D2a-B:** a distinct depth-2 px8ta control for the release-only
-  bounded-suffix arm. **Do not rely on the still-ignored depth-2-plus-depth-3
-  loop row.**
+  bounded-suffix arm. **Do not use the px8ta depth-2-plus-depth-3 loop row as
+  this arm's control.** That row now clears under `AC-6`, but it exercises both
+  arms at once and a loop body reports nothing past its first failure, so it
+  cannot separate them.
+
+**D2b — THREE depth-3 causal controls on the UNCHANGED px8ta program.** Green at
+depth 3 is not evidence of the replacement route; these separate it from a green
+arriving for some other reason. All three run against the px8ta program as it
+stands — **no new fixture, and no edit to the program under test.**
+
+- **D2b-1 — the selected-caller edge.** Apply the existing
+  `StaticResponseCallerRetargetMutation::RestoreSelectedKTarget`. Require a
+  **positive application count**, **typed planner diagnostics unchanged**, and
+  the exact refusal `a forward-declared response owner has no verified selected
+  incoming call`. It leaves Arm A's classification and identity population
+  intact and removes only the selected-caller → response-owner target, so it
+  tests that edge and nothing else.
+- **D2b-2 — the typed-K-context edge.** Apply the existing
+  `StaticResponseOwnerBodyMutation::OmitKCall` to that same depth-3 program.
+  Require a **positive application count** and the finished-owner refusal `a
+  response owner emitted 0 K calls instead of exactly one`. This proves the
+  selected response owner cannot merely perform the effect and omit the exact
+  typed K context.
+- **D2b-3 — route replacement, retained from the Architect's own probe.**
+  Suppressing the single-exclusive authority seed at depth 3 restores the exact
+  old `ContinuationSpecialization` undeclared-target refusal. **State
+  explicitly in the candidate that this control proves ROUTE REPLACEMENT — that
+  the repair removed the path which formed the failing claim. It does NOT make
+  that refusal desired behaviour and is NOT a licence to preserve it.** Arm B is
+  not applicable on this path (`ARCHITECT_ARM_B_APPLICATIONS=0`) and its own
+  independent control is unaffected.
+
+**SCOPE FENCE — `core.rs` and `units.rs` stay OUT of production scope.**
+Architect `evt_6c900nagc7mn4`. **No fallback, no lookup widening, no new
+declaration lane, and no `Fusion` owner is authorized.** The subsumption is
+lawful precisely because the exact `function_local.continuation_calls` lookup,
+the affine claim, the response-owner body verifier and the claim-ledger closeout
+are all byte-unchanged; a candidate that edits them has substituted a different
+mechanism for the ruled one and is a hard stop, not a refinement. **Arm B, both
+depth-2 controls and their mutations, `writeAll` as negative control, both
+composed depth-3 `[r3,r2,r1]` vectors, and every existing fail-closed closeout
+remain REQUIRED.**
 
 ## 4a. Symptom inventory
 
@@ -456,8 +511,9 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 
 **Count of record:** hard stops 3; symptom entries 3. Entry 1 was classified at
 `evt_177exqsxhvg5y`; entry 2 at `evt_76nkdg0h81xnw`; entry 3 at
-`evt_45qpftkx3s894`. The stop-3 Research trigger and entry-3 shared-predicate
-trigger have fired; no ruling follows until both are discharged.
+`evt_45qpftkx3s894`. **Both stop-3 triggers are DISCHARGED** — Research at
+`evt_5p5jn87bmwpcc`, the entry-3 shared-predicate question at
+`evt_6c900nagc7mn4`. Both next fire at six.
 
 ## 5. Acceptance criteria
 
@@ -505,8 +561,9 @@ failing.** Do not re-ask it.
 release `[r3, r2, r1]` at `89d2bfb57` and MUST still do so after any repair** --
 the composed three-deep WRITE and the `D0c-2`(D) three-deep READ. They are the
 only measured native-correct teardowns, so a repair that breaks either has
-traded violations for a new one. **AC-6's exact depth-3 object-emission refusal
-on the ignored px8ta row is preserved unchanged.**
+traded violations for a new one. **The px8ta depth-3 refusal is NOT among the
+things preserved:** `AC-6` now requires it to be gone. Preserving it was a
+criterion of the pre-ruling recut, and `evt_6c900nagc7mn4` withdrew it.
 
 **AC-5. DISCHARGED.** Both measurement rounds registered predictions before
 their runs -- `D0c` at `evt_287tm2f6ycg0x`, `D0c-2` at `evt_29sjeg0q437k8`'s
@@ -514,11 +571,15 @@ predecessor `evt_29wbxhm9mcvs9`. Both rounds are closed. **No further
 discriminating fixture is authorized**, so this criterion governs nothing live
 and is not re-asked.
 
-**AC-6. `px8ta public_two_three_level_brackets_finish_and_release_lifo` remains
-`#[ignore]`d, and its depth-3 behaviour is unchanged.** Run it under
-`catch_unwind` and report what depth 3 does. **Expected: the same
-`ContinuationSpecialization` object-emission refusal.** A *different* depth-3
-failure is a finding — report it, do not absorb it.
+**AC-6. `px8ta public_two_three_level_brackets_finish_and_release_lifo` PASSES
+at BOTH depth 2 and depth 3, with strict LIFO at each, and is no longer
+`#[ignore]`d.** Report the release vector at each depth. **There must be no
+`ContinuationSpecialization` object-emission refusal at depth 3, and no refusal
+of any other kind.** Architect `evt_6c900nagc7mn4`: Arm A lawfully eliminates
+the route that formed the failing claim rather than satisfying the old lookup.
+**A surviving depth-3 failure is a hard stop to report, not a cost to absorb** —
+and it would refute the ruling's mechanism, so it returns to the Architect
+rather than being worked around here.
 
 **AC-7. DISCHARGED.** `D0a` is answered AFFIRMED, enclave event id
 `evt_17kyxq7q5v8ar`, recorded on the node. Nothing further is owed here and the
@@ -536,63 +597,56 @@ reaching depth-3 vectors `[r3,r2,r1]`.
 local `--workspace` run. Local work is `scripts/ken-cargo -p ken-runtime` and
 the named test, nothing wider.
 
-**AC-9. CLOSE OBLIGATION. This node does not reach `merged` until
-`px8ta_oriented_subcontinuation.rs:326` carries a LIVE owner at the START of its
-`#[ignore]` string.** *(Control: the row satisfies one of two branches at the
-candidate's base. **(b) LIVE OWNER** — the first node token in that reason
-string resolves to a node whose status is `ready`, `active` or `draft`; `merged`
-and `closed` fail, and present-and-terminal fails exactly as absent does.
-**(c) NO LIVE OWNER** — the string opens by stating in words that no live node
-owns the next step and names this node as having established that, which leaves
-a reader a record to go to rather than a dead end. **Branch (a) CLEARED is
-foreclosed here** by `AC-6` and `AC-0`. A string that names a terminal node
-without taking branch (c)'s words fails. The candidate carrying this edit
-touches `crates/` and is therefore **`full` CI, never doc-only**.)*
+**AC-9. CLOSE OBLIGATION, CLEARED-ROW BRANCH. This node does not reach `merged`
+until the px8ta row runs green and its second blocker is closed with it.** Three
+things land in the SAME candidate, or none of them do:
 
-> **Added by Steward amendment 2026-09-19. Unlike most close obligations, this
-> one has only ONE branch available to it.** The usual form is *clears or names
-> a live owner*, and `AC-6` above forecloses the first half: the row **remains
-> `#[ignore]`d** by this node's own design, and `AC-0` bars adding attributes.
-> So the row survives this node, and the only question is whether it survives
-> pointing at something live.
+- `px8ta_oriented_subcontinuation.rs`'s
+  `public_two_three_level_brackets_finish_and_release_lifo` carries **no
+  `#[ignore]` attribute**, and the stale reason string naming
+  `RT-SUBCONTINUATION-LIFO-RELEASE-ORDER` is **deleted, not edited** — once the
+  row runs there is no owner to name and no successor to point at.
+- `docs/program/issues/RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED.md` moves to
+  `status: closed`, citing `evt_6c900nagc7mn4` and naming this node as the
+  mechanism that subsumed it. **It gets no separate implementation**, and no
+  part of its repair may be attempted here.
+- The closeout states **in words** that the `(H)` probe recorded on that node is
+  NOT claimed fixed. That node shares a refusal SIGNATURE between `(H)` and
+  px8ta depth 3 and expressly never established a shared ROUTE. If `(H)` is
+  ever re-measured and still refuses, that is a finding for the Steward, not a
+  regression of this WP.
+
+*(`AC-0` prohibits ADDING an `#[ignore]`; removing one is what this node exists
+to do. The candidate touches `crates/` and is therefore **`full` CI, never
+doc-only**.)*
+
+> **Amended 2026-09-21 by Architect ruling `evt_6c900nagc7mn4`, which removed
+> this AC's only available branch and replaced it.** The 2026-09-19 version had
+> no cleared-row branch at all: `AC-6` then required the depth-3 refusal to
+> SURVIVE, so the row necessarily survived too, and the only live question was
+> whether it survived pointing at a live owner rather than at a `merged` node.
+> **Both halves of that reasoning are void.** The refusal is lawfully
+> eliminated and the row clears, so the live-owner and no-live-owner branches
+> are **deleted, not retained as fallbacks**. A candidate that leaves the row
+> `#[ignore]`d — pointing at anything, live or terminal — fails this criterion.
 >
-> Today it does not. It opens
-> `#[ignore = "RT-SUBCONTINUATION-LIFO-RELEASE-ORDER …` — `merged` — and names
-> no other token at all. **This node is its live owner and this frame is the
-> only record of that**, via the title's naming of
-> `public_two_three_level_brackets_finish_and_release_lifo` as *"one of the
-> fifteen originally selected ignored rows (population now 14)"*. A reader who
-> starts at the row sees a merged node and stops. Measured at
-> `evt_73fa9v0ca03ve`, where this row was one of 8 of 14 in that state.
->
-> **If this node's repair lands and the row still refuses at depth 3** — which
-> `AC-6` expects, as the same `ContinuationSpecialization` object-emission
-> refusal — **then the successor owner is whatever node takes that refusal, and
-> naming it is part of closing here.** If no live node owns it, the attribute
-> says so in those words and names this node as having established it. Handing
-> the row back to `main` still pointing at a merged node reproduces exactly the
-> state `RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` was cut to clean up.
->
-> **Why an AC when `M7a` arm 2 already reaches this row at close.** `M7a` is a
-> **gate**, run by the merge seats at close; an AC is a **design input**, read
-> by the implementer before the work and by QA during review. **Reachability by
-> the gate is not visibility to the author** (runtime-implementer,
-> `evt_719q9chqy9dwz`). This is the same reason
-> `RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` carries `AC-11` despite arm 2.
->
-> **Not licensed by this AC:** the census's `AC-6` proposal will name this node
-> as the expected applier for this row. That is a **routing** statement backed
-> by measurement. The **mechanism content** of the successor string is this
-> node's finding to make — the census did not measure this row.
+> **Ledger row 9 clears outright when this lands.** The row was two blockers
+> under one `#[ignore]`: this node repairs the first and lawfully subsumes the
+> second, so there is no successor owner to name and nothing is handed back to
+> `main` still ignored.
 
 ## 6. What this WP is NOT
 
-- **It does not clear the px8ta row and must not try.** That row carries a
-  second blocker at depth 3 owned by
-  `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`. **Un-ignoring it here buys a red
-  row for no information**, and an AC requiring it to pass would be
-  unsatisfiable — the WP could only meet it by repairing a defect it does not
-  own.
+- **It DOES clear the px8ta row — that changed under a ruling, and the earlier
+  text saying otherwise is removed rather than qualified.** The row's second
+  depth-3 blocker, owned by `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`, is
+  lawfully SUBSUMED by Arm A rather than separately repaired (Architect
+  `evt_6c900nagc7mn4`). **This WP still does not IMPLEMENT that node**, and
+  nothing here licenses touching `core.rs` or `units.rs`: the subsumption is a
+  consequence of the planner-classification repair, not a second deliverable.
+  The superseded sentences — that un-ignoring the row "buys a red row for no
+  information" and that an AC requiring it to pass would be unsatisfiable —
+  were written when the refusal was expected to survive. They are FALSE now.
 - **No interp repair is authorized, and `D1b` is DELETED, not deferred.** Its
   premise -- that interp violates on the composed-return nests -- measures
   FALSE at `89d2bfb57`. **State this in the bounded form and no wider: there is

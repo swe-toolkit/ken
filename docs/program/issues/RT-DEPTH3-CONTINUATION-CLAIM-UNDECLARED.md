@@ -12,19 +12,47 @@ github: null
 origin: "Measured by runtime-implementer under RT-SUBCONTINUATION-LIFO-RELEASE-ORDER's D0 (evt_707t1acbaxp62): the row body is `for depth in 2..=3`, depth 2 panics on the release-order assertion, and running both depths under catch_unwind exposed a depth-3 refusal nobody had seen -- order-independent, reproduced with depth 3 run first, separate temp dir and separate build_native_program per depth. Architect ruled it OUTSIDE RT-DISCHARGE-ARM-SUBSTITUTES-PLAN-FOR-OBSERVATION and therefore outside the standing do-not-repair-toward-green prohibition (evt_ptqeeexkz2xa), and directed the Steward to file an owner. Steward VERIFIED that ruling at source rather than inheriting it, and it is stronger than stated: `independent_contract` and `realized_call_words` have ZERO occurrences in ALL of crates/ at origin/main 5899268451d42e7c1337929a996921d6483b6541, not merely in units.rs, so no refusal observed on this tree can be an exit of that rule. Steward-filed per COORDINATION section 2 (agents cannot create tracked work)."
 ---
 
-> ## THE ROW THIS BLOCKS IS ALREADY COUNTED, AND THIS NODE IS WHY IT CANNOT CLOSE
+> ## SUBSUMED. THIS NODE IS NOT TO BE IMPLEMENTED. IT CLOSES WITH THE REPAIR.
 >
-> The `px8ta_oriented_subcontinuation.rs` row
-> `public_two_three_level_brackets_finish_and_release_lifo` is one of the rows
-> the CI sweep **selects and runs** — the operator's top-priority work. (It
-> carries no registry exemption; see the count note at the foot of this node,
-> and quote the predicate with any figure.) **Repairing the release-order defect
-> does not clear it.** The row is two blockers under one `#[ignore]`, and this
-> node owns the second.
+> **Architect ruling `evt_6c900nagc7mn4`, 2026-09-21, adopting Research
+> advisory `evt_5p5jn87bmwpcc`.** `RT-BRACKET-RELEASE-ORDER-PARITY`'s two-arm
+> planner-classification repair makes the px8ta row pass strict LIFO at BOTH
+> depths and removes the depth-3 refusal this node was filed for. That is
+> **lawful elimination**, not a newly satisfied lookup and not a weakened
+> guard: Arm A cannot add the absent identity key to
+> `function_local.continuation_calls`: instead it replaces the ordinary route
+> that formed the failing claim with an exact selected-caller -> response-owner
+> -> typed-K-context path, whose own claim, body and closeout checks all stay
+> live.
 >
-> **Do not treat this as a reason to defer the ordering repair.** Both are
-> owed; neither subsumes the other. The ordering defect is
-> `RT-BRACKET-RELEASE-ORDER-PARITY`'s.
+> **Status: `draft` until that repair LANDS, then `closed` in the SAME
+> candidate.** Closure is conditional on landing, and this node **must not
+> receive a separate implementation** — not a fallback, not a lookup widening,
+> not a new declaration lane, not a `Fusion` owner. The two prohibitions under
+> WHAT MUST NOT HAPPEN below are unchanged and are now also the ruling's own
+> scope fence.
+>
+> ### THE `(H)` PROBE IS NOT CLAIMED FIXED, AND CLOSING THIS NODE DOES NOT SAY IT IS
+>
+> This node records probe **(H)** — a depth-3 continuation with no further
+> effect below it — as sharing this refusal SIGNATURE while **route identity
+> with px8ta depth 3 was never established**. That caution stands exactly as
+> written. The subsumption reaches the px8ta blocker and nothing else. **If
+> `(H)` is ever re-measured and still refuses, that is a finding to return to
+> the Steward** — not a regression of the bracket repair, and not grounds to
+> reopen this node on unmeasured residue.
+>
+> The row itself: `public_two_three_level_brackets_finish_and_release_lifo` is
+> one of the rows the CI sweep **selects and runs** — the operator's
+> top-priority work. (It carries no registry exemption; see the count note at
+> the foot of this node, and quote the predicate with any figure.) It was two
+> blockers under one `#[ignore]`; **ledger row 9 clears outright** when the
+> repair lands, because the first is repaired and the second is subsumed.
+>
+> **Superseded and removed, not qualified:** *"THE ROW THIS BLOCKS IS ALREADY
+> COUNTED, AND THIS NODE IS WHY IT CANNOT CLOSE"*, *"Repairing the
+> release-order defect does not clear it"*, and *"Both are owed; neither
+> subsumes the other."* All three were true when written and are false now.
 
 ## What was measured, and at what base
 
@@ -178,11 +206,15 @@ of them is the answer.**
   > states: *"Lead with the symbol name. The line number never travels without
   > its anchor."* The `#[ignore]` reason text is being replaced too, so a
   > reason-string quote would not have served as the anchor either.
-- **Do not un-ignore the row.** The ordering blocker is still live and owned
-  elsewhere; un-ignoring buys a red row for no information.
-- **Do not fold this into `RT-BRACKET-RELEASE-ORDER-PARITY`.** Different
-  mechanism, different layer, different owner. One `#[ignore]` covering two
-  defects is what hid this one for as long as it was hidden.
+- **The row IS un-ignored — by `RT-BRACKET-RELEASE-ORDER-PARITY`, not here.**
+  The superseded bullets *"Do not un-ignore the row"* and *"Do not fold this
+  into `RT-BRACKET-RELEASE-ORDER-PARITY`"* are removed: `evt_6c900nagc7mn4`
+  ruled that the ordering repair lawfully subsumes this blocker, so the row
+  clears in that node's candidate and this node closes with it. **Nothing here
+  is folded INTO that WP as work** — no part of this node is implemented, by it
+  or by anyone. What remains true, and is why the original bullet existed at
+  all: one `#[ignore]` covering two defects is what hid this one for as long as
+  it was hidden, and the row now carries no `#[ignore]` at all.
 
 ## MEASURED FROM OUTSIDE THIS NODE'S FIXTURE: THE SUBJECT IS WIDER THAN "FILE NESTS"
 
