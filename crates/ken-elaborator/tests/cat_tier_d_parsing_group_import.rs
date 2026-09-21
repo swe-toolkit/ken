@@ -318,18 +318,32 @@ fn parsing_numeric_loader_visible_inventory_is_exact() {
         "char_to_digit",
         "numeric_argument_origin",
         "parse_digits_at",
+        "parse_digits_at::accepted_digit",
+        "parse_digits_at::empty",
+        "parse_digits_at::invalid_digit",
         "parse_formatted_digits",
         "parse_int",
         "parse_int_chars",
+        "parse_int_chars::bare_sign",
+        "parse_int_chars::empty",
+        "parse_int_chars::signed",
+        "parse_int_chars::unsigned",
         "parse_nat",
         "parse_nat_chars",
+        "parse_nat_chars::empty",
+        "parse_nat_chars::nonempty",
     ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(NUMERIC_SOURCE, NUMERIC, "parsing_numeric"),
         expected
     );
     let mut loaded = direct_numeric();
-    let imports = expected.iter().cloned().collect::<Vec<_>>().join(", ");
+    let imports = expected
+        .iter()
+        .filter(|surface| !surface.contains("::"))
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
     loaded
         .env
         .elaborate_file(&format!("import {NUMERIC} ({imports})"))
