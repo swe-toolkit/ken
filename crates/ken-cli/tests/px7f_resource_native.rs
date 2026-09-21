@@ -293,25 +293,11 @@ fn linked_public_escape_is_exact_closed() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-//
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it cannot observe in CarriedWord
-//
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// The four px4b rows carry this same owner with the OPPOSITE provenance:
-// those were branch-introduced, this one predates the branch.
-// Annotation only -- test body and expectations are unchanged.
 #[test]
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PLANNER-KRET-GRAFTED-SPINE: the planner derives k_ret_identity from a continuation the spec does not let the runtime invoke. This row refuses at the require_i64 on k_ret_identity in define_static_response_owner_bodies (at 1f0402ba4, around units.rs:3430 -- the SYMBOL is the citation, the line is a hint anchored to that SHA), which compares the planner expected Ret-case identity against the runtime carrier tag. exact_response_ret_identity reads ONE syntactic occurrence and composes nothing, while 42 s6.4 requires the grafted spine -- bind (Vis e f) k = Vis e (lambda r. bind (f r) k), per 36 s2.2 -- so after grafting the immediate syntactic continuation is not an object in the tree and the node only continuation is the composed one. Established by RT-PX7F-LINKED-PUBLIC-ROWS, which measured expected ctor:right-denial::ITree::Ret against carried ::ITree::Vis, then decoded that Vis operation to PrivateResourceRelease (FSOp ctor_543 -- the arena spells these operations ctor_NNN because the prelude strips the eleven Private FS-op spellings from globals once the checked public bracket is installed, per the private-name strip loop in ken-elaborator prelude and the prelude-record doc above it, leaving the eleven name-stripped ids as the last eleven FSOp constructors in declaration order; the artifact own FSOp roster returns that 10-named/11-unnamed partition at 29e6b21e1f8c5b80557428693a66eb61c19ea4c4) while this row own origin is PrivateFsHandleMetadata (542): the K departs onto the BRACKET OWN RELEASE, which composition predicts specifically and a selection defect gives no reason for. THIS ROW IS THE DISCRIMINATING WITNESS. Architect ruled fork (A) normative; the emission-side alternative is foreclosed because it would make a conformant runtime non-conformant."]
+#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that."]
 fn linked_public_right_denial_preserves_exact_masks() {
     let observation = run("right-denial", RIGHT_NOT_HELD);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
@@ -327,25 +313,11 @@ fn linked_public_right_denial_preserves_exact_masks() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-//
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it cannot observe in CarriedWord
-//
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// The four px4b rows carry this same owner with the OPPOSITE provenance:
-// those were branch-introduced, this one predates the branch.
-// Annotation only -- test body and expectations are unchanged.
 #[test]
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PLANNER-KRET-GRAFTED-SPINE: THIS ROW IS AN INSTANCE OF THE DEFECT. It fails the same check by the same mechanism as the right-denial row above -- the require_i64 on k_ret_identity in define_static_response_owner_bodies -- because the planner derives k_ret_identity from a continuation the spec does not let the runtime invoke. Established by RT-PX7F-LINKED-PUBLIC-ROWS. WHAT THIS ROW LACKS IS DISCRIMINATING POWER, NOT MEMBERSHIP: it is not evidence FOR that mechanism and must not be read as a second confirmation of it, because its K operation equals its OWN origin -- both PrivateResourceRelease, FSOp ctor_543 -- since in this program the composed continuation after the inner release also reaches the bracket release. Immediate and composed agree here by coincidence of constructor, which is VALUE EQUALITY AND NOT IDENTITY. The discrimination between the immediate and composed readings rests entirely on the right-denial row, whose origin is PrivateFsHandleMetadata (542) and whose K departs onto 543. Repairing this row means repairing that mechanism; measuring it does not test that mechanism."]
+#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that."]
 fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
     let observation = run("double-release", DOUBLE_RELEASE);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
