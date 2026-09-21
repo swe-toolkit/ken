@@ -88,8 +88,19 @@ new return protocol, which is representation design beyond this node. That is
 why this node is `draft` and not `ready`: it is framed but not releasable, and
 it must not be picked up as available work.
 
+Architect disposition: **do not reopen the persistent/durable closure lane.**
+Stop 16 establishes that this path lacks a lawful existing carrier; it does not
+establish that reviving the retired `(PersistentClosure, Closure)` admission is
+the right representation. That lane remains recognized-but-never-admitted under
+`RT-CLOSURE-BOUNDARY-LANE`'s recorded `dec_21aa95jbsznfh` plus addendum
+`dec_6xffebwj4s347`. Nor does this node authorize a new return
+protocol: that is a separate representation component, and the one-attempt
+bound ends this node before such a component is designed. Reopening requires a
+separately framed architecture decision grounded on current `main`, not a
+successor search or another implementation attempt here.
+
 Durable branch state is clean at
 `4f6b2a454786dd66eb2a1eb9681913e1e4f69b9d`. No host logging, global diagnostic
-recoding, aggregate relaxation, or capacity change was retained. The Architect
-owns the stop-16 disposition and the symptom entry; neither is recorded here.
-Reopening this node requires that disposition, not a successor search.
+recoding, aggregate relaxation, or capacity change was retained. The frame's
+symptom inventory now records stop 16 as entry 17. Counts stand at hard stops
+16 / symptom entries 17; neither trigger fires, and both next fire at 18.
