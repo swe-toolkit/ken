@@ -27,8 +27,8 @@ of `env_config_values` IS reachable.
 
 ## 2. Settled inputs. Do not re-derive.
 
-The pre-refutation facts were measured at `8472b78aa`; the presence-split facts
-and the refutation below were measured at `d5d7e6299`.
+Facts below were measured at `8472b78aa`; the presence-split facts and the
+refutation at `d5d7e6299`.
 
 The package is `catalog/packages/Application/Configuration/Decoder.ken.md`,
 187 lines. It declares roughly twenty functions and **zero proofs**: the
@@ -54,8 +54,7 @@ The structure that motivates this node:
   `env_config_field_check`, which accepts when
   `env_config_lookup (bytes_encode (schema_field_name field)) entries` is
   `Some`, and on `None` yields `env_config_missing_field`.
-- **`env_config_missing_field` does NOT reject unconditionally**, and this is
-  the fact an earlier version of this frame missed. It calls
+- **`env_config_missing_field` does NOT reject unconditionally.** It calls
   `schema_check_presence ... (schema_field_presence field)`, and
   `schema_check_presence` at `Schema.ken.md:97` splits:
   `SchemaRequired ↦ schema_field_reject`, `SchemaOptional ↦
@@ -82,8 +81,42 @@ intended route; this node is not expected to re-prove coverage from scratch.
 
 Attached `pub proof` terms in
 `catalog/packages/Application/Configuration/Decoder.ken.md`, on the exported
-subjects. An attached `pub proof` travels with the function selector, so **no
-client import, export list, or selector list changes.**
+subjects, plus the one production visibility change they require.
+
+**A proof travelling with its subject's selector does not make the names in
+its STATEMENT resolvable at a client.** Those must be published separately.
+AC-1 states the agreement against `env_config_lookup`, so that authority must
+be nameable.
+
+Authorized by the Architect at `evt_44c2n2qh6y1c1`, exhaustively:
+
+- `fn env_config_lookup` becomes `pub fn env_config_lookup`. Preserve its
+  name, type, body, declaration position, and canonical identity. This is a
+  visibility change, not a body change.
+- `env_config_lookup_choice`, `env_config_entry_key`, and
+  `env_config_entry_value` stay private.
+- No source `export` declaration changes: `pub` contributes directly to the
+  interface under `spec/30-surface/33-declarations.md §4.1`.
+- The published population is exactly EIGHT identities -- four direct names
+  (`decode_process_environment`, `decode_config_entries`, `env_config_help`,
+  `env_config_lookup`) and four attached laws
+  (`decode_process_environment::{required_lookup,optional_absence}` and
+  `decode_config_entries::{required_lookup,optional_absence}`). Attached names
+  are selector-only and do not become ambient bare names.
+- The Tier-E controls in `crates/ken-elaborator/tests/cat_tier_e_decoder_import.rs`
+  MUST change: remove `env_config_lookup` from the private-refusal roster,
+  positively import and use its canonical identity, and pin that exact
+  4-direct/4-attached population.
+- `decoder_checked_provider_and_schema_closure_is_exact` is an exact ledger,
+  not a prohibition. Section 2 requires instantiating `valid_coverage`, so the
+  provider growth is a consequence of the mandated deliverable. Updating it to
+  its new true value is part of this node. The authorized additions are
+  `MkSchemaField`, `SchemaFieldAccepted`, `SchemaOptional`, `SchemaPresence`,
+  `SchemaRequired`, `SchemaValueShape`, `schema_validate_fields`,
+  `schema_validate_fields::valid_coverage`, and `Data.Collections.Derived.nth`.
+
+Add no wrapper, second traversal, proposition family, datatype, postulate,
+primitive, or trusted-base entry.
 
 ## 4. Acceptance criteria
 
@@ -94,8 +127,7 @@ index `i` in range of `schema_fields schema` **whose `schema_field_presence` is
 field_i)) entries` is `Some v_i` and `nth i values = Some v_i`. The bytes are
 the entry's own bytes with no re-encoding, which is where raw-`Bytes`
 preservation is discharged. The same law for `decode_config_entries`. This is
-the safety property: it is what makes a required field's value trustworthy, and
-it is TRUE, unlike the universal form this frame carried before.
+the safety property: it is what makes a required field's value trustworthy.
 
 **AC-2 -- the optional lane is stated, not left implicit.** A law that says
 what the placeholder means: for an index `i` whose presence is `SchemaOptional`
@@ -126,7 +158,8 @@ two lanes separately. Provenance is retained from the prior frame: for an
 
 Stop and report if AC-1 or AC-2 cannot be discharged without a new primitive,
 postulate, `Axiom`, or trusted-base entry, or if either requires changing an
-existing function body rather than adding proofs. **Do not repair the
+existing function BODY. The section 3 visibility change is authorized and is
+not a body change; no further widening is. **Do not repair the
 optional/empty conflation in this node.** Whether an absent optional field may
 be represented by empty `Bytes` is a design question about the decoder's return
 type, and it is routed to the Architect separately. This node proves what is
@@ -137,8 +170,17 @@ representation should change.
 
 Do not prove general `env_config_lookup` laws beyond what AC-1 and AC-2 need,
 do not touch `Application/Input/Schema.ken.md`, do not change `env_config_help`'s
-delegation to `schema_help`, and do not widen any export or selector list.
+delegation to `schema_help`, and widen the public surface no further than the
+eight identities section 3 enumerates.
 Total ordering and shadowing behavior of duplicate keys in `entries` is not in
 scope. Changing the decoder's return type so that optional absence is
 distinguishable from a present empty value is NOT in scope and is the
 Architect's to rule on.
+
+## 7. Symptom inventory
+
+Architect hard-stop count for this chain stays at 0; entry 1 is a frame
+contradiction surfaced before any Architect technique ruling existed.
+
+1. Public attached-law signatures could not close while their exact lookup
+   authority remained private and visibility changes were forbidden.
