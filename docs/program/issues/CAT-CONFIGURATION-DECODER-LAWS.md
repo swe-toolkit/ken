@@ -1,6 +1,6 @@
 ---
 id: CAT-CONFIGURATION-DECODER-LAWS
-title: "prove that a Valid decode never reaches env_config_values' empty-Bytes placeholder -- the decoder runs the schema traversal and the value traversal INDEPENDENTLY over the same fields and entries, discards the validation's own values, and recomputes them, so nothing today connects Valid to lookup success; if that agreement fails, a missing required field decodes to empty Bytes instead of an error. Instantiates the landed schema_validate_fields::valid_coverage at the two decoder entry points and carries raw-Bytes identity and per-entry-point provenance with it."
+title: "prove the required-field agreement the decoder actually has, and characterize the optional lane it does not -- env_config_validation discards the validation payload and recomputes values in a second independent traversal whose None branch emits an empty-Bytes placeholder; the REQUIRED lane is guarded (schema_check_presence rejects SchemaRequired), so the reachable placeholder is an ABSENT OPTIONAL field, whose empty Bytes is indistinguishable from a present-but-empty value"
 status: ready
 owner: foundation
 size: M
@@ -12,7 +12,7 @@ github: null
 origin: "One of the seventeen proof-backfill follow-ons named by docs/program/CATALOG-PROOF-COMPLETENESS-SURVEY.md, under operator ruling 2026-09-13 / PRINCIPLES #16. Framed by the Steward 2026-09-21 as L3's successor AFTER measuring the package, NOT adopted from the survey's one-line recommendation -- the survey proposes four parallel targets (lookup, accumulation, provenance, raw-Bytes) and does not name the independent-traversal agreement, which is the one that carries a wrong answer if it fails. Deferred until now because its precursor is CAT-SCHEMA-LAWS, which merged at 47d770216; framing it earlier would have grounded a frame on an unmerged commit. All current-code facts measured at origin/main 8472b78aa2a2ef7bb9216d6ea518606c2b0e2393."
 ---
 
-# Decoder laws: a Valid decode returns looked-up bytes, never a placeholder
+# Decoder laws: the required-field agreement, and the optional lane it excludes
 
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.
@@ -21,10 +21,14 @@ stop and report the mismatch; do not build around it.
 
 State and prove, over the existing decoder representation and with no new
 trust, that a `Valid` result from either decoder entry point returns exactly
-the bytes found in `entries` for each schema field, in field order. The
-`None` branch of `env_config_values` must be shown unreachable on that path.
+the bytes found in `entries` **for every REQUIRED field**, in field order, and
+state as its own law what happens in the optional lane, where the `None` branch
+of `env_config_values` IS reachable.
 
-## 2. Settled inputs -- measured at `8472b78aa`. Do not re-derive.
+## 2. Settled inputs. Do not re-derive.
+
+The pre-refutation facts were measured at `8472b78aa`; the presence-split facts
+and the refutation below were measured at `d5d7e6299`.
 
 The package is `catalog/packages/Application/Configuration/Decoder.ken.md`,
 187 lines. It declares roughly twenty functions and **zero proofs**: the
@@ -47,9 +51,25 @@ The structure that motivates this node:
   not an error. Nothing in the package connects `Valid` to that branch being
   unreachable.
 - `environment_field_check`/`config_field_check` reduce to
-  `env_config_field_check`, which accepts iff
+  `env_config_field_check`, which accepts when
   `env_config_lookup (bytes_encode (schema_field_name field)) entries` is
-  `Some`, and otherwise yields `env_config_missing_field`.
+  `Some`, and on `None` yields `env_config_missing_field`.
+- **`env_config_missing_field` does NOT reject unconditionally**, and this is
+  the fact an earlier version of this frame missed. It calls
+  `schema_check_presence ... (schema_field_presence field)`, and
+  `schema_check_presence` at `Schema.ken.md:97` splits:
+  `SchemaRequired ↦ schema_field_reject`, `SchemaOptional ↦
+  schema_field_accept optional_value` with `optional_value = True`. **So an
+  absent REQUIRED field makes validation `Invalid` and no decode happens; an
+  absent OPTIONAL field is ACCEPTED and reaches the placeholder.**
+- ⇒ **`valid_coverage`'s accepted `True` is not evidence of lookup success.**
+  It is satisfied by "present and found" and by "optional and absent" alike,
+  so it cannot carry a universal lookup implication. Measured by
+  foundation-leader at `d5d7e6299` with one `SchemaOptional`/`SchemaBytes`
+  field and `entries = Nil`, green under private `Refl` witnesses at both
+  entry points, reproduction at `evt_7wgfandr6fd2e`; independently confirmed
+  by the Steward against `Decoder.ken.md:95-101,118-128` and
+  `Schema.ken.md:90-100`.
 
 The precursor is landed and is the lever: `CAT-SCHEMA-LAWS` merged at
 `47d770216` and published `schema_validate_fields::valid_coverage`, which
@@ -67,40 +87,52 @@ client import, export list, or selector list changes.**
 
 ## 4. Acceptance criteria
 
-**AC-1 -- Valid returns looked-up bytes, and the placeholder is unreachable.**
-For `decode_environment_entries schema entries` returning
-`Valid values`: for every index `i` in range of `schema_fields schema`,
-`env_config_lookup (bytes_encode (schema_field_name field_i)) entries` is
-`Some v_i` and `nth i values = Some v_i`. The bytes are the entry's own bytes
-with no re-encoding, which is where raw-`Bytes` preservation is discharged.
+**AC-1 -- the required-field agreement, at both entry points.** For
+`decode_environment_entries schema entries` returning `Valid values`: for every
+index `i` in range of `schema_fields schema` **whose `schema_field_presence` is
+`SchemaRequired`**, `env_config_lookup (bytes_encode (schema_field_name
+field_i)) entries` is `Some v_i` and `nth i values = Some v_i`. The bytes are
+the entry's own bytes with no re-encoding, which is where raw-`Bytes`
+preservation is discharged. The same law for `decode_config_entries`. This is
+the safety property: it is what makes a required field's value trustworthy, and
+it is TRUE, unlike the universal form this frame carried before.
 
-**AC-2 -- the law must be refutable, and by the right mutation.** Two controls.
-Changing `env_config_values`' `None` branch to a different placeholder must
-leave the proof GREEN, because that branch is unreachable on the Valid path --
-a proof that reds here is keyed on the placeholder's value rather than on its
-unreachability. Changing `env_config_field_check` to accept a missing field
-must turn it RED. A law that survives both is vacuous and does not pass.
+**AC-2 -- the optional lane is stated, not left implicit.** A law that says
+what the placeholder means: for an index `i` whose presence is `SchemaOptional`
+and whose lookup is `None`, a `Valid` result has `nth i values = Some
+(list_to_bytes (Nil UInt8))`. State it as a published law rather than a comment,
+because it is the only thing that makes the conflation visible to a reader: an
+absent optional field and a present field holding empty bytes produce the same
+element, and nothing in the returned `List Bytes` distinguishes them.
 
-**AC-3 -- provenance stays distinct per entry point.** For an `Invalid`
-result, the carried issues' origins are `EnvVariableOrigin` for
+**AC-3 -- the laws must be refutable, and by the right mutations.** Changing
+`env_config_field_check` to accept a missing field must turn AC-1 RED. Changing
+`env_config_values`' `None` branch to a different placeholder must turn AC-2 RED
+and leave AC-1 GREEN -- AC-1 must not be keyed on the placeholder's value, and
+AC-2 must be. A pair that does not split on that mutation is not measuring the
+two lanes separately. Provenance is retained from the prior frame: for an
+`Invalid` result the carried issues' origins are `EnvVariableOrigin` for
 `decode_environment_entries` and `ConfigEntryOrigin` for
-`decode_config_entries`, one per failing field, matching the behavior already
-fixture-checked by
+`decode_config_entries`, one per failing field, matching
 `crates/ken-elaborator/tests/cc8_env_config_decoder_acceptance.rs::config_failures_keep_config_key_origins_distinct_from_environment`.
 
 ## 5. Stop condition
 
-Stop and report if AC-1 cannot be discharged from `valid_coverage` without a
-new primitive, postulate, `Axiom`, or trusted-base entry; if it requires
-changing any existing function body rather than adding proofs; or if the
-agreement turns out to be FALSE -- that is, if `Valid` can hold while a lookup
-returns `None`. A false agreement is a product defect, not a proof exercise,
-and it comes back to me before any repair is attempted.
+Stop and report if AC-1 or AC-2 cannot be discharged without a new primitive,
+postulate, `Axiom`, or trusted-base entry, or if either requires changing an
+existing function body rather than adding proofs. **Do not repair the
+optional/empty conflation in this node.** Whether an absent optional field may
+be represented by empty `Bytes` is a design question about the decoder's return
+type, and it is routed to the Architect separately. This node proves what is
+true today and makes the conflation legible; it does not decide whether the
+representation should change.
 
 ## 6. Not this node
 
-Do not prove general `env_config_lookup` laws beyond what AC-1 needs, do not
-touch `Application/Input/Schema.ken.md`, do not change `env_config_help`'s
+Do not prove general `env_config_lookup` laws beyond what AC-1 and AC-2 need,
+do not touch `Application/Input/Schema.ken.md`, do not change `env_config_help`'s
 delegation to `schema_help`, and do not widen any export or selector list.
 Total ordering and shadowing behavior of duplicate keys in `entries` is not in
-scope.
+scope. Changing the decoder's return type so that optional absence is
+distinguishable from a present empty value is NOT in scope and is the
+Architect's to rule on.
