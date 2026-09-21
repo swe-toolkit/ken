@@ -22,18 +22,33 @@ under it before.
   `pub use resolve::{RDecl, RDeclKind, RExpr, RType}` -- **four** names, not 26.
 - **Zero consumers outside `ken-elaborator`.** No other crate, bench, example or
   binary names `ken_elaborator::resolve`, `RExpr` or `RDeclKind`.
-- **Eight integration test files consume the R layer**, and they are external to
+- **NINE integration test files consume the R layer**, and they are external to
   the lib target, so `pub(crate)` breaks them. They use exactly **three
   functions** -- `resolve_decl`, `resolve_decls`, `resolve_expr_standalone` --
   and **five types** -- `RDecl`, `RDeclKind`, `RExpr`, `RType`, and
   `RInfixOperator`, which the `pub use` does not name:
 
-      acceptance.rs  effects.rs  kenfmt_b3_layout.rs  kenfmt_b4_splicing.rs
-      kenfmt_let_layout.rs  lang_fixity_decl_surface.rs
-      lang_structural_result_elab.rs  let4_multi_binding.rs
+      acceptance.rs  constrained_instance_elaboration.rs  effects.rs
+      kenfmt_b3_layout.rs  kenfmt_b4_splicing.rs  kenfmt_let_layout.rs
+      lang_fixity_decl_surface.rs  lang_structural_result_elab.rs
+      let4_multi_binding.rs
 
-  `lang_roots_loader_local_instance_dict_scope.rs:190` is a **false hit** -- the
-  word "resolve" in an assertion message. Do not relocate it.
+  `constrained_instance_elaboration.rs` imports root `RType` at line 4 and
+  matches `RType::RVarTy` twice in a live assertion. It is present at this
+  frame's own anchor `3de9a5030` and attributed to `2eb0e6f39`, so it was
+  always a consumer; the earlier count of eight was wrong when written, not
+  overtaken by drift.
+
+  **Six files match an R-layer name in prose only and are NOT consumers.** Do
+  not relocate them: `lang_mod_strict_resolution_d0.rs`,
+  `lang_standard_infix_call_completion.rs`,
+  `lang_truncation_surface_syntax.rs`, `lang_type_projection_surface_form.rs`,
+  `surface_arrow_in_expr_acceptance.rs`, `surface_def_refinement.rs`.
+  `lang_roots_loader_local_instance_dict_scope.rs:190` is likewise a **false
+  hit** -- the word "resolve" in an assertion message.
+
+  Population re-measured by the Steward at `e35aa44ad` and at anchor
+  `3de9a5030`, independently of the ring's census, and the two agree.
 - **The node's own "six of the nine functions" is anchored to the abandoned
   branch `a8f0873b0`, not to `main`.** The census above supersedes it. The node's
   "the retraction compiles" is from that same branch and is not a claim about
@@ -66,7 +81,7 @@ for a retraction reachable as `pub(crate)` on roughly thirty items in two files.
 ## 4. Deliverable
 
 Narrow the R layer's items so nothing in it is nameable from outside the crate,
-and relocate the eight integration test files' R-layer usage into the crate as
+and relocate the nine integration test files' R-layer usage into the crate as
 unit tests.
 
 **Architect ruling, already made and not reopenable here: move those tests
