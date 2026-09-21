@@ -1,7 +1,7 @@
 ---
 id: LANG-ATOM-START-CLASSIFICATION-CLOSURE
 title: "Make what-starts-an-atom ONE classification over ATOM FORMS, applied to every atom-start roster in the parser, so the places encoding it cannot drift apart -- the measured omissions (KwProof, TruncBar) close as a consequence, not as the deliverable. The first proposal, a total function over Token, FAILED: a Token-total map sends Ident(_) to atom and is finished, so the closure property holds for token-keyed forms and silently fails for contextual multi-word ones like `recursive result for xs`. Covers three roster pairs across both the expression and the type side, one of them uncensused, plus re-validating the parser.rs:3122-3125 infix-path soundness argument that reasons FROM the roster being narrow and whose premise this repair edits from 600 lines away."
-status: active
+status: merged
 owner: language
 size: L
 gate: none
