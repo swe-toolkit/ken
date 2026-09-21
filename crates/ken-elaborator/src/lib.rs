@@ -217,6 +217,34 @@ pub struct ElabEnv {
     pub module_state: modules::ModuleState,
 }
 
+/// Compile-time inventory tripwire for every field carried by [`ElabEnv`].
+///
+/// This function only acknowledges that a field exists. It does not classify
+/// any namespace and therefore does not establish that the SEAL-2 producer walk
+/// is complete. `seal2_tests::support::enumerate_producer_types` remains the
+/// obligation that performs that classification.
+#[allow(dead_code)]
+fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
+    let ElabEnv {
+        env: _,
+        globals: _,
+        num_values: _,
+        fixities: _,
+        fixity_spans: _,
+        ctor_decl_spans: _,
+        numeric_env: _,
+        standard_operators: _,
+        bytes_env: _,
+        foreign_env: _,
+        effect_rows: _,
+        space_metadata: _,
+        prelude_env: _,
+        class_env: _,
+        resolution_provenance: _,
+        module_state: _,
+    } = env;
+}
+
 impl ElabEnv {
     pub fn empty() -> Result<Self, ElabError> {
         let mut env = GlobalEnv::new();
