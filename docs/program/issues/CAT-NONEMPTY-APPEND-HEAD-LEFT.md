@@ -1,6 +1,6 @@
 ---
 id: CAT-NONEMPTY-APPEND-HEAD-LEFT
-title: "`nonempty_append` publishes no law about its head, so a client holding only the four authorized selectors cannot establish `nonempty_head (nonempty_append xs ys) = nonempty_head xs`. Measured: the equality is not definitional under an abstract carrier, and the carrier constructor is outside a selector-list import even though `NonEmpty` is `pub data`. Add one `pub proof head_left for nonempty_append` in the package that owns the type. Its subject is already `pub fn`, and an attached `pub proof` is measured to travel with the function selector, so no client import or selector list changes."
+title: "`nonempty_append` publishes no law about its head, so a client holding only the three authorized selectors cannot establish `nonempty_head (nonempty_append xs ys) = nonempty_head xs`. Measured: the equality is not definitional under an abstract carrier, and the carrier constructor is outside a selector-list import even though `NonEmpty` is `pub data`. Add one `pub proof head_left for nonempty_append` in the package that owns the type. Its subject is already `pub fn`, and an attached `pub proof` is measured to travel with the function selector, so no client import or selector list changes."
 status: ready
 owner: foundation
 size: S
@@ -21,7 +21,8 @@ origin: "Steward, 2026-09-20, at origin/main 1bd3ad8f15bdfee72e6fb16ce7c187191bb
 `pub data NonEmpty a = NonEmptyCons a (List a)`; `:65` is
 `pub fn nonempty_append`. The ring's `UnresolvedCon { name: "NonEmptyCons" }`
 was an import-scope result in the client, not a privacy property of this
-package: the client's authorized selector list carries four names and the
+package: the client's authorized selector list carries three names -- `NonEmpty`,
+`nonempty_append`, `nonempty_cons` -- and the
 constructor is not among them.
 
 **An attached `pub proof` travels with the function selector, and the live
@@ -60,7 +61,7 @@ Mutate the conclusion's right-hand side to `nonempty_head a ys` and the proof
 MUST go red. A law that still checks under that swap is not this law.
 
 **AC-2 -- client reachability is MEASURED, not assumed.** From
-`Application/Input/Schema.ken.md`, with its existing four-selector `NonEmpty`
+`Application/Input/Schema.ken.md`, with its existing three-selector `NonEmpty`
 import BYTE-UNCHANGED, `nonempty_append::head_left` must resolve. Report the
 exact diagnostic if it does not, and stop.
 

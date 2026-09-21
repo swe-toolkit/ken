@@ -1,7 +1,7 @@
 ---
 id: LANG-FOREIGN-NAME-FORMAT-CHARS
 title: "whole-source lexical policy for Unicode Cf format characters (bidi overrides, zero-width joiners, U+FEFF) -- a Trojan-Source lint over ALL Ken source (comments and string literals, and identifiers once blessed letters land), NOT a check at the two `foreign`-name sites, because a bidi override is expressible anywhere in source and the deception is of a human reading it"
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
@@ -22,13 +22,15 @@ origin: Architect finding at evt_3aeg25e7b35mc while approving LANG-FOREIGN-NAME
 > # escape-value-identity round-trip. Forward-compatible with SPEC-IDENT-BLESSED
 > # (same guard), orthogonal to TR39. No crates/conformance change.
 > #
-> # WHAT REMAINS = the buildable lexer-lint node (the §1f guard in the lexer). It
-> # is a LANGUAGE-RING node, HELD behind the current match-pattern queue work — it
-> # does NOT jump the lane-2 serial queue. §1f is now its design authority (the
-> # front-loaded judgment is done); the Steward frames it shovel-ready and releases
-> # it when the language lane drains. `status: draft` reflects HELD-not-released,
-> # not awaiting-design. CV flagged a non-blocking conformance-witness follow-on
-> # (to be authored separately by CV). The recut analysis below grounded the §1f
+> # RELEASED 2026-09-20; frame at
+> # `docs/program/wp/LANG-FOREIGN-NAME-FORMAT-CHARS.md`. This is a LANGUAGE-RING
+> # node whose hold has dissolved: the match-pattern queue it was behind is
+> # merged through slice 6, and so are the three `elab.rs` nodes that shared
+> # the lane. §1f is its design authority and the front-loaded
+> # judgment is done. The deliverable is the §1f guard in
+> # `crates/ken-elaborator/src/lexer.rs`. CV flagged a non-blocking
+> # conformance-witness follow-on (to be authored separately by CV), so this
+> # candidate stays inside `crates/`. The recut analysis below grounded the §1f
 > # shape and is retained.
 > #
 > # RECUT 2026-09-06 — WHOLE-SOURCE LEXICAL POLICY (operator concurred).
@@ -171,22 +173,22 @@ smaller-surface version of the defect the `Cc` node avoided.**
 > **That answer determines whether the whole-source disposition has a victim at
 > all**, and it is a product question rather than a scope one. Raised by the
 > Adversary, which explicitly declined to rule on it; the Steward agrees it is
-> not its call. **Until it is answered, do not build either disposition** — and
-> do not read this open node as an implied obligation to build one.
+> not its call.
 
-**`gate:` corrected `none` → `operator`, 2026-08-14.** The body has said since
-2026-08-13 that neither disposition may be built until the operator answers, and
-the frontmatter said the node was ungated. **That is the exact misreading this
-node's own opening paragraph warns about** — an open node whose metadata implies
-it is startable reads as available work, and `gate:` is the field a reader
-filters on rather than the prose. The gate is not new; only its recording is.
+**ANSWERED, and the gate is discharged.** The operator ruled on 2026-09-06 that
+the reader includes humans in terminals and web views, so the vector has a real
+victim, and concurred in the whole-source shape. `gate:` is back to `none` and
+the node is released. The question is retained because it is what selected the
+whole-source disposition over the two-`foreign`-name one.
 
 ## Not this node
 
-- Widening the `Cc` check, revisiting `is_control()`, or touching `lexer.rs`.
-  **The placement reasoning in `LANG-FOREIGN-NAME-CONTROL-CHARS` binds here
-  unchanged:** `lexer.rs:229` decodes every string literal, and a check there
-  would forbid these characters in ordinary string data.
+- Widening the `Cc` check or revisiting `is_control()`. **`lexer.rs` is no
+  longer excluded** — the whole-source recut makes it the deliverable's home.
+  What still binds from `LANG-FOREIGN-NAME-CONTROL-CHARS` is the reason a check
+  at the string-literal decoder alone is wrong: it would forbid these codepoints
+  in ordinary string data. §1f resolves that by restricting the raw spelling
+  while the escape keeps the data expressible.
 - Identifier confusables or TR39 — that is `SURF-IDENT-TR39`'s lane and it is
   merged.
 - Normalization of any kind, or defining a well-formed C symbol name.
