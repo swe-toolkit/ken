@@ -79,6 +79,10 @@ pub enum ElabError {
     ParseError { msg: String, span: Span },
     /// A non-ASCII letter appeared where an identifier could begin or continue.
     NonAsciiIdentifierCharacter { character: char, span: Span },
+    /// A raw Unicode general-category `Cf` scalar appeared in source outside
+    /// the sole U+FEFF-at-byte-zero byte-order-mark exception (`31 §1f`).
+    /// Escapes remain data and therefore never produce this source-level error.
+    RawFormatCharacter { character: char, span: Span },
     /// A backslash committed the lexer to an escape production that is
     /// unrecognized for its literal kind, malformed in shape, or well-shaped
     /// with an invalid value (`31 §3`). Takes precedence over the ordinary
@@ -436,6 +440,11 @@ impl fmt::Display for ElabError {
                 f,
                 "non-ASCII identifier character {:?} at {}-{}: identifiers are ASCII-only",
                 character, span.start, span.end,
+            ),
+            ElabError::RawFormatCharacter { character, span } => write!(
+                f,
+                "raw Unicode format character U+{:04X} at {}-{}",
+                *character as u32, span.start, span.end,
             ),
             ElabError::InvalidEscape { span, reason } => {
                 write!(f, "invalid escape at {}-{}: {}", span.start, span.end, reason)

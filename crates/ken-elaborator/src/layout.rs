@@ -6,6 +6,7 @@
 
 use crate::ast::{BinOp, Decl, Expr, LetBinding, MatchArm, Type};
 use crate::error::{ElabError, Span};
+use crate::format::rewrite_format_characters_for_formatter;
 use crate::lexer::Token;
 use crate::lossless::{parse_lossless, CommentPlacement, FormattableSource};
 
@@ -321,7 +322,8 @@ pub fn format_source(source: &dyn FormattableSource) -> String {
 
 /// Parse and format one Ken compilation unit.
 pub fn format_ken(source: &str) -> Result<String, ElabError> {
-    let parsed = parse_lossless(source)?;
+    let rewrite = rewrite_format_characters_for_formatter(source);
+    let parsed = parse_lossless(rewrite.source()).map_err(|error| rewrite.original_error(error))?;
     Ok(format_source(parsed.as_ref()))
 }
 

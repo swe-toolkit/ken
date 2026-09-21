@@ -219,6 +219,12 @@ pub fn extract_ken_md(src: &str) -> Result<KenMdExtraction, ElabError> {
     })
 }
 
+fn rebase_formatter_error(error: ElabError, body_start: usize) -> ElabError {
+    crate::format::map_formatter_error_spans(error, |span| {
+        Span::new(body_start + span.start, body_start + span.end)
+    })
+}
+
 /// Format every recognized Ken fence body and splice the replacements back
 /// without touching Markdown prose or fence markers.
 pub fn format_ken_md(src: &str) -> Result<String, ElabError> {
@@ -232,8 +238,12 @@ pub fn format_ken_md(src: &str) -> Result<String, ElabError> {
         } else {
             match crate::layout::format_ken(body) {
                 Ok(formatted) => formatted,
+                Err(error @ ElabError::RawFormatCharacter { .. }) => {
+                    return Err(rebase_formatter_error(error, fence.body_range.start));
+                }
                 Err(_) if matches!(fence.role, KenMdFenceRole::Ignore | KenMdFenceRole::Reject) => {
-                    crate::format::canonicalize_lexed_tokens(body)?
+                    crate::format::canonicalize_lexed_tokens(body)
+                        .map_err(|error| rebase_formatter_error(error, fence.body_range.start))?
                 }
                 Err(ElabError::ParseError { msg, span }) => {
                     let role = match fence.role {
@@ -249,7 +259,7 @@ pub fn format_ken_md(src: &str) -> Result<String, ElabError> {
                         ),
                     });
                 }
-                Err(error) => return Err(error),
+                Err(error) => return Err(rebase_formatter_error(error, fence.body_range.start)),
             }
         };
         replacements.push((fence.body_range.clone(), replacement));
