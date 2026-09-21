@@ -1,7 +1,7 @@
 ---
 id: RT-GRAFTED-SPINE-CONTROL-GRAPH
 title: "Represent the emitted grafted spine as a typed, well-nested interprocedural control graph, produced from actual lowering rather than re-derived from a D0 projection. Behavior-inert structural precursor to RT-PLANNER-KRET-GRAFTED-SPINE's one final D0+D1+D2 attempt: it clears no ignored row and carries no behavior repair. Component boundary GraftedSpineControlGraph."
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
