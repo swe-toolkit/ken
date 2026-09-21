@@ -1,7 +1,7 @@
 ---
 id: RT-DELAYED-OWNER-CLASSIFICATION-TWO-PASS
 title: "Delay owner classification by exact two-pass lowering. SUCCESSOR TO RT-BRACKET-RELEASE-ORDER-PARITY, WHOSE OWN STOP CONDITION FIRED. D0 ran on exact clean WIP e38ff86bf and returned its STOP branch (runtime-implementer evt_6f5gw5hf02xf0, verified runtime-leader evt_75s17sf4bxdbn): there is no admissible planning-time predicate separating rt_read_offset_stage from rt_read_window_stage, because the fact Arm A needs does not yet exist where Arm A runs. static_response_phase_b_split is in planning/static_transition/responses.rs; TransportDormant is decided only in lowering/units.rs, and planning precedes lowering. The sibling identities O0 and W0 are byte-identical immediately before the split modulo planner-issued provenance atoms, yet settle InlineNoCall with one verified response-owner call versus TransportDormant with zero. Origins and operation detail would be prohibited proxies; disposition and call presence would predict an emission-time result. ARCHITECT RULED THE SHAPE at evt_493eky78hsp3h: DELAYED OWNER CLASSIFICATION BY EXACT TWO-PASS LOWERING. Hoisting is REJECTED as a cycle -- Phase B decides the response disposition that lowering consumes, so hoisting exact settlement would lower against a plan whose disposition is undecided, a planning-time approximation would create a second emission authority that D0 already proved cannot distinguish O0 from W0, and an exact hoist would itself be a provisional lowering pass, which is this mechanism under another name. THE CLEARED-ROW SPLIT IS REJECTED ON MEASUREMENT (Steward asked at evt_j1qetp1pkej9; measured and refused at evt_493eky78hsp3h): with Arm A suppressed on e38ff86bf, px8ta depth 2 stays correct on Arm B but depth 3 applies suppression eight times and restores the exact old undeclared-target refusal BEFORE ANY RELEASE VECTOR EXISTS, RestoreSelectedKTarget is preempted by that refusal, and OmitKCall applies zero times because no response-owner body exists. AC-6 depth 3, all three D2b controls and the RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED closure therefore all depend on Arm A, so no Arm-B-only candidate may be assembled and there is no partial delivery available. This node is ONE ATOMIC PRODUCT NODE carrying the entire remaining deliverable set of RT-BRACKET-RELEASE-ORDER-PARITY -- Arm A and Arm B together, both D2a controls and their mutations, writeAll, both composed depth-3 vectors, px8ta depths 2 and 3 unignored, all three D2b controls, the five section 2.3 identities, removal of the order-excluding helpers once both engines agree, and atomic closure of RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED. AN UNUSED DISCOVERY PRECURSOR IS NOT A DELIVERABLE AND MUST NOT LAND. Held at draft pending the operator lane-shape answer; this reopens artifact/mod.rs, lowering/core.rs and lowering/units.rs, which RT-BRACKET-RELEASE-ORDER-PARITY expressly fenced OUT of production scope, and that fence is lifted ONLY for the bounded orchestration and observation surface named in Scope."
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -9,18 +9,20 @@ tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Steward, 2026-09-21. Framed on Architect ruling evt_493eky78hsp3h, which answered the two asks the Steward routed at evt_j1qetp1pkej9 after D0 returned on its stop branch. RT-BRACKET-RELEASE-ORDER-PARITY reached the phase-ordering obstruction its own stop condition named and hands its remaining deliverables here; it is held at draft and closes with this node's landing. Operator fork posted at evt_74bkfrh5xsnkf: this buys one of the fourteen defect-named ignored runtime rows plus one node closure, and the Steward recommended paying it because D2 removes an order-excluding oracle and native emits acquisition order on all six reaching depth-2 nests, so parking the row leaves a live wrong-order defect standing behind an instrument blind to it."
+origin: "Steward, 2026-09-21. Framed on Architect ruling evt_493eky78hsp3h, which answered the two asks the Steward routed at evt_j1qetp1pkej9 after D0 returned on its stop branch. RT-BRACKET-RELEASE-ORDER-PARITY reached the phase-ordering obstruction its own stop condition named and hands its remaining deliverables here; it is held at draft and closes with this node's landing. Operator AUTHORIZED the restructure on the Steward recommendation (fork evt_74bkfrh5xsnkf): this buys one of the fourteen defect-named ignored runtime rows plus one node closure, and the Steward recommended paying it because D2 removes an order-excluding oracle and native emits acquisition order on all six reaching depth-2 nests, so parking the row leaves a live wrong-order defect standing behind an instrument blind to it."
 ---
 
-> # THIS NODE IS NOT STARTABLE YET. It is `draft` on purpose.
+> # AUTHORIZED AND STARTABLE. Build it.
 > #
-> # It waits on ONE operator answer: whether L1 spends a two-pass rebuild of the
-> # runtime lowering path to clear this row. The mechanism below is fully ruled
-> # and needs no further design round. **Nothing here is provisional except the
-> # authorization.**
-> #
+> # The mechanism below is fully ruled and needs no further design round.
 > # **Reaching D0's stop was a correct outcome, not a failure.** The predicate
 > # was not missed; its input does not exist at the phase that needs it.
+> #
+> # **Start from landed current `main`, not from the held WIP.** Carry your own
+> # built content forward; do not resume a branch cut before the ruling.
+> #
+> # **`D1` is a means, not a result.** It may not land except as consumed by
+> # `D2`. An unused discovery precursor is not a deliverable.
 
 ## What is settled, and where it lives
 
