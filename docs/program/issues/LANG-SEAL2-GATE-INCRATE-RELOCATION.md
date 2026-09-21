@@ -1,7 +1,7 @@
 ---
 id: LANG-SEAL2-GATE-INCRATE-RELOCATION
 title: "Move SEAL-2's producer WALK (`enumerate_producer_types`) into ken-elaborator so its completeness claim becomes enforceable for the FIRST time. The walk enforces namespace closure by destructuring `ElabEnv` with no `..`, which an integration test can do only while EVERY field is `pub` -- so the gate was structurally incapable of its own claim from the day it was written, and held only by the accident that no field was private yet. `ElabEnv` now holds a `pub(crate)` field permanently, so the walk moves in-crate or its completeness claim is abandoned. Carries a second, SMALLER deliverable: a twenty-line private non-test destructure in lib.rs that fires at `cargo check`. The two are deliberately in ONE node so closing the cheap one cannot be read as buying the expensive one."
-status: ready
+status: merged
 owner: language
 size: M
 gate: none

@@ -1,7 +1,7 @@
 ---
 id: RT-PX7F-LINKED-PUBLIC-ROWS
 title: "Clear the two px7f linked-public rows. Both trap at runtime with UnclassifiedRuntimeTrap { terminal_value: -1 }; AC-3 of the census established that a process-mode compile emits four require_nonzero checks into the entry adapter via define_root_adapter, gated on the compile lane and not the body -- a property shared with every process-mode row in the workspace, so it does not individuate these two. WHICH of the four checks fires on each row is unmeasured, and that measurement is step one of this node, not its deliverable. DELIVERABLE IS THE ROWS, per AC-2: each row is either un-ignored and green in CI, or still #[ignore]d with a reason string that OPENS with the ID of whoever owns the row NEXT -- the successor's ID when a live successor exists, otherwise this node's own ID stating which check fires and why it is terminal. The relabel branch is first-class and is NOT a terminal refusal. If the two rows fire different checks the grouping is wrong, and saying so is a result, not a failure."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
