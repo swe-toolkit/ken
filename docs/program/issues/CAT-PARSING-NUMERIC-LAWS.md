@@ -89,25 +89,63 @@ the worker started at `Zero`.
 prove that `parse_digits_at` returns `Ok` on any list satisfying it. The
 predicate is local to this package and adds no trust.
 
+**The public-signature arm is RULED.** Architect `evt_2yxag35v29bnp` settled
+it; that ruling is operative and this section carries its content, not a
+pointer to it. Preserve the exact public equations; do NOT publish the private
+error representation and do NOT substitute weaker public shadows.
+
+Keep private: `NumericErrorKind`, `EmptyInput`, `InvalidDigit`,
+`numeric_error_code`, `numeric_diagnostic`. Retain the Tier-D private-inventory
+assertions naming them.
+
+Publish exactly these six direct names, because the public equations depend on
+them: `numeric_empty_input_code` and `numeric_invalid_digit_code` (both
+`DiagnosticCode`), `numeric_zero_accumulator`, `numeric_decimal_base` and
+`numeric_minus_code` (all `Int`), and `pub fn negate_parsed`.
+
+**One production body changes, and only one.** `numeric_error_code` consumes
+the two public code constants instead of rebuilding `MkDiagnosticCode` literals.
+This is behavior-preserving and it is load-bearing, not tidying: the Architect
+probed the alternative and publishing the constants WITHOUT this redirect reds
+`invalid_digit` with `Refl: the two sides of the goal are not convertible`. The
+four public error-law types then use the public closed form
+(`MkDiagnostic (locate position) numeric_invalid_digit_code`, and the `Zero` /
+`Suc Zero` forms with `numeric_empty_input_code`), including the matching
+`MkDiagnostic` in the corresponding `J` motive branch. Private proof bodies and
+private AC witnesses may keep using private helpers where their own types do
+not escape.
+
 **Two files, and the second is required, not optional.** The package file, plus
 `crates/ken-elaborator/tests/cat_tier_d_parsing_group_import.rs`, whose
 `parsing_numeric_loader_visible_inventory_is_exact` (`:316`) pins an exact
-eight-name `assert_eq!` against `published_module_surfaces` and then builds an
-import list from that same set at `:332`. D0's attached members cannot leave
-that pin green, so the candidate carries a NAMED-SET delta to it. **A count
-re-pin is not acceptable** -- show the delta is exactly the intended names.
+`assert_eq!` against `published_module_surfaces` and then builds an import list
+from that same set at `:332`. That pin moves from eight names to **exactly 23**:
+14 direct and nine attached. **A count re-pin is not acceptable** -- the delta
+is these names and no others.
 
-Follow the landed precedent rather than inventing a shape:
-`crates/ken-elaborator/tests/cc1_nonempty_validation_acceptance.rs` solved this
-for `CAT-NONEMPTY-APPEND-HEAD-LEFT` by adding the attached name to the
-published-surface expectation while EXCLUDING `::`-bearing names from the
-import list, because an attached proof is not a `::`-selectable import token.
-Nothing else in the Tier-D file moves: no other assertion, no `#[ignore]`, no
-second test.
+The six added direct names are `negate_parsed`, `numeric_decimal_base`,
+`numeric_empty_input_code`, `numeric_invalid_digit_code`, `numeric_minus_code`,
+`numeric_zero_accumulator`, joined to the eight already landed.
+
+The nine attached identities are `parse_digits_at::{accepted_digit, empty,
+invalid_digit}`, `parse_int_chars::{bare_sign, empty, signed, unsigned}`, and
+`parse_nat_chars::{empty, nonempty}`.
+
+The generated direct-import token list filters only names containing `::`,
+leaving the 14 direct names, because an attached law travels with its selected
+public subject and is not a literal `subject::proof` import token. This is the
+landed pattern from `cc1_nonempty_validation_acceptance.rs`. Nothing else in
+the Tier-D file moves: no other assertion, no `#[ignore]`, no second test.
+
+The Architect ran this exact closure against held WIP `b6ba73b85` in a scratch
+worktree: the inventory test passed, asserting the 23-name set and importing
+the 14 direct names together.
 
 Beyond those two files: no new function on the parse path, import, module,
 instance, primitive, postulate, `Axiom`, or trusted entry. `trusted_base()`
-delta stays zero and the format direction is byte-unchanged.
+delta stays zero and the format direction is byte-unchanged. D1 remains private
+and unchanged. Public API and trust prose state the six direct contract names
+and the nine attached laws explicitly.
 
 ## Acceptance criteria
 
@@ -133,7 +171,8 @@ without recursion is pinning the `Nil` case and nothing else.
 
 ## Stop condition
 
-Hand back rather than work around if either holds:
+Hand back rather than work around if any of these holds. The third is already
+ruled and is listed so nobody re-opens it.
 
 - **A law cannot be stated without an `Int` ordering or value fact.** Do not
   add an `Axiom`, do not introduce a bounded digit table, and do not
@@ -143,14 +182,19 @@ Hand back rather than work around if either holds:
   makes an import a fleet-visible change, not a local one. Report it; the
   frame amendment is the Steward's.
 - **An exact public D0 signature needs a currently-private Numeric name.**
-  `numeric_diagnostic`, `EmptyInput`/`InvalidDigit` and the named `Int`
-  literals are private, and the surface parser rejects inlining them into a
-  public proof type. Publishing them, or weakening the public claim while the
-  exact equation stays private, changes the package's published surface. That
-  is the **Architect's** call, not the ring's and not the Steward's: stop and
-  route it. If the chosen arm makes a public law weaker than the private
-  equation it names, that asymmetry is stated in the package rather than left
-  for a reader to find.
+  **RULED AND DISCHARGED** by Architect `evt_2yxag35v29bnp`; the Deliverable
+  now carries the authorized arm. This is no longer an open stop. Do not
+  re-raise it, and do not choose a different arm.
+
+## Hard-stop accounting
+
+Per-chain `§1a` count for `(CAT-PARSING-NUMERIC-LAWS, public attached-D0
+signature closure)` is **1**, advanced by `evt_2yxag35v29bnp`. Symptom entry 1
+is recorded in exact child `2f829d3d224fc9e571177c6023915fd519dd09a1`: the
+exact public laws were keyed on provider-private implementation identities
+rather than a closed public contract. The next `§1a` Research trigger and
+`§1b` predicate check are both at 3. The WIP audit at `evt_13fhszfz31sqk` was
+not a stop and did not count.
 
 ## Not this node
 
