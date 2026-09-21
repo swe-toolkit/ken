@@ -44,6 +44,8 @@ fn public_surface() -> BTreeSet<String> {
         "schema_issue_origin",
         "schema_issue_code",
         "schema_validate_fields",
+        "schema_validate_fields::accepted_tail_invalid",
+        "schema_validate_fields::valid_coverage",
         "schema_validate",
         "schema_help",
     ])
@@ -202,7 +204,7 @@ fn schema_selective_import_ledger_is_exact() {
         ),
         (
             "Data.Collections.Derived".to_string(),
-            names(&["list_append"]),
+            names(&["list_append", "nth"]),
         ),
         (
             "Data.Collections.NonEmpty".to_string(),
@@ -218,12 +220,13 @@ fn schema_selective_import_ledger_is_exact() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the roots loader queries every declaration and constructor and a
-/// real selective-import client resolves exactly the 26-name ArgParse/Decoder
-/// union to canonical Schema identities. CLAIMED: Schema publishes precisely
-/// its two real clients' usable carrier, constructor, accessor, and traversal
-/// surface. THE GAP: publication queries do not prove provider provenance,
-/// which the sibling checked-core identity test measures independently.
+/// MEASURED: the roots loader observes an exact 28-name published inventory:
+/// 26 directly selectable surfaces plus two attached proofs. A real selective-
+/// import client resolves all 26 direct names to canonical Schema identities,
+/// and each attached proof's subject is present in that selector set. CLAIMED:
+/// Schema publishes precisely this carrier, constructor, accessor, traversal,
+/// and attached-proof surface. THE GAP: this arm does not independently exercise
+/// expression-level attached-proof resolution through an imported subject alias.
 #[test]
 fn schema_loader_visible_inventory_is_exact() {
     let expected = public_surface();
@@ -237,7 +240,22 @@ fn schema_loader_visible_inventory_is_exact() {
         .iter()
         .map(|surface| (surface.clone(), env.globals[&format!("{SCHEMA}.{surface}")]))
         .collect::<BTreeMap<_, _>>();
-    let selections = expected
+    let direct_surfaces = expected
+        .iter()
+        .filter(|surface| !surface.contains("::"))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for attached in expected.iter().filter(|surface| surface.contains("::")) {
+        let subject = attached
+            .split_once("::")
+            .expect("attached Schema surface must name its subject")
+            .0;
+        assert!(
+            direct_surfaces.contains(subject),
+            "attached Schema surface {attached} requires direct subject {subject}"
+        );
+    }
+    let selections = direct_surfaces
         .iter()
         .enumerate()
         .map(|(index, surface)| format!("{surface} as cat_tier_e_schema_{index}"))
@@ -268,6 +286,7 @@ fn schema_checked_provider_identity_closure_is_exact() {
         "Capability.Formatting.Doc.Doc",
         "Capability.Formatting.Doc.Text",
         "Data.Collections.Derived.list_append",
+        "Data.Collections.Derived.nth",
         "Data.Collections.NonEmpty.NonEmpty",
         "Data.Collections.NonEmpty.nonempty_append",
         "Data.Collections.NonEmpty.nonempty_cons",
@@ -317,10 +336,12 @@ fn schema_checked_provider_identity_closure_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: standalone roots loading preserves trust, class, and instance
-/// populations while all twelve non-client helpers reject through real external
-/// selective imports. CLAIMED: Schema's migration changes only dependency and
-/// usable-client visibility. THE GAP: exact body preservation is a one-shot
-/// object diff rather than a permanent source-text test.
+/// populations while all twelve pre-existing non-client operational helpers
+/// reject through real external selective imports. The exact public-inventory
+/// arm closes over the added private theorem helpers. CLAIMED: Schema's migration
+/// changes only dependency and usable-client visibility. THE GAP: exact body
+/// preservation is a one-shot object diff rather than a permanent source-text
+/// test.
 #[test]
 fn schema_publication_is_visibility_only() {
     let (mut env, _, _) = load_schema();
