@@ -1,7 +1,7 @@
 ---
 id: LANG-FOREIGN-NAME-FORMAT-CHARS
 title: "whole-source lexical policy for Unicode Cf format characters (bidi overrides, zero-width joiners, U+FEFF) -- a Trojan-Source lint over ALL Ken source (comments and string literals, and identifiers once blessed letters land), NOT a check at the two `foreign`-name sites, because a bidi override is expressible anywhere in source and the deception is of a human reading it"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
