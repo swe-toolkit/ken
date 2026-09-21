@@ -211,17 +211,135 @@ pub(in crate::cranelift_backend) struct GraftedSpineQuery {
     pub(in crate::cranelift_backend) summaries: Vec<GraftedSpineRealizableSummary>,
 }
 
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GraftedSpineValidationMutation {
+    Exact,
+    SubstituteExpectedSource {
+        member: u32,
+        original: u32,
+        replacement: u32,
+    },
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct GraftedSpineObservedTerminal {
+    pub member: u32,
+    pub body: u32,
+    pub node: String,
+    pub control_word: Option<u64>,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GraftedSpineValidationObservation {
+    pub member: u32,
+    pub expected_source: u32,
+    pub outcome: Result<(), String>,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GraftedSpineActualLoweringObservation {
+    pub topology: Vec<String>,
+    pub terminals: Vec<GraftedSpineObservedTerminal>,
+    pub validations: Vec<GraftedSpineValidationObservation>,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static GRAFTED_SPINE_VALIDATION_MUTATION:
+        std::cell::Cell<Option<GraftedSpineValidationMutation>> = const {
+            std::cell::Cell::new(None)
+        };
+    static GRAFTED_SPINE_VALIDATION_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static GRAFTED_SPINE_ACTUAL_LOWERING_OBSERVATIONS:
+        std::cell::RefCell<Vec<GraftedSpineActualLoweringObservation>> = const {
+            std::cell::RefCell::new(Vec::new())
+        };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+pub fn with_grafted_spine_validation_mutation<T>(
+    mutation: GraftedSpineValidationMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<GraftedSpineActualLoweringObservation>, usize) {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            GRAFTED_SPINE_VALIDATION_MUTATION.with(|active| active.set(None));
+            GRAFTED_SPINE_VALIDATION_MUTATION_APPLICATIONS.with(|count| count.set(0));
+            GRAFTED_SPINE_ACTUAL_LOWERING_OBSERVATIONS
+                .with(|observations| observations.borrow_mut().clear());
+        }
+    }
+
+    GRAFTED_SPINE_ACTUAL_LOWERING_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().clear());
+    GRAFTED_SPINE_VALIDATION_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    GRAFTED_SPINE_VALIDATION_MUTATION.with(|active| active.set(Some(mutation)));
+    let reset = Reset;
+    let result = operation();
+    let observations = GRAFTED_SPINE_ACTUAL_LOWERING_OBSERVATIONS
+        .with(|recorded| std::mem::take(&mut *recorded.borrow_mut()));
+    let applications = GRAFTED_SPINE_VALIDATION_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(reset);
+    (result, observations, applications)
+}
+
+fn prepare_validation_inputs(
+    validation_inputs: impl IntoIterator<Item = (StaticOriginId, StaticOriginId)>,
+) -> Vec<(StaticOriginId, StaticOriginId)> {
+    #[allow(unused_mut)]
+    let mut inputs = validation_inputs
+        .into_iter()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    if let Some(mutation) = GRAFTED_SPINE_VALIDATION_MUTATION.with(std::cell::Cell::get) {
+        for (member, expected_source) in &mut inputs {
+            match mutation {
+                GraftedSpineValidationMutation::Exact => {}
+                GraftedSpineValidationMutation::SubstituteExpectedSource {
+                    member: selected_member,
+                    original,
+                    replacement,
+                } if member.observation_ordinal() == selected_member
+                    && expected_source.observation_ordinal() == original =>
+                {
+                    *expected_source = StaticOriginId::for_validation_observation(replacement);
+                    GRAFTED_SPINE_VALIDATION_MUTATION_APPLICATIONS.with(|count| {
+                        count.set(
+                            count
+                                .get()
+                                .checked_add(1)
+                                .expect("the grafted-spine validation mutation count fits usize"),
+                        )
+                    });
+                }
+                GraftedSpineValidationMutation::SubstituteExpectedSource { .. } => {}
+            }
+        }
+    }
+    inputs
+}
+
 /// Artifact-wide graph builder. Its expected population is the declaration
 /// bundle, while its observed population is the five body-definition passes.
 #[derive(Default)]
 pub(in crate::cranelift_backend) struct GraftedSpineControlGraphBuilder {
     expected: BTreeSet<GraftedSpineFunctionScope>,
+    validation_inputs: Vec<(StaticOriginId, StaticOriginId)>,
     functions: BTreeMap<GraftedSpineFunctionScope, GraftedSpineFunctionGraph>,
 }
 
 impl GraftedSpineControlGraphBuilder {
     pub(in crate::cranelift_backend) fn new(
         expected: impl IntoIterator<Item = GraftedSpineFunctionScope>,
+        validation_inputs: impl IntoIterator<Item = (StaticOriginId, StaticOriginId)>,
     ) -> Result<Self, CraneliftBackendError> {
         let mut closed = BTreeSet::new();
         for scope in expected {
@@ -233,6 +351,7 @@ impl GraftedSpineControlGraphBuilder {
         }
         Ok(Self {
             expected: closed,
+            validation_inputs: prepare_validation_inputs(validation_inputs),
             functions: BTreeMap::new(),
         })
     }
@@ -451,7 +570,13 @@ impl GraftedSpineControlGraphBuilder {
 
     pub(in crate::cranelift_backend) fn finish(
         self,
-    ) -> Result<GraftedSpineControlGraph, CraneliftBackendError> {
+    ) -> Result<
+        (
+            GraftedSpineControlGraph,
+            Vec<(StaticOriginId, StaticOriginId)>,
+        ),
+        CraneliftBackendError,
+    > {
         let observed = self.functions.keys().copied().collect::<BTreeSet<_>>();
         if observed != self.expected {
             return Err(graph_error(format!(
@@ -463,7 +588,7 @@ impl GraftedSpineControlGraphBuilder {
             functions: self.functions,
         };
         graph.validate()?;
-        Ok(graph)
+        Ok((graph, self.validation_inputs))
     }
 }
 
@@ -490,6 +615,65 @@ impl ReachState {
 }
 
 impl GraftedSpineControlGraph {
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    pub(in crate::cranelift_backend) fn observe_actual_lowering_validation(
+        &self,
+        validation_inputs: impl IntoIterator<Item = (StaticOriginId, StaticOriginId)>,
+    ) {
+        if GRAFTED_SPINE_VALIDATION_MUTATION
+            .with(std::cell::Cell::get)
+            .is_none()
+        {
+            return;
+        }
+        // The sorted first planner row is stable across the two compilations.
+        // Its expected source was already captured (and, for the second run,
+        // mutated) before any emitted Function entered the graph builder.
+        let validations = validation_inputs
+            .into_iter()
+            .next()
+            .into_iter()
+            .map(
+                |(member, expected_source)| GraftedSpineValidationObservation {
+                    member: member.observation_ordinal(),
+                    expected_source: expected_source.observation_ordinal(),
+                    outcome: self
+                        .query(member, expected_source)
+                        .map(|_| ())
+                        .map_err(|error| error.to_string()),
+                },
+            )
+            .collect();
+        let terminals = self
+            .functions
+            .values()
+            .flat_map(|function| {
+                function
+                    .terminals
+                    .iter()
+                    .map(|terminal| GraftedSpineObservedTerminal {
+                        member: terminal.member.observation_ordinal(),
+                        body: terminal.body.observation_ordinal(),
+                        node: format!("{:?}", terminal.node),
+                        control_word: terminal.control_word,
+                    })
+            })
+            .collect();
+        GRAFTED_SPINE_ACTUAL_LOWERING_OBSERVATIONS.with(|observations| {
+            observations
+                .borrow_mut()
+                .push(GraftedSpineActualLoweringObservation {
+                    topology: self
+                        .typed_edges()
+                        .into_iter()
+                        .map(|edge| format!("{edge:?}"))
+                        .collect(),
+                    terminals,
+                    validations,
+                })
+        });
+    }
+
     fn validate(&self) -> Result<(), CraneliftBackendError> {
         for function in self.functions.values() {
             for call in &function.calls {
@@ -698,19 +882,6 @@ impl GraftedSpineControlGraph {
         expected_source: StaticOriginId,
     ) -> Result<GraftedSpineQuery, CraneliftBackendError> {
         self.validate()?;
-        let terminals = self
-            .functions
-            .values()
-            .flat_map(|function| function.terminals.iter())
-            .filter(|terminal| terminal.member == member)
-            .collect::<Vec<_>>();
-        let [terminal] = terminals.as_slice() else {
-            return Err(graph_error(format!(
-                "member {member:?} has {} independently observed terminals instead of one",
-                terminals.len()
-            )));
-        };
-        self.validate_terminal_control_words(terminal.node)?;
         let seeds = self
             .functions
             .values()
@@ -729,6 +900,19 @@ impl GraftedSpineControlGraph {
                 "member {member:?} has no actual seed edge at expected source {expected_source:?}"
             )));
         }
+        let terminals = self
+            .functions
+            .values()
+            .flat_map(|function| function.terminals.iter())
+            .filter(|terminal| terminal.member == member)
+            .collect::<Vec<_>>();
+        let [terminal] = terminals.as_slice() else {
+            return Err(graph_error(format!(
+                "member {member:?} has {} independently observed terminals instead of one",
+                terminals.len()
+            )));
+        };
+        self.validate_terminal_control_words(terminal.node)?;
         let (state, summaries) = self.reachability()?;
         for seed in &seeds {
             let reached = &state[&seed.call];
@@ -1074,7 +1258,7 @@ mod tests {
     }
 
     #[test]
-    fn validation_inputs_do_not_change_topology_or_terminal_observation() {
+    fn query_inputs_do_not_mutate_a_finished_synthetic_graph() {
         let graph = two_path_graph();
         let before_edges = graph.typed_edges();
         let before_terminals = graph

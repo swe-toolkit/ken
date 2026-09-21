@@ -101,6 +101,13 @@ pub use lowering::{
     ComposedReturnRetSinkObservation,
 };
 #[cfg(feature = "px8-ds-test-support")]
+pub use grafted_spine_control_graph::{
+    with_grafted_spine_validation_mutation, GraftedSpineActualLoweringObservation,
+    GraftedSpineObservedTerminal, GraftedSpineValidationMutation,
+    GraftedSpineValidationObservation,
+};
+
+#[cfg(feature = "px8-ds-test-support")]
 pub use lowering::source::{
     checked_ih_generated_entry_capsule_mutation_is_exact,
     with_checked_ih_generated_entry_capsule_mutation,

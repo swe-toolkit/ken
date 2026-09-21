@@ -2655,6 +2655,27 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         boundary_value_abi: &boundary_value_abi,
     };
     let root_function_local = helpers.declare_in_func(&mut module, &mut ctx.func, None);
+    // Independent validation inputs are captured before graph construction.
+    // They remain opaque to every emission operation and are consumed only by
+    // the finished graph query, so AC-3 can vary one across whole compilations.
+    let grafted_spine_validation_inputs = static_transition_plan
+        .static_response_feasibility_ledger_all()?
+        .map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(),
+                infeasible.reason(),
+            ))
+        })?
+        .iter()
+        .map(|row| (row.vis_origin(), row.producer_call_origin()))
+        .chain(
+            static_transition_plan
+                .static_response_deferred()
+                .iter()
+                .map(|row| (row.vis_origin(), row.producer_call_origin())),
+        )
+        .collect::<BTreeSet<_>>();
     let mut compiler = Lowering {
         continuation_claims: None,
         fusion_compositions: None,
@@ -2676,6 +2697,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         declarations,
         grafted_spine_builder: Some(GraftedSpineControlGraphBuilder::new(
             unit_bundle.grafted_spine_scope_population(),
+            grafted_spine_validation_inputs,
         )?),
         grafted_spine_graph: None,
         static_transition_plan,

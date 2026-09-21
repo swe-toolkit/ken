@@ -45,7 +45,16 @@ impl StaticOriginId {
         Self(id)
     }
 
-    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    pub(in crate::cranelift_backend) const fn for_validation_observation(id: u32) -> Self {
+        Self(id)
+    }
+
+    #[cfg(any(
+        test,
+        feature = "checked-ih-realization-observation",
+        feature = "px8-ds-test-support"
+    ))]
     pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
         self.0
     }

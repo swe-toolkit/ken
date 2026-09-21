@@ -455,7 +455,12 @@ impl Lowering<'_> {
         let builder = self.grafted_spine_builder.take().ok_or_else(|| {
             backend_module("the grafted-spine builder was already closed".to_string())
         })?;
-        self.grafted_spine_graph = Some(builder.finish()?);
+        let (graph, validation_inputs) = builder.finish()?;
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        graph.observe_actual_lowering_validation(validation_inputs);
+        #[cfg(not(any(test, feature = "px8-ds-test-support")))]
+        drop(validation_inputs);
+        self.grafted_spine_graph = Some(graph);
         Ok(())
     }
 }
