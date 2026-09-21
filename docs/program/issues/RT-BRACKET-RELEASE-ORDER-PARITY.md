@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-RELEASE-ORDER-PARITY
 title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: a BOUNDED AUTHORITY-SEED predicate in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong. ARM A CORRECTED at evt_76nkdg0h81xnw (hard stop 2 / symptom entry 2) after the ring measured that per-group exclusive eligibility does NOT fix its own control: the governed ResourceRelease responses sit in the MIXED group that the original text fenced at >= 2, and the causal probe worked by promoting exactly that P1-free mixed group, so one exclusive group now seeds authority for its P1-free mixed dependent on a single-exclusive plane only. HARD STOP 3 RULED at evt_6c900nagc7mn4 adopting Research advisory evt_5p5jn87bmwpcc: the complete two-arm repair makes the px8ta row pass strict LIFO at BOTH depths and removes its depth-3 ContinuationSpecialization refusal, and that is LAWFUL ELIMINATION of the route that formed the failing claim -- not a newly satisfied lookup and not a weakened guard, since Arm A cannot add the absent identity key to function_local.continuation_calls. RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED is therefore SUBSUMED and closes atomically with this product, THIS NODE NOW CLEARS LEDGER ROW 9, neither arm may be narrowed to preserve the refusal, and core.rs/units.rs stay outside production scope. HARD STOP 4 RULED at evt_24nwhvgacvy28: running the two fixtures section 2.3 named UNMEASURED found a real Arm-A regression -- fs_read_at_malformed_window_narrows_to_invalid_bounds refuses before execution with 'a forward-declared response owner has no verified selected incoming call' on WIP aa1cfc6a1 while passing on c28bc8305. The closeout is CORRECT and Arm A confuses BINDING authority with CALL authority: checked-IH transport membership and group shape establish that the planner MAY install the candidate environment, not that this artifact emits its call, and the unsettled candidate becomes TransportDormant. Arm A's reach is narrowed by a required per-selected-caller liveness proof, and D0 must prove that boundary is available at classification time BEFORE any implementation -- if no planning-available fact separates rt_read_offset_stage from rt_read_window_stage without predicting an emission-time result, the work STOPS and returns to the Steward as a separately sized restructure. Stop-3 is NOT reopened."
-status: ready
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,32 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-03; RECUT 2026-09-18 twice. Original filing: scope-call disposition of the Q2 finding the Architect routed to the Steward (Architect evt_66q0njbd8qjf1, runtime thread thr_13yeftxjnxz2z). While building R3 for RT-COMPOSED-RETURN-FORWARD-RET-EDGE (b2), the runtime-implementer found the parity oracle still fails all five composed-return fixtures on RESOURCE RELEASE ORDER: interp releases resource1 then resource2, native releases 2 then 1. A decisive STRUCTURAL check (runtime-implementer evt_5merj95jgakap; Architect CONCUR evt_66q0njbd8qjf1) EXONERATES R3: the captured-environment carrier is built as worker.captures in POSITION order (emit_checked_ih_captured_environment aggregates.rs:3848-3865, field ordinal N = capture N) and R3 projects emit_carrier_field(carrier, ordinal) at that same ordinal (the landed Direct route's convention, core.rs:7893), so R3 threads the file/buffer handles in PLANNER order and is NOT a capture-ordinal permutation. The divergence is downstream in bracket teardown, outcome-independent, pre-existing (these five fixtures previously base-trapped before reaching teardown, so it was invisible), and orthogonal to the composed-return object. FIRST RECUT (Architect evt_71r7rzjzepckc) split the node into SIBLING and NESTED shapes. SECOND RECUT WITHDRAWS THAT SPLIT: the Steward opened the fixtures and there is no sibling shape -- rt_parity_native.rs:184 is withResource wrapping withBuffer and :336 is withResource/withResource/withBuffer three deep, each combinator takes exactly one acquisition and one body (38-ffi-io.md:411-413), and the repo's own helper names say it (rt_inner_bracket_result, rt_file_bracket_result). 'A two-resource bracket' was loose prose in the 2026-09-03 filing meaning a bracket NEST holding two resources; the Architect read it as one bracket holding two and the Steward wrote the first recut on that reading. Architect withdrew the split at evt_1byx3327ppasg. Coordinates re-measure at the build SHA; b2 branch WIP was 430350cff at the finding."
 ---
+
+> # STOPPED. THIS NODE'S OWN STOP CONDITION FIRED, AND IT HANDS OFF.
+> #
+> # **Do not start implementation here.** `D0` ran on exact clean WIP
+> # `e38ff86bf` and returned its STOP branch (`evt_6f5gw5hf02xf0`, verified
+> # `evt_75s17sf4bxdbn`): no admissible planning-time fact separates
+> # `rt_read_offset_stage` from `rt_read_window_stage`, because
+> # `static_response_phase_b_split` runs in `planning/` and `TransportDormant`
+> # is decided only in `lowering/units.rs`. That is the phase-ordering
+> # obstruction this frame named, and reaching it was a CORRECT outcome.
+> #
+> # **The remaining deliverables moved to
+> # `RT-DELAYED-OWNER-CLASSIFICATION-TWO-PASS`**, which carries them as ONE
+> # atomic node and closes this one on landing. Architect ruling
+> # `evt_493eky78hsp3h`.
+> #
+> # **NO ARM-B-ONLY CANDIDATE MAY BE ASSEMBLED FROM `e38ff86bf`.** The Steward
+> # asked to split so the row could clear now (`evt_j1qetp1pkej9`); the
+> # measurement refused it. Under Arm-A suppression px8ta depth 3 restores the
+> # old undeclared-target refusal before any release vector exists, so `AC-6`
+> # at depth 3, all three `D2b` controls and the `AC-9` closure all depend on
+> # Arm A. **There is no partial delivery available here.**
+> #
+> # Everything below remains the settled record and is cited by the successor.
+> # Section 3's scope fence on `core.rs`/`units.rs` is lifted ONLY there, and
+> # only for the bounded surface that frame names.
 
 > # BOTH MEASUREMENT ROUNDS CLOSED; ARCHITECT HAS RULED THE CAUSE.
 > #
