@@ -16,19 +16,11 @@ These rulings remain operative and are retained verbatim.
 - **2026-08-25:** "there are three lanes authorized right now. language (lane
   2) was unblocking rt on priority, and when that was done should have unblocked
   foundation (lane 3) with module/import."
-- **2026-09-05:** "btw the trial is over. 3 lanes works with some contention.
-  retire the idea that there is still a trial running."
 
 ## Live objective direction
 
-- **2026-09-12, Route B:** L2's next deliverable is
-  `LANG-ACTIVE-PREMISE-KERNEL-VIEW`, the contextual kernel-query boundary split
-  out of `LANG-TRANSPORT-SIGMA-PREMISE-SYNTHESIS`. **Discharged — that node is
-  merged.**
-- **2026-09-19, "g then remeasure":** selects option (g) on the A1 re-baseline
-  fork and directs that the measurement follow the repair. **DISCHARGED — both
-  halves landed at `6a36cfbdd`.** L2 has no live operator objective; see its
-  row for the standing direction I sequenced it against.
+- **L2 has no live operator objective** (Route B and "g then remeasure" both
+  discharged); see L2's row.
 
 ## Catalog proof direction
 
@@ -47,10 +39,20 @@ These rulings remain operative and are retained verbatim.
   the top priority until it is done."
 - **2026-09-19:** "It is too slow. You need to streamline the process and focus
   on forward movement, not management."
+- **2026-09-21, how to read L1 difficulty:** clearing ignored tests "is
+  fundamentally about closing gaps left during initial implementation. Because
+  these were left it is expected that at least some of the underlying issues
+  are difficult ... and this difficulty could be indicative of fundamental
+  weakness in the implementation and lead to restructuring."
 
-The 2026-09-19 ruling means frames stay short; investigation is the first step
-of a repair, not a separate report node; label and wording hygiene do not enter
-a lane.
+**RESTRUCTURING IS ADMISSIBLE; difficulty is the signal, not a reason to
+restate the objective.** Zero rows cleared plus N structural findings is not
+zero progress. But "could be indicative" is a prior: a minimal correct repair
+still wins when the structure says so, and restructuring returns to me to size
+as its own node. SUPERSEDES escalation `evt_5vkyp3sekgq0h`.
+
+That means frames stay short, investigation is the first step of a repair
+rather than a separate report node, and wording hygiene does not enter a lane.
 
 ## Authorized roster
 
@@ -67,9 +69,9 @@ ring starts without an operator lane change.
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-PX7F-LINKED-PUBLIC-ROWS` -- `ready`, M, T1, gate none, frame landed; released, and the landing it was waiting on cleared at `a17235098` | None framed. Select the next ignored-row node from the deep `ready` RT backlog when PX7F lands; do NOT frame a new one | `RT-PLANNER-KRET-GRAFTED-SPINE` is PARKED `draft` by Architect stop-16 disposition `evt_3h3dqjet1wx3q`, landed `a17235098`. Counts are 16 hard stops / 17 symptom entries; the next Research trigger is 18 and the next predicate check is 18, so neither fires. Reopening requires a separately framed architecture decision grounded on then-current `main`, NOT a successor search or another attempt. `4f6b2a454786dd66eb2a1eb9681913e1e4f69b9d` is evidence only and is never a candidate. |
-| L2 | language | Language surface. The operator's 2026-08-25 "unblock foundation with module/import" direction is DISCHARGED -- all 13 `LANG-MOD-*` members AND `CAT-GCD-REFACTOR` are `merged`; the root `LANG-MODULE-IMPORT-SYSTEM` sits `draft` only because a campaign root is never itself released | `LANG-SEAL2-GATE-INCRATE-RELOCATION` -- promoted `ready` and framed in this commit. M, T2, gate none, `depends_on` empty. Architect review NOT owed; design fully ruled at `evt_6b39fyc17xzm1`, `evt_x1b90s36dtc2`, `evt_1se8wycskre80` | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` -- `draft`, now the only pool member. Re-measure its premise before promoting; do NOT frame a new node | `LANG-R-LAYER-EXPORT-RETRACTION` LANDED `8fd30c13a`, 38/38 blobs verified; the lieutenant holds its M7 status closeout in a bounded batch, which is M9 and not mine. SEAL2 released on its own recorded condition -- it was `draft` by PRIORITY only and never technically blocked. Premise re-measured at `a17235098` and it HOLDS: `ElabEnv` carries 15 `pub` fields and exactly one `pub(crate)` field, `standard_operators` at `lib.rs:173`, crate-internal BY CONTRACT and permanent, so the walk's `..` cannot be retired from an integration test. |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-CONFIGURATION-DECODER-LAWS` -- `ready`; respin `3c722a5ffefbc15c5fb7866417f71a13a4250f29` QA-approved at `evt_2s2m16ykx8smv` but NOT merge-authorized by me. M, T1 | `CAT-PARSING-CURSOR-LAWS` -- ALREADY FRAMED `ready`, L, T1; all three `depends_on` are `merged`. Kick when DECODER closes. Do NOT frame a successor -- one exists | **Blocked on an Architect ordering precondition the sanctioned tooling cannot satisfy.** Change request `evt_5e9zs7zaatyvf` requires remote exact-SHA CI history BEFORE a renewed verdict, but `scripted-pr-automerge.sh` takes six flags with no establish-only mode and pushes, opens the PR, polls checks and merges on green in one sequence (`:292`, `:298`, `:823`, `:869`); only a RED run exits first (`:841`). Fork put to the Architect at `evt_5wvy943z7cx72`: (a) verdict on local exact-SHA evidence, CI still gating the merge inside M5, or (b) hold for an operator-authorized establish-only mode. Respin against dead `6b900762` measured line-multiset IDENTICAL, 1148 lines both sides, one file -- a pure permutation, no content added or edited. |
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-BRACKET-RELEASE-ORDER-PARITY` -- `ready`, M, T1. `D0c`+`D0c-2` both CLOSED: 6 reaching depth-2 native nests WRONG, 2 reaching depth-3 CORRECT; mode, inner-kind, outer-kind, homogeneity, combinator and read-vs-write all dead. **ARCHITECT RULED `evt_4t14zmba83hjm`: depth is the SELECTOR, the cause is planner classification** -- a bounded bracket-settlement continuation left on the unowned Deferred forward-`Ret` route. `D1a` AUTHORIZED only as two required arms (per-group exclusive eligibility in `static_response_phase_b_split`; `release_only_suffix` third class in `bounded_deferred_response_suffix`), each mutation-proved by its own control. `D0a` AFFIRMED `evt_17kyxq7q5v8ar` | None framed. 30 `ready` RT nodes exist but `status: ready` is a claim about a node, NOT evidence about the tree -- run `git log --oneline origin/main --grep=<NODE-ID>` before selecting. Do NOT frame a new one | Recut carrying the envelope must LAND before runtime-leader releases `D1a`; the Architect holds its inventory child until then. Objective reachability ANSWERED by the operator 2026-09-21 (see Runtime direction); `evt_5vkyp3sekgq0h` superseded. `RT-PLANNER-KRET-GRAFTED-SPINE` PARKED `draft` by stop-16 `evt_3h3dqjet1wx3q`. |
+| L2 | language | **Language surface. NO live operator objective** -- Route B and "g then remeasure" both discharged | **NONE. `LANG-SEAL2-GATE-INCRATE-RELOCATION` LANDED `c2eca6e41`** (5 blobs verified by identity). The lane is DARK | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` -- `draft`, the only live candidate. Its deferral premise HAS dissolved (`RT-DESCENT-RETIRE` merged; all 16 `V3-FO-*` merged/closed) | **Operator fork OPEN at `evt_1py9jhvehv77c`.** My earlier D0-only default is WITHDRAWN -- D0 alone is a census node, which §1 and the watchdog both forbid, and the node itself says D1 is not the ring's to decide. What makes it worth doing is that settling it lifts the Architect's standing no-new-citation-bearing-labels prohibition (`evt_2q0bm3ez5aczd`). Recommended: release D0+D1, D2 only if D1 rules for exclusion. |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-CONFIGURATION-DECODER-LAWS` -- ROUTED `3c722a5ffefbc15c5fb7866417f71a13a4250f29`, Decision `dec_46thvhz2xdjbd`, 2 paths `+1031/-26` off base `7e3db6f55`. The lieutenant owns M4-M9 | `CAT-PARSING-CURSOR-LAWS` -- ALREADY FRAMED `ready`, L, T1; all three `depends_on` are `merged`. Kick when DECODER closes. Do NOT frame a successor | The Architect ordering precondition is WITHDRAWN and the publisher blocker is owned. PR #4127 registered zero workflow runs; I authorized close-and-LEAVE-CLOSED at `evt_1sc9f2p4zed1c` so the publisher takes its `else` branch and cuts a FRESH PR on the identical head -- `scripted-pr-automerge.sh:294-299` reuses only an OPEN PR, so close/reopen had preserved the broken object. Head unchanged, approvals valid. FALSIFIER: if the fresh PR also fails to register, my reading is wrong and it becomes a real operator escalation I carry. |
 
 ## Update rule
 

@@ -4,24 +4,52 @@
 - **Owner:** runtime
 - **Size:** M
 - **Tier:** T1 (section 7)
-- **Depends on:** `fa4fc3647b09b9480940f7d5d35c50ffb7978aeb` **if and only if
-  you touch `px8ta_oriented_subcontinuation.rs`** — see section 8.
+- **Depends on:** nothing. The former conditional dependency on
+  `fa4fc3647b09b9480940f7d5d35c50ffb7978aeb` is **DISCHARGED** — see section 8.
 - **Branch:** `wp/RT-BRACKET-RELEASE-ORDER-PARITY-nested-teardown`
 
-> ## THE REPAIR DIRECTION IS KNOWN. THE MECHANISM IS NOT, AND SIX THINGS CO-VARY.
+> ## RECUT 2026-09-21 — `D0c` + `D0c-2` RAN; ARCHITECT HAS RULED THE CAUSE.
 >
-> Inner-before-outer is forced by bracket semantics, so there is no open
-> question about *what* correct looks like. **What is open is why native gets it
-> right on one nest and wrong on another**, and the most attractive answer
-> — "the inner bracket's kind" — **is provably not keyed where the release is
-> emitted** (section 2.5). Kill the confounds before you pick a site.
+> **`D1a` IS AUTHORIZED, AND ONLY AS THE TWO-ARM ENVELOPE IN §4.** Architect
+> ruling `evt_4t14zmba83hjm`. **Depth is the SELECTOR, not the cause.** The
+> causal boundary is Specialized or handler-owned execution versus unowned
+> Deferred forward-`Ret`: a statically bounded bracket-settlement continuation
+> is left on the unowned Deferred route even though it must execute before the
+> enclosing bracket resumes. **Fix that predicate; do not reorder release
+> events after emission.**
+>
+> **Measured population, final** (`D0c` `evt_29sjeg0q437k8`, `D0c-2`
+> `evt_pz0w7e8ae39w`): **SIX reaching depth-2 native nests, all WRONG** — px8ta
+> baseline, (C), (A), (B), composed two-deep read, and `rt_read_norights_stage`
+> — across both kinds in both positions, both combinators, homogeneous and
+> heterogeneous, metadata/read/write-create. **TWO reaching depth-3 composed
+> nests, both CORRECT**, across read and write. **Interp is correct on all four
+> composed measurements.**
+>
+> **Dead: mode, inner-kind, outer-kind, homogeneity, combinator, read-vs-write.**
+> `§2.5`'s "Depth is controlled and is out" is refuted; `§2.5`'s structural kill
+> of "inner bracket kind" SURVIVES and is corroborated — `ResourceRelease` is
+> kind-agnostic, so ordering was never keyed at the release site. It is keyed in
+> planner classification, exactly where `§2.5` said it would have to be.
+>
+> **`D0a` AFFIRMED** (`evt_17kyxq7q5v8ar`), AC-7 discharged. **`D0c` and `D0c-2`
+> are CLOSED; do not re-run either.** Two arms are required: A alone fixes the
+> composed family and leaves px8ta wrong; B alone fixes px8ta and leaves the
+> composed family wrong.
 
 ## 1. Objective
 
 On a nest of bracket scopes the inner bracket must settle before the outer.
-Native violates this on `withResource`-in-`withResource` and satisfies it on
-`withResource`-wrapping-`withBuffer`. **Establish which property separates
-those two cases, then repair native.**
+**Native violates this on all SIX reaching depth-2 nests measured, regardless
+of kind, combinator, mode, homogeneity or read/write, and satisfies it on BOTH
+reaching depth-3 nests.** The separator is ruled (`evt_4t14zmba83hjm`) and is
+planner classification, not depth. Repair native inside the §4 envelope.
+
+**`D0a` is AFFIRMED** (Spec enclave `evt_17kyxq7q5v8ar`): `62-authority.md` §4.2
+makes settlement normative under ADR 0021, whose delayed-body clause puts an
+inner bracket's settlement inside completion of the inner EXPRESSION. Inner
+settlement precedes outer-body completion, derived from locked text; no spec
+edit is authorized or needed. AC-7 is discharged and is not re-asked.
 
 **This does not turn the px8ta row green** and no acceptance criterion says it
 does — see section 6.
@@ -89,18 +117,43 @@ finished. That is a violated bracket, not a violated convention.**
 > handle validity, not settlement order. Cite `ADR 0021:177-178` via
 > `62-authority.md:325-326`.
 
-### 2.3 The two nests, and what each engine does
+### 2.3 What each engine does, RE-MEASURED at `89d2bfb57`
 
-    composed-return   OUTER withResource file, INNER withBuffer
-                      interp  file then buffer = outer-then-inner   VIOLATES
-                      native  buffer then file = inner-then-outer   CORRECT
+    depth 2, px8ta   FsHandle/FsHandle, Metadata   native [r1,r2]    WRONG
+    depth 2, D0c(C)  FsHandle/FsHandle, Read       native [r1,r2]    WRONG
+    depth 2, D0c(A)  Buffer/Buffer                 native [r1,r2]    WRONG
+    depth 2, D0c(B)  Buffer outer / FsHandle inner native [r1,r2]    WRONG
+    depth 2, composed read                         native [r1,r2]    WRONG
+                     FsHandle outer / Buffer inner interp [r2,r1]    correct
+    depth 2, D0c-2(E) rt_read_norights_stage       native [r1,r2]    WRONG
+                     WriteCreate outer / Buffer    interp [r2,r1]    correct
+    depth 3, composed write                        native [r3,r2,r1] correct
+                     FsHandle/FsHandle/Buffer      interp [r3,r2,r1] correct
+    depth 3, D0c-2(D) composed READ                native [r3,r2,r1] correct
+                     FsHandle/FsHandle/Buffer      interp [r3,r2,r1] correct
 
-    px8ta row         withResource nested in withResource
-                      native  outer-then-inner                      VIOLATES
+**Native is wrong on all SIX reaching depth-2 nests and right on BOTH reaching
+depth-3 nests. Interp is correct on all FOUR measured composed programs.** The
+old reading here -- native right on one nest and wrong on the other, with interp
+carried unre-run from 2026-09-03 -- was refuted the moment it was re-measured.
 
-**Native is right on one nest and wrong on the other.** Interp's behaviour is
-carried from the 2026-09-03 finding and **has not been re-run** — re-measure it
-before relying on it.
+**The five-fixture accounting, stated once and binding everywhere in this
+frame: THREE of the five existing composed-return fixtures are MEASURED, TWO
+remain UNMEASURED.**
+
+    MEASURED  fs_read_at_malformed_offset_narrows_to_invalid_offset      D0c
+    MEASURED  fs_write_at_malformed_offset_narrows_to_invalid_offset     D0c
+    MEASURED  fs_read_at_malformed_offset_without_read_right_            D0c-2(E)
+                narrows_to_invalid_offset  (drives rt_read_norights_stage)
+    UNMEASURED fs_read_at_malformed_window_narrows_to_invalid_bounds
+    UNMEASURED fs_write_at_malformed_offset_without_write_right_
+                narrows_to_invalid_offset
+
+**`D0c-2`(D) is a FOURTH measurement, not a sixth fixture.** It is a transient
+READ variant of the depth-3 write program, built for the round and removed; it
+is a required depth-3 control, not a member of the five-fixture set. So: four
+measurement PROGRAMS across both rounds, three measured FIXTURES of five. The
+two unmeasured fixtures are unknown, not clear.
 
 ### 2.4 The row under repair
 
@@ -120,21 +173,32 @@ Depth-2's behaviour is the runtime-implementer's D0 measurement under
 `catch_unwind` — order-independent, reproduced with depth 3 first, separate temp
 dir and separate `build_native_program` per depth.
 
-### 2.5 SIX CONFOUNDS. ONE IS ALREADY DEAD. DO NOT PICK A SITE FIRST.
+### 2.5 The confound table is HISTORICAL. The inner-kind structural kill is LIVE.
 
-                        composed-return      px8ta
-                        native CORRECT       native WRONG
-    inner combinator    withBuffer           withResource
-    inner kind          Buffer               FsHandle
-    inner error type    ResourceError        FileError
-    inner acquisition   capacity : Int       (name, mode)
-    outer mode          Read / WriteCreate   ResourceMetadata
-    NEST HOMOGENEITY    heterogeneous        HOMOGENEOUS
+> **HISTORICAL — pre-`D0c` prediction, REFUTED 2026-09-21. It is not the
+> current state and nothing below it is an instruction.** Retained only
+> because the dead native-right-versus-native-wrong contrast rested on it.
+>
+> It asserted six properties co-varying across a pair in which the
+> composed-return family is native-CORRECT and px8ta native-WRONG at depth 2:
+>
+>                         composed-return      px8ta
+>                         native CORRECT       native WRONG
+>     inner combinator    withBuffer           withResource
+>     inner kind          Buffer               FsHandle
+>     inner error type    ResourceError        FileError
+>     inner acquisition   capacity : Int       (name, mode)
+>     outer mode          Read / WriteCreate   ResourceMetadata
+>     NEST HOMOGENEITY    heterogeneous        HOMOGENEOUS
+>
+> **At `89d2bfb57` BOTH families are WRONG at depth 2** (`§2.3`). The
+> contrasted pair does not exist, so no axis in the table survived, and depth
+> was neither controlled nor out. The header of this table also carried
+> "DO NOT PICK A SITE FIRST"; that stop fired, was answered by
+> `evt_4t14zmba83hjm`, and is spent.
 
-**Depth is controlled and is out.** Both families cover 2-deep and 3-deep, and
-at depth 2 one is right and the other wrong.
-
-**"Inner bracket kind" is dead where you would look for it.** `ResourceRelease`
+**LIVE, and corroborated by the ruling: "inner bracket kind" is dead where you
+would look for it.** `ResourceRelease`
 is a single kind-agnostic op. Under
 `crates/ken-runtime/src/cranelift_backend/`:
 
@@ -158,61 +222,166 @@ place it provably is not.**
 **px8ta is homogeneous at every level** — `:44`, `:55`, `:78`, `:169`, `:179`,
 `:186` are all `withResource` with mode `ResourceMetadata` on `held-N.bin`.
 Homogeneous in combinator, kind AND mode, where the composed-return nests are
-heterogeneous in all three. **That makes homogeneity and inner-kind separable
-rather than rival** — they predict opposite results on `D0c`(A).
+heterogeneous in all three. **That made homogeneity and inner-kind separable
+rather than rival** — they predicted opposite results on `D0c`(A). **`D0c`(A)
+ran: the answer was WRONG, which killed BOTH.** The separation held; neither
+hypothesis survived it.
 
-**The repair site is NOT localized, deliberately.** Naming one before `D0c`
-would be naming a correlate. That is `D1a`'s first act, informed by `D0c`.
+**The repair site IS localized, by ruling.** It was deliberately withheld
+while `D0c-2` was open, because naming one then would have been naming a
+correlate. `D0c-2` closed leaving no single surface axis, and the Architect
+localized the cause structurally rather than by correlation
+(`evt_4t14zmba83hjm`): the two planner classification arms in `§4`. **Do not
+re-derive a site from the surface table above; build A and B.**
 
-## 3. THE DESIGN JUDGMENT, FRONT-LOADED
+## 3. THE DESIGN JUDGMENT, RULED
 
-**Build `D0c` and `D1a` now. Do not wait on the Spec round.**
+**`D1a` is AUTHORIZED and BOUNDED. Build arms A and B together (§4).**
 
-`D0a` confirms a derivation from locked text; it is not an open design
-question, and the direction inverts only if Spec reads settlement as unordered
-relative to body completion — which would be refuting what a bracket is.
-**Parking a repair on an absent ruling whose expected value is "yes" is how a
-lane stalls.**
+Every gate is discharged: `D0a` AFFIRMED (`evt_17kyxq7q5v8ar`), `D0c` closed
+(`evt_29sjeg0q437k8`), `D0c-2` closed (`evt_pz0w7e8ae39w`). Nothing waits on a
+Spec round or a further fixture. **Do not re-run `D0c` or `D0c-2`.**
 
-**If `D0a` comes back refuted, stop and return the WP to the Steward.** Do not
-re-aim the repair yourself.
+**Depth is the selector, not the cause.** Architect ruling `evt_4t14zmba83hjm`,
+grounded at `89d2bfb57`: depth changes which existing planner admission class
+the continuation happens to enter. The causal boundary is **Specialized or
+handler-owned execution versus unowned Deferred forward-`Ret`.** In the composed
+depth-2 fixture only `BufferAllocate` is a `StaticResponseContinuation`;
+`FsReadAt` and both `ResourceRelease` responses are Deferred P2
+`UnconsumedTransportCaller` with `handler_owner: None`, so they stay on the
+forward-`Ret` route and the enclosing bracket resumes while the inner settlement
+is still only a returned value. At depth 3 all three `ResourceRelease` responses
+are Specialized, the Deferred population is empty, the owner calls the exact K
+once and returns before its caller resumes -- lexical bracket order, LIFO.
+**px8ta depth 2 is a SECOND lowering path, not another sample of the first:**
+`FsOpen` is Specialized, but `bounded_deferred_response_suffix` finds the inner
+`ResourceRelease` and rejects it because `ResourceRelease` is removed from
+`substantive` and both admitted classes require a non-empty substantive set.
 
-**`D0c` before `D1a`, and this is the ordering that matters.** Six properties
-co-vary; three cheap fixtures collapse them. A repair chosen before that is a
-repair chosen on a correlate, and it will look right on the fixture it was
-chosen from.
+**BOTH ARMS ARE REQUIRED, and this is measured, not asserted.** The Architect's
+probes: relaxing `ordinary_stage_count >= 2` to `>= 1` flipped the composed
+depth-2 fixture to `[r2,r1]` while depth-3 stayed correct -- **and did NOT fix
+px8ta**, which remained `[r1,r2]`. That disproves a one-line global-threshold
+repair as closure over the population. **A patch containing only A fixes the
+composed family and leaves px8ta wrong; only B fixes px8ta and leaves the
+composed family wrong.**
+
+**The standing prohibitions.** Do not reorder release events after emission. No
+host-dispatch reorder, trace sort, `ResourceRelease` kind split, exploratory
+logging, global diagnostic recoding, aggregate relaxation, or capacity change is
+authorized. Fix the classification predicate.
 
 ## 4. Deliverables
 
-**D0a — confirm the settlement derivation with the Spec enclave**, including:
-**does `62-authority.md:325-326` incorporating ADR 0021 by reference discharge
-the ordering requirement, or must the clause be written into `spec/`?** Runs
-concurrently. **Named refutation: Spec reads settlement as not ordered relative
-to body completion.**
+**D0a — DISCHARGED.** The Spec enclave AFFIRMED at `evt_17kyxq7q5v8ar`:
+`spec/60-security/62-authority.md:325-326` §4.2 makes settlement normative under
+ADR 0021, whose delayed-body clause puts an inner bracket's settlement inside
+completion of the inner EXPRESSION. **Inner settlement precedes outer-body
+completion**, derived from locked text; no clause need be written into `spec/`
+and no spec edit is authorized. The named refutation was rejected. AC-7 is
+discharged. **Do not re-ask this.**
 
-**D0c — kill the confounds, cheapest first.** These buy a direction for the
-repair; they are not measurements of the ignored-row population.
+**D0c — RAN AND IS CLOSED.** Result at `evt_29sjeg0q437k8`. Mode, inner-kind,
+outer-kind and homogeneity are dead; combinator dies with kind. **Do not re-run
+it.** Its remaining value is the five dead axes, not a direction.
 
-    (C) one-token edit to a fixture you already run: px8ta's inner bracket
-        mode ResourceMetadata -> ResourceRead. Homogeneous combinator,
-        HETEROGENEOUS mode.
-          still wrong -> mode is not it; the split is combinator or kind
-          now correct -> it was never "bracket kind"; it is nest homogeneity
-    (A) withBuffer inside withBuffer.
-          inner-kind predicts CORRECT, homogeneity predicts WRONG.
-          One bit; separates the two leading hypotheses outright.
-    (B) withResource inside withBuffer — inverts the pair while holding
-        heterogeneity. inner-kind predicts WRONG, outer-kind predicts CORRECT.
-        withBuffer's body is an ordinary HostIO computation, so this is
-        expressible today.
+**D0c-2 — RAN AND IS CLOSED. Read-vs-write is DEAD on both sides.** Result at
+`evt_pz0w7e8ae39w`, predictions pre-registered at `evt_29wbxhm9mcvs9`.
 
-**D1a — repair native's nested teardown** so the inner bracket settles before
-the outer, at the site `D0c` points to. Report the site and the argument for
-it, not only the diff.
+    (E) rt_read_norights_stage REACHES teardown -- it is a valid fixture, not
+        a pre-teardown refusal. Acquired [FsOpen r1, BufferAllocate r2].
+          native [r1,r2] WRONG    interp [r2,r1] correct
+        => ResourceWriteCreate vs read/metadata killed INSIDE depth 2.
+    (D) depth-3 READ, middle bracket changed from write-create sink to
+        ResourceRead source. Acquired [FsOpen r1, FsOpen r2, BufferAllocate r3].
+          native [r3,r2,r1] correct   interp [r3,r2,r1] correct
+        => read/write killed INSIDE depth 3.
 
-**D2a — a nested release-order control that is NOT `#[ignore]`d.** It must
-execute, observe the effect trace, and assert `releases == opens.reverse()`.
-Depth 2 is sufficient; **do not extend it to depth 3** (section 6).
+**The live set is now exactly two: depth-equals-count versus lowering path** --
+and **no fixture separates those either.** If depth selects a different lowering,
+the two co-vary by construction. That is why this is no longer a measurement
+question.
+
+**THE STANDING STOP FIRED AND HAS BEEN ANSWERED.** Depth was left standing, so
+the WP returned to the Steward and the structural question -- what differs in
+depth-3 lowering versus depth-2 lowering -- went to the Architect, who ruled it
+at `evt_4t14zmba83hjm`. The ring did not infer the structure or pick a site from
+the correlation, which is the whole point of the stop, and it did not have to:
+depth is the SELECTOR and the cause is planner classification. **`D1a` is
+therefore no longer forbidden — it is AUTHORIZED, bounded to arms A and B
+below, and site selection is settled by the ruling rather than open.**
+
+**Note the mechanism is not "emits in acquisition order."** That would make
+depth 3 release `[r1, r2, r3]`; it releases `[r3, r2, r1]`. Depth 3 is doing
+something structurally different, not the same thing at greater length.
+
+> **HISTORICAL — what `D0c-2` was authorized to split, retained for the record.
+> It is closed; nothing from here to the end of this block is an instruction.**
+
+> Depth and resource count are ONE variable, not two. Every bracket takes
+> exactly one acquisition (`spec/30-surface/38-ffi-io.md:408-413`), so nest
+> depth N IS N resources and no fixture can separate them.
+>
+> Same discipline as `D0c`: predictions registered before each run. Cheapest
+> first:
+>
+>     (D) a depth-3 READ nest. Holds family and depth against the
+>         known-correct case, varies only read/write.
+>           correct -> read/write is dead; depth still stands
+>           wrong   -> depth is dead; the operation axis is causal
+>
+>     (E) a depth-2 nest with a ResourceWriteCreate outer, varying read/write
+>         inside the known-wrong case.
+>           wrong   -> read/write is dead from the other side
+>           correct -> the operation axis is causal, and (D) says whether
+>                      depth adds anything
+>
+> `rt_read_norights_stage` was flagged as a possible (E) that might never
+> reach teardown. It was verified and it DOES reach teardown.
+>
+> The block closed with a standing stop: if `D0c-2` left depth standing, stop
+> and return the WP, because "why is the depth-3 lowering different" is an
+> Architect ruling and not `D1a`'s to assume. **That stop fired, was honoured,
+> and was answered — see the operative record above. END OF HISTORICAL BLOCK.**
+
+**D1a — repair the planner classification, as TWO arms. Both required.**
+
+**Arm A — `StaticTransitionPlan::static_response_phase_b_split`.** Stop using
+the whole-plane `ordinary_stage_count >= 2` threshold to reject an
+**exclusively predeclared transport group**. One such group is enough authority
+for that group's execute-then-resume call. **Make eligibility PER GROUP for the
+exclusive case; do NOT globally change the threshold to `>= 1`.** Preserve the
+mixed-owner law exactly: mixed-owner groups keep their current `>= 2`, P1-free
+behavior; a P1-bearing mixed group stays Deferred except under the existing
+explicit overpromotion mutation. The suppression mutation must still restore P2.
+
+**Arm B — `StaticTransitionPlan::bounded_deferred_response_suffix`.** Admit a
+third structural class:
+
+```rust
+let release_only_suffix = !suffix.is_empty()
+    && suffix
+        .iter()
+        .all(|row| row.operation() == HostOpV1::ResourceRelease);
+```
+
+Return the bounded suffix when `repeated_producer || mapping_access_chain ||
+release_only_suffix`. **This is not operation-name special casing at emission:**
+the preceding frontier walk has already proved exact lexical K, finite
+population, no opaque frontier, no cycle, and P2 shape, and
+`bounded_deferred_response_handler_owner` still requires one unique specialized
+owner or refuses. The predicate recognizes the bracket-settlement tail that the
+old `substantive` filter made impossible to admit.
+
+**D2a — TWO non-ignored controls, one per arm. One aggregate release-order test
+is not evidence for both.**
+
+- **D2a-A:** a depth-2 end-to-end control for the composed single-stage arm,
+  using the existing reaching `rt_read_norights_stage` shape or a
+  source-equivalent fixture. Assert acquisitions and exact reverse releases.
+- **D2a-B:** a distinct depth-2 px8ta control for the release-only
+  bounded-suffix arm. **Do not rely on the still-ignored depth-2-plus-depth-3
+  loop row.**
 
 ## 5. Acceptance criteria
 
@@ -220,8 +389,10 @@ Depth 2 is sufficient; **do not extend it to depth 3** (section 6).
 is the number this work exists to move; a deliverable that seems to need a new
 one is a hard stop to report, not a cost to absorb.
 
-**AC-1. `D2a` exists, is not ignored, and passes.** Give its path and symbol
-name.
+**AC-1. BOTH `D2a` controls exist, are not ignored, and pass.** Give the path
+and symbol name of each. **`D2a-A` (composed single-stage arm) and `D2a-B`
+(px8ta release-only-suffix arm) are separate tests** -- one aggregate
+release-order test does not satisfy this.
 
 **AC-2. Report the observed release SEQUENCE before and after, as vectors —
 not pass/fail.** The assertion compares two vectors and the vectors are the
@@ -230,19 +401,37 @@ evidence:
     before   opens [r0, r1]   releases [r0, r1]    acquisition order
     after    opens [r0, r1]   releases [r1, r0]    inner-before-outer
 
-**AC-3. Control: the fix must be capable of failing.** Show `D2a` goes red
-against the pre-fix binary, and state which branch of the repaired code it
-exercises. A control that passes on both trees tests nothing.
+**AC-3. MUTATION-PROVE THE TWO ARMS INDEPENDENTLY.** A control that passes on
+both trees tests nothing, and a control that reddens under either mutation does
+not separate the arms.
 
-**AC-4. THE COMPOSED-RETURN NEST IS NATIVE'S OWN WORKING CASE AND MUST STAY
-CORRECT.** Report its release order before and after. **A repair for px8ta that
-breaks it has traded one violation for another** — and unlike most
-no-regression clauses this one has teeth, because it is a case where native is
-already right and the repair is aimed squarely at it.
+- **Restoring exclusive single-stage deferral must redden `D2a-A` with
+  `[r1,r2]`.**
+- **Suppressing release-only suffix admission must redden `D2a-B` with
+  `[r1,r2]`.**
 
-**AC-5. Each `D0c` fixture records its PREDICTION BEFORE its run**, and which
-hypotheses the result kills. **A discriminating fixture whose prediction is
-written down afterwards discriminates nothing** — it explains.
+**Each mutation needs a positive application witness and must compile.** State
+which branch of the repaired code each control exercises.
+
+**AC-4. DISCHARGED, AND IT REFUTED ITS OWN PREMISE.** This criterion required
+re-measuring native's claimed working case BEFORE the repair, on the reasoning
+that "if the native half no longer holds there is no contrast left to explain."
+It ran and the half does not hold: the composed two-deep READ is native-WRONG
+(`[r1, r2]`) and interp-CORRECT (`[r2, r1]`). **The criterion did its job by
+failing.** Do not re-ask it.
+
+**What replaces it as the no-regression clause:** **BOTH reaching depth-3 nests
+release `[r3, r2, r1]` at `89d2bfb57` and MUST still do so after any repair** --
+the composed three-deep WRITE and the `D0c-2`(D) three-deep READ. They are the
+only measured native-correct teardowns, so a repair that breaks either has
+traded violations for a new one. **AC-6's exact depth-3 object-emission refusal
+on the ignored px8ta row is preserved unchanged.**
+
+**AC-5. DISCHARGED.** Both measurement rounds registered predictions before
+their runs -- `D0c` at `evt_287tm2f6ycg0x`, `D0c-2` at `evt_29sjeg0q437k8`'s
+predecessor `evt_29wbxhm9mcvs9`. Both rounds are closed. **No further
+discriminating fixture is authorized**, so this criterion governs nothing live
+and is not re-asked.
 
 **AC-6. `px8ta public_two_three_level_brackets_finish_and_release_lifo` remains
 `#[ignore]`d, and its depth-3 behaviour is unchanged.** Run it under
@@ -250,8 +439,14 @@ written down afterwards discriminates nothing** — it explains.
 `ContinuationSpecialization` object-emission refusal.** A *different* depth-3
 failure is a finding — report it, do not absorb it.
 
-**AC-7. `D0a` has an answer recorded, affirmed or refuted**, with the enclave
-event id. An unanswered `D0a` does not close this WP.
+**AC-7. DISCHARGED.** `D0a` is answered AFFIRMED, enclave event id
+`evt_17kyxq7q5v8ar`, recorded on the node. Nothing further is owed here and the
+question is not re-asked.
+
+**AC-8a. USE THE EXISTING DIAGNOSTICS STRUCTURALLY.** The composed arm must no
+longer leave its governed releases as unowned Deferred P2, and the px8ta inner
+release must acquire the unique bounded handler owner. **Do not pin absolute
+origin ids.** Preserve both reaching depth-3 vectors `[r3,r2,r1]`.
 
 **AC-8. No-regression in CI**, per `COORDINATION §12` — green in CI, never a
 local `--workspace` run. Local work is `scripts/ken-cargo -p ken-runtime` and
@@ -314,38 +509,71 @@ touches `crates/` and is therefore **`full` CI, never doc-only**.)*
   row for no information**, and an AC requiring it to pass would be
   unsatisfiable — the WP could only meet it by repairing a defect it does not
   own.
-- **It is not the interp repair (`D1b`).** Interp violates the same rule on the
-  composed-return nests. That is a real correctness defect with a known
-  direction, and it is a separate WP so that the two engines' repairs are
-  reviewed apart. **Do not fix both here.**
-- **It does not author an ordering clause in `spec/`.** If `D0a` concludes one
-  is needed, that is the enclave's to write and the Steward's to sequence.
+- **No interp repair is authorized, and `D1b` is DELETED, not deferred.** Its
+  premise -- that interp violates on the composed-return nests -- measures
+  FALSE at `89d2bfb57`. **State this in the bounded form and no wider: there is
+  no MEASURED interp defect. Interp is correct on all FOUR measured composed
+  programs. No interp repair is authorized. TWO of the five existing fixtures
+  remain UNMEASURED and would be a finding if they disagree** (`§2.3` names
+  which). No `D1b` node exists and none is to be filed on the refuted premise.
+  If a measurement in this WP shows interp violating anywhere, return it to the
+  Steward.
+- **This is not a claim that the engines agree.** At measured depth 2 they
+  plainly do not: native `[r1,r2]`, interp `[r2,r1]`. The engine contrast is
+  real and is the defect. What is absent is a native-right-versus-native-wrong
+  LEAD and any SECOND repair obligation on present evidence.
+- **It does not author an ordering clause in `spec/`, and `D0a` settled that no
+  clause is needed.** The enclave AFFIRMED the derivation from locked text at
+  `evt_17kyxq7q5v8ar` and authorized no spec edit. Should anything downstream
+  reopen it, that is still the enclave's to write and the Steward's to
+  sequence -- but it is not an open question here.
 - **It is not a measurement of the other fourteen ignored rows.** The "a
   looping test reports nothing past its first failure" finding is real, is
   recorded on the node, and is not this WP's work.
 
 ## 7. Estimated tier: T1
 
-Semantic repair in the native backend's teardown path, on a property with no
-explicit spec clause, where correctness comes from a derivation over locked text
-and **six properties co-vary across the only two data points.** The diff may be
-small; the reasoning that picks it is not. **Not a T2 mechanical change** — a
-cheap seat would match native to interp or interp to native, or would take the
-inner-kind correlate at face value and edit the release path, which section 2.5
-rules out from source.
+Semantic repair in the native backend's planner classification, on a property
+whose correctness derives from locked text AFFIRMED by the enclave at
+`evt_17kyxq7q5v8ar`. **The measurement load is now spent and the reasoning load
+has moved to the repair.** `D0c` and `D0c-2` killed mode, inner-kind,
+outer-kind, homogeneity, combinator and read-vs-write across six reaching
+depth-2 nests and two reaching depth-3 nests; the Architect has ruled the cause
+at `evt_4t14zmba83hjm`. **What remains T1 is holding TWO classification arms
+apart** -- per-group exclusive eligibility without touching the mixed-owner law,
+and a third bounded-suffix class that does not become operation-name special
+casing -- **and proving each independently by mutation.** The Architect's own
+probe showed a one-line global threshold change fixes one family and not the
+other. The diff may be small; keeping the two laws separate is not.
 
 ## 8. Contention
 
-**Measured against the queue at `badc039da`.**
+**The px8ta dependency is DISCHARGED — verified, not assumed.**
+`RT-SUBCONTINUATION-LIFO-RELEASE-ORDER` is `merged`; its `D1` landed on `main`
+as `4eb3dc4c6` and its node closure as `d959980ae`. At this WP's base
+`89d2bfb57` the blob for `crates/ken-cli/tests/px8ta_oriented_subcontinuation.rs`
+is `248cbd21dbb4bd5a8b9b590bfafb7f2ee70f9ed9`, **byte-identical to the blob at
+`fa4fc3647b09b9480940f7d5d35c50ffb7978aeb`**. So the rewrite that branch SHA
+carried is already in your base. **`D2a-B` necessarily touches that file and is
+free to.** Do not treat `fa4fc3647` as a future prerequisite; it is not an
+unmerged base and there is nothing to wait for.
 
-- `fa4fc3647b09b9480940f7d5d35c50ffb7978aeb` (`RT-SUBCONTINUATION-LIFO-RELEASE-ORDER`
-  `D1`, routed, ahead of this WP) **rewrites
-  `crates/ken-cli/tests/px8ta_oriented_subcontinuation.rs`** under hunk
-  `@@ -261,28 +261,69 @@`. **`D0c`(C) edits that file, so cut your branch after
-  it lands** — or stage `D0c`(C) on a copy and fold it after.
-- Nothing else in the queue touches `ken-runtime/src`. `af2270b7b` is `docs/`
-  plus a playbook; `9342062315`, `b042af474`, `fabcd98ed`, `89f1cc71b`,
-  `45f66746b` are `docs/` only; `d0058baf1` is `ken-elaborator`.
-- **`RT-CARRIER-PRODUCER-OCCURRENCE` is the lane's kick ahead of this WP.** It
-  works in `constructors.rs`; this WP does not. They do not collide, but they
-  are sequenced, not concurrent.
+**This WP is the ACTIVE L1 work package.** `steward/lanes.md` names it as such,
+and its only release blocker is this recut landing on `main`. Any earlier text
+sequencing it behind `RT-CARRIER-PRODUCER-OCCURRENCE` is superseded: that node
+is not ahead of this one.
+
+> **HISTORICAL — the queue snapshot below was measured against
+> `badc039da` and is not the live contention plan. It is retained as the
+> record of why the px8ta dependency was once conditional.** The queue it
+> describes has since drained; re-measure at your own base if you need a
+> current picture.
+>
+> - `fa4fc3647…` (`RT-SUBCONTINUATION-LIFO-RELEASE-ORDER` `D1`, then routed and
+>   ahead of this WP) rewrote `px8ta_oriented_subcontinuation.rs` under hunk
+>   `@@ -261,28 +261,69 @@`. `D0c`(C) already ran against that file and `D0c`
+>   is closed, so the contention was spent for `D0c`.
+> - Nothing else in that queue touched `ken-runtime/src`. `af2270b7b` was
+>   `docs/` plus a playbook; `9342062315`, `b042af474`, `fabcd98ed`,
+>   `89f1cc71b`, `45f66746b` were `docs/` only; `d0058baf1` was
+>   `ken-elaborator`.

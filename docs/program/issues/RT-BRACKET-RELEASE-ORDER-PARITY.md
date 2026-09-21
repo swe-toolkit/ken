@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-RELEASE-ORDER-PARITY
-title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics (settlement follows the body's returned value or error; the inner bracket's completion is an event in the outer's body). Both engines violate it, on different nests -- BUT THAT PAIR IS CARRIED FROM 2026-09-03 AND NEITHER HALF HAS BEEN RE-RUN: interp releases outer-then-inner on the composed-return fixtures, where native is CORRECT; native releases outer-then-inner on px8ta row `public_two_three_level_brackets_finish_and_release_lifo`, one of the fifteen originally selected ignored rows (population now 14; row 15 closed at 9c3a5f588). Native being right on one nest and wrong on another is the lead, and six properties co-vary across that pair -- so if the native half no longer holds there is no contrast left to explain, which is why AC-4 re-measures it BEFORE the repair rather than after."
+title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics -- AFFIRMED from locked text by the Spec enclave at evt_17kyxq7q5v8ar. MEASURED at 89d2bfb57 across two closed rounds: native violates the rule on all SIX reaching depth-2 nests and satisfies it on BOTH reaching depth-3 nests, so mode, inner-kind, outer-kind, homogeneity, combinator AND read-vs-write are all dead as leads; interp is correct on all FOUR measured composed programs, so there is no MEASURED interp defect and no interp repair is authorized -- but THREE of the five existing composed-return fixtures are measured and TWO remain UNMEASURED, and there plainly IS an engine contrast at measured depth 2 where native is wrong and interp right. ARCHITECT RULED the cause at evt_4t14zmba83hjm: depth is the SELECTOR, not the cause -- the causal boundary is Specialized or handler-owned execution versus unowned Deferred forward-Ret, where a statically bounded bracket-settlement continuation stays on the unowned route although it must execute before the enclosing bracket resumes. D1a is authorized ONLY as two required arms: per-group exclusive eligibility in static_response_phase_b_split, and a release-only third class in bounded_deferred_response_suffix. Either arm alone leaves half the population wrong."
 status: ready
 owner: runtime
 size: M
@@ -12,18 +12,37 @@ github: null
 origin: "Steward, 2026-09-03; RECUT 2026-09-18 twice. Original filing: scope-call disposition of the Q2 finding the Architect routed to the Steward (Architect evt_66q0njbd8qjf1, runtime thread thr_13yeftxjnxz2z). While building R3 for RT-COMPOSED-RETURN-FORWARD-RET-EDGE (b2), the runtime-implementer found the parity oracle still fails all five composed-return fixtures on RESOURCE RELEASE ORDER: interp releases resource1 then resource2, native releases 2 then 1. A decisive STRUCTURAL check (runtime-implementer evt_5merj95jgakap; Architect CONCUR evt_66q0njbd8qjf1) EXONERATES R3: the captured-environment carrier is built as worker.captures in POSITION order (emit_checked_ih_captured_environment aggregates.rs:3848-3865, field ordinal N = capture N) and R3 projects emit_carrier_field(carrier, ordinal) at that same ordinal (the landed Direct route's convention, core.rs:7893), so R3 threads the file/buffer handles in PLANNER order and is NOT a capture-ordinal permutation. The divergence is downstream in bracket teardown, outcome-independent, pre-existing (these five fixtures previously base-trapped before reaching teardown, so it was invisible), and orthogonal to the composed-return object. FIRST RECUT (Architect evt_71r7rzjzepckc) split the node into SIBLING and NESTED shapes. SECOND RECUT WITHDRAWS THAT SPLIT: the Steward opened the fixtures and there is no sibling shape -- rt_parity_native.rs:184 is withResource wrapping withBuffer and :336 is withResource/withResource/withBuffer three deep, each combinator takes exactly one acquisition and one body (38-ffi-io.md:411-413), and the repo's own helper names say it (rt_inner_bracket_result, rt_file_bracket_result). 'A two-resource bracket' was loose prose in the 2026-09-03 filing meaning a bracket NEST holding two resources; the Architect read it as one bracket holding two and the Steward wrote the first recut on that reading. Architect withdrew the split at evt_1byx3327ppasg. Coordinates re-measure at the build SHA; b2 branch WIP was 430350cff at the finding."
 ---
 
-> # OPERATIVE (Steward, 2026-09-03; RECUT TWICE, 2026-09-18)
+> # BOTH MEASUREMENT ROUNDS CLOSED; ARCHITECT HAS RULED THE CAUSE.
 > #
-> # SCOPE RULING (unchanged, 2026-09-03): filed as a DISTINCT runtime node, NOT
-> # folded into RT-COMPOSED-RETURN-FORWARD-RET-EDGE (b2). b2 landed its
-> # composed-return repair on OUTCOME parity; release-order parity is EXCLUDED
-> # for those five fixtures and tracked HERE. R3 is exonerated by the structural
-> # check (handles threaded in planner order, no permutation — see `origin`).
+> # **`D1a` is AUTHORIZED and ONLY as the two-arm envelope in Deliverables.**
+> # Architect ruling `evt_4t14zmba83hjm`, grounded at `89d2bfb57`.
 > #
-> # SEQUENCING: b2 is `closed` (main `5668d363d`, 2026-09-05), so this node's
-> # release precondition has been met since that date and the node is `ready`.
-> # Architect is the required design reviewer; runtime QA gate; Steward M1-M3a
-> # -> lieutenant. Coordinates re-measure at the release SHA.
+> # **Final measured population** (`D0c` `evt_29sjeg0q437k8`, `D0c-2`
+> # `evt_pz0w7e8ae39w`): SIX reaching depth-2 native nests, ALL WRONG. TWO
+> # reaching depth-3 composed nests, BOTH CORRECT. Interp correct on all FOUR
+> # MEASURED composed programs -- **no MEASURED interp defect**, no interp
+> # repair authorized, and `D1b` stays deleted. **THREE of the five existing
+> # composed-return fixtures are measured; TWO remain UNMEASURED** and would be
+> # a finding if they disagree. There IS an engine contrast at measured depth
+> # 2 -- that contrast is the defect; what is absent is a second repair
+> # obligation.
+> #
+> # **Dead leads:** mode, inner-kind, outer-kind, homogeneity, combinator,
+> # read-vs-write. The superseded claim -- that interp violates on the
+> # composed-return nests where native is CORRECT, and that native-right versus
+> # native-wrong was the lead -- is false.
+> #
+> # **THE CAUSE IS PLANNER CLASSIFICATION, NOT DEPTH.** Depth changes which
+> # existing admission class the continuation enters; the causal boundary is
+> # Specialized/handler-owned execution versus unowned Deferred forward-`Ret`.
+> # px8ta depth 2 is a SECOND lowering path, not another sample of the first.
+> # **Both arms are required and this is measured:** the Architect's probe
+> # relaxing the global threshold fixed the composed family and left px8ta
+> # wrong.
+> #
+> # `D0a` AFFIRMED `evt_17kyxq7q5v8ar`, AC-7 discharged. `D0c` and `D0c-2` are
+> # CLOSED -- do not re-run either. Historical prediction text below is retained
+> # under explicit historical labels only.
 
 ## There is ONE shape. The surface cannot express the other one.
 
@@ -101,45 +120,93 @@ finished — **a violated bracket, not a violated convention.**
 > the Spec enclave as refutable — sent there on `:400-406`, Spec finds no
 > ordering rule and the reading looks unsupported.
 >
-> **Open question for Spec, stated and not answered here:** does
-> `62-authority.md:325-326` incorporating ADR 0021 by reference discharge this,
-> or must the ordering clause be written into `spec/`?
+> **That question went to Spec and is ANSWERED** (`evt_17kyxq7q5v8ar`):
+> `62-authority.md:325-326` incorporating ADR 0021 by reference DOES discharge
+> it. No ordering clause need be written into `spec/`, no spec edit is
+> authorized, and `AC-7` is discharged. Do not re-ask.
 
-## Both engines violate it, on DIFFERENT nests
+## NATIVE violates it at EVERY measured depth 2. Interp violates it nowhere MEASURED.
 
-    composed-return   OUTER withResource file, INNER withBuffer
-                      interp  file then buffer = outer-then-inner   VIOLATES
-                      native  buffer then file = inner-then-outer   CORRECT
+Measured at `89d2bfb57` by `D0c` (`evt_29sjeg0q437k8`):
 
-    px8ta row         withResource nested in withResource
-                      native  outer-then-inner                      VIOLATES
+    depth 2, px8ta   FsHandle/FsHandle, Metadata   native [r1,r2]   WRONG
+    depth 2, D0c(C)  FsHandle/FsHandle, Read       native [r1,r2]   WRONG
+    depth 2, D0c(A)  Buffer/Buffer                 native [r1,r2]   WRONG
+    depth 2, D0c(B)  Buffer outer / FsHandle inner native [r1,r2]   WRONG
+    depth 2, composed read                         native [r1,r2]   WRONG
+                     FsHandle outer / Buffer inner interp [r2,r1]   correct
+    depth 2, D0c-2(E) rt_read_norights_stage       native [r1,r2]   WRONG
+                     WriteCreate outer / Buffer    interp [r2,r1]   correct
+    depth 3, composed write                        native [r3,r2,r1] correct
+                     FsHandle/FsHandle/Buffer      interp [r3,r2,r1] correct
+    depth 3, D0c-2(D) composed READ                native [r3,r2,r1] correct
+                     FsHandle/FsHandle/Buffer      interp [r3,r2,r1] correct
 
-**Native satisfies the rule on one nest and breaks it on another.** That, not a
-shape distinction, is the lead.
+**There is no native-right-versus-native-wrong lead.** Native is wrong on all
+SIX reaching depth-2 nests regardless of kind, combinator, mode, homogeneity or
+read/write, and correct on BOTH reaching depth-3 nests. Interp is correct on all
+FOUR measured composed programs.
 
-**`D0b` (a Steward scope call on "sibling" order) is GONE.** There is no
-unspecified shape, so **interp on the composed-return fixtures is a correctness
-defect with a direction, not a disposition.**
+**There IS an engine contrast, and the table above shows it:** at measured depth
+2 native releases `[r1,r2]` and interp `[r2,r1]`. That contrast is the defect
+this node repairs. What died is the *lead* -- the idea that some surface
+property separates a native-correct family from a native-wrong one.
 
-## The lead is a CORRELATE. Write it as a hypothesis to kill.
+**The mechanism is NOT "emits in acquisition order."** That would make depth 3
+release `[r1,r2,r3]`; it releases `[r3,r2,r1]`. Depth 3 is doing something
+structurally different, not the same thing at greater length.
 
-**Six properties co-vary perfectly across the pair**, so "inner bracket kind"
-is one reading of two data points, not their content (Architect,
-`evt_1byx3327ppasg`):
+**`D0b` (a Steward scope call on "sibling" order) is GONE** -- there is no
+unspecified shape.
 
-                        composed-return      px8ta
-                        native CORRECT       native WRONG
-    inner combinator    withBuffer           withResource
-    inner kind          Buffer               FsHandle
-    inner error type    ResourceError        FileError
-    inner acquisition   capacity : Int       (name, mode)
-    outer mode          Read / WriteCreate   ResourceMetadata
-    NEST HOMOGENEITY    heterogeneous        HOMOGENEOUS
+**The five-fixture accounting, binding everywhere on this node: THREE of the
+five existing composed-return fixtures are MEASURED, TWO remain UNMEASURED.**
 
-**Depth is controlled and is out.** Both families cover 2-deep and 3-deep, and
-at depth 2 one is right and the other wrong.
+    MEASURED  fs_read_at_malformed_offset_narrows_to_invalid_offset      D0c
+    MEASURED  fs_write_at_malformed_offset_narrows_to_invalid_offset     D0c
+    MEASURED  fs_read_at_malformed_offset_without_read_right_            D0c-2(E)
+                narrows_to_invalid_offset  (drives rt_read_norights_stage)
+    UNMEASURED fs_read_at_malformed_window_narrows_to_invalid_bounds
+    UNMEASURED fs_write_at_malformed_offset_without_write_right_
+                narrows_to_invalid_offset
 
-### One confound is already dead, and it is the one first proposed
+**`D0c-2`(D) is a FOURTH measurement, not a sixth fixture** -- a transient READ
+variant of the depth-3 write program, built for the round and removed. Four
+measurement PROGRAMS; three measured FIXTURES of five.
+
+**The interp DEFECT CLAIM is retired on measurement, and only within that
+bound:** no MEASURED interp defect, interp correct on all four measured
+programs, no interp repair authorized. The two unmeasured fixtures are unknown
+rather than clear, and would be a finding if they disagree.
+
+## The correlate table is HISTORICAL. The inner-kind structural kill is LIVE.
+
+> **HISTORICAL — pre-`D0c` prediction, REFUTED 2026-09-21. It is not the
+> current state and nothing in it is an instruction.** Retained only because
+> the dead native-right-versus-native-wrong contrast rested on it.
+>
+> It read six properties as co-varying perfectly across a pair in which the
+> composed-return family is native-CORRECT and px8ta native-WRONG, so that
+> "inner bracket kind" was one reading of two data points rather than their
+> content (Architect, `evt_1byx3327ppasg`):
+>
+>                         composed-return      px8ta
+>                         native CORRECT       native WRONG
+>     inner combinator    withBuffer           withResource
+>     inner kind          Buffer               FsHandle
+>     inner error type    ResourceError        FileError
+>     inner acquisition   capacity : Int       (name, mode)
+>     outer mode          Read / WriteCreate   ResourceMetadata
+>     NEST HOMOGENEITY    heterogeneous        HOMOGENEOUS
+>
+> **At `89d2bfb57` BOTH families are WRONG at depth 2.** The contrasted pair
+> does not exist, so no axis in the table survived, and depth was neither
+> controlled nor out. The instruction this section carried -- write the lead
+> as a hypothesis to kill, and do not localize a site first -- fired, was
+> honoured, and is spent: the Architect localized the cause structurally at
+> `evt_4t14zmba83hjm`.
+
+### LIVE: one confound is dead structurally, and it is the one first proposed
 
 **Resource kind cannot be carried by the release emission.** `ResourceRelease`
 is a single kind-agnostic op. Under
@@ -200,37 +267,91 @@ cheap fixture.
 
 ## Deliverables
 
-D0a. **Confirm the settlement derivation with the Spec enclave**, including the
-     ADR-by-reference question. A confirmation with a named refutation, not a
-     fresh investigation. **Named refutation: Spec reads settlement as not
-     ordered relative to body completion.**
+D0a. **DISCHARGED.** Spec enclave AFFIRMED at `evt_17kyxq7q5v8ar`:
+     `62-authority.md` §4.2 makes settlement normative under ADR 0021, whose
+     delayed-body clause puts an inner bracket's settlement inside completion
+     of the inner EXPRESSION. Inner settlement precedes outer-body completion,
+     derived from locked text. No spec edit authorized or needed. Do not
+     re-ask.
 
-D0c. **Kill the confounds with discriminating fixtures, cheapest first.** These
-     buy a DIRECTION for the repair; they are not measurements of the
-     population.
+D0c. **RAN AND IS CLOSED** (`evt_29sjeg0q437k8`). Mode, inner-kind, outer-kind
+     and homogeneity are each dead with a WRONG case on both sides; combinator
+     dies with kind because the two never vary independently. **Do not re-run
+     it.** Its value is the four dead axes, not a direction.
 
-       (C) one-token edit to a fixture already run: change px8ta's inner
-           bracket mode from `ResourceMetadata` to `ResourceRead`.
-           homogeneous combinator, HETEROGENEOUS mode.
-             still wrong -> mode is not it; combinator or kind
-             now correct -> never "bracket kind"; it is nest homogeneity
-       (A) `withBuffer` inside `withBuffer`.
-             inner-kind predicts CORRECT, homogeneity predicts WRONG.
-             One bit, separates the two leading hypotheses outright.
-       (B) `withResource` inside `withBuffer` — inverts the pair while holding
-           heterogeneity. Inner-kind predicts WRONG, outer-kind predicts
-           CORRECT. `withBuffer`'s body is an ordinary `HostIO` computation, so
-           this is expressible today.
+D0c-2. **RAN AND IS CLOSED** (`evt_pz0w7e8ae39w`; predictions pre-registered
+     at `evt_29wbxhm9mcvs9`). **Read-vs-write is DEAD on both sides.** (E)
+     `rt_read_norights_stage` reaches teardown and is a valid fixture: native
+     `[r1,r2]` wrong, interp `[r2,r1]` correct, killing write-create vs
+     read/metadata inside depth 2. (D) a depth-3 READ: native and interp both
+     `[r3,r2,r1]` correct, killing read/write inside depth 3. **Live set is now
+     depth-equals-count versus lowering path, and no fixture separates those
+     either** -- if depth selects the lowering they co-vary by construction.
+     **The standing stop FIRED and has since been ANSWERED.** Depth was left
+     standing, the structural question went to the Architect, and the ruling
+     landed at `evt_4t14zmba83hjm`: depth is the SELECTOR, the cause is planner
+     classification. `D1a` is now AUTHORIZED, bounded to the two arms below.
+     Interp is correct on all FOUR composed measurements across both rounds;
+     no interp-repair evidence emerged, which further confirms `D1b`'s deletion.
 
-D1a. **Repair native's nested teardown** so the inner bracket settles before
-     the outer. Report the site and the argument for it, not only the diff.
+     Historical, the split it was authorized to make:
+     Depth-equals-count, read-vs-write and lowering path are confounded in the
+     single composed three-deep write. **Depth and resource count are ONE
+     variable** -- every bracket takes exactly one acquisition
+     (`spec/30-surface/38-ffi-io.md:408-413`), so nest depth N IS N resources
+     and no fixture separates them. Predictions registered BEFORE each
+     run. Cheapest first:
 
-D1b. **Repair interp on the composed-return nests** — it releases
-     outer-then-inner there, which the derivation forbids. This has a direction
-     now and is no longer gated on a Steward decision.
+       (D) a depth-3 READ nest. Holds family and depth against the
+           known-correct case, varies only read/write.
+             correct -> read/write dead; depth still stands
+             wrong   -> depth dead; the operation axis is causal
+       (E) a depth-2 nest with a `ResourceWriteCreate` outer, varying
+           read/write inside the known-wrong case.
+             wrong   -> read/write dead from the other side
+             correct -> the operation axis is causal
+           `rt_read_norights_stage` (`rt_parity_native.rs:220-222`) already
+           nests one at depth 2 and MAY serve, but it reads as a
+           negative/refusal stage and may never reach teardown. Verify that
+           before relying on it, and report it if it does not.
+
+D1a. **Repair the planner classification, as TWO REQUIRED ARMS** (Architect
+     `evt_4t14zmba83hjm`). Either arm alone leaves half the population wrong.
+
+     **A.** `StaticTransitionPlan::static_response_phase_b_split` -- stop using
+     the whole-plane `ordinary_stage_count >= 2` threshold to reject an
+     EXCLUSIVELY PREDECLARED transport group. **Per-group eligibility for the
+     exclusive case; do NOT globally change the threshold to `>= 1`.** The
+     mixed-owner law is preserved exactly, and the suppression mutation must
+     still restore P2.
+
+     **B.** `StaticTransitionPlan::bounded_deferred_response_suffix` -- admit a
+     third structural class `release_only_suffix` (non-empty, every row
+     `HostOpV1::ResourceRelease`), returned when `repeated_producer ||
+     mapping_access_chain || release_only_suffix`. Not emission-time
+     operation-name special casing: the frontier walk has already proved exact
+     lexical K, finite population, no opaque frontier, no cycle and P2 shape,
+     and the handler-owner check still requires one unique specialized owner.
+
+     **Do not reorder release events after emission.** No host-dispatch
+     reorder, trace sort, `ResourceRelease` kind split, exploratory logging,
+     global diagnostic recoding, aggregate relaxation, or capacity change.
+
+D2a. **TWO non-ignored controls, one per arm.** `D2a-A` for the composed
+     single-stage arm (the reaching `rt_read_norights_stage` shape or a
+     source-equivalent); `D2a-B`, distinct, for the px8ta release-only-suffix
+     arm -- **not the still-ignored depth-2-plus-depth-3 loop row.** Mutation
+     must redden each independently with `[r1,r2]`, each with a positive
+     application witness that compiles. **One aggregate release-order test is
+     not evidence for both arms.**
 
 D2.  Re-enable release-order parity on the five composed-return fixtures
-     (remove the b2 exclusion marker) once both engines agree.
+     (remove the b2 exclusion marker) once both engines agree. **THREE of the
+     five are measured; TWO remain UNMEASURED** -- see the accounting above for
+     which. Measured does NOT mean agreeing: at depth 2 the engines disagree,
+     and that disagreement is what `D1a` repairs. Re-enable only once they
+     agree, and treat a disagreement from either unmeasured fixture as a
+     finding to return to the Steward.
 
 ## Acceptance
 
@@ -239,14 +360,30 @@ D2.  Re-enable release-order parity on the five composed-return fixtures
 - Report the observed release SEQUENCE as vectors, before and after. **The
   assertion compares two vectors; the vectors are the evidence** — a pass/fail
   is not.
-- **The composed-return nest is native's own working case and must stay
-  correct.** A repair for px8ta that breaks it has traded one violation for
-  another, and this is the control with teeth: it is a case where native is
-  already right.
-- `D0c` reports each fixture's prediction BEFORE its run, and which hypotheses
-  each result kills. A discriminating fixture whose prediction is recorded
-  afterwards discriminates nothing.
+- **BOTH reaching depth-3 nests release `[r3, r2, r1]` at `89d2bfb57` and MUST
+  still do so after any repair** -- the composed three-deep WRITE and the
+  `D0c-2`(D) three-deep READ. They are the only measured native-correct
+  teardowns, so a repair that breaks either has traded violations for a new
+  one. **AC-6's exact depth-3 object-emission refusal on the ignored px8ta row
+  is preserved unchanged.** (This replaces the old clause naming the
+  composed-return nest as native's working case; that clause was refuted by its
+  own re-measurement -- the composed TWO-deep read is native-wrong.)
+- **DISCHARGED.** Both rounds registered predictions before their runs -- `D0c`
+  at `evt_287tm2f6ycg0x`, `D0c-2` at `evt_29wbxhm9mcvs9` -- and both are closed.
+  **No further discriminating fixture is authorized**, so this governs nothing
+  live.
+- **TWO independent controls, one per `D1a` arm, and each mutation-proved.**
+  Restoring exclusive single-stage deferral must redden `D2a-A` with `[r1,r2]`;
+  suppressing release-only suffix admission must redden `D2a-B` with `[r1,r2]`.
+  Each mutation needs a positive application witness and must compile. **One
+  aggregate release-order test is not evidence for both arms.**
+- **Structural diagnostics, not pinned ids.** The composed arm must no longer
+  leave its governed releases as unowned Deferred P2, and the px8ta inner
+  release must acquire the unique bounded handler owner.
 - The px8ta row is **not** un-ignored by this node alone — its depth-3 blocker
   is `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`'s.
-- Both repairs are grounded in the settlement derivation, **not in matching
-  whichever engine was easier to change.**
+- **The native repair** is grounded in the settlement derivation affirmed at
+  `evt_17kyxq7q5v8ar`, **not in matching whichever engine was easier to
+  change.** There is exactly ONE repair, and it is native-side: interp measures
+  correct on all FOUR measured composed programs, so no interp repair is
+  authorized and none is to be filed.
