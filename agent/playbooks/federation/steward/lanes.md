@@ -16,13 +16,13 @@ These rulings remain operative and are retained verbatim.
 - **2026-08-25:** "there are three lanes authorized right now. language (lane
   2) was unblocking rt on priority, and when that was done should have unblocked
   foundation (lane 3) with module/import."
+- **2026-09-21, FLEET REDUCED TO ONE LANE:** "when L2 and L3 finish their
+  current tasks, stop giving them new work. gracefully reduce the fleet to the
+  single L1 lane." Neither had a task in flight; both stood down at
+  `evt_59a2pvderx1ne`. SUPERSEDES the 2026-08-25 ruling above, retained because
+  it defines what reinstatement restores.
 
-## Live objective direction
-
-- **L2 has no live operator objective** (Route B and "g then remeasure" both
-  discharged); see L2's row.
-
-## Catalog proof direction
+## Catalog proof direction -- SUSPENDED WITH L3, NOT WITHDRAWN
 
 - **2026-09-13:** "The proofs are not done. A catalog package is not finished
   until its proofs are complete. Declaring that they are tested computation is
@@ -56,22 +56,22 @@ rather than a separate report node, and wording hygiene does not enter a lane.
 
 ## Authorized roster
 
-Three lanes, in priority order:
-
-1. Runtime
-2. Language
-3. Foundation
-
-Finished accepted work still routes immediately, regardless of lane. No other
-ring starts without an operator lane change.
+**ONE lane: L1 Runtime.** L2 and L3 are stood down by the 2026-09-21 ruling.
+No other ring starts without an operator lane change and no seat stands itself
+back up. Finished accepted work still routes immediately.
 
 ## Current state
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-BRACKET-RELEASE-ORDER-PARITY` -- **STOPPED at `draft`; its own stop condition fired and it hands off.** `D0` returned its STOP branch on exact WIP `e38ff86bf` (`evt_6f5gw5hf02xf0`, verified `evt_75s17sf4bxdbn`): `static_response_phase_b_split` runs in `planning/` and `TransportDormant` is decided only in `lowering/units.rs`, so the fact Arm A needs does not exist where Arm A runs. **No Arm-B-only candidate may be assembled** -- under Arm-A suppression px8ta depth 3 restores the old undeclared-target refusal before any release vector exists, so `AC-6` depth 3, all three `D2b` controls and the `AC-9` closure all depend on Arm A. Counts 4/4, both triggers still fire at 6 | `RT-DELAYED-OWNER-CLASSIFICATION-TWO-PASS` -- `draft`, L, **T1**, framed on Architect ruling `evt_493eky78hsp3h`. Delayed owner classification by exact two-pass lowering; hoisting was rejected as a cycle. ONE atomic node carrying the whole remaining set, closing `RT-DEPTH3-...` with it. An unused discovery precursor must not land | **OPERATOR FORK OPEN at `evt_74bkfrh5xsnkf`** -- this buys 1 of the 14 defect-named ignored rows plus one node closure, and reopens `artifact/mod.rs`, `lowering/core.rs`, `lowering/units.rs` and Phase B. I recommended paying it: `D3` removes an order-excluding oracle and native emits acquisition order on all six reaching depth-2 nests, so parking the row leaves a live wrong-order defect behind a blind instrument. **T1 vs the seats' current T2 is a reseat question the operator owns** (`MODELS.md`). Runtime HELD at `e38ff86bf`; do not release the successor without the operator answer |
-| L2 | language | **Language surface. NO live operator objective** -- Route B and "g then remeasure" both discharged | **NONE. `LANG-SEAL2-GATE-INCRATE-RELOCATION` LANDED `c2eca6e41`** (5 blobs verified by identity). The lane is DARK | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` -- `draft`, the only live candidate. Its deferral premise HAS dissolved (`RT-DESCENT-RETIRE` merged; all 16 `V3-FO-*` merged/closed) | **Operator fork OPEN at `evt_1py9jhvehv77c`.** My earlier D0-only default is WITHDRAWN -- D0 alone is a census node, which §1 and the watchdog both forbid, and the node itself says D1 is not the ring's to decide. What makes it worth doing is that settling it lifts the Architect's standing no-new-citation-bearing-labels prohibition (`evt_2q0bm3ez5aczd`). Recommended: release D0+D1, D2 only if D1 rules for exclusion. |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-CONFIGURATION-DECODER-LAWS` -- ROUTED `3c722a5ffefbc15c5fb7866417f71a13a4250f29`, Decision `dec_46thvhz2xdjbd`, 2 paths `+1031/-26` off base `7e3db6f55`. The lieutenant owns M4-M9 | `CAT-PARSING-CURSOR-LAWS` -- ALREADY FRAMED `ready`, L, T1; all three `depends_on` are `merged`. Kick when DECODER closes. Do NOT frame a successor | The Architect ordering precondition is WITHDRAWN and the publisher blocker is owned. PR #4127 registered zero workflow runs; I authorized close-and-LEAVE-CLOSED at `evt_1sc9f2p4zed1c` so the publisher takes its `else` branch and cuts a FRESH PR on the identical head -- `scripted-pr-automerge.sh:294-299` reuses only an OPEN PR, so close/reopen had preserved the broken object. Head unchanged, approvals valid. FALSIFIER: if the fresh PR also fails to register, my reading is wrong and it becomes a real operator escalation I carry. |
+
+**Stood down, and the one thing still live.** `CAT-CONFIGURATION-DECODER-LAWS`
+is routed at exact `3c722a5ffefbc15c5fb7866417f71a13a4250f29` and belongs to
+the lieutenant, not to a lane. If its fresh PR also registers zero workflow
+runs, HOLD it for the operator -- that reading is then wrong and I carry it.
+`CAT-PARSING-CURSOR-LAWS` stays framed and unkicked, and
+`CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` stays `draft` and unreleased.
 
 ## Update rule
 
