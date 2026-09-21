@@ -89,9 +89,25 @@ the worker started at `Zero`.
 prove that `parse_digits_at` returns `Ok` on any list satisfying it. The
 predicate is local to this package and adds no trust.
 
-One file. No new function on the parse path, import, module, instance,
-primitive, postulate, `Axiom`, or trusted entry. `trusted_base()` delta stays
-zero and the format direction is byte-unchanged.
+**Two files, and the second is required, not optional.** The package file, plus
+`crates/ken-elaborator/tests/cat_tier_d_parsing_group_import.rs`, whose
+`parsing_numeric_loader_visible_inventory_is_exact` (`:316`) pins an exact
+eight-name `assert_eq!` against `published_module_surfaces` and then builds an
+import list from that same set at `:332`. D0's attached members cannot leave
+that pin green, so the candidate carries a NAMED-SET delta to it. **A count
+re-pin is not acceptable** -- show the delta is exactly the intended names.
+
+Follow the landed precedent rather than inventing a shape:
+`crates/ken-elaborator/tests/cc1_nonempty_validation_acceptance.rs` solved this
+for `CAT-NONEMPTY-APPEND-HEAD-LEFT` by adding the attached name to the
+published-surface expectation while EXCLUDING `::`-bearing names from the
+import list, because an attached proof is not a `::`-selectable import token.
+Nothing else in the Tier-D file moves: no other assertion, no `#[ignore]`, no
+second test.
+
+Beyond those two files: no new function on the parse path, import, module,
+instance, primitive, postulate, `Axiom`, or trusted entry. `trusted_base()`
+delta stays zero and the format direction is byte-unchanged.
 
 ## Acceptance criteria
 
@@ -126,6 +142,15 @@ Hand back rather than work around if either holds:
 - **D1 cannot be stated without an import.** The five-loader measurement above
   makes an import a fleet-visible change, not a local one. Report it; the
   frame amendment is the Steward's.
+- **An exact public D0 signature needs a currently-private Numeric name.**
+  `numeric_diagnostic`, `EmptyInput`/`InvalidDigit` and the named `Int`
+  literals are private, and the surface parser rejects inlining them into a
+  public proof type. Publishing them, or weakening the public claim while the
+  exact equation stays private, changes the package's published surface. That
+  is the **Architect's** call, not the ring's and not the Steward's: stop and
+  route it. If the chosen arm makes a public law weaker than the private
+  equation it names, that asymmetry is stated in the package rather than left
+  for a reader to find.
 
 ## Not this node
 
