@@ -1724,57 +1724,54 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
     if let Some(response) = selected_response_owner_target(plan, bundle, identity)? {
         #[cfg(feature = "px8-ds-test-support")]
         if plan.arm_a_liveness_phase()? != ArmALivenessPhase::Discovery {
-            if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
-            .with(std::cell::Cell::get)
-        {
-            STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
-                .with(|count| count.set(count.get() + 1));
-            return match mutation {
-                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget
-                    | StaticResponseCallerRetargetMutation::RestoreSelectedKTargetWithComposedOverlap => bundle
-                    .continuation(identity.target())
-                    .ok_or_else(|| {
-                        backend_module(
-                            "the response-caller mutation found no original K declaration"
+            if let Some(mutation) =
+                STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get)
+            {
+                STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
+                    .with(|count| count.set(count.get() + 1));
+                return match mutation {
+                    StaticResponseCallerRetargetMutation::RestoreSelectedKTarget
+                    | StaticResponseCallerRetargetMutation::RestoreSelectedKTargetWithComposedOverlap => {
+                        bundle.continuation(identity.target()).ok_or_else(|| {
+                            backend_module(
+                                "the response-caller mutation found no original K declaration"
+                                    .to_string(),
+                            )
+                        })
+                    }
+                    StaticResponseCallerRetargetMutation::RemoveSelectedCaller => {
+                        Err(backend_module(
+                            "the response-caller mutation removed one selected incoming caller"
                                 .to_string(),
-                        )
-                    }),
-                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => {
-                        Err(
-                    backend_module(
-                        "the response-caller mutation removed one selected incoming caller"
-                            .to_string(),
-                    ),
-                )
+                        ))
                     }
                     StaticResponseCallerRetargetMutation::RetargetToDifferentResponseOwner => {
-                    let owners = plan
-                        .static_response_owner_specializations()?
-                        .map_err(|infeasible| {
-                            backend_module(format!(
+                        let owners = plan.static_response_owner_specializations()?.map_err(
+                            |infeasible| {
+                                backend_module(format!(
                                 "compile-time response specialization is infeasible at {:?}: {}",
                                 infeasible.vis_origin(),
                                 infeasible.reason(),
                             ))
-                        },
+                            },
                         )?;
-                    let substitute = owners
-                        .iter()
-                        .find(|owner| owner.selected_caller() != identity)
-                        .ok_or_else(|| {
+                        let substitute = owners
+                            .iter()
+                            .find(|owner| owner.selected_caller() != identity)
+                            .ok_or_else(|| {
+                                backend_module(
+                                    "the response-caller retarget control found no different owner"
+                                        .to_string(),
+                                )
+                            })?;
+                        bundle.response(substitute.id()).ok_or_else(|| {
                             backend_module(
-                                "the response-caller retarget control found no different owner"
+                                "the response-caller retarget control found no declared substitute"
                                     .to_string(),
                             )
-                        })?;
-                    bundle.response(substitute.id()).ok_or_else(|| {
-                        backend_module(
-                            "the response-caller retarget control found no declared substitute"
-                                .to_string(),
-                        )
-                    })
-                }
-            };
+                        })
+                    }
+                };
             }
         }
         return Ok(response);
