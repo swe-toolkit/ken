@@ -14,8 +14,9 @@ unenforced.
 
 ## 2. Fixed inputs
 
-Base: `dcbc24c33231f0529e5e975dc21597fbb7d6a5ab`. `lexer.rs` is blob-identical
-at this base and at `e8ab799b5`, where these inputs were first measured.
+Base: `994e5f95aae8079df643c68004b8bfb9c4954719`. `lexer.rs` is blob-identical
+at this base, at `dcbc24c33` and at `e8ab799b5`, where these inputs were first
+measured.
 
 `spec/30-surface/31-lexical.md §1f` (`:514`, landed `2d72bd7e7`) is the design
 authority and settles the policy: the predicate is the closed Unicode general
@@ -30,10 +31,18 @@ Measured at the base:
 - The lexer is `crates/ken-elaborator/src/lexer.rs`. A `git grep` over `crates/`
   for `202E`, `U+FEFF`, `0xFEFF`, `feff`, `is_format`, `GeneralCategory` and
   `Trojan` returns **zero** hits. No guard exists in any form.
-- **Zero raw in-scope `Cf` codepoints occur anywhere in tracked source.** So the
-  guard lands green with no corpus migration owed — and equally, **no existing
-  file witnesses it.** Every control below is an authored fixture, and a suite
-  that only re-checks the corpus proves nothing.
+- **Zero raw in-scope `Cf` codepoints occur in any `.ken` or `.ken.md` file.**
+  So the guard lands green with no corpus migration owed — and equally, **no
+  existing Ken source witnesses it.** Every control below is an authored
+  fixture, and a suite that only re-checks the corpus proves nothing.
+- **Two tracked NON-Ken files do contain U+00AD, and they are out of scope.**
+  `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/constructors.rs`
+  (one, in a Rust comment near `:2438`) and
+  `docs/program/ds-campaign-judgment-log.md` (five, in prose). Neither is read
+  by the Ken lexer, so neither is a migration obligation. **Do not edit either
+  file.** `constructors.rs` is concurrently owned by L1's active
+  `RT-GRAFTED-SPINE-CONTROL-GRAPH`; touching it would collide with live work.
+  If your own sweep finds them, that is this input reproducing, not a defect.
 - **`advance` is not the whole-source chokepoint.** `cur` (`:318`) and `advance`
   (`:322`) decode one `char` at `self.pos`, but `skip_ws_comments` (`:341`)
   delegates to the free function `classify_comment` (`:236`) and its end
