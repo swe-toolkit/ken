@@ -71,19 +71,41 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 - **AC-4.** Bracket-SHAPED but unmarked code gets NO region. The control is ONE
   declaration chain carrying a canonical `withResource` bracket AND the proven
   lookalike declaration, asserting `regions.len() == 1`. RESEMBLANCE, not an
-  unrelated acquire. **The discriminating observation is a fail-closed
-  REFUSAL, not a count of 2**: a selector widened to key on application SHAPE
-  rather than on the injected identity is rejected at marker normalization --
-  `compiler bracket marker <id> has malformed application` -- before any region
-  is built. MEASURED at `daee72575`; this supersedes the count-of-2
-  discriminator in the Architect's ruling `evt_7nrdfv7ekvcqt` point 5, which
-  the Steward carried into this frame unmeasured. The count assertion stays as
-  the PROPERTY; refusal is how the control reds. An acquisition outside a
-  canonical producer is UNCONSTRUCTIBLE FROM SOURCE -- prelude confinement
-  removes a 41-name roster from `elab.globals`, `private_resource_acquire`
-  among them -- so the earlier "unrelated acquire/release pair" control
-  demanded a state nothing can reach. Do NOT hand-build the Runtime IR here:
-  that bypasses erasure, and erasure's selection is the thing AC-4 measures.
+  unrelated acquire. An acquisition outside a canonical producer is
+  UNCONSTRUCTIBLE FROM SOURCE -- prelude confinement removes a 41-name roster
+  from `elab.globals`, `private_resource_acquire` among them -- so the earlier
+  "unrelated acquire/release pair" control demanded a state nothing can reach.
+  Do NOT hand-build the Runtime IR here: that bypasses erasure, and erasure's
+  selection is the thing AC-4 measures.
+  - **What ONE mutation establishes, written as that mutation and not as a
+    class.** Widening the selector to key on application SHAPE rather than on
+    the injected identity reds FAIL-CLOSED at marker normalization with
+    `compiler bracket marker <id> has malformed application`. Measured at
+    `daee72575`; located at `compiler_driver.rs:1275-1281`, inside
+    `transform_bracket_producer_term` under `NormalizeMarkerPayloads`, firing
+    only when `markers.ids().contains(&id)` holds for the application head and
+    the spine is malformed. SUPERSEDES the count-of-2 discriminator in ruling
+    `evt_7nrdfv7ekvcqt` point 5, which was a published PREDICTION.
+  - **This does NOT generalize to over-wrapping.** The guard is keyed on MARKER
+    IDENTITY, so a SOURCE LOOKALIKE -- different `GlobalId`, so
+    `contains(&id)` is false -- passes normalization untouched and NOTHING
+    refuses. `source_lookalike_identity_does_not_forge_bracket_metadata` shows
+    exactly that: `regions.is_empty()`, no error. Do not restate refusal as a
+    property of over-wrapping in general; that is the same move as the
+    prediction it replaced.
+  - **THE COUNT IS NOT YET MUTATION-PROVEN, and the discharge is OWED.** Under
+    the shape-widening mutation the test reds at
+    `prepare_native_program_sources(...).expect(...)`: the build never
+    completes, so `regions.len() == 1` never executes. That mutation proves
+    fail-closed authenticity and NOTHING about the count. The ring discharges
+    by EITHER (a) supplying a mutation that builds a region WITHOUT tripping
+    normalization, so the count goes 1 -> 2 and reds; OR (b) recording that
+    none can, with the reason -- the guard is identity-keyed and normalization
+    structurally precedes region construction -- and stating plainly that the
+    count is then a SECONDARY assertion whose failing configuration is
+    unreachable. Deleting or relaxing the guard to manufacture (a) is an
+    explicit NON-discharge. Due before child 3 assembles. Does NOT gate the
+    leader's confirmation or QA routing (`evt_7m05yqa48pxhk` point 5).
 - **AC-5.** No port is selected by `HostOpV1`, name, expression resemblance, or
   a `ResourceRelease` search. Validation by `HostOpV1` is permitted and must be
   shown to be validation, not selection.
@@ -132,10 +154,16 @@ prescribed control was unbuildable, and it is replaced above by resemblance.
 The owner-disambiguation fixture built while discovering this is retained as
 AC-8 rather than discarded, because it measures a real and different property.
 
-The replacement's DISCRIMINATOR was then mis-stated in turn, and is corrected
-in AC-4 above: an over-wrapping selector does not yield 2. Widening the
+The replacement's DISCRIMINATOR was then mis-stated in turn, TWICE. First the
+count: an over-wrapping selector does not yield 2, because widening the
 selector to key on application shape is refused at marker normalization before
-any region is built, so the control reds by refusal. The system's real
-behaviour is STRONGER than the predicted one. This is a frame defect in the
-Steward's amendment, not a second structural wall, and it does NOT advance the
-count.
+any region is built. Then the correction itself OVER-GENERALIZED, replacing a
+predicted class with an asserted one -- refusal holds for that named mutation
+and NOT for a source lookalike, whose different `GlobalId` passes normalization
+untouched with nothing refused. Both are corrected in AC-4 above, which now
+names the mutation and its message rather than a property of over-wrapping.
+NON-ADVANCING by the Architect's ruling `evt_7m05yqa48pxhk` point 4: a defect
+in frame TEXT surfaced by measurement, no mechanism rework, no new structural
+wall met. The count stays at 1. The live consequence is carried in AC-4: the
+count assertion is not yet mutation-proven, and horn (a) or (b) is owed by the
+ring.
