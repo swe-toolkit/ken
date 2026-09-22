@@ -622,12 +622,20 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
    fixture passes on current main — keyed on treating checked-IH transport and
    group membership as proof of a causal call although the candidate
    representation separates binding authority from call obligation.
+5. The two-pass orchestrator builds a complete eligibility-probe plan before it
+   knows whether `A` is empty, so all six empty-`A` mapping cases run two planner
+   lifecycles against current main's one and regress as either a final-planning
+   refusal or a bad native artifact — keyed on deciding whether discovery is
+   needed only after an otherwise disposable full plan has already run, contrary
+   to the one-pass boundary and without isolating final semantics from the
+   preflight or its distinct mode.
 
-**Count of record:** hard stops 4; symptom entries 4. Entry 1 was classified at
+**Count of record:** hard stops 5; symptom entries 5. Entry 1 was classified at
 `evt_177exqsxhvg5y`; entry 2 at `evt_76nkdg0h81xnw`; entry 3 at
-`evt_45qpftkx3s894`; entry 4 was reported at `evt_59tt59x2mbbxg`. **Both stop-3
-triggers are DISCHARGED** — Research at `evt_5p5jn87bmwpcc`, the entry-3
-shared-predicate question at `evt_6c900nagc7mn4`. Both next fire at six.
+`evt_45qpftkx3s894`; entry 4 was reported at `evt_59tt59x2mbbxg`; entry 5 was
+reported at `evt_78xgqja72hktm`. **Both stop-3 triggers are DISCHARGED** —
+Research at `evt_5p5jn87bmwpcc`, the entry-3 shared-predicate question at
+`evt_6c900nagc7mn4`. Both next fire at six.
 
 ## 5. Acceptance criteria
 
