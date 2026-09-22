@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-CONTROL-REGION-IR
-title: "Make bracket-settlement ownership and order EXPLICIT IN THE CONTROL IR. OPERATOR CHOSE THIS REPRESENTATION 2026-09-22 ('concur with rec. should be in the IR') after RT-DELAYED-OWNER-CLASSIFICATION-TWO-PASS was parked at hard stop 7; Architect ruled the shape at evt_4y0w2788qfxk1. THE SEMANTIC UNIT IS A BRACKET CONTROL REGION -- not a response, operation, call seat, group or fixture. One region owns one acquisition-success lifetime from delayed-body entry through settlement-result merge, and NESTED REGIONS' CONTROL EDGES ESTABLISH INNER-BEFORE-OUTER; response-owner liveness does not and has now twice proved to be only an indirect correlate of settlement order. A compiler-private checked wrapper marks the bracket at erasure, a private settlement plane resolves markers into regions on StaticTransitionPlan before response Phase B assigns any owner, a closed ResponseDisposition makes BracketOwned a PROJECTION of that plane rather than a predicate, and lowering consumes only a validated control view. D0 IS AN EQUIVALENCE REFUTER ON THE SMALLEST END-TO-END VERTICAL SLICE AND IT RUNS BEFORE THE EMITTER IS GENERALIZED: it compares interpreter and linked-native observation tuples and CAN REFUTE THE REPRESENTATION, which population equality provably cannot. This node begins at ZERO hard stops; the parked chain keeps 7/7."
-status: ready
+title: "UMBRELLA, RECUT INTO THREE ORDERED CHILDREN 2026-09-22 AND NOT ITSELF STARTABLE. Architect second WIP audit `evt_3rvns2yxm898r` ruled this cut MIS-SIZED; the mis-sizing was the STEWARD'S and the recut is the Steward's. Children in order: `RT-BRACKET-PRODUCER-AUTHENTICITY`, then `RT-BRACKET-SETTLEMENT-PLANE`, then `RT-BRACKET-LOWERING-AND-D0-REFUTER`, which ASSEMBLES all three and routes the ONLY candidate. Children 1 and 2 are held, reviewed inputs and NEVER independently landed products; "no standalone marker, inert plane, or partial owner" remains binding. THE REPRESENTATION IS NOT IN QUESTION -- the audit says outright that its findings do not invalidate explicit Control IR. This node freezes at HARD STOP 0, the sizing verdict adds NO symptom entry, and each child chain begins at zero. Retained work is preserved at evidence checkpoint `81f222b7f012829cd9f8d0f3dc684410a9b2b9ee` on `wp/RT-BRACKET-CONTROL-REGION-IR`, parented on pre-registration commit `c22f4861d` which stays UNCHANGED; that checkpoint is EVIDENCE AND REUSABLE WORK, NEVER A CANDIDATE. Original objective retained below for the law it states: make bracket-settlement ownership and order EXPLICIT IN THE CONTROL IR. OPERATOR CHOSE THIS REPRESENTATION 2026-09-22 ('concur with rec. should be in the IR') after RT-DELAYED-OWNER-CLASSIFICATION-TWO-PASS was parked at hard stop 7; Architect ruled the shape at evt_4y0w2788qfxk1. THE SEMANTIC UNIT IS A BRACKET CONTROL REGION -- not a response, operation, call seat, group or fixture. One region owns one acquisition-success lifetime from delayed-body entry through settlement-result merge, and NESTED REGIONS' CONTROL EDGES ESTABLISH INNER-BEFORE-OUTER; response-owner liveness does not and has now twice proved to be only an indirect correlate of settlement order. A compiler-private checked wrapper marks the bracket at erasure, a private settlement plane resolves markers into regions on StaticTransitionPlan before response Phase B assigns any owner, a closed ResponseDisposition makes BracketOwned a PROJECTION of that plane rather than a predicate, and lowering consumes only a validated control view. D0 IS AN EQUIVALENCE REFUTER ON THE SMALLEST END-TO-END VERTICAL SLICE AND IT RUNS BEFORE THE EMITTER IS GENERALIZED: it compares interpreter and linked-native observation tuples and CAN REFUTE THE REPRESENTATION, which population equality provably cannot. This node begins at ZERO hard stops; the parked chain keeps 7/7."
+status: draft
 owner: runtime
 size: L
 gate: none
@@ -12,17 +12,17 @@ github: null
 origin: "Steward, 2026-09-22, on current main 03e9b0afdf4c055479c0b70130b48d264bf58b93. Operator closed the representation fork in conversation ('concur with rec. should be in the IR') after the Steward put it to them at evt_47n69ztgsp6b8; the Architect's terminal ruling evt_4zk1ckv4czk4e required that any future attempt be a separately framed architecture decision on current main with the representation chosen by the operator. Shape ruled at evt_4y0w2788qfxk1, which confirmed the Steward's bounded-scope reading and adopted the Steward's request that the equivalence refuter come first. THIS IS NOT AN AMENDMENT to RT-DELAYED-OWNER-CLASSIFICATION-TWO-PASS and does not inherit its scope fence; that node stays parked at draft and its evidence stays evidence."
 ---
 
-> # AUTHORIZED AND STARTABLE. Build it.
+> # UMBRELLA ONLY. NOT STARTABLE. Recut into three ordered children.
 > #
-> # **Start from landed current `main`.** This is a NEW node, not an amendment
-> # to the parked one, and it does not inherit that node's scope fence.
+> # **Start at `RT-BRACKET-PRODUCER-AUTHENTICITY`**, which is `ready`. Then
+> # `RT-BRACKET-SETTLEMENT-PLANE`, then `RT-BRACKET-LOWERING-AND-D0-REFUTER`.
 > #
-> # **`D0` runs FIRST and can stop this node.** It is not a census. It is an
-> # end-to-end equivalence observation on the smallest vertical slice, and it is
-> # the only instrument here that can refute the representation.
+> # **Only child 3 routes a candidate**, and it routes children 1, 2 and 3 as
+> # ONE atomic combined tree. Children 1 and 2 produce reviewed checkpoints.
 > #
-> # **Do not answer a `D0` failure with a larger census.** That is the exact
-> # move that cost seven hard stops on the parked node.
+> # **Everything below is still binding law** -- the mechanism, the acceptance
+> # criteria, the prohibitions and the stop condition. It was not wrong. It was
+> # too big for one cut, and that was the Steward's error.
 
 ## 1. What is settled. Do not re-derive any of it.
 
