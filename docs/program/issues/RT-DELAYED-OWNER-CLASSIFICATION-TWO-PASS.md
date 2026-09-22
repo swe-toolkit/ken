@@ -1,6 +1,6 @@
 ---
 id: RT-DELAYED-OWNER-CLASSIFICATION-TWO-PASS
-title: "Delay owner classification by exact two-pass lowering. SUCCESSOR TO RT-BRACKET-RELEASE-ORDER-PARITY, WHOSE OWN STOP CONDITION FIRED. D0 ran on exact clean WIP e38ff86bf and returned its STOP branch (runtime-implementer evt_6f5gw5hf02xf0, verified runtime-leader evt_75s17sf4bxdbn): there is no admissible planning-time predicate separating rt_read_offset_stage from rt_read_window_stage, because the fact Arm A needs does not yet exist where Arm A runs. static_response_phase_b_split is in planning/static_transition/responses.rs; TransportDormant is decided only in lowering/units.rs, and planning precedes lowering. The sibling identities O0 and W0 are byte-identical immediately before the split modulo planner-issued provenance atoms, yet settle InlineNoCall with one verified response-owner call versus TransportDormant with zero. Origins and operation detail would be prohibited proxies; disposition and call presence would predict an emission-time result. ARCHITECT RULED THE SHAPE at evt_493eky78hsp3h: DELAYED OWNER CLASSIFICATION BY EXACT TWO-PASS LOWERING. Hoisting is REJECTED as a cycle -- Phase B decides the response disposition that lowering consumes, so hoisting exact settlement would lower against a plan whose disposition is undecided, a planning-time approximation would create a second emission authority that D0 already proved cannot distinguish O0 from W0, and an exact hoist would itself be a provisional lowering pass, which is this mechanism under another name. THE CLEARED-ROW SPLIT IS REJECTED ON MEASUREMENT (Steward asked at evt_j1qetp1pkej9; measured and refused at evt_493eky78hsp3h): with Arm A suppressed on e38ff86bf, px8ta depth 2 stays correct on Arm B but depth 3 applies suppression eight times and restores the exact old undeclared-target refusal BEFORE ANY RELEASE VECTOR EXISTS, RestoreSelectedKTarget is preempted by that refusal, and OmitKCall applies zero times because no response-owner body exists. AC-6 depth 3, all three D2b controls and the RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED closure therefore all depend on Arm A, so no Arm-B-only candidate may be assembled and there is no partial delivery available. This node is ONE ATOMIC PRODUCT NODE carrying the entire remaining deliverable set of RT-BRACKET-RELEASE-ORDER-PARITY -- Arm A and Arm B together, both D2a controls and their mutations, writeAll, both composed depth-3 vectors, px8ta depths 2 and 3 unignored, all three D2b controls, the five section 2.3 identities, removal of the order-excluding helpers once both engines agree, and atomic closure of RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED. AN UNUSED DISCOVERY PRECURSOR IS NOT A DELIVERABLE AND MUST NOT LAND. Held at draft pending the operator lane-shape answer; this reopens artifact/mod.rs, lowering/core.rs and lowering/units.rs, which RT-BRACKET-RELEASE-ORDER-PARITY expressly fenced OUT of production scope, and that fence is lifted ONLY for the bounded orchestration and observation surface named in Scope."
+title: "Delay owner classification by exact two-pass lowering. SUCCESSOR TO RT-BRACKET-RELEASE-ORDER-PARITY, WHOSE OWN STOP CONDITION FIRED. D0 ran on exact clean WIP e38ff86bf and returned its STOP branch (runtime-implementer evt_6f5gw5hf02xf0, verified runtime-leader evt_75s17sf4bxdbn): there is no admissible planning-time predicate separating rt_read_offset_stage from rt_read_window_stage, because the fact Arm A needs does not yet exist where Arm A runs. static_response_phase_b_split is in planning/static_transition/responses.rs; TransportDormant is decided only in lowering/units.rs, and planning precedes lowering. The sibling identities O0 and W0 are byte-identical immediately before the split modulo planner-issued provenance atoms, yet settle InlineNoCall with one verified response-owner call versus TransportDormant with zero. Origins and operation detail would be prohibited proxies; disposition and call presence would predict an emission-time result. ARCHITECT RULED THE SHAPE at evt_493eky78hsp3h: DELAYED OWNER CLASSIFICATION BY EXACT TWO-PASS LOWERING. AMENDED AT evt_4zchjga3n8xs5 AFTER HARD STOP 6 TO A THREE-POPULATION COMMIT-OR-REPLAY TRANSACTION: the eager seed is REJECTED and there is no eligibility preflight and no pre-lowering liveness predictor. A, N, P and L are separate measured populations and none may be inferred from another; Initial selects P = A minus N after excluding only structurally impossible identities, and commits as the real artifact iff P equals A intersect L with strict final coverage already passed, otherwise it is discarded and replayed exactly once. Two passes are now the WORST case, not the mechanism. A bounded D1a census gates production and can stop this node. Hoisting is REJECTED as a cycle -- Phase B decides the response disposition that lowering consumes, so hoisting exact settlement would lower against a plan whose disposition is undecided, a planning-time approximation would create a second emission authority that D0 already proved cannot distinguish O0 from W0, and an exact hoist would itself be a provisional lowering pass, which is this mechanism under another name. THE CLEARED-ROW SPLIT IS REJECTED ON MEASUREMENT (Steward asked at evt_j1qetp1pkej9; measured and refused at evt_493eky78hsp3h): with Arm A suppressed on e38ff86bf, px8ta depth 2 stays correct on Arm B but depth 3 applies suppression eight times and restores the exact old undeclared-target refusal BEFORE ANY RELEASE VECTOR EXISTS, RestoreSelectedKTarget is preempted by that refusal, and OmitKCall applies zero times because no response-owner body exists. AC-6 depth 3, all three D2b controls and the RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED closure therefore all depend on Arm A, so no Arm-B-only candidate may be assembled and there is no partial delivery available. This node is ONE ATOMIC PRODUCT NODE carrying the entire remaining deliverable set of RT-BRACKET-RELEASE-ORDER-PARITY -- Arm A and Arm B together, both D2a controls and their mutations, writeAll, both composed depth-3 vectors, px8ta depths 2 and 3 unignored, all three D2b controls, the five section 2.3 identities, removal of the order-excluding helpers once both engines agree, and atomic closure of RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED. AN UNUSED DISCOVERY PRECURSOR IS NOT A DELIVERABLE AND MUST NOT LAND. AUTHORIZED AND RELEASED; this reopens artifact/mod.rs, lowering/core.rs and lowering/units.rs, which RT-BRACKET-RELEASE-ORDER-PARITY expressly fenced OUT of production scope, and that fence is lifted ONLY for the bounded orchestration and observation surface named in Scope."
 status: ready
 owner: runtime
 size: L
@@ -23,6 +23,14 @@ origin: "Steward, 2026-09-21. Framed on Architect ruling evt_493eky78hsp3h, whic
 > #
 > # **`D1` is a means, not a result.** It may not land except as consumed by
 > # `D2`. An unused discovery precursor is not a deliverable.
+> #
+> # **AMENDED AFTER HARD STOP 6 — `evt_4zchjga3n8xs5`.** The eager `P = A` seed
+> # is rejected. Read `D1` fresh; do not build from the prior mechanism, and do
+> # not reuse a candidate cut against it. WIP `420c7a757` is evidence and
+> # reusable work, never a candidate.
+> #
+> # **RUN `D1a` FIRST.** It is a bounded census that gates everything else and
+> # can stop this node. Do not write orchestration code before it discharges.
 
 ## What is settled, and where it lives
 
@@ -54,70 +62,159 @@ Do not re-derive any of this, and do not re-open it.
 
 ## Deliverables
 
-**D1 — THE TWO-PASS MECHANISM. Ruled at `evt_493eky78hsp3h`. It is a means, not
-a result: it may not land except as consumed by `D2`.**
+**D1 — THE COMMIT-OR-REPLAY MECHANISM. Shape ruled at `evt_493eky78hsp3h`;
+AMENDED at `evt_4zchjga3n8xs5` after hard stop 6 refuted the eager seed. It is a
+means, not a result: it may not land except as consumed by `D2`.**
+
+**THREE POPULATIONS, AND THEY ARE NOT ALIASES.**
+
+```text
+A = structurally eligible Arm-A identities
+N = identities in A that are structurally impossible to select, Deferred first
+P = A \ N, the provisional identities actually selected in Initial
+L = exact verified pre-target-filter call-seat identities observed by lowering
+S = A intersect L, the solved selection
+```
+
+**No test, control, assertion or diagnostic may infer any one of `A`, `N`, `P`
+and `L` from another.** Entries 4, 5 and 6 of the predecessor's symptom
+inventory are ONE defect appearing three times: each substituted the unmeasured
+structural universe `A` for a later causal-call or lifecycle population. Closing
+that substitution over the complete actual `A` population is this node's
+obligation. It is not a fixture repair, and no operation or fixture carve-out
+discharges it.
+
+**There is no eligibility preflight and no pre-lowering liveness predictor.**
+The commit criterion is `P == S`, which is knowable only AFTER lowering. `A`
+being empty is not a special mechanism; it is the degenerate case where
+`P = S = empty` and Initial commits.
 
 1. **Name the candidate universe before liveness.** Let `A` be the exact
    `ContinuationCallIdentity` set admitted by the bounded single-exclusive
    structural law **before any liveness filter** — the already-ruled
    `ordinary_stage_count == 1`, P1-free, `(true,false)` seed plus `(true,true)`
    dependent boundary. Historical `ordinary_stage_count >= 2` ownership and Arm
-   B are **outside `A`** and remain byte-for-behavior.
-2. **Discovery plan: provisionally select all of `A`.** Rebuild the Phase-B
-   result in an explicit discovery mode in which every structurally eligible
-   `A` member receives a provisional response owner, and lower it through the
-   **normal** generated-function pipeline into a **separate disposable module of
-   the same concrete kind and target configuration** as the real module. JIT
-   discovers in JIT; object discovers in object. **No provisional
-   `CompiledModule`, object bytes, symbol table, diagnostic report or cache may
-   escape.**
-3. **Observe the exact call-seat set, never a proxy.** After each function's
+   B are **outside `A`** and remain byte-for-behavior. `A` is unchanged from the
+   original ruling and is not narrowed to make a fixture pass.
+
+2. **Derive `N` before any owner is installed, from structure alone.** `N` is
+   the exact subset of `A` for which selecting that identity would require a
+   detached `RequiredConsumerCall`, but the already-built
+   `SourceReturnContextTemplate` has no `ComputationalMatchCase` in either its
+   steps or its recursive `worker_return` chain. **This is precisely the
+   condition `pair_detached_required_consumer` refuses today** as `an exact
+   detached required consumer has no computational occurrence`. Derive it from
+   the pre-Phase-B continuation plan and checked-IH transport identity, **before
+   response-owner assignment and before aggregate refresh**. **Factor the
+   existing `first_computational_consumer` derivation — do not duplicate its
+   walk, approximate it, or key it on Mapping, operation, origin class, count or
+   fixture.** The signal is exact `ContinuationCallIdentity` and nothing else.
+   **`N` is a structural impossibility filter, NEVER a liveness predictor.**
+
+3. **Initial selects `P = A \ N`, and `N` is Deferred before the rebuild.** Put
+   `N` into Deferred before aggregate ownership and checked-IH transports are
+   rebuilt, so `publish_checked_ih_post_call_consumers` still receives a valid
+   graph. **Only this one observed absence is conditionally admitted.** Missing
+   incoming edges, ambiguous consumers, invalid frames and every other
+   construction failure remain fatal. **Do not catch or suppress
+   `pair_detached_required_consumer`**, do not fabricate a destination, and do
+   not let a pending `RequiredConsumerCall` reach any downstream consumer. **The
+   same absence for an identity OUTSIDE `A` remains the original fatal
+   refusal.**
+
+4. **Observe the exact call-seat set, never a proxy.** After each function's
    finished CLIF has passed `verify_emitted_continuation_calls`, take the exact
    union already presented at the three `verified_response_owner_calls` seats:
    `function_local.continuation_emissions.keys()` plus each
-   `checked_ih_transport_emissions` source-call identity. Intersect it with `A`
-   to give `L`. **Record identities.** Never an aggregate count, origin class,
-   operation kind, disposition, fixture name or syntax fact. The existing target
-   filter may then derive response-owner calls as it does today.
-4. **A missing provisional owner call is data ONLY at the discovery boundary.**
+   `checked_ih_transport_emissions` source-call identity. That union, taken
+   **before target filtering**, is `L`. **Record identities.** Never an
+   aggregate count, origin class, operation kind, disposition, fixture name or
+   syntax fact.
+
+5. **Coverage tolerance is bounded to `P`, and exists only to decide replay.**
    Factor a private coverage observation out of
    `validate_response_owner_call_coverage`: it partitions selected owners into
    called and uncalled exact callers, retains the composed-overlap and
    context-population checks, and **still refuses any uncalled owner outside
-   `A`**. In discovery only, an uncalled member of `A` contributes to `A \ L`.
-   **Do not catch an arbitrary lowering error and call it dormant.** The
-   one-shot `ArmALivenessWitness { eligible: A, live: L }` may be minted **only
-   after** every generated function is finished and verified, candidate totality
-   has closed, all non-coverage claim, composition, owner-body and graph ledgers
-   have closed, and the only tolerated coverage shortfall is exactly within `A`.
-5. **Discard the discovery module, rebuild the plan, then emit once for real.**
-   Final Phase B accepts the typed one-shot witness, **re-derives its own
-   eligible set `A2`, and refuses unless `A2 == witness.eligible` as exact set
-   equality.** It specializes exactly `A2 intersect witness.live` and puts
-   `A2 \ witness.live` into Deferred **before `declare_unit_bundle`**, so no
-   dormant owner is ever forward-declared. Phase-B closed re-derivation must
-   **consume** the same witness, not recompute or weaken it.
-6. **Re-observe and close the cycle on the final artifact.** Real lowering
-   records the same verified call-seat set over **all** of `A2` — including
-   identities left Deferred — **before target filtering**, and requires exact
-   equality with `witness.live`. **Missing or extra identities refuse.** Then run
-   the existing final `validate_response_owner_call_coverage` at its current
-   closeout seat, with its current fatal semantics and its exact
-   missing-selected-caller diagnostic. `claim_exact`, target lookup, candidate
-   totality, response-owner K-body verification and the claim/discharge
-   equalities are unchanged. **This is two independent fail-closed nets:
-   provisional-versus-final call-set equality, then ordinary final coverage.**
-7. **Keep the two modules structurally separate.** The artifact owner provides a
-   private same-kind module factory or pair. **Do not run object discovery for a
-   JIT artifact** and do not define provisional bodies in the real module. A
-   final symbol census must show exactly the final plan's owners and **no
-   dormant provisional owner**. Run the discovery pass **only when `A` is
-   nonempty**; ordinary artifacts stay one-pass.
+   `A`**. An uncalled **exact caller in `P`** is data used only to decide commit
+   versus replay. **`N` has no provisional owner, so it can contribute no
+   tolerance.** **Do not catch an arbitrary lowering error and call it dormant.**
+
+6. **The Initial module closes transactionally: COMMIT or REPLAY.** Mint the
+   one-shot `ArmALivenessWitness { eligible: A, structurally_deferred: N,
+   live: L }` only after every generated function is finished and verified,
+   candidate totality has closed, and all non-coverage claim, composition,
+   owner-body and graph ledgers have closed. Require `N` a subset of `A` and
+   `N` disjoint from `L`. Let `S = A intersect L`.
+   **Commit the Initial module as the real artifact if and only if `P == S` and
+   every final obligation is closed** — and run the unchanged strict final
+   response-owner coverage on that same plan BEFORE committing, preserving
+   missing-selected-caller before composed-overlap before context accumulation.
+   **A commit path tolerates nothing.** A committed Initial carries no
+   provisional residue, because its selected set already equals the solved set
+   and every final check passed.
+
+7. **If `P != S`, discard Initial and replay exactly once.** Carry ONLY the
+   one-shot witness into one fresh Final module. Final re-derives exact `A2` and
+   `N2`, **requires `A2 == A` and `N2 == N` as exact set equality**, selects
+   exactly `S`, requires `N2` disjoint from `L`, reproduces exact `L` before
+   target filtering, and then runs the unchanged final
+   `validate_response_owner_call_coverage` at its current closeout seat with its
+   current fatal semantics. **Missing or extra identities refuse.** **No third
+   planning or lowering pass, no iteration, no reset-and-reuse, and no module
+   state, function/data IDs, bytes, symbols, diagnostics, result tables,
+   ledgers, caches or mutable pass state crosses the discard boundary.** Do not
+   repair isolation by enumerating and resetting global counters; an
+   ever-longer reset list cannot prove isolation. **A production-semantic
+   decision must not read mutable process or thread-global state written by
+   Initial.**
+
+8. **Keep the modules structurally separate and final-capable.** The Initial
+   module IS the artifact whenever it commits, so both possible modules are
+   built through the same concrete factory, configuration and name. **No object
+   name ends in `-discovery`**; an artifact must not escape carrying provisional
+   configuration. Creating the second module lazily after a replay decision is
+   preferred; an already-created identical pair is acceptable only if the unused
+   module is never planned or lowered. **Do not run object discovery for a JIT
+   artifact.**
+
+**Typed orchestration ownership is required.** The correlation may not be
+represented as an unchecked `(CompiledModule, Option<Witness>)` at the
+orchestration boundary:
+
+```rust
+InitialArmACompilation::Commit(CompiledModule<M>)
+InitialArmACompilation::Replay {
+    disposable: CompiledModule<M>,
+    witness: ArmALivenessWitness,
+}
+```
+
+**The only legal lifecycle outcomes are `[InitialCommit]` and
+`[InitialReplay, Final]`.** Retain the planner-entry observer at the actual
+`plan_static_transition_graph_with_symbols_and_arm_a_liveness` entry and close,
+**and additionally record the terminal commit/replay outcome — a planner-close
+label alone cannot prove whether the module escaped.**
+
+**D1a — THE BOUNDED D0 THAT GATES PRODUCTION. Run it FIRST; it can stop this
+node.** Show that the `N` predicate reads only the pre-owner template/transport
+relation and is **selection-independent**, correlating every row by exact
+identity. Census `A`, `N`, `P` and eventual `L` for: all six Mapping programs,
+`O0`/`W0`, both `D2a` controls, px8ta depths 2 and 3, `writeAll`, and all five
+section 2.3 identities. **The two alternating Mapping refusals must be explained
+by exact `N` membership, and known-live `O0` must not enter `N`.**
+
+**STOP AND HAND BACK** if the absence cannot be derived before Phase B, if it
+changes under owner selection, or if it does not account exactly for both
+refusals. **Do not build a pending-obligation workaround.** On that branch the
+Steward takes restructuring to the operator; it is not the ring's to route.
 
 **D2 — the two-arm repair, consuming `D1`.** Arm A is
 `static_response_phase_b_split` under the bounded authority-seed law, now
-admitting exactly `A2 intersect witness.live`. Arm B is the release-only third
-structural class in `bounded_deferred_response_suffix`. Both land together; the
+admitting exactly the solved selection `S = A intersect L` — which on a
+committed Initial is already `P`, and on a replay is re-derived by `Final`. Arm
+B is the release-only third structural class in
+`bounded_deferred_response_suffix`. Both land together; the
 existing outer conditions, the checked-IH transport source requirement, P2
 suppression restoration and P1-bearing-plane behaviour are unchanged.
 
@@ -162,15 +259,24 @@ retained as route-replacement evidence.
 `fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset`.
 **A count is not a discharge.**
 
-**AC-8. THE WITNESS IS EXACT IN BOTH DIRECTIONS.** Show that final Phase B
-refuses on `A2 != witness.eligible`, and that final re-observation refuses on
-both a missing and an extra identity against `witness.live`. **An equality
+**AC-8. THE WITNESS IS EXACT IN BOTH DIRECTIONS, ON ALL THREE SETS.** Show that
+replay refuses on `A2 != witness.eligible`, refuses on `N2 !=
+witness.structurally_deferred`, and that final re-observation refuses on **both
+a missing and an extra** identity against `witness.live`. Show `N` a subset of
+`A` and `N` disjoint from `L` are each enforced, not assumed. **An equality
 proved in only one direction is not proved.**
 
-**AC-9. NOTHING ESCAPES THE DISCOVERY PASS.** A final symbol census shows
-exactly the final plan's owners and no dormant provisional owner. No provisional
-module, object bytes, symbol table, diagnostic report or cache is reachable
-after discovery. **An artifact with empty `A` runs exactly one pass** — show it.
+**AC-9. NOTHING PROVISIONAL ESCAPES, ON EITHER PATH.** On a replay, no
+discarded-module object bytes, symbol table, diagnostic report, cache or module
+state is reachable afterwards, and a final symbol census shows exactly the final
+plan's owners and no dormant provisional owner. On a commit, the census shows
+exactly the solved owners `S` and the strict final coverage passed **before**
+the module escaped.
+
+**An artifact with empty `A` runs exactly one pass** — show it **on the literal
+pure empty-`A` control**. **THE MAPPING FRONTIER IS NOT AN EMPTY-`A` WITNESS**
+and may not be substituted for one: measurement at `evt_47yqzemfp9zv3` puts four
+of its six programs inside nonempty `A`. Mapping is a nonempty-`A` control.
 
 **AC-10. THE FINAL DETECTOR IS NEITHER MOVED NOR WEAKENED.** Final
 `validate_response_owner_call_coverage` runs at its current seat with its current
@@ -185,25 +291,69 @@ local `--workspace` run.
 to `closed` in the SAME candidate. Its `(H)` caution is expressly **not** claimed
 fixed.
 
+**AC-13. THE THREE POPULATIONS ARE SEPARATELY MEASURED, NEVER INFERRED.** For
+every fixture named in `D1a`, report exact `A`, `N`, `P` and `L` as identity
+sets. **No assertion may derive one of them from another**, and a count is never
+a substitute for a set. This is the closure of the entries-4-to-6 shared
+predicate, and it is discharged by measurement over the complete actual `A`
+population — not by any operation or fixture carve-out.
+
+**AC-14. THE `D1a` GATE IS DISCHARGED EXPLICITLY, INCLUDING ITS STOP BRANCH.**
+State in the handoff that the `N` predicate was shown selection-independent and
+derivable before Phase B, and that exact `N` membership accounts for **both**
+alternating Mapping refusals while `O0` stayed out of `N`. If any of those fail,
+the deliverable is the STOP and the evidence for it — **not** a
+pending-obligation workaround, and not a narrowed `A`.
+
 ## Required mutations, at minimum
 
 Each needs a **positive application count** and **byte-exact restoration**.
 
+**Controls, which are measurements and not mutations:**
+
+- **Pure empty `A`:** exactly one Initial commit and one lowering.
+- **Mapping, all six:** native/interpreter parity retained, and **each case's
+  exact `A`, `N`, `P`, `L` and measured lifecycle pinned individually.** One
+  blanket lifecycle vector across the frontier is not evidence — that
+  substitution is what stop 6 was.
+- **Nonempty commit:** a measured `P == S` case commits ONE module and that
+  module contains exactly its solved owners.
+- **Replay:** `O0`/`W0` preserves `[InitialReplay, Final]`, the exact witness
+  sets, and the final symbol census.
+
+**Mutations:**
+
+- **Remove only the `N` exclusion from one alternating Mapping identity** —
+  require the exact `pair_detached_required_consumer` refusal to return.
+- **Force a known representable, live identity into `N`** — require refusal by
+  the structural-set and liveness nets. **It may not silently commit a smaller
+  fixed point.**
+- **Force an Initial commit when `P != S`** — require refusal. **Initial may
+  never escape.**
+- **A missing consumer on an identity OUTSIDE `A`** — require the original exact
+  fatal refusal, unchanged.
 - **Remove O0 from final authorization after discovery** — require the final
   exact-set mismatch, or the prior Arm-A red.
 - **Force W0 into final authorization** — require the existing refusal
   `a forward-declared response owner has no verified selected incoming call`.
 - **Drop one verified O0 discovery call AND add one W0 call, INDEPENDENTLY** —
   so that **equal cardinality cannot pass**.
-- **Retain every already-framed mutation and exact refusal**, including the two
-  route-boundary controls D0 discharged.
+- **Retain every already-framed mutation and exact refusal**, including the
+  eligibility-preflight and forced-replay mutations, the plan-local
+  generated-entry epoch, the exact-set mutations, the detector-precedence
+  control, the two route-boundary controls D0 discharged, and the complete prior
+  atomic suite.
 
 ## What this node does NOT authorize
 
 The scope fence that `RT-BRACKET-RELEASE-ORDER-PARITY` placed on `core.rs` and
 `units.rs` is lifted **only** for the bounded orchestration and observation
 surface in `artifact/mod.rs`, `lowering/core.rs`, `lowering/units.rs` and
-response-plan construction / Phase B. Nothing else opens.
+response-plan construction / Phase B, **plus the `N` derivation surface in
+`planning/static_transition/aggregates.rs`, and there only to FACTOR the
+existing `first_computational_consumer` walk for reuse.** Nothing else opens,
+and `pair_detached_required_consumer` is not weakened, relocated or made
+final-only.
 
 Not authorized: fallback, lookup widening, a new declaration lane, dispatcher
 reorder, trace sorting, aggregate relaxation, operation or fixture carve-outs,
@@ -214,25 +364,45 @@ carve-out is not authorized and never was.**
 
 ## Stop condition
 
-Stop and hand back, naming it, if the discovery pass cannot be run in a module of
-the same concrete kind and target configuration as the real one, or if minting a
-sound witness would require tolerating a coverage shortfall outside `A`, or if
-final re-observation cannot be taken before target filtering. **Do not
-approximate any of these, and do not land an unused discovery precursor.**
+**`D1a` IS THE FIRST STOP AND IT COMES BEFORE ANY ORCHESTRATION WORK.** Stop if
+`N` cannot be derived before Phase B, if it changes under owner selection, or if
+exact `N` membership does not account for both alternating Mapping refusals. On
+that branch the Steward takes restructuring to the operator.
+
+Stop and hand back, naming it, if Initial cannot be run in a module of the same
+concrete kind and target configuration as the real artifact, or if minting a
+sound witness would require tolerating a coverage shortfall outside `P`, or if
+final re-observation cannot be taken before target filtering, or if a committed
+Initial cannot be shown to have passed strict final coverage before it escaped.
+**Do not approximate any of these, and do not land an unused discovery
+precursor.**
 
 ## Tier, size and contention
 
 **T1.** `MODELS.md` puts the line on the WORK: T2 covers refactoring, mechanical
 moves, census and ledger work and evidence-instrument repair, and **T1 returns
-for genuinely hard compiler implementation.** A two-pass lowering discipline with
-a one-shot witness type and two exact set-equality nets is not refactoring.
+for genuinely hard compiler implementation.** A three-population commit-or-replay
+transaction with a one-shot witness type, a selection-independent structural
+exclusion set, and exact set-equality nets on `A`, `N` and `L` is not
+refactoring.
 **The runtime seats currently read T2, so this is a seat mismatch the operator
 owns** — `MODELS.md` says so expressly: if you cannot tell which side a
 deliverable falls on it is the operator's call, and here the Steward can tell,
 which makes it a reseat question rather than an inference.
 
-**Size L.** One atomic candidate, four reopened surfaces, two lowering modules
-totalling roughly 25k lines.
+**Size L, re-sized at `evt_4zchjga3n8xs5` and still L.** One atomic candidate,
+four reopened surfaces, two lowering modules totalling roughly 25k lines. The
+amendment ADDS the `N` derivation, a third witness set, the commit/replay
+transaction and eight controls and mutations; it REMOVES the eligibility
+preflight, `FinalWithoutWitness`, and the separate-discovery-pass gating. Net
+larger than the original cut, and still one node — `D2`, `D3` and `D4` are
+untouched and `D1` remains a means consumed by `D2`.
+
+**The risk profile is better than the previous cut, and that is why it is not
+split.** `D1a` front-loads the whole mechanism risk into a bounded census that
+runs before any orchestration code is written and can refuse the approach
+outright. A split would strand `D1a` as a report node, which §1 forbids and
+which the Architect already rejected as an unused precursor.
 
 **Contention:** none. L2 is dark, L3 is publisher-blocked and operator-owned, and
 the doc track touches `library/` and `agent/` only. Runtime holds the only claim
