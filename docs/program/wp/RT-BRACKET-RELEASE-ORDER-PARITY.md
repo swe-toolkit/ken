@@ -629,13 +629,25 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
    needed only after an otherwise disposable full plan has already run, contrary
    to the one-pass boundary and without isolating final semantics from the
    preflight or its distinct mode.
+6. The late-selecting Initial implementation measures the complete Mapping
+   frontier inside the real planner and refutes entry 5's empty-`A` premise:
+   ordinary Phase B derives nonempty `A` and completes `[Discovery, Final]` for
+   all four two-operation programs, while both alternating three-operation
+   programs refuse at `pair_detached_required_consumer` before Initial can close
+   — keyed on inferring that current-main one-pass execution placed a program
+   outside structural `A` without measuring `A`, the same substitution of
+   structural eligibility for the later causal-call/lifecycle population shared
+   by entries 4–6.
 
-**Count of record:** hard stops 5; symptom entries 5. Entry 1 was classified at
+**Count of record:** hard stops 6; symptom entries 6. Entry 1 was classified at
 `evt_177exqsxhvg5y`; entry 2 at `evt_76nkdg0h81xnw`; entry 3 at
 `evt_45qpftkx3s894`; entry 4 was reported at `evt_59tt59x2mbbxg`; entry 5 was
-reported at `evt_78xgqja72hktm`. **Both stop-3 triggers are DISCHARGED** —
-Research at `evt_5p5jn87bmwpcc`, the entry-3 shared-predicate question at
-`evt_6c900nagc7mn4`. Both next fire at six.
+reported at `evt_78xgqja72hktm`; entry 6 was reported at
+`evt_47yqzemfp9zv3`. **Both stop-6 triggers are FIRED and the ruling is held** —
+Research was requested at `evt_522yfgcveskqz`, where the entry-6 shared-predicate
+question was answered: entries 4–6 all substitute unmeasured structural `A` for
+later causal-call/lifecycle population. Research is not yet discharged. Both
+next fire at nine after the present triggers are discharged.
 
 ## 5. Acceptance criteria
 
