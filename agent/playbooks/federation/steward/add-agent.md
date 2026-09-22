@@ -56,30 +56,33 @@ before editing: the requirement is invisible from a seat that is already correct
 5. `moot status` to confirm RUNNING, then **confirm the new seating by
    observation** — never from the edit you just made.
 
-## Keep the soundness-review edge on different model families
+## Reviewer independence is a property of context, not model
 
 This governs one edge: the author whose product receives the Architect's
-required soundness review. **The discriminator is model FAMILY.** Provider
-diversity is preferred; provider, harness or effort differences alone do not
-substitute for it.
+required soundness review.
 
-**When a capable alternative at the required tier exists, keep the author and
-the Architect on different model families.** Same-family review has correlated
-blind spots; it is not thereby no review.
+Independence holds when the reviewer's verdict comes from its own measurement.
+It collapses when the reviewer inherits the author's instrument or premise, or
+rules on a shape it authored itself — whatever either seat is running.
 
-## Check that edge before every review handoff
+**Do not spend a reseat or a provider swap on this.** They change what a seat
+runs, not where its verdict comes from.
 
-Not only before a reseat — a chain that collapsed earlier must be visible
-rather than assumed intact.
+## Check independence at every review handoff
 
-**When no capable alternative exists, state `same-model correlated review` in
-the handoff** and do not count agreement as independent corroboration. Do not
-waive it silently, and do not add a reviewer or a review hop.
+Not from the config: a `grep` of `model =` tells you what a seat is set to and
+nothing about where a verdict came from. Ask instead:
 
-**Read the block's comments, not only its keys.** A `grep` of `model =` lines
-tells you what a seat is set to and never whether the edge is already known
-broken — the block may already record the collapse, when it was surfaced, and
-which seat to move to restore it.
+1. Did the reviewer measure the claim, or restate the author's evidence?
+2. Is it ruling on a shape it authored or already ruled?
+3. Would its verdict change if the author's instrument were wrong?
+
+**You will be tempted to skip this when the seats are on different models**,
+because difference reads as independence. It is the weaker signal.
+
+A wrong answer to any of the three means **state it in the handoff** and do
+not count agreement as independent corroboration. Do not waive it silently,
+and do not add a reviewer or a review hop.
 
 ## Negative scope
 

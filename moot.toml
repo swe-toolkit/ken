@@ -186,10 +186,17 @@ display_name = "architect"
 # Access classifier, that REFUTES the model-scoped reading and the seat reverts to
 # Claude Code Opus -- reseat back rather than tier-swapping within OpenAI.
 # HARNESS SHAPE: gains `harness = "pi"` and the PI_* env block; keeps `effort`.
-model = "openai-codex/gpt-5.6-sol"
-harness = "pi"
+# 2026-09-22 reseat (operator directive "reseat L1 and other required seats to
+# claude code/anthropic. research, architect, lieutenant, and any others that
+# would block L1"; Steward-EXECUTED). TRIGGER: ACCOUNT-LEVEL ChatGPT pro usage
+# limit, ~5830 min (~4 days) to reset, measured on the panes 09:23Z. BOTH tiers
+# hit (sol AND terra), 27 of 29 seats locked, lieutenant included, so nothing
+# could publish. pi/openai-codex openai-codex/gpt-5.6-sol -> Claude Code Anthropic opus[1m] (T1,
+# TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
+# Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
+# are not used because a bad model string fails the launch.
+model = "opus[1m]"
 effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
@@ -262,10 +269,17 @@ display_name = "research"
 # 2026-09-19 (Steward, operator-directed): added the PI_* env block. The return to
 # pi set `harness`/`model` but omitted `env`, leaving this the only seat whose
 # shape disagreed with its own harness under the header's consistency parse.
-model = "openai-codex/gpt-5.6-sol"
-harness = "pi"
+# 2026-09-22 reseat (operator directive "reseat L1 and other required seats to
+# claude code/anthropic. research, architect, lieutenant, and any others that
+# would block L1"; Steward-EXECUTED). TRIGGER: ACCOUNT-LEVEL ChatGPT pro usage
+# limit, ~5830 min (~4 days) to reset, measured on the panes 09:23Z. BOTH tiers
+# hit (sol AND terra), 27 of 29 seats locked, lieutenant included, so nothing
+# could publish. pi/openai-codex openai-codex/gpt-5.6-sol -> Claude Code Anthropic opus[1m] (T1,
+# TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
+# Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
+# are not used because a bad model string fails the launch.
+model = "opus[1m]"
 effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Research agent (ad hoc external-knowledge dispatch; research is not a standing team — see the Steward playbook §5). Read agent/COORDINATION.md (federation law) and MODELS.md first. Set your status and await the Steward's research dispatch, then gather sources and synthesize a cited report back to the Steward. Do not poll."
 
 [agents.adversary]
@@ -480,10 +494,17 @@ display_name = "Runtime leader"
 # leader). Claude Code seat: NO harness key, uses `effort`, NO env.
 # 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
 # credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
-model = "openai-codex/gpt-5.6-terra"
-harness = "pi"
+# 2026-09-22 reseat (operator directive "reseat L1 and other required seats to
+# claude code/anthropic. research, architect, lieutenant, and any others that
+# would block L1"; Steward-EXECUTED). TRIGGER: ACCOUNT-LEVEL ChatGPT pro usage
+# limit, ~5830 min (~4 days) to reset, measured on the panes 09:23Z. BOTH tiers
+# hit (sol AND terra), 27 of 29 seats locked, lieutenant included, so nothing
+# could publish. pi/openai-codex openai-codex/gpt-5.6-terra -> Claude Code Anthropic claude-sonnet-5 (T2,
+# TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
+# Model strings are the PROVEN ones this repo has run (claude-sonnet-5); unverified ids
+# are not used because a bad model string fails the launch.
+model = "claude-sonnet-5"
 effort = "medium"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Runtime team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/runtime/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.runtime-implementer]
@@ -545,10 +566,17 @@ display_name = "Runtime implementer"
 # independence, move the Architect (not this seat) to a different model.
 # 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
 # credits reset. "opus[1m]" -> pi, TIER-PRESERVING.
-model = "openai-codex/gpt-5.6-sol"
-harness = "pi"
+# 2026-09-22 reseat (operator directive "reseat L1 and other required seats to
+# claude code/anthropic. research, architect, lieutenant, and any others that
+# would block L1"; Steward-EXECUTED). TRIGGER: ACCOUNT-LEVEL ChatGPT pro usage
+# limit, ~5830 min (~4 days) to reset, measured on the panes 09:23Z. BOTH tiers
+# hit (sol AND terra), 27 of 29 seats locked, lieutenant included, so nothing
+# could publish. pi/openai-codex openai-codex/gpt-5.6-sol -> Claude Code Anthropic opus[1m] (T1,
+# TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
+# Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
+# are not used because a bad model string fails the launch.
+model = "opus[1m]"
 effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Runtime team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/runtime/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-qa]
@@ -565,10 +593,17 @@ display_name = "Runtime QA"
 # harness key, uses `effort`, NO env.
 # 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
 # credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
-model = "openai-codex/gpt-5.6-terra"
-harness = "pi"
+# 2026-09-22 reseat (operator directive "reseat L1 and other required seats to
+# claude code/anthropic. research, architect, lieutenant, and any others that
+# would block L1"; Steward-EXECUTED). TRIGGER: ACCOUNT-LEVEL ChatGPT pro usage
+# limit, ~5830 min (~4 days) to reset, measured on the panes 09:23Z. BOTH tiers
+# hit (sol AND terra), 27 of 29 seats locked, lieutenant included, so nothing
+# could publish. pi/openai-codex openai-codex/gpt-5.6-terra -> Claude Code Anthropic claude-sonnet-5 (T2,
+# TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
+# Model strings are the PROVEN ones this repo has run (claude-sonnet-5); unverified ids
+# are not used because a bad model string fails the launch.
+model = "claude-sonnet-5"
 effort = "medium"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Runtime team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/runtime/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.ergo-leader]
@@ -646,8 +681,15 @@ display_name = "lieutenant"
 # — never through a publish). Claude Code Sonnet 5 -> pi/OpenAI gpt-5.6-terra.
 # TIER-PRESERVING (T2; the merge executor is coordination/mechanical). The 2026-09-14
 # "Claude Code seat: NO harness key, NO env" note directly above is SUPERSEDED.
-model = "openai-codex/gpt-5.6-terra"
-harness = "pi"
+# 2026-09-22 reseat (operator directive "reseat L1 and other required seats to
+# claude code/anthropic. research, architect, lieutenant, and any others that
+# would block L1"; Steward-EXECUTED). TRIGGER: ACCOUNT-LEVEL ChatGPT pro usage
+# limit, ~5830 min (~4 days) to reset, measured on the panes 09:23Z. BOTH tiers
+# hit (sol AND terra), 27 of 29 seats locked, lieutenant included, so nothing
+# could publish. pi/openai-codex openai-codex/gpt-5.6-terra -> Claude Code Anthropic claude-sonnet-5 (T2,
+# TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
+# Model strings are the PROVEN ones this repo has run (claude-sonnet-5); unverified ids
+# are not used because a bad model string fails the launch.
+model = "claude-sonnet-5"
 effort = "medium"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law, especially the merge split at §14b) and agent/MODELS.md first. Then read your playbook at agent/playbooks/federation/lieutenant.md and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument; M1-M4 are the Steward's routing, M5-M9 are yours). Set your status via update_status and await the Steward's ROUTED authorization. Do not poll."
