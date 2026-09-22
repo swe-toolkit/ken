@@ -638,16 +638,24 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
    outside structural `A` without measuring `A`, the same substitution of
    structural eligibility for the later causal-call/lifecycle population shared
    by entries 4–6.
+7. The three-population transaction reaches `P = A ∩ L`, passes unchanged strict
+   selected-caller coverage, and commits Initial on each of the four
+   two-operation Mapping programs, yet every resulting native artifact traps at
+   terminal `-1` while current main retains parity; both alternating programs
+   have `N = A`, commit with `P = ∅`, and retain parity — keyed on treating exact
+   call-seat presence plus graph coverage as semantic authority for the
+   response-owner route although they prove edge existence and closure, not
+   observational equivalence with the Deferred execution path.
 
-**Count of record:** hard stops 6; symptom entries 6. Entry 1 was classified at
+**Count of record:** hard stops 7; symptom entries 7. Entry 1 was classified at
 `evt_177exqsxhvg5y`; entry 2 at `evt_76nkdg0h81xnw`; entry 3 at
 `evt_45qpftkx3s894`; entry 4 was reported at `evt_59tt59x2mbbxg`; entry 5 was
 reported at `evt_78xgqja72hktm`; entry 6 was reported at
-`evt_47yqzemfp9zv3`. **Both stop-6 triggers are FIRED and the ruling is held** —
-Research was requested at `evt_522yfgcveskqz`, where the entry-6 shared-predicate
-question was answered: entries 4–6 all substitute unmeasured structural `A` for
-later causal-call/lifecycle population. Research is not yet discharged. Both
-next fire at nine after the present triggers are discharged.
+`evt_47yqzemfp9zv3`; entry 7 was reported at `evt_2r56hb6afn6d9`.
+**Both stop-6 triggers are DISCHARGED** — Research advisory
+`evt_4kmz5pg4z71dy` was adopted at `evt_4zchjga3n8xs5`, which closed entries
+4–6 over distinct `A`, `P`, and `L` populations. Entry 7 advances both counts
+without firing either trigger. Both next fire at nine.
 
 ## 5. Acceptance criteria
 
