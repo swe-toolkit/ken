@@ -70,14 +70,20 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 - **AC-3.** Nested brackets each carry their own distinct role markers.
 - **AC-4.** Bracket-SHAPED but unmarked code gets NO region. The control is ONE
   declaration chain carrying a canonical `withResource` bracket AND the proven
-  lookalike declaration, asserting `regions.len() == 1`; the discriminating
-  observation is that an over-wrapping selector yields 2. RESEMBLANCE, not an
-  unrelated acquire. An acquisition outside a canonical producer is
-  UNCONSTRUCTIBLE FROM SOURCE -- prelude confinement removes a 41-name roster
-  from `elab.globals`, `private_resource_acquire` among them -- so the earlier
-  "unrelated acquire/release pair" control demanded a state nothing can reach.
-  Do NOT hand-build the Runtime IR here: that bypasses erasure, and erasure's
-  selection is the thing AC-4 measures.
+  lookalike declaration, asserting `regions.len() == 1`. RESEMBLANCE, not an
+  unrelated acquire. **The discriminating observation is a fail-closed
+  REFUSAL, not a count of 2**: a selector widened to key on application SHAPE
+  rather than on the injected identity is rejected at marker normalization --
+  `compiler bracket marker <id> has malformed application` -- before any region
+  is built. MEASURED at `daee72575`; this supersedes the count-of-2
+  discriminator in the Architect's ruling `evt_7nrdfv7ekvcqt` point 5, which
+  the Steward carried into this frame unmeasured. The count assertion stays as
+  the PROPERTY; refusal is how the control reds. An acquisition outside a
+  canonical producer is UNCONSTRUCTIBLE FROM SOURCE -- prelude confinement
+  removes a 41-name roster from `elab.globals`, `private_resource_acquire`
+  among them -- so the earlier "unrelated acquire/release pair" control
+  demanded a state nothing can reach. Do NOT hand-build the Runtime IR here:
+  that bypasses erasure, and erasure's selection is the thing AC-4 measures.
 - **AC-5.** No port is selected by `HostOpV1`, name, expression resemblance, or
   a `ResourceRelease` search. Validation by `HostOpV1` is permitted and must be
   shown to be validation, not selection.
@@ -125,3 +131,11 @@ and NOT this WP's to repair. The claim AC-4 makes is sound; only its
 prescribed control was unbuildable, and it is replaced above by resemblance.
 The owner-disambiguation fixture built while discovering this is retained as
 AC-8 rather than discarded, because it measures a real and different property.
+
+The replacement's DISCRIMINATOR was then mis-stated in turn, and is corrected
+in AC-4 above: an over-wrapping selector does not yield 2. Widening the
+selector to key on application shape is refused at marker normalization before
+any region is built, so the control reds by refusal. The system's real
+behaviour is STRONGER than the predicted one. This is a frame defect in the
+Steward's amendment, not a second structural wall, and it does NOT advance the
+count.
