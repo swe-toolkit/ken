@@ -68,9 +68,16 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 - **AC-2.** A bracket body containing a LAWFUL PUBLIC EARLY RELEASE still has an
   unambiguous finalizer port, and the early release stays ordinary body work.
 - **AC-3.** Nested brackets each carry their own distinct role markers.
-- **AC-4.** Bracket-SHAPED but unmarked code gets NO region. The control is a
-  declaration containing a canonical bracket AND an unrelated acquire/release
-  pair -- the mixed-owner case the previous lookalike control would have missed.
+- **AC-4.** Bracket-SHAPED but unmarked code gets NO region. The control is ONE
+  declaration chain carrying a canonical `withResource` bracket AND the proven
+  lookalike declaration, asserting `regions.len() == 1`; the discriminating
+  observation is that an over-wrapping selector yields 2. RESEMBLANCE, not an
+  unrelated acquire. An acquisition outside a canonical producer is
+  UNCONSTRUCTIBLE FROM SOURCE -- prelude confinement removes a 41-name roster
+  from `elab.globals`, `private_resource_acquire` among them -- so the earlier
+  "unrelated acquire/release pair" control demanded a state nothing can reach.
+  Do NOT hand-build the Runtime IR here: that bypasses erasure, and erasure's
+  selection is the thing AC-4 measures.
 - **AC-5.** No port is selected by `HostOpV1`, name, expression resemblance, or
   a `ResourceRelease` search. Validation by `HostOpV1` is permitted and must be
   shown to be validation, not selection.
@@ -78,6 +85,10 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
   that would fail if it did not.
 - **AC-7.** The marker is metadata: no runtime value, no public Ken syntax, no
   effect, no ABI field.
+- **AC-8.** Owner disambiguation. Two distinct producers in one chain yield two
+  distinct occurrences, each settling exactly once. This is what defeats the
+  refuted section 2 selector. It is a SEPARATE claim from AC-4 and does not
+  discharge it.
 
 ## 5. Stop condition
 
@@ -95,3 +106,22 @@ Checked erasure and prelude production, the compiler-owned occurrence plan,
 `ir.rs` for the wrapper, and the reference evaluator unwrap. **No new carrier,
 return protocol, KRET lane, host operation, dispatcher reorder, trace sort or
 fallback.**
+
+## 7. Symptom inventory
+
+One entry per advancing hard stop on this WP. The Architect owns the count;
+the Steward seeds and amends the frame. Counters are per WP and per design
+question and do not pool: the umbrella and the parked predecessor keep their
+own. Triggers fire at three.
+
+**Entry 1 -- AC-4 demanded an unreachable state.** The prescribed control was a
+declaration carrying a canonical bracket plus an UNRELATED acquire/release
+pair. Measured: prelude confinement is `elab.globals.remove` over a 41-name
+roster, `private_resource_acquire` included, so an acquisition outside a
+canonical producer cannot be written from source at all. The two producers
+also cannot be siblings -- unnested sibling brackets fail at erasure with
+`checked_oriented_marker_location`, which is the pre-existing `RT-AGG-COMPOSE`
+and NOT this WP's to repair. The claim AC-4 makes is sound; only its
+prescribed control was unbuildable, and it is replaced above by resemblance.
+The owner-disambiguation fixture built while discovering this is retained as
+AC-8 rather than discarded, because it measures a real and different property.
