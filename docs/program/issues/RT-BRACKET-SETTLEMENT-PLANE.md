@@ -111,10 +111,17 @@ a new name.
 `responses.rs` for the reconciliation. **No new carrier, return protocol, KRET
 lane, host operation, dispatcher reorder, trace sort or fallback.**
 
-**`ResponseDisposition` gains a variant, so child 1's measured hazard applies
-directly here: `-p ken-runtime` CANNOT type-check a `match` in a crate that
-depends on it, and neither can any per-target run.** After adding the variant,
-sweep the WORKSPACE BY GREP for matches over that type -- not by building --
-then run targeted `-p <crate> --no-run` for every crate the sweep implicates.
-Never `--workspace`. Child 1's equivalent sweep found FOUR sites where two were
-reported, two of them in a crate the obvious gate could not reach.
+**A CROSS-CRATE exhaustiveness sweep is owed ONLY IF THE TYPE IS VISIBLE
+OUTSIDE `ken-runtime`. CHECK VISIBILITY FIRST -- do not inherit the answer.**
+Measured at `dda3ff6d7`: `ResponseDisposition` and `StaticTransitionPlan` are
+`pub(in crate::cranelift_backend)` with no public re-export and are referenced
+in `ken-runtime` ONLY, so `-p ken-runtime` IS the complete type-check gate for
+this variant. Positive control, same grep and tree: child 1's `RuntimeExpr` is
+`pub` and reaches `ken-cli`, `ken-elaborator`, `ken-interp` and `ken-runtime`,
+which is why ITS sweep found four sites in two crates.
+
+WHAT STILL APPLIES HERE: the WITHIN-crate sweep by GREP before building (20
+`ResponseDisposition` references), and RE-CHECKING the visibility conclusion at
+the moment the variant lands. If `BracketSettlementId` or any new type reaches
+a public surface, the cross-crate sweep is owed again ON THAT TYPE and today's
+answer does not carry. Never `--workspace`.
