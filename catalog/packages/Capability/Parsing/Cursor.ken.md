@@ -30,7 +30,7 @@ import Data.Collections.Derived (bytes_nat_length, length, nth)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
-import Data.Numeric.Nat.Order (IsTrue, leq_nat, sub)
+import Data.Numeric.Nat.Order (IsTrue as NatOrderIsTrue, leq_nat, sub)
 
 import Core.Logic.Transport (cong, sym, trans)
 
@@ -272,7 +272,7 @@ pub fn CursorLaws (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc)
 
 theorem cursor_nat_lt_from_leq_suc
       (a : Nat)
-    : (b : Nat) → IsTrue (leq_nat (Suc a) b) → Equal Bool (cursor_nat_lt a b) True =
+    : (b : Nat) → NatOrderIsTrue (leq_nat (Suc a) b) → Equal Bool (cursor_nat_lt a b) True =
   λb.
     match b {
       Zero ↦ λh. absurd h;
@@ -285,7 +285,7 @@ theorem cursor_nat_lt_from_leq_suc
 
 theorem cursor_nat_lt_to_leq_suc
       (a : Nat)
-    : (b : Nat) → Equal Bool (cursor_nat_lt a b) True → IsTrue (leq_nat (Suc a) b) =
+    : (b : Nat) → Equal Bool (cursor_nat_lt a b) True → NatOrderIsTrue (leq_nat (Suc a) b) =
   λb.
     match b {
       Zero ↦ λh. absurd h;
@@ -298,7 +298,7 @@ theorem cursor_nat_lt_to_leq_suc
 
 theorem cursor_nat_not_lt_to_reverse_leq
       (a : Nat)
-    : (b : Nat) → Equal Bool (cursor_nat_lt a b) False → IsTrue (leq_nat b a) =
+    : (b : Nat) → Equal Bool (cursor_nat_lt a b) False → NatOrderIsTrue (leq_nat b a) =
   λb.
     match b {
       Zero ↦ λh. Proved;
@@ -320,7 +320,7 @@ theorem cursor_nat_lt_zero_add_suc
 theorem cursor_nat_lt_zero_from_leq_suc
       (witness : Nat)
     : (larger : Nat)
-      → IsTrue (leq_nat (Suc witness) larger)
+      → NatOrderIsTrue (leq_nat (Suc witness) larger)
       → Equal Bool (cursor_nat_lt Zero larger) True =
   λlarger.
     match larger {
@@ -339,8 +339,8 @@ theorem cursor_nat_lt_zero_add_from_positive
 
 theorem cursor_leq_suc_add_right
       (smaller : Nat) (larger : Nat) (rest : Nat)
-    : IsTrue (leq_nat (Suc smaller) larger)
-      → IsTrue (leq_nat (Suc (add smaller rest)) (add larger rest)) =
+    : NatOrderIsTrue (leq_nat (Suc smaller) larger)
+      → NatOrderIsTrue (leq_nat (Suc (add smaller rest)) (add larger rest)) =
   match rest {
     Zero ↦ λh. h;
     Suc rest2 ↦ λh. cursor_leq_suc_add_right smaller larger rest2 h
@@ -676,14 +676,14 @@ theorem arg_cursor_peek_has_remaining_from
               λvalue.
                 λpeeked.
                   let
-                    in_bounds : IsTrue (leq_nat (Suc offset) (arg_length arg)) =
+                    in_bounds : NatOrderIsTrue (leq_nat (Suc offset) (arg_length arg)) =
                       (proof some_below_length for nth)
                         UInt8
                         offset
                         (bytes_to_list arg)
                         value
                         peeked;
-                    decreases : IsTrue
+                    decreases : NatOrderIsTrue
                       (leq_nat
                         (Suc (sub (arg_length arg) (Suc offset)))
                         (sub (arg_length arg) offset)) =
@@ -731,19 +731,19 @@ theorem arg_remaining_advance_decreases_from_peek
               λvalue.
                 λpeeked.
                   let
-                    in_bounds : IsTrue (leq_nat (Suc offset) (arg_length arg)) =
+                    in_bounds : NatOrderIsTrue (leq_nat (Suc offset) (arg_length arg)) =
                       (proof some_below_length for nth)
                         UInt8
                         offset
                         (bytes_to_list arg)
                         value
                         peeked;
-                    decreases : IsTrue
+                    decreases : NatOrderIsTrue
                       (leq_nat
                         (Suc (sub (arg_length arg) (Suc offset)))
                         (sub (arg_length arg) offset)) =
                       (proof suc_decreases for sub) (arg_length arg) offset in_bounds;
-                    lifted : IsTrue
+                    lifted : NatOrderIsTrue
                       (leq_nat
                         (Suc (add (sub (arg_length arg) (Suc offset)) (arg_lengths_sum rest)))
                         (add (sub (arg_length arg) offset) (arg_lengths_sum rest))) =
@@ -781,7 +781,7 @@ theorem arg_cursor_end_valid_at_current
             λcomparison_is_cursor.
               λempty.
                 let
-                  in_bounds : IsTrue (leq_nat (Suc offset) (arg_length arg)) =
+                  in_bounds : NatOrderIsTrue (leq_nat (Suc offset) (arg_length arg)) =
                     cursor_nat_lt_to_leq_suc
                       offset
                       (arg_length arg)
@@ -790,7 +790,7 @@ theorem arg_cursor_end_valid_at_current
                         True
                         (cursor_nat_lt offset (arg_length arg))
                         comparison_is_cursor);
-                  decreases : IsTrue
+                  decreases : NatOrderIsTrue
                     (leq_nat
                       (Suc (sub (arg_length arg) (Suc offset)))
                       (sub (arg_length arg) offset)) =
