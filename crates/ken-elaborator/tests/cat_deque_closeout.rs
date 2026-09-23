@@ -177,10 +177,10 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
         .collect()
 }
 
-/// MEASURED: ordinary isolated roots loading installs exactly the sixteen named
-/// Deque identities, returns only identities from that population, and executes
-/// every checked fence. The resulting trusted base equals a fresh load of the
-/// Derived provider closure. CLAIMED: Deque is standalone, owns exactly its
+/// MEASURED: ordinary isolated roots loading installs exactly the checked
+/// identities in Deque's expected owned inventory, returns only identities
+/// from that population, and executes every checked fence. The resulting
+/// trusted base equals a fresh load of the Derived provider closure. CLAIMED: Deque is standalone, owns exactly its
 /// checked family, and adds no consumer-local trust. THE GAP: constructors are
 /// not separate loader results; the qualified environment inventory closes that
 /// part of the population independently.
