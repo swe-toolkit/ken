@@ -162,9 +162,9 @@ fn assert_private(surface: &str) {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the roots loader queries every publishable Decoder declaration and
-/// constructor and the successful surface equals the exact downstream union
-/// measured before migration. CLAIMED: Decoder publishes precisely the carrier
-/// and combinator API consumed by current packages. THE GAP: generated
+/// constructor and the successful surface equals the declared carrier,
+/// combinator, and checked preservation-law inventory. CLAIMED: Decoder
+/// publishes exactly that API to its clients. THE GAP: generated
 /// dictionaries are outside the query population, but this module declares no
 /// class or instance and `load_decoder` pins that fact.
 #[test]
@@ -174,17 +174,29 @@ fn parsing_decoder_loader_visible_inventory_is_exact() {
         "Decoder",
         "DecoderError",
         "DecoderFailed",
+        "DecoderNonBacktrackable",
         "DecoderRejected",
         "DecoderResult",
+        "DecoderPreserves",
         "decoder_alt",
+        "decoder_alt_preserves",
+        "decoder_alt_propagates_nonbacktrackable",
+        "decoder_alt_rejection_uses_second",
         "decoder_bind",
+        "decoder_bind_preserves",
         "decoder_error_location",
         "decoder_fail",
+        "decoder_fail_preserves",
         "decoder_many",
+        "decoder_many_preserves",
         "decoder_pure",
+        "decoder_pure_preserves",
         "decoder_recursive",
+        "decoder_recursive_preserves",
         "decoder_satisfy",
+        "decoder_satisfy_preserves",
         "decoder_seq",
+        "decoder_seq_preserves",
     ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(
@@ -235,12 +247,12 @@ fn parsing_decoder_imports_exact_canonical_cursor_surface() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: real selective-import clients cannot name any unconsumed sibling
-/// constructor, combinator worker, convenience combinator, or law. CLAIMED:
-/// publication does not expose implementation state or widen beyond the exact
-/// current consumer union. THE GAP: future consumers may require a deliberate
-/// additive publication, which must update the exact inventory rather than
-/// silently inheriting visibility.
+/// MEASURED: real selective-import clients cannot name any private sibling
+/// constructor, combinator worker, convenience combinator, or fuel-law helper.
+/// CLAIMED: publication does not expose implementation state beyond the
+/// deliberate checked preservation-law inventory. THE GAP: new clients may
+/// require a deliberate additive publication; the exact inventory must then
+/// move rather than silently inherit visibility.
 #[test]
 fn parsing_decoder_unconsumed_siblings_remain_private() {
     for surface in [
@@ -258,4 +270,116 @@ fn parsing_decoder_unconsumed_siblings_remain_private() {
     ] {
         assert_private(surface);
     }
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: a strict client imports the real Parsing cursor, Source and
+/// ValidSpan along with Decoder's public proof surface, then constructs
+/// preservation terms for fail, pure, alt, many and a recursive layer that
+/// actually invokes its recursive argument. CLAIMED: the provider's laws are
+/// usable over actual client carriers without exposing private Decoder
+/// constructors or fuel helpers. THE GAP: this public-API fixture does not
+/// identify the held Parsing branch's private ByteCursorBounded predicate.
+#[test]
+fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
+    let mut loaded = load_decoder();
+    loaded
+        .env
+        .elaborate_module_from_roots(
+            &[catalog_or::catalog_root()],
+            "Capability.Parsing.Parsing",
+        )
+        .expect("Parsing source/span client must roots-load");
+    loaded
+        .env
+        .elaborate_file(
+            r#"
+            import Capability.Parsing.Parsing (Source, Span, ByteCursor, ValidSpan, byte_cursor_ops)
+            import Capability.Parsing.Cursor (cursor_locate)
+            import Capability.Parsing.Decoder
+              (Decoder, DecoderPreserves,
+                decoder_alt, decoder_alt_preserves,
+                decoder_fail, decoder_fail_preserves,
+                decoder_many, decoder_many_preserves,
+                decoder_pure, decoder_pure_preserves,
+                decoder_recursive, decoder_recursive_preserves)
+
+            fn cursor_location_valid (s : Source) (cur : ByteCursor) : Prop =
+              ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur)
+
+            theorem location_sound (s : Source)
+                : (cur : ByteCursor)
+                  → cursor_location_valid s cur
+                  → ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur) =
+              λcur. λgood. good
+
+            theorem fail_preserves (s : Source)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops) =
+              decoder_fail_preserves
+                ByteCursor UInt8 Span Bool byte_cursor_ops
+                (cursor_location_valid s) (ValidSpan s) (location_sound s)
+
+            theorem pure_preserves (s : Source) (value : Bool)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_pure ByteCursor Span Bool value) =
+              decoder_pure_preserves
+                ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s) value
+
+            fn recursive_layer
+                  (recur : Decoder ByteCursor Span Bool)
+                : Decoder ByteCursor Span Bool =
+              decoder_alt
+                ByteCursor Span Bool
+                (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                recur
+
+            theorem alt_preserves (s : Source) (value : Bool)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_alt
+                      ByteCursor Span Bool
+                      (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                      (decoder_pure ByteCursor Span Bool value)) =
+              decoder_alt_preserves
+                ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                (decoder_pure ByteCursor Span Bool value)
+                (fail_preserves s)
+                (pure_preserves s value)
+
+            theorem many_preserves (s : Source)
+                : DecoderPreserves
+                    ByteCursor Span (List Bool) (cursor_location_valid s) (ValidSpan s)
+                    (decoder_many
+                      ByteCursor UInt8 Span Bool byte_cursor_ops
+                      (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)) =
+              decoder_many_preserves
+                ByteCursor UInt8 Span Bool byte_cursor_ops
+                (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                (cursor_location_valid s) (ValidSpan s)
+                (location_sound s) (fail_preserves s)
+
+            theorem recursive_preserves (s : Source)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_recursive
+                      ByteCursor UInt8 Span Bool byte_cursor_ops recursive_layer) =
+              decoder_recursive_preserves
+                ByteCursor UInt8 Span Bool byte_cursor_ops recursive_layer
+                (cursor_location_valid s) (ValidSpan s) (location_sound s)
+                (λrecur.
+                  λrecur_preserves.
+                    decoder_alt_preserves
+                      ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                      (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                      recur
+                      (fail_preserves s)
+                      recur_preserves)
+            "#,
+        )
+        .expect("public Decoder preservation laws must work for Parsing's source/span carriers");
 }
