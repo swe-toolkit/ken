@@ -23,6 +23,7 @@ import Application.Input.Schema
     MkSchema,
     SchemaFieldCheck,
     schema_field_presence,
+    schema_fields,
     SchemaFieldRejected,
     MkSchemaIssue,
     SchemaFieldAccepted,
@@ -42,6 +43,8 @@ import Capability.Parsing.Cursor
 
 import Capability.Parsing.Decoder
   (Decoder, decoder_pure, decoder_bind, decoder_satisfy, DecoderFailed, Decoded)
+
+import Core.Logic.Transport (cong, trans)
 
 import Data.Collections.Derived (list_append)
 
@@ -132,7 +135,7 @@ fn program_commands (spec : ProgramSpec) : List CommandSpec =
     MkProgramSpec name description commands ↦ commands
   }
 
-fn argparse_option_schema_field (spec : OptionSpec) : SchemaField =
+pub fn argparse_option_schema_field (spec : OptionSpec) : SchemaField =
   MkSchemaField
     (list_char_to_string
       (list_append Char (string_to_list_char "--") (string_to_list_char (option_name spec))))
@@ -150,7 +153,7 @@ fn argparse_option_schema_fields (specs : List OptionSpec) : List SchemaField =
       Cons SchemaField (argparse_option_schema_field spec) (argparse_option_schema_fields rest)
   }
 
-fn argparse_positional_schema_field (spec : PositionalSpec) : SchemaField =
+pub fn argparse_positional_schema_field (spec : PositionalSpec) : SchemaField =
   MkSchemaField
     (list_char_to_string
       (list_append
@@ -177,7 +180,7 @@ fn argparse_positional_schema_fields (specs : List PositionalSpec) : List Schema
         (argparse_positional_schema_fields rest)
   }
 
-fn command_schema (spec : CommandSpec) : Schema =
+pub fn command_schema (spec : CommandSpec) : Schema =
   MkSchema
     (command_name spec)
     (command_description spec)
@@ -436,7 +439,10 @@ fn argparse_run
 ## 4. Help derived from the spec
 
 Help is a pure fold from `CommandSpec` to `Doc`. Names, descriptions, modes,
-positionals, and subcommands all come from that one value.
+positionals, and subcommands all come from that one value. The checked
+`command_schema::fields_in_spec_order` proof shows that every option field
+precedes every positional field, preserving each list's order. The checked
+`command_help::rendered_from_schema` proof ties rendering to that schema.
 
 ```ken
 fn argparse_option_value_chars (spec : OptionSpec) : List Char =
@@ -518,7 +524,91 @@ fn argparse_subcommands_chars (specs : List CommandSpec) : List Char =
       list_append Char (argparse_subcommand_chars spec) (argparse_subcommands_chars rest)
   }
 
-fn command_help (spec : CommandSpec) : Doc = schema_help (command_schema spec)
+pub fn command_help (spec : CommandSpec) : Doc = schema_help (command_schema spec)
+
+theorem option_schema_fields_map
+      (specs : List OptionSpec)
+    : Equal
+        (List SchemaField)
+        (argparse_option_schema_fields specs)
+        (map OptionSpec SchemaField argparse_option_schema_field specs) =
+  match specs {
+    Nil ↦ Proved;
+    Cons spec rest ↦
+      cong
+        (List SchemaField)
+        (List SchemaField)
+        (argparse_option_schema_fields rest)
+        (map OptionSpec SchemaField argparse_option_schema_field rest)
+        (Cons SchemaField (argparse_option_schema_field spec))
+        (option_schema_fields_map rest)
+  }
+
+theorem positional_schema_fields_map
+      (specs : List PositionalSpec)
+    : Equal
+        (List SchemaField)
+        (argparse_positional_schema_fields specs)
+        (map PositionalSpec SchemaField argparse_positional_schema_field specs) =
+  match specs {
+    Nil ↦ Proved;
+    Cons spec rest ↦
+      cong
+        (List SchemaField)
+        (List SchemaField)
+        (argparse_positional_schema_fields rest)
+        (map PositionalSpec SchemaField argparse_positional_schema_field rest)
+        (Cons SchemaField (argparse_positional_schema_field spec))
+        (positional_schema_fields_map rest)
+  }
+
+pub proof fields_in_spec_order for command_schema
+      (name : String)
+      (description : String)
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+    : Equal
+        (List SchemaField)
+        (schema_fields (command_schema (MkCommandSpec name description options positionals)))
+        (list_append
+          SchemaField
+          (map OptionSpec SchemaField argparse_option_schema_field options)
+          (map PositionalSpec SchemaField argparse_positional_schema_field positionals)) =
+  trans
+    (List SchemaField)
+    (list_append
+      SchemaField
+      (argparse_option_schema_fields options)
+      (argparse_positional_schema_fields positionals))
+    (list_append
+      SchemaField
+      (map OptionSpec SchemaField argparse_option_schema_field options)
+      (argparse_positional_schema_fields positionals))
+    (list_append
+      SchemaField
+      (map OptionSpec SchemaField argparse_option_schema_field options)
+      (map PositionalSpec SchemaField argparse_positional_schema_field positionals))
+    (cong
+      (List SchemaField)
+      (List SchemaField)
+      (argparse_option_schema_fields options)
+      (map OptionSpec SchemaField argparse_option_schema_field options)
+      (λfields. list_append SchemaField fields (argparse_positional_schema_fields positionals))
+      (option_schema_fields_map options))
+    (cong
+      (List SchemaField)
+      (List SchemaField)
+      (argparse_positional_schema_fields positionals)
+      (map PositionalSpec SchemaField argparse_positional_schema_field positionals)
+      (list_append
+        SchemaField
+        (map OptionSpec SchemaField argparse_option_schema_field options))
+      (positional_schema_fields_map positionals))
+
+pub proof rendered_from_schema for command_help
+      (spec : CommandSpec)
+    : Equal Doc (command_help spec) (schema_help (command_schema spec)) =
+  Refl
 
 fn program_help (spec : ProgramSpec) : Doc =
   Text
@@ -553,6 +643,9 @@ export OptionMode,
   ParsedPositional,
   ParsedCommand,
   MkParsedCommand,
+  argparse_option_schema_field,
+  argparse_positional_schema_field,
+  command_schema,
   argparse_run,
   command_help,
   program_help
@@ -564,3 +657,10 @@ All declarations are transparent structural terms over CC1–CC6a. The package
 adds no parser carrier, error carrier, renderer, cached-length carrier, byte
 equality primitive, postulate, `Axiom`, or trusted-base entry. Raw argv values
 cross the parser directly as `Bytes`; lengths and elements are structural.
+
+The two public help proofs use structural induction on the specification lists
+and the checked `cong` and `trans` transport lemmas. The parser's byte
+preservation and complete, ordered diagnostic accumulation are not yet proved
+here. The current `NonEmpty` and `Schema` APIs do not provide the full-list
+projection laws needed for the latter; these guarantees remain behavior tested
+by CC7, not checked claims in this package.
