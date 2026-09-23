@@ -162,9 +162,9 @@ fn assert_private(surface: &str) {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the roots loader queries every publishable Decoder declaration and
-/// constructor and the successful surface equals the exact downstream union
-/// measured before migration. CLAIMED: Decoder publishes precisely the carrier
-/// and combinator API consumed by current packages. THE GAP: generated
+/// constructor and the successful surface equals the declared carrier,
+/// combinator, and checked preservation-law inventory. CLAIMED: Decoder
+/// publishes exactly that API to its clients. THE GAP: generated
 /// dictionaries are outside the query population, but this module declares no
 /// class or instance and `load_decoder` pins that fact.
 #[test]
@@ -174,17 +174,29 @@ fn parsing_decoder_loader_visible_inventory_is_exact() {
         "Decoder",
         "DecoderError",
         "DecoderFailed",
+        "DecoderNonBacktrackable",
         "DecoderRejected",
         "DecoderResult",
+        "DecoderPreserves",
         "decoder_alt",
+        "decoder_alt_preserves",
+        "decoder_alt_propagates_nonbacktrackable",
+        "decoder_alt_rejection_uses_second",
         "decoder_bind",
+        "decoder_bind_preserves",
         "decoder_error_location",
         "decoder_fail",
+        "decoder_fail_preserves",
         "decoder_many",
+        "decoder_many_preserves",
         "decoder_pure",
+        "decoder_pure_preserves",
         "decoder_recursive",
+        "decoder_recursive_preserves",
         "decoder_satisfy",
+        "decoder_satisfy_preserves",
         "decoder_seq",
+        "decoder_seq_preserves",
     ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(
@@ -235,12 +247,12 @@ fn parsing_decoder_imports_exact_canonical_cursor_surface() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: real selective-import clients cannot name any unconsumed sibling
-/// constructor, combinator worker, convenience combinator, or law. CLAIMED:
-/// publication does not expose implementation state or widen beyond the exact
-/// current consumer union. THE GAP: future consumers may require a deliberate
-/// additive publication, which must update the exact inventory rather than
-/// silently inheriting visibility.
+/// MEASURED: real selective-import clients cannot name any private sibling
+/// constructor, combinator worker, convenience combinator, or fuel-law helper.
+/// CLAIMED: publication does not expose implementation state beyond the
+/// deliberate checked preservation-law inventory. THE GAP: new clients may
+/// require a deliberate additive publication; the exact inventory must then
+/// move rather than silently inherit visibility.
 #[test]
 fn parsing_decoder_unconsumed_siblings_remain_private() {
     for surface in [
@@ -258,4 +270,263 @@ fn parsing_decoder_unconsumed_siblings_remain_private() {
     ] {
         assert_private(surface);
     }
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: a strict client imports the real Parsing cursor, Source and
+/// ValidSpan along with Decoder's public proof surface, then constructs
+/// preservation terms for fail, pure, alt, satisfy, seq, many, and a
+/// recursive layer that actually invokes its recursive argument. `seq`
+/// composes two byte tokens and `many` repeats the actual space-byte token;
+/// successful peeks close the test-local cursor predicate under advance by a
+/// checked finite-path proof, not an assumption that any bare ValidSpan
+/// advances.
+/// CLAIMED: the provider's laws are usable over actual client carriers
+/// without exposing private Decoder constructors or fuel helpers. THE GAP:
+/// this public-API fixture does not identify the held Parsing branch's
+/// private ByteCursorBounded predicate.
+#[test]
+fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
+    let mut loaded = load_decoder();
+    loaded
+        .env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Parsing source/span client must roots-load");
+    loaded
+        .env
+        .elaborate_file(
+            r#"
+            import Capability.Parsing.Parsing (Source, Span, ByteCursor, ValidSpan, byte_cursor_ops)
+            import Capability.Parsing.Cursor (cursor_advance, cursor_locate, cursor_peek)
+            import Capability.Parsing.Decoder
+              (Decoder, DecoderPreserves,
+                decoder_alt, decoder_alt_preserves,
+                decoder_fail, decoder_fail_preserves,
+                decoder_many, decoder_many_preserves,
+                decoder_pure, decoder_pure_preserves,
+                decoder_recursive, decoder_recursive_preserves,
+                decoder_satisfy, decoder_satisfy_preserves,
+                decoder_seq, decoder_seq_preserves)
+
+            fn cursor_valid_through
+                  (s : Source) (cur : ByteCursor) (steps : Nat) : Prop =
+              match steps {
+                Zero ↦ ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur);
+                Suc later ↦
+                  And
+                    (ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur))
+                    ((value : UInt8)
+                      → Equal
+                        (Option UInt8)
+                        (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                        (Some UInt8 value)
+                      → cursor_valid_through
+                        s
+                        (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur)
+                        later)
+              }
+
+            fn cursor_location_valid (s : Source) (cur : ByteCursor) : Prop =
+              (steps : Nat) → cursor_valid_through s cur steps
+
+            theorem location_sound (s : Source)
+                : (cur : ByteCursor)
+                  → cursor_location_valid s cur
+                  → ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur) =
+              λcur. λgood. good Zero
+
+            theorem advance_sound (s : Source)
+                : (cur : ByteCursor)
+                  → (value : UInt8)
+                  → Equal
+                    (Option UInt8)
+                    (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                    (Some UInt8 value)
+                  → cursor_location_valid s cur
+                  → cursor_location_valid
+                    s
+                    (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur) =
+              λcur. λvalue. λpeeked. λgood. λsteps.
+                (and_snd
+                  (ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur))
+                  ((value2 : UInt8)
+                    → Equal
+                      (Option UInt8)
+                      (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                      (Some UInt8 value2)
+                    → cursor_valid_through
+                      s
+                      (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur)
+                      steps)
+                  (good (Suc steps)))
+                  value
+                  peeked
+
+            theorem fail_preserves (s : Source)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops) =
+              decoder_fail_preserves
+                ByteCursor UInt8 Span Bool byte_cursor_ops
+                (cursor_location_valid s) (ValidSpan s) (location_sound s)
+
+            theorem pure_preserves (s : Source) (value : Bool)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_pure ByteCursor Span Bool value) =
+              decoder_pure_preserves
+                ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s) value
+
+            fn byte_token (code : Int) : Decoder ByteCursor Span UInt8 =
+              decoder_satisfy
+                ByteCursor UInt8 Span byte_cursor_ops
+                (λbyte. eq_int (uint8_to_int byte) code)
+
+            const space_code : Int = (32 : Int)
+
+            theorem byte_token_preserves (s : Source) (code : Int)
+                : DecoderPreserves
+                    ByteCursor Span UInt8 (cursor_location_valid s) (ValidSpan s)
+                    (byte_token code) =
+              decoder_satisfy_preserves
+                ByteCursor UInt8 Span byte_cursor_ops
+                (λbyte. eq_int (uint8_to_int byte) code)
+                (cursor_location_valid s) (ValidSpan s)
+                (location_sound s) (advance_sound s)
+
+            theorem token_pair_preserves
+                  (s : Source) (first_code : Int) (second_code : Int)
+                : DecoderPreserves
+                    ByteCursor Span UInt8 (cursor_location_valid s) (ValidSpan s)
+                    (decoder_seq
+                      ByteCursor Span UInt8 UInt8
+                      (byte_token first_code)
+                      (byte_token second_code)) =
+              decoder_seq_preserves
+                ByteCursor Span UInt8 UInt8
+                (cursor_location_valid s) (ValidSpan s)
+                (byte_token first_code) (byte_token second_code)
+                (byte_token_preserves s first_code)
+                (byte_token_preserves s second_code)
+
+            fn recursive_layer
+                  (recur : Decoder ByteCursor Span Bool)
+                : Decoder ByteCursor Span Bool =
+              decoder_alt
+                ByteCursor Span Bool
+                (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                recur
+
+            theorem alt_preserves (s : Source) (value : Bool)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_alt
+                      ByteCursor Span Bool
+                      (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                      (decoder_pure ByteCursor Span Bool value)) =
+              decoder_alt_preserves
+                ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                (decoder_pure ByteCursor Span Bool value)
+                (fail_preserves s)
+                (pure_preserves s value)
+
+            theorem many_preserves (s : Source)
+                : DecoderPreserves
+                    ByteCursor Span (List UInt8) (cursor_location_valid s) (ValidSpan s)
+                    (decoder_many
+                      ByteCursor UInt8 Span UInt8 byte_cursor_ops
+                      (byte_token space_code)) =
+              decoder_many_preserves
+                ByteCursor UInt8 Span UInt8 byte_cursor_ops
+                (byte_token space_code)
+                (cursor_location_valid s) (ValidSpan s)
+                (location_sound s) (byte_token_preserves s space_code)
+
+            theorem recursive_preserves (s : Source)
+                : DecoderPreserves
+                    ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                    (decoder_recursive
+                      ByteCursor UInt8 Span Bool byte_cursor_ops recursive_layer) =
+              decoder_recursive_preserves
+                ByteCursor UInt8 Span Bool byte_cursor_ops recursive_layer
+                (cursor_location_valid s) (ValidSpan s) (location_sound s)
+                (λrecur.
+                  λrecur_preserves.
+                    decoder_alt_preserves
+                      ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s)
+                      (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                      recur
+                      (fail_preserves s)
+                      recur_preserves)
+            "#,
+        )
+        .expect("public Decoder preservation laws must work for Parsing's source/span carriers");
+}
+
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: a concrete one-element-remaining cursor with a zero-progress
+/// repeated step produces a non-backtrackable failure, and `decoder_alt` leaves
+/// that exact outcome unchanged instead of running a successful fallback.
+/// CLAIMED: zero progress is a real, distinct non-backtracking arm. THE GAP:
+/// the general public theorem quantifies over any fatal error; this closed
+/// fixture pins one reachable producer of that error without naming its
+/// intentionally private constructor.
+#[test]
+fn decoder_alt_zero_progress_keeps_failure_instead_of_fallback() {
+    let mut loaded = load_decoder();
+    loaded
+        .env
+        .elaborate_file(
+            r#"
+            import Capability.Parsing.Cursor (CursorOps, MkCursorOps)
+            import Capability.Parsing.Decoder
+              (DecoderError, DecoderResult, Decoded, DecoderFailed, DecoderRejected,
+                DecoderNonBacktrackable, decoder_alt, decoder_many, decoder_pure)
+
+            data StalledCursor = MkStalledCursor
+            fn stalled_remaining (cur : StalledCursor) : Nat = Suc Zero
+            fn stalled_peek (cur : StalledCursor) : Option UInt8 = None UInt8
+            fn stalled_advance (cur : StalledCursor) : StalledCursor = cur
+            fn stalled_locate (cur : StalledCursor) : Nat = Zero
+            const stalled_ops : CursorOps StalledCursor UInt8 Nat =
+              MkCursorOps
+                StalledCursor UInt8 Nat
+                stalled_remaining stalled_peek stalled_advance stalled_locate
+
+            const stalled_many : DecoderResult StalledCursor Nat (List Bool) =
+              decoder_many
+                StalledCursor UInt8 Nat Bool stalled_ops
+                (decoder_pure StalledCursor Nat Bool True)
+                MkStalledCursor
+
+            fn error_or_rejected
+                  (outcome : DecoderResult StalledCursor Nat (List Bool))
+                : DecoderError Nat =
+              match outcome {
+                Decoded values next ↦ DecoderRejected Nat Zero;
+                DecoderFailed err ↦ err
+              }
+
+            theorem stalled_error_is_nonbacktrackable :
+                DecoderNonBacktrackable Nat (error_or_rejected stalled_many) =
+              Proved
+
+            theorem alt_preserves_the_stalled_failure
+                : Equal
+                    (DecoderResult StalledCursor Nat (List Bool))
+                    (decoder_alt
+                      StalledCursor Nat (List Bool)
+                      (decoder_many
+                        StalledCursor UInt8 Nat Bool stalled_ops
+                        (decoder_pure StalledCursor Nat Bool True))
+                      (decoder_pure StalledCursor Nat (List Bool) (Nil Bool))
+                      MkStalledCursor)
+                    stalled_many =
+              Proved
+            "#,
+        )
+        .expect("a nonprogress error must not backtrack to a successful alternative");
 }

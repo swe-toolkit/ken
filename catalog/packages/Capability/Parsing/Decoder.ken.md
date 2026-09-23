@@ -1767,6 +1767,747 @@ theorem decoder_many_consumes_all
                 succeeded
 ```
 
+### Invariant preservation
+
+A client chooses predicates for well-formed cursors and locations. Successful
+decodes retain the cursor predicate; every failed decode satisfies the location
+predicate at the error's public location. The base and composite laws below
+are checked beside the private case splits and fuel recursors. Their premises
+express cursor-location soundness, not assumptions about a particular client.
+`DecoderNonBacktrackable` distinguishes ordinary rejection from the two
+non-backtrackable errors without publishing their constructors. The two
+`alt` equations establish the actual branch choice: rejection tries the
+second decoder; non-backtrackable failure keeps the first error. Preservation
+alone would also hold for an incorrect fallback on zero progress, so the
+branch equations are separate checked claims.
+
+```ken
+fn DecoderResultPreserved
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (outcome : DecoderResult c loc a)
+    : Prop =
+  match outcome {
+    Decoded value next ↦ good_cursor next;
+    DecoderFailed err ↦ good_location (decoder_error_location loc err)
+  }
+
+pub fn DecoderNonBacktrackable (loc : Type) (err : DecoderError loc) : Prop =
+  match err {
+    DecoderRejected at ↦ Bottom;
+    DecoderZeroProgress at ↦ Top;
+    DecoderFuelExhausted at ↦ Top
+  }
+
+pub fn DecoderPreserves
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (decoder : Decoder c loc a)
+    : Prop =
+  (cur : c)
+    → good_cursor cur → DecoderResultPreserved c loc a good_cursor good_location
+    (decoder cur)
+
+pub theorem decoder_pure_preserves
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (value : a)
+    : DecoderPreserves c loc a good_cursor good_location (decoder_pure c loc a value) =
+  λcur. λgood. good
+
+pub theorem decoder_fail_preserves
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (locate_sound : (cur : c)
+        → good_cursor
+        cur
+        → good_location
+        (cursor_locate c el loc ops cur))
+    : DecoderPreserves c loc a good_cursor good_location (decoder_fail c el loc a ops) =
+  λcur. λgood. locate_sound cur good
+
+theorem decoder_zero_progress_nonbacktrackable
+      (loc : Type) (at : loc)
+    : DecoderNonBacktrackable loc (DecoderZeroProgress loc at) =
+  Proved
+
+theorem decoder_fuel_exhausted_nonbacktrackable
+      (loc : Type) (at : loc)
+    : DecoderNonBacktrackable loc (DecoderFuelExhausted loc at) =
+  Proved
+
+theorem decoder_alt_nonbacktrackable_error
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (second : Decoder c loc a)
+      (cur : c)
+      (err : DecoderError loc)
+      (nonbacktrackable : DecoderNonBacktrackable loc err)
+    : Equal
+        (DecoderResult c loc a)
+        (decoder_alt_result c loc a second cur (DecoderFailed c loc a err))
+        (DecoderFailed c loc a err) =
+  decoder_error_elim
+    loc
+    (λerror.
+      DecoderNonBacktrackable loc error
+      → Equal
+        (DecoderResult c loc a)
+        (decoder_alt_result c loc a second cur (DecoderFailed c loc a error))
+        (DecoderFailed c loc a error))
+    err
+    (λat. λimpossible. absurd impossible)
+    (λat. λvalid. Refl)
+    (λat. λvalid. Refl)
+    nonbacktrackable
+
+pub theorem decoder_alt_propagates_nonbacktrackable
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (first : Decoder c loc a)
+      (second : Decoder c loc a)
+      (cur : c)
+      (err : DecoderError loc)
+      (nonbacktrackable : DecoderNonBacktrackable loc err)
+      (first_failed : Equal (DecoderResult c loc a) (first cur) (DecoderFailed c loc a err))
+    : Equal
+        (DecoderResult c loc a)
+        (decoder_alt c loc a first second cur)
+        (DecoderFailed c loc a err) =
+  decoder_equal_chain
+    (DecoderResult c loc a)
+    (decoder_alt_result c loc a second cur (first cur))
+    (decoder_alt_result c loc a second cur (DecoderFailed c loc a err))
+    (DecoderFailed c loc a err)
+    (J
+      (λoutcome _.
+        Equal
+          (DecoderResult c loc a)
+          (decoder_alt_result c loc a second cur (first cur))
+          (decoder_alt_result c loc a second cur outcome))
+      Refl
+      first_failed)
+    (decoder_alt_nonbacktrackable_error c loc a second cur err nonbacktrackable)
+
+pub theorem decoder_alt_rejection_uses_second
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (first : Decoder c loc a)
+      (second : Decoder c loc a)
+      (cur : c)
+      (at : loc)
+      (first_rejected : Equal
+        (DecoderResult c loc a)
+        (first cur)
+        (DecoderFailed c loc a (DecoderRejected loc at)))
+    : Equal (DecoderResult c loc a) (decoder_alt c loc a first second cur) (second cur) =
+  J
+    (λoutcome _.
+      Equal
+        (DecoderResult c loc a)
+        (decoder_alt_result c loc a second cur (first cur))
+        (decoder_alt_result c loc a second cur outcome))
+    Refl
+    first_rejected
+
+pub theorem decoder_bind_preserves
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (b : Type)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (first : Decoder c loc a)
+      (next_decoder : a → Decoder c loc b)
+      (first_preserves : DecoderPreserves c loc a good_cursor good_location first)
+      (next_preserves : (value : a)
+        → DecoderPreserves
+        c
+        loc
+        b
+        good_cursor
+        good_location
+        (next_decoder value))
+    : DecoderPreserves c loc b good_cursor good_location
+        (decoder_bind c loc a b first next_decoder) =
+  λcur.
+    λgood.
+      decoder_result_elim
+        c
+        loc
+        a
+        (λfirst_outcome.
+          DecoderResultPreserved c loc a good_cursor good_location first_outcome
+          → DecoderResultPreserved
+            c
+            loc
+            b
+            good_cursor
+            good_location
+            (decoder_bind_result c loc a b next_decoder first_outcome))
+        (first cur)
+        (λvalue. λnext. λvalid. next_preserves value next valid)
+        (λerr. λvalid. valid)
+        (first_preserves cur good)
+
+pub theorem decoder_seq_preserves
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (b : Type)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (first : Decoder c loc a)
+      (second : Decoder c loc b)
+      (first_preserves : DecoderPreserves c loc a good_cursor good_location first)
+      (second_preserves : DecoderPreserves c loc b good_cursor good_location second)
+    : DecoderPreserves c loc b good_cursor good_location (decoder_seq c loc a b first second) =
+  decoder_bind_preserves
+    c
+    loc
+    a
+    b
+    good_cursor
+    good_location
+    first
+    (λignored. second)
+    first_preserves
+    (λignored. second_preserves)
+
+pub theorem decoder_alt_preserves
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (first : Decoder c loc a)
+      (second : Decoder c loc a)
+      (first_preserves : DecoderPreserves c loc a good_cursor good_location first)
+      (second_preserves : DecoderPreserves c loc a good_cursor good_location second)
+    : DecoderPreserves c loc a good_cursor good_location (decoder_alt c loc a first second) =
+  λcur.
+    λgood.
+      decoder_result_elim
+        c
+        loc
+        a
+        (λfirst_outcome.
+          DecoderResultPreserved c loc a good_cursor good_location first_outcome
+          → DecoderResultPreserved
+            c
+            loc
+            a
+            good_cursor
+            good_location
+            (decoder_alt_result c loc a second cur first_outcome))
+        (first cur)
+        (λvalue. λnext. λvalid. valid)
+        (λerr.
+          decoder_error_elim
+            loc
+            (λerror.
+              DecoderResultPreserved
+                c
+                loc
+                a
+                good_cursor
+                good_location
+                (DecoderFailed c loc a error)
+              → DecoderResultPreserved
+                c
+                loc
+                a
+                good_cursor
+                good_location
+                (decoder_alt_result c loc a second cur (DecoderFailed c loc a error)))
+            err
+            (λat. λvalid. second_preserves cur good)
+            (λat. λvalid. valid)
+            (λat. λvalid. valid))
+        (first_preserves cur good)
+
+theorem decoder_option_prop_elim
+      (a : Type)
+      (motive : Option a → Prop)
+      (option : Option a)
+      (none : motive (None a))
+      (some : (value : a) → motive (Some a value))
+    : motive option =
+  match option {
+    None ↦ none;
+    Some value ↦ some value
+  }
+
+theorem decoder_bool_prop_elim
+      (motive : Bool → Prop) (value : Bool) (on_true : motive True) (on_false : motive False)
+    : motive value =
+  match value {
+    True ↦ on_true;
+    False ↦ on_false
+  }
+
+fn decoder_satisfy_accepted
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (cur : c)
+      (value : el)
+      (accepted : Bool)
+    : DecoderResult c loc el =
+  match accepted {
+    True ↦ Decoded c loc el value (cursor_advance c el loc ops cur);
+    False ↦ DecoderFailed c loc el (DecoderRejected loc (cursor_locate c el loc ops cur))
+  }
+
+fn decoder_satisfy_outcome
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (accept : el → Bool)
+      (cur : c)
+      (observed : Option el)
+    : DecoderResult c loc el =
+  match observed {
+    None ↦ DecoderFailed c loc el (DecoderRejected loc (cursor_locate c el loc ops cur));
+    Some value ↦ decoder_satisfy_accepted c el loc ops cur value (accept value)
+  }
+
+pub theorem decoder_satisfy_preserves
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (accept : el → Bool)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (locate_sound : (cur : c)
+        → good_cursor
+        cur
+        → good_location
+        (cursor_locate c el loc ops cur))
+      (advance_sound : (cur : c)
+        → (value : el)
+        → Equal
+        (Option el)
+        (cursor_peek c el loc ops cur)
+        (Some el value)
+        → good_cursor
+        cur
+        → good_cursor
+        (cursor_advance c el loc ops cur))
+    : DecoderPreserves c loc el good_cursor good_location
+        (decoder_satisfy c el loc ops accept) =
+  λcur.
+    λgood.
+      decoder_option_prop_elim
+        el
+        (λobserved.
+          Equal (Option el) (cursor_peek c el loc ops cur) observed
+          → DecoderResultPreserved
+            c
+            loc
+            el
+            good_cursor
+            good_location
+            (decoder_satisfy_outcome c el loc ops accept cur observed))
+        (cursor_peek c el loc ops cur)
+        (λnot_found. locate_sound cur good)
+        (λvalue.
+          λpeeked.
+            decoder_bool_prop_elim
+              (λaccepted.
+                DecoderResultPreserved
+                  c
+                  loc
+                  el
+                  good_cursor
+                  good_location
+                  (decoder_satisfy_accepted c el loc ops cur value accepted))
+              (accept value)
+              (advance_sound cur value peeked good)
+              (locate_sound cur good))
+        Refl
+
+theorem decoder_many_fuel_zero_preserves
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (step : Decoder c loc a)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (locate_sound : (cur : c)
+        → good_cursor
+        cur
+        → good_location
+        (cursor_locate c el loc ops cur))
+      (cur : c)
+      (good : good_cursor cur)
+    : DecoderResultPreserved c loc
+        (List a)
+        good_cursor good_location
+        (decoder_many_fuel c el loc a ops step Zero cur) =
+  decoder_nat_elim
+    (λremaining.
+      Equal Nat (cursor_remaining c el loc ops cur) remaining
+      → DecoderResultPreserved
+        c
+        loc
+        (List a)
+        good_cursor
+        good_location
+        (decoder_many_zero_result c el loc a ops cur remaining))
+    (cursor_remaining c el loc ops cur)
+    (λempty. good)
+    (λrest. λpositive. locate_sound cur good)
+    Refl
+
+theorem decoder_many_decoded_success_preserves
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (fuel : Nat)
+      (cur : c)
+      (value : a)
+      (next : c)
+      (recursive_outcome : DecoderResult c loc (List a))
+      (recursive_preserved : DecoderResultPreserved
+        c
+        loc
+        (List a)
+        good_cursor
+        good_location
+        recursive_outcome)
+    : DecoderResultPreserved c loc
+        (List a)
+        good_cursor good_location
+        (decoder_many_decoded_result
+          c
+          el
+          loc
+          a
+          ops
+          fuel
+          cur
+          value
+          next
+          True
+          recursive_outcome) =
+  decoder_result_elim
+    c
+    loc
+    (List a)
+    (λoutcome.
+      DecoderResultPreserved c loc (List a) good_cursor good_location outcome
+      → DecoderResultPreserved
+        c
+        loc
+        (List a)
+        good_cursor
+        good_location
+        (decoder_many_decoded_result c el loc a ops fuel cur value next True outcome))
+    recursive_outcome
+    (λrest. λend. λvalid. valid)
+    (λerr. λvalid. valid)
+    recursive_preserved
+
+theorem decoder_many_fuel_preserves
+      (fuel : Nat)
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (step : Decoder c loc a)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (locate_sound : (cur : c)
+        → good_cursor
+        cur
+        → good_location
+        (cursor_locate c el loc ops cur))
+      (step_preserves : DecoderPreserves c loc a good_cursor good_location step)
+    : (cur : c)
+      → good_cursor cur
+      → DecoderResultPreserved c loc
+        (List a)
+        good_cursor good_location
+        (decoder_many_fuel c el loc a ops step fuel cur) =
+  match fuel {
+    Zero ↦
+      λcur.
+        λgood.
+          decoder_many_fuel_zero_preserves
+            c
+            el
+            loc
+            a
+            ops
+            step
+            good_cursor
+            good_location
+            locate_sound
+            cur
+            good;
+    Suc fuel2 ↦
+      λcur.
+        λgood.
+          decoder_result_elim
+            c
+            loc
+            a
+            (λstep_outcome.
+              DecoderResultPreserved c loc a good_cursor good_location step_outcome
+              → DecoderResultPreserved
+                c
+                loc
+                (List a)
+                good_cursor
+                good_location
+                (decoder_many_fuel_outcome c el loc a ops step (Suc fuel2) cur step_outcome))
+            (step cur)
+            (λvalue.
+              λnext.
+                λnext_good.
+                  decoder_bool_prop_elim
+                    (λcomparison.
+                      DecoderResultPreserved
+                        c
+                        loc
+                        (List a)
+                        good_cursor
+                        good_location
+                        (decoder_many_decoded_result
+                          c
+                          el
+                          loc
+                          a
+                          ops
+                          fuel2
+                          cur
+                          value
+                          next
+                          comparison
+                          (decoder_many_fuel c el loc a ops step fuel2 next)))
+                    (cursor_nat_lt
+                      (cursor_remaining c el loc ops next)
+                      (cursor_remaining c el loc ops cur))
+                    (decoder_many_decoded_success_preserves
+                      c
+                      el
+                      loc
+                      a
+                      ops
+                      good_cursor
+                      good_location
+                      fuel2
+                      cur
+                      value
+                      next
+                      (decoder_many_fuel c el loc a ops step fuel2 next)
+                      (decoder_many_fuel_preserves
+                        fuel2
+                        c
+                        el
+                        loc
+                        a
+                        ops
+                        step
+                        good_cursor
+                        good_location
+                        locate_sound
+                        step_preserves
+                        next
+                        next_good))
+                    (locate_sound next next_good))
+            (λerr.
+              decoder_error_elim
+                loc
+                (λerror.
+                  good_location (decoder_error_location loc error)
+                  → DecoderResultPreserved
+                    c
+                    loc
+                    (List a)
+                    good_cursor
+                    good_location
+                    (decoder_many_fuel_outcome
+                      c
+                      el
+                      loc
+                      a
+                      ops
+                      step
+                      (Suc fuel2)
+                      cur
+                      (DecoderFailed c loc a error)))
+                err
+                (λat. λvalid. good)
+                (λat. λvalid. valid)
+                (λat. λvalid. valid))
+            (step_preserves cur good)
+  }
+
+pub theorem decoder_many_preserves
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (step : Decoder c loc a)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (locate_sound : (cur : c)
+        → good_cursor
+        cur
+        → good_location
+        (cursor_locate c el loc ops cur))
+      (step_preserves : DecoderPreserves c loc a good_cursor good_location step)
+    : DecoderPreserves c loc
+        (List a)
+        good_cursor good_location
+        (decoder_many c el loc a ops step) =
+  λcur.
+    λgood.
+      decoder_many_fuel_preserves
+        (cursor_remaining c el loc ops cur)
+        c
+        el
+        loc
+        a
+        ops
+        step
+        good_cursor
+        good_location
+        locate_sound
+        step_preserves
+        cur
+        good
+
+theorem decoder_recursive_fuel_preserves
+      (fuel : Nat)
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (layer : Decoder c loc a → Decoder c loc a)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (locate_sound : (cur : c)
+        → good_cursor
+        cur
+        → good_location
+        (cursor_locate c el loc ops cur))
+      (layer_preserves : (recur : Decoder c loc a)
+        → DecoderPreserves
+        c
+        loc
+        a
+        good_cursor
+        good_location
+        recur
+        → DecoderPreserves
+        c
+        loc
+        a
+        good_cursor
+        good_location
+        (layer recur))
+    : DecoderPreserves c loc a good_cursor good_location
+        (decoder_recursive_fuel c el loc a ops layer fuel) =
+  match fuel {
+    Zero ↦ λcur. λgood. locate_sound cur good;
+    Suc fuel2 ↦
+      layer_preserves
+        (decoder_recursive_fuel c el loc a ops layer fuel2)
+        (decoder_recursive_fuel_preserves
+          fuel2
+          c
+          el
+          loc
+          a
+          ops
+          layer
+          good_cursor
+          good_location
+          locate_sound
+          layer_preserves)
+  }
+
+pub theorem decoder_recursive_preserves
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (layer : Decoder c loc a → Decoder c loc a)
+      (good_cursor : c → Prop)
+      (good_location : loc → Prop)
+      (locate_sound : (cur : c)
+        → good_cursor
+        cur
+        → good_location
+        (cursor_locate c el loc ops cur))
+      (layer_preserves : (recur : Decoder c loc a)
+        → DecoderPreserves
+        c
+        loc
+        a
+        good_cursor
+        good_location
+        recur
+        → DecoderPreserves
+        c
+        loc
+        a
+        good_cursor
+        good_location
+        (layer recur))
+    : DecoderPreserves c loc a good_cursor good_location
+        (decoder_recursive c el loc a ops layer) =
+  λcur.
+    λgood.
+      decoder_recursive_fuel_preserves
+        (cursor_remaining c el loc ops cur)
+        c
+        el
+        loc
+        a
+        ops
+        layer
+        good_cursor
+        good_location
+        locate_sound
+        layer_preserves
+        cur
+        good
+```
+
 ## 3. Using it
 
 Build token decoders with `decoder_satisfy`, use `decoder_pure` and
@@ -1774,7 +2515,12 @@ Build token decoders with `decoder_satisfy`, use `decoder_pure` and
 `decoder_seq`, and `decoder_alt`. `decoder_many` repeats a step, while
 `decoder_recursive` supplies a structurally fuel-bounded recursive layer.
 Callers never supply repetition or recursion fuel; both bounds come from
-`CursorOps.remaining`.
+`CursorOps.remaining`. A caller may apply `DecoderPreserves` with its own
+cursor/location predicates. For `satisfy` it supplies an advance-preservation
+premise for successful peeks; for `many` it supplies step preservation; and
+for `recursive` it supplies preservation of the layer for every preserving
+recursive argument. The latter two laws discharge the private fuel cases
+internally rather than exposing a caller fuel budget.
 
 ## 4. Design notes
 
@@ -1789,16 +2535,21 @@ None.
 ## 6. Trust  derivation
 
 Every combinator is transparent, structurally recursive on `Nat` fuel, and
-uses only checked cursor operations. The semantic equations and repetition law
-are ordinary transparent terms using `J`, structural eliminators, and the
-prelude conjunction projections; they import no proof assumption. Neither this
-package nor its proof dependencies add an axiom or primitive.
+uses only checked cursor operations. The semantic equations, repetition law, and parametric preservation laws are
+ordinary transparent terms using `J`, structural eliminators, and the prelude
+conjunction projections; they import no proof assumption. In particular,
+`decoder_many_preserves` inducts over its private fuel and keeps zero-progress
+and fuel-exhaustion locations valid; `decoder_recursive_preserves` inducts over
+its private fuel and uses a layer-preservation premise. Neither this package
+nor its proof dependencies add an axiom or primitive.
 
 ## 7. Package  summary
 
 Public surface: `DecoderError` with ordinary `DecoderRejected`, `DecoderResult`
 with `Decoded` and `DecoderFailed`, `Decoder`, location projection, and the
 pure, failure, bind, sequence, alternative, predicate-token, repetition, and
-recursive combinators consumed by downstream packages. The semantic equations
-and the `DecoderManyConsumesAllLaw` inhabitant are checked private proof
-machinery and do not widen that surface.
+recursive combinators consumed by downstream packages. `DecoderPreserves`,
+`DecoderNonBacktrackable`, the two `alt` branch equations, and the eight
+combinator preservation theorems form the checked public proof interface.
+The older semantic equations, `DecoderManyConsumesAllLaw`, and both fuel
+recursors stay private.
