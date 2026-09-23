@@ -192,6 +192,8 @@ fn nullary_abstract_export_is_transparent_to_owner_and_opaque_to_client() {
         "the defining module's constructor must exist in the flat checked environment"
     );
 
+    env.elaborate_file("import M")
+        .expect("client explicitly imports the qualified interface");
     env.elaborate_decl("const observed : Int = M.inspect M.make")
         .expect("a client may consume the opaque surface through public operations");
     match env.elaborate_decl("const forbidden : M.T = M.MkT") {
@@ -240,6 +242,8 @@ fn top_level_pub_data_is_not_abstract_exported() {
 fn client_match_hidden_ctor_rejected_at_surface() {
     let mut env = mk_env();
     env.elaborate_file("module M { pub data T = MkT }").expect("module M elaborates");
+    env.elaborate_file("import M")
+        .expect("client explicitly imports the abstract type");
 
     match env.elaborate_decl("fn bad (t : M.T) : Int = match t { MkT |-> 0 }") {
         Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "MkT"),
@@ -355,6 +359,8 @@ fn parameterized_abstract_export_preserves_kind_and_owner_proof() {
         "the abstract export must retain the hand-written opaque Pi kind"
     );
 
+    env.elaborate_file("import M")
+        .expect("client explicitly imports the qualified interface");
     env.elaborate_decl("const one : M.NonEmpty Nat = M.nonempty_singleton Nat Zero")
         .expect("a client may construct through the public smart constructor");
     env.elaborate_decl("const first : Nat = M.nonempty_head Nat one")
@@ -434,6 +440,8 @@ fn strict_roots_parameterized_abstract_export_keeps_two_faces() {
         trusted_before,
         "strict cross-unit abstract export must add no trust"
     );
+    env.elaborate_file("import M")
+        .expect("client explicitly imports the qualified provider");
     match env.elaborate_decl("const forbidden : M.Boxed Nat = M.MkBoxed Nat Zero") {
         Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "M.MkBoxed"),
         other => panic!("strict client must not name the provider constructor: {other:?}"),
