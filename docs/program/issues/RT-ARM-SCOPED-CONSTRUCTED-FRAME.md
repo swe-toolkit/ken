@@ -41,6 +41,14 @@ origin: "Architect sizing ruling evt_5mfgjmrhyrwcp (answering Steward evt_37qy3r
   nor parked px8ta (response-owner liveness) supplies the selected arm's
   activation-local captured operands or exact callable target.
 
+- **This node also owns the `L2` relation question.**
+  `agreeing_recursive_body_unit` (`core.rs:1230`) compares declared-unit
+  identity. `RT-CONTEXT-FRAME-LABEL-CORRECTION` `§D3` called the gap between
+  node identity and body equality "real and should be repaired", and filed no
+  owner. `RT-CONTEXT-CAPTURE-CLAIM-ABSENCE` calls `L2` correct, but its
+  evidence (the unit test near `:1271`) compares ids only, so it passes under
+  both readings. Adversary `evt_132c307qm7jeg`.
+
 ## Deliverables
 
 - **D0, before any code.** On current `main`, for each of the four fixtures,
@@ -59,9 +67,17 @@ origin: "Architect sizing ruling evt_5mfgjmrhyrwcp (answering Steward evt_37qy3r
   - without inventing entry-ABI membership;
   - without changing `agreeing_recursive_body_unit` for paths that still rely
     on one unit.
+  D1 also answers the `L2` question: either the arm-scoped frame makes the
+  identity comparison right, because each arm gets its own unit, or the
+  Architect rules `:1230` correct. The candidate then corrects whichever
+  record is wrong (`§D3` there, or the exemption here).
 - **D2, only after the Architect approves D1.** Build it. Un-ignore each row it
   clears. Rewrite the label of each row it does not clear to the measured
-  stop.
+  stop. In the same candidate, correct the stale owner comment on
+  `predeclared_entry_frame_slot`
+  (`planning/static_transition/continuations.rs:~4334`, "`D4b` owns making
+  such a value capturable"): `D4b` was an admission closeout, and this node
+  is the owner.
 
 ## Acceptance criteria
 
