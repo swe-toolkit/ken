@@ -13,6 +13,8 @@ reverses the other list once and continues from there.
 ```ken
 import Data.Collections.Derived (list_append, reverse)
 
+import Core.Logic.Transport (sym)
+
 data Deque a = MkDeque (List a) (List a)
 
 const empty (a : Type) : Deque a = MkDeque a (Nil a) (Nil a)
@@ -123,6 +125,51 @@ data PopPreserves (a : Type) (x : a) (q : Deque a) : Option (Pair a (Deque a)) �
     → PopPreserves a x q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x q2))
 }
 
+data PopFrontListView (a : Type) (q : Deque a) : Option (Pair a (Deque a)) → Type where {
+  MkPopFrontNone :
+    Equal (List a) (toList a q) (Nil a) → PopFrontListView a q (None (Pair a (Deque a)));
+  MkPopFrontSome :
+    (x : a)
+    → (rest : Deque a)
+    → Equal (List a) (toList a q) (Cons a x (toList a rest))
+    → PopFrontListView a q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x rest))
+}
+
+fn deque_pop_front_reversed (a : Type) (reversed : List a) : Option (Pair a (Deque a)) =
+  match reversed {
+    Nil ↦ None (Pair a (Deque a));
+    Cons x rest ↦ Some (Pair a (Deque a)) (mk_pair a (Deque a) x (MkDeque a rest (Nil a)))
+  }
+
+fn deque_pop_front_nil_view
+      (a : Type) (back : List a) (reversed : List a)
+    : Equal (List a) (reverse a back) reversed
+      → PopFrontListView a (MkDeque a (Nil a) back) (deque_pop_front_reversed a reversed) =
+  match reversed {
+    Nil ↦ λsame. MkPopFrontNone a (MkDeque a (Nil a) back) same;
+    Cons x rest ↦
+      λsame.
+        MkPopFrontSome
+          a
+          (MkDeque a (Nil a) back)
+          x
+          (MkDeque a rest (Nil a))
+          (J
+            (λcurrent _. Equal (List a) (reverse a back) (Cons a x current))
+            same
+            (sym (List a) (list_append a rest (Nil a)) rest (list_append::right_unit a rest)))
+  }
+
+fn popFront_list_view (a : Type) (q : Deque a) : PopFrontListView a q (popFront a q) =
+  match q {
+    MkDeque front back ↦
+      match front {
+        Nil ↦ deque_pop_front_nil_view a back (reverse a back) Refl;
+        Cons x rest ↦
+          MkPopFrontSome a (MkDeque a (Cons a x rest) back) x (MkDeque a rest back) Refl
+      }
+  }
+
 fn popFront_pushFront
       (a : Type) (x : a) (q : Deque a)
     : PopPreserves a x q (popFront a (pushFront a x q)) =
@@ -138,12 +185,21 @@ fn popBack_pushBack
   }
 ```
 
+The private `PopFrontListView` is indexed by the actual `popFront` result.
+`popFront_list_view` proves for every deque that `None` leaves an empty list
+view, while `Some (x, rest)` decomposes the original view into `x` followed
+by the residual view. For an empty front, the proof generalizes the reversed
+back to a private list argument and carries an equality back to `reverse`;
+it uses the canonical `list_append::right_unit` and `Transport.sym` proofs
+to remove the residual empty back. The implementation of `popFront` is unchanged.
+
 ## Trust and derivation
 
 `Deque` is an ordinary strictly positive inductive. Its operations reuse the
 transparent `list_append` and `reverse` definitions from
-`Data.Collections.Derived`; every law is a checked proof term. Relative to that
-provider closure, the package adds no axiom, postulate, primitive, foreign
+`Data.Collections.Derived` and the canonical `Core.Logic.Transport.sym` proof;
+every law is a checked proof term. Relative to those provider closures, the
+package adds no axiom, postulate, primitive, foreign
 declaration, unresolved hole, or consumer-local `trusted_base()` entry. Loading
 the full closure inherits the provider's existing audited trust footprint
 without widening or duplicating it.
