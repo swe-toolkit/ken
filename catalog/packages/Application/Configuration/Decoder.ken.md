@@ -25,6 +25,8 @@ import Application.Input.Schema
     schema_issue_origin,
     schema_validate)
 
+import Application.Input.Schema
+
 import Capability.Diagnostics.Core
   (ConfigKeyOrigin, Diagnostic, EnvironmentOrigin, MkDiagnostic, MkDiagnosticCode, Origin)
 
@@ -33,6 +35,8 @@ import Capability.Formatting.Doc (Doc)
 import Capability.Process.Environment (process_environment)
 
 import Core.Classes.LawfulClasses (bytes_deceq_eq)
+
+import Data.Collections.Derived
 
 import Data.Collections.NonEmpty (NonEmpty, nonempty_map)
 
