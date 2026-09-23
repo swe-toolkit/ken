@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-CURSOR-LAWS
 title: "Proof-backfill for Capability/Parsing/Cursor.ken.md: construct the missing inhabitant of the package's own CursorLaws proposition for arg_cursor_ops -- the three components (CursorPeekHasRemaining, CursorAdvanceProgress, CursorEndValid) are written as Props with no term proving them for the shipped dictionary."
-status: ready
+status: merged
 owner: foundation
 size: L
 gate: none
