@@ -1,18 +1,39 @@
 ---
 id: CAT-PARSING-LAWS
 title: "Proof-backfill for Capability/Parsing/Parsing.ken.md: inhabit the package's own ParserLaws proposition for parse_bool_expr (ParserValid, ParserTotal, ParserSourceLocal), and prove the Boolean printer/formatter round trip over the same syntax, spans, source and decoder representation, with no new trust"
-status: ready
+status: active
 owner: foundation
 size: L
 gate: none
 tier: T1
-depends_on: [CAT-PARSING-CURSOR-LAWS, CAT-PARSING-DECODER-LAWS]
+depends_on: [CAT-PARSING-CURSOR-LAWS, CAT-PARSING-DECODER-LAWS, CAT-PARSING-DECODER-PRESERVATION]
 blocks: []
 github: null
 origin: "One of the seventeen proof-backfill follow-ons named by docs/program/CATALOG-PROOF-COMPLETENESS-SURVEY.md, under operator ruling 2026-09-13 ('schedule the proof backfill before extending the catalog'). Chosen next because its two lower-tier parsing packages (Cursor, Decoder) now carry laws. Steward-filed per COORDINATION section 2."
 ---
 
 # `ParserLaws` has no inhabitant for the one parser the package ships
+
+> **HELD 2026-09-23 at candidate `1f5f99eb5`, base `aacfc618e`.** It is not
+> merge-ready, and QA does not run on it. It resumes on current main after
+> `CAT-PARSING-DECODER-PRESERVATION` lands.
+>
+> **Hard-stop inventory.** Two independent rows; fixing one does not fix
+> the other.
+>
+> 1. **Primitive `Bytes` view absent.** The printer-to-parser round trip
+>    needs a concatenation list-view equation and the UTF-8 encoded-byte
+>    list, and no TCB contract states either. This is TCB growth, routed to
+>    the operator at `evt_2tn395xd481ar`. Until the operator answers, the
+>    round trip is proved only as far as those facts allow, and the rest is
+>    recorded as stopped.
+> 2. **Decoder preservation absent at its public proof boundary.** The
+>    `Parsing.ken.md:892-917` obligation cannot be discharged, because
+>    Decoder's error cases, fuel recursors and laws are private. Owned by
+>    `CAT-PARSING-DECODER-PRESERVATION` (Architect `evt_12832hyyk1mrs`).
+>    `ParserValid`, `ParserSourceLocal` and `ParserTotal` stay unweakened.
+>    The `AC-3` path prohibition is unchanged: this node does not edit
+>    `Decoder.ken.md`.
 
 ## Settled inputs -- measured at `1da3055e2`. Re-ground before acting.
 
