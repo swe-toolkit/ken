@@ -70,7 +70,7 @@ import Capability.Parsing.Decoder
     decoder_satisfy,
     decoder_satisfy_preserves,
     decoder_seq,
-    decoder_seq_preserves as decoder_seq_public_preserves)
+    decoder_seq_preserves)
 
 import Core.Classes.LawfulClasses (leq_nat)
 
@@ -1154,51 +1154,6 @@ theorem parse_decoder_bounded_valid
           safe)
     bounded
 
-fn decoder_seq_outcome
-      (a : Type)
-      (b : Type)
-      (second : Decoder ByteCursor Span b)
-      (first_outcome : DecoderResult ByteCursor Span a)
-    : DecoderResult ByteCursor Span b =
-  match first_outcome {
-    Decoded value next ↦ second next;
-    DecoderFailed err ↦ DecoderFailed ByteCursor Span b err
-  }
-
-theorem decoder_seq_outcome_equation
-      (a : Type)
-      (b : Type)
-      (first : Decoder ByteCursor Span a)
-      (second : Decoder ByteCursor Span b)
-      (cur : ByteCursor)
-    : Equal
-        (DecoderResult ByteCursor Span b)
-        (decoder_seq ByteCursor Span a b first second cur)
-        (decoder_seq_outcome a b second (first cur)) =
-  Refl
-
-theorem decoder_seq_preserves
-      (a : Type)
-      (b : Type)
-      (first : Decoder ByteCursor Span a)
-      (second : Decoder ByteCursor Span b)
-      (first_safe : DecoderPreservesBounded a first)
-      (second_safe : DecoderPreservesBounded b second)
-    : DecoderPreservesBounded b (decoder_seq ByteCursor Span a b first second) =
-  λs.
-    λstart.
-      λcur.
-        λcur_safe.
-          decoder_result_prop_elim
-            a
-            (λfirst_outcome.
-              DecoderOutcomeBounded a s start first_outcome
-              → DecoderOutcomeBounded b s start (decoder_seq_outcome a b second first_outcome))
-            (first cur)
-            (λvalue. λnext. λbounded. second_safe s start next bounded)
-            (λerr. λbounded. bounded)
-            (first_safe s start cur cur_safe)
-
 theorem parse_result_valid_source_local
       (a : Type) (s : Source) (start : Nat) (outcome : ParseResult a)
     : ParseResultValid a s start outcome → ParseResultSourceLocal a s outcome =
@@ -1378,7 +1333,7 @@ theorem decoder_seq_public_bounded
     (decoder_seq ByteCursor Span a b first second)
     (λs.
       λstart.
-        decoder_seq_public_preserves
+        decoder_seq_preserves
           ByteCursor
           Span
           a
