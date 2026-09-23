@@ -460,9 +460,10 @@ fn assert_parsing_private(surface: &str) {
 ///
 /// MEASURED: every publishable Parsing declaration and constructor is queried
 /// through the roots loader, and the successful set equals the coherent public
-/// API. A strict client imports that whole surface and constructs every plain
-/// transparent carrier it needs. CLAIMED: published types have a usable
-/// producer/observer path rather than an inert or callable-looking boundary.
+/// API. A strict client imports that whole surface, constructs the plain
+/// transparent carriers, and checks the attached Boolean ParserLaws proof.
+/// CLAIMED: published types and laws have usable client paths rather than
+/// inert or callable-looking boundaries.
 /// THE GAP: Source construction is class-mediated and separately checked by the
 /// class registry; ByteCursor stays abstract because parser_from_decoder
 /// constructs it while byte_cursor_ops supplies the public decoder dictionary.
@@ -514,6 +515,7 @@ fn parsing_module_loader_visible_inventory_is_exact_and_coherent() {
         "located_span",
         "located_value",
         "parse_bool_expr",
+        "parse_bool_expr_laws",
         "parse_bool_expr_total",
         "parser_fail",
         "parser_from_decoder",
@@ -570,6 +572,15 @@ fn parsing_module_loader_visible_inventory_is_exact_and_coherent() {
                  (Nil (Located BoolExpr))",
         )
         .expect("plain Parsing carriers must be constructible by a strict client");
+    loaded
+        .env
+        .elaborate_file(
+            "import Capability.Parsing.Parsing \
+               (BoolExpr, ParserLaws, Syntax, parse_bool_expr, parse_bool_expr_laws)\n\
+             theorem strict_bool_parser_laws : \
+               ParserLaws (Syntax BoolExpr) parse_bool_expr = parse_bool_expr_laws",
+        )
+        .expect("the full attached ParserLaws proof must be usable by a strict client");
     let source = loaded
         .env
         .class_env
@@ -613,7 +624,13 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
     );
     assert_eq!(
         intersection_names(CURSOR, &loaded.cursor),
-        names(&["CursorOps", "MkCursorOps"])
+        names(&[
+            "CursorOps",
+            "MkCursorOps",
+            "cursor_advance",
+            "cursor_locate",
+            "cursor_peek",
+        ])
     );
     assert_eq!(
         intersection_names(DECODER, &loaded.decoder),
@@ -622,16 +639,22 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
             "Decoder",
             "DecoderError",
             "DecoderFailed",
+            "DecoderPreserves",
             "DecoderRejected",
             "DecoderResult",
             "decoder_alt",
+            "decoder_alt_preserves",
             "decoder_error_location",
             "decoder_fail",
             "decoder_many",
+            "decoder_many_preserves",
             "decoder_pure",
             "decoder_recursive",
+            "decoder_recursive_preserves",
             "decoder_satisfy",
+            "decoder_satisfy_preserves",
             "decoder_seq",
+            "decoder_seq_preserves",
         ])
     );
     assert_eq!(
@@ -640,7 +663,12 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
     );
     assert_eq!(
         intersection_names("Data.Collections.Derived", &loaded.derived),
-        names(&["bytes_nat_length", "list_append", "nth", "nth::some_below_length"])
+        names(&[
+            "bytes_nat_length",
+            "list_append",
+            "nth",
+            "nth::some_below_length"
+        ])
     );
     assert_eq!(
         intersection_names("Data.Numeric.Nat.Order", &loaded.nat_order),

@@ -359,6 +359,7 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "bool_expression_decoder",
         "complete_bool_decoder",
         "parse_bool_expr",
+        "parse_bool_expr_laws",
         "parse_bool_expr_total",
         "print_bool_expr",
         "format_bool_expr",
