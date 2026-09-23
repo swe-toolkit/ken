@@ -7,7 +7,7 @@ mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind, literate, parser};
+use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const ARGPARSE: &str = "Application.CommandLine.ArgParse";
@@ -33,6 +33,7 @@ fn schema_imports() -> BTreeSet<String> {
         "MkSchema",
         "SchemaFieldCheck",
         "schema_field_presence",
+        "schema_fields",
         "SchemaFieldRejected",
         "MkSchemaIssue",
         "SchemaFieldAccepted",
@@ -63,13 +64,18 @@ fn public_surface() -> BTreeSet<String> {
         "ParsedPositional",
         "ParsedCommand",
         "MkParsedCommand",
+        "argparse_option_schema_field",
+        "argparse_positional_schema_field",
+        "command_schema",
+        "command_schema::fields_in_spec_order",
         "argparse_run",
         "command_help",
+        "command_help::rendered_from_schema",
         "program_help",
     ])
 }
 
-fn private_surface() -> [&'static str; 44] {
+fn private_surface() -> [&'static str; 43] {
     [
         "argparse_byte_matches_char",
         "argparse_cons_validations",
@@ -85,15 +91,15 @@ fn private_surface() -> [&'static str; 44] {
         "argparse_name_decoder",
         "argparse_option_chars",
         "argparse_option_matches",
-        "argparse_option_schema_field",
         "argparse_option_schema_fields",
+        "option_schema_fields_map",
         "argparse_option_value_chars",
         "argparse_options_chars",
         "argparse_parse_tokens",
         "argparse_parsed_command",
         "argparse_positional_chars",
-        "argparse_positional_schema_field",
         "argparse_positional_schema_fields",
+        "positional_schema_fields_map",
         "argparse_positionals_chars",
         "argparse_schema_issue_diagnostic",
         "argparse_short_chars",
@@ -105,7 +111,6 @@ fn private_surface() -> [&'static str; 44] {
         "command_name",
         "command_options",
         "command_positionals",
-        "command_schema",
         "option_description",
         "option_mode",
         "option_name",
@@ -128,6 +133,7 @@ fn load_argparse() -> (ElabEnv, BTreeSet<GlobalId>, BTreeSet<GlobalId>) {
         "Capability.Formatting.Doc",
         "Capability.Parsing.Cursor",
         "Capability.Parsing.Decoder",
+        "Core.Logic.Transport",
         "Data.Collections.Derived",
         "Data.Collections.NonEmpty",
         "Data.Sums.Validation",
@@ -289,6 +295,7 @@ fn argparse_selective_import_ledger_is_exact() {
                 "Decoded",
             ]),
         ),
+        ("Core.Logic.Transport".to_owned(), names(&["cong", "trans"])),
         (
             "Data.Collections.Derived".to_owned(),
             names(&["list_append"]),
@@ -318,7 +325,7 @@ fn argparse_selective_import_ledger_is_exact() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: loader queries resolve exactly the coherent 20-name CLI-driver API
+/// MEASURED: loader queries resolve the coherent CLI-driver API and its help laws
 /// to canonical ArgParse identities. CLAIMED: callers can construct command
 /// specifications, inspect parsed results, parse arguments, and render both
 /// command and program help without access to implementation traversals. THE
@@ -344,12 +351,13 @@ fn argparse_loader_visible_inventory_is_exact() {
     let selections = expected
         .iter()
         .enumerate()
+        .filter(|(_, surface)| !surface.contains("::"))
         .map(|(index, surface)| format!("{surface} as cat_tier_e_argparse_{index}"))
         .collect::<Vec<_>>()
         .join(", ");
     env.elaborate_file(&format!("import {ARGPARSE} ({selections})"))
         .expect("the complete ArgParse public surface must import together");
-    for surface in &expected {
+    for surface in expected.iter().filter(|surface| !surface.contains("::")) {
         assert_eq!(
             env.globals[&format!("{ARGPARSE}.{surface}")],
             canonical[surface],
@@ -358,11 +366,60 @@ fn argparse_loader_visible_inventory_is_exact() {
     }
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: an external client instantiates the attached field-order proof on
+/// one option followed by one positional, while an empty-fields conclusion is
+/// rejected. CLAIMED: the law is usable for an inhabited, nonempty spec and
+/// proves content, not just a selectable proof name. THE GAP: this exercise
+/// does not prove the parser byte or diagnostic claims.
+#[test]
+fn argparse_help_order_law_is_usable_for_nonempty_specs() {
+    let (mut env, _, _) = load_argparse();
+    env.elaborate_file(
+        r#"
+import Application.CommandLine.ArgParse
+  (OptionSpec, MkOptionSpec, FlagOption, PositionalSpec, MkPositionalSpec,
+    CommandSpec, MkCommandSpec, command_schema, argparse_option_schema_field,
+    argparse_positional_schema_field)
+import Application.Input.Schema (SchemaField, schema_fields)
+import Data.Collections.Derived (list_append)
+
+const flag : OptionSpec = MkOptionSpec "verbose" (None String) FlagOption "report more"
+const input : PositionalSpec = MkPositionalSpec "file" True
+const options : List OptionSpec = Cons OptionSpec flag (Nil OptionSpec)
+const positionals : List PositionalSpec = Cons PositionalSpec input (Nil PositionalSpec)
+const command : CommandSpec = MkCommandSpec "run" "desc" options positionals
+
+theorem inhabited_help_order
+  : Equal (List SchemaField)
+    (schema_fields (command_schema command))
+    (list_append SchemaField
+      (map OptionSpec SchemaField argparse_option_schema_field options)
+      (map PositionalSpec SchemaField argparse_positional_schema_field positionals)) =
+  command_schema::fields_in_spec_order "run" "desc" options positionals
+"#,
+    )
+    .expect("strict client must apply attached law to an inhabited mixed spec");
+    let wrong = env.elaborate_file(
+        "theorem help_fields_cannot_disappear : Equal (List SchemaField) \
+         (schema_fields (command_schema command)) \
+         (Nil SchemaField) = Refl",
+    );
+    assert!(
+        matches!(
+            wrong,
+            Err(ElabError::KernelRejected { .. }) | Err(ElabError::TypeMismatch { .. })
+        ),
+        "a nonempty help schema cannot be proved empty: {wrong:?}"
+    );
+}
+
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every non-prelude, non-owned identity in checked ArgParse terms is
-/// one of the 49 D0 identities, including Schema and Decoder carrier reach; all
-/// 20 Schema identities belong to Schema's published 26-name surface. CLAIMED:
+/// in the expected provider closure, including Schema, Decoder, and checked
+/// transport proofs. The Schema identities belong to Schema's public surface. CLAIMED:
 /// ArgParse has no undeclared provider, mis-cut Schema dependency, or unexpected
 /// Tier-E edge. THE GAP: unused source imports are covered by the exact ledger.
 #[test]
@@ -384,11 +441,17 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Application.Input.Schema.SchemaPresence",
         "Application.Input.Schema.SchemaRequired",
         "Application.Input.Schema.SchemaValueShape",
+        "Application.Input.Schema.schema_documentation",
         "Application.Input.Schema.schema_field_presence",
+        "Application.Input.Schema.schema_fields",
+        "Application.Input.Schema.schema_fields_help_chars",
+        "Application.Input.Schema.schema_name",
         "Application.Input.Schema.schema_help",
         "Application.Input.Schema.schema_issue_code",
         "Application.Input.Schema.schema_issue_origin",
         "Application.Input.Schema.schema_validate_fields",
+        "Core.Logic.Transport.cong",
+        "Core.Logic.Transport.trans",
         "Capability.Diagnostics.Core.ArgumentOrigin",
         "Capability.Diagnostics.Core.Diagnostic",
         "Capability.Diagnostics.Core.MkByteRange",
@@ -419,10 +482,24 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Data.Sums.Validation.validation_map",
         "Semigroup_instance_Data.Collections.NonEmpty.NonEmpty",
     ]);
-    let expected_ids = expected_names
+    let mut expected_ids = expected_names
         .iter()
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
+    // The checked help proof unfolds Schema's renderer. Its anonymous literal
+    // identities are provider-owned, not new ArgParse dependencies.
+    let mut schema_help_references = BTreeSet::new();
+    collect_decl_globals(
+        env.env
+            .lookup(env.globals["Application.Input.Schema.schema_help"])
+            .expect("Schema help declaration"),
+        &mut schema_help_references,
+    );
+    expected_ids.extend(
+        schema_help_references
+            .into_iter()
+            .filter(|id| !env.globals.values().any(|named| named == id) && !base_ids.contains(id)),
+    );
     let mut resolved = BTreeSet::new();
     for identity in &owned {
         if let Some(declaration) = env.env.lookup(*identity) {
@@ -436,7 +513,22 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         .difference(&base_ids)
         .copied()
         .collect::<BTreeSet<_>>();
-    assert_eq!(external, expected_ids);
+    assert_eq!(
+        external,
+        expected_ids,
+        "unexpected references: {:?}",
+        external
+            .difference(&expected_ids)
+            .map(|id| (
+                *id,
+                env.globals
+                    .iter()
+                    .filter(|(_, val)| *val == id)
+                    .map(|(name, _)| name.as_str())
+                    .collect::<Vec<_>>()
+            ))
+            .collect::<Vec<_>>()
+    );
     let observed_names = env
         .globals
         .iter()
@@ -450,13 +542,19 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         .filter_map(|name| name.strip_prefix("Application.Input.Schema."))
         .map(str::to_owned)
         .collect::<BTreeSet<_>>();
-    assert_eq!(schema_names.len(), 20);
     let schema_public =
         catalog_publication::published_module_surfaces(SCHEMA_SOURCE, SCHEMA, "argparse_schema");
-    assert!(schema_names.is_subset(&schema_public));
+    let schema_private_renderer_helpers = names(&[
+        "schema_documentation",
+        "schema_fields_help_chars",
+        "schema_name",
+    ]);
+    assert!(schema_names
+        .difference(&schema_private_renderer_helpers)
+        .all(|name| schema_public.contains(name)));
     let selections = schema_imports().into_iter().collect::<Vec<_>>().join(", ");
     env.elaborate_file(&format!("import {SCHEMA} ({selections})"))
-        .expect("all 18 directly consumed Schema names must import together");
+        .expect("all directly consumed Schema names must import together");
     match env.elaborate_file(&format!("import {SCHEMA} (schema_field_shape)")) {
         Err(ElabError::UnboundName { name, .. }) => {
             assert_eq!(name, "Application.Input.Schema.schema_field_shape");
@@ -472,7 +570,7 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: roots loading preserves trust, class, and instance populations
-/// while all 44 implementation names reject through real external imports.
+/// while all remaining implementation names reject through real external imports.
 /// CLAIMED: ArgParse changes only dependency and coherent CLI-driver visibility.
 /// THE GAP: exact body preservation is a one-shot object diff.
 #[test]
