@@ -142,6 +142,69 @@ fn facade_publishes_without_binding_while_in_scope_export_republishes_binding() 
     assert_eq!(body_const(&in_scope, "observed"), in_scope.globals["M.foo"]);
 }
 
+// Durable invariant: a checked prop intro follows the public family through
+// direct and renamed re-exports, but only an authorized import grants the path.
+#[test]
+fn roots_loader_prop_intro_follows_only_imported_family_paths() {
+    let provider = "pub prop HasProof (a : Type) : Omega where { intro : HasProof a }";
+    let facade = "export Pub (HasProof as Proof)";
+    let in_scope = "import Pub (HasProof) export HasProof as Claim";
+    let entry = r#"
+        import Pub as K
+        import Facade as F
+        import InScope as I
+        theorem direct (a : Type) : K.HasProof a = K.HasProof.intro a
+        theorem through_facade (a : Type) : F.Proof a = F.Proof.intro a
+        theorem through_in_scope (a : Type) : I.Claim a = I.Claim.intro a
+    "#;
+    let env = load_entry(
+        "prop-intro-reexports",
+        &[
+            ("Pub.ken", provider),
+            ("Facade.ken", facade),
+            ("InScope.ken", in_scope),
+            ("Entry.ken", entry),
+        ],
+    )
+    .expect("all three imported family paths are authorized");
+    assert!(env.globals.contains_key("Entry.direct"));
+    assert!(env.globals.contains_key("Entry.through_facade"));
+    assert!(env.globals.contains_key("Entry.through_in_scope"));
+    assert!(!env.globals.contains_key("Facade.Proof.intro"));
+
+    let selective = load_entry(
+        "prop-intro-selective-facade",
+        &[
+            ("Pub.ken", provider),
+            ("Facade.ken", facade),
+            (
+                "Entry.ken",
+                "import Facade (Proof) \
+                 theorem selected (a : Type) : Proof a = Proof.intro a",
+            ),
+        ],
+    )
+    .expect("selective facade family also brings its intro through the family name");
+    assert!(selective.globals.contains_key("Entry.selected"));
+
+    let denied = r#"
+        import Facade (Proof)
+        theorem bad (a : Type) : Proof a = Facade.Proof.intro a
+    "#;
+    match load_entry(
+        "prop-intro-selective-no-prefix",
+        &[
+            ("Pub.ken", provider),
+            ("Facade.ken", facade),
+            ("Entry.ken", denied),
+        ],
+    ) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "Facade.Proof.intro"),
+        Err(other) => panic!("expected denied qualified facade prefix, got {other:?}"),
+        Ok(_) => panic!("selective import cannot grant a qualified facade prefix"),
+    }
+}
+
 #[test]
 fn unresolved_sources_fail_closed_at_the_export_site() {
     let mut in_scope = ElabEnv::new().expect("base environment");

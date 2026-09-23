@@ -53,6 +53,10 @@ pub struct ModuleState {
     /// enforcement point for private-by-default (`§4.1`) and abstract
     /// export (`§4.2`): a name simply isn't here if it wasn't exported.
     exports: HashMap<String, HashMap<String, String>>,
+    /// Canonical `prop` family → names of its actually elaborated intro helpers.
+    /// Kept separate from exports so a private family can be explicitly
+    /// re-exported without accidentally exposing data constructors or modules.
+    prop_intros: HashMap<String, Vec<String>>,
     /// Direct parent → child edges recorded only when expanding an inline
     /// `module` declaration. Loaded file units have no such edge even when
     /// their dotted path shares a prefix with another loaded unit.
@@ -373,9 +377,24 @@ fn resolve_ref(
                     span: span.clone(),
                 });
         }
-        // A multi-segment module path needs an exact authorized prefix above.
-        // Recursively resolving a shorter prefix and appending `leaf` would
-        // bypass the child's own public export map (including private names).
+        // A `prop` intro is a selector on an exported family, not an inline
+        // module child. Its exact entry is minted only from an elaborated
+        // PropDecl (including re-exports), under the authorized module prefix.
+        // Never infer a child module from a shorter imported prefix: its
+        // private leaves still need that child's own public export map.
+        if let Some((module_part, family)) = prefix_part.rsplit_once('.') {
+            if let Some(canonical_module) = scope.prefixes.get(module_part) {
+                if let Some(pubmap) = exports.get(canonical_module) {
+                    if let (Some(canonical_family), Some(canonical_intro)) =
+                        (pubmap.get(family), pubmap.get(&format!("{family}.{leaf}")))
+                    {
+                        if canonical_intro == &format!("{canonical_family}.{leaf}") {
+                            return Ok(canonical_intro.clone());
+                        }
+                    }
+                }
+            }
+        }
         Err(ElabError::UnboundName {
             name: name.to_string(),
             span: span.clone(),
@@ -638,6 +657,28 @@ fn publish_identity(
     }
 }
 
+/// Publish only checked helpers belonging to the exact exported `prop` family.
+/// A rename changes the visible family path, never the helper's canonical ID.
+fn publish_family_intros(
+    exports_here: &mut HashMap<String, String>,
+    prop_intros: &HashMap<String, Vec<String>>,
+    surface_family: &str,
+    canonical_family: &str,
+    span: &Span,
+) -> Result<(), ElabError> {
+    if let Some(intros) = prop_intros.get(canonical_family) {
+        for intro in intros {
+            publish_identity(
+                exports_here,
+                &format!("{surface_family}.{intro}"),
+                &format!("{canonical_family}.{intro}"),
+                span,
+            )?;
+        }
+    }
+    Ok(())
+}
+
 fn published_name(item: &ImportItem) -> &str {
     item.rename.as_deref().unwrap_or(&item.name)
 }
@@ -645,6 +686,7 @@ fn published_name(item: &ImportItem) -> &str {
 fn apply_export(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
+    prop_intros: &HashMap<String, Vec<String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     exports_here: &mut HashMap<String, String>,
     form: &ExportForm,
@@ -665,6 +707,7 @@ fn apply_export(
                     })?;
                 let surface = published_name(item);
                 publish_identity(exports_here, surface, canonical, span)?;
+                publish_family_intros(exports_here, prop_intros, surface, canonical, span)?;
                 for name in [item.name.as_str(), surface] {
                     if !scope.bindings.contains_key(name) && !globals.contains_key(name) {
                         scope.facade_only.insert(name.to_string());
@@ -682,7 +725,9 @@ fn apply_export(
                         span: span.clone(),
                     });
                 }
-                publish_identity(exports_here, published_name(item), &canonical, span)?;
+                let surface = published_name(item);
+                publish_identity(exports_here, surface, &canonical, span)?;
+                publish_family_intros(exports_here, prop_intros, surface, &canonical, span)?;
             }
         }
     }
@@ -2798,6 +2843,7 @@ fn expand_scope(
                 apply_export(
                     scope,
                     &elab.module_state.exports,
+                    &elab.module_state.prop_intros,
                     &elab.globals,
                     &mut exports_here,
                     form,
@@ -3169,6 +3215,21 @@ fn expand_scope(
                         &rdecl,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
+                    if let Decl::PropDecl { intros, .. } = inner {
+                        let mut checked_intros = Vec::with_capacity(intros.len());
+                        for intro in intros {
+                            let canonical_intro = format!("{}.{}", result.name, intro.name);
+                            if !elab.globals.contains_key(&canonical_intro) {
+                                return Err(ElabError::Internal(format!(
+                                    "prop intro '{canonical_intro}' did not elaborate"
+                                )));
+                            }
+                            checked_intros.push(intro.name.clone());
+                        }
+                        elab.module_state
+                            .prop_intros
+                            .insert(result.name.clone(), checked_intros);
+                    }
                     if is_pub {
                         if let Decl::AttachedProofDecl {
                             subject,
@@ -3189,6 +3250,13 @@ fn expand_scope(
                             // into any export table, so a client can't bring
                             // them into scope by any import form).
                             publish_identity(&mut exports_here, &bare, &result.name, inner.span())?;
+                            publish_family_intros(
+                                &mut exports_here,
+                                &elab.module_state.prop_intros,
+                                &bare,
+                                &result.name,
+                                inner.span(),
+                            )?;
                         }
                     }
                     ids.push(result);
