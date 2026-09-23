@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-23 06:42:41Z — from 711 issue file(s) in `docs/program/issues/`.
+2026-09-23 07:21:49Z — from 712 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -361,6 +361,7 @@ the committed file matches the generator's output.
 | `RT-4B-WALKED-CONSTANCY` | Two assertions landed in one candidate compose into a result neither states -- the five input populations read `(4, 2, 0, 2, 1)` identically whether fusion forms or is perturbed so it cannot, so `walked` discriminates input size and nothing downstream of it; the observation's own doc calls this a gap in attribution, which is a weaker claim than what was measured, and the next reader of a non-zero walked count is one node away | merged | runtime | XS | none | 2116 |
 | `RT-ACTIVE-EXIT-RESIDUAL-PIN` | Mutation-proven route/arrival coverage for the narrowed non-process `ProcessExitStatus x Active` residual arm at core.rs:4292, which M6 (RT-CHECKED-IH-FUNCTIONAL-REPRESENTATION) narrowed to non-process callers only. M6 correctly deleted the sole prior control for this route (the sar_d3 mutation-provenance test in positional_candidate_settlement.rs) because it pinned the RETIRED SAR measurement mechanism (the sar_d2_* counters); the retained residual arm is behavioral and under the green suite but no NEW test re-establishes route/arrival mutation coverage specifically for the narrowed arm. Add one, without reopening the retired measurement mechanism. | draft | runtime | S | none | — |
 | `RT-AGG-COMPOSE` | escaping two Resources into one aggregate (Prod (Resource _) (Resource _)) fails at erasure — checked endpoints do not compose | draft | runtime | TBD | none | — |
+| `RT-ARM-SCOPED-CONSTRUCTED-FRAME` | give each runtime-selected branch arm its own creation-site constructed-context frame and exact callable-body identity, so a recursive position inside the selected arm can supply its ProducerLocal captures without admitting the nonselected sibling or inventing entry-ABI membership -- the representation the four px7l/px7m rows lack (RT-CONTEXT-CAPTURE-CLAIM-ABSENCE outcome B). Design/feasibility first: D0 inventory and a component sketch to the Architect before any code; not a promise that all four rows clear | ready | runtime | L | none | — |
 | `RT-AUTHORITY-CONTRACT-MISDESCRIBES-ITS-POPULATION` | generated_constructor_authorities is NOT restricted to generated-context constructors -- a user's Result::Ok acquires an authority exactly like a generated-context one -- but the field name, its doc comment, and the registrar's own error string all say generated-context. The doc comment is the artifact the entire exclude-or-refuse obligation derives from, so a faithful derivation from it transmits the misdescription with full authority. That is what happened. (This title said 'ranges over EVERY carried constructor' until the Architect measured both writers: exit_failure returns early and the other registrar is gated, so the universal is false at a measured site while the finding is untouched.) | ready | runtime | S | none | — |
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | closed | runtime | M | none | — |
 | `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` | Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER | merged | runtime | M | none | — |
@@ -799,6 +800,7 @@ is itself not yet `merged`/`closed`:
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-ARM-SCOPED-CONSTRUCTED-FRAME` blocked by `RT-CONTEXT-CAPTURE-CLAIM-ABSENCE` (status: ready)
 - `RT-BRACKET-LOWERING-AND-D0-REFUTER` blocked by `RT-BRACKET-SETTLEMENT-PLANE` (status: ready)
 - `RT-BRACKET-SETTLEMENT-PLANE` blocked by `RT-BRACKET-PRODUCER-AUTHENTICITY` (status: ready)
 - `RT-D5B-POSTCALL-REFUSAL-MECHANISM` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
