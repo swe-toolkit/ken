@@ -286,10 +286,7 @@ fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
     let mut loaded = load_decoder();
     loaded
         .env
-        .elaborate_module_from_roots(
-            &[catalog_or::catalog_root()],
-            "Capability.Parsing.Parsing",
-        )
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
         .expect("Parsing source/span client must roots-load");
     loaded
         .env
@@ -382,4 +379,70 @@ fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
             "#,
         )
         .expect("public Decoder preservation laws must work for Parsing's source/span carriers");
+}
+
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: a concrete one-element-remaining cursor with a zero-progress
+/// repeated step produces a non-backtrackable failure, and `decoder_alt` leaves
+/// that exact outcome unchanged instead of running a successful fallback.
+/// CLAIMED: zero progress is a real, distinct non-backtracking arm. THE GAP:
+/// the general public theorem quantifies over any fatal error; this closed
+/// fixture pins one reachable producer of that error without naming its
+/// intentionally private constructor.
+#[test]
+fn decoder_alt_zero_progress_keeps_failure_instead_of_fallback() {
+    let mut loaded = load_decoder();
+    loaded
+        .env
+        .elaborate_file(
+            r#"
+            import Capability.Parsing.Cursor (CursorOps, MkCursorOps)
+            import Capability.Parsing.Decoder
+              (DecoderError, DecoderResult, Decoded, DecoderFailed, DecoderRejected,
+                DecoderNonBacktrackable, decoder_alt, decoder_many, decoder_pure)
+
+            data StalledCursor = MkStalledCursor
+            fn stalled_remaining (cur : StalledCursor) : Nat = Suc Zero
+            fn stalled_peek (cur : StalledCursor) : Option UInt8 = None UInt8
+            fn stalled_advance (cur : StalledCursor) : StalledCursor = cur
+            fn stalled_locate (cur : StalledCursor) : Nat = Zero
+            const stalled_ops : CursorOps StalledCursor UInt8 Nat =
+              MkCursorOps
+                StalledCursor UInt8 Nat
+                stalled_remaining stalled_peek stalled_advance stalled_locate
+
+            const stalled_many : DecoderResult StalledCursor Nat (List Bool) =
+              decoder_many
+                StalledCursor UInt8 Nat Bool stalled_ops
+                (decoder_pure StalledCursor Nat Bool True)
+                MkStalledCursor
+
+            fn error_or_rejected
+                  (outcome : DecoderResult StalledCursor Nat (List Bool))
+                : DecoderError Nat =
+              match outcome {
+                Decoded values next ↦ DecoderRejected Nat Zero;
+                DecoderFailed err ↦ err
+              }
+
+            theorem stalled_error_is_nonbacktrackable :
+                DecoderNonBacktrackable Nat (error_or_rejected stalled_many) =
+              Proved
+
+            theorem alt_preserves_the_stalled_failure
+                : Equal
+                    (DecoderResult StalledCursor Nat (List Bool))
+                    (decoder_alt
+                      StalledCursor Nat (List Bool)
+                      (decoder_many
+                        StalledCursor UInt8 Nat Bool stalled_ops
+                        (decoder_pure StalledCursor Nat Bool True))
+                      (decoder_pure StalledCursor Nat (List Bool) (Nil Bool))
+                      MkStalledCursor)
+                    stalled_many =
+              Proved
+            "#,
+        )
+        .expect("a nonprogress error must not backtrack to a successful alternative");
 }
