@@ -13,6 +13,8 @@ reverses the other list once and continues from there.
 ```ken
 import Data.Collections.Derived (list_append, reverse)
 
+import Core.Logic.Transport (sym)
+
 data Deque a = MkDeque (List a) (List a)
 
 const empty (a : Type) : Deque a = MkDeque a (Nil a) (Nil a)
@@ -133,11 +135,6 @@ data PopFrontListView (a : Type) (q : Deque a) : Option (Pair a (Deque a)) → T
     → PopFrontListView a q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x rest))
 }
 
-theorem deque_sym
-      (ty : Type) (left : ty) (right : ty) (same : Equal ty left right)
-    : Equal ty right left =
-  J (λactual _. Equal ty actual left) Refl same
-
 fn deque_pop_front_reversed (a : Type) (reversed : List a) : Option (Pair a (Deque a)) =
   match reversed {
     Nil ↦ None (Pair a (Deque a));
@@ -160,11 +157,7 @@ fn deque_pop_front_nil_view
           (J
             (λcurrent _. Equal (List a) (reverse a back) (Cons a x current))
             same
-            (deque_sym
-              (List a)
-              (list_append a rest (Nil a))
-              rest
-              (list_append::right_unit a rest)))
+            (sym (List a) (list_append a rest (Nil a)) rest (list_append::right_unit a rest)))
   }
 
 fn popFront_list_view (a : Type) (q : Deque a) : PopFrontListView a q (popFront a q) =
@@ -197,15 +190,16 @@ The private `PopFrontListView` is indexed by the actual `popFront` result.
 view, while `Some (x, rest)` decomposes the original view into `x` followed
 by the residual view. For an empty front, the proof generalizes the reversed
 back to a private list argument and carries an equality back to `reverse`;
-it uses the canonical `list_append::right_unit` proof to remove the residual
-empty back. The implementation of `popFront` is unchanged.
+it uses the canonical `list_append::right_unit` and `Transport.sym` proofs
+to remove the residual empty back. The implementation of `popFront` is unchanged.
 
 ## Trust and derivation
 
 `Deque` is an ordinary strictly positive inductive. Its operations reuse the
 transparent `list_append` and `reverse` definitions from
-`Data.Collections.Derived`; every law is a checked proof term. Relative to that
-provider closure, the package adds no axiom, postulate, primitive, foreign
+`Data.Collections.Derived` and the canonical `Core.Logic.Transport.sym` proof;
+every law is a checked proof term. Relative to those provider closures, the
+package adds no axiom, postulate, primitive, foreign
 declaration, unresolved hole, or consumer-local `trusted_base()` entry. Loading
 the full closure inherits the provider's existing audited trust footprint
 without widening or duplicating it.
