@@ -254,6 +254,83 @@ fn qualified_module_import_exposes_prop_intro_through_family_path() {
     assert!(env.globals.contains_key("consume"));
 }
 
+// Durable invariant: only the declared intro of a publicly exported prop
+// follows the qualified family path, including an alias or facade rename.
+#[test]
+fn qualified_prop_intro_follows_alias_and_reexported_family_identity() {
+    let env = elaborate_ok(
+        r#"
+        module M {
+          pub prop HasProof (a : Type) : Omega where {
+            intro : HasProof a
+          }
+        }
+        module Facade { export M (HasProof as Claim) }
+        module InScope { import M (HasProof) export HasProof as Proof }
+        import M as Alias
+        import Facade as F
+        import InScope
+        theorem through_alias (a : Type) : Alias.HasProof a = Alias.HasProof.intro a
+        theorem through_facade (a : Type) : F.Claim a = F.Claim.intro a
+        theorem through_in_scope (a : Type) : InScope.Proof a = InScope.Proof.intro a
+        "#,
+    );
+    assert!(env.globals.contains_key("through_alias"));
+    assert!(env.globals.contains_key("through_facade"));
+    assert!(env.globals.contains_key("through_in_scope"));
+    assert!(!env.globals.contains_key("Facade.Claim.intro"));
+}
+
+// Durable invariant: an exported family grants only its actually declared
+// intro helpers; selective import does not grant an unrelated module prefix.
+#[test]
+fn qualified_prop_intro_rejects_private_unknown_and_unimported_paths() {
+    let source = r#"
+        module M {
+          pub prop HasProof (a : Type) : Omega where {
+            intro : HasProof a
+          }
+          prop Hidden (a : Type) : Omega where {
+            intro : Hidden a
+          }
+        }
+    "#;
+    for (imports, family, expression, missing) in [
+        (
+            "import M",
+            "M.HasProof",
+            "M.HasProof.missing",
+            "M.HasProof.missing",
+        ),
+        ("import M", "M.HasProof", "M.Hidden.intro", "M.Hidden.intro"),
+        (
+            "import M (HasProof)",
+            "HasProof",
+            "M.HasProof.intro",
+            "M.HasProof.intro",
+        ),
+        (
+            "import M as Alias",
+            "Alias.HasProof",
+            "M.HasProof.intro",
+            "M.HasProof.intro",
+        ),
+    ] {
+        // Keep the theorem's type well-bound in each scope; refusal must
+        // identify the attempted selector, not a missing family type.
+        let src = format!(
+            "{source}\nmodule Client {{ {imports} \
+             theorem bad (a : Type) : {family} a = {expression} a }}"
+        );
+        let mut env = mk_env();
+        match env.elaborate_file(&src) {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, missing),
+            Err(other) => panic!("expected rejected intro path {missing}, got {other:?}"),
+            Ok(_) => panic!("unexpectedly accepted intro path {expression}"),
+        }
+    }
+}
+
 #[test]
 fn public_attached_proof_requires_public_subject() {
     let err = elaborate_err(

@@ -53,6 +53,14 @@ pub struct ModuleState {
     /// enforcement point for private-by-default (`§4.1`) and abstract
     /// export (`§4.2`): a name simply isn't here if it wasn't exported.
     exports: HashMap<String, HashMap<String, String>>,
+    /// Canonical `prop` family → names of its actually elaborated intro helpers.
+    /// Kept separate from exports so a private family can be explicitly
+    /// re-exported without accidentally exposing data constructors or modules.
+    prop_intros: HashMap<String, Vec<String>>,
+    /// Direct parent → child edges recorded only when expanding an inline
+    /// `module` declaration. Loaded file units have no such edge even when
+    /// their dotted path shares a prefix with another loaded unit.
+    inline_children: HashMap<String, HashSet<String>>,
     /// Plural resolver input for this run. N2 accepts exactly one populated
     /// root; retaining the list here makes later roots a data change.
     catalog_roots: Vec<PathBuf>,
@@ -234,8 +242,9 @@ struct Scope {
     bindings: HashMap<String, String>,
     /// Bare names bound by a top-level LOCAL declaration in this scope.
     locals: std::collections::HashSet<String>,
-    /// Qualified imports (`M → M`) and aliases (`N → M`). Only entries here
-    /// authorize a module prefix (`M.foo` or `N.foo`); loaded exports alone do not.
+    /// Qualified imports, aliases, and inline descendants of a locally
+    /// declared or imported owner. Every canonical target is backed by an
+    /// actual inline-declaration edge; loaded exports alone grant no prefix.
     prefixes: HashMap<String, String>,
     /// Names mentioned by a facade export remain deliberately unavailable to
     /// the body unless a separate import/local binding supplies them. Keeping
@@ -368,9 +377,23 @@ fn resolve_ref(
                     span: span.clone(),
                 });
         }
-        if prefix_part.contains('.') {
-            let resolved_prefix = resolve_ref(scope, exports, prefix_part, span)?;
-            return Ok(format!("{resolved_prefix}.{leaf}"));
+        // A `prop` intro is a selector on an exported family, not an inline
+        // module child. Its exact entry is minted only from an elaborated
+        // PropDecl (including re-exports), under the authorized module prefix.
+        // Never infer a child module from a shorter imported prefix: its
+        // private leaves still need that child's own public export map.
+        if let Some((module_part, family)) = prefix_part.rsplit_once('.') {
+            if let Some(canonical_module) = scope.prefixes.get(module_part) {
+                if let Some(pubmap) = exports.get(canonical_module) {
+                    if let (Some(canonical_family), Some(canonical_intro)) =
+                        (pubmap.get(family), pubmap.get(&format!("{family}.{leaf}")))
+                    {
+                        if canonical_intro == &format!("{canonical_family}.{leaf}") {
+                            return Ok(canonical_intro.clone());
+                        }
+                    }
+                }
+            }
         }
         Err(ElabError::UnboundName {
             name: name.to_string(),
@@ -437,27 +460,97 @@ fn resolve_attached_ref(
     Ok(format!("{subject}::{proof_name}"))
 }
 
+/// Find an inline module by walking outward from the current lexical module.
+/// Each component must follow a recorded declaration edge; a similarly named
+/// file-backed export is never evidence that the path is owned by this scope.
+fn lexical_inline_import(
+    prefix: &str,
+    module: &str,
+    inline_children: &HashMap<String, HashSet<String>>,
+) -> Option<String> {
+    // Dotted imports retain the absolute file-path identity from §3.2.
+    // Only a bare child name can be resolved relative to an inline owner.
+    if module.contains('.') {
+        return None;
+    }
+    let mut owner = prefix;
+    while !owner.is_empty() {
+        let mut canonical = owner.to_string();
+        let mut fully_declared = true;
+        for part in module.split('.') {
+            let child = qualify(&canonical, part);
+            if !inline_children
+                .get(&canonical)
+                .is_some_and(|children| children.contains(&child))
+            {
+                fully_declared = false;
+                break;
+            }
+            canonical = child;
+        }
+        if fully_declared {
+            return Some(canonical);
+        }
+        owner = owner.rsplit_once('.').map_or("", |(parent, _)| parent);
+    }
+    None
+}
+
+/// Grant only descendants whose edges were produced by actual inline module
+/// declarations. `surface` may be an alias or a sibling-relative import;
+/// `canonical` is the exact path used by the child's export table.
+fn authorize_inline_descendants(
+    scope: &mut Scope,
+    inline_children: &HashMap<String, HashSet<String>>,
+    canonical: &str,
+    surface: &str,
+) {
+    let mut pending = vec![(canonical.to_string(), surface.to_string())];
+    while let Some((parent, alias)) = pending.pop() {
+        if let Some(children) = inline_children.get(&parent) {
+            for child in children {
+                let leaf = child
+                    .strip_prefix(&parent)
+                    .and_then(|rest| rest.strip_prefix('.'))
+                    .expect("inline declaration edge must name a direct child");
+                let surface_child = qualify(&alias, leaf);
+                scope.prefixes.insert(surface_child.clone(), child.clone());
+                pending.push((child.clone(), surface_child));
+            }
+        }
+    }
+}
+
 fn apply_import(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
+    inline_children: &HashMap<String, HashSet<String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
+    owner: &str,
     module: &str,
     kind: &ImportKind,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let pubmap = exports.get(module).ok_or_else(|| ElabError::UnboundName {
-        name: module.to_string(),
-        span: span.clone(),
-    })?;
+    let canonical =
+        lexical_inline_import(owner, module, inline_children).unwrap_or_else(|| module.to_string());
+    let pubmap = exports
+        .get(&canonical)
+        .ok_or_else(|| ElabError::UnboundName {
+            name: module.to_string(),
+            span: span.clone(),
+        })?;
     match kind {
-        ImportKind::Qualified => {
+        ImportKind::Qualified | ImportKind::Aliased(_) => {
+            let surface = match kind {
+                ImportKind::Qualified => module,
+                ImportKind::Aliased(alias) => alias,
+                ImportKind::Selective(_) => unreachable!(),
+            };
             scope
                 .prefixes
-                .insert(module.to_string(), module.to_string());
-        }
-        ImportKind::Aliased(alias) => {
-            scope.prefixes.insert(alias.clone(), module.to_string());
+                .insert(surface.to_string(), canonical.clone());
+            authorize_inline_descendants(scope, inline_children, &canonical, surface);
         }
         ImportKind::Selective(names) => {
             for item in names {
@@ -564,6 +657,28 @@ fn publish_identity(
     }
 }
 
+/// Publish only checked helpers belonging to the exact exported `prop` family.
+/// A rename changes the visible family path, never the helper's canonical ID.
+fn publish_family_intros(
+    exports_here: &mut HashMap<String, String>,
+    prop_intros: &HashMap<String, Vec<String>>,
+    surface_family: &str,
+    canonical_family: &str,
+    span: &Span,
+) -> Result<(), ElabError> {
+    if let Some(intros) = prop_intros.get(canonical_family) {
+        for intro in intros {
+            publish_identity(
+                exports_here,
+                &format!("{surface_family}.{intro}"),
+                &format!("{canonical_family}.{intro}"),
+                span,
+            )?;
+        }
+    }
+    Ok(())
+}
+
 fn published_name(item: &ImportItem) -> &str {
     item.rename.as_deref().unwrap_or(&item.name)
 }
@@ -571,6 +686,7 @@ fn published_name(item: &ImportItem) -> &str {
 fn apply_export(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
+    prop_intros: &HashMap<String, Vec<String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     exports_here: &mut HashMap<String, String>,
     form: &ExportForm,
@@ -591,6 +707,7 @@ fn apply_export(
                     })?;
                 let surface = published_name(item);
                 publish_identity(exports_here, surface, canonical, span)?;
+                publish_family_intros(exports_here, prop_intros, surface, canonical, span)?;
                 for name in [item.name.as_str(), surface] {
                     if !scope.bindings.contains_key(name) && !globals.contains_key(name) {
                         scope.facade_only.insert(name.to_string());
@@ -608,7 +725,9 @@ fn apply_export(
                         span: span.clone(),
                     });
                 }
-                publish_identity(exports_here, published_name(item), &canonical, span)?;
+                let surface = published_name(item);
+                publish_identity(exports_here, surface, &canonical, span)?;
+                publish_family_intros(exports_here, prop_intros, surface, &canonical, span)?;
             }
         }
     }
@@ -628,20 +747,36 @@ fn declared_module_paths(decls: &[Decl], prefix: &str, out: &mut HashSet<String>
     }
 }
 
-fn imported_module_paths(decls: &[Decl], out: &mut Vec<(String, Span)>) {
+fn imported_module_paths(decls: &[Decl], owner: &str, out: &mut Vec<(String, String, Span)>) {
     for decl in decls {
         match decl.unwrap_pub() {
             Decl::ImportDecl { module, span, .. } => {
-                out.push((module.clone(), span.clone()));
+                out.push((module.clone(), owner.to_string(), span.clone()));
             }
             Decl::ExportDecl {
                 form: ExportForm::Facade { module, .. },
                 span,
-            } => out.push((module.clone(), span.clone())),
-            Decl::ModuleDecl { decls: inner, .. } => imported_module_paths(inner, out),
+            } => out.push((module.clone(), owner.to_string(), span.clone())),
+            Decl::ModuleDecl {
+                name, decls: inner, ..
+            } => imported_module_paths(inner, &qualify(owner, name), out),
             _ => {}
         }
     }
+}
+
+fn declared_inline_import(owner: &str, module: &str, declared: &HashSet<String>) -> bool {
+    if module.contains('.') {
+        return false;
+    }
+    let mut current = owner;
+    while !current.is_empty() {
+        if declared.contains(&qualify(current, module)) {
+            return true;
+        }
+        current = current.rsplit_once('.').map_or("", |(parent, _)| parent);
+    }
+    false
 }
 
 fn admission_boundary(decls: &[Decl]) -> Result<Option<(BoundaryHeader, Span)>, ElabError> {
@@ -882,11 +1017,11 @@ fn load_unit(
     elab.module_state.active_imports.push(module.to_string());
     let result = (|| {
         let mut local_modules = HashSet::new();
-        declared_module_paths(&decls, "", &mut local_modules);
+        declared_module_paths(&decls, module, &mut local_modules);
         let mut imports = Vec::new();
-        imported_module_paths(&decls, &mut imports);
-        for (dependency, import_span) in imports {
-            if local_modules.contains(&dependency)
+        imported_module_paths(&decls, module, &mut imports);
+        for (dependency, owner, import_span) in imports {
+            if declared_inline_import(&owner, &dependency, &local_modules)
                 || elab.module_state.exports.contains_key(&dependency)
             {
                 continue;
@@ -2280,6 +2415,7 @@ fn prebind_scope_declarations(
     exports: &HashMap<String, HashMap<String, String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
+    inline_children: &HashMap<String, HashSet<String>>,
     exports_here: &mut HashMap<String, String>,
 ) -> Result<(), ElabError> {
     // Collision population follows declaration namespace effects, not the
@@ -2355,8 +2491,10 @@ fn prebind_scope_declarations(
                 if let Err(error) = apply_import(
                     &mut synthesis_scope,
                     exports,
+                    inline_children,
                     globals,
                     prelude_binding_names,
+                    prefix,
                     module,
                     kind,
                     span,
@@ -2657,6 +2795,7 @@ fn expand_scope(
         &elab.module_state.exports,
         &elab.globals,
         &elab.module_state.prelude_binding_names,
+        &elab.module_state.inline_children,
         &mut exports_here,
     )?;
     let declared_fixities = collect_scope_fixities(elab, decls, scope)?;
@@ -2690,8 +2829,10 @@ fn expand_scope(
                 apply_import(
                     scope,
                     &elab.module_state.exports,
+                    &elab.module_state.inline_children,
                     &elab.globals,
                     &elab.module_state.prelude_binding_names,
+                    prefix,
                     module,
                     kind,
                     span,
@@ -2702,6 +2843,7 @@ fn expand_scope(
                 apply_export(
                     scope,
                     &elab.module_state.exports,
+                    &elab.module_state.prop_intros,
                     &elab.globals,
                     &mut exports_here,
                     form,
@@ -2753,7 +2895,26 @@ fn expand_scope(
                     crate::standard_operators::is_standard_operator_home(&child_prefix);
                 elab.module_state
                     .exports
-                    .insert(child_prefix, child_exports);
+                    .insert(child_prefix.clone(), child_exports);
+                if !prefix.is_empty() {
+                    elab.module_state
+                        .inline_children
+                        .entry(prefix.to_string())
+                        .or_default()
+                        .insert(child_prefix.clone());
+                }
+                // The defining scope owns its declared child without an
+                // import. Its grandchildren are authorized by the same
+                // declaration edges, never by similarly spelled file paths.
+                scope
+                    .prefixes
+                    .insert(child_prefix.clone(), child_prefix.clone());
+                authorize_inline_descendants(
+                    scope,
+                    &elab.module_state.inline_children,
+                    &child_prefix,
+                    &child_prefix,
+                );
                 if is_standard_operator_home {
                     certify_standard_operator_home(
                         elab,
@@ -3054,6 +3215,21 @@ fn expand_scope(
                         &rdecl,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
+                    if let Decl::PropDecl { intros, .. } = inner {
+                        let mut checked_intros = Vec::with_capacity(intros.len());
+                        for intro in intros {
+                            let canonical_intro = format!("{}.{}", result.name, intro.name);
+                            if !elab.globals.contains_key(&canonical_intro) {
+                                return Err(ElabError::Internal(format!(
+                                    "prop intro '{canonical_intro}' did not elaborate"
+                                )));
+                            }
+                            checked_intros.push(intro.name.clone());
+                        }
+                        elab.module_state
+                            .prop_intros
+                            .insert(result.name.clone(), checked_intros);
+                    }
                     if is_pub {
                         if let Decl::AttachedProofDecl {
                             subject,
@@ -3074,6 +3250,13 @@ fn expand_scope(
                             // into any export table, so a client can't bring
                             // them into scope by any import form).
                             publish_identity(&mut exports_here, &bare, &result.name, inner.span())?;
+                            publish_family_intros(
+                                &mut exports_here,
+                                &elab.module_state.prop_intros,
+                                &bare,
+                                &result.name,
+                                inner.span(),
+                            )?;
                         }
                     }
                     ids.push(result);
@@ -3586,6 +3769,303 @@ mod namespace_effect_tests {
             exports.keys().map(String::as_str).collect::<BTreeSet<_>>(),
             BTreeSet::from(["renamed"])
         );
+    }
+
+    fn inline_owner_root(source: &str) -> tempfile::TempDir {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::write(root.path().join("A.ken"), source).expect("write inline owner unit");
+        root
+    }
+
+    const INLINE_OWNER: &str = "module N {\n\
+         pub const x : Nat = Zero\n\
+         const s : Nat = Suc Zero\n\
+         const inside : Nat = s\n\
+         }\n\
+         pub const top : Nat = Zero\n";
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: the roots loader admits A's own `A.N.x` and the inline
+    /// sibling P's `import N` / `N.x`, without loading a decoy `N.ken`.
+    /// CLAIMED: declaration provenance, not a discoverable file or ambient
+    /// exports, grants the public child name. THE GAP: the B-unit negatives
+    /// below exclude the alternative of simply opening all loaded children.
+    #[test]
+    fn inline_child_owner_and_sibling_import_use_declaration_provenance() {
+        let root = inline_owner_root(
+            "module N { pub const x : Nat = Zero\n\
+             const s : Nat = Suc Zero\n\
+             const inside : Nat = s }\n\
+             const own : Nat = A.N.x\n\
+             module P { import N\npub const sibling : Nat = N.x }\n\
+             pub const top : Nat = Zero\n",
+        );
+        fs::write(root.path().join("N.ken"), "pub const x : Nat = Suc Zero\n")
+            .expect("write a distinct file-backed decoy N");
+        let mut env = ElabEnv::new().expect("base environment");
+        let trust_before = env.env.trusted_base();
+        env.elaborate_module_from_roots(&[root.path().to_path_buf()], "A")
+            .expect("owner and inline sibling must use A.N.x");
+        for name in ["A.N.x", "A.N.inside", "A.own", "A.P.sibling"] {
+            assert!(env.globals.contains_key(name), "missing checked {name}");
+        }
+        assert!(
+            !env.module_state.loaded_units.contains_key("N"),
+            "inline N must not load the distinct N.ken"
+        );
+        assert_eq!(env.env.trusted_base(), trust_before);
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: distinct B file units accept `A.N.x` after `import A` and
+    /// `K.N.x` after `import A as K`; alias-only `A.N.x` rejects by name.
+    /// CLAIMED: only the bound surface prefix reaches the actual inline child.
+    /// THE GAP: selective and no-import controls below rule out ambient access.
+    #[test]
+    fn imported_owner_grants_only_its_bound_inline_child_path() {
+        let root = inline_owner_root(INLINE_OWNER);
+        let roots = [root.path().to_path_buf()];
+        for source in [
+            "import A\nconst observed : Nat = A.N.x\n",
+            "import A as K\nconst observed : Nat = K.N.x\n",
+        ] {
+            fs::write(root.path().join("B.ken"), source).expect("write B client");
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_module_from_roots(&roots, "B")
+                .unwrap_or_else(|error| panic!("B should access the child: {error:?}"));
+            assert!(env.globals.contains_key("B.observed"));
+            assert!(env.globals.contains_key("A.N.x"));
+        }
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\nconst denied : Nat = A.N.x\n",
+        )
+        .expect("write B with the unbound original prefix");
+        let mut env = ElabEnv::new().expect("base environment");
+        match env.elaborate_module_from_roots(&roots, "B") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.N.x"),
+            other => panic!("alias-only import must not grant A.N.x: {other:?}"),
+        }
+        assert!(env.globals.contains_key("A.N.x"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.3, 4.1).
+    ///
+    /// MEASURED: owner, sibling and B consumer refuse private s at the
+    /// exact child path after x was registered as a public child export.
+    /// CLAIMED: qualified authority never bypasses the child export table.
+    /// THE GAP: the independent positive owner/sibling/B tests above prove
+    /// that the same paths reach public x; a refused SCC need not commit it.
+    #[test]
+    fn inline_child_private_leaf_refuses_in_owner_sibling_and_importer() {
+        let root = inline_owner_root(&format!(
+            "{INLINE_OWNER}const public_control : Nat = A.N.x\n\
+             const denied : Nat = A.N.s\n"
+        ));
+        let roots = [root.path().to_path_buf()];
+        let mut env = ElabEnv::new().expect("base environment");
+        match env.elaborate_module_from_roots(&roots, "A") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.N.s"),
+            other => panic!("A must not name private child leaf: {other:?}"),
+        }
+        assert!(env.globals.contains_key("A.N.x"));
+
+        fs::write(
+            root.path().join("A.ken"),
+            format!(
+                "{INLINE_OWNER}module P {{ import N\n\
+                 pub const public_control : Nat = N.x\n\
+                 const denied : Nat = N.s }}\n"
+            ),
+        )
+        .expect("write private sibling fixture");
+        let mut env = ElabEnv::new().expect("base environment");
+        match env.elaborate_module_from_roots(&roots, "A") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "N.s"),
+            other => panic!("P must not name private child leaf: {other:?}"),
+        }
+        assert!(env.globals.contains_key("A.N.x"));
+
+        fs::write(root.path().join("A.ken"), INLINE_OWNER).expect("restore public A");
+        for (source, private_name) in [
+            (
+                "import A\nconst public_control : Nat = A.N.x\n\
+                 const denied : Nat = A.N.s\n",
+                "A.N.s",
+            ),
+            (
+                "import A as K\nconst public_control : Nat = K.N.x\n\
+                 const denied : Nat = K.N.s\n",
+                "K.N.s",
+            ),
+        ] {
+            fs::write(root.path().join("B.ken"), source).expect("write B privacy client");
+            let mut env = ElabEnv::new().expect("base environment");
+            match env.elaborate_module_from_roots(&roots, "B") {
+                Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, private_name),
+                other => panic!("B must not name private child leaf: {other:?}"),
+            }
+            assert!(env.globals.contains_key("A.N.x"));
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3).
+    ///
+    /// MEASURED: selective A(top) admits the bare top, but not A.N.x;
+    /// previously loaded A also grants no import-free A.N.x in B. CLAIMED:
+    /// no imported-owner prefix means no nested module authority. THE GAP:
+    /// the qualified and aliased variants above establish that x exists.
+    #[test]
+    fn selective_or_loaded_owner_does_not_grant_inline_child_access() {
+        let root = inline_owner_root(INLINE_OWNER);
+        let roots = [root.path().to_path_buf()];
+        fs::write(
+            root.path().join("B.ken"),
+            "import A (top)\nconst public_control : Nat = top\n",
+        )
+        .expect("write successful selective B client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&roots, "B")
+            .expect("selective public top must resolve without nested access");
+        assert!(env.globals.contains_key("B.public_control"));
+
+        fs::write(
+            root.path().join("B.ken"),
+            "import A (top)\nconst public_control : Nat = top\n\
+             const denied : Nat = A.N.x\n",
+        )
+        .expect("write selective B client");
+        let mut env = ElabEnv::new().expect("base environment");
+        match env.elaborate_module_from_roots(&roots, "B") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.N.x"),
+            other => panic!("selection must not grant nested access: {other:?}"),
+        }
+        assert!(env.globals.contains_key("A.N.x"));
+
+        fs::write(root.path().join("B.ken"), "const denied : Nat = A.N.x\n")
+            .expect("write unimported B client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&roots, "A")
+            .expect("A must finish before checking the B cache boundary");
+        match env.elaborate_module_from_roots(&roots, "B") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.N.x"),
+            other => panic!("loaded A must not grant nested access: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.2 declaration order).
+    ///
+    /// MEASURED: P's `import N` before A declares inline N rejects at N.
+    /// CLAIMED: loader knowledge of a later child does not make the import
+    /// available early. THE GAP: the succeeding ordered P fixture above
+    /// proves that refusal is caused by order, not by missing N altogether.
+    #[test]
+    fn inline_sibling_import_requires_prior_declaration() {
+        let root = inline_owner_root(
+            "module P { import N\nconst premature : Nat = N.x }\n\
+             module N { pub const x : Nat = Zero }\n",
+        );
+        let mut env = ElabEnv::new().expect("base environment");
+        match env.elaborate_module_from_roots(&[root.path().to_path_buf()], "A") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "N"),
+            other => panic!("import of a later inline sibling must reject: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3 per-unit closure).
+    ///
+    /// MEASURED: two unimported spellings in inline sibling P reject even
+    /// though A already declared N. CLAIMED: only A's own scope inherits its
+    /// declaration authority; P must import N. THE GAP: the positive sibling
+    /// import test above keeps this refusal from being a missing-child test.
+    #[test]
+    fn inline_sibling_does_not_inherit_owner_declaration_access() {
+        for reference in ["N.x", "A.N.x"] {
+            let root = inline_owner_root(&format!(
+                "{INLINE_OWNER}module P {{ const denied : Nat = {reference} }}\n"
+            ));
+            let mut env = ElabEnv::new().expect("base environment");
+            match env.elaborate_module_from_roots(&[root.path().to_path_buf()], "A") {
+                Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, reference),
+                other => panic!("P must import N to name {reference}: {other:?}"),
+            }
+            assert!(env.globals.contains_key("A.N.x"));
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3, 4.1).
+    ///
+    /// MEASURED: A and P name a grandchild through declaration / import,
+    /// alias K reaches it from B, and its private leaf refuses at K.N.Q.s.
+    /// CLAIMED: authorization follows every inline declaration edge and
+    /// checks the terminal child's own public export map. THE GAP: the
+    /// disjoint file-backed control below excludes dotted-spelling inference.
+    #[test]
+    fn inline_grandchild_preserves_transitive_authority_and_privacy() {
+        let root = inline_owner_root(
+            "module N { module Q { pub const x : Nat = Zero\n\
+             const s : Nat = Suc Zero } }\n\
+             const own : Nat = A.N.Q.x\n\
+             module P { import N\nconst sibling : Nat = N.Q.x }\n\
+             pub const top : Nat = Zero\n",
+        );
+        let roots = [root.path().to_path_buf()];
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\nconst observed : Nat = K.N.Q.x\n",
+        )
+        .expect("write aliased grandchild client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&roots, "B")
+            .expect("every declared inline edge must be available through K");
+        for name in ["A.N.Q.x", "A.own", "A.P.sibling", "B.observed"] {
+            assert!(env.globals.contains_key(name), "missing {name}");
+        }
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\nconst denied : Nat = K.N.Q.s\n",
+        )
+        .expect("write private grandchild client");
+        let mut env = ElabEnv::new().expect("base environment");
+        match env.elaborate_module_from_roots(&roots, "B") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "K.N.Q.s"),
+            other => panic!("private grandchild must not escape: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: A.N is independently loaded from A/N.ken and A has an
+    /// unrelated inline root declaration, but importing A still refuses
+    /// A.N.x. CLAIMED: a dotted export and a loaded unit do not supply an
+    /// inline declaration edge. THE GAP: the positive B import of A's own
+    /// `top` proves that the root import is not simply broken.
+    #[test]
+    fn file_backed_child_never_counts_as_inline_descendant_of_imported_owner() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::create_dir(root.path().join("A")).expect("write A directory");
+        fs::write(root.path().join("A/N.ken"), "pub const x : Nat = Zero\n")
+            .expect("write independent file-backed A.N");
+        fs::write(
+            root.path().join("B.ken"),
+            "import A\nconst public_control : Nat = A.top\n\
+             const denied : Nat = A.N.x\n",
+        )
+        .expect("write imported owner B client");
+        let roots = [root.path().to_path_buf()];
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_file("module A { pub const top : Nat = Zero }")
+            .expect("create an unrelated importable owner");
+        env.elaborate_module_from_roots(&roots, "A.N")
+            .expect("load the real file-backed child");
+        match env.elaborate_module_from_roots(&roots, "B") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.N.x"),
+            other => panic!("a file-backed A.N must not become inline: {other:?}"),
+        }
+        assert!(env.globals.contains_key("A.top"));
+        assert!(env.globals.contains_key("A.N.x"));
     }
 
     /// Promise class: durable invariant (spec 33 §3.2, §3.3).
