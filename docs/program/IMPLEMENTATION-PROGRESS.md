@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-23 21:06:35Z — from 721 issue file(s) in `docs/program/issues/`.
+2026-09-23 22:32:59Z — from 722 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -69,6 +69,7 @@ the committed file matches the generator's output.
 | `CAT-CONFIGURATION-DECODER-LAWS` | prove the required-field agreement the decoder actually has, and characterize the optional lane it does not -- env_config_validation discards the validation payload and recomputes values in a second independent traversal whose None branch emits an empty-Bytes placeholder; the REQUIRED lane is guarded (schema_check_presence rejects SchemaRequired), so the reachable placeholder is an ABSENT OPTIONAL field, whose empty Bytes is indistinguishable from a present-but-empty value | merged | foundation | M | none | — |
 | `CAT-CONFIGURATION-DECODER-PRESENCE-CARRIER` | replace the decoder's lossy List Bytes result with List (Option Bytes) -- empty Bytes is an ordinary value in this package, not a reserved sentinel, so the current map sends two distinct inputs (no entry, and an entry whose value is empty) to one indistinguishable result element; carry the validated payload instead of recomputing it, and delete env_config_values with its placeholder branch so the agreement obligation disappears at its source rather than being proved | draft | foundation | M | none | — |
 | `CAT-DEQUE-POP-LAWS` | Proof-backfill for Data/Collections/Deque.ken.md, keeping its zero-publication surface: prove in-package for an arbitrary deque that popFront agrees with the list view -- popFront q = None implies toList q = Nil, and popFront q = Some (x, rest) implies toList q = Cons x (toList rest) -- instead of only the pushed-then-popped round trip | ready | foundation | S | architect | — |
+| `CAT-DEQUE-POPBACK-LAWS` | Proof-backfill for Data/Collections/Deque.ken.md, keeping its zero-publication surface: prove in-package for an arbitrary deque that popBack agrees with the list view -- popBack q = None implies toList q = Nil, and popBack q = Some (x, rest) implies toList q = list_append (toList rest) (Cons x Nil) | ready | foundation | S | architect | — |
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-DERIVED-PUB-EXPORT` | Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3079 |
 | `CAT-DERIVED-REUSE-CONSUMERS` | Drain catalog-reuse census group 4 (derived-list computational reuse) — replace six reimplementations of list_append, reverse, concat_map, and length across five packages with selective imports from Data.Collections.Derived. The consumer half of CAT-DERIVED-PUB-EXPORT, shaped on the landed CAT-NAT-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | M | none | — |
@@ -803,6 +804,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `BYTES-CONCAT-AND-ENCODE-CONTRACTS` blocked by `CAT-PARSING-LAWS` (status: active)
+- `CAT-DEQUE-POPBACK-LAWS` blocked by `CAT-DEQUE-POP-LAWS` (status: ready)
 - `F4` blocked by `A3` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
@@ -822,7 +824,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (ready) `CAT-DEQUE-POP-LAWS` (ready) `KERNEL-NORMALIZE-ORIGIN-TRACE` (active) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-SELECTED-PENDING-CALL-PACKAGE` (active)
+- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (ready) `CAT-DEQUE-POP-LAWS` (ready) `CAT-DEQUE-POPBACK-LAWS` (ready) `KERNEL-NORMALIZE-ORIGIN-TRACE` (active) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-SELECTED-PENDING-CALL-PACKAGE` (active)
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
