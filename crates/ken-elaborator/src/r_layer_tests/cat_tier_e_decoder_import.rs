@@ -191,9 +191,10 @@ fn collect_decl_globals(declaration: &Decl, out: &mut BTreeSet<GlobalId>) {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the real parser returns exactly the seven D0-ledger module/name
-/// sets. CLAIMED: Decoder declares every provider dependency and no unused edge.
-/// THE GAP: AST equality establishes the interface; checked identity closure
-/// separately establishes that every imported name is retained by compiled terms.
+/// sets, and each non-base checked provider identity has a qualified owner in
+/// Decoder's declared imports. CLAIMED: checked provider modules have explicit
+/// Decoder import edges. THE GAP: the exact ledger separately pins source
+/// import items; it does not show that every listed name is consumed.
 #[test]
 fn decoder_selective_import_ledger_is_exact() {
     let extracted = literate::extract_ken_md(DECODER_SOURCE).expect("Decoder extraction");
@@ -212,8 +213,12 @@ fn decoder_selective_import_ledger_is_exact() {
                     .map(|item| item.name.clone())
                     .collect::<BTreeSet<_>>(),
             )),
+            SurfaceDecl::ImportDecl {
+                kind: ImportKind::Qualified,
+                ..
+            } => None,
             SurfaceDecl::ImportDecl { .. } => {
-                panic!("Decoder dependency imports must all be selective")
+                panic!("Decoder dependency imports must be selective or qualified")
             }
             _ => None,
         })
@@ -250,6 +255,72 @@ fn decoder_selective_import_ledger_is_exact() {
         ),
     ]);
     assert_eq!(actual, expected);
+    let qualified_modules = declarations
+        .iter()
+        .filter_map(|declaration| match declaration.unwrap_pub() {
+            SurfaceDecl::ImportDecl {
+                module,
+                kind: ImportKind::Qualified,
+                ..
+            } => Some(module.clone()),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        qualified_modules,
+        names(&["Application.Input.Schema", "Data.Collections.Derived"])
+    );
+
+    let declared_modules = declarations
+        .iter()
+        .filter_map(|declaration| match declaration.unwrap_pub() {
+            SurfaceDecl::ImportDecl { module, .. } => Some(module.clone()),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    let (env, owned, base_ids) = load_decoder();
+    let mut resolved = BTreeSet::new();
+    for identity in &owned {
+        if let Some(declaration) = env.env.lookup(*identity) {
+            collect_decl_globals(declaration, &mut resolved);
+        }
+    }
+    let external = resolved
+        .difference(&owned)
+        .copied()
+        .collect::<BTreeSet<_>>()
+        .difference(&base_ids)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let named_external = env
+        .globals
+        .iter()
+        .filter(|(_, identity)| external.contains(identity))
+        .map(|(_, identity)| *identity)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        named_external, external,
+        "every checked non-base provider identity must have a qualified owner"
+    );
+    let referenced_modules = env
+        .globals
+        .iter()
+        .filter(|(_, identity)| external.contains(identity))
+        .map(|(name, _)| {
+            name.rsplit_once('.')
+                .unwrap_or_else(|| panic!("checked external identity has no module: {name}"))
+                .0
+                .to_owned()
+        })
+        .collect::<BTreeSet<_>>();
+    let undeclared_modules = referenced_modules
+        .difference(&declared_modules)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert!(
+        undeclared_modules.is_empty(),
+        "Decoder checked provider modules lack import edges: {undeclared_modules:?}"
+    );
 }
 
 /// Promise class: normative compatibility vector.
