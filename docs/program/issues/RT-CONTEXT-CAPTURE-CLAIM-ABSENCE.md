@@ -1,7 +1,7 @@
 ---
 id: RT-CONTEXT-CAPTURE-CLAIM-ABSENCE
 title: "The A-versus-B discriminator RT-CONTEXT-FRAME-REFUSAL-DEPTH-CENSUS measured itself unable to answer: at the depth-3 stop `resolve_context_capture_claim` (core.rs:9551) the availability claim is ABSENT rather than rejected, and whether the planner SHOULD have issued a ContinuationEnvironmentClaim for this coordinate (outcome A, repairable) or no claim can exist here (outcome B, terminal -- the disposition is an exemption row plus a rewritten label, NOT a repair) turns on the producer's conditions, which no node has read. Four ignored rows converge completely on this one stop, so one disposition serves all four."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
