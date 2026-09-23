@@ -30,7 +30,7 @@ import Data.Collections.Derived (bytes_nat_length, length, nth)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
-import Data.Numeric.Nat.Order (leq_nat, sub)
+import Data.Numeric.Nat.Order (IsTrue, leq_nat, sub)
 
 import Core.Logic.Transport (cong, sym, trans)
 
