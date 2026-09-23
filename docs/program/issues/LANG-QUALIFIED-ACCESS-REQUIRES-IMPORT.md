@@ -1,7 +1,7 @@
 ---
 id: LANG-QUALIFIED-ACCESS-REQUIRES-IMPORT
-title: "make resolve_ref grant qualified access M.foo only when the current module has a qualified import of M (import M or import M as N), as spec 33-declarations section 3.2 states, instead of resolving against any already-loaded module's exports"
-status: ready
+title: "make resolve_ref grant qualified access P.foo only through a granted authority -- a qualified import of P (import P or import P as N), P's local inline declaration in the current file unit, or P being an inline child of a module the current module imports in qualified form -- always checking foo against P's public export table, as spec 33-declarations sections 3.1-3.2 state, instead of resolving against any already-loaded module's exports"
+status: active
 owner: language
 size: S
 gate: none
@@ -31,12 +31,30 @@ origin: "Operator ruling 2026-09-23, concurring with Steward recommendation evt_
 
 ## Deliverable
 
-Qualified resolution succeeds only if the prefix names a module the current
-module imports in qualified form, either `import M` or `import M as N`
-(through `N`). A selective-only import, or no import, gives `UnboundName`
-for `M.foo`. The unqualified branch, the strict-mode floor and
-`resolve_class_ref` / `resolve_attached_ref` routing are unchanged except
-through this one rule.
+Qualified resolution of `P.foo` succeeds only through one of three granted
+authorities, and the leaf is always looked up in the exact public export
+table of the resolved module. Nothing resolves against an ambient loaded
+export (`exports.get(prefix)` with no grant).
+
+1. **Qualified import.** The current module imports `M` in qualified form,
+   either `import M` or `import M as N` (through `N`). A selective-only
+   import, or no import, gives `UnboundName` for `M.foo`.
+2. **Local inline declaration** (Architect `evt_63xfjnpep5e34`, spec 33
+   §3.1). Inside file unit `A`, declaring `module N { ... }` lets `A`'s own
+   scope name `A.N.x`. A sibling module in `A` gets it only through
+   `import N`, which normalizes to the same canonical `A.N` that the loader
+   and the child's export key use.
+3. **Inline descendant of an imported owner.** `import A` in unit `B`
+   grants `A.N.x` for a child `N` declared inline in `A`; `import A as K`
+   grants `K.N.x` and not `A.N.x`. A selective import of `A` or a mere load
+   of `A` grants nothing nested. Ownership comes from recorded declaration
+   provenance, never from a dotted-string prefix: a separately file-backed
+   `A.N` is not an inline descendant.
+
+The unqualified branch, the strict-mode floor and `resolve_class_ref` /
+`resolve_attached_ref` routing are unchanged except through these rules.
+Landed as `04b30eab3` with arm 1 only; arms 2 and 3 repair the regression
+measured in `evt_7ffv9v4tvkpxc`.
 
 ## Acceptance criteria
 
@@ -48,8 +66,17 @@ through this one rule.
   gives `N.foo`; a selective import gives bare `foo`.
 - **AC-3.** Every catalog package still elaborates, and the
   `r_layer_tests` import and roster suites stay green. A fixture that relied
-  on the leak gets the missing import. The rule is never relaxed. List every
-  such fixture in the handback.
+  on the leak gets the missing import. The no-ambient-export rule for
+  unrelated modules is never relaxed; the local-declaration and
+  inline-owner arms above are not relaxations. List every such fixture in
+  the handback.
+- **AC-3a (roots loader).** Through `elaborate_module_from_roots`, with
+  `A` and `B` as real file units and `module N` and a sibling `module P`
+  declared inline in `A.ken`:
+  same-unit `A.N.x`; sibling `import N` / `N.x`; cross-unit `import A` /
+  `A.N.x`; alias `K.N.x`; selective and no-import controls refusing. Pair
+  the private `A.N.s` refusal (from `A`'s outer scope, `P` and `B`) with the
+  public `x` acceptance. The landed arm-1 negatives stay discriminating.
 - **AC-4.** Targeted builds only, through `scripts/ken-cargo -p
   ken-elaborator` and the named tests. No-regression means green in CI.
 
@@ -57,5 +84,8 @@ through this one rule.
 
 - If a catalog package, or the prelude's own resolution, cannot be fixed
   by adding an import, STOP and report it verbatim to the Steward.
+- If an inline child is still unreachable after the three allowed routes,
+  or making it reachable needs an ambient export bypass, STOP and report it.
+  Never add a fictitious `import A.N` file dependency to make it work.
 - **Not this node:** merging base's duplicate `IsTrue`
   (`decimal_char.rs:223`) with `Core.Classes.LawfulClasses.IsTrue`.
