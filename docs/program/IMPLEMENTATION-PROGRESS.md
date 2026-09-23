@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-23 08:39:48Z — from 713 issue file(s) in `docs/program/issues/`.
+2026-09-23 09:57:18Z — from 714 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -55,6 +55,7 @@ the committed file matches the generator's output.
 | `ABI-S6` | ordinary anonymous and file-backed mappings as opaque runtime-owned regions and bounded byte views | active | runtime | L | none | — |
 | `BUDGET-EFF` | TransferCount.remaining must be bounded by the effective request | merged | verify | M | none | — |
 | `BUDGET-EXHAUST` | transfer-budget bound checks are fail-open on variant extension | merged | verify | S | none | — |
+| `CAT-ARGPARSE-LAWS` | Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust | ready | foundation | L | none | — |
 | `CAT-BOOL-PUB-EXPORT` | Mark the three census group-6 boolean providers loader-visible (pub): bool_and and bool_leq in Core.Classes.LawfulClasses, is_some in Data.Sums.Combinators. The provider prerequisite for census group 6 (Boolean computational reuse), shaped on the twice-landed CAT-ORDER-PUB-EXPORT / CAT-DERIVED-PUB-EXPORT pattern. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3108 |
 | `CAT-BOOL-REUSE-CONSUMERS` | Drain catalog-reuse census group 6 (Boolean computational reuse) — replace three reimplementations (Derived#bool_and, Derived#bool_leq, Map#option_is_some) with selective imports of the now-public LC.bool_and, LC.bool_leq and SC.is_some. The consumer half of CAT-BOOL-PUB-EXPORT, shaped on the landed CAT-DERIVED-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3136 |
 | `CAT-BSEARCH` | Decidable ordered search — Algorithm/Searching: membership over a sorted List returning a Dec proof, target 3 of the Foundation expressibility trial | merged | foundation | M | none | — |
@@ -750,6 +751,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-S6-HS18-D5B-SUBSTRATE-PORT` — Port the D5b prefix's PRODUCTION residue onto main so ABI-S6-HS18-MAIN-BASED-CLOSURE increment A has a substrate to stand on. Increment A was decomposed as a diff between two points on the preserved line, which measures what it ADDED to the checkpoint rather than what it NEEDS on main; the four prefix commits below it never landed. Scope is the ~117-item prefix-minus-main gap NARROWED to its production cluster (generated-context-result authority, checked-IH post-call/detached, recursive-position calls, source dynamic match, the absent acceptance test), not the raw +10472/-5307. Excludes the refused MappingAcquireFile arm BY CONSTRUCTION -- it is RT-D5B-MAPPING-AVAILABILITY-FLIP's, deliberately held.
+- `CAT-ARGPARSE-LAWS` — Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust
 - `CAT-CONFIGURATION-DECODER-IMPORT-EDGES` — give Decoder.ken.md a declared import edge for every qualified reference it makes -- 30 references to Data.Collections.Derived.nth and 7 qualified Application.Input.Schema names resolve today only because a sibling module's private import loaded their module, which spec 33-declarations section 3.2 does not grant -- and make the Decoder ledger test red on an undeclared provider
 - `CAT-PARSING-LAWS` — Proof-backfill for Capability/Parsing/Parsing.ken.md: inhabit the package's own ParserLaws proposition for parse_bool_expr (ParserValid, ParserTotal, ParserSourceLocal), and prove the Boolean printer/formatter round trip over the same syntax, spans, source and decoder representation, with no new trust
 - `CI-MAIN-RUNS-CANCEL-EACH-OTHER` — Every push to main shares one concurrency group with cancel-in-progress, so each merge kills the CI still running for the previous merge; post-merge runs on main are a record of a specific tree, not a superseded attempt at the same one, and the fix is to stop cancelling them
