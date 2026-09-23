@@ -125,8 +125,7 @@ data PopPreserves (a : Type) (x : a) (q : Deque a) : Option (Pair a (Deque a)) �
 
 data PopFrontListView (a : Type) (q : Deque a) : Option (Pair a (Deque a)) → Type where {
   MkPopFrontNone :
-    Equal (List a) (toList a q) (Nil a)
-    → PopFrontListView a q (None (Pair a (Deque a)));
+    Equal (List a) (toList a q) (Nil a) → PopFrontListView a q (None (Pair a (Deque a)));
   MkPopFrontSome :
     (x : a)
     → (rest : Deque a)
@@ -134,23 +133,45 @@ data PopFrontListView (a : Type) (q : Deque a) : Option (Pair a (Deque a)) → T
     → PopFrontListView a q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x rest))
 }
 
-fn popFront_list_view
-      (a : Type) (q : Deque a)
-    : PopFrontListView a q (popFront a q) =
+theorem deque_sym
+      (ty : Type) (left : ty) (right : ty) (same : Equal ty left right)
+    : Equal ty right left =
+  J (λactual _. Equal ty actual left) Refl same
+
+fn deque_pop_front_reversed (a : Type) (reversed : List a) : Option (Pair a (Deque a)) =
+  match reversed {
+    Nil ↦ None (Pair a (Deque a));
+    Cons x rest ↦ Some (Pair a (Deque a)) (mk_pair a (Deque a) x (MkDeque a rest (Nil a)))
+  }
+
+fn deque_pop_front_nil_view
+      (a : Type) (back : List a) (reversed : List a)
+    : Equal (List a) (reverse a back) reversed
+      → PopFrontListView a (MkDeque a (Nil a) back) (deque_pop_front_reversed a reversed) =
+  match reversed {
+    Nil ↦ λsame. MkPopFrontNone a (MkDeque a (Nil a) back) same;
+    Cons x rest ↦
+      λsame.
+        MkPopFrontSome
+          a
+          (MkDeque a (Nil a) back)
+          x
+          (MkDeque a rest (Nil a))
+          (J
+            (λcurrent _. Equal (List a) (reverse a back) (Cons a x current))
+            same
+            (deque_sym
+              (List a)
+              (list_append a rest (Nil a))
+              rest
+              (list_append::right_unit a rest)))
+  }
+
+fn popFront_list_view (a : Type) (q : Deque a) : PopFrontListView a q (popFront a q) =
   match q {
     MkDeque front back ↦
       match front {
-        Nil ↦
-          match reverse a back {
-            Nil ↦ MkPopFrontNone a (MkDeque a (Nil a) back) Refl;
-            Cons x rest ↦
-              MkPopFrontSome
-                a
-                (MkDeque a (Nil a) back)
-                x
-                (MkDeque a rest (Nil a))
-                Refl
-          };
+        Nil ↦ deque_pop_front_nil_view a back (reverse a back) Refl;
         Cons x rest ↦
           MkPopFrontSome a (MkDeque a (Cons a x rest) back) x (MkDeque a rest back) Refl
       }
