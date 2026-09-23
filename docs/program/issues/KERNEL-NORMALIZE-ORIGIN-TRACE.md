@@ -19,10 +19,14 @@ origin: "Operator authorized 2026-09-23 ('add an origin-tracking mode to the ker
 - The held bracket tree's child 1
   (`wp/RT-BRACKET-PRODUCER-AUTHENTICITY` `4b4c8565c`) wraps each bracket
   role in a compiler marker. The kernel's first `normalize` copies the
-  shared dispatcher through them. The unignored native row
+  shared dispatcher through them. The first measurement (frame at
+  `7b16ebf1f`) had the unignored native row
   `px7f_resource_native::linked_public_escape_is_exact_closed`, green on
-  `main`, then goes red on the correct "two host response cases claim one
-  operation constructor" guard. Without the wrappers there is one route.
+  `main`, going red on the "two host response cases claim one operation
+  constructor" guard. **Stale** (Architect `evt_74g06g8ja3r21`): the current
+  held transplant fails first at the ObjectEmission source-material budget
+  (native 0/1). Neither result is evidence about trace feasibility or a
+  child-1 native green.
 - No-kernel routes are refuted (`evt_1ndp4xwre8qx6` (c)). The markers are
   already undeclared and opaque to delta, yet the duplicate still appears.
   An opaque `bind` gives no lowering of all five roles.
@@ -36,7 +40,13 @@ origin: "Operator authorized 2026-09-23 ('add an origin-tracking mode to the ker
 
 ## Deliverables
 
-- **D1, design to the Architect before code.** It must cover:
+- **D1, design plus a kept measurement.** The design covers the points below.
+  Its measurement is kept kernel code on `wp/KERNEL-NORMALIZE-ORIGIN-TRACE`,
+  built **before** D1 approval (Steward `evt_36q2kv31j701h`,
+  `evt_62mfb6f7658f6`). It stays unlanded, with no QA and no Decision, and
+  it stops at the first uncovered edge. D1 is approved only on a successful
+  one-to-one `px7f` trace: the role table, traced/plain `Term` equality, and
+  the four mutation reds. The design must cover:
   - **One reducer.** Today's `normalize` becomes the no-op-observer
     instance. A new trace API is the collecting instance. Neither observer
     can select branches or change a reduct.
@@ -47,9 +57,10 @@ origin: "Operator authorized 2026-09-23 ('add an origin-tracking mode to the ker
     and carries taken arguments and recursive IHs.
   - **Failing closed.** Any required identity with zero or several final
     descendants fails closed, and so does any collision.
-  - **Measurement first.** Measure one-to-one transport on the `px7f`
-    fixture before the full build.
-- **D2, after approval.** Build the kernel mode. Add a compiler-boundary
+  - **Measurement first.** The kept increment above measures one-to-one
+    transport on the `px7f` fixture. Kept code is not approved D2.
+- **D2, after D1 approval.** Complete the kernel mode for production, then
+  QA, the Decision, and landing. Add a compiler-boundary
   gate that refuses before checked package emission unless
   `traced.term == normalize(env, ctx, unmarked_input)` (full structural
   equality). The child-1 repair that consumes the trace is the bracket
