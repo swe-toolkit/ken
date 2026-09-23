@@ -191,6 +191,42 @@ radius. The Architect's `evt_4hzm4praxvdrq`; frame §1a.E.
 **One disposition serves all four.** The census established they converge
 completely, which is what makes this one node rather than four.
 
+# D3 exemption — one record covering four rows
+
+**B, at clean `1f33e45d87070d4c3420d86aaba6cf85b89a30aa`.** This single
+exemption covers both `px7l_checked_host_recursive_bind.rs` rows and both
+`px7m_hostresult_computational_match.rs` rows named above. Each remains ignored:
+the unforced baseline stops first at the correct `BoundaryCarrier` arity refusal
+at `L1`; the prior diagnostic forced `L1` and `L2` only to reveal the common
+`L3` claim-absence refusal. It did not force `L3` or measure what lies beyond.
+
+The producer was called on each target `ProducerLocal` coordinate and returned
+`Ok(None)`: binding/environment origins 358/356 and 377/375 in `px7l`, 395/391
+in `px7m` dynamic-ok, and both 409/405 and 410/410 in dynamic-err. Each
+predeclared frame has two actual `EntryAbi` members, witnessed by `Ok(Some(0))`
+and `Ok(Some(1))` controls. `continuation_owner_entry_sources` constructs its
+entry run solely from the descriptor's Parameter+Capture ABI slots;
+whole-coordinate matching in `predeclared_entry_frame_slot` cannot declare a
+mid-body
+`ProducerLocal` as one of those members. An absent *predeclared-entry* capture
+claim is therefore correct under the current ABI, not an omitted planner
+claim. A same-coordinate `Ok(Some)` followed by `L3` `None` would have refuted
+that reading, but none occurred. Generated-context projections that take no
+predeclared arm describe a different consumer and do not supply entry members.
+
+`L1` is `recursive_position_captures_all_planner_recoverable`; `L2` is
+`agreeing_recursive_body_unit`; `L3` is `resolve_context_capture_claim`.
+`L3` is the terminal claim-absence refusal for this predeclared-entry route.
+There is **no live owner for follow-on representation work** at these rows;
+the four `#[ignore]` labels name this node's B finding rather than a repair.
+`calls.rs::gather_cannot_serve` retains its route selection unchanged: a missing
+claim remains missing; a matching, validated constructed frame may take its
+existing route, while other cases continue to refuse. This ruling does not
+exclude a separately scoped, authenticated creation-site constructed frame or
+generated-context representation, and authorizes neither an invented entry
+slot nor a lowering bypass. The `L2` two-direction unit test and all guards
+remain in force. No production source change belongs to this exemption.
+
 # Related
 
 - [[RT-CONTEXT-FRAME-REFUSAL-DEPTH-CENSUS]] -- `merged`. Its deliverable is
