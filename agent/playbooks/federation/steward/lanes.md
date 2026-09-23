@@ -60,17 +60,18 @@ investigation opens a repair, never a separate report node.
 
 ## Authorized roster
 
-**L1 Runtime and L3 Foundation, plus L2 Language for one WP**
-(`LANG-QUALIFIED-ACCESS-REQUIRES-IMPORT`, operator 2026-09-23), then idle. No other ring starts without an operator lane change and
-no seat stands itself back up. Finished accepted work still routes immediately.
+**L1 Runtime and L3 Foundation; L2 Language for one WP, then idle.**
+**2026-09-23:** "seat the spec and kernel rings as needed": Kernel runs the L1
+kernel trace beside the carrier; Spec serves BYTES D2. No other ring starts
+without an operator lane change. Accepted work still routes immediately.
 
 ## Current state
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-SELECTED-ARM-CALLABLE-CARRIER` -- `active`, L, T1: a checked cross-boundary callable-and-operand carrier for the four `px7l`/`px7m` rows (operator concurred 2026-09-23; Architect contract `evt_52fhyanq4p78r`). D1 sketch to the Architect before code | `KERNEL-NORMALIZE-ORIGIN-TRACE` -- `ready`, L, T1, TCB growth the operator authorized 2026-09-23 (answering `evt_4xax1j2qjg62v`): a no-op/collecting observer over one reducer, with a traced-equals-normalize gate. Then the bracket tree resumes on it, with `rt_escape` row 13 and `rt_span` row 14 as extra controls (Architect `evt_2817gkyjtdaa7`) | **BRACKET TREE HELD** until the kernel trace lands. Child 1 at `4b4c8565c543c148039ea06ac798c7c91eda2ce8` and child 2 checkpoint `21c039918` are held reviewed inputs, NEVER independently landed or moved. The held tree turns `linked_public_escape_is_exact_closed` red. Hard stop 0 |
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-SELECTED-ARM-CALLABLE-CARRIER` -- `active`, L, T1: a checked cross-boundary callable-and-operand carrier for the four `px7l`/`px7m` rows (operator concurred 2026-09-23; Architect contract `evt_52fhyanq4p78r`). D1 sketch to the Architect before code | `KERNEL-NORMALIZE-ORIGIN-TRACE` -- `active` on the **kernel** ring, concurrent, L, T1, operator-authorized TCB growth: one reducer with a no-op/collecting observer and a traced-equals-normalize gate. When it lands, the bracket tree resumes on it, with `rt_escape` row 13 and `rt_span` row 14 as extra controls (Architect `evt_2817gkyjtdaa7`) | **BRACKET TREE HELD** until the kernel trace lands. Child 1 at `4b4c8565c543c148039ea06ac798c7c91eda2ce8` and child 2 checkpoint `21c039918` are held reviewed inputs, NEVER independently landed or moved. The held tree turns `linked_public_escape_is_exact_closed` red. Hard stop 0 |
 | L2 | language | One WP only (operator 2026-09-23) | `LANG-QUALIFIED-ACCESS-REQUIRES-IMPORT` -- `active`, S, T1: `resolve_ref` grants `M.foo` only under a qualified import of `M` (spec `33 §3.2`) | None: L2 returns to idle | language ring owes the candidate, then QA + Decision |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-PARSING-LAWS` -- `active`, L, T1: `ParserLaws` for `parse_bool_expr` through the public Decoder preservation laws (landed `7008b6bb6`). Resumed `evt_5ehbgp5ng2mtn` | `BYTES-CONCAT-AND-ENCODE-CONTRACTS` -- `ready`, M, T1, TCB growth the operator authorized 2026-09-23: Architect D1 on where UTF-8 lives (Rust contracts or Ken source), then the byte facts and the finished printer round trip. Then `CAT-ARGPARSE-LAWS` (`ready`) | Foundation ring owes the PARSING-LAWS candidate, with the round trip recorded as stopped on hard-stop row 1. The BYTES node's D2 spec text needs a Spec seat. Editing the census sentinel is NOT authorized |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-PARSING-LAWS` -- `active`, L, T1: `ParserLaws` for `parse_bool_expr` through the public Decoder preservation laws (landed `7008b6bb6`). Resumed `evt_5ehbgp5ng2mtn` | `BYTES-CONCAT-AND-ENCODE-CONTRACTS` -- `ready`, M, T1, TCB growth the operator authorized 2026-09-23: Architect D1 on where UTF-8 lives (Rust contracts or Ken source), then the byte facts and the finished printer round trip. Then `CAT-ARGPARSE-LAWS` (`ready`) | Foundation ring owes the PARSING-LAWS candidate, with the round trip recorded as stopped on hard-stop row 1. Spec enclave drafts BYTES D2 now, carrying the Architect's `Source`/`IsUtf8` check (`evt_7vm5m0xk9chdp`). Editing the census sentinel is NOT authorized |
 
 ## Update rule
 
