@@ -636,11 +636,11 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
     );
     assert_eq!(
         intersection_names("Core.Classes.LawfulClasses", &loaded.lawful),
-        names(&["leq_nat"])
+        names(&["leq_nat", "leq_nat::trans"])
     );
     assert_eq!(
         intersection_names("Data.Collections.Derived", &loaded.derived),
-        names(&["bytes_nat_length", "list_append", "nth"])
+        names(&["bytes_nat_length", "list_append", "nth", "nth::some_below_length"])
     );
     assert_eq!(
         intersection_names("Data.Numeric.Nat.Order", &loaded.nat_order),

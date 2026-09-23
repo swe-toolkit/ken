@@ -382,6 +382,12 @@ successful parse is formatted by printing its span-erased result;
 success premise is an actual parse, not an assumption that arbitrary
 printer output will parse.
 
+The private bounds bridge proves that a successful byte token stays within
+the original source's structural byte length and that sequencing preserves
+this bound. It converts a decoder-level bound into parser validity and
+source locality, but its `complete_bool_decoder` premise is not inhabited
+here: `ParserLaws` remains a predicate, not a proved Boolean parser law.
+
 ```ken
 export BoolExpr, BTrue, BFalse, BNot, BAnd
 
@@ -795,6 +801,459 @@ pub theorem parse_bool_expr_total : ParserTotal (Syntax BoolExpr) parse_bool_exp
           Failed err ↦ Proved
         }
 
+theorem nat_leq_suc (n : Nat) : LessEqNat n (Suc n) =
+  match n {
+    Zero ↦ Proved;
+    Suc previous ↦ nat_leq_suc previous
+  }
+
+theorem bytes_refl (b : Bytes) : Equal Bytes b b = Refl
+
+theorem source_length_from_bytes
+      (s : Source) (t : Source) (same_bytes : Equal Bytes (source_bytes t) (source_bytes s))
+    : Equal Nat (source_length t) (source_length s) =
+  J (λbs _. Equal Nat (bytes_nat_length (source_bytes t)) (bytes_nat_length bs)) Refl same_bytes
+
+theorem leq_nat_at_equal_upper
+      (lower : Nat)
+      (upper : Nat)
+      (equal_upper : Nat)
+      (same_upper : Equal Nat upper equal_upper)
+      (bounded : LessEqNat lower upper)
+    : LessEqNat lower equal_upper =
+  J (λupper2 _. LessEqNat lower upper2) bounded same_upper
+
+theorem byte_cursor_peek_in_bounds
+      (s : Source)
+      (position : Nat)
+      (value : UInt8)
+      (peeked : Equal
+        (Option UInt8)
+        (byte_cursor_peek (MkByteCursor s position))
+        (Some UInt8 value))
+    : LessEqNat (Suc position) (source_length s) =
+  (proof some_below_length for nth) UInt8 position (bytes_to_list (source_bytes s)) value peeked
+
+theorem byte_cursor_advance_bounded_for_source
+      (s : Source)
+      (t : Source)
+      (start : Nat)
+      (position : Nat)
+      (value : UInt8)
+      (same_bytes : Equal Bytes (source_bytes t) (source_bytes s))
+      (start_bounded : LessEqNat start position)
+      (peeked : Equal
+        (Option UInt8)
+        (byte_cursor_peek (MkByteCursor t position))
+        (Some UInt8 value))
+    : And (LessEqNat start (Suc position)) (LessEqNat (Suc position) (source_length s)) =
+  let advanced =
+    byte_cursor_advance_bounded t start position value start_bounded peeked
+  in
+    and_intro
+      (LessEqNat start (Suc position))
+      (LessEqNat (Suc position) (source_length s))
+      (and_fst
+        (LessEqNat start (Suc position))
+        (LessEqNat (Suc position) (source_length t))
+        advanced)
+      (leq_nat_at_equal_upper
+        (Suc position)
+        (source_length t)
+        (source_length s)
+        (source_length_from_bytes s t same_bytes)
+        (and_snd
+          (LessEqNat start (Suc position))
+          (LessEqNat (Suc position) (source_length t))
+          advanced))
+
+theorem byte_cursor_advance_bounded
+      (s : Source)
+      (start : Nat)
+      (position : Nat)
+      (value : UInt8)
+      (start_bounded : LessEqNat start position)
+      (peeked : Equal
+        (Option UInt8)
+        (byte_cursor_peek (MkByteCursor s position))
+        (Some UInt8 value))
+    : And (LessEqNat start (Suc position)) (LessEqNat (Suc position) (source_length s)) =
+  and_intro
+    (LessEqNat start (Suc position))
+    (LessEqNat (Suc position) (source_length s))
+    ((proof trans for leq_nat)
+      start
+      position
+      (Suc position)
+      start_bounded
+      (nat_leq_suc position))
+    (byte_cursor_peek_in_bounds s position value peeked)
+
+fn DecoderOutcomeBounded
+      (a : Type) (s : Source) (start : Nat) (outcome : DecoderResult ByteCursor Span a)
+    : Prop =
+  match outcome {
+    Decoded value next ↦
+      And
+        (Equal Bytes (source_bytes (byte_cursor_source next)) (source_bytes s))
+        (And
+          (LessEqNat start (byte_cursor_position next))
+          (LessEqNat (byte_cursor_position next) (source_length s)));
+    DecoderFailed err ↦ ValidSpan s (decoder_error_location Span err)
+  }
+
+fn ByteCursorBounded (s : Source) (start : Nat) (cur : ByteCursor) : Prop =
+  And
+    (Equal Bytes (source_bytes (byte_cursor_source cur)) (source_bytes s))
+    (And
+      (LessEqNat start (byte_cursor_position cur))
+      (LessEqNat (byte_cursor_position cur) (source_length s)))
+
+fn DecoderPreservesBounded (a : Type) (decoder : Decoder ByteCursor Span a) : Prop =
+  (s : Source)
+    → (start : Nat)
+    → (cur : ByteCursor)
+    → ByteCursorBounded s start cur → DecoderOutcomeBounded a s start
+    (decoder cur)
+
+theorem option_prop_elim
+      (a : Type)
+      (motive : Option a → Prop)
+      (option : Option a)
+      (none : motive (None a))
+      (some : (value : a) → motive (Some a value))
+    : motive option =
+  match option {
+    None ↦ none;
+    Some value ↦ some value
+  }
+
+theorem bool_prop_elim
+      (motive : Bool → Prop) (value : Bool) (on_true : motive True) (on_false : motive False)
+    : motive value =
+  match value {
+    True ↦ on_true;
+    False ↦ on_false
+  }
+
+fn byte_code_decoder_accepted
+      (s : Source) (position : Nat) (value : UInt8) (accepted : Bool)
+    : DecoderResult ByteCursor Span UInt8 =
+  match accepted {
+    True ↦ Decoded ByteCursor Span UInt8 value (MkByteCursor s (Suc position));
+    False ↦
+      DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (MkSpan position position))
+  }
+
+fn byte_code_decoder_outcome
+      (s : Source) (position : Nat) (code : Int) (observed : Option UInt8)
+    : DecoderResult ByteCursor Span UInt8 =
+  match observed {
+    None ↦
+      DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (MkSpan position position));
+    Some value ↦ byte_code_decoder_accepted s position value (eq_int (uint8_to_int value) code)
+  }
+
+theorem byte_code_decoder_preserves
+      (code : Int)
+    : DecoderPreservesBounded UInt8 (byte_code_decoder code) =
+  λs.
+    λstart.
+      λcur.
+        match cur {
+          MkByteCursor t position ↦
+            λsafe.
+              let
+                same_bytes : Equal Bytes (source_bytes t) (source_bytes s) =
+                  and_fst
+                    (Equal Bytes (source_bytes t) (source_bytes s))
+                    (And (LessEqNat start position) (LessEqNat position (source_length s)))
+                    safe;
+                valid_bounds : And
+                  (LessEqNat start position)
+                  (LessEqNat position (source_length s)) =
+                  and_snd
+                    (Equal Bytes (source_bytes t) (source_bytes s))
+                    (And (LessEqNat start position) (LessEqNat position (source_length s)))
+                    safe
+              in
+                byte_code_decoder_bounded
+                  s
+                  t
+                  start
+                  position
+                  code
+                  same_bytes
+                  (and_fst
+                    (LessEqNat start position)
+                    (LessEqNat position (source_length s))
+                    valid_bounds)
+                  (and_snd
+                    (LessEqNat start position)
+                    (LessEqNat position (source_length s))
+                    valid_bounds)
+        }
+
+theorem byte_code_decoder_outcome_equation
+      (s : Source) (position : Nat) (code : Int)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder code (MkByteCursor s position))
+        (byte_code_decoder_outcome
+          s
+          position
+          code
+          (byte_cursor_peek (MkByteCursor s position))) =
+  Refl
+
+theorem byte_code_decoder_bounded
+      (s : Source)
+      (t : Source)
+      (start : Nat)
+      (position : Nat)
+      (code : Int)
+      (same_bytes : Equal Bytes (source_bytes t) (source_bytes s))
+      (start_bounded : LessEqNat start position)
+      (position_bounded : LessEqNat position (source_length s))
+    : DecoderOutcomeBounded UInt8 s start (byte_code_decoder code (MkByteCursor t position)) =
+  option_prop_elim
+    UInt8
+    (λobserved.
+      Equal (Option UInt8) (byte_cursor_peek (MkByteCursor t position)) observed
+      → DecoderOutcomeBounded
+        UInt8
+        s
+        start
+        (byte_code_decoder_outcome t position code observed))
+    (byte_cursor_peek (MkByteCursor t position))
+    (λnone_peeked. valid_zero_width_span s position position_bounded)
+    (λvalue.
+      λsome_peeked.
+        bool_prop_elim
+          (λaccepted.
+            DecoderOutcomeBounded
+              UInt8
+              s
+              start
+              (byte_code_decoder_accepted t position value accepted))
+          (eq_int (uint8_to_int value) code)
+          (and_intro
+            (Equal Bytes (source_bytes t) (source_bytes s))
+            (And (LessEqNat start (Suc position)) (LessEqNat (Suc position) (source_length s)))
+            same_bytes
+            (byte_cursor_advance_bounded_for_source
+              s
+              t
+              start
+              position
+              value
+              same_bytes
+              start_bounded
+              some_peeked))
+          (valid_zero_width_span s position position_bounded))
+    Refl
+
+fn parse_decoder_outcome
+      (a : Type) (s : Source) (start : Nat) (outcome : DecoderResult ByteCursor Span a)
+    : ParseResult a =
+  match outcome {
+    Decoded value next ↦
+      Parsed a value (MkSpan start (byte_cursor_position next)) (byte_cursor_position next);
+    DecoderFailed err ↦ Failed a (decoder_parse_error s err)
+  }
+
+theorem parser_from_decoder_outcome_equation
+      (a : Type)
+      (decoder : Decoder ByteCursor Span a)
+      (s : Source)
+      (start : Nat)
+      (h : LessEqNat start (source_length s))
+    : Equal
+        (ParseResult a)
+        (parser_from_decoder a decoder s start h)
+        (parse_decoder_outcome a s start (decoder (MkByteCursor s start))) =
+  Refl
+
+theorem decoder_result_prop_elim
+      (a : Type)
+      (motive : DecoderResult ByteCursor Span a → Prop)
+      (outcome : DecoderResult ByteCursor Span a)
+      (on_decoded : (value : a)
+        → (next : ByteCursor)
+        → motive
+        (Decoded ByteCursor Span a value next))
+      (on_failed : (err : DecoderError Span) → motive (DecoderFailed ByteCursor Span a err))
+    : motive outcome =
+  match outcome {
+    Decoded value next ↦ on_decoded value next;
+    DecoderFailed err ↦ on_failed err
+  }
+
+theorem parse_decoder_bounded_valid
+      (a : Type)
+      (s : Source)
+      (start : Nat)
+      (outcome : DecoderResult ByteCursor Span a)
+      (bounded : DecoderOutcomeBounded a s start outcome)
+    : ParseResultValid a s start (parse_decoder_outcome a s start outcome) =
+  decoder_result_prop_elim
+    a
+    (λdecoded_outcome.
+      DecoderOutcomeBounded a s start decoded_outcome
+      → ParseResultValid a s start (parse_decoder_outcome a s start decoded_outcome))
+    outcome
+    (λvalue.
+      λnext.
+        λsafe.
+          let
+            position : Nat = byte_cursor_position next;
+            valid_bounds : And
+              (LessEqNat start position)
+              (LessEqNat position (source_length s)) =
+              and_snd
+                (Equal Bytes (source_bytes (byte_cursor_source next)) (source_bytes s))
+                (And (LessEqNat start position) (LessEqNat position (source_length s)))
+                safe;
+            span_valid : ValidSpan s (MkSpan start position) =
+              and_intro
+                (LessEqNat start position)
+                (LessEqNat position (source_length s))
+                (and_fst
+                  (LessEqNat start position)
+                  (LessEqNat position (source_length s))
+                  valid_bounds)
+                (and_snd
+                  (LessEqNat start position)
+                  (LessEqNat position (source_length s))
+                  valid_bounds)
+          in
+            and_intro
+              (ValidSpan s (MkSpan start position))
+              (And (Equal Nat start start) (Equal Nat position position))
+              span_valid
+              (and_intro (Equal Nat start start) (Equal Nat position position) Refl Refl))
+    (λerr.
+      λsafe.
+        and_intro
+          (Equal SourceId (source_id s) (source_id s))
+          (ValidSpan s (decoder_error_location Span err))
+          Refl
+          safe)
+    bounded
+
+fn decoder_seq_outcome
+      (a : Type)
+      (b : Type)
+      (second : Decoder ByteCursor Span b)
+      (first_outcome : DecoderResult ByteCursor Span a)
+    : DecoderResult ByteCursor Span b =
+  match first_outcome {
+    Decoded value next ↦ second next;
+    DecoderFailed err ↦ DecoderFailed ByteCursor Span b err
+  }
+
+theorem decoder_seq_outcome_equation
+      (a : Type)
+      (b : Type)
+      (first : Decoder ByteCursor Span a)
+      (second : Decoder ByteCursor Span b)
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span b)
+        (decoder_seq ByteCursor Span a b first second cur)
+        (decoder_seq_outcome a b second (first cur)) =
+  Refl
+
+theorem decoder_seq_preserves
+      (a : Type)
+      (b : Type)
+      (first : Decoder ByteCursor Span a)
+      (second : Decoder ByteCursor Span b)
+      (first_safe : DecoderPreservesBounded a first)
+      (second_safe : DecoderPreservesBounded b second)
+    : DecoderPreservesBounded b (decoder_seq ByteCursor Span a b first second) =
+  λs.
+    λstart.
+      λcur.
+        λcur_safe.
+          decoder_result_prop_elim
+            a
+            (λfirst_outcome.
+              DecoderOutcomeBounded a s start first_outcome
+              → DecoderOutcomeBounded b s start (decoder_seq_outcome a b second first_outcome))
+            (first cur)
+            (λvalue. λnext. λbounded. second_safe s start next bounded)
+            (λerr. λbounded. bounded)
+            (first_safe s start cur cur_safe)
+
+theorem parse_result_valid_source_local
+      (a : Type) (s : Source) (start : Nat) (outcome : ParseResult a)
+    : ParseResultValid a s start outcome → ParseResultSourceLocal a s outcome =
+  match outcome {
+    Parsed value consumed next ↦
+      λvalid.
+        and_fst
+          (ValidSpan s consumed)
+          (And (Equal Nat (span_start consumed) start) (Equal Nat (span_end consumed) next))
+          valid;
+    Failed err ↦
+      λvalid.
+        and_fst
+          (Equal SourceId (error_source err) (source_id s))
+          (ValidSpan s (error_span err))
+          valid
+  }
+
+theorem parser_valid_source_local
+      (a : Type) (p : Parser a) (valid : ParserValid a p)
+    : ParserSourceLocal a p =
+  λs. λstart. λh. parse_result_valid_source_local a s start (p s start h) (valid s start h)
+
+theorem parser_from_decoder_valid_if_bounded
+      (a : Type)
+      (decoder : Decoder ByteCursor Span a)
+      (bounded : DecoderPreservesBounded a decoder)
+    : ParserValid a (parser_from_decoder a decoder) =
+  λs.
+    λstart.
+      λh.
+        parse_decoder_bounded_valid
+          a
+          s
+          start
+          (decoder (MkByteCursor s start))
+          (bounded
+            s
+            start
+            (MkByteCursor s start)
+            (and_intro
+              (Equal Bytes (source_bytes s) (source_bytes s))
+              (And (LessEqNat start start) (LessEqNat start (source_length s)))
+              (bytes_refl (source_bytes s))
+              (and_intro
+                (LessEqNat start start)
+                (LessEqNat start (source_length s))
+                ((proof refl for LessEqNat) start)
+                h)))
+
+theorem parse_bool_expr_laws_if_decoder_bounded
+      (bounded : DecoderPreservesBounded (Syntax BoolExpr) complete_bool_decoder)
+    : ParserLaws (Syntax BoolExpr) parse_bool_expr =
+  let valid : ParserValid (Syntax BoolExpr) parse_bool_expr =
+    parser_from_decoder_valid_if_bounded (Syntax BoolExpr) complete_bool_decoder bounded
+  in
+    and_intro
+      (ParserValid (Syntax BoolExpr) parse_bool_expr)
+      (And
+        (ParserTotal (Syntax BoolExpr) parse_bool_expr)
+        (ParserSourceLocal (Syntax BoolExpr) parse_bool_expr))
+      valid
+      (and_intro
+        (ParserTotal (Syntax BoolExpr) parse_bool_expr)
+        (ParserSourceLocal (Syntax BoolExpr) parse_bool_expr)
+        parse_bool_expr_total
+        (parser_valid_source_local (Syntax BoolExpr) parse_bool_expr valid))
+
 pub theorem format_bool_expr_on_parse_success
       (s : Source)
       (syntax : Syntax BoolExpr)
@@ -909,7 +1368,9 @@ reference implementation.
    own. `parse_bool_expr_total` — exhaustive parse-result split.
    `format_bool_expr_on_parse_success` and
    `format_bool_expr_on_parse_failure` — equality transport across each
-   parser-result alternative.
+   parser-result alternative. The private byte-cursor lemmas use the
+   structural `Bytes → List UInt8` view and checked `nth`/`leq_nat` laws;
+   they do not prove the complete recursive decoder's bounds.
 6. **Consumers.** Source-aware parser implementations can use this package's
    source, span, result, and validity vocabulary.
 7. **Validation evidence.** The catalog checks the
