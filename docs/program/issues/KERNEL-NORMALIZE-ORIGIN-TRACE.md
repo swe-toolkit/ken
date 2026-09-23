@@ -1,15 +1,15 @@
 ---
 id: KERNEL-NORMALIZE-ORIGIN-TRACE
 title: "add an observational origin-tracking mode to ken-kernel's normalizer -- one reducer with a no-op observer for today's normalize and a collecting observer for a trace API -- so the bracket tree's child 1 can identify each compiler-authored bracket role's exact normalized occurrence without the shared dispatcher producing two host response routes; the traced Term must equal normalize's Term"
-status: ready
-owner: runtime
+status: active
+owner: kernel
 size: L
 gate: architect
 tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Operator authorized 2026-09-23 ('add an origin-tracking mode to the kernel's normalizer'), answering Steward fork evt_4xax1j2qjg62v. TCB growth, admitted by that ruling. Design basis: Architect sketch and runtime-implementer feasibility sketch evt_5cwnemaw1zpkx (runtime-leader summary evt_1ndp4xwre8qx6). Steward-filed per COORDINATION section 2."
+origin: "Operator authorized 2026-09-23 ('add an origin-tracking mode to the kernel's normalizer'), answering Steward fork evt_4xax1j2qjg62v. TCB growth, admitted by that ruling. Kernel ring seated to run it beside the L1 carrier (operator 2026-09-23 14:07Z: 'seat the spec and kernel rings as needed'). Design basis: Architect sketch and runtime-implementer feasibility sketch evt_5cwnemaw1zpkx (runtime-leader summary evt_1ndp4xwre8qx6). Steward-filed per COORDINATION section 2."
 ---
 
 # The normalizer must say where each bracket role went
