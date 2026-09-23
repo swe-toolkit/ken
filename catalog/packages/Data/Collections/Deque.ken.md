@@ -192,6 +192,14 @@ fn popBack_pushBack
   }
 ```
 
+The private `PopFrontListView` is indexed by the actual `popFront` result.
+`popFront_list_view` proves for every deque that `None` leaves an empty list
+view, while `Some (x, rest)` decomposes the original view into `x` followed
+by the residual view. For an empty front, the proof generalizes the reversed
+back to a private list argument and carries an equality back to `reverse`;
+it uses the canonical `list_append::right_unit` proof to remove the residual
+empty back. The implementation of `popFront` is unchanged.
+
 ## Trust and derivation
 
 `Deque` is an ordinary strictly positive inductive. Its operations reuse the

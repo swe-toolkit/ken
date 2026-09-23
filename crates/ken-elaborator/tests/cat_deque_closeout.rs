@@ -36,14 +36,21 @@ fn expected_owned_names() -> BTreeSet<String> {
     [
         "Deque",
         "MkDeque",
+        "MkPopFrontNone",
+        "MkPopFrontSome",
         "MkPopPreserves",
+        "PopFrontListView",
         "PopPreserves",
         "deque_append_snoc_assoc",
         "deque_cong",
+        "deque_pop_front_nil_view",
+        "deque_pop_front_reversed",
+        "deque_sym",
         "empty",
         "popBack",
         "popBack_pushBack",
         "popFront",
+        "popFront_list_view",
         "popFront_pushFront",
         "pushBack",
         "pushFront",
@@ -200,13 +207,63 @@ fn deque_owned_inventory_is_exact_and_standalone_with_zero_local_trust() {
         .expect("Deque Definition and every checked fence must elaborate");
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: ordinary isolated-roots loading checks the actual private Deque
+/// law, and a second compilation of the extracted package plus two concrete
+/// in-module applications checks the law over inhabited direct and rebalance
+/// deques. CLAIMED: the indexed law is checked and applies inside its private
+/// owner rather than merely naming a generic result family. THE GAP: this
+/// instantiates two configurations; the arbitrary-`q` kernel-checked proof
+/// in the loaded package supplies the universal quantifier.
+#[test]
+fn pop_front_list_view_checks_in_loaded_package_and_on_inhabited_deques() {
+    let (loaded, _) = load(DEQUE);
+    let law_id = loaded.globals[&format!("{DEQUE}.popFront_list_view")];
+    assert!(
+        matches!(loaded.env.lookup(law_id), Some(Decl::Transparent { .. })),
+        "the arbitrary-deque law must be a checked transparent proof"
+    );
+
+    let extracted = ken_elaborator::literate::extract_ken_md(DEQUE_KEN_MD)
+        .expect("Deque literate source must extract");
+    let in_module = format!(
+        "{}\n\
+         const deque_direct : Deque Bool = \
+           MkDeque Bool (Cons Bool True (Nil Bool)) (Cons Bool False (Nil Bool))\n\
+         const deque_direct_view : \
+           PopFrontListView Bool deque_direct (popFront Bool deque_direct) = \
+           popFront_list_view Bool deque_direct\n\
+         const deque_rebalanced : Deque Bool = \
+           MkDeque Bool (Nil Bool) (Cons Bool True (Cons Bool False (Nil Bool)))\n\
+         const deque_rebalanced_view : \
+           PopFrontListView Bool deque_rebalanced (popFront Bool deque_rebalanced) = \
+           popFront_list_view Bool deque_rebalanced",
+        extracted.source
+    );
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("Derived provider closure must be available");
+    env.elaborate_file(&in_module)
+        .expect("actual Deque package plus both concrete in-module law applications must check");
+    for name in ["deque_direct_view", "deque_rebalanced_view"] {
+        let id = env.globals[name];
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{name} must be a checked proof, not an assumption"
+        );
+    }
+}
+
 /// MEASURED: every checked Deque type and body refers to the exact nine-name
-/// compiler floor plus the two canonical Derived identities. Independent roots
+/// compiler floor plus three canonical Derived identities. Independent roots
 /// loads assign those providers the same `GlobalId`, and the semantic import
-/// boundary selects exactly those two items. CLAIMED: Deque's complete direct
-/// catalog dependency is `{Derived.list_append, Derived.reverse}`. THE GAP:
+/// boundary still selects exactly `list_append` and `reverse`. CLAIMED: Deque's
+/// complete direct catalog dependency is `{Derived.list_append,
+/// Derived.list_append::right_unit, Derived.reverse}`. THE GAP: attached proof
+/// selection adds the right-unit identity without widening the source import;
 /// source forms `J` and `Refl` elaborate into kernel terms without provider
-/// globals; the source-level free-name D0 records them as compiler syntax.
+/// globals, and the source-level free-name D0 records them as compiler syntax.
 #[test]
 fn deque_direct_provider_inventory_is_exact_and_canonical() {
     let base = ElabEnv::new().expect("base environment");
@@ -214,10 +271,13 @@ fn deque_direct_provider_inventory_is_exact_and_canonical() {
     let (via_derived, _) = load(DERIVED);
     let append_name = format!("{DERIVED}.list_append");
     let reverse_name = format!("{DERIVED}.reverse");
+    let right_unit_name = format!("{DERIVED}.list_append::right_unit");
     let append = via_deque.globals[&append_name];
     let reverse = via_deque.globals[&reverse_name];
+    let right_unit = via_deque.globals[&right_unit_name];
     assert_eq!(append, via_derived.globals[&append_name]);
     assert_eq!(reverse, via_derived.globals[&reverse_name]);
+    assert_eq!(right_unit, via_derived.globals[&right_unit_name]);
 
     let owned_ids = qualified_owned_ids(&via_deque);
     let mut external = BTreeSet::new();
@@ -237,7 +297,7 @@ fn deque_direct_provider_inventory_is_exact_and_canonical() {
     .collect::<BTreeSet<_>>();
     let expected_external = expected_floor
         .into_iter()
-        .chain([append, reverse])
+        .chain([append, reverse, right_unit])
         .collect::<BTreeSet<_>>();
     assert_eq!(
         external, expected_external,
