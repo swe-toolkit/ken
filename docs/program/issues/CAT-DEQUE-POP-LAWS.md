@@ -57,7 +57,9 @@ empty-front case uses the public `list_append::right_unit` under `Cons`.
 
 ## Stop conditions
 
-- If the proof needs String or Bytes literal convertibility, a computed
-  selector bridge, a production change to `Deque`, or any publication,
+- If the proof needs String or Bytes literal convertibility, factoring of
+  production code, a production change to `Deque`, or any publication,
   STOP and return to the Steward. Publishing Deque is catalog extension,
-  which is not authorized here.
+  which is not authorized here. A private proof-local generalization of a
+  computed scrutinee such as `reverse a back` is allowed (Steward
+  `evt_35hgzdc77kfcc`, Architect `evt_3pm09a42ksj0e`).
