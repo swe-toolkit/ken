@@ -276,11 +276,16 @@ fn parsing_decoder_unconsumed_siblings_remain_private() {
 ///
 /// MEASURED: a strict client imports the real Parsing cursor, Source and
 /// ValidSpan along with Decoder's public proof surface, then constructs
-/// preservation terms for fail, pure, alt, many and a recursive layer that
-/// actually invokes its recursive argument. CLAIMED: the provider's laws are
-/// usable over actual client carriers without exposing private Decoder
-/// constructors or fuel helpers. THE GAP: this public-API fixture does not
-/// identify the held Parsing branch's private ByteCursorBounded predicate.
+/// preservation terms for fail, pure, alt, satisfy, seq, many, and a
+/// recursive layer that actually invokes its recursive argument. `seq`
+/// composes two byte tokens and `many` repeats the actual space-byte token;
+/// successful peeks close the test-local cursor predicate under advance by a
+/// checked finite-path proof, not an assumption that any bare ValidSpan
+/// advances.
+/// CLAIMED: the provider's laws are usable over actual client carriers
+/// without exposing private Decoder constructors or fuel helpers. THE GAP:
+/// this public-API fixture does not identify the held Parsing branch's
+/// private ByteCursorBounded predicate.
 #[test]
 fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
     let mut loaded = load_decoder();
@@ -293,23 +298,70 @@ fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
         .elaborate_file(
             r#"
             import Capability.Parsing.Parsing (Source, Span, ByteCursor, ValidSpan, byte_cursor_ops)
-            import Capability.Parsing.Cursor (cursor_locate)
+            import Capability.Parsing.Cursor (cursor_advance, cursor_locate, cursor_peek)
             import Capability.Parsing.Decoder
               (Decoder, DecoderPreserves,
                 decoder_alt, decoder_alt_preserves,
                 decoder_fail, decoder_fail_preserves,
                 decoder_many, decoder_many_preserves,
                 decoder_pure, decoder_pure_preserves,
-                decoder_recursive, decoder_recursive_preserves)
+                decoder_recursive, decoder_recursive_preserves,
+                decoder_satisfy, decoder_satisfy_preserves,
+                decoder_seq, decoder_seq_preserves)
+
+            fn cursor_valid_through
+                  (s : Source) (cur : ByteCursor) (steps : Nat) : Prop =
+              match steps {
+                Zero ↦ ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur);
+                Suc later ↦
+                  And
+                    (ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur))
+                    ((value : UInt8)
+                      → Equal
+                        (Option UInt8)
+                        (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                        (Some UInt8 value)
+                      → cursor_valid_through
+                        s
+                        (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur)
+                        later)
+              }
 
             fn cursor_location_valid (s : Source) (cur : ByteCursor) : Prop =
-              ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur)
+              (steps : Nat) → cursor_valid_through s cur steps
 
             theorem location_sound (s : Source)
                 : (cur : ByteCursor)
                   → cursor_location_valid s cur
                   → ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur) =
-              λcur. λgood. good
+              λcur. λgood. good Zero
+
+            theorem advance_sound (s : Source)
+                : (cur : ByteCursor)
+                  → (value : UInt8)
+                  → Equal
+                    (Option UInt8)
+                    (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                    (Some UInt8 value)
+                  → cursor_location_valid s cur
+                  → cursor_location_valid
+                    s
+                    (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur) =
+              λcur. λvalue. λpeeked. λgood. λsteps.
+                (and_snd
+                  (ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur))
+                  ((value2 : UInt8)
+                    → Equal
+                      (Option UInt8)
+                      (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                      (Some UInt8 value2)
+                    → cursor_valid_through
+                      s
+                      (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur)
+                      steps)
+                  (good (Suc steps)))
+                  value
+                  peeked
 
             theorem fail_preserves (s : Source)
                 : DecoderPreserves
@@ -325,6 +377,38 @@ fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
                     (decoder_pure ByteCursor Span Bool value) =
               decoder_pure_preserves
                 ByteCursor Span Bool (cursor_location_valid s) (ValidSpan s) value
+
+            fn byte_token (code : Int) : Decoder ByteCursor Span UInt8 =
+              decoder_satisfy
+                ByteCursor UInt8 Span byte_cursor_ops
+                (λbyte. eq_int (uint8_to_int byte) code)
+
+            const space_code : Int = (32 : Int)
+
+            theorem byte_token_preserves (s : Source) (code : Int)
+                : DecoderPreserves
+                    ByteCursor Span UInt8 (cursor_location_valid s) (ValidSpan s)
+                    (byte_token code) =
+              decoder_satisfy_preserves
+                ByteCursor UInt8 Span byte_cursor_ops
+                (λbyte. eq_int (uint8_to_int byte) code)
+                (cursor_location_valid s) (ValidSpan s)
+                (location_sound s) (advance_sound s)
+
+            theorem token_pair_preserves
+                  (s : Source) (first_code : Int) (second_code : Int)
+                : DecoderPreserves
+                    ByteCursor Span UInt8 (cursor_location_valid s) (ValidSpan s)
+                    (decoder_seq
+                      ByteCursor Span UInt8 UInt8
+                      (byte_token first_code)
+                      (byte_token second_code)) =
+              decoder_seq_preserves
+                ByteCursor Span UInt8 UInt8
+                (cursor_location_valid s) (ValidSpan s)
+                (byte_token first_code) (byte_token second_code)
+                (byte_token_preserves s first_code)
+                (byte_token_preserves s second_code)
 
             fn recursive_layer
                   (recur : Decoder ByteCursor Span Bool)
@@ -350,15 +434,15 @@ fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
 
             theorem many_preserves (s : Source)
                 : DecoderPreserves
-                    ByteCursor Span (List Bool) (cursor_location_valid s) (ValidSpan s)
+                    ByteCursor Span (List UInt8) (cursor_location_valid s) (ValidSpan s)
                     (decoder_many
-                      ByteCursor UInt8 Span Bool byte_cursor_ops
-                      (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)) =
+                      ByteCursor UInt8 Span UInt8 byte_cursor_ops
+                      (byte_token space_code)) =
               decoder_many_preserves
-                ByteCursor UInt8 Span Bool byte_cursor_ops
-                (decoder_fail ByteCursor UInt8 Span Bool byte_cursor_ops)
+                ByteCursor UInt8 Span UInt8 byte_cursor_ops
+                (byte_token space_code)
                 (cursor_location_valid s) (ValidSpan s)
-                (location_sound s) (fail_preserves s)
+                (location_sound s) (byte_token_preserves s space_code)
 
             theorem recursive_preserves (s : Source)
                 : DecoderPreserves
