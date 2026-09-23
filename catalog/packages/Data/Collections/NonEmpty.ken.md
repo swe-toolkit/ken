@@ -102,6 +102,57 @@ pub proof head_left for nonempty_append
   }
 ```
 
+The public list-view laws make the complete sequence visible to clients:
+append is ordinary list append after `nonempty_to_list`, and map visits every
+element in the same order. Both proofs eliminate the constructor only inside
+this package; clients need no access to it.
+
+```ken
+theorem nonempty_append_list_view_cons
+      (a : Type) (x : a) (rest : List a) (y : a) (more : List a)
+    : Equal
+        (List a)
+        (nonempty_to_list
+          a
+          (nonempty_append a (nonempty_cons a x rest) (nonempty_cons a y more)))
+        (list_append
+          a
+          (nonempty_to_list a (nonempty_cons a x rest))
+          (nonempty_to_list a (nonempty_cons a y more))) =
+  Refl
+
+pub proof list_view for nonempty_append
+      (a : Type) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal
+        (List a)
+        (nonempty_to_list a (nonempty_append a xs ys))
+        (list_append a (nonempty_to_list a xs) (nonempty_to_list a ys)) =
+  match xs {
+    NonEmptyCons x rest ↦
+      match ys {
+        NonEmptyCons y more ↦ nonempty_append_list_view_cons a x rest y more
+      }
+  }
+
+theorem nonempty_map_list_view_cons
+      (a : Type) (b : Type) (f : a → b) (x : a) (rest : List a)
+    : Equal
+        (List b)
+        (nonempty_to_list b (nonempty_map a b f (nonempty_cons a x rest)))
+        (map a b f (nonempty_to_list a (nonempty_cons a x rest))) =
+  Refl
+
+pub proof list_view for nonempty_map
+      (a : Type) (b : Type) (f : a → b) (xs : NonEmpty a)
+    : Equal
+        (List b)
+        (nonempty_to_list b (nonempty_map a b f xs))
+        (map a b f (nonempty_to_list a xs)) =
+  match xs {
+    NonEmptyCons x rest ↦ nonempty_map_list_view_cons a b f x rest
+  }
+```
+
 Associativity follows from ordinary list append. After exposing the three
 heads, `list_append::assoc` proves the equality of the stored tails; `cong`
 lifts that equality beneath the shared `NonEmptyCons` head.
@@ -162,9 +213,9 @@ list-append associativity.
 
 **Public API (stable names):** abstract `NonEmpty`, `nonempty_singleton`,
 `nonempty_cons`, `nonempty_head`, `nonempty_tail`, `nonempty_to_list`,
-`nonempty_map`, `nonempty_append`, its attached `head_left` law, and
-`Semigroup_instance_NonEmpty`. `NonEmptyCons` is internal; the smart
-constructors are the public construction surface.
+`nonempty_map`, `nonempty_append`, their attached `list_view` laws, append's
+`head_left` law, and `Semigroup_instance_NonEmpty`. `NonEmptyCons` is internal;
+the smart constructors are the public construction surface.
 
 **Source map:**
 

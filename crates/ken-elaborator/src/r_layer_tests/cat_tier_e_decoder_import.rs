@@ -507,10 +507,11 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
         attached_schema_proofs,
         names(&[
             "schema_validate_fields::accepted_tail_invalid",
+            "schema_validate_fields::invalid_issue_sequence",
             "schema_validate_fields::valid_coverage",
         ])
     );
-    assert_eq!(schema_public.len() - attached_schema_proofs.len(), 26);
+    assert_eq!(schema_public.len() - attached_schema_proofs.len(), 28);
     assert!(schema_names.is_subset(&schema_public));
     env.elaborate_file(&format!(
         "import {SCHEMA} ({})",

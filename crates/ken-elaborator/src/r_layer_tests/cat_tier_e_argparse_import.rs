@@ -441,11 +441,8 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Application.Input.Schema.SchemaPresence",
         "Application.Input.Schema.SchemaRequired",
         "Application.Input.Schema.SchemaValueShape",
-        "Application.Input.Schema.schema_documentation",
         "Application.Input.Schema.schema_field_presence",
         "Application.Input.Schema.schema_fields",
-        "Application.Input.Schema.schema_fields_help_chars",
-        "Application.Input.Schema.schema_name",
         "Application.Input.Schema.schema_help",
         "Application.Input.Schema.schema_issue_code",
         "Application.Input.Schema.schema_issue_origin",
@@ -482,24 +479,10 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Data.Sums.Validation.validation_map",
         "Semigroup_instance_Data.Collections.NonEmpty.NonEmpty",
     ]);
-    let mut expected_ids = expected_names
+    let expected_ids = expected_names
         .iter()
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
-    // The checked help proof unfolds Schema's renderer. Its anonymous literal
-    // identities are provider-owned, not new ArgParse dependencies.
-    let mut schema_help_references = BTreeSet::new();
-    collect_decl_globals(
-        env.env
-            .lookup(env.globals["Application.Input.Schema.schema_help"])
-            .expect("Schema help declaration"),
-        &mut schema_help_references,
-    );
-    expected_ids.extend(
-        schema_help_references
-            .into_iter()
-            .filter(|id| !env.globals.values().any(|named| named == id) && !base_ids.contains(id)),
-    );
     let mut resolved = BTreeSet::new();
     for identity in &owned {
         if let Some(declaration) = env.env.lookup(*identity) {
@@ -544,14 +527,8 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         .collect::<BTreeSet<_>>();
     let schema_public =
         catalog_publication::published_module_surfaces(SCHEMA_SOURCE, SCHEMA, "argparse_schema");
-    let schema_private_renderer_helpers = names(&[
-        "schema_documentation",
-        "schema_fields_help_chars",
-        "schema_name",
-    ]);
-    assert!(schema_names
-        .difference(&schema_private_renderer_helpers)
-        .all(|name| schema_public.contains(name)));
+    assert_eq!(schema_names.len(), 21);
+    assert!(schema_names.is_subset(&schema_public));
     let selections = schema_imports().into_iter().collect::<Vec<_>>().join(", ");
     env.elaborate_file(&format!("import {SCHEMA} ({selections})"))
         .expect("all directly consumed Schema names must import together");

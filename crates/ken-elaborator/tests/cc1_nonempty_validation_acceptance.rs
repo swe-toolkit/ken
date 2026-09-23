@@ -337,9 +337,11 @@ fn nonempty_loader_visible_inventory_is_exact() {
         "Semigroup_instance_NonEmpty",
         "nonempty_append",
         "nonempty_append::head_left",
+        "nonempty_append::list_view",
         "nonempty_cons",
         "nonempty_head",
         "nonempty_map",
+        "nonempty_map::list_view",
         "nonempty_singleton",
         "nonempty_tail",
         "nonempty_to_list",
@@ -512,6 +514,8 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
             "Data.Collections.NonEmpty.nonempty_map",
             "Data.Collections.NonEmpty.nonempty_append",
             "Data.Collections.NonEmpty.nonempty_append::assoc",
+            "Data.Collections.NonEmpty.nonempty_append::list_view",
+            "Data.Collections.NonEmpty.nonempty_map::list_view",
         ],
     );
 
