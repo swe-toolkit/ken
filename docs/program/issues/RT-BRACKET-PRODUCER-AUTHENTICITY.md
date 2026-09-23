@@ -93,19 +93,26 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
     exactly that: `regions.is_empty()`, no error. Do not restate refusal as a
     property of over-wrapping in general; that is the same move as the
     prediction it replaced.
-  - **THE COUNT IS NOT YET MUTATION-PROVEN, and the discharge is OWED.** Under
-    the shape-widening mutation the test reds at
-    `prepare_native_program_sources(...).expect(...)`: the build never
-    completes, so `regions.len() == 1` never executes. That mutation proves
-    fail-closed authenticity and NOTHING about the count. The ring discharges
-    by EITHER (a) supplying a mutation that builds a region WITHOUT tripping
-    normalization, so the count goes 1 -> 2 and reds; OR (b) recording that
-    none can, with the reason -- the guard is identity-keyed and normalization
-    structurally precedes region construction -- and stating plainly that the
-    count is then a SECONDARY assertion whose failing configuration is
-    unreachable. Deleting or relaxing the guard to manufacture (a) is an
-    explicit NON-discharge. Due before child 3 assembles. Does NOT gate the
-    leader's confirmation or QA routing (`evt_7m05yqa48pxhk` point 5).
+  - **THE COUNT IS DISCHARGED ON HORN (b) at `0528c13e1`**, inside the accepted
+    tip. Test file only, +35/-3, with `compiler_driver.rs` byte-identical and
+    every mutation reverted -- so the guard was NOT relaxed to manufacture a
+    reachable failure, which would have been the explicit non-discharge.
+  - **The recorded reason is STRONGER than the one this frame predicted, and
+    the prediction should not be read as established.** This frame offered
+    "the guard is identity-keyed and normalization structurally precedes region
+    construction" as the expected horn-(b) reason. Measured, three mutations
+    are stopped by TWO barriers, not one. Widening to any 2-argument
+    application, and the same restricted to well-typed applications, are
+    refused at `NormalizeMarkerPayloads` on the arity guard. But marking a
+    SATURATED 2-argument transparent application CLEARS normalization and then
+    fails erasure lowering with `normalized HostIO body is neither
+    identity-checked Ret nor Vis`. Normalization is therefore not the only
+    thing in the way, and a second region still needs a second bracket-shaped
+    producer occurrence that source cannot express.
+  - **The count assertion is not inert, and that is measured rather than
+    argued.** AC-8 runs the byte-identical sweep over a two-producer program
+    and reads 2, so the instrument does distinguish 1 from 2. What is
+    unconstructible is a FALSE 2 on the AC-4 fixture.
 - **AC-5.** No port is selected by `HostOpV1`, name, expression resemblance, or
   a `ResourceRelease` search. Validation by `HostOpV1` is permitted and must be
   shown to be validation, not selection.
@@ -164,6 +171,11 @@ untouched with nothing refused. Both are corrected in AC-4 above, which now
 names the mutation and its message rather than a property of over-wrapping.
 NON-ADVANCING by the Architect's ruling `evt_7m05yqa48pxhk` point 4: a defect
 in frame TEXT surfaced by measurement, no mechanism rework, no new structural
-wall met. The count stays at 1. The live consequence is carried in AC-4: the
-count assertion is not yet mutation-proven, and horn (a) or (b) is owed by the
-ring.
+wall met. The count stays at 1. The consequence AC-4 carried is now DISCHARGED
+on horn (b) at `0528c13e1`, and nothing on this WP is owed to child 3.
+
+The frame was wrong a THIRD time in the same direction and the ring caught it
+again: the horn-(b) reason offered above was a single barrier, and there are
+two. Every one of these was a general claim stated at a scope that had not been
+run. The standing remedy is in AC-4's wording, which now names the mutation and
+its message instead of a property.
