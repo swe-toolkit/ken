@@ -1,7 +1,7 @@
 ---
 id: RT-SELECTED-ARM-CALLABLE-CARRIER
 title: "build a checked cross-boundary callable-and-operand carrier that binds a runtime-selected source arm to its exact recursive-unit/context call target and its own activation-local worker and continuation-capture runs, validated at consumption, so the four px7l/px7m rows can lower natively without admitting a nonselected sibling, inventing entry-ABI membership, or moving effects"
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -13,6 +13,15 @@ origin: "Operator authorized 2026-09-23 (concurred with Steward recommendation e
 ---
 
 # The selected arm's call target and captures must cross the join
+
+> # CLOSED 2026-09-23: `D2` STOP. No code changed.
+>
+> Runtime `evt_6zf0n10f0djzs`, Architect `evt_7v8he9tyxftp6`. No executed
+> arm identity, activation-local run or runtime call-event stamp reaches
+> the call, so the consume guard has nothing legitimate to check. No carrier
+> design exists on the present substrate. That is not proof that none can
+> exist. The operator authorized the new representation, and the design
+> continues as `RT-SELECTED-PENDING-CALL-PACKAGE`.
 
 ## Settled inputs -- Architect `evt_52fhyanq4p78r`, D0 at `bbe57c25f`
 
