@@ -137,7 +137,8 @@ and `IsTrue`. Widen the existing import list.
 > inspectable resolved term, showing `NatOrderIsTrue` resolves to the
 > `LawfulClasses` `GlobalId` and not to base's. Also owed: the untouched
 > census green, the targeted Cursor suite, and package check and fmt. No
-> sentinel, loader or test-harness edit.
+> sentinel or loader edit. The one harness edit it forces is `AC-3b`'s
+> provider roster, which gains `Core.Classes.LawfulClasses.IsTrue`.
 
 **4. The `Bytes` view closes by unfolding, not by a new fact.**
 `bytes_nat_length bs` is *defined* as `length UInt8 (bytes_to_list bs)`
@@ -219,13 +220,18 @@ added lines contain no `Axiom`, postulate, primitive, `Omega` carrier, or
 kernel/TCB surface; **and** the diff touches
 `catalog/packages/Capability/Parsing/Cursor.ken.md` plus, under `crates/`,
 **only test harnesses that mechanically reconstruct a consumer's view of a
-catalog package.** Any path under `crates/**/src/**`, or any other non-test
-path, is a hard stop and a report, not a scope extension.
+catalog package.** Since `LANG-R-LAYER-EXPORT-RETRACTION` (`8fd30c13a`)
+that harness is
+`crates/ken-elaborator/src/r_layer_tests/cat_tier_d_cursor_import.rs`, and
+it is the **one** path under `crates/**/src/**` this node may touch (amended
+2026-09-23, Architect `evt_jvx885kfwpbz`). Any other path under
+`crates/**/src/**`, or any other non-test path, is a hard stop and a report,
+not a scope extension.
 
 > **AMENDED 2026-09-19 ON A HARD STOP THAT THIS `AC` PRODUCED CORRECTLY.**
 > Foundation stopped at `be70f1f84` rather than edit a harness, which is the
 > behaviour the clause was written to get. **The clause was wrong, not the
-> stop.** `crates/ken-elaborator/tests/cat_tier_d_cursor_import.rs` holds
+> stop.** `cat_tier_d_cursor_import.rs` (now under `src/r_layer_tests/`) holds
 > `parsing_cursor_loader_visible_inventory_is_exact`, which asserts
 > `published_module_surfaces(...)` equals a 17-name literal set. **A new `pub`
 > export necessarily changes that set**, so the harness edit is mechanical and
@@ -254,10 +260,14 @@ authorisation is for the name, not for the file.
 adds.** *Control:* `provider_modules(PARSING_CURSOR)` lists
 `Core.Logic.Transport`; `assert_providers_consumed(PARSING_CURSOR, …)` lists
 `Core.Logic.Transport.cong` / `.sym` / `.trans` and
-**`Core.Classes.LawfulClasses.leq_nat`**; the doc comment's numeral matches the
-roster length. **Exactly those three items and nothing else** — a fold that
-grows loses the Architect's pre-clearance (`evt_4nh9w0qr67mw3`) and goes back
-for re-review.
+**`Core.Classes.LawfulClasses.leq_nat`**, and, since the aliased import of
+settled input 3, **`Core.Classes.LawfulClasses.IsTrue`**; the doc comment's
+numeral matches the roster length (sixteen). The comment's MEASURED sentence
+says *the sixteen inventoried identities*, not a completeness claim: the
+helper checks only the roster it is given. **Exactly those items and nothing
+else** — a fold that grows further loses the Architect's pre-clearance
+(`evt_4nh9w0qr67mw3`, extended by `evt_jvx885kfwpbz` for `IsTrue`) and goes
+back for re-review.
 
 > **CORRECTED 2026-09-19 ON A HARD STOP THIS `AC` CAUSED.** `AC-3b` first said
 > **`Data.Numeric.Nat.Order.leq_nat`**, and **no such global exists** —
@@ -363,7 +373,8 @@ expected set records a regression rather than a fact. Measured: `IsTrue` is
 `.Order.ken.md:37` imports it explicitly and uses it eighteen times while
 staying **out** of the census, and `IsTrue` appears in **zero** census entries
 catalog-wide. So the repair is an explicit import in `Cursor.ken.md`,
-aliased per settled input 3, and the sentinel is not touched. Steward ruling `evt_5f4qhhwqk1hye`.
+aliased per settled input 3, and the sentinel is not touched. Steward ruling
+`evt_5f4qhhwqk1hye`.
 
 > **A ONE-ARMED PREDICATE WOULD HAVE BEEN WORSE THAN THE LISTS IT REPLACED.**
 > "Bring every firing consumer-view assertion into agreement" is the natural
