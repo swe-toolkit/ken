@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-DECODER-PRESERVATION
 title: "Publish checked, reusable invariant-preservation laws beside the combinators in Capability.Parsing.Decoder, parametric in client-supplied good-cursor and good-location predicates, so a client parser can prove its span/source laws without seeing Decoder's private error cases or fuel recursors -- the public proof boundary CAT-PARSING-LAWS stopped on"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
