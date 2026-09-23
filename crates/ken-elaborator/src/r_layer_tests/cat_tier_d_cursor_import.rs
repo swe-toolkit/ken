@@ -297,11 +297,12 @@ fn parsing_cursor_loader_visible_inventory_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: Cursor roots-loads after DC and the published lower tiers with no
-/// trust/class/instance growth; every one of its fifteen imported provider
+/// trust/class/instance growth; each of the sixteen inventoried provider
 /// identities occurs in an owned checked declaration; private representation
-/// operations remain unimportable. CLAIMED: DC is the sole intra-slice value
-/// edge and every lower-tier value dependency is explicit. THE GAP: each import
-/// item's necessity is established by the population-side removal campaign.
+/// operations remain unimportable. CLAIMED: the inventoried lower-tier value
+/// dependencies have checked consumers. THE GAP: roster completeness is not
+/// established by this presence-only helper; each import item's necessity is
+/// established by the population-side removal campaign.
 #[test]
 fn parsing_cursor_imports_are_canonical_and_visibility_only() {
     assert_providers_consumed(
@@ -317,6 +318,7 @@ fn parsing_cursor_imports_are_canonical_and_visibility_only() {
             "Data.Collections.Derived.length",
             "Data.Collections.Derived.nth",
             "Data.Numeric.Nat.Arithmetic.add",
+            "Core.Classes.LawfulClasses.IsTrue",
             "Core.Classes.LawfulClasses.leq_nat",
             "Data.Numeric.Nat.Order.sub",
             "Core.Logic.Transport.cong",
