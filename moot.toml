@@ -1,28 +1,37 @@
-# ken federation — moot launch profile. TWO HARNESSES, split 22 / 6.
+# ken federation — moot launch profile. 29 seats, TWO HARNESSES, split 27 / 2.
 #
 # ⚠ DERIVE WIRING FROM THE `[agents.*]` BLOCKS, NEVER FROM PROSE — INCLUDING
-# THIS PROSE. This header has been wrong twice (it once claimed every seat ran
-# direct on the Anthropic subscription, and it later still listed four Claude
-# Code seats after three had moved). The blocks are the configuration; this is a
-# summary that goes stale between edits.
+# THIS PROSE. This header has been wrong three times: it once claimed every seat
+# ran direct on the Anthropic subscription; it later still listed four Claude
+# Code seats after three had moved; it then described a 22-seat native Codex
+# harness when no seat uses that harness any more. The blocks are the
+# configuration. Measure before trusting this summary:
 #
-# **22 seats — native Codex harness** (`harness = "codex"`, the operator's
-# ChatGPT/Codex subscription). Effort is `model_reasoning_effort` on these seats.
-#   - `gpt-5.6-sol`   — the seats that author or audit deeply: spec-author,
-#                       conformance-validator, librarian, doc-author, research,
-#                       and the kernel/verify/ergo/foundation implementers.
-#   - `gpt-5.6-terra` — leaders, QA, and the language implementer.
+#   python3 -c "import tomllib;from collections import Counter as C;\
+#   d=tomllib.load(open('moot.toml','rb'))['agents'];print(len(d),\
+#   dict(C(a.get('harness','<none>') for a in d.values())),\
+#   dict(C(a.get('model','?') for a in d.values())))"
 #
-# **6 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
-# steward's cold-start `/login`; these use `effort`, NOT
-# `model_reasoning_effort`). NOT uniformly Opus — do not infer a model from the
-# harness:
-#   - `steward`   — operator proxy / workflow authority. Opus.
-#   - `adversary` — standing red team. Opus.
-#   - `architect` — Opus (T1), reseated 2026-08-18. See the note below.
-#   - `runtime-leader`, `runtime-implementer`, `runtime-qa` — **Sonnet 5**
-#     (T2), reseated 2026-08-18. Not a tier change: MODELS.md names Sonnet 5
-#     as one of the two sanctioned T2 options for this ring.
+# **27 seats — pi harness** (`harness = "pi"`, OpenAI via pi). Effort key is
+# `effort` and the PI_* env block is required. NO seat in this file carries
+# `model_reasoning_effort`; that key belongs to the native `codex` harness,
+# which nothing here currently uses.
+#   - `gpt-6-sol`   (8) — seats that author or audit deeply: architect,
+#     research, spec-author, and every team implementer. High, except
+#     ergo-implementer at medium (its observed setting, preserved on reseat).
+#   - `gpt-6-luna` (19) — leaders, QA, lieutenant, librarian, the doc ring,
+#     spec-leader, conformance-validator. Medium.
+#
+# **2 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
+# steward's cold-start `/login`). No `harness` key and no `env` block:
+#   - `steward`   — operator proxy / workflow authority. `claude-opus-5-5[1m]`.
+#   - `adversary` — standing red team. `claude-opus-5-5[1m]`.
+#   Both pinned to Opus 5.5 on 2026-09-23. `[1m]` is harness-level and does not
+#   reach the API; a bare family name like `opus[1m]` would be a floating alias.
+#
+# GPT-6 is a LIVE OPERATOR TRIAL (2026-09-22): a 50% token discount against the
+# 5.6 models it replaces, seated T1=sol / T2=luna. Only the L1 Runtime ring is
+# running it; every other lane is stood down.
 
 # ⚠ THE 2026-08-18 RESEAT IS PURPOSE-LIMITED (operator). The OpenAI pool hit
 # its subscription floor — `runtime-qa`, `runtime-leader`, `research` and
@@ -127,9 +136,12 @@ display_name = "spec-author"
 # 2026-09-19 reseat (operator directive, Steward-executed at the clean seam). Claude
 # Code Opus 5 -> pi/OpenAI gpt-5.6-sol. TIER-PRESERVING (T1 enclave seat, high).
 # HARNESS SHAPE CHANGES: gains `harness = "pi"` and the PI_* env block.
-# NOTE FOR MODELS.md (Steward is barred from editing it, §7): MODELS.md maps T1 to
-# Opus-class and states there is no T1 seat on the GPT backend. This seat and the
-# architect now contradict that. Surfaced to the operator 2026-09-19.
+# 2026-09-22 reseat (operator directive): gpt-5.6-sol -> gpt-6-sol. Tier, harness
+# and effort unchanged; see the GPT-6 trial note in the file header.
+# OPEN WITH THE OPERATOR, and it is NOT this file's to settle: COORDINATION.md
+# requires both load-bearing soundness votes to be Opus-tier, and the GPT backend
+# is not. MODELS.md no longer maps tiers to models at all, so it neither grants
+# nor refuses this. The disposition belongs in COORDINATION.md.
 model = "openai-codex/gpt-6-sol"
 harness = "pi"
 effort = "high"
@@ -149,15 +161,19 @@ startup_prompt = "You are Ken's conformance validator (clean-room enclave). Read
 
 [agents.steward]
 display_name = "steward"
-# 2026-09-14 (operator, in-session): Opus 4.8 1M -> Opus 5 1M. The operator set this
-# seat's live model via /model, which writes the alias `opus[1m]`; this block is
-# updated to match. `opus[1m]` is the PROVEN string (it is what /model produced and
-# it resolves to "Opus 5 (1M context)" in the live footer) — `claude-opus-5[1m]` was
-# NOT used because the explicit 1M-suffixed Opus 5 id is unverified here, and a bad
-# model string fails the launch. NOTE: `opus[1m]` is an ALIAS and tracks the latest
-# Opus, so it will follow a future Opus release; pin explicitly if that is unwanted.
-# Operator instruction: do NOT use claude-opus-4-8[1m].
-model = "opus[1m]"
+# 2026-09-23 reseat (operator directive): Opus 5 1M -> Opus 5.5 1M, EXPLICITLY
+# PINNED. This replaces the floating alias `opus[1m]` that this seat carried since
+# 2026-09-14. The alias tracked the newest Opus and would have picked 5.5 up on the
+# next restart by itself; the operator asked for 5.5 by name, and a pinned id says
+# which model produced a given run. TRADEOFF ACCEPTED: this seat no longer follows
+# a future Opus release on its own. Restore `opus[1m]` to get that back.
+# THE ID IS VERIFIED, NOT CONSTRUCTED: the harness states it itself in the
+# adversary's live session — "The exact model ID is claude-opus-5-5[1m]" — after
+# the operator set that seat via the CLI. `[1m]` is harness-level and is stripped
+# before the API call, so the session log's bare `claude-opus-5-5` is NOT the
+# config string. A bad model string fails the launch, so nothing here is guessed.
+# Operator instruction, still standing: do NOT use claude-opus-4-8[1m].
+model = "claude-opus-5-5[1m]"
 effort = "high"
 startup_prompt = "You are Ken's Steward (operator proxy, workflow authority). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/steward.md and docs/program/05-implementation-dag.md, then begin tracking program progress per your playbook."
 
@@ -291,7 +307,13 @@ display_name = "adversary"
 # 2026-08-19 reseat (operator): pi/OpenRouter glm-5.2 -> Anthropic Opus. OpenRouter
 # credits exhausted; spend down the Anthropic subscription before renewal (~10h).
 # Claude Code harness = NO harness key, uses `effort`, NO env.
-model = "claude-opus-4-8[1m]"
+# 2026-09-23 reseat: Opus 4.8 1M -> Opus 5.5 1M. The OPERATOR ALREADY SET THIS SEAT
+# LIVE via the CLI and its footer reads "Opus 5.5 (1M context)"; this block is
+# updated to match what is running, so a relaunch does not silently drop it back to
+# 4.8. Tier unchanged. Keeps the seat off the Steward's own model only by release
+# accident now, not by design -- reviewer independence derives from context rather
+# than model (operator, 2026-09-22), so sharing 5.5 is not an independence defect.
+model = "claude-opus-5-5[1m]"
 effort = "high"
 startup_prompt = "You are Ken's Adversary (a standing red-team; the negative-space twin of the Librarian). Read agent/COORDINATION.md (federation law) and MODELS.md first, then your playbook agent/playbooks/federation/adversary.md and your memory scopes (fleet + enclave + roles/adversary). Set your status and, event-driven on Steward/publisher merge notifications, hunt recent changes + their blast radius for flaws, gaps, leaky abstractions, and undesirable behavior. Ground every finding (repro + file:line + the violated invariant) and route it to a side thread to the Steward. You are advisory and non-blocking — never gate a merge, fix, rule, or merge. Do not poll."
 

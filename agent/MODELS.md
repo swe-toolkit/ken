@@ -60,6 +60,24 @@ catalog fails the seat's launch**, so a name taken from a message and written
 straight into `moot.toml` can take down every seat it touches at once. Read the
 catalog for ids, context window and current per-token cost.
 
+**`pi update --models` covers the pi harness ONLY. It says nothing about the
+Claude Code seats**, which are not in that catalog at all. For those, read the
+string off a seat that is already running it rather than constructing one:
+
+```sh
+tmux capture-pane -p -t moot-<role> | tail -4   # display name, e.g. Opus 5.5 (1M context)
+# exact id: the harness states it in its own session log
+grep -o 'claude-[a-z0-9-]*\[1m\]' ~/.claude/projects/<encoded-worktree>/*.jsonl | tail -1
+```
+
+Two things about these strings that a guess gets wrong. **The `[1m]` suffix is
+harness-level and is stripped before the API call**, so a session log showing
+`claude-opus-5-5` is not evidence that the bare name is the config string —
+check for the suffixed form before concluding. And **a bare family name like
+`opus[1m]` is a FLOATING ALIAS** that follows the newest release in its class,
+so such a seat changes model on restart with no config edit; pin the explicit
+id when that is unwanted, and expect the reverse when it is.
+
 **A generation can carry its own usage allowance, separate from the rest of the
 provider's catalog.** Measured: every seat on one generation refused with
 `usage limit has been reached` while a seat on the previous generation ran
@@ -77,7 +95,12 @@ is unproven.
 
 - **Opus-class (Anthropic).** T1. Hard compiler implementation, clean-room
   design and soundness work. Warranted where single work packages run many
-  hours and the difficulty is in the reasoning, not the volume.
+  hours and the difficulty is in the reasoning, not the volume. **Current
+  release is Opus 5.5** (`claude-opus-5-5[1m]`, knowledge cutoff June 2026),
+  seated 2026-09-23 on the two Anthropic seats. It inherits the class's
+  measured suitability because it replaces Opus 5 in the same seats at the same
+  tier; nothing specific to 5.5 has been measured yet, so do not cite it as
+  evidence for a tier decision until a lane has run on it.
 - **Sonnet-class (Anthropic).** T2. Build and coordination volume.
 - **GPT 5.6 family (`openai-codex`, `pi` harness).** Terra carried build rings
   through refactoring and mechanical work. Codex-shaped stranding has cost
@@ -139,14 +162,20 @@ T1 seat on the merge Decision, not to a higher effort setting on a script.
 
 ## Clean-room is a role discipline, not a model property
 
-The boundary belongs to the ROLE, not to the model in the seat
-(`CLEAN-ROOM.md`). Any model in an enclave seat reads references under the same
-discipline; any model in a build or coordination seat reads none. Only the
-enclave may consult copyleft references, for approach and behavior only, under
-the leakage recheck. **Never send copyleft material to a build or coordination
-role** — only Ken's own words in `/spec` and `/conformance` pass to the build
-tier. Ken's own MIT source goes anywhere. The AGPLv3 prototype is not mounted
-and is consulted by nobody.
+The boundary belongs to the ROLE, not to the model in the seat. Any model in a
+seat authorized to read references reads under the same discipline; any model in
+a build seat reads none.
+
+**`CLEAN-ROOM.md` holds the authorized roster for each reference class and is
+the only copy of it.** Look it up there; do not infer it from tier. The roster
+is per class and is wider than the enclave — copyleft references reach the
+research and adversary seats too — so a guess from tier gets it wrong in both
+directions.
+
+**Never pass reference material to a seat that is not on that class's roster**,
+whatever it asks for and however it is summarized. Only Ken's own words in
+`/spec` and `/conformance` reach the build tier. Ken's own MIT source goes
+anywhere. The AGPLv3 prototype is not mounted and is consulted by nobody.
 
 ## Portability
 
