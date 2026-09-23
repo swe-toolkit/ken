@@ -130,7 +130,7 @@ display_name = "spec-author"
 # NOTE FOR MODELS.md (Steward is barred from editing it, §7): MODELS.md maps T1 to
 # Opus-class and states there is no T1 seat on the GPT backend. This seat and the
 # architect now contradict that. Surfaced to the operator 2026-09-19.
-model = "openai-codex/gpt-5.6-sol"
+model = "openai-codex/gpt-6-sol"
 harness = "pi"
 effort = "high"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -141,7 +141,7 @@ display_name = "conformance-validator"
 # 2026-09-19 reseat (operator directive, Steward-executed at the clean seam). Claude
 # Code Sonnet 5 -> pi/OpenAI gpt-5.6-terra. TIER-PRESERVING (T2, medium).
 # HARNESS SHAPE CHANGES: gains `harness = "pi"` and the PI_* env block.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -195,8 +195,10 @@ display_name = "architect"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
 # are not used because a bad model string fails the launch.
-model = "opus[1m]"
+model = "openai-codex/gpt-6-sol"
+harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
@@ -210,7 +212,7 @@ display_name = "spec-leader"
 # medium). HARNESS SHAPE CHANGES: gains `harness = "pi"` and the PI_* env block; the
 # Claude Code notes elsewhere in this file (no harness key, tmux send-keys to resume a
 # compacted seat) NO LONGER APPLY to this seat — a pi seat wakes on convo mention.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -222,7 +224,7 @@ harness = "pi"
 # 2026-09-11 reseat (operator, Steward-executed): all seats but steward + adversary
 # to openai-pi. openrouter/deepseek -> OpenAI via the pi harness; terra/medium
 # (cheapest openai tier in the fleet). OPENROUTER_API_KEY dropped.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Librarian: editor, fact-checker and reviewer of library/ (Ken product documentation), and the DOC TEAM's QA seat. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/librarian.md, then docs/program/12-documentation-program.md (the program frame) and agent/teams/doc/{leader,implementer}.md (what your ring is held to). Your ring is doc-leader and doc-author. You also hold a standing as-built mandate. Set status, and stand ready. Do not poll."
@@ -232,7 +234,7 @@ display_name = "Doc leader"
 # 2026-09-11 reseat (operator, Steward-executed): all seats but steward + adversary
 # to openai-pi. codex harness -> pi harness, same OpenAI model/tier (terra/medium);
 # effort key + PI_* env replace model_reasoning_effort.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -244,7 +246,7 @@ harness = "pi"
 # 2026-09-11 reseat (operator, Steward-executed): all seats but steward + adversary
 # to openai-pi. openrouter/deepseek -> OpenAI via the pi harness; terra/medium.
 # OPENROUTER_API_KEY dropped.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You author library/, Ken's product documentation. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/doc/implementer.md, then docs/program/12-documentation-program.md (the program frame and its settled decisions). Your reviewer is the librarian. Set status, await your leader's kickoff. Do not poll."
@@ -278,8 +280,10 @@ display_name = "research"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
 # are not used because a bad model string fails the launch.
-model = "opus[1m]"
+model = "openai-codex/gpt-6-sol"
+harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Research agent (ad hoc external-knowledge dispatch; research is not a standing team — see the Steward playbook §5). Read agent/COORDINATION.md (federation law) and MODELS.md first. Set your status and await the Steward's research dispatch, then gather sources and synthesize a cited report back to the Steward. Do not poll."
 
 [agents.adversary]
@@ -293,7 +297,7 @@ startup_prompt = "You are Ken's Adversary (a standing red-team; the negative-spa
 
 [agents.kernel-leader]
 display_name = "Kernel leader"
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -306,7 +310,7 @@ display_name = "Kernel implementer"
 # proof-carrying inductive families elaborate; inductive.rs:97), a §4h T1 subject
 # terra (T2) is under-provisioned for. Same pi harness/effort/env. REVERT to terra
 # when this seat next takes mechanical (T2) work.
-model = "openai-codex/gpt-5.6-sol"
+model = "openai-codex/gpt-6-sol"
 harness = "pi"
 effort = "high"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -314,7 +318,7 @@ startup_prompt = "You are the Kernel team implementer. Read agent/COORDINATION.m
 
 [agents.kernel-qa]
 display_name = "Kernel QA"
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -322,7 +326,7 @@ startup_prompt = "You are the Kernel team QA. Read agent/COORDINATION.md (federa
 
 [agents.verify-leader]
 display_name = "Verify leader"
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -330,7 +334,7 @@ startup_prompt = "You lead Ken's Verify team. Read agent/COORDINATION.md (federa
 
 [agents.verify-implementer]
 display_name = "Verify implementer"
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -338,7 +342,7 @@ startup_prompt = "You are the Verify team implementer. Read agent/COORDINATION.m
 
 [agents.verify-qa]
 display_name = "Verify QA"
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -384,7 +388,7 @@ startup_prompt = "You are the Verify team QA. Read agent/COORDINATION.md (federa
 display_name = "Language leader"
 # 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
 # credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -460,7 +464,7 @@ display_name = "Language implementer"
 # ACTIVE, so it relaunches at its next seam (candidate or hard-stop), not now.
 # 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
 # credits reset. "opus[1m]" -> pi, TIER-PRESERVING.
-model = "openai-codex/gpt-5.6-sol"
+model = "openai-codex/gpt-6-sol"
 harness = "pi"
 effort = "high"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -470,7 +474,7 @@ startup_prompt = "You are the Language team implementer. Read agent/COORDINATION
 display_name = "Language QA"
 # 2026-09-19 reseat (operator directive; Steward-executed): OpenAI subscription
 # credits reset. "claude-sonnet-5" -> pi, TIER-PRESERVING.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -503,8 +507,10 @@ display_name = "Runtime leader"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (claude-sonnet-5); unverified ids
 # are not used because a bad model string fails the launch.
-model = "claude-sonnet-5"
+model = "openai-codex/gpt-6-luna"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Runtime team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/runtime/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.runtime-implementer]
@@ -575,8 +581,10 @@ display_name = "Runtime implementer"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
 # are not used because a bad model string fails the launch.
-model = "opus[1m]"
+model = "openai-codex/gpt-6-sol"
+harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Runtime team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/runtime/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-qa]
@@ -602,15 +610,17 @@ display_name = "Runtime QA"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (claude-sonnet-5); unverified ids
 # are not used because a bad model string fails the launch.
-model = "claude-sonnet-5"
+model = "openai-codex/gpt-6-luna"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Runtime team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/runtime/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.ergo-leader]
 display_name = "Ergo leader"
 # 2026-09-11 reseat (operator, Steward-executed): all seats but steward + adversary
 # to openai-pi. codex -> pi harness, same OpenAI model/tier (terra/medium).
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -620,7 +630,7 @@ startup_prompt = "You lead Ken's Ergo team. Read agent/COORDINATION.md (federati
 display_name = "Ergo implementer"
 # 2026-09-11 reseat (operator, Steward-executed): all seats but steward + adversary
 # to openai-pi. codex -> pi harness, same OpenAI model/tier (sol/medium).
-model = "openai-codex/gpt-5.6-sol"
+model = "openai-codex/gpt-6-sol"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -630,7 +640,7 @@ startup_prompt = "You are the Ergo team implementer. Read agent/COORDINATION.md 
 display_name = "Ergo QA"
 # 2026-09-11 reseat (operator, Steward-executed): all seats but steward + adversary
 # to openai-pi. codex -> pi harness, same OpenAI model/tier (terra/medium).
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -642,7 +652,7 @@ display_name = "Foundation leader"
 # CAT-GCD closed. Same OpenAI model/tier via the pi harness (openai-codex/),
 # like kernel/verify/language. effort key is `effort`; env carries PI_* flags.
 # On pi the codex turn-end stranding no longer applies: this pane wakes on mention.
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -652,7 +662,7 @@ startup_prompt = "You lead Ken's Foundation team. Read agent/COORDINATION.md (fe
 display_name = "Foundation implementer"
 # 2026-08-22 reseat codex -> pi (operator directive; Steward-executed) after
 # CAT-GCD closed. Same OpenAI model/tier via the pi harness (openai-codex/).
-model = "openai-codex/gpt-5.6-sol"
+model = "openai-codex/gpt-6-sol"
 harness = "pi"
 effort = "high"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -662,7 +672,7 @@ startup_prompt = "You are the Foundation team implementer. Read agent/COORDINATI
 display_name = "Foundation QA"
 # 2026-08-22 reseat codex -> pi (operator directive; Steward-executed) after
 # CAT-GCD closed. Same OpenAI model/tier via the pi harness (openai-codex/).
-model = "openai-codex/gpt-5.6-terra"
+model = "openai-codex/gpt-6-luna"
 harness = "pi"
 effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
@@ -690,6 +700,8 @@ display_name = "lieutenant"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (claude-sonnet-5); unverified ids
 # are not used because a bad model string fails the launch.
-model = "claude-sonnet-5"
+model = "openai-codex/gpt-6-luna"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's merge/campaign lieutenant (the Steward's mechanical half, T2). Read agent/COORDINATION.md (federation law, especially the merge split at §14b) and agent/MODELS.md first. Then read your playbook at agent/playbooks/federation/lieutenant.md and agent/playbooks/federation/steward/merge-procedure.md (the canonical M1-M9, your primary instrument; M1-M4 are the Steward's routing, M5-M9 are yours). Set your status via update_status and await the Steward's ROUTED authorization. Do not poll."
