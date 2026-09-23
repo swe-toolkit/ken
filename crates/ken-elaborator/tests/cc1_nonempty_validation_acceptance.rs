@@ -463,6 +463,7 @@ fn nonempty_owner_keeps_raw_constructor_while_clients_cannot_name_it() {
 
     env.elaborate_file(
         "import Data.Collections.NonEmpty (NonEmpty, nonempty_cons, nonempty_head)\n\
+         import Data.Collections.NonEmpty\n\
          const cc1_public_value : NonEmpty Nat = nonempty_cons Nat Zero (Nil Nat)\n\
          const cc1_public_head : Nat = nonempty_head Nat cc1_public_value",
     )

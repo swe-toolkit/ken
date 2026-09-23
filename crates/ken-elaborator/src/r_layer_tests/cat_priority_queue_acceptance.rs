@@ -1855,8 +1855,9 @@ fn transparent_body(env: &ElabEnv, id: GlobalId) -> Term {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: real roots-loader selective imports and kernel bodies retain all
-/// six exact exported GlobalIds; real evaluation constructs and drains values
+/// MEASURED: real roots-loader selective imports, an explicit qualified import
+/// for the order helper, and kernel bodies retain all six exact exported
+/// GlobalIds; real evaluation constructs and drains values
 /// through the five public operations. CLAIMED: the six-name abstract public
 /// API is usable. THE GAP: constructor/worker privacy is independently checked
 /// below; finite execution is not a general queue law.
@@ -1866,6 +1867,7 @@ fn public_client_constructs_peeks_merges_and_drains_exact_exports() {
     let api = Api::from_env(&env);
     env.elaborate_file(
         "import Core.Classes.LawfulClasses (Ord)\n\
+         import Core.Classes.LawfulClasses\n\
          import Data.Collections.PriorityQueue\n\
            (PriorityQueue, empty, insert, find_min, pop_min, merge)\n\
          fn cat_pq_client_empty (k : Type) (v : Type) (d : Ord k)\n\
@@ -1890,7 +1892,7 @@ fn public_client_constructs_peeks_merges_and_drains_exact_exports() {
            : PriorityQueue k v (Core.Classes.LawfulClasses.ord_leq_at k d) =\n\
            merge k v d left right",
     )
-    .expect("fresh external client must selectively import and use every public identity");
+    .expect("fresh external client must import and use every public identity");
     for (wrapper, id) in [
         ("cat_pq_client_empty", api.empty),
         ("cat_pq_client_insert", api.insert),
@@ -2070,6 +2072,8 @@ fn direct_declarations_and_private_names_reach_the_import_boundary() {
     }
     assert_eq!(observed, expected);
 
+    env.elaborate_file(&format!("import {MODULE}"))
+        .expect("qualified privacy checks must bind the module prefix");
     env.elaborate_file(
         "import Core.Classes.LawfulClasses (Ord, ord_leq_at)\n\
          import Data.Collections.PriorityQueue (PriorityQueue, empty, merge, pop_min)\n\

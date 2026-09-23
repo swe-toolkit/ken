@@ -50,6 +50,8 @@ fn entry_elaborates_and_registers_the_free_laws() {
 fn canonical_operations_compute_on_concrete_naturals() {
     let mut env = ElabEnv::new().expect("base environment");
     load_arithmetic(&mut env);
+    env.elaborate_file("import Data.Numeric.Nat.Arithmetic")
+        .expect("client imports the qualified arithmetic module");
     env.elaborate_decl(
         "theorem add_two_three_check : Equal Nat (Data.Numeric.Nat.Arithmetic.add (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))) (Suc (Suc (Suc (Suc (Suc Zero))))) = Proved",
     )

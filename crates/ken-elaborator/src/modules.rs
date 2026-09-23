@@ -234,8 +234,8 @@ struct Scope {
     bindings: HashMap<String, String>,
     /// Bare names bound by a top-level LOCAL declaration in this scope.
     locals: std::collections::HashSet<String>,
-    /// Alias prefixes from `import M as N` — `N` resolves to `M` when used
-    /// as a qualifying prefix (`N.foo`).
+    /// Qualified imports (`M → M`) and aliases (`N → M`). Only entries here
+    /// authorize a module prefix (`M.foo` or `N.foo`); loaded exports alone do not.
     prefixes: HashMap<String, String>,
     /// Names mentioned by a facade export remain deliberately unavailable to
     /// the body unless a separate import/local binding supplies them. Keeping
@@ -358,14 +358,10 @@ fn resolve_ref(
         if let Some(q) = scope.bindings.get(prefix_part) {
             return Ok(format!("{q}.{leaf}"));
         }
-        let canonical_module = scope
-            .prefixes
-            .get(prefix_part)
-            .cloned()
-            .unwrap_or_else(|| prefix_part.to_string());
-        if let Some(pubmap) = exports.get(&canonical_module) {
-            return pubmap
-                .get(leaf)
+        if let Some(canonical_module) = scope.prefixes.get(prefix_part) {
+            return exports
+                .get(canonical_module)
+                .and_then(|pubmap| pubmap.get(leaf))
                 .cloned()
                 .ok_or_else(|| ElabError::UnboundName {
                     name: name.to_string(),
@@ -3590,6 +3586,94 @@ mod namespace_effect_tests {
             exports.keys().map(String::as_str).collect::<BTreeSet<_>>(),
             BTreeSet::from(["renamed"])
         );
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.2, §3.3).
+    ///
+    /// MEASURED: the roots loader returns exact `UnboundName` for both exported
+    /// `M.foo` and `M.bar` when A imports only `M (foo)`. CLAIMED: selective
+    /// imports must not grant qualified access. THE GAP: the positive
+    /// qualified-import controls below show this is not a missing export.
+    #[test]
+    fn selective_import_does_not_grant_qualified_access() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::write(
+            root.path().join("M.ken"),
+            "pub const foo : Nat = Zero\npub const bar : Nat = Zero\n",
+        )
+        .expect("write exported provider");
+        for qualified in ["M.bar", "M.foo"] {
+            fs::write(
+                root.path().join("A.ken"),
+                format!("import M (foo)\nconst probe : Nat = {qualified}\n"),
+            )
+            .expect("write selective consumer");
+            let mut env = ElabEnv::new().expect("base environment");
+            match env.elaborate_module_from_roots(&[root.path().to_path_buf()], "A") {
+                Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, qualified),
+                other => panic!("selective import must not grant {qualified}: {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3 per-unit closure).
+    ///
+    /// MEASURED: a sibling imports and loads M before A refers to `M.bar`.
+    /// CLAIMED: the loader cache is not ambient import authority for A. THE
+    /// GAP: the sibling must successfully elaborate before A is checked.
+    #[test]
+    fn sibling_loaded_module_does_not_grant_qualified_access() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::write(root.path().join("M.ken"), "pub const bar : Nat = Zero\n")
+            .expect("write exported provider");
+        fs::write(
+            root.path().join("Sibling.ken"),
+            "import M\nconst seen : Nat = M.bar\n",
+        )
+        .expect("write sibling importer");
+        fs::write(root.path().join("A.ken"), "const probe : Nat = M.bar\n")
+            .expect("write unimported consumer");
+        let mut env = ElabEnv::new().expect("base environment");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots(&roots, "Sibling")
+            .expect("sibling must load M and use its qualified export");
+        match env.elaborate_module_from_roots(&roots, "A") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "M.bar"),
+            other => panic!("sibling-loaded M must not grant A access: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.2).
+    ///
+    /// MEASURED: the same exported foo is usable via each authorized import
+    /// shape at the roots-loader boundary. CLAIMED: only qualified and aliased
+    /// imports grant dotted access, while selection binds the bare name. THE
+    /// GAP: AC-1's identical-path negative fixtures discriminate the grant.
+    #[test]
+    fn qualified_alias_and_selective_imports_bind_their_distinct_access_paths() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::write(root.path().join("M.ken"), "pub const foo : Nat = Zero\n")
+            .expect("write exported provider");
+        for (module, source) in [
+            ("Qualified", "import M\nconst probe : Nat = M.foo\n"),
+            ("Aliased", "import M as N\nconst probe : Nat = N.foo\n"),
+            ("Selective", "import M (foo)\nconst probe : Nat = foo\n"),
+        ] {
+            fs::write(root.path().join(format!("{module}.ken")), source).expect("write consumer");
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_module_from_roots(&[root.path().to_path_buf()], module)
+                .unwrap_or_else(|error| panic!("{module} should elaborate: {error:?}"));
+        }
+        fs::write(
+            root.path().join("AliasOriginal.ken"),
+            "import M as N\nconst probe : Nat = M.foo\n",
+        )
+        .expect("write alias-only consumer using the unbound original prefix");
+        let mut env = ElabEnv::new().expect("base environment");
+        match env.elaborate_module_from_roots(&[root.path().to_path_buf()], "AliasOriginal") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "M.foo"),
+            other => panic!("alias must not grant the original prefix: {other:?}"),
+        }
     }
 
     /// `Pub` is a transparent namespace-effect wrapper for the complete

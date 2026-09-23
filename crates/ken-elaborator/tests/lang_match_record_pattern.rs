@@ -322,6 +322,8 @@ fn module_rewriting_recurses_through_record_field_patterns() {
          }",
     )
     .expect("module record pattern elaborates");
+    env.elaborate_file("import RecordOwner")
+        .expect("client imports the qualified owner");
     elaborate(
         &mut env,
         "const module_record_result : Nat = RecordOwner.result",

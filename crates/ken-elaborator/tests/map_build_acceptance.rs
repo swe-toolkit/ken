@@ -1692,6 +1692,7 @@ fn cat_rel_public_api_is_usable_while_tree_constructors_stay_private() {
 
     match env.elaborate_file(
         "import Data.Collections.Map (Tree)\n\
+         import Data.Collections.Map\n\
          fn cat_rel_hidden_leaf (k : Type) (v : Type) (m : Tree k v) : Tree k v = \
            Data.Collections.Map.Leaf k v",
     ) {
