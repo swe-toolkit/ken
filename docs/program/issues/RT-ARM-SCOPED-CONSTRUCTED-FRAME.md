@@ -1,7 +1,7 @@
 ---
 id: RT-ARM-SCOPED-CONSTRUCTED-FRAME
 title: "give each runtime-selected branch arm its own creation-site constructed-context frame and exact callable-body identity, so a recursive position inside the selected arm can supply its ProducerLocal captures without admitting the nonselected sibling or inventing entry-ABI membership -- the representation the four px7l/px7m rows lack (RT-CONTEXT-CAPTURE-CLAIM-ABSENCE outcome B). Design/feasibility first: D0 inventory and a component sketch to the Architect before any code; not a promise that all four rows clear"
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -13,6 +13,31 @@ origin: "Architect sizing ruling evt_5mfgjmrhyrwcp (answering Steward evt_37qy3r
 ---
 
 # Each selected arm needs its own constructed frame
+
+> # CLOSED 2026-09-23: `D1` STOP. No code changed.
+>
+> Architect `evt_52fhyanq4p78r`, on the runtime D0 across all eight
+> alternatives at `bbe57c25f`. All four rows still refuse at `L1`, with zero
+> retargets. Each fixture's one materialized frame is keyed to a sibling body
+> (343/362/332/341), while `L1` queries the distinct 322/347/369/378. No
+> existing edge both sees the selected source arm's live captures and
+> carries the exact selected target to the later recursive call. The join
+> transports a value word, not a callable plus its operand runs, and
+> `constructed_context_frame` is a single `Option`. The stop condition fired:
+> the rows need a **new checked cross-boundary callable-and-operand
+> carrier**, a new representation forwarded to the operator at
+> `evt_46d36ha5k2943`. A pre-join rewrite would need its own effect-order
+> and one-call proof. Neither horn is authorized here.
+>
+> **`L2` answered:** `agreeing_recursive_body_unit` (`core.rs:1230`) and its
+> `[41,41]`/`[41,42]` test are **correct** for today's
+> one-unit-across-arms contract. A future branch-local representation would
+> validate selected arm, exact unit and matching frame under its own
+> authenticated call boundary, and leave `L2` in place for one-unit paths.
+> This ruling supersedes `RT-CONTEXT-FRAME-LABEL-CORRECTION` `§D3`'s
+> "real and should be repaired". The stale `D4b` comment at
+> `continuations.rs:~4334` goes to the carrier node if the operator
+> authorizes one.
 
 ## Settled inputs -- Architect `evt_5mfgjmrhyrwcp`
 
@@ -41,6 +66,14 @@ origin: "Architect sizing ruling evt_5mfgjmrhyrwcp (answering Steward evt_37qy3r
   nor parked px8ta (response-owner liveness) supplies the selected arm's
   activation-local captured operands or exact callable target.
 
+- **This node also owns the `L2` relation question.**
+  `agreeing_recursive_body_unit` (`core.rs:1230`) compares declared-unit
+  identity. `RT-CONTEXT-FRAME-LABEL-CORRECTION` `§D3` called the gap between
+  node identity and body equality "real and should be repaired", and filed no
+  owner. `RT-CONTEXT-CAPTURE-CLAIM-ABSENCE` calls `L2` correct, but its
+  evidence (the unit test near `:1271`) compares ids only, so it passes under
+  both readings. Adversary `evt_132c307qm7jeg`.
+
 ## Deliverables
 
 - **D0, before any code.** On current `main`, for each of the four fixtures,
@@ -59,9 +92,17 @@ origin: "Architect sizing ruling evt_5mfgjmrhyrwcp (answering Steward evt_37qy3r
   - without inventing entry-ABI membership;
   - without changing `agreeing_recursive_body_unit` for paths that still rely
     on one unit.
+  D1 also answers the `L2` question: either the arm-scoped frame makes the
+  identity comparison right, because each arm gets its own unit, or the
+  Architect rules `:1230` correct. The candidate then corrects whichever
+  record is wrong (`§D3` there, or the exemption here).
 - **D2, only after the Architect approves D1.** Build it. Un-ignore each row it
   clears. Rewrite the label of each row it does not clear to the measured
-  stop.
+  stop. In the same candidate, correct the stale owner comment on
+  `predeclared_entry_frame_slot`
+  (`planning/static_transition/continuations.rs:~4334`, "`D4b` owns making
+  such a value capturable"): `D4b` was an admission closeout, and this node
+  is the owner.
 
 ## Acceptance criteria
 
