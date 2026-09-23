@@ -116,14 +116,28 @@ must not become a third predecessor.
 `sub` from `Data.Numeric.Nat.Order`, and `Order.ken.md:39` re-exports `leq_nat`
 and `IsTrue`. Widen the existing import list.
 
-> **CORRECTED 2026-09-19: WIDEN TO `(leq_nat, sub)` ONLY. DO NOT IMPORT
-> `IsTrue`.** Foundation measured that importing it makes the consumer-view
-> loader harness fail `AmbiguousReference`, because base already supplies
-> `IsTrue`. The sentence above is right that `Order` re-exports it and wrong to
-> read that as licence to name it here — a name available by two routes is
-> ambiguous, not redundant. **The narrowed import preserves package check and
-> fmt**, and the bridge still closes because `IsTrue` remains in scope from
-> base.
+> **AMENDED 2026-09-23: IMPORT `IsTrue` ONLY UNDER A PER-ITEM ALIAS. NEVER
+> AS BARE `IsTrue`.** The operative import is
+> `import Data.Numeric.Nat.Order (IsTrue as NatOrderIsTrue, leq_nat, sub)`.
+> The 13 `IsTrue` occurrences in the newly added proofs are spelled
+> `NatOrderIsTrue`; the shipped propositions and dictionary are unchanged.
+> Architect ruling `evt_71p40x65qww39`.
+>
+> Why the bare import is refused: base binds a separate `IsTrue`
+> (`crates/ken-elaborator/src/decimal_char.rs`, Char's refinement), whose
+> `GlobalId` differs from `Core.Classes.LawfulClasses.IsTrue`. `bind_import`
+> correctly refuses two identities under one name, directly or through the
+> `Order` re-export alike. `§3.2`'s per-name rename is the spec's remedy. The
+> directional census (`AC-3c`) needs an explicit provider edge, which the
+> aliased import is. This supersedes the 2026-09-19 "do not import `IsTrue`"
+> text and the earlier rejection of an alias (`evt_56ngqsbcmtavc`), which
+> assumed a same-identity collision.
+>
+> **Control, owed with the candidate:** an identity assertion, or an
+> inspectable resolved term, showing `NatOrderIsTrue` resolves to the
+> `LawfulClasses` `GlobalId` and not to base's. Also owed: the untouched
+> census green, the targeted Cursor suite, and package check and fmt. No
+> sentinel, loader or test-harness edit.
 
 **4. The `Bytes` view closes by unfolding, not by a new fact.**
 `bytes_nat_length bs` is *defined* as `length UInt8 (bytes_to_list bs)`
@@ -348,8 +362,8 @@ expected set records a regression rather than a fact. Measured: `IsTrue` is
 `pub fn IsTrue` at `Core/Classes/LawfulClasses.ken.md:54`, `Data.Numeric.Nat`
 `.Order.ken.md:37` imports it explicitly and uses it eighteen times while
 staying **out** of the census, and `IsTrue` appears in **zero** census entries
-catalog-wide. So the repair is an explicit import in `Cursor.ken.md`, and the
-sentinel is not touched. Steward ruling `evt_5f4qhhwqk1hye`.
+catalog-wide. So the repair is an explicit import in `Cursor.ken.md`,
+aliased per settled input 3, and the sentinel is not touched. Steward ruling `evt_5f4qhhwqk1hye`.
 
 > **A ONE-ARMED PREDICATE WOULD HAVE BEEN WORSE THAN THE LISTS IT REPLACED.**
 > "Bring every firing consumer-view assertion into agreement" is the natural
