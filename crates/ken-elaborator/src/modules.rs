@@ -465,6 +465,7 @@ fn resolve_attached_ref(
 /// file-backed export is never evidence that the path is owned by this scope.
 fn lexical_inline_import(
     prefix: &str,
+    file_root: Option<&str>,
     module: &str,
     inline_children: &HashMap<String, HashSet<String>>,
 ) -> Option<String> {
@@ -490,6 +491,12 @@ fn lexical_inline_import(
         }
         if fully_declared {
             return Some(canonical);
+        }
+        // The dots in a loaded unit's path are directories, not lexical
+        // ancestors. Stop at the actual file unit before a bare import can
+        // capture a separately elaborated inline child of its path prefix.
+        if file_root == Some(owner) {
+            break;
         }
         owner = owner.rsplit_once('.').map_or("", |(parent, _)| parent);
     }
@@ -528,12 +535,13 @@ fn apply_import(
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
     owner: &str,
+    file_root: Option<&str>,
     module: &str,
     kind: &ImportKind,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let canonical =
-        lexical_inline_import(owner, module, inline_children).unwrap_or_else(|| module.to_string());
+    let canonical = lexical_inline_import(owner, file_root, module, inline_children)
+        .unwrap_or_else(|| module.to_string());
     let pubmap = exports
         .get(&canonical)
         .ok_or_else(|| ElabError::UnboundName {
@@ -2412,6 +2420,7 @@ fn prebind_scope_declarations(
     scope: &mut Scope,
     decls: &[Decl],
     prefix: &str,
+    file_root: Option<&str>,
     exports: &HashMap<String, HashMap<String, String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
@@ -2495,6 +2504,7 @@ fn prebind_scope_declarations(
                     globals,
                     prelude_binding_names,
                     prefix,
+                    file_root,
                     module,
                     kind,
                     span,
@@ -2792,6 +2802,7 @@ fn expand_scope(
         scope,
         decls,
         prefix,
+        elab.module_state.active_imports.last().map(String::as_str),
         &elab.module_state.exports,
         &elab.globals,
         &elab.module_state.prelude_binding_names,
@@ -2833,6 +2844,7 @@ fn expand_scope(
                     &elab.globals,
                     &elab.module_state.prelude_binding_names,
                     prefix,
+                    elab.module_state.active_imports.last().map(String::as_str),
                     module,
                     kind,
                     span,
@@ -3815,6 +3827,69 @@ mod namespace_effect_tests {
             "inline N must not load the distinct N.ken"
         );
         assert_eq!(env.env.trusted_base(), trust_before);
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.2).
+    ///
+    /// MEASURED: a `Data.Foo` file unit's bare `import N` resolves the actual
+    /// file `N.ken` even after a separate inline `Data.N` has been elaborated;
+    /// both cold and preloaded N cases retain N.x's exact GlobalId in the body.
+    /// CLAIMED: a loaded unit's lexical ancestor walk stops at that unit root,
+    /// never capturing a similarly spelled child of the `Data` namespace.
+    /// THE GAP: the existing inline-owner/sibling controls show that clipping
+    /// the file walk does not forbid genuine same-unit inline children.
+    #[test]
+    fn file_unit_import_cannot_capture_external_inline_ancestor() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::create_dir_all(root.path().join("Data")).expect("create file-unit directory");
+        fs::write(root.path().join("N.ken"), "pub const x : Nat = Suc Zero\n")
+            .expect("write file-backed N");
+        fs::write(
+            root.path().join("Data/Foo.ken"),
+            "import N\npub const observed : Nat = N.x\n",
+        )
+        .expect("write Data.Foo file unit");
+        fs::write(
+            root.path().join("Data/Owned.ken"),
+            "module N { pub const x : Nat = Zero }\n\
+             module P { import N\npub const selected : Nat = N.x }\n",
+        )
+        .expect("write actual same-unit inline sibling");
+        let roots = [root.path().to_path_buf()];
+        for preload_n in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_file("module Data { module N { pub const x : Nat = Zero } }")
+                .expect("separate inline Data.N");
+            if preload_n {
+                env.elaborate_module_from_roots(&roots, "N")
+                    .expect("preload the distinct file-backed N");
+            }
+            env.elaborate_module_from_roots(&roots, "Data.Foo")
+                .expect("Data.Foo must import the file-backed N");
+            assert!(env.module_state.loaded_units.contains_key("N"));
+            assert_ne!(env.globals["N.x"], env.globals["Data.N.x"]);
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals["Data.Foo.observed"])
+                .expect("observed is transparent");
+            match body {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, env.globals["N.x"]),
+                other => panic!("observed must reference N.x, got {other:?}"),
+            }
+            env.elaborate_module_from_roots(&roots, "Data.Owned")
+                .expect("same-unit sibling import must remain relative");
+            let (_, sibling_body) = env
+                .env
+                .transparent_body(env.globals["Data.Owned.P.selected"])
+                .expect("sibling selector is transparent");
+            assert_ne!(env.globals["Data.Owned.N.x"], env.globals["N.x"]);
+            match sibling_body {
+                ken_kernel::Term::Const { id, .. } => {
+                    assert_eq!(id, env.globals["Data.Owned.N.x"])
+                }
+                other => panic!("same-unit sibling must reference its own N.x, got {other:?}"),
+            }
+        }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
