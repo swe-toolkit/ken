@@ -608,7 +608,7 @@ pub proof fields_in_spec_order for command_schema
 pub proof rendered_from_schema for command_help
       (spec : CommandSpec)
     : Equal Doc (command_help spec) (schema_help (command_schema spec)) =
-  Refl
+  cong CommandSpec Doc spec spec command_help Refl
 
 fn program_help (spec : ProgramSpec) : Doc =
   Text

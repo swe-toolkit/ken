@@ -11,9 +11,11 @@ the clients.
 ```ken
 import Capability.Formatting.Doc (Doc, Text)
 
+import Core.Logic.Transport (cong, trans)
+
 import Data.Collections.Derived (list_append, nth)
 
-import Data.Collections.NonEmpty (NonEmpty, nonempty_append, nonempty_cons)
+import Data.Collections.NonEmpty (NonEmpty, nonempty_append, nonempty_cons, nonempty_to_list)
 
 import Data.Sums.Validation (Invalid, Valid, Validation)
 
@@ -65,7 +67,12 @@ fn schema_fields (schema : Schema) : List SchemaField =
 
 The checker is supplied by each client, so source-specific policy and origin
 types stay local. The traversal nevertheless owns the accumulation shape and
-visits every field.
+visits every field. Two public, pure proof observers expose the complete issue
+list: `schema_expected_issue_list` folds the field specifications and the
+client's inspection result independently of validation, while
+`schema_observed_issue_list` reads the returned `Validation`. The attached
+`invalid_issue_sequence` proof equates these lists, retaining every rejection
+in field order even when earlier fields fail.
 
 ```ken
 data SchemaIssue origin = MkSchemaIssue origin String
@@ -154,6 +161,203 @@ pub fn schema_validate_fields
         value
         (inspect field)
         (schema_validate_fields origin value inspect rest)
+  }
+
+pub fn schema_observed_issue_list
+      (origin : Type) (value : Type) (checked : SchemaValidation origin value)
+    : List (SchemaIssue origin) =
+  match checked {
+    Valid accepted ↦ Nil (SchemaIssue origin);
+    Invalid issues ↦ nonempty_to_list (SchemaIssue origin) issues
+  }
+
+fn schema_head_issue_list
+      (origin : Type) (value : Type) (checked : SchemaFieldCheck origin value)
+    : List (SchemaIssue origin) =
+  match checked {
+    SchemaFieldAccepted accepted ↦ Nil (SchemaIssue origin);
+    SchemaFieldRejected issue ↦ Cons (SchemaIssue origin) issue (Nil (SchemaIssue origin))
+  }
+
+pub fn schema_expected_issue_list
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (fields : List SchemaField)
+    : List (SchemaIssue origin) =
+  match fields {
+    Nil ↦ Nil (SchemaIssue origin);
+    Cons field rest ↦
+      list_append
+        (SchemaIssue origin)
+        (schema_head_issue_list origin value (inspect field))
+        (schema_expected_issue_list origin value inspect rest)
+  }
+
+theorem schema_cons_accepted_valid_issue_order
+      (origin : Type) (value : Type) (accepted : value) (rest : List value)
+    : Equal
+        (List (SchemaIssue origin))
+        (schema_observed_issue_list
+          origin
+          value
+          (schema_validation_cons
+            origin
+            value
+            (SchemaFieldAccepted origin value accepted)
+            (Valid (NonEmpty (SchemaIssue origin)) (List value) rest)))
+        (list_append
+          (SchemaIssue origin)
+          (schema_head_issue_list origin value (SchemaFieldAccepted origin value accepted))
+          (schema_observed_issue_list
+            origin
+            value
+            (Valid (NonEmpty (SchemaIssue origin)) (List value) rest))) =
+  Proved
+
+theorem schema_cons_accepted_invalid_issue_order
+      (origin : Type) (value : Type) (accepted : value) (issues : NonEmpty (SchemaIssue origin))
+    : Equal
+        (List (SchemaIssue origin))
+        (schema_observed_issue_list
+          origin
+          value
+          (schema_validation_cons
+            origin
+            value
+            (SchemaFieldAccepted origin value accepted)
+            (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)))
+        (list_append
+          (SchemaIssue origin)
+          (schema_head_issue_list origin value (SchemaFieldAccepted origin value accepted))
+          (schema_observed_issue_list
+            origin
+            value
+            (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues))) =
+  Refl
+
+theorem schema_cons_rejected_valid_issue_order
+      (origin : Type) (value : Type) (issue : SchemaIssue origin) (rest : List value)
+    : Equal
+        (List (SchemaIssue origin))
+        (schema_observed_issue_list
+          origin
+          value
+          (schema_validation_cons
+            origin
+            value
+            (SchemaFieldRejected origin value issue)
+            (Valid (NonEmpty (SchemaIssue origin)) (List value) rest)))
+        (list_append
+          (SchemaIssue origin)
+          (schema_head_issue_list origin value (SchemaFieldRejected origin value issue))
+          (schema_observed_issue_list
+            origin
+            value
+            (Valid (NonEmpty (SchemaIssue origin)) (List value) rest))) =
+  Refl
+
+theorem schema_cons_rejected_invalid_issue_order
+      (origin : Type)
+      (value : Type)
+      (issue : SchemaIssue origin)
+      (issues : NonEmpty (SchemaIssue origin))
+    : Equal
+        (List (SchemaIssue origin))
+        (schema_observed_issue_list
+          origin
+          value
+          (schema_validation_cons
+            origin
+            value
+            (SchemaFieldRejected origin value issue)
+            (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)))
+        (list_append
+          (SchemaIssue origin)
+          (schema_head_issue_list origin value (SchemaFieldRejected origin value issue))
+          (schema_observed_issue_list
+            origin
+            value
+            (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues))) =
+  nonempty_append::list_view
+    (SchemaIssue origin)
+    (nonempty_cons (SchemaIssue origin) issue (Nil (SchemaIssue origin)))
+    issues
+
+theorem schema_validation_cons_issue_order
+      (origin : Type)
+      (value : Type)
+      (head : SchemaFieldCheck origin value)
+      (tail : SchemaValidation origin value)
+    : Equal
+        (List (SchemaIssue origin))
+        (schema_observed_issue_list
+          origin
+          value
+          (schema_validation_cons origin value head tail))
+        (list_append
+          (SchemaIssue origin)
+          (schema_head_issue_list origin value head)
+          (schema_observed_issue_list origin value tail)) =
+  match head {
+    SchemaFieldAccepted accepted ↦
+      match tail {
+        Valid rest ↦ schema_cons_accepted_valid_issue_order origin value accepted rest;
+        Invalid issues ↦ schema_cons_accepted_invalid_issue_order origin value accepted issues
+      };
+    SchemaFieldRejected issue ↦
+      match tail {
+        Valid rest ↦ schema_cons_rejected_valid_issue_order origin value issue rest;
+        Invalid issues ↦ schema_cons_rejected_invalid_issue_order origin value issue issues
+      }
+  }
+
+pub proof invalid_issue_sequence for schema_validate_fields
+      (origin : Type)
+      (value : Type)
+      (inspect : SchemaField → SchemaFieldCheck origin value)
+      (fields : List SchemaField)
+    : Equal
+        (List (SchemaIssue origin))
+        (schema_observed_issue_list
+          origin
+          value
+          (schema_validate_fields origin value inspect fields))
+        (schema_expected_issue_list origin value inspect fields) =
+  match fields {
+    Nil ↦ Proved;
+    Cons field rest ↦
+      trans
+        (List (SchemaIssue origin))
+        (schema_observed_issue_list
+          origin
+          value
+          (schema_validate_fields origin value inspect (Cons SchemaField field rest)))
+        (list_append
+          (SchemaIssue origin)
+          (schema_head_issue_list origin value (inspect field))
+          (schema_observed_issue_list
+            origin
+            value
+            (schema_validate_fields origin value inspect rest)))
+        (schema_expected_issue_list origin value inspect (Cons SchemaField field rest))
+        (schema_validation_cons_issue_order
+          origin
+          value
+          (inspect field)
+          (schema_validate_fields origin value inspect rest))
+        (cong
+          (List (SchemaIssue origin))
+          (List (SchemaIssue origin))
+          (schema_observed_issue_list
+            origin
+            value
+            (schema_validate_fields origin value inspect rest))
+          (schema_expected_issue_list origin value inspect rest)
+          (list_append
+            (SchemaIssue origin)
+            (schema_head_issue_list origin value (inspect field)))
+          (schema_validate_fields::invalid_issue_sequence origin value inspect rest))
   }
 
 pub proof valid_coverage for schema_validate_fields
@@ -766,6 +970,8 @@ export SchemaPresence,
   schema_issue_origin,
   schema_issue_code,
   schema_validate_fields,
+  schema_observed_issue_list,
+  schema_expected_issue_list,
   schema_validate,
   schema_help
 ```
@@ -774,4 +980,6 @@ export SchemaPresence,
 
 `Schema` mentions neither client and adds no primitive, postulate, `Axiom`, or
 trusted-base entry. Its result and issue carriers are parameterized over client
-origin and value types.
+origin and value types. The two proof observers and the checked
+`invalid_issue_sequence` proof add no production-validation behavior or trust;
+the proof uses `NonEmpty`'s public list-view append law.

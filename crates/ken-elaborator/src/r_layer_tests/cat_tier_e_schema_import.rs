@@ -7,7 +7,7 @@ mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind, literate, parser};
+use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const SCHEMA: &str = "Application.Input.Schema";
@@ -46,13 +46,20 @@ fn public_surface() -> BTreeSet<String> {
         "schema_validate_fields",
         "schema_validate_fields::accepted_tail_invalid",
         "schema_validate_fields::valid_coverage",
+        "schema_validate_fields::invalid_issue_sequence",
+        "schema_observed_issue_list",
+        "schema_expected_issue_list",
         "schema_validate",
         "schema_help",
     ])
 }
 
-fn private_surface() -> [&'static str; 12] {
+fn private_surface() -> [&'static str; 18] {
     [
+        "schema_cons_accepted_invalid_issue_order",
+        "schema_cons_accepted_valid_issue_order",
+        "schema_cons_rejected_invalid_issue_order",
+        "schema_cons_rejected_valid_issue_order",
         "schema_documentation",
         "schema_field_detail_chars",
         "schema_field_documentation",
@@ -61,10 +68,12 @@ fn private_surface() -> [&'static str; 12] {
         "schema_field_reject",
         "schema_field_shape",
         "schema_fields_help_chars",
+        "schema_head_issue_list",
         "schema_name",
         "schema_presence_chars",
         "schema_shape_chars",
         "schema_validation_cons",
+        "schema_validation_cons_issue_order",
     ]
 }
 
@@ -74,6 +83,7 @@ fn load_schema() -> (ElabEnv, BTreeSet<GlobalId>, BTreeSet<GlobalId>) {
     base_ids.extend(env.env.declarations().iter().map(Decl::id));
     for provider in [
         "Capability.Formatting.Doc",
+        "Core.Logic.Transport",
         "Data.Collections.Derived",
         "Data.Collections.NonEmpty",
         "Data.Sums.Validation",
@@ -203,12 +213,21 @@ fn schema_selective_import_ledger_is_exact() {
             names(&["Doc", "Text"]),
         ),
         (
+            "Core.Logic.Transport".to_string(),
+            names(&["cong", "trans"]),
+        ),
+        (
             "Data.Collections.Derived".to_string(),
             names(&["list_append", "nth"]),
         ),
         (
             "Data.Collections.NonEmpty".to_string(),
-            names(&["NonEmpty", "nonempty_append", "nonempty_cons"]),
+            names(&[
+                "NonEmpty",
+                "nonempty_append",
+                "nonempty_cons",
+                "nonempty_to_list",
+            ]),
         ),
         (
             "Data.Sums.Validation".to_string(),
@@ -220,9 +239,8 @@ fn schema_selective_import_ledger_is_exact() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the roots loader observes an exact 28-name published inventory:
-/// 26 directly selectable surfaces plus two attached proofs. A real selective-
-/// import client resolves all 26 direct names to canonical Schema identities,
+/// MEASURED: the roots loader observes the exact published inventory and a
+/// selective-import client resolves direct names to canonical Schema identities,
 /// and each attached proof's subject is present in that selector set. CLAIMED:
 /// Schema publishes precisely this carrier, constructor, accessor, traversal,
 /// and attached-proof surface. THE GAP: this arm does not independently exercise
@@ -272,10 +290,57 @@ fn schema_loader_visible_inventory_is_exact() {
     }
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: a strict consumer applies the whole-sequence law to two rejected
+/// fields and cannot prove its expected list contains only one issue. CLAIMED:
+/// the exported proof vocabulary carries all invalid issues in order, not only
+/// the first. THE GAP: this fixture is a witness; the general attached law is
+/// what quantifies over arbitrary fields and inspectors.
+#[test]
+fn schema_issue_sequence_law_has_a_two_rejection_client() {
+    let (mut env, _, _) = load_schema();
+    env.elaborate_file(
+        r#"
+import Application.Input.Schema
+  (SchemaField, MkSchemaField, SchemaOptional, SchemaFlag,
+    SchemaFieldCheck, SchemaFieldRejected, SchemaIssue, MkSchemaIssue,
+    schema_validate_fields, schema_observed_issue_list, schema_expected_issue_list)
+
+const field : SchemaField = MkSchemaField "one" SchemaOptional SchemaFlag "one"
+const issue : SchemaIssue Nat = MkSchemaIssue Nat Zero "missing"
+const two_fields : List SchemaField =
+  Cons SchemaField field (Cons SchemaField field (Nil SchemaField))
+fn reject_field (ignored : SchemaField) : SchemaFieldCheck Nat Bool =
+  SchemaFieldRejected Nat Bool issue
+
+theorem all_issues_retain_order
+  : Equal (List (SchemaIssue Nat))
+    (schema_observed_issue_list Nat Bool
+      (schema_validate_fields Nat Bool reject_field two_fields))
+    (schema_expected_issue_list Nat Bool reject_field two_fields) =
+  schema_validate_fields::invalid_issue_sequence Nat Bool reject_field two_fields
+"#,
+    )
+    .expect("strict consumer must apply ordered issue law to two rejections");
+    let wrong = env.elaborate_file(
+        "theorem one_issue_is_two : Equal (List (SchemaIssue Nat)) \
+         (schema_expected_issue_list Nat Bool reject_field two_fields) \
+         (Cons (SchemaIssue Nat) issue (Nil (SchemaIssue Nat))) = Refl",
+    );
+    assert!(
+        matches!(
+            wrong,
+            Err(ElabError::KernelRejected { .. }) | Err(ElabError::TypeMismatch { .. })
+        ),
+        "two rejected fields cannot produce a singleton expected list: {wrong:?}"
+    );
+}
+
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every non-prelude, non-owned identity in Schema's checked
-/// declarations is exactly one of the nine D0-measured provider identities.
+/// declarations is in the exact expected provider closure.
 /// CLAIMED: Schema has no undeclared provider or unexpected Tier-E edge. THE
 /// GAP: checked-core identity closure cannot detect an unused import, while the
 /// exact parsed-import ledger covers that residual.
@@ -285,11 +350,15 @@ fn schema_checked_provider_identity_closure_is_exact() {
     let expected_names = names(&[
         "Capability.Formatting.Doc.Doc",
         "Capability.Formatting.Doc.Text",
+        "Core.Logic.Transport.cong",
+        "Core.Logic.Transport.trans",
         "Data.Collections.Derived.list_append",
         "Data.Collections.Derived.nth",
         "Data.Collections.NonEmpty.NonEmpty",
         "Data.Collections.NonEmpty.nonempty_append",
         "Data.Collections.NonEmpty.nonempty_cons",
+        "Data.Collections.NonEmpty.nonempty_to_list",
+        "Data.Collections.NonEmpty.nonempty_append::list_view",
         "Data.Sums.Validation.Invalid",
         "Data.Sums.Validation.Valid",
         "Data.Sums.Validation.Validation",
@@ -320,6 +389,7 @@ fn schema_checked_provider_identity_closure_is_exact() {
         .filter(|(name, identity)| {
             external.contains(identity)
                 && (name.starts_with("Capability.Formatting.Doc.")
+                    || name.starts_with("Core.Logic.Transport.")
                     || name.starts_with("Data.Collections.Derived.")
                     || name.starts_with("Data.Collections.NonEmpty.")
                     || name.starts_with("Data.Sums.Validation."))
@@ -336,8 +406,8 @@ fn schema_checked_provider_identity_closure_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: standalone roots loading preserves trust, class, and instance
-/// populations while all twelve pre-existing non-client operational helpers
-/// reject through real external selective imports. The exact public-inventory
+/// populations while private implementation and proof helpers reject through
+/// real external selective imports. The exact public-inventory
 /// arm closes over the added private theorem helpers. CLAIMED: Schema's migration
 /// changes only dependency and usable-client visibility. THE GAP: exact body
 /// preservation is a one-shot object diff rather than a permanent source-text
