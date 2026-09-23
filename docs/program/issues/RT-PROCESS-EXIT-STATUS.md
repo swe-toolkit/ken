@@ -1,7 +1,7 @@
 ---
 id: RT-PROCESS-EXIT-STATUS
-title: "rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds refuses with StaticResponseDeferred -- a deferred host response reaches a cross-owner transfer. WHICH of the two sites refuses is UNDECIDED: the frame's section 3 argument that the construct tag identifies the admissibility walk is REFUTED (Architect, evt_398hkbskdt1mx) and the enumeration it discharged is owed again. The id names a ProcessExitStatus/Persistent-over-NoReferent refusal the row no longer produces; the id is a citation key and is NOT renamed, the title is. Decide whether the Deferred is a correct fail-closed or a classify leak, and repair whichever it is."
-status: ready
+title: "rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds -- CLOSED on the D1 outcome (iii) STOP, measured at d47f1f990: the Release response is Specialized in the plan, the represented-constructor preflight (boundary.rs admissibility walk) refuses it before its response owner is entered, and lowering-time consumption of the selected call is unestablished. The repair is the producer-to-carrier ingress seam, filed as RT-RESPONSE-CARRIER-INGRESS-SEAM. The id is a citation key and is NOT renamed."
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -12,14 +12,26 @@ github: null
 origin: "Measured by the RT-SRCBODY-BIND-ORDER D12 complete no-fail-fast enumeration (evt_2n9wq8xyj0aa1); re-measured by RT-IGNORED-FAILING-ROWS-INVENTORY's ledger (docs/program/evidence/rt-ignored-failing-rows-ledger.md) row 13, which records a DIFFERENT refusal from the one this node is named for and label agrees? NO. Fails at frozen base 21fd46dc as well as at the candidate, so it is pre-existing base debt and not a regression. Framed by the Steward 2026-09-18 under the operator L1 directive 2026-09-17 ('Is L1 still working on clearing the ignored tests? That is the top priority until it is done.'). depends_on was [RT-SRCBODY-BIND-ORDER]; that node is merged and the edge was a READ, not a dependency -- the provenance is recorded here instead. Steward-filed per COORDINATION section 2."
 ---
 
-> # `ready`. The `D1` step-1 site is UNDECIDED; frame `§3.3` decides it.
+> # CLOSED 2026-09-23: `D1` outcome `(iii)`, a measured STOP.
 >
-> Held `draft` 2026-09-18 on the Architect's refutation (`evt_398hkbskdt1mx`)
-> of the construct-tag discriminator. The owed `§3` replacement landed as
-> `c2b4854cb`: a terminating marker probe at `boundary.rs:1058`, both endings
-> stated before the run, preconditions checked (`evt_35mdm2f7bmc02`). Released
-> `ready` 2026-09-23. **Neither site is established; the probe is the oracle.**
-> The frame's `§3` governs; do not name a site before it has run.
+> Successor: `RT-RESPONSE-CARRIER-INGRESS-SEAM`.
+>
+> Architect ruling `evt_6np1yzwgg8m2r`, on clean checkpoint
+> `d47f1f990d42ef30f670652006c5bc124d6f55a2`. Phase B marks `BufferFreeze` and
+> all three `ResourceRelease` `Vis` Specialized, with an empty Deferred
+> population. The first refusal is constructor origin 746: its
+> `ResourceRelease` operation root 745 lowers to `StaticResponseDeferred`
+> outside a response owner. The represented-constructor transfer
+> (`transfer_represented_boundary_value`) descends into the admissibility walk
+> at `boundary.rs:1056`, which correctly refuses compiler control. So `AC-1` is
+> answered: **the walk fired, not the variant arm**. This is an ingress/phase
+> mismatch at the producer-to-carrier seam, not a boundary guard defect.
+> Neither `(i)` nor `(ii)` holds, and `AC-2`'s binary verdict cannot be
+> measured behind the earlier refusal.
+>
+> The `D2` annotation commit is kept as a measurement, not a candidate. Its
+> correction lands with the successor's candidate, never as a label-only
+> change.
 
 > # TREAT EVERY ANCHOR IN THIS FRAME AS PERISHABLE
 >
@@ -182,6 +194,15 @@ were already fixed incidentally by one earlier candidate on this chain.
               defect is in the FIXTURE or in the program it compiles. Repair
               the row, and say plainly that the compiler was right.
 
+    (iii) SPECIALIZED in the plan, but the represented-constructor preflight
+           refuses it before its owner is entered, so consumption is
+           unestablished
+           => a valid STOP and a measured outcome, not a failure. Hand back the
+              exact Vis/caller/owner identities and the refusing path. Do not
+              demote on speculation or relax either refusal arm. The seam
+              repair is a separate node. (Added 2026-09-23, Architect
+              `evt_6np1yzwgg8m2r`.)
+
 **Attempt `(i)`.** One honest try plus a handback. If the attempt shows the
 value is genuinely unconsumed, that is `(ii)` measured from the inside, which
 is a better measurement than a standalone probe would have been.
@@ -203,6 +224,8 @@ the next reader can tell staleness from disagreement.
   by enclosing function, and states how it was distinguished from the other.
 - **AC-2.** The handback states the caller-consumption verdict for this row's
   response — consumed or not — and cites the evidence, not the expectation.
+  Under `(iii)`, "unestablished behind the earlier refusal" with the
+  refusing identities and path is the verdict, and it satisfies this AC.
 - **AC-3.** If `(i)`: the repair is in classify and the diff touches no
   fail-closed arm in `boundary.rs`. If it does touch one, that is a hard stop to
   the Architect under `D3` below, not a judgment call.
