@@ -325,6 +325,8 @@ fn guard_composes_after_whole_pattern_and_module_rewriting_reaches_it() {
          }",
     )
     .expect("guard resolution and module rewriting descend through the arm");
+    env.elaborate_file("import GuardOwner")
+        .expect("client imports the qualified owner");
     let selected = elaborate(&mut env, "const module_guard : Nat = GuardOwner.selected");
     let zero = constructor(env.globals["Zero"], []);
     assert_eq!(

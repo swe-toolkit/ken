@@ -137,6 +137,8 @@ fn qualified_module_patterns_preserve_alias_bindings() {
          }",
     )
     .expect("qualified owner elaborates its as-pattern");
+    env.elaborate_file("import AliasOwner")
+        .expect("client imports the qualified owner");
     env.elaborate_decl("const observed : AliasOwner.AliasToken = AliasOwner.keep AliasOwner.make")
         .expect("client consumes the public function without constructor visibility");
     assert_eq!(env.env.trusted_base(), trusted_before);

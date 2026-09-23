@@ -294,6 +294,8 @@ fn module_rewriting_recurses_through_or_alternatives() {
          }",
     )
     .expect("module-local or-pattern constructors rewrite recursively");
+    env.elaborate_file("import OrOwner")
+        .expect("client imports the qualified owner");
     let selected = elaborate(&mut env, "const module_or_result : Nat = OrOwner.result");
     let zero = constructor(env.globals["Zero"], []);
     assert_eq!(

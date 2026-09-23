@@ -284,6 +284,8 @@ fn module_rewriting_recurses_through_tuple_components() {
          }",
     )
     .expect("module tuple pattern elaborates");
+    env.elaborate_file("import TupleOwner")
+        .expect("client imports the qualified owner");
     elaborate(
         &mut env,
         "const module_tuple_result : Nat = \

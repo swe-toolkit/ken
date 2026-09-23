@@ -256,7 +256,8 @@ fn transparent_deque_bodies_have_exact_derived_head_occurrence_populations() {
 fn both_homomorphisms_and_both_pop_inverses_instantiate_generically() {
     let mut env = loaded_env();
     env.elaborate_file(
-        "theorem cat_deque_ac1_front \
+        "import Data.Collections.Derived\n\
+         theorem cat_deque_ac1_front \
              (a : Type) (x : a) (q : Deque a) \
            : Equal (List a) \
                (toList a (pushFront a x q)) \
