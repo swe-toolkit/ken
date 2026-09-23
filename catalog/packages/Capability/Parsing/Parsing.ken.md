@@ -234,7 +234,9 @@ conditional on the caller supplying a proof the start position is in bounds
 by the `Parser` type itself, so a caller can state and check them per
 concrete parser. `parser_pure` and `parser_fail` are the two base combinators:
 the former always succeeds on a zero-width span at `start`, the latter
-always fails at `start` with a zero-width error span.
+always fails at `start` with a zero-width error span. The Boolean parser's
+`parse_bool_expr_total` inhabits only `ParserTotal`; it establishes the
+exhaustive result split, not span validity or source locality.
 
 ```ken
 export Located, MkLocated
@@ -374,7 +376,11 @@ repetition and recursive descent seed their private structural fuel from the
 cursor's `remaining`; the old CAT-5-local fuel recursions are retired.
 The grammar selectively imports `list_append` from
 `Data.Collections.Derived` to assemble child lists without maintaining a
-package-local copy.
+package-local copy. `format_bool_expr_on_parse_success` proves that a
+successful parse is formatted by printing its span-erased result;
+`format_bool_expr_on_parse_failure` preserves its parse error. The
+success premise is an actual parse, not an assumption that arbitrary
+printer output will parse.
 
 ```ken
 export BoolExpr, BTrue, BFalse, BNot, BAnd
@@ -771,6 +777,58 @@ pub fn format_bool_expr (s : Source) : Result ParseError Bytes =
     Parsed syntax consumed next ↦ Ok ParseError Bytes (print_bool_expr (erase_spans syntax));
     Failed err ↦ Err ParseError Bytes err
   }
+
+fn format_bool_parse_outcome
+      (outcome : ParseResult (Syntax BoolExpr))
+    : Result ParseError Bytes =
+  match outcome {
+    Parsed syntax consumed next ↦ Ok ParseError Bytes (print_bool_expr (erase_spans syntax));
+    Failed err ↦ Err ParseError Bytes err
+  }
+
+pub theorem parse_bool_expr_total : ParserTotal (Syntax BoolExpr) parse_bool_expr =
+  λs.
+    λstart.
+      λh.
+        match parse_bool_expr s start h {
+          Parsed syntax consumed next ↦ Proved;
+          Failed err ↦ Proved
+        }
+
+pub theorem format_bool_expr_on_parse_success
+      (s : Source)
+      (syntax : Syntax BoolExpr)
+      (consumed : Span)
+      (next : Nat)
+      (h : LessEqNat Zero (source_length s))
+      (parsed : Equal
+        (ParseResult (Syntax BoolExpr))
+        (parse_bool_expr s Zero h)
+        (Parsed (Syntax BoolExpr) syntax consumed next))
+    : Equal
+        (Result ParseError Bytes)
+        (format_bool_expr s)
+        (Ok ParseError Bytes (print_bool_expr (erase_spans syntax))) =
+  J
+    (λoutcome _.
+      Equal (Result ParseError Bytes) (format_bool_expr s) (format_bool_parse_outcome outcome))
+    Refl
+    parsed
+
+pub theorem format_bool_expr_on_parse_failure
+      (s : Source)
+      (err : ParseError)
+      (h : LessEqNat Zero (source_length s))
+      (failed : Equal
+        (ParseResult (Syntax BoolExpr))
+        (parse_bool_expr s Zero h)
+        (Failed (Syntax BoolExpr) err))
+    : Equal (Result ParseError Bytes) (format_bool_expr s) (Err ParseError Bytes err) =
+  J
+    (λoutcome _.
+      Equal (Result ParseError Bytes) (format_bool_expr s) (format_bool_parse_outcome outcome))
+    Refl
+    failed
 ```
 
 ## 5. Design notes
@@ -822,8 +880,10 @@ reference implementation.
    `ParserLaws`, `parser_from_decoder`, `parser_pure`, `parser_fail`,
    `BoolExpr`, `BTrue`, `BFalse`, `BNot`, `BAnd`, `Syntax`, `MkSyntax`,
    `syntax_root`, `syntax_children`, `erase_spans`, `ValidLocatedList`,
-   `ValidSyntax`, `parse_bool_expr`, `print_bool_expr`, and
-   `format_bool_expr`.
+   `ValidSyntax`, `parse_bool_expr`, `parse_bool_expr_total`,
+   `print_bool_expr`, `format_bool_expr`,
+   `format_bool_expr_on_parse_success`, and
+   `format_bool_expr_on_parse_failure`.
 2. **Source map.**
 
    | Task | Section |
@@ -839,12 +899,17 @@ reference implementation.
    parser-result data. It adds no kernel primitive, no source-loader
    behavior, and no language-semantics change.
 4. **`trusted_base()` delta.** **Zero.** Every proof in this package —
-   `LessEqNat::refl`, `LessEqNat::zero_left`, `valid_zero_width_span` — is
-   real and kernel-checked; no law or predicate is postulated.
+   `LessEqNat::refl`, `LessEqNat::zero_left`, `valid_zero_width_span`,
+   `parse_bool_expr_total`, `format_bool_expr_on_parse_success`, and
+   `format_bool_expr_on_parse_failure` — is real and kernel-checked; no law
+   or predicate is postulated.
 5. **Proof families.** `LessEqNat::refl` — induction on `n`.
    `LessEqNat::zero_left` — definitional (first match arm). `valid_zero_width_span`
    — direct composition of the two via `and_intro`, no case-split of its
-   own.
+   own. `parse_bool_expr_total` — exhaustive parse-result split.
+   `format_bool_expr_on_parse_success` and
+   `format_bool_expr_on_parse_failure` — equality transport across each
+   parser-result alternative.
 6. **Consumers.** Source-aware parser implementations can use this package's
    source, span, result, and validity vocabulary.
 7. **Validation evidence.** The catalog checks the
