@@ -63,6 +63,15 @@ list:
 The ring chooses the exact statements. Each must quantify over arbitrary
 input and must fail if the implementation changes the behavior it names.
 
+**Parked for the operator (2026-09-23).** Deliverable 3 and its provider
+laws landed (`6e235b746`, `3120a845c`). Deliverables 1 and 2 stopped on
+bounded attempts (`evt_3jdh6yptdct5m`, `evt_4ts4acq2t3jxf`). The cause is
+per-occurrence literal identity: `elab_str_lit` mints a fresh identity for
+each `"--"`, so the parser's prefix literal and the proof's never convert
+(Architect `evt_5sy6b16r05r48`; not an established K3 dependency). The
+kept extraction `71776ddd8` stays unlanded. Resume only on an operator
+ruling.
+
 ## Acceptance criteria
 
 - **AC-1.** No new trust: the added lines contain no `Axiom`, postulate,
