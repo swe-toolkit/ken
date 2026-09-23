@@ -1,7 +1,7 @@
 ---
 id: CAT-CONFIGURATION-DECODER-IMPORT-EDGES
 title: "give Decoder.ken.md a declared import edge for every qualified reference it makes -- 30 references to Data.Collections.Derived.nth and 7 qualified Application.Input.Schema names resolve today only because a sibling module's private import loaded their module, which spec 33-declarations section 3.2 does not grant -- and make the Decoder ledger test red on an undeclared provider"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none
