@@ -1,7 +1,7 @@
 ---
 id: CAT-CONFIGURATION-DECODER-LAWS
 title: "prove the required-field agreement the decoder actually has, and characterize the optional lane it does not -- env_config_validation discards the validation payload and recomputes values in a second independent traversal whose None branch emits an empty-Bytes placeholder; the REQUIRED lane is guarded (schema_check_presence rejects SchemaRequired), so the reachable placeholder is an ABSENT OPTIONAL field, whose empty Bytes is indistinguishable from a present-but-empty value"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
