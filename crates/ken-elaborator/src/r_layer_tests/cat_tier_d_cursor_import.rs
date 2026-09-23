@@ -39,6 +39,7 @@ fn provider_modules(module: &str) -> &'static [&'static str] {
             "Data.Collections.Derived",
             "Data.Numeric.Nat.Arithmetic",
             "Data.Numeric.Nat.Order",
+            "Core.Logic.Transport",
         ],
         _ => &[],
     }
@@ -255,7 +256,7 @@ fn formatting_doc_imports_are_canonical_and_visibility_only() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every publishable Parsing.Cursor declaration and constructor is
-/// queried through its real DC-first roots closure, and exactly the 17-name
+/// queried through its real DC-first roots closure, and exactly the 18-name
 /// downstream union imports together. CLAIMED: Cursor exposes its shared
 /// dictionary, argument carriers, operations, and laws without publishing
 /// implementation state. THE GAP: provider use and the private boundary are
@@ -272,6 +273,7 @@ fn parsing_cursor_loader_visible_inventory_is_exact() {
         "CursorPeekHasRemaining",
         "MkArgLocation",
         "MkCursorOps",
+        "arg_cursor_laws",
         "arg_cursor_ops",
         "arg_cursor_start",
         "arg_length",
@@ -295,11 +297,12 @@ fn parsing_cursor_loader_visible_inventory_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: Cursor roots-loads after DC and the published lower tiers with no
-/// trust/class/instance growth; every one of its eleven imported provider
+/// trust/class/instance growth; each of the sixteen inventoried provider
 /// identities occurs in an owned checked declaration; private representation
-/// operations remain unimportable. CLAIMED: DC is the sole intra-slice value
-/// edge and every lower-tier value dependency is explicit. THE GAP: each import
-/// item's necessity is established by the population-side removal campaign.
+/// operations remain unimportable. CLAIMED: the inventoried lower-tier value
+/// dependencies have checked consumers. THE GAP: roster completeness is not
+/// established by this presence-only helper; each import item's necessity is
+/// established by the population-side removal campaign.
 #[test]
 fn parsing_cursor_imports_are_canonical_and_visibility_only() {
     assert_providers_consumed(
@@ -315,7 +318,12 @@ fn parsing_cursor_imports_are_canonical_and_visibility_only() {
             "Data.Collections.Derived.length",
             "Data.Collections.Derived.nth",
             "Data.Numeric.Nat.Arithmetic.add",
+            "Core.Classes.LawfulClasses.IsTrue",
+            "Core.Classes.LawfulClasses.leq_nat",
             "Data.Numeric.Nat.Order.sub",
+            "Core.Logic.Transport.cong",
+            "Core.Logic.Transport.sym",
+            "Core.Logic.Transport.trans",
         ],
     );
     assert_private(PARSING_CURSOR, "MkArgCursor");
