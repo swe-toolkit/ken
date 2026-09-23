@@ -57,10 +57,13 @@ The ring fixes the exact statements.
   or second decoder. Shipped declarations are unchanged apart from added
   proofs and exports.
 - **AC-2.** Decoder imports nothing from a higher tier (`Parsing`, `Source`).
-  A consumer-view check instantiates the laws with Parsing's actual
-  `ByteCursorBounded s start` and `ValidSpan s` and elaborates. The
-  instantiation lives in a test, not in `Parsing.ken.md`, which
-  `CAT-PARSING-LAWS` owns.
+  A consumer-view check instantiates the laws with Parsing's landed public
+  `ByteCursor` / `byte_cursor_ops` and `ValidSpan`, a test-local
+  good-cursor predicate, and a checked `cursor_locate` premise, and it
+  elaborates. `ByteCursorBounded` exists only on the held Parsing
+  candidate, so wiring it in belongs to `CAT-PARSING-LAWS` after this node
+  lands (Steward `evt_2wrezd0sxmba8` answer). The check lives in a test,
+  not in `Parsing.ken.md`.
 - **AC-3 (falsifier).** Name one one-line change to `decoder_alt` that
   breaks the `alt` law, for example falling back on `DecoderZeroProgress`.
   No law may be vacuous.
