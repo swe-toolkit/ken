@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-23 13:35:54Z — from 717 issue file(s) in `docs/program/issues/`.
+2026-09-23 13:42:15Z — from 718 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -55,6 +55,7 @@ the committed file matches the generator's output.
 | `ABI-S6` | ordinary anonymous and file-backed mappings as opaque runtime-owned regions and bounded byte views | active | runtime | L | none | — |
 | `BUDGET-EFF` | TransferCount.remaining must be bounded by the effective request | merged | verify | M | none | — |
 | `BUDGET-EXHAUST` | transfer-budget bound checks are fail-open on variant extension | merged | verify | S | none | — |
+| `BYTES-CONCAT-AND-ENCODE-CONTRACTS` | state the byte-list view of bytes_concat as a registered contract beside the two existing Bytes/List UInt8 round trips, settle where Ken's UTF-8 encoding properties come from (a Rust primitive with stated contracts, or Ken source with proofs), supply the narrowest encoding fact the Boolean printer needs on that basis, and finish CAT-PARSING-LAWS' printer round trip with them | ready | foundation | M | architect | — |
 | `CAT-ARGPARSE-LAWS` | Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust | ready | foundation | L | none | — |
 | `CAT-BOOL-PUB-EXPORT` | Mark the three census group-6 boolean providers loader-visible (pub): bool_and and bool_leq in Core.Classes.LawfulClasses, is_some in Data.Sums.Combinators. The provider prerequisite for census group 6 (Boolean computational reuse), shaped on the twice-landed CAT-ORDER-PUB-EXPORT / CAT-DERIVED-PUB-EXPORT pattern. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3108 |
 | `CAT-BOOL-REUSE-CONSUMERS` | Drain catalog-reuse census group 6 (Boolean computational reuse) — replace three reimplementations (Derived#bool_and, Derived#bool_leq, Map#option_is_some) with selective imports of the now-public LC.bool_and, LC.bool_leq and SC.is_some. The consumer half of CAT-BOOL-PUB-EXPORT, shaped on the landed CAT-DERIVED-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3136 |
@@ -800,6 +801,7 @@ is itself not yet `merged`/`closed`:
 
 - `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
+- `BYTES-CONCAT-AND-ENCODE-CONTRACTS` blocked by `CAT-PARSING-LAWS` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
@@ -819,7 +821,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `KERNEL-NORMALIZE-ORIGIN-TRACE` (ready) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft)
+- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (ready) `KERNEL-NORMALIZE-ORIGIN-TRACE` (ready) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft)
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
