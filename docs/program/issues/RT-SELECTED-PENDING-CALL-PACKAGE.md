@@ -1,7 +1,7 @@
 ---
 id: RT-SELECTED-PENDING-CALL-PACKAGE
-title: "design, before any code, a typed activation-owned selected pending-call package carried beside the pending ITree word from the executed source arm through the six transport families to a one-event consuming call gate, with a runtime call-event authority, so the four px7l/px7m rows have a legitimate package to check; bounded D0 measurement first, STOP and park if owner, identity or transport cannot be specified"
-status: ready
+title: "design, before any code, a typed activation-owned selected pending-call package carried beside the pending ITree word from the executed source arm through the six transport families to a one-event consuming call gate, with a runtime call-event authority, so the four px7l/px7m rows have a legitimate package to check; bounded D0 census of the present substrate first, then a D1 pre-code specification; STOP and park only if D1 cannot specify owner, extent, identity or a complete route"
+status: active
 owner: runtime
 size: L
 gate: architect
@@ -29,27 +29,41 @@ origin: "Operator 2026-09-23 ~15:00Z: 'concur with rec on L1 carrier', authorizi
 
 ## Deliverables
 
-- **D0, bounded measurement.** One positive executed requested arm with its
-  exact S/C runs, carried to one selected call. Paired sibling, duplicate
-  and missing mutations must each be refused. Scratch instrumentation only.
-- **D1, design to the Architect.** Specify the package:
+- **D0, bounded census of the present substrate** (Architect
+  `evt_4chkm2xxyfang`; the first D0 demanded a package that does not yet
+  exist). Scratch instrumentation only. Identify the executed arm versus the
+  sibling, the producer, `L1` and word-only loss points, the available
+  operands and their owners, and the first refusal. Report the positive
+  package and its mutations as **not yet runnable**, not as green or red.
+  The baseline is `evt_30dybw9824mt`: the only frame is sibling 343's, and
+  body 322's S/C values are never materialized.
+- **D1, pre-code specification to the Architect.** Specify the package:
   - **Placement.** It travels beside the pending `ITree` word. Not inside
     `CarriedBoundaryWord` and not in the frozen `LoweringOperand` sum.
-  - **Contents.** Each requested alternative's own ordered worker and
-    continuation runs, built only on the executed arm. Name each member's
-    representation, owner and extent.
+  - **Contents.** The executed-arm construction site for body 322's
+    **own** ordered S/C values; relabeling 343's frame does not count. Name
+    each member's owner, representation, extent, same-activation lifetime
+    and backing. Owning the package does not establish who owns each
+    borrowed span.
   - **Transport.** Its route through all six families, ending at a
     one-event consuming gate that re-declares and authenticates the target.
-  - **Call-event authority.** A runtime call-event identity with duplicate
-    and expired refusal.
+  - **Call-event authority.** A runtime-minted call-event identity tied to
+    the exact selected body and activation, consumed exactly once, with
+    duplicate, expired and wrong-arm refusal.
+  - **Effects.** Nothing takes effect before selection, and there is
+    exactly one call.
+  - **Later proof.** Say how the implementation will produce a positive
+    selected-arm witness and independently turn the sibling, duplicate and
+    missing mutations red at the real call gate.
   - **Lifetime.** A proof that it cannot outlive its borrowed bytes or carry
     foreign SSA handles.
   - **Allocation.** Say whether it needs a metered allocation.
 
 ## Acceptance criteria
 
-- **AC-1.** The D0 result is posted in the WP thread: the positive run and
-  the three mutation reds, or the STOP.
+- **AC-1.** The D0 census is posted in the WP thread. The positive witness
+  and the mutation reds are obligations of the later implementation frame.
+  This node does not claim them.
 - **AC-2.** The D1 design keeps `L1`/`L2`/`L3`, one-unit `L2` and
   `gather_cannot_serve`. It does not force `Vis` or move the context call.
 - **AC-3.** No production code lands from this node. A later build node is
@@ -57,8 +71,9 @@ origin: "Operator 2026-09-23 ~15:00Z: 'concur with rec on L1 carrier', authorizi
 
 ## Stop conditions
 
-- If D0 cannot specify the owner, identity or transport, STOP. The Steward
-  parks the attempt.
+- If D1 cannot specify a representable owner, extent, identity and
+  complete route, that is the §5 STOP. The Steward parks the attempt. A
+  record name with no production site or transport is not D1.
 - If the design needs a metered allocation or a bounded counter, the typed
   profile-attributed resource-fault path is a separate operator fork. STOP
   before designing it here, and do not amend `TerminalErrorV1`.

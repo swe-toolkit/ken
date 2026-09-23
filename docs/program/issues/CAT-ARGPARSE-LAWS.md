@@ -1,7 +1,7 @@
 ---
 id: CAT-ARGPARSE-LAWS
 title: "Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust"
-status: ready
+status: active
 owner: foundation
 size: L
 gate: none
@@ -36,7 +36,14 @@ origin: "Proof-backfill follow-on CAT-ARGPARSE-LAWS named by docs/program/CATALO
   nonzero locations; invalid-UTF-8 value bytes surviving; adding one option
   changing help with no second edit.
 - `CAT-SCHEMA-LAWS`, `CAT-PARSING-CURSOR-LAWS` and `CAT-PARSING-DECODER-LAWS`
-  are merged. Use their laws; do not re-prove them here.
+  are merged. Use their laws; do not re-prove them here. The new provider
+  laws below are additions, not re-proofs.
+- **Law 2 needs provider laws that are not exported** (`evt_6s7xaffe0nz4`).
+  `Data/Collections/NonEmpty.ken.md` has no public list-view append or map
+  projection law, and `Application/Input/Schema.ken.md` has no ordered
+  invalid-issue-sequence law. Add them in those packages as public proofs
+  under the same AC-1 rule, with their consumer-view harnesses. Keep the
+  `NonEmpty` constructor private.
 
 ## Deliverable
 
@@ -61,13 +68,24 @@ input and must fail if the implementation changes the behavior it names.
 - **AC-1.** No new trust: the added lines contain no `Axiom`, postulate,
   primitive, `Omega` carrier, or kernel/TCB change. The production
   representation and shipped declarations are unchanged apart from added
-  proofs and exports.
+  proofs and exports, with one exception (Steward, 2026-09-23, after the
+  measured stop `evt_6s7xaffe0nz4`). The implementer first makes a bounded, checked
+  exact-goal J-transport attempt against the actual unfolded parser match,
+  and the Architect reviews it. If that attempt stays stuck, one shared
+  private step may be factored out, used by both the production parser and
+  the proof, preserving every old arm and the callback, index and effect
+  semantics. Exported types are unchanged and `cc7_*` stays green. AC-2
+  keeps a natural-site mutation for each law, including after factoring.
+  The Architect confirms meaning on the actual candidate.
 - **AC-2 (falsifier).** For each deliverable, the handback names one
-  one-line mutation of `argparse_parse_tokens` or `command_schema` that makes
-  its proof fail to check. For example, `Suc index` instead of
-  `Suc (Suc index)` after a value option must break law 2. No law may be
-  vacuous: its hypotheses must be satisfiable, and removing any one must
-  make it false.
+  one-line natural-site mutation that makes that law's proof fail to check
+  for its own property. For laws 1 and 2 the site is
+  `argparse_parse_tokens`, or the single shared production step it calls if
+  AC-1's factorization is used. For law 3 it is `command_schema` or
+  `command_help`. For example, `Suc index` instead of `Suc (Suc index)` after
+  a value option, at whichever site owns that branch, must break law 2. No
+  law may be vacuous: its hypotheses must be satisfiable, and removing any
+  one must make it false.
 - **AC-3.** Under `crates/`, only consumer-view harnesses change, such as
   `src/r_layer_tests/cat_tier_e_argparse_import.rs`. Use Cursor's `AC-3c`
   rule: bring a MIRRORING assertion into agreement; for a DIRECTIONAL one
