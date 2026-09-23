@@ -295,7 +295,34 @@ fn lawful_functors_surface() -> ElabEnv {
     env
 }
 
+fn decoder_surface() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("Decoder dependency environment");
+    for provider in [
+        "Application.Input.Schema",
+        "Capability.Diagnostics.Core",
+        "Capability.Formatting.Doc",
+        "Capability.Process.Environment",
+        "Core.Classes.LawfulClasses",
+        "Data.Collections.NonEmpty",
+        "Data.Sums.Validation",
+    ] {
+        env.elaborate_module_from_roots(&[catalog_packages_dir()], provider)
+            .unwrap_or_else(|error| panic!("Decoder provider {provider} must load: {error:?}"));
+    }
+    env.elaborate_module_from_roots(
+        &[catalog_packages_dir()],
+        "Application.Configuration.Decoder",
+    )
+    .expect("Decoder must load through its known dependency environment");
+    env
+}
+
 const ENUMERATED_CARRIER_ENVIRONMENTS: &[EnumeratedCarrierEnvironment] = &[
+    EnumeratedCarrierEnvironment {
+        roots: &["Application/Configuration/Decoder.ken.md"],
+        load: decoder_surface,
+        loaded_witnesses: &["Application.Configuration.Decoder.decode_config_entries"],
+    },
     EnumeratedCarrierEnvironment {
         roots: &[
             "Capability/System/Buffer.ken.md",
