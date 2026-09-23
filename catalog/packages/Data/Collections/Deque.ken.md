@@ -123,6 +123,39 @@ data PopPreserves (a : Type) (x : a) (q : Deque a) : Option (Pair a (Deque a)) �
     → PopPreserves a x q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x q2))
 }
 
+data PopFrontListView (a : Type) (q : Deque a) : Option (Pair a (Deque a)) → Type where {
+  MkPopFrontNone :
+    Equal (List a) (toList a q) (Nil a)
+    → PopFrontListView a q (None (Pair a (Deque a)));
+  MkPopFrontSome :
+    (x : a)
+    → (rest : Deque a)
+    → Equal (List a) (toList a q) (Cons a x (toList a rest))
+    → PopFrontListView a q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x rest))
+}
+
+fn popFront_list_view
+      (a : Type) (q : Deque a)
+    : PopFrontListView a q (popFront a q) =
+  match q {
+    MkDeque front back ↦
+      match front {
+        Nil ↦
+          match reverse a back {
+            Nil ↦ MkPopFrontNone a (MkDeque a (Nil a) back) Refl;
+            Cons x rest ↦
+              MkPopFrontSome
+                a
+                (MkDeque a (Nil a) back)
+                x
+                (MkDeque a rest (Nil a))
+                Refl
+          };
+        Cons x rest ↦
+          MkPopFrontSome a (MkDeque a (Cons a x rest) back) x (MkDeque a rest back) Refl
+      }
+  }
+
 fn popFront_pushFront
       (a : Type) (x : a) (q : Deque a)
     : PopPreserves a x q (popFront a (pushFront a x q)) =
