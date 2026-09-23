@@ -1,239 +1,156 @@
-# Model tiers
+# Models
 
-Ken runs a tiered fleet (currently T1+T2) to concentrate the most expensive
-seat on the
-highest-judgment and clean-room-critical work, using a capable
-high-throughput model for high-volume code generation and coordination. Every
-agent runs an **Anthropic model directly** on the subscription (OAuth); there is
-no open-weight tier and no provider proxy.
+What is available, what each is suited to, and how to choose.
 
-**Tier vocabulary (canonical — use this, not model names).** Refer to seats by
-**tier** everywhere — playbooks, WP frames, the tracker, convo — never by a model
-name or a model characteristic (e.g. "N-months behind"). The tier↔model mapping
-lives **only in the table below**, so it stays accurate as models change and no
-downstream doc goes stale:
+**Seat assignments live in `moot.toml` and nowhere else.** This file never
+records which seat runs which model, what tier a named seat is, or what a lane
+is currently seated on. To learn what a seat runs, read its pane or its
+`[agents.<role>]` block. To change one, use
+`playbooks/federation/steward/add-agent.md`, which owns the per-harness key
+sets and the reseat procedure.
 
-- **T1** — highest-judgment class (Opus-class). The clean-room enclave.
-- **T2** — high-throughput build/coordination class (Sonnet-class).
-- **T3** — lightweight class (Haiku-class). Not currently seated (Ken runs T1+T2).
+## Classify the work, not the seat
 
-A new T1/T2/T3 family (e.g. GPT 5.6 → **Sol** / **Terra** / **Luna**) is expected;
-when a family swaps in, **only this table changes** — every tier reference
-downstream is already correct.
+`T1`/`T2`/`T3` name a class of WORK. A frame records the tier its work
+requires; whether a seat can meet that is a separate, seating question.
 
-> **The GPT 5.6 names are ordered by MASS, not by mnemonic (operator,
-> 2026-07-14):** **Sol** (star) > **Terra** (planet) > **Luna** (moon) ⇒
-> **Sol = T1, Terra = T2, Luna = T3.** This doc previously had Luna and Terra
-> **transposed**. If you are ever unsure, re-derive it from the mass ordering —
-> do not trust a downstream doc's spelling.
+- **T1** — highest judgment. Clean-room design, spec elaboration, soundness
+  rulings, abstraction-boundary pinning, genuinely hard implementation.
+- **T2** — high-volume build and coordination. Code generation, mechanical
+  gates, verification runs, review passes, doc observation.
+- **T3** — lightweight. Deterministic reflow, canonicalization, fully specified
+  renames, run-and-report.
 
-| Tier | Model (current mapping) | Roles | Why |
-|---|---|---|---|
-| **T1** (enclave) | **Opus-class** (1M, high effort, extended thinking) | Spec-author, Conformance-validator, **Steward**, **Architect**; **Research** and **Adversary** aux seats (the Adversary dispatches T2/T3 fan-out for breadth) | Highest judgment; the clean-room enclave; design + workflow authority; hard flaw-reasoning. These calls are worth the most. |
-| **T2** (build & coordination) | **Sonnet-class** | Build-team Leaders, Implementers, QA; Spec-team Leader; Librarian | High-volume code generation, coordination, mechanical gates, verification runs, doc observation. |
-| **T3** | **Haiku-class** | (none currently) | Lightweight tier; held in reserve. |
+**Refer to work by tier, never by a model name or a model characteristic.** The
+tier survives a model swap; the name does not.
 
-> ### The Roles column is a DEFAULT, not the landed seating (operator, 2026-07-21)
->
-> **Seating is chosen per team, on task difficulty — not derived from the role.**
-> The table above is the starting assumption; individual teams deviate from it
-> deliberately, and those deviations are sanctioned, not drift.
->
-> **Runtime is the standing exception, and it is INVERTED vs the table:**
-> **`runtime-implementer` is T1**, **`runtime-leader` is T2**. The *implementation*
-> is the hard part on that team, not the coordination. Operator: *"Runtime has
-> been sol [high], also a T1 seat, and we've had single WP sessions that took 16
-> hours to complete. Runtime is dealing with genuinely hard coding tasks. Opus is
-> warranted."*
->
-> **⇒ NEVER infer a seat's tier from its role.** A seat's tier is an
-> **observation**: `tmux capture-pane` the seat, read the model line, and map it
-> through the mass ordering above (Sol/Terra/Luna = T1/T2/T3). Before proposing
-> any seating change — **especially a cost-saving downgrade** — confirm what the
-> seat is actually running. *This paragraph exists because the Steward read the
-> Roles column, inferred `runtime-implementer` was T2, and reported a "tier drift
-> to revert" for a seat that was already T1; acting on it would have downgraded a
-> correctly-seated T1 role in the middle of 16-hour work.*
->
-> **Corollary for watchdogs:** a Runtime WP legitimately running for **hours** is
-> not a stall. Tuning stall thresholds to tens of minutes on that ring produces
-> false positives, and a watchdog that cries stall trains its readers to ignore
-> it (COORDINATION §13; `reason-in-agent-team-hours-not-human-days`).
+**A SEAT'S TIER IS AN OBSERVATION, NOT AN INFERENCE.** Never derive it from a
+role name, from this file, or from what a seat ran last week. `tmux
+capture-pane` the seat and read its model line. This matters most in the
+direction that costs least to get wrong on paper: **before proposing a
+downgrade, confirm what the seat is actually running.**
 
-> ### Runtime's T1 exception is SUSPENDED for refactoring
->
-> **Operator, 2026-08-10. WIDENED 2026-08-18 — read the widening below.**
->
-> Operator, 2026-08-10, verbatim: *"for the refactoring work, this is much more
-> mechanical than the initial implementation and discovery. We can switch to T2
-> model, either gpt-5.6-terra (medium reasoning effort) or sonnet 5 in the
-> implementation seat performing the work."*
->
-> ⇒ **`runtime-implementer` runs T2 for refactoring and instrument work.** The
-> T1 exception above is grounded in *"genuinely hard coding tasks"*, and a
-> byte-for-behaviour move against a census ledger is not one.
->
-> **THE 2026-08-18 WIDENING, and why the old boundary is gone.** This block used
-> to read *"it covers **#8 only**"* and to name `RT-LEXICAL-RECURSOR-CONSUMERS`,
-> `RT-RECURSOR-TRANSPORT`, `RT-FNUNIT-RESULT-TOKEN` and `RT-DESCENT-RETIRE` as
-> staying T1. **All four are now `merged`, so that boundary named an empty set.**
-> The operator confirmed on 2026-08-18 that the whole ring's move to T2 was
-> deliberate, on the ground that *"this is a refactoring task, much simpler than
-> implementing the compiler."*
->
-> **The line is the WORK, not the node id.** T2 for refactoring, mechanical
-> moves, census and ledger work, and evidence-instrument repair. **T1 returns for
-> genuinely hard compiler implementation** — the semantic arc deferred after #8
-> closure (canonical terms, transition results, commands, law extraction) is
-> design work and comes back to T1. If you cannot tell which side a deliverable
-> falls on, it is the operator's call, not an inference from the node's prefix.
->
-> **Observed 2026-08-18:** all three runtime seats read `gpt-5.6-terra medium`.
-> That matches this block as now written. It did **not** match the block as
-> previously written, which is what produced the escalation that corrected it.
->
-> **Which of the two T2 options.** The seats are on Terra. The earlier default
-> was Sonnet 5 on the grounds that the #8 slices carry heavy ledger and
-> mutation-restoration criteria and that Codex stranding shapes cost the ring
-> turns; **that argument was not overruled, it was outweighed** by Anthropic-pool
-> capacity — the pools are independent, so T2 build on the GPT backend buys
-> sustained T1 enclave work at the same time.
->
-> **Confirm by observation before flipping, per the paragraph above.** A seating
-> change proposed from the Roles column rather than from the pane is the exact
-> error that paragraph records — and note this block has now been wrong in both
-> directions, so read the pane and do not trust this file alone.
+If you cannot tell which tier a deliverable needs, that is the operator's call,
+not an inference from the node's prefix. The line is the WORK, not the node id:
+refactoring, mechanical moves, census and ledger work and instrument repair sit
+lower than the implementation they serve.
 
-The operator is the human product owner; Steward is the primary proxy into the
-federation.
+## Reading model names
 
-### Credit-window failover — GPT/Codex ≈ T2 (operator, 2026-07-04)
+Within one vendor family the names are ordered by MASS:
 
-The Anthropic subscription credits are finite and the fleet **fails over to a
-ChatGPT/Codex backend** when they are exhausted (operator-managed devcontainer
-integration). Capability mapping for that backend (operator-stated):
+```
+Astra  >  Sol  >  Terra  >  Luna
+```
 
-- **GPT 5.5** (current strongest GPT) **≈ Sonnet-class ≈ T2.**
-- **Opus-class (T1) is stronger than any current GPT** — there is **no T1 on the
-  GPT backend** until the GPT 5.6 family (Sol/Terra/Luna = T1/T2/T3 — by mass)
-  ships.
+**The name does not carry across generations, and assuming it does is the
+trap.** A later generation's `sol` can sit at an earlier generation's `terra`
+price point, and a family may ship no `terra` at all. Re-derive the ordering
+inside the family you are actually choosing from; do not map `sol` to `sol`.
 
-**Operating rule while Anthropic/Opus credits remain:** the Opus enclave is the
-**irreplaceable capability** — reserve the remaining credits for **T1-critical
-work** (clean-room design, spec elaboration, soundness rulings, abstraction-
-boundary pinning). **Defer T2 build/execution to the GPT backend** (separate
-credit pool). Soundness gates cast on the GPT backend are **provisional** →
-**Opus agents re-review the GPT work when the Anthropic subscription refreshes.**
-So: elaborate + frame now (T1), build on GPT (T2), re-cert on refresh (T1).
+## Find out what exists before naming one
 
-**Steady state after refresh — the split team (operator, 2026-07-04).** Once the
-Anthropic subscription refreshes, the fleet runs **split across two independent
-credit pools**: **Anthropic supplies ONLY the Opus (T1) enclave**; **everything
-else (build teams, coordination) runs on the ChatGPT/Codex pool (T2).** Because
-the pools are independent, this enables **wider T2 fan-out AND sustained T1 work
-simultaneously** — the Opus pool is never drained by build-team burn, so T1
-throughput is maximized while the GPT pool scales the build fleet as wide as it
-allows. This is the **ideal steady state for the catalog cadence** (T1 enclave
-pins each abstraction boundary → a wide T2 fleet fans out): the topology now
-matches the workflow. Phase 3 also folds in the Opus re-review of the Phase-2
-GPT-only work.
+```sh
+pi update --models   # refresh the catalog FIRST
+```
 
-**The "everything else on GPT" split is itself a default, subject to the
-per-team difficulty rule above.** A build seat whose work is genuinely T1-hard
-may be seated on the Anthropic pool despite being a build role — done for
-`runtime-implementer` on 2026-07-21. Read the seat, not the phase model.
+The catalog is `~/.pi/agent/models-store.json` and it goes stale: a model
+released today is absent until refreshed. **A model string that is not in the
+catalog fails the seat's launch**, so a name taken from a message and written
+straight into `moot.toml` can take down every seat it touches at once. Read the
+catalog for ids, context window and current per-token cost.
 
-**The three phases:** (1) **now** — whole fleet on Anthropic (shared pool);
-reserve it for T1 enclave elaboration/framing, defer T2 builds. (2) **credits
-exhausted → refresh** — whole fleet on GPT (≈T2, no T1); execute the shovel-ready
-build queue; gates provisional. (3) **refreshed** — split team (Opus-only on
-Anthropic ∥ everything-else on GPT); wide fan-out + sustained T1 + Opus re-review
-of Phase-2 work.
+**A generation can carry its own usage allowance, separate from the rest of the
+provider's catalog.** Measured: every seat on one generation refused with
+`usage limit has been reached` while a seat on the previous generation ran
+normally on the same account, same credential and same harness. So a working
+pool does NOT imply a given model will run, and `pi auth check` reporting
+`ready` proves the credential, not the allowance. When every seat on one model
+fails at once and none has done any work, suspect the ALLOWANCE for that model
+before the harness, the config or the seats: the discriminating test is one
+seat on a different model, and it costs a single relaunch.
 
-### Delegating the mechanical tail — a T1-conservation tactic
+## What each is suited to
 
-Operator-originated (2026-07-04). An expensive role (esp. a **T1 enclave**
-seat) may hand the **mechanical tail** of an authoring turn to a **cheaper-tier
-(T2/Sonnet) subagent** — but only under a load-bearing criterion and two hard
-guardrails. The point is to spend fewer **T1** tokens on work a T2 model does
-identically; misapplied, it spends *more*.
+Record what was MEASURED here, not an impression, and say plainly when a family
+is unproven.
 
-- **Criterion — delegate IFF the subagent's verification is a deterministic
-  re-check cheaper than the doing.** Delegate: 80-col reflow, ASCII→Unicode
-  canonicalization, a fully-specified rename across N files,
-  run-tests-and-report — each verified by the checker script / `git diff
-  --word-diff`. Keep on T1: initial spec/seed prose, law statements, fork
-  transcription, silence-resolution, clean-room judgment, **any semantic
-  verification.**
-- **Do NOT delegate:** (a) a grounding read you author *against* (the facts
-  come back as a summary and you re-fetch anyway — negative ROI); (b) a
-  reconcile / "does §X say Y" pass — that reintroduces the exact
-  cite-vs-verify hazard `reconcile-don't-cite` exists to prevent. The
-  delegation prompt is **mechanical-only, "no rewording"** — a subagent that
-  "helpfully" rewords a normative sentence is a fidelity regression in
-  fidelity-critical material.
-- **GUARDRAIL 1 — the subagent MUST run on the cheaper tier (T2/Sonnet).** A
-  `Task`/Agent-tool subagent **inherits the parent session's model by
-  default**, so a subagent spawned from a T1 (Opus) seat is **Opus unless you
-  pass the Agent tool's `model: sonnet` override.** Delegating *without* that
-  override runs the mechanical tail on **T1** — the exact opposite of the
-  tactic (it spends *more* of the scarce pool, not less). **Always spawn the
-  tail on `model: sonnet`.**
-- **GUARDRAIL 2 — right-size it.** The gain is **modest (~10–20% on
-  edit-heavy turns, ~0 on design-heavy turns)** and easily **inverted by
-  overhead**: a small reflow (one chapter) is usually cheaper done **inline**
-  than paying a subagent's spin-up + full-context read. Delegate only when the
-  tail is genuinely large and the delegated cost (even on T2) is below the
-  inline cost. If in doubt, inline.
+- **Opus-class (Anthropic).** T1. Hard compiler implementation, clean-room
+  design and soundness work. Warranted where single work packages run many
+  hours and the difficulty is in the reasoning, not the volume.
+- **Sonnet-class (Anthropic).** T2. Build and coordination volume.
+- **GPT 5.6 family (`openai-codex`, `pi` harness).** Terra carried build rings
+  through refactoring and mechanical work. Codex-shaped stranding has cost
+  rings turns; budget for it on long mechanical runs.
+- **GPT 6 family (`openai-codex`, `pi` harness).** **UNMEASURED.** Seated for
+  evaluation on one lane. Nothing is established about its suitability at any
+  tier yet — do not cite a tier for it until a lane has run on it and the
+  finding is written here.
 
-## Knobs (tune by observed quality, not up front)
+Pools are independent per provider, so splitting tiers across providers buys
+sustained work in both at once; exhausting one does not stall the other.
 
-The tier split is fixed (T1 enclave / T2 everyone else); the tunable
-knob is **effort**, set per role in `moot.toml`.
+## Cost is the second axis, and the spread is large
 
-- **Kernel and Verify QA** are soundness-adjacent — they are the likeliest
-  candidates for a higher effort setting if verification quality lags. Start at
-  the team-default effort; raise it on observed misses, not up front.
-- **Publisher-path work stays mechanical.** The deep correctness and
-  architectural review is the **Architect's** (T1) job on the merge Decision;
-  publisher handling should remain scripted/mechanical, not a high-effort model
-  task.
+Per-token cost across an available catalog can span two orders of magnitude,
+and the cheapest model in a new generation can undercut the mid model of the
+previous one by ~20x. That makes a tier choice a real budget decision rather
+than a rounding error, and it makes an unnecessary T1 seating expensive in a
+way that is invisible until the pool runs out.
 
-## Clean-room × roles (load-bearing)
+Read current numbers from the catalog rather than from memory or from here.
 
-The clean-room boundary is a **role** discipline, not a property of the model in
-the seat (`CLEAN-ROOM.md`; the enclave↔reference-access mapping is incidental —
-any model in an enclave seat reads references under the same discipline, any
-model in a build/coordination seat reads none):
+## Delegating the mechanical tail
 
-- Only the **enclave** (Spec-author, Conformance-validator, Architect) may
-  consult copyleft references. The build and coordination roles see only `/spec`
-  and `/conformance`, which are clean by construction. The AGPLv3 prototype
-  (`yon`) is **not mounted** and is not consulted by anyone — there is zero
-  AGPLv3 contact, which is strictly cleaner than the alternative.
-- **Never send copyleft material to a build or coordination role.** Only the
-  behavioral description in Ken's own words (the spec/conformance artifacts) may
-  pass to the build tier; never copyleft source text itself. Ken's own MIT
-  source is fine to send anywhere.
-- **Copyleft references ( GPL/AGPL/CeCILL — `smtcoq`, `spot`, `jif`) are
-  enclave-only too.** Only the enclave (Architect / Spec) reads them, for
-  *approach and behavior* only, under the leakage recheck (`CLEAN-ROOM.md`); they
-  are never sent to a non-enclave seat and never vendored. Permissive refs (Lean,
-  Z3, Quint, …) may be read by the enclave but, like all refs, are not a source
-  for implementer agents — those build from `/spec`.
+An expensive seat may hand the mechanical tail of a turn to a cheaper-tier
+subagent. Misapplied, it spends MORE.
+
+- **Delegate if and only if the subagent's verification is a deterministic
+  re-check cheaper than the doing.** Yes: 80-column reflow, canonicalization, a
+  fully specified rename across N files, run-tests-and-report. No: seed prose,
+  law statements, fork transcription, clean-room judgment, **any semantic
+  verification**.
+- **Do not delegate a grounding read you author against** — the facts return as
+  a summary and you re-fetch anyway. **Do not delegate a reconcile or a "does
+  §X say Y" pass** — that reintroduces the cite-versus-verify hazard. The
+  delegation prompt is mechanical-only, no rewording; a subagent that helpfully
+  rewords a normative sentence is a fidelity regression.
+- **A subagent inherits the parent's model unless you override it.** Spawning
+  one from a T1 seat without passing a cheaper model runs the tail on T1, which
+  is the exact opposite of the tactic.
+- **Resolving a tier to a dispatchable model.** A subagent's model comes from
+  the Agent tool's own options, NOT from `moot.toml` — seat configuration does
+  not apply to subagents, so there is nothing to look up there. Map by the tier
+  definitions above: **T1 -> the highest-judgment option the tool offers
+  (Opus-class), T2 -> the mid option (Sonnet-class), T3 -> the lightweight one
+  (Haiku-class).** Pass the tier's model explicitly; a skill or playbook that
+  calls for a T2 review resolves it here and names no model of its own.
+- **Right-size it.** The gain is modest on edit-heavy turns and near zero on
+  design-heavy ones, and a small tail is cheaper inline than a subagent's
+  spin-up and context read. In doubt, inline.
+
+## Effort is the tunable knob
+
+Tier is the coarse choice; `effort` is set per role in `moot.toml` and is what
+you tune on observed quality. Raise it on observed misses, not up front.
+Soundness-adjacent verification is the likeliest candidate if quality lags.
+Publisher-path work stays mechanical — the deep correctness review belongs to a
+T1 seat on the merge Decision, not to a higher effort setting on a script.
+
+## Clean-room is a role discipline, not a model property
+
+The boundary belongs to the ROLE, not to the model in the seat
+(`CLEAN-ROOM.md`). Any model in an enclave seat reads references under the same
+discipline; any model in a build or coordination seat reads none. Only the
+enclave may consult copyleft references, for approach and behavior only, under
+the leakage recheck. **Never send copyleft material to a build or coordination
+role** — only Ken's own words in `/spec` and `/conformance` pass to the build
+tier. Ken's own MIT source goes anywhere. The AGPLv3 prototype is not mounted
+and is consulted by nobody.
 
 ## Portability
 
-Playbooks and `COORDINATION.md` are written **model-agnostic** — no reliance on
-any single model's idiosyncratic behaviors — because the same coordination law
-must hold regardless of which model sits in each seat.
-
-**Routing mechanism.** Each agent is a normal Claude Code process launched by
-`moot up`, which reads its `model` + `effort` per role from `moot.toml`
-(`[agents.<role>]`) and passes `--model`/`--effort`. Every role — enclave and
-build/coordination alike — runs **direct on the Anthropic subscription** (OAuth),
-with **no `env` block** and **no proxy**. (A retired `run-llm-proxy.sh` /
-`127.0.0.1:8090` once dispatched a non-Anthropic build tier by model prefix; it
-is vestigial now that the whole fleet is Anthropic-direct — a stray `env` block
-pointing a role at it would break that role's launch.) Operator runbook:
-`local/mootup-agent-backends-setup.md`.
+Playbooks and `COORDINATION.md` are written model-agnostic, with no reliance on
+any single model's idiosyncratic behavior, because the same coordination law
+must hold whichever model sits in a seat. A rule that only works on one model
+is a defect in the rule.
