@@ -16,11 +16,10 @@ These rulings remain operative and are retained verbatim.
 - **2026-08-25:** "there are three lanes authorized right now. language (lane
   2) was unblocking rt on priority, and when that was done should have unblocked
   foundation (lane 3) with module/import."
-- **2026-09-21, FLEET REDUCED TO ONE LANE:** "when L2 and L3 finish their
-  current tasks, stop giving them new work. gracefully reduce the fleet to the
-  single L1 lane." Neither had a task in flight; both stood down at
-  `evt_59a2pvderx1ne`. SUPERSEDES the 2026-08-25 ruling above, retained because
-  it defines what reinstatement restores.
+- **2026-09-23, L3 REINSTATED, L2 STAYS IDLE:** operator asked to bring up
+  the other two lanes if the gpt-6-luna seats were working as expected, then
+  answered the L2 objective fork "Leave L2 idle for now". Roster is L1 + L3.
+  SUPERSEDES the 2026-09-21 one-lane reduction.
 
 ## Catalog proof direction -- SUSPENDED WITH L3, NOT WITHDRAWN
 
@@ -56,22 +55,16 @@ rather than a separate report node, and wording hygiene does not enter a lane.
 
 ## Authorized roster
 
-**ONE lane: L1 Runtime.** L2 and L3 are stood down by the 2026-09-21 ruling.
-No other ring starts without an operator lane change and no seat stands itself
-back up. Finished accepted work still routes immediately.
+**TWO lanes: L1 Runtime and L3 Foundation.** L2 is idle with no objective by
+the 2026-09-23 ruling. No other ring starts without an operator lane change and
+no seat stands itself back up. Finished accepted work still routes immediately.
 
 ## Current state
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-BRACKET-SETTLEMENT-PLANE` -- `ready`, M, T1, child 2 of 3, RELEASED 2026-09-22 on child 1's QA approval. Consume ONLY authenticated ports from child 1; partition marked settlement instances out of the RAW response occurrence/context inventory BEFORE the ordinary demand classifier; key every instance by its exact call/return context; the independent rebuild at plan close must be EXACTLY equal. `bracket_release_only_suffix` is GONE and must not return under any name. A first-match `find_map` on `effect_origin` collapses repeated lowering contexts -- parent edges and the ledger must NEVER be built on a first-match ID. Build on `4b4c8565c543c148039ea06ac798c7c91eda2ce8` | `RT-BRACKET-LOWERING-AND-D0-REFUTER` (child 3, `draft`, L) ASSEMBLES all three and routes the ONLY candidate. Children 1 and 2 are held reviewed inputs, NEVER independently landed | **CHILD 1 ACCEPTED** at `4b4c8565c543c148039ea06ac798c7c91eda2ce8` (`evt_4z54qy2pvmw0f`), 8 commits from `a4d12698a`; hard stop 1, symptom entry 1. Umbrella `RT-BRACKET-CONTROL-REGION-IR` stays `draft` and NOT STARTABLE at hard stop 0; its law still binds and THE REPRESENTATION IS NOT IN QUESTION. Evidence, never candidates: `81f222b7f012829cd9f8d0f3dc684410a9b2b9ee`, `64fd9e6abf63072b3222124b6df4c546b7a1d243`, `9d6a9547f09b7893cbbe1c8c2bcefd6eaefec14c`. Parked predecessor keeps 7/7, next fire at 9 |
-
-**Stood down, and the one thing still live.** `CAT-CONFIGURATION-DECODER-LAWS`
-is routed at exact `3c722a5ffefbc15c5fb7866417f71a13a4250f29` and belongs to
-the lieutenant, not to a lane. If its fresh PR also registers zero workflow
-runs, HOLD it for the operator -- that reading is then wrong and I carry it.
-`CAT-PARSING-CURSOR-LAWS` stays framed and unkicked, and
-`CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` stays `draft` and unreleased.
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-BRACKET-SETTLEMENT-PLANE` -- `active`, M, T1, child 2 of 3, RELEASED 2026-09-22 on child 1's QA approval. Consume ONLY authenticated ports from child 1; partition marked settlement instances out of the RAW response occurrence/context inventory BEFORE the ordinary demand classifier; key every instance by its exact call/return context; the independent rebuild at plan close must be EXACTLY equal. `bracket_release_only_suffix` is GONE and must not return under any name. A first-match `find_map` on `effect_origin` collapses repeated lowering contexts -- parent edges and the ledger must NEVER be built on a first-match ID. Build on `4b4c8565c543c148039ea06ac798c7c91eda2ce8` | `RT-BRACKET-LOWERING-AND-D0-REFUTER` (child 3, `draft`, L) ASSEMBLES all three and routes the ONLY candidate. Children 1 and 2 are held reviewed inputs, NEVER independently landed | **CHILD 1 ACCEPTED** at `4b4c8565c543c148039ea06ac798c7c91eda2ce8` (`evt_4z54qy2pvmw0f`), 8 commits from `a4d12698a`; hard stop 1, symptom entry 1. Umbrella `RT-BRACKET-CONTROL-REGION-IR` stays `draft` and NOT STARTABLE at hard stop 0; its law still binds and THE REPRESENTATION IS NOT IN QUESTION. Evidence, never candidates: `81f222b7f012829cd9f8d0f3dc684410a9b2b9ee`, `64fd9e6abf63072b3222124b6df4c546b7a1d243`, `9d6a9547f09b7893cbbe1c8c2bcefd6eaefec14c`. Parked predecessor keeps 7/7, next fire at 9 |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-CONFIGURATION-DECODER-LAWS` -- `active`, RESPIN onto current `origin/main`. Routed `3c722a5ff` is WITHDRAWN: PR #4149 is `CONFLICTING` because `LANG-R-LAYER-EXPORT-RETRACTION` moved its test to `crates/ken-elaborator/src/r_layer_tests/`, which is also why it registered zero workflow runs. Thread `thr_6z4d2qhb2rdz4` | `CAT-PARSING-CURSOR-LAWS` -- framed `ready`, L, T1. Kick when DECODER lands | foundation ring owes the respin SHA, then QA + Architect Decision on it |
 
 ## Update rule
 
