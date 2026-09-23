@@ -292,27 +292,42 @@ fn schema_loader_visible_inventory_is_exact() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: a strict consumer applies the whole-sequence law to two rejected
-/// fields and cannot prove its expected list contains only one issue. CLAIMED:
-/// the exported proof vocabulary carries all invalid issues in order, not only
-/// the first. THE GAP: this fixture is a witness; the general attached law is
-/// what quantifies over arbitrary fields and inspectors.
+/// MEASURED: a strict consumer applies the whole-sequence law to two fields
+/// rejected with distinct issues, proves their expected order, and rejects both
+/// a reversed same-length list and a singleton. CLAIMED: the exported proof
+/// vocabulary retains every invalid issue in field order. THE GAP: this is a
+/// two-field witness; the attached law quantifies over all fields and inspectors.
 #[test]
 fn schema_issue_sequence_law_has_a_two_rejection_client() {
     let (mut env, _, _) = load_schema();
     env.elaborate_file(
         r#"
 import Application.Input.Schema
-  (SchemaField, MkSchemaField, SchemaOptional, SchemaFlag,
+  (SchemaField, MkSchemaField, SchemaRequired, SchemaOptional, SchemaFlag,
     SchemaFieldCheck, SchemaFieldRejected, SchemaIssue, MkSchemaIssue,
     schema_validate_fields, schema_observed_issue_list, schema_expected_issue_list)
 
-const field : SchemaField = MkSchemaField "one" SchemaOptional SchemaFlag "one"
-const issue : SchemaIssue Nat = MkSchemaIssue Nat Zero "missing"
+const first_field : SchemaField = MkSchemaField "one" SchemaRequired SchemaFlag "one"
+const second_field : SchemaField = MkSchemaField "two" SchemaOptional SchemaFlag "two"
+const first_issue : SchemaIssue Nat = MkSchemaIssue Nat Zero "first"
+const second_issue : SchemaIssue Nat = MkSchemaIssue Nat (Suc Zero) "second"
 const two_fields : List SchemaField =
-  Cons SchemaField field (Cons SchemaField field (Nil SchemaField))
-fn reject_field (ignored : SchemaField) : SchemaFieldCheck Nat Bool =
-  SchemaFieldRejected Nat Bool issue
+  Cons SchemaField first_field (Cons SchemaField second_field (Nil SchemaField))
+fn reject_field (field : SchemaField) : SchemaFieldCheck Nat Bool =
+  match field {
+    MkSchemaField name presence shape documentation ↦
+      match presence {
+        SchemaRequired ↦ SchemaFieldRejected Nat Bool first_issue;
+        SchemaOptional ↦ SchemaFieldRejected Nat Bool second_issue
+      }
+  }
+
+theorem expected_issues_are_in_field_order
+  : Equal (List (SchemaIssue Nat))
+    (schema_expected_issue_list Nat Bool reject_field two_fields)
+    (Cons (SchemaIssue Nat) first_issue
+      (Cons (SchemaIssue Nat) second_issue (Nil (SchemaIssue Nat)))) =
+  Refl
 
 theorem all_issues_retain_order
   : Equal (List (SchemaIssue Nat))
@@ -322,18 +337,31 @@ theorem all_issues_retain_order
   schema_validate_fields::invalid_issue_sequence Nat Bool reject_field two_fields
 "#,
     )
-    .expect("strict consumer must apply ordered issue law to two rejections");
-    let wrong = env.elaborate_file(
-        "theorem one_issue_is_two : Equal (List (SchemaIssue Nat)) \
+    .expect("strict consumer must prove and apply ordered issue law to two distinct rejections");
+    let reversed = env.elaborate_file(
+        "theorem reversed_issues : Equal (List (SchemaIssue Nat)) \
          (schema_expected_issue_list Nat Bool reject_field two_fields) \
-         (Cons (SchemaIssue Nat) issue (Nil (SchemaIssue Nat))) = Refl",
+         (Cons (SchemaIssue Nat) second_issue \
+           (Cons (SchemaIssue Nat) first_issue (Nil (SchemaIssue Nat)))) = Refl",
     );
     assert!(
         matches!(
-            wrong,
+            reversed,
             Err(ElabError::KernelRejected { .. }) | Err(ElabError::TypeMismatch { .. })
         ),
-        "two rejected fields cannot produce a singleton expected list: {wrong:?}"
+        "two distinct rejected issues must not reverse at equal length: {reversed:?}"
+    );
+    let singleton = env.elaborate_file(
+        "theorem one_issue_is_two : Equal (List (SchemaIssue Nat)) \
+         (schema_expected_issue_list Nat Bool reject_field two_fields) \
+         (Cons (SchemaIssue Nat) first_issue (Nil (SchemaIssue Nat))) = Refl",
+    );
+    assert!(
+        matches!(
+            singleton,
+            Err(ElabError::KernelRejected { .. }) | Err(ElabError::TypeMismatch { .. })
+        ),
+        "two rejected fields cannot produce a singleton expected list: {singleton:?}"
     );
 }
 
