@@ -5341,6 +5341,31 @@ mod tests {
     };
     use crate::erasure::erase_checked_core_package_for_target;
 
+    #[test]
+    fn native_literal_metadata_uses_only_live_checked_provenance_after_rollback() {
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_decl("const zz_lit : String = \"zz\"").unwrap();
+        let failed = env.elaborate_decl("fn bad (s : String) : String = bad \"zz\"");
+        assert!(matches!(failed, Err(crate::ElabError::KernelRejected {
+            error: ken_kernel::KernelError::NotTerminating(_), ..
+        })));
+        for name in ["p0", "p1"] {
+            env.elaborate_decl(&format!(
+                "foreign {name} : String = \"sym_{name}\" \"libc.so\" pure"
+            ))
+            .unwrap();
+        }
+        let reused = env.globals["p1"];
+        assert!(env.env.checked_literal(reused).is_none());
+        assert_eq!(literal_native_symbol(&env, reused), None);
+        env.elaborate_decl("const fresh : String = \"az\"").unwrap();
+        let (_, body) = env.env.transparent_body(env.globals["fresh"]).unwrap();
+        let ken_kernel::Term::Const { id: literal, .. } = body else {
+            panic!("fresh String is backed by a checked literal")
+        };
+        assert_eq!(literal_native_symbol(&env, literal).as_deref(), Some("lit_string_az"));
+    }
+
     const GATE_4A_EQUALITY_SOURCE: &str = r#"program capabilities FS APartial
 fn walk (fuel : Nat) (state : Bool) : HostIO APartial ExitCode =
   match fuel {

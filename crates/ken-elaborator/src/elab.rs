@@ -13625,6 +13625,17 @@ fn elaborate_v0(
 /// `requires` clauses (so the full type ≠ the carrier Pi-chain) is a tracked
 /// follow-on; L3a's recursive views (`map`/`filter`/`fold`/`zip`/`unfoldUpTo`/
 /// `sort`/`insert`) carry none.
+// A rolled-back declaration releases its id in the kernel and in the
+// elaborator's literal side table as one lifetime transition.
+fn rollback_literal_decl(
+    env: &mut GlobalEnv,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+) -> Option<Decl> {
+    let decl = env.remove_last()?;
+    num_values.remove(&decl.id());
+    Some(decl)
+}
+
 fn elaborate_recursive_view(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
@@ -13661,7 +13672,7 @@ fn elaborate_recursive_view(
         match install_fixity_binding(fixities, fixity_spans, id, &rdecl.name, declared_fixity) {
             Ok(inserted) => inserted,
             Err(error) => {
-                env.remove_last();
+                rollback_literal_decl(env, num_values);
                 globals.remove(&rdecl.name);
                 return Err(error);
             }
@@ -13672,7 +13683,7 @@ fn elaborate_recursive_view(
     let associated = match reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators)) {
         Ok(associated) => associated,
         Err(error) => {
-            env.remove_last();
+            rollback_literal_decl(env, num_values);
             globals.remove(&rdecl.name);
             if fixity_inserted {
                 fixities.remove(&id);
@@ -13692,7 +13703,7 @@ fn elaborate_recursive_view(
     let (body_core, body_obligations) = match body_result {
         Ok(body) => body,
         Err(error) => {
-            while let Some(d) = env.remove_last() {
+            while let Some(d) = rollback_literal_decl(env, num_values) {
                 if d.id() == id {
                     break;
                 }
@@ -13727,7 +13738,7 @@ fn elaborate_recursive_view(
             // Roll back: remove the pre-admitted opaque and any literal
             // postulates body elaboration added after it (remove_last until we
             // hit our opaque), then unbind the name.
-            while let Some(d) = env.remove_last() {
+            while let Some(d) = rollback_literal_decl(env, num_values) {
                 if d.id() == id {
                     break;
                 }
@@ -13804,7 +13815,7 @@ pub(crate) fn elaborate_mutual_group(
 
     if declared_fixities.len() != members.len() {
         for id in ids.iter().rev() {
-            env.remove_last();
+            rollback_literal_decl(env, num_values);
             let _ = id;
         }
         for rdecl in members {
@@ -13825,7 +13836,7 @@ pub(crate) fn elaborate_mutual_group(
                     fixity_spans.remove(inserted);
                 }
                 for id in ids.iter().rev() {
-                    while let Some(decl) = env.remove_last() {
+                    while let Some(decl) = rollback_literal_decl(env, num_values) {
                         if decl.id() == *id {
                             break;
                         }
@@ -13850,7 +13861,7 @@ pub(crate) fn elaborate_mutual_group(
                 fixity_spans.remove(inserted);
             }
             for id in ids.iter().rev() {
-                while let Some(decl) = env.remove_last() {
+                while let Some(decl) = rollback_literal_decl(env, num_values) {
                     if decl.id() == *id {
                         break;
                     }
@@ -13899,7 +13910,7 @@ pub(crate) fn elaborate_mutual_group(
     })();
     if let Err(e) = proof_validation {
         for id in ids.iter().rev() {
-            while let Some(decl) = env.remove_last() {
+            while let Some(decl) = rollback_literal_decl(env, num_values) {
                 if decl.id() == *id {
                     break;
                 }
@@ -13938,7 +13949,7 @@ pub(crate) fn elaborate_mutual_group(
     // trace, same discipline as the singleton path's rollback.
     if let Err(e) = elab_err {
         for id in ids.iter().rev() {
-            while let Some(d) = env.remove_last() {
+            while let Some(d) = rollback_literal_decl(env, num_values) {
                 if d.id() == *id {
                     break;
                 }
@@ -13993,7 +14004,7 @@ pub(crate) fn elaborate_mutual_group(
             // rejected group leaves zero trace, exactly like the singleton
             // rollback, just for every member instead of one.
             for id in ids.iter().rev() {
-                while let Some(d) = env.remove_last() {
+                while let Some(d) = rollback_literal_decl(env, num_values) {
                     if d.id() == *id {
                         break;
                     }
@@ -14312,7 +14323,7 @@ fn elaborate_view_with_spec(
             Err(e) => {
                 // Roll back the pre-admission + any obligation holes / literal
                 // postulates added after it (ensures holes from Phase 3, etc.).
-                while let Some(d) = env.remove_last() {
+                while let Some(d) = rollback_literal_decl(env, num_values) {
                     if d.id() == pre_id {
                         break;
                     }
