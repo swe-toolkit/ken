@@ -61,6 +61,12 @@ pub struct ModuleState {
     /// `module` declaration. Loaded file units have no such edge even when
     /// their dotted path shares a prefix with another loaded unit.
     inline_children: HashMap<String, HashSet<String>>,
+    /// Completed file unit → its own expanded inline declaration paths.
+    /// A global parent→child edge alone cannot prove which unit declared it.
+    file_inline_paths: HashMap<String, HashSet<String>>,
+    /// Completed in-memory module → the paths from its declaring source call.
+    /// Kept separate from file identities, even at the same dotted spelling.
+    memory_inline_paths: HashMap<String, HashSet<String>>,
     /// Plural resolver input for this run. N2 accepts exactly one populated
     /// root; retaining the list here makes later roots a data change.
     catalog_roots: Vec<PathBuf>,
@@ -523,6 +529,7 @@ fn lexical_inline_import(
 fn authorize_inline_descendants(
     scope: &mut Scope,
     inline_children: &HashMap<String, HashSet<String>>,
+    owned_paths: &HashSet<String>,
     canonical: &str,
     surface: &str,
 ) {
@@ -530,6 +537,12 @@ fn authorize_inline_descendants(
     while let Some((parent, alias)) = pending.pop() {
         if let Some(children) = inline_children.get(&parent) {
             for child in children {
+                // The shared graph only says an edge was declared somewhere.
+                // Every traversed edge must belong to this particular owner
+                // unit, not just have the same canonical spelling.
+                if !owned_paths.contains(child) {
+                    continue;
+                }
                 let leaf = child
                     .strip_prefix(&parent)
                     .and_then(|rest| rest.strip_prefix('.'))
@@ -546,6 +559,8 @@ fn apply_import(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
     inline_children: &HashMap<String, HashSet<String>>,
+    file_inline_paths: &HashMap<String, HashSet<String>>,
+    memory_inline_paths: &HashMap<String, HashSet<String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
     owner: &str,
@@ -556,7 +571,8 @@ fn apply_import(
     kind: &ImportKind,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let canonical = match lexical_inline_import(
+    let own_paths;
+    let (canonical, authorized_paths) = match lexical_inline_import(
         owner,
         file_root,
         unit_inline_modules,
@@ -564,14 +580,31 @@ fn apply_import(
         module,
         inline_children,
     ) {
-        InlineImport::Available(path) => path,
+        InlineImport::Available(path) => {
+            own_paths = unit_inline_modules
+                .intersection(ordered_inline_modules)
+                .cloned()
+                .collect::<HashSet<_>>();
+            (path, Some(&own_paths))
+        }
         InlineImport::Unavailable => {
             return Err(ElabError::UnboundName {
                 name: module.to_string(),
                 span: span.clone(),
             });
         }
-        InlineImport::Absolute => module.to_string(),
+        InlineImport::Absolute => {
+            // A file-unit import selects its catalog file's own provenance;
+            // an in-memory import may instead name a prior in-memory module.
+            let paths = if file_root.is_some() {
+                file_inline_paths.get(module)
+            } else {
+                file_inline_paths
+                    .get(module)
+                    .or_else(|| memory_inline_paths.get(module))
+            };
+            (module.to_string(), paths)
+        }
     };
     let pubmap = exports
         .get(&canonical)
@@ -589,7 +622,9 @@ fn apply_import(
             scope
                 .prefixes
                 .insert(surface.to_string(), canonical.clone());
-            authorize_inline_descendants(scope, inline_children, &canonical, surface);
+            if let Some(paths) = authorized_paths {
+                authorize_inline_descendants(scope, inline_children, paths, &canonical, surface);
+            }
         }
         ImportKind::Selective(names) => {
             for item in names {
@@ -1103,6 +1138,15 @@ fn load_unit(
         )?;
         let ids: Vec<ken_kernel::GlobalId> =
             results.into_iter().map(|result| result.def_id).collect();
+        // A file's descendants are those it declared AND expanded, not
+        // similarly spelled edges retained from another source unit.
+        elab.module_state.file_inline_paths.insert(
+            module.to_string(),
+            local_modules
+                .intersection(&ordered_inline_modules)
+                .cloned()
+                .collect(),
+        );
         elab.module_state
             .exports
             .insert(module.to_string(), exports);
@@ -2480,6 +2524,8 @@ fn prebind_scope_declarations(
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
     inline_children: &HashMap<String, HashSet<String>>,
+    file_inline_paths: &HashMap<String, HashSet<String>>,
+    memory_inline_paths: &HashMap<String, HashSet<String>>,
     exports_here: &mut HashMap<String, String>,
 ) -> Result<(), ElabError> {
     // Collision population follows declaration namespace effects, not the
@@ -2542,6 +2588,8 @@ fn prebind_scope_declarations(
         globals,
         prelude_binding_names,
         inline_children,
+        file_inline_paths,
+        memory_inline_paths,
         exports_here,
     )
 }
@@ -2557,6 +2605,8 @@ fn prebind_synthesized_dictionaries(
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
     inline_children: &HashMap<String, HashSet<String>>,
+    file_inline_paths: &HashMap<String, HashSet<String>>,
+    memory_inline_paths: &HashMap<String, HashSet<String>>,
     exports_here: &mut HashMap<String, String>,
 ) -> Result<(), ElabError> {
     // Instance and derive declarations reference a class, but also produce one
@@ -2584,6 +2634,8 @@ fn prebind_synthesized_dictionaries(
                     &mut synthesis_scope,
                     exports,
                     inline_children,
+                    file_inline_paths,
+                    memory_inline_paths,
                     globals,
                     prelude_binding_names,
                     prefix,
@@ -2896,6 +2948,8 @@ fn expand_scope(
         &elab.globals,
         &elab.module_state.prelude_binding_names,
         &elab.module_state.inline_children,
+        &elab.module_state.file_inline_paths,
+        &elab.module_state.memory_inline_paths,
         &mut exports_here,
     )?;
     let declared_fixities = collect_scope_fixities(elab, decls, scope)?;
@@ -2930,6 +2984,8 @@ fn expand_scope(
                     scope,
                     &elab.module_state.exports,
                     &elab.module_state.inline_children,
+                    &elab.module_state.file_inline_paths,
+                    &elab.module_state.memory_inline_paths,
                     &elab.globals,
                     &elab.module_state.prelude_binding_names,
                     prefix,
@@ -3011,15 +3067,27 @@ fn expand_scope(
                 // Record availability only after this unit has completed the
                 // child's ordered expansion, never from another unit's edge.
                 ordered_inline_modules.insert(child_prefix.clone());
+                // Intersect this source unit's declarations with what its
+                // ordered pass actually expanded. The global edge map can
+                // still contain same-spelling children from another unit.
+                let owned_paths: HashSet<String> = unit_inline_modules
+                    .intersection(ordered_inline_modules)
+                    .cloned()
+                    .collect();
+                if elab.module_state.active_imports.is_empty() {
+                    elab.module_state
+                        .memory_inline_paths
+                        .insert(child_prefix.clone(), owned_paths.clone());
+                }
                 // The defining scope owns its declared child without an
-                // import. Its grandchildren are authorized by the same
-                // declaration edges, never by similarly spelled file paths.
+                // import. Every grandchild needs this unit's own edge.
                 scope
                     .prefixes
                     .insert(child_prefix.clone(), child_prefix.clone());
                 authorize_inline_descendants(
                     scope,
                     &elab.module_state.inline_children,
+                    &owned_paths,
                     &child_prefix,
                     &child_prefix,
                 );
@@ -3039,6 +3107,8 @@ fn expand_scope(
                     &elab.globals,
                     &elab.module_state.prelude_binding_names,
                     &elab.module_state.inline_children,
+                    &elab.module_state.file_inline_paths,
+                    &elab.module_state.memory_inline_paths,
                     &mut exports_here,
                 )?;
                 if is_standard_operator_home {
@@ -4748,6 +4818,180 @@ mod namespace_effect_tests {
                 other => panic!("P must import N to name {reference}: {other:?}"),
             }
             assert!(env.globals.contains_key("A.N.x"));
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: a file A's own N is importable by P, but P cannot name
+    /// N.Q.leak unless this file also declared Q, cold or after an unrelated
+    /// in-memory A.N.Q.leak has been checked. The refusal is at the reference
+    /// and the existing external id cannot become the checked borrowed body.
+    /// CLAIMED: every descendant edge needs this file unit's provenance.
+    /// THE GAP: the paired own-Q positive and file-import-owner negative below
+    /// distinguish a real edge from an ambient same-spelling edge.
+    #[test]
+    fn file_unit_refuses_external_inline_grandchild_cold_and_preloaded() {
+        let root = inline_owner_root(
+            "module N { pub const own : Nat = Zero }\n\
+             module P { import N\n\
+             pub const borrowed : Nat = N.Q.leak }\n",
+        );
+        let source = fs::read_to_string(root.path().join("A.ken")).expect("read fixture source");
+        for preload in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let external = if preload {
+                env.elaborate_file(
+                    "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }",
+                )
+                .expect("unrelated in-memory descendant");
+                Some(env.globals["A.N.Q.leak"])
+            } else {
+                None
+            };
+            let error = env
+                .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+                .expect_err("another unit's grandchild is not this file's declaration");
+            let at = source
+                .find("N.Q.leak")
+                .expect("one attempted grandchild reference");
+            match error {
+                ElabError::UnboundName { name, span } => {
+                    assert_eq!(name, "N.Q.leak", "preload={preload}");
+                    assert_eq!((span.start, span.end), (at, at + "N.Q.leak".len()));
+                }
+                other => panic!("preload={preload}: wrong refusal: {other:?}"),
+            }
+            assert!(env.globals.contains_key("A.N.own"));
+            assert_eq!(env.globals.get("A.N.Q.leak").copied(), external);
+            assert!(!env.globals.contains_key("A.P.borrowed"));
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: when A.ken actually declares N.Q, P's import N authorizes
+    /// N.Q.leak and binds the new file's checked id, not an earlier in-memory
+    /// identity with the same spelling. CLAIMED: the per-edge gate preserves
+    /// transitive authority for genuine same-unit descendants. THE GAP: the
+    /// missing-Q negative above rejects the other provenance at this path.
+    #[test]
+    fn file_unit_own_inline_grandchild_selects_its_checked_identity() {
+        let root = inline_owner_root(
+            "module N { pub const own : Nat = Zero\n\
+             module Q { pub const leak : Nat = Zero } }\n\
+             module P { import N\n\
+             pub const borrowed : Nat = N.Q.leak }\n",
+        );
+        for preload in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let unrelated = if preload {
+                env.elaborate_file(
+                    "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }",
+                )
+                .expect("unrelated in-memory descendant");
+                Some(env.globals["A.N.Q.leak"])
+            } else {
+                None
+            };
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+                .expect("file-owned N.Q must remain accessible through imported N");
+            let own = env.globals["A.N.Q.leak"];
+            if let Some(unrelated) = unrelated {
+                assert_ne!(own, unrelated, "file Q must have a new checked identity");
+            }
+            let (_, borrowed) = env
+                .env
+                .transparent_body(env.globals["A.P.borrowed"])
+                .expect("P's public body is checked");
+            match borrowed {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, own),
+                other => panic!("own grandchild body did not select Q.leak: {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: a separate in-memory import of a completed owner can still
+    /// reach the owner's genuinely declared grandchild under an alias.
+    /// CLAIMED: the provenance net covers the in-memory module boundary too,
+    /// rather than excluding all descendants once the source call returns.
+    /// THE GAP: the file-unit negatives above exclude unrelated provenance.
+    #[test]
+    fn in_memory_import_preserves_its_own_inline_grandchild() {
+        let mut env = ElabEnv::new().expect("base environment");
+        let trust_before = env.env.trusted_base();
+        env.elaborate_file("module A { module N { module Q { pub const x : Nat = Zero } } }")
+            .expect("first in-memory unit declares A.N.Q");
+        let own = env.globals["A.N.Q.x"];
+        env.elaborate_file("import A as K\nconst observed : Nat = K.N.Q.x")
+            .expect("later in-memory import retains A's declared grandchild");
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals["observed"])
+            .expect("imported grandchild has a checked body");
+        match body {
+            ken_kernel::Term::Const { id, .. } => assert_eq!(id, own),
+            other => panic!("owner import lost its exact grandchild: {other:?}"),
+        }
+        assert_eq!(env.env.trusted_base(), trust_before);
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: B imports file A as K and reaches A's real N.own, but not
+    /// the independently checked in-memory A.N.Q.leak, cold or preloaded.
+    /// CLAIMED: imported file owners carry their own inline edge provenance,
+    /// not process-global edges. THE GAP: the own-Q positive above ensures
+    /// imported modules are not simply denied all descendants.
+    #[test]
+    fn imported_file_owner_refuses_an_external_same_spelling_grandchild() {
+        let root = inline_owner_root("module N { pub const own : Nat = Zero }\n");
+        fs::write(
+            root.path().join("Good.ken"),
+            "import A as K\nconst selected : Nat = K.N.own\n",
+        )
+        .expect("write positive imported-owner client");
+        let b_source = "import A as K\nconst denied : Nat = K.N.Q.leak\n";
+        fs::write(root.path().join("B.ken"), b_source)
+            .expect("write negative imported-owner client");
+        for preload in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let external = if preload {
+                env.elaborate_file(
+                    "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }",
+                )
+                .expect("unrelated in-memory descendant");
+                Some(env.globals["A.N.Q.leak"])
+            } else {
+                None
+            };
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Good")
+                .expect("file A's own N is reachable through a separate strict file import");
+            let (_, selected) = env
+                .env
+                .transparent_body(env.globals["Good.selected"])
+                .expect("positive import has a checked body");
+            match selected {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, env.globals["A.N.own"]),
+                other => panic!("file A's child body was not selected: {other:?}"),
+            }
+            let error = env
+                .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+                .expect_err("file A must not re-export an external inline grandchild");
+            let at = b_source
+                .find("K.N.Q.leak")
+                .expect("one denied grandchild reference");
+            match error {
+                ElabError::UnboundName { name, span } => {
+                    assert_eq!(name, "K.N.Q.leak", "preload={preload}");
+                    assert_eq!((span.start, span.end), (at, at + "K.N.Q.leak".len()));
+                }
+                other => panic!("preload={preload}: wrong refusal: {other:?}"),
+            }
+            assert_eq!(env.globals.get("A.N.Q.leak").copied(), external);
+            assert!(!env.globals.contains_key("B.denied"));
         }
     }
 
