@@ -1,7 +1,7 @@
 ---
 id: LANG-IMPORT-LOAD-ORDER-INDEPENDENCE
 title: "A unit's import N must resolve the same way whatever its callers loaded first: a same-unit inline module declared later is UnboundName at the import, an earlier one resolves only through this unit's ordered declaration edge, and a file import follows N.ken even when an unrelated inline N exists"
-status: active
+status: merged
 owner: language
 size: S
 gate: architect
