@@ -257,26 +257,81 @@ bytes_decode : Bytes → Result Utf8Error String
   **only** way to a `String` is this named, fail-visible step; an implicit or
   hidden-charset path is **rejected** (does not exist).
 
+For the primitive implementation, the late
+`Data.Binary.BytesPrimitiveContracts` module names the following four and only
+four new trusted postulates (the first is the concatenation view in `37 §2.6`):
+
+```
+AllAscii s :=
+  AllAsciiCodes (map Char Int charToInt (string_to_list_char s))
+AsciiBytes bs :=
+  AllAsciiCodes (map UInt8 Int uint8_to_int (bytes_to_list bs))
+IsUtf8 bs := match bytes_decode bs {
+  Err _ ↦ Bottom; Ok text ↦ Equal Bytes (bytes_encode text) bs
+}
+
+bytes_concat_list_view : (a b : Bytes) →
+  Equal (List UInt8) (bytes_to_list (bytes_concat a b))
+    (list_append UInt8 (bytes_to_list a) (bytes_to_list b))
+bytes_encode_ascii_octets : (s : String) → AllAscii s →
+  Equal (List Int)
+    (map UInt8 Int uint8_to_int (bytes_to_list (bytes_encode s)))
+    (map Char Int charToInt (string_to_list_char s))
+bytes_decode_encode : (s : String) →
+  Equal (Result Utf8Error String)
+    (bytes_decode (bytes_encode s)) (Ok Utf8Error String s)
+ascii_bytes_utf8 : (bs : Bytes) → AsciiBytes bs → IsUtf8 bs
+```
+
+`AllAsciiCodes` is a finite checked family: 128 ASCII tags cover precisely
+`0..127`, a checked equality indexes each `AsciiCode`, and list witnesses
+recur structurally. The
+`AllAscii` and `AsciiBytes` aliases and the `IsUtf8` predicate are transparent
+checked definitions below Parsing, not additional trusted facts. In
+particular the latter is definitionally the existing Parsing predicate; no
+`Source` contract change or import into Parsing is needed. K3's checked
+literal-character view constructs `AllAscii` for a concrete ASCII literal.
+The F2 equation relates the complete encoding of any witnessed ASCII string
+to its character codes; it is not a six-token table or a per-character law.
+F3 supplies an actual proof term for the decode-after-encode equality, not
+merely a proposition with no inhabitant. F4' states decode/re-encode identity
+for ASCII byte lists only; it does not assert the false reverse round trip for
+arbitrary UTF-8 bytes. For a concatenated printer output, F1 and F2 give its
+ASCII byte list, F3 covers its encoded leaves, and F4' gives the `IsUtf8`
+witness once its structural `AsciiBytes` witness is checked. These are
+implementation contracts of opaque primitives; none reduces in the kernel.
+They load only after the checked `Derived.list_append` provider, rather than
+adding a premature `bytes.rs` registration. The added `trusted_base()` ledger
+is exactly `bytes_concat_list_view`, `bytes_encode_ascii_octets`,
+`bytes_decode_encode`, and `ascii_bytes_utf8`.
+
 ### 1.5 The serialization round-trip law
 
-Over the `bytes_encode`/`bytes_decode` boundary, `BytesRoundTripLaw` is the
-**one-directional** round-trip law, **provable** against `20-verification/`.
-Its byte input is explicitly conditional on having been produced by
-`bytes_encode`:
+Over the `bytes_encode`/`bytes_decode` boundary, the intended
+**one-directional** round-trip law has byte input explicitly conditional on
+having been produced by `bytes_encode`:
 
 ```
-BytesRoundTripLaw :=
-  ∀ (s : String). bytes_decode (bytes_encode s) == Ok s
+∀ (s : String). bytes_decode (bytes_encode s) == Ok s
 ```
+
+The pre-existing `BytesRoundTripLaw : Ω₀` is an opaque oracle-tagged
+proposition, not definitionally the displayed equality and not itself an
+inhabitant of it. F3 (`§1.4`) provides the explicit quantified equality
+witness. It is a trusted property of the primitive implementation, not an
+unassisted Ken-source proof of the decoder algorithm or a proof of the opaque
+`BytesRoundTripLaw` marker. The marker's existing L8 proof target is separate;
+clients requiring this equality consume F3 directly.
 
 - **Why it holds (and the direction matters).** `bytes_encode s` is the UTF-8
   bytes of `s`; `bytes_decode` parses valid UTF-8 (which `bytes_encode` always
   produces) and **re-constructs** a `String`, NFC-normalizing at construction
   (`41 §3a`). Because `s` is **already** NFC and NFC is **idempotent**, the
-  reconstructed string equals `s` — so the law holds. The proof obligation is
-  **dischargeable** (AC5 asserts the obligation is provable — a verified-
-  component target — not merely that one sample round-trips; structural, per
-  the untrusted-layer lesson).
+  reconstructed string equals `s` — so the law holds. F3 gives a checked
+  proof inhabitant for this equation relative to the trusted primitive
+  contract. A successful discharge of the separate opaque
+  `BytesRoundTripLaw` marker using a postulate witness tests only the
+  obligation mechanism, not this semantic proof.
 - **The reverse is NOT a law — pin the silence so it is not over-claimed.**
   There is no unconditional inverse for arbitrary bytes: from
   `bytes_decode b == Ok s`, it does **not** follow in general that
@@ -304,8 +359,8 @@ immutable, `b"…"`/`0x[…]` literals); the **core ops** (`§1.2`, registered
 reductions, `35 §3` partiality); the **effect-tracked I/O surface** (`§1.3`,
 each op `visits` its exact row, untracked = type error via the `36 §1.4` escape
 check); the explicit **`bytes_encode`/`bytes_decode`** boundary (`§1.4`, no
-hidden charset); and the **round-trip law** (`§1.5`, provable,
-one-directional). **No new kernel
+hidden charset); and the **round-trip law** (`§1.5`, one-directional; the
+later F3 primitive contract supplies its equality witness). **No new kernel
 rule** (`§1.1`); **no `foreign`** (that is L7, `§2`–`§3`).
 
 **Acceptance (AC1–AC5).**
@@ -323,9 +378,11 @@ rule** (`§1.1`); **no `foreign`** (that is L7, `§2`–`§3`).
   named `bytes_decode`; an implicit/hidden-charset path is **rejected** (or
   absent), and invalid input produces `Err`.
 - **AC5 — round-trip law.**
-  `bytes_decode (bytes_encode s) == Ok s` is **provable** (the obligation is
-  dischargeable — structural), not merely sampled; the reverse is **not**
-  asserted (`§1.5`).
+  `bytes_decode (bytes_encode s) == Ok s` has the quantified F3 proof
+  inhabitant (`§1.4`), not merely a passing sample. The pre-existing opaque
+  marker's discharge test proves only that an obligation can accept a
+  certificate; it does not prove the decoder from Ken source. The reverse is
+  **not** asserted (`§1.5`).
 
 **Conformance:** `../../conformance/surface/bytes-io/` — AC1–AC5 with per-case
 **verdict/structural flip** and the **cross-case sweep** (the effect-tracking

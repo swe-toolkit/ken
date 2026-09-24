@@ -284,8 +284,26 @@ The propositions are registered postulates. This is a deliberate fixed trust
 cost: primitive operations compute in the interpreter but remain opaque to
 kernel conversion, so `Refl` cannot prove either equation. Registering the two
 guarantees once prevents each consumer from adding its own cached length and
-`Axiom`. The exact `trusted_base()` growth is therefore the two primitive
-operations plus these two propositions, all four named and audited.
+`Axiom`. This structural view adds two primitive operations and two
+postulates, all four named and audited.
+
+The separate `Data.Binary.BytesPrimitiveContracts` module, loaded after
+`Data.Collections.Derived`, registers the further byte facts needed by clients.
+Its concatenation contract is one equation, quantified over arbitrary `Bytes`:
+
+```
+bytes_concat_list_view : (a b : Bytes) →
+  Equal (List UInt8) (bytes_to_list (bytes_concat a b))
+    (list_append UInt8 (bytes_to_list a) (bytes_to_list b))
+```
+
+`bytes_concat` stays opaque to kernel conversion; `Refl` cannot replace its
+view with a list append. This postulate is therefore a new, explicit trust
+item, not a consequence of either round trip above. `list_append` itself is a
+checked structural List function, not another byte primitive or axiom.
+`bytes.rs` continues to register only the two original byte-view postulates;
+the late module registers this equation beside its three ASCII/codec contracts
+(`38 §1.4`).
 
 Every other byte traversal is derived. The initial surface operation is the
 ordinary structural fold
