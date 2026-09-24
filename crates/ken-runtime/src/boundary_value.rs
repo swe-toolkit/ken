@@ -1417,9 +1417,12 @@ fn reserve_region_table<T>(
     resource: crate::boundary_resource_profile::BoundaryResource,
     requested: u128,
 ) -> Result<(), BoundaryReservationFailureV1> {
-    table.try_reserve_exact(length - table.len()).map_err(|_| {
-        region_table_reservation_failure(resource, table.capacity(), requested)
-    })
+    if length > table.len() {
+        table.try_reserve_exact(length - table.len()).map_err(|_| {
+            region_table_reservation_failure(resource, table.capacity(), requested)
+        })?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1446,6 +1449,30 @@ mod reservation_units_tests {
                 requested: 4,
             }
         );
+    }
+
+    #[test]
+    fn region_reservation_can_shrink_before_publication() {
+        let mut region = BoundaryRegion::default();
+        region.reserve(5, 8, 13, 3).expect("larger reservation");
+        assert_eq!(region.nodes.len(), 5 * NODE_WORDS);
+        assert_eq!(region.words.len(), 8);
+        assert_eq!(region.names.len(), 8);
+        assert_eq!(region.data.len(), 13);
+        assert_eq!(region.limbs.len(), 3);
+
+        region.reserve(2, 3, 4, 1).expect("smaller reservation");
+        assert_eq!(region.nodes.len(), 2 * NODE_WORDS);
+        assert_eq!(region.words.len(), 3);
+        assert_eq!(region.names.len(), 3);
+        assert_eq!(region.data.len(), 4);
+        assert_eq!(region.limbs.len(), 1);
+
+        region.publish();
+        assert_eq!(region.header[RegionHeaderField::NodeCapacity as usize], 2);
+        assert_eq!(region.header[RegionHeaderField::WordCapacity as usize], 3);
+        assert_eq!(region.header[RegionHeaderField::DataCapacity as usize], 4);
+        assert_eq!(region.header[RegionHeaderField::LimbCapacity as usize], 1);
     }
 }
 
