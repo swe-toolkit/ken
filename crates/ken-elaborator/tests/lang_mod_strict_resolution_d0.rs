@@ -1059,7 +1059,7 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            // AC-5: charToInt is this package's own provider-less builtin use.
+            // AC-5: Derived closure set plus charToInt, this package's own provider-less builtin use.
             "Data.Binary.BytesPrimitiveContracts".to_string(),
             [
                 "And",
