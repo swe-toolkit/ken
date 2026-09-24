@@ -478,6 +478,7 @@ impl GlobalEnv {
         self.terminal_supports.remove(&decl.id());
         self.support_edges.remove(&decl.id());
         self.all_supports.retain(|_, family| *family != decl.id());
+        self.checked_literals.remove(&decl.id());
         Some(decl)
     }
 
@@ -588,9 +589,19 @@ impl GlobalEnv {
     }
 
     /// Checked literal payload for interpreter/native lowering and conversion.
-    /// No payload exists for any other primitive or unregistered declaration.
+    /// Only a live literal primitive at the exact registered String carrier
+    /// can expose one, even if a stale entry is present in the backing table.
     pub fn checked_literal(&self, id: GlobalId) -> Option<&CheckedStringLiteral> {
-        self.checked_literals.get(&id)
+        let literal = self.checked_literals.get(&id)?;
+        let carrier = self.checked_string_carrier?;
+        match self.lookup(id)? {
+            Decl::Primitive {
+                reduction: PrimReduction::Literal,
+                ty: Term::Const { id: ty, level_args },
+                ..
+            } if *ty == carrier && level_args.is_empty() => Some(literal),
+            _ => None,
+        }
     }
 
     /// The only registered String-to-List-Char operation and its typed
@@ -697,5 +708,76 @@ impl InductiveDecl {
             }
             c.type_ = telescope_to_pi(&self.params, telescope_to_pi(&c.args, head));
         }
+    }
+}
+
+#[cfg(test)]
+mod literal_rollback_tests {
+    use super::*;
+    use crate::check::{declare_checked_string_literal, register_checked_string_carrier};
+    use crate::{declare_def, declare_primitive};
+
+    fn carrier(env: &mut GlobalEnv) -> GlobalId {
+        let id = declare_primitive(
+            env,
+            vec![],
+            Term::ty(Level::Zero),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        register_checked_string_carrier(env, id).unwrap();
+        id
+    }
+
+    #[test]
+    fn popped_literal_is_absent_from_raw_table_before_id_reuse() {
+        let mut env = GlobalEnv::new();
+        carrier(&mut env);
+        let id = declare_checked_string_literal(&mut env, "zz").unwrap();
+        assert_eq!(env.checked_literals.get(&id).unwrap().as_str(), "zz");
+        let popped = env.remove_last().unwrap();
+        assert_eq!(popped.id(), id);
+        assert!(env.checked_literals.get(&id).is_none(), "rollback must purge the raw entry, not merely hide it behind the accessor");
+        assert_eq!(env.next_global_id(), id);
+        let fresh = declare_checked_string_literal(&mut env, "az").unwrap();
+        assert_eq!(fresh, id);
+        assert_eq!(env.checked_literal(fresh).unwrap().as_str(), "az");
+    }
+
+    #[test]
+    fn checked_payload_requires_live_literal_and_exact_string_carrier() {
+        let mut env = GlobalEnv::new();
+        let string = carrier(&mut env);
+        let genuine = declare_checked_string_literal(&mut env, "az").unwrap();
+        assert_eq!(env.checked_literal(genuine).unwrap().as_str(), "az");
+
+        let wrong_kind = declare_def(
+            &mut env,
+            vec![],
+            Term::const_(string, vec![]),
+            Term::const_(genuine, vec![]),
+        )
+        .unwrap();
+        env.checked_literals
+            .insert(wrong_kind, CheckedStringLiteral("stale".into()));
+        assert!(env.checked_literal(wrong_kind).is_none());
+
+        let alias = declare_def(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            Term::const_(string, vec![]),
+        )
+        .unwrap();
+        let wrong_carrier = declare_primitive(
+            &mut env,
+            vec![],
+            Term::const_(alias, vec![]),
+            PrimReduction::Literal,
+        )
+        .unwrap();
+        env.checked_literals
+            .insert(wrong_carrier, CheckedStringLiteral("stale".into()));
+        assert!(env.checked_literal(wrong_carrier).is_none(), "convertible is not the exact String carrier");
     }
 }
