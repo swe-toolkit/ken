@@ -1,7 +1,7 @@
 ---
 id: CAT-ARGPARSE-LAWS
 title: "Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust"
-status: ready
+status: active
 owner: foundation
 size: L
 gate: none
@@ -84,6 +84,28 @@ across occurrences (its AC-4). No parser or elaborator change.
   fallback is withdrawn (2026-09-24). A distinct post-K3 structural blocker
   is a STOP for its own ruling. Exported types are unchanged and `cc7_*`
   stays green. The Architect confirms meaning on the actual candidate.
+- **AC-1a (proof-only adapter; Architect `evt_7fzgaaqe3x855`).** The one
+  permitted auxiliary declaration is a private, transparent, proof-only
+  single-token adapter, parameterized by the outcomes the proof splits on
+  (for example the selected `Option OptionSpec`, and the prefix `Bool` in the
+  `None` branch).
+  - It calls the existing `argparse_parse_tokens` for recursive tails and
+    the existing `argparse_cons_validations` and `argparse_error` for
+    assembly. It never recurses as an independent parser.
+  - It is not public, is not called by `argparse_run` or any production
+    function, adds no trust, and does not replace the parser in any law
+    statement.
+  - The first load-bearing lemma is a checked, arbitrary-input bridge on the
+    **full `Validation`**, from the actual parser's `Cons` step to the
+    adapter at its computed selectors, before any outcome is specialized. A
+    bridge between copied observers, or only at `Option (List Bytes)`, does
+    not count.
+  - The final theorems still name `argparse_parse_tokens`. Positives must
+    take both the ValueOption and the positional branches; an Invalid-only
+    observer does not witness law 1.
+  - AC-2's production-site falsifiers are unchanged. With the adapter
+    untouched, each must redden the bridge or the attached law at its own
+    obligation.
 - **AC-2 (falsifier).** For each deliverable, the handback names one
   one-line natural-site mutation that makes that law's proof fail to check
   for its own property. For laws 1 and 2 the site is
@@ -101,6 +123,13 @@ across occurrences (its AC-4). No parser or elaborator change.
   means green in CI.
 
 ## Stop conditions
+
+- If the generic full-`Validation` bridge does not check with `Refl` or
+  existing transport, STOP. Do not add a second adapter or edit the parser or
+  elaborator. Hard-stop inventory (Architect `evt_7fzgaaqe3x855`): this
+  computed-selector chain is at HS2. The theorem's own match on a neutral
+  nested selector does not refine the parser's eliminator. A third stop
+  triggers Research.
 
 - If a law needs a fact about primitive `Bytes` or `String` that no existing
   TCB contract states, prove everything else and STOP on that fact. Do not
