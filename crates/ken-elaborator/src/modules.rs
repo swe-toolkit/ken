@@ -435,6 +435,23 @@ fn resolve_ref(
     name: &str,
     span: &Span,
 ) -> Result<String, ElabError> {
+    if let Some((subject, proof)) = name.split_once("::") {
+        if !subject.contains('.') {
+            if scope.qualified_ids.contains_key(name)
+                || scope.local_attached_proofs.contains(name)
+            {
+                if let Some(canonical) = scope.bindings.get(subject) {
+                    return Ok(format!("{canonical}::{proof}"));
+                }
+            }
+            if scope.mode == ResolutionMode::Strict && scope.bindings.contains_key(subject) {
+                return Err(ElabError::UnboundName {
+                    name: name.to_string(),
+                    span: span.clone(),
+                });
+            }
+        }
+    }
     if let Some(dot) = name.rfind('.') {
         let (prefix_part, leaf) = (&name[..dot], &name[dot + 1..]);
         if let Some(q) = scope.bindings.get(prefix_part) {
@@ -6253,6 +6270,23 @@ mod namespace_effect_tests {
         assert!(matches!(head.as_ref(), ken_kernel::Term::Const { id, .. } if *id == file_proof));
 
         fs::write(
+            root.path().join("Selective.ken"),
+            "import A (id)\ntheorem selected (x : Nat) : Eq Nat (id x) x = id::same x\n",
+        )
+        .expect("write selective attached-proof client");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Selective")
+            .expect("selective subject retains the checked attached-proof ID");
+        let (_, body) = env.env.transparent_body(env.globals["Selective.selected"])
+            .expect("selective proof client has a checked body");
+        let ken_kernel::Term::Lam(_, body) = body else {
+            panic!("selective proof should bind one argument: {body:?}");
+        };
+        let ken_kernel::Term::App(head, _) = *body else {
+            panic!("selective proof should apply checked helper: {body:?}");
+        };
+        assert!(matches!(head.as_ref(), ken_kernel::Term::Const { id, .. } if *id == file_proof));
+
+        fs::write(
             root.path().join("Bad.ken"),
             "import A as K\ntheorem denied (x : Nat) : Eq Nat (K.id x) x = (proof extra for K.id) x\n",
         )
@@ -6260,6 +6294,15 @@ mod namespace_effect_tests {
         match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Bad") {
             Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "K.id::extra"),
             other => panic!("file import cannot borrow memory-only proof: {other:?}"),
+        }
+        fs::write(
+            root.path().join("BadDirect.ken"),
+            "import A (id)\ntheorem denied (x : Nat) : Eq Nat (id x) x = id::extra x\n",
+        )
+        .expect("write memory-only selective selector negative");
+        match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "BadDirect") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "id::extra"),
+            other => panic!("selective file subject cannot borrow memory proof: {other:?}"),
         }
         env.elaborate_file(
             "import A as M\ntheorem memory_selected (x : Nat) : Eq Nat (M.id x) x = (proof extra for M.id) x",
