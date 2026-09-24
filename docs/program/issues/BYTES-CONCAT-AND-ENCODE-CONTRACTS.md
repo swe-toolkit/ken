@@ -6,7 +6,7 @@ owner: foundation
 size: M
 gate: architect
 tier: T1
-depends_on: [KERNEL-LITERAL-CHAR-VIEW]
+depends_on: [KERNEL-LITERAL-CHAR-VIEW, LANG-KENFMT-AXIOM-CLOSING-PAREN]
 blocks: []
 github: null
 origin: "Operator ruling 2026-09-23, concurring with Steward recommendation evt_2tn395xd481ar: yes to the concatenation fact and to the narrowest encoding fact. Operator added: 'Ultimately, we will need proofs about UTF-8. Whether or not those are stated as facts depends on whether or not the properties of UTF-8 are taken from Rust in the implementation or in ken source.' TCB growth admitted by that ruling. Need raised by foundation-leader evt_1bkphsn9w1x3q (CAT-PARSING-LAWS hard-stop row 1). Steward-filed per COORDINATION section 2. AMENDED by operator 2026-09-24 ~03:40Z, 'concur with rec.': the Architect general design evt_1jyhkq1pfdnmc -- K3 (filed as KERNEL-LITERAL-CHAR-VIEW), F4' replacing the false fact 4 (evt_1jn0htjgamn7b), and four trusted postulates. Boundary and sequencing: Architect evt_15ce7ened9hxz."

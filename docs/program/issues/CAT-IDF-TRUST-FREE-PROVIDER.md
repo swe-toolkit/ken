@@ -1,7 +1,7 @@
 ---
 id: CAT-IDF-TRUST-FREE-PROVIDER
 title: "Trust-closure repair after Vec: move the canonical idf (and comp) to a small trust-free function-combinator provider, so loading Data.Vector.Vector cold no longer pulls five unrelated trusted assumptions into its manifest; pinned by a cold-load trusted_base set-equality check"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: architect
