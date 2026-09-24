@@ -581,6 +581,15 @@ fn resolve_attached_ref(
     if subject_is_local || scope.local_attached_proofs.contains(&selected) {
         return Ok((format!("{canonical_subject}::{proof_name}"), None));
     }
+    // D0's legacy ambient path remains available only when the subject is
+    // genuinely untracked. An imported subject has a selected provider, so
+    // a missing checked proof must never borrow ambient global history.
+    if scope.mode == ResolutionMode::Legacy
+        && !scope.bindings.contains_key(subject)
+        && !subject.contains('.')
+    {
+        return Ok((format!("{canonical_subject}::{proof_name}"), None));
+    }
     Err(ElabError::UnboundName {
         name: format!("{canonical_subject}::{proof_name}"),
         span: span.clone(),
