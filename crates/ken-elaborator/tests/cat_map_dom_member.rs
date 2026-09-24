@@ -28,16 +28,31 @@ fn load_map() -> ElabEnv {
     env
 }
 
-/// Promise class: durable invariant.
+/// Promise class: transition sentinel for this proof-only Map increment.
+/// Retire or rebaseline it at the first separately authorized Map public-API
+/// extension. The current exact set is a backfill boundary, not a permanent
+/// compatibility promise during initial development.
 ///
 /// MEASURED: the real roots loader admits exactly these nine independently
 /// base-captured Map surfaces through selective imports, including the two
 /// explicitly exported constructors and no inferred data constructors.
 /// CLAIMED: this proof backfill adds no loader-visible public API. THE GAP:
-/// every candidate declaration and attached proof is probed by the shared
-/// publication-query helper, not just the selected Map names in old tests.
+/// the shared publication-query helper probes every candidate declaration
+/// and attached proof; this increment authorizes no public expansion. Private
+/// proof/helper additions and changes preserving the same visible set stay
+/// green. A newly public name, constructor, or attached proof must turn this
+/// sentinel red, prompting review and retirement or a fresh base capture at
+/// that separately authorized Map public-API extension, not a bug waiver.
+///
+/// Known blast radius on this base: Map's `reachable_plus` uses `size`/`dom`;
+/// `lang_membership_operator_surface.rs` selectively imports `Tree`, both
+/// nominal views, and both constructors. `map_build_acceptance.rs`,
+/// `cat_map_bool_and_owner.rs`, and `es2_acceptance.rs` elaborate Map;
+/// this test probes its loader-visible set. `lang_mod_strict_resolution_d0.rs`
+/// inventories the Map module, while `n2_in_repo_loader.rs` and
+/// `dotted_module_path_parser.rs` use its path only, not its exports.
 #[test]
-fn map_loader_visible_export_inventory_is_exact() {
+fn map_dom_member_public_surface_transition_sentinel() {
     let expected = [
         "Tree",
         "OrderedKeyMembership",
@@ -56,7 +71,7 @@ fn map_loader_visible_export_inventory_is_exact() {
     eprintln!("Map loader-visible exports: {visible:?}");
     assert_eq!(
         visible, expected,
-        "Map's roots-loader public export set must match the base capture"
+        "Map proof-backfill sentinel: review any new export at the separately authorized public-API extension"
     );
 }
 
