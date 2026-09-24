@@ -55,6 +55,37 @@ pub(in crate::cranelift_backend) enum D5CloseoutMutation {
 }
 
 #[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SelectedTicketGateMutation {
+    Exact,
+    WrongTarget,
+    DuplicateConsume,
+}
+
+#[cfg(test)]
+thread_local! {
+    static SELECTED_TICKET_GATE_MUTATION: std::cell::Cell<SelectedTicketGateMutation> =
+        const { std::cell::Cell::new(SelectedTicketGateMutation::Exact) };
+    static SELECTED_TICKET_GATE_MUTATION_APPLIED: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn with_selected_ticket_gate_mutation<T>(
+    mutation: SelectedTicketGateMutation,
+    run: impl FnOnce() -> T,
+) -> (T, usize) {
+    SELECTED_TICKET_GATE_MUTATION.with(|cell| {
+        assert_eq!(cell.replace(mutation), SelectedTicketGateMutation::Exact);
+    });
+    SELECTED_TICKET_GATE_MUTATION_APPLIED.with(|cell| cell.set(0));
+    let result = run();
+    SELECTED_TICKET_GATE_MUTATION.with(|cell| cell.set(SelectedTicketGateMutation::Exact));
+    let count = SELECTED_TICKET_GATE_MUTATION_APPLIED.with(std::cell::Cell::get);
+    (result, count)
+}
+
+#[cfg(test)]
 thread_local! {
     pub(super) static RECURSIVE_POSITION_UNIT_CALLS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
@@ -503,11 +534,16 @@ impl<'a> Lowering<'a> {
                 ));
             }
 
+            // Issue only after the selected route has resolved and passed its
+            // body check. This authenticates the selected direct worker call;
+            // it does not claim to capture a separate copied pending value.
+            let ticket = self.issue_selected_call_ticket(builder, &target)?;
             let emitted = self.with_grafted_spine_call_source(static_origin, |this| {
                 this.call_declared_unit_target(
                     builder,
                     target,
                     &inputs,
+                    Some(ticket),
                     #[cfg(test)]
                     None,
                 )
@@ -1059,6 +1095,7 @@ impl<'a> Lowering<'a> {
                         builder,
                         target,
                         &inputs,
+                        None,
                         #[cfg(test)]
                         None,
                     )
@@ -1123,6 +1160,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 target,
                 &inputs,
+                None,
                 #[cfg(test)]
                 None,
             )
@@ -1621,6 +1659,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 target,
                 inputs,
+                None,
                 #[cfg(test)]
                 None,
             )
@@ -1676,6 +1715,7 @@ impl<'a> Lowering<'a> {
                         builder,
                         target,
                         inputs,
+                        None,
                         #[cfg(test)]
                         launch_ingress,
                     )
@@ -1687,6 +1727,7 @@ impl<'a> Lowering<'a> {
                         builder,
                         target,
                         &all,
+                        None,
                         #[cfg(test)]
                         launch_ingress,
                     )
@@ -1733,6 +1774,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 target,
                 inputs,
+                None,
                 #[cfg(test)]
                 None,
             )?;
@@ -1834,6 +1876,118 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        fn selected_call_target_words(
+            builder: &mut FunctionBuilder<'_>,
+            target: &units::DeclaredUnitCall,
+        ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError> {
+            // FuncRef is only local to the emitting function; two different
+            // functions can assign the SAME ordinal to different callees. Read
+            // the module-wide FuncId from its declared user name instead.
+            let cranelift_codegen::ir::ExternalName::User(name_ref) =
+                builder.func.dfg.ext_funcs[target.function].name
+            else {
+                return Err(backend_module("selected call target has no module user identity".to_string()));
+            };
+            let user = &builder.func.params.user_named_funcs()[name_ref];
+            if user.namespace != 0 {
+                return Err(backend_module("selected call target is outside the module function namespace".to_string()));
+            }
+            let callee_id = user.index;
+            let body = builder.ins().iconst(
+                types::I64, i64::from(target.origin.ticket_body_ordinal()),
+            );
+            let callee = builder.ins().iconst(types::I64, i64::from(callee_id));
+            Ok((body, callee))
+        }
+
+        fn branch_on_selected_call_status(
+            builder: &mut FunctionBuilder<'_>,
+            status: cranelift_codegen::ir::Value,
+        ) {
+            let failed = builder.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::NotEqual, status, 0,
+            );
+            let failure = builder.create_block();
+            let continued = builder.create_block();
+            builder.ins().brif(failed, failure, &[], continued, &[]);
+            builder.switch_to_block(failure);
+            builder.ins().return_(&[status]);
+            builder.seal_block(failure);
+            builder.switch_to_block(continued);
+            builder.seal_block(continued);
+        }
+
+        fn issue_selected_call_ticket(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            target: &units::DeclaredUnitCall,
+        ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+            let services = self.function_local.services_pointer.ok_or_else(|| {
+                backend_module("selected call has no published activation services".to_string())
+            })?;
+            let issue = self.function_local.selected_call_issue.ok_or_else(|| {
+                backend_module("selected call has no checked issuer helper".to_string())
+            })?;
+            let pointer_type = builder.func.dfg.value_type(services);
+            let ticket = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                std::mem::size_of::<crate::invocation_tickets::SelectedCallTicketV1>() as u32,
+                3,
+            ));
+            let pointer = builder.ins().stack_addr(pointer_type, ticket, 0);
+            let (body, callee) = Self::selected_call_target_words(builder, target)?;
+            let call = builder.ins().call(issue, &[services, body, callee, pointer]);
+            let [status] = builder.inst_results(call) else {
+                return Err(backend_module("selected issuer returned no status".to_string()));
+            };
+            let status = *status;
+            Self::branch_on_selected_call_status(builder, status);
+            Ok(pointer)
+        }
+
+        fn consume_selected_call_ticket(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            ticket: cranelift_codegen::ir::Value,
+            target: &units::DeclaredUnitCall,
+        ) -> Result<(), CraneliftBackendError> {
+            let services = self.function_local.services_pointer.ok_or_else(|| {
+                backend_module("selected gate has no published activation services".to_string())
+            })?;
+            let consume = self.function_local.selected_call_consume.ok_or_else(|| {
+                backend_module("selected gate has no checked consuming helper".to_string())
+            })?;
+            let (body, callee) = Self::selected_call_target_words(builder, target)?;
+            #[cfg(test)]
+            let callee = if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
+                == SelectedTicketGateMutation::WrongTarget
+            {
+                SELECTED_TICKET_GATE_MUTATION_APPLIED.with(|cell| cell.set(cell.get() + 1));
+                builder.ins().iadd_imm(callee, 1)
+            } else {
+                callee
+            };
+            let call = builder.ins().call(consume, &[services, ticket, body, callee]);
+            let [status] = builder.inst_results(call) else {
+                return Err(backend_module("selected gate returned no status".to_string()));
+            };
+            let status = *status;
+            Self::branch_on_selected_call_status(builder, status);
+            #[cfg(test)]
+            if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
+                == SelectedTicketGateMutation::DuplicateConsume
+            {
+                SELECTED_TICKET_GATE_MUTATION_APPLIED.with(|cell| cell.set(cell.get() + 1));
+                let duplicate = builder.ins().call(consume, &[services, ticket, body, callee]);
+                let [status] = builder.inst_results(duplicate) else {
+                    return Err(backend_module("duplicate gate returned no status".to_string()));
+                };
+                let status = *status;
+                Self::branch_on_selected_call_status(builder, status);
+            }
+            Ok(())
+        }
+
         /// Emit the direct call to a declared unit target.
         ///
         /// Returns the produced operand **and the exact `Inst` emitted for the
@@ -1847,8 +2001,14 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             target: units::DeclaredUnitCall,
             inputs: &[LoweringOperand],
+            selected_ticket: Option<cranelift_codegen::ir::Value>,
             #[cfg(test)] launch_ingress: Option<cranelift_codegen::ir::Value>,
         ) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst), CraneliftBackendError> {
+            // The consuming gate runs FIRST: not a single borrowed parameter,
+            // capture, frame slot or effect may be read on a rejected ticket.
+            if let Some(ticket) = selected_ticket {
+                self.consume_selected_call_ticket(builder, ticket, &target)?;
+            }
             // Compile-time result identity, resolved before the call. The callee
             // returns only its positional environment word; no code tag crosses
             // in the frame and no runtime lookup selects the body.

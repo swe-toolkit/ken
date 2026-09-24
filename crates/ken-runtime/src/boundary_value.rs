@@ -1374,6 +1374,108 @@ pub struct BoundaryRegion {
 
 const NODE_WORDS: usize = BOUNDARY_NODE_STRIDE as usize / 8;
 
+/// The exact named storage table whose reservation cannot fit.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BoundaryReservationFailureV1 {
+    pub resource: crate::boundary_resource_profile::BoundaryResource,
+    pub limit: u128,
+    pub requested: u128,
+}
+
+fn check_region_reservation(
+    resource: crate::boundary_resource_profile::BoundaryResource,
+    requested: u128,
+    maximum: usize,
+) -> Result<usize, BoundaryReservationFailureV1> {
+    if requested > maximum as u128 {
+        Err(BoundaryReservationFailureV1 { resource, limit: maximum as u128, requested })
+    } else {
+        Ok(requested as usize)
+    }
+}
+
+fn region_table_reservation_failure(
+    resource: crate::boundary_resource_profile::BoundaryResource,
+    backing_capacity: usize,
+    requested: u128,
+) -> BoundaryReservationFailureV1 {
+    use crate::boundary_resource_profile::BoundaryResource;
+    // Nodes occupy NODE_WORDS u64 cells each. All other tables' cells
+    // already use the unit named by their resource.
+    let limit = match resource {
+        BoundaryResource::Nodes => backing_capacity / NODE_WORDS,
+        BoundaryResource::Words | BoundaryResource::DataBytes | BoundaryResource::NativeIntLimbs => {
+            backing_capacity
+        }
+    };
+    BoundaryReservationFailureV1 { resource, limit: limit as u128, requested }
+}
+
+fn reserve_region_table<T>(
+    table: &mut Vec<T>,
+    length: usize,
+    resource: crate::boundary_resource_profile::BoundaryResource,
+    requested: u128,
+) -> Result<(), BoundaryReservationFailureV1> {
+    if length > table.len() {
+        table.try_reserve_exact(length - table.len()).map_err(|_| {
+            region_table_reservation_failure(resource, table.capacity(), requested)
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod reservation_units_tests {
+    use super::*;
+    use crate::boundary_resource_profile::BoundaryResource;
+
+    #[test]
+    fn reservation_failure_reports_nodes_in_logical_nodes_not_backing_cells() {
+        let physical_cells = 3 * NODE_WORDS + 1;
+        assert_eq!(
+            region_table_reservation_failure(BoundaryResource::Nodes, physical_cells, 4),
+            BoundaryReservationFailureV1 {
+                resource: BoundaryResource::Nodes,
+                limit: 3,
+                requested: 4,
+            }
+        );
+        assert_eq!(
+            region_table_reservation_failure(BoundaryResource::Words, physical_cells, 4),
+            BoundaryReservationFailureV1 {
+                resource: BoundaryResource::Words,
+                limit: physical_cells as u128,
+                requested: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn region_reservation_can_shrink_before_publication() {
+        let mut region = BoundaryRegion::default();
+        region.reserve(5, 8, 13, 3).expect("larger reservation");
+        assert_eq!(region.nodes.len(), 5 * NODE_WORDS);
+        assert_eq!(region.words.len(), 8);
+        assert_eq!(region.names.len(), 8);
+        assert_eq!(region.data.len(), 13);
+        assert_eq!(region.limbs.len(), 3);
+
+        region.reserve(2, 3, 4, 1).expect("smaller reservation");
+        assert_eq!(region.nodes.len(), 2 * NODE_WORDS);
+        assert_eq!(region.words.len(), 3);
+        assert_eq!(region.names.len(), 3);
+        assert_eq!(region.data.len(), 4);
+        assert_eq!(region.limbs.len(), 1);
+
+        region.publish();
+        assert_eq!(region.header[RegionHeaderField::NodeCapacity as usize], 2);
+        assert_eq!(region.header[RegionHeaderField::WordCapacity as usize], 3);
+        assert_eq!(region.header[RegionHeaderField::DataCapacity as usize], 4);
+        assert_eq!(region.header[RegionHeaderField::LimbCapacity as usize], 1);
+    }
+}
+
 impl BoundaryRegion {
     /// Number of **live** nodes.
     ///
@@ -1529,17 +1631,45 @@ impl BoundaryRegion {
     /// growing one would move it out from under the published pointer. Reserving
     /// is therefore the caller's explicit, auditable decision about how much
     /// storage an invocation may take.
-    pub fn reserve(&mut self, nodes: usize, words: usize, data: usize, limbs: usize) {
-        debug_assert!(
-            self.header.is_empty(),
-            "reserve before publish: growing a table moves it under the pointer"
-        );
-        let node_words = (self.live_nodes + nodes) * NODE_WORDS;
+    pub fn reserve(
+        &mut self, nodes: usize, words: usize, data: usize, limbs: usize,
+    ) -> Result<(), BoundaryReservationFailureV1> {
+        use crate::boundary_resource_profile::BoundaryResource;
+        debug_assert!(self.header.is_empty(), "reserve before publish: growing a table moves it under the pointer");
+        // Preflight every resource without wrapping before materializing any
+        // table. The physical Vec maximum is a distinct bound from the
+        // deployment profile, retained in the owner's typed error.
+        let node_request = self.live_nodes as u128 + nodes as u128;
+        let node_count = check_region_reservation(
+            BoundaryResource::Nodes, node_request,
+            (isize::MAX as usize / std::mem::size_of::<u64>()) / NODE_WORDS,
+        )?;
+        let word_request = self.live_words as u128 + words as u128;
+        let word_count = check_region_reservation(
+            BoundaryResource::Words, word_request,
+            isize::MAX as usize / std::mem::size_of::<u64>(),
+        )?;
+        let data_request = self.live_data as u128 + data as u128;
+        let data_count = check_region_reservation(
+            BoundaryResource::DataBytes, data_request, isize::MAX as usize,
+        )?;
+        let limb_request = self.live_limbs as u128 + limbs as u128;
+        let limb_count = check_region_reservation(
+            BoundaryResource::NativeIntLimbs, limb_request,
+            isize::MAX as usize / std::mem::size_of::<u64>(),
+        )?;
+        let node_words = node_count * NODE_WORDS;
+        reserve_region_table(&mut self.nodes, node_words, BoundaryResource::Nodes, node_request)?;
+        reserve_region_table(&mut self.words, word_count, BoundaryResource::Words, word_request)?;
+        reserve_region_table(&mut self.names, word_count, BoundaryResource::Words, word_request)?;
+        reserve_region_table(&mut self.data, data_count, BoundaryResource::DataBytes, data_request)?;
+        reserve_region_table(&mut self.limbs, limb_count, BoundaryResource::NativeIntLimbs, limb_request)?;
         self.nodes.resize(node_words, 0);
-        self.words.resize(self.live_words + words, 0);
-        self.names.resize(self.live_words + words, 0);
-        self.data.resize(self.live_data + data, 0);
-        self.limbs.resize(self.live_limbs + limbs, 0);
+        self.words.resize(word_count, 0);
+        self.names.resize(word_count, 0);
+        self.data.resize(data_count, 0);
+        self.limbs.resize(limb_count, 0);
+        Ok(())
     }
 
     /// The live magnitude limbs of one spilled `Int` node, or `None` when the
@@ -1827,8 +1957,10 @@ impl BoundaryArenaV1 {
     }
 
     /// Grant emitted code room to construct invocation-owned nodes.
-    pub fn reserve(&mut self, nodes: usize, words: usize, data: usize, limbs: usize) {
-        self.0.reserve(nodes, words, data, limbs);
+    pub fn reserve(
+        &mut self, nodes: usize, words: usize, data: usize, limbs: usize,
+    ) -> Result<(), BoundaryReservationFailureV1> {
+        self.0.reserve(nodes, words, data, limbs)
     }
 
     /// Publish the arena header. See [`BoundaryRegion::publish`].
@@ -1892,8 +2024,10 @@ impl BoundaryPersistentImage {
     }
 
     /// Grant emitted code room to construct persistent nodes.
-    pub fn reserve(&mut self, nodes: usize, words: usize, data: usize, limbs: usize) {
-        self.0.reserve(nodes, words, data, limbs);
+    pub fn reserve(
+        &mut self, nodes: usize, words: usize, data: usize, limbs: usize,
+    ) -> Result<(), BoundaryReservationFailureV1> {
+        self.0.reserve(nodes, words, data, limbs)
     }
 
     /// The live data bytes of one node's span.
@@ -2110,8 +2244,10 @@ impl BoundaryValueStore {
         &mut self.image
     }
 
-    pub fn reserve_persistent(&mut self, nodes: usize, words: usize, data: usize, limbs: usize) {
-        self.image.reserve(nodes, words, data, limbs);
+    pub fn reserve_persistent(
+        &mut self, nodes: usize, words: usize, data: usize, limbs: usize,
+    ) -> Result<(), BoundaryReservationFailureV1> {
+        self.image.reserve(nodes, words, data, limbs)
     }
 
     /// Publish the persistent header emitted code resolves persistent words

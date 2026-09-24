@@ -114,14 +114,38 @@ fn mint_invocation_epoch(limit: u64) -> Result<u64, ken_host::CapacityExhaustedV
 
 use crate::activation_services::GeneratedActivationServicesV1;
 use crate::boundary_resource_profile::{
-    BoundaryCapacityExhaustedV1, BoundaryResource, BoundaryResourceProfileV2, BoundaryResourceScope,
+    BoundaryCapacityExhaustedV1, BoundaryResource, BoundaryResourceProfileV3, BoundaryResourceScope,
 };
 use crate::boundary_value::{
     ARENA_DATA_CAPACITY, ARENA_LIMB_CAPACITY, ARENA_NATIVE_INT, ARENA_NODE_CAPACITY,
     ARENA_PERSISTENT, ARENA_WORD_CAPACITY, BoundaryArenaBuilder, BoundaryArenaV1,
-    BoundaryValueStore, BoundaryWord,
+    BoundaryReservationFailureV1, BoundaryValueStore, BoundaryWord,
 };
+
+/// A store either rejects the first process epoch authority or refuses to
+/// publish its persistent backing. Both are pre-publication failures.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BoundaryStoreOpenErrorV2 {
+    ProfileMismatch(InvocationEpochProfileMismatchV2),
+    CapacityExhausted(ken_host::CapacityExhaustedV1),
+}
+
+fn region_reservation_fault(
+    scope: ken_host::CapacityScopeV1,
+    failure: BoundaryReservationFailureV1,
+) -> ken_host::CapacityExhaustedV1 {
+    let resource = match failure.resource {
+        BoundaryResource::Nodes => ken_host::CapacityResourceV1::Nodes,
+        BoundaryResource::Words => ken_host::CapacityResourceV1::Words,
+        BoundaryResource::DataBytes => ken_host::CapacityResourceV1::DataBytes,
+        BoundaryResource::NativeIntLimbs => ken_host::CapacityResourceV1::NativeIntLimbs,
+    };
+    ken_host::CapacityExhaustedV1 {
+        scope, resource, limit: failure.limit, requested: failure.requested,
+    }
+}
 use crate::native_int::NativeIntArenaV1;
+use crate::invocation_tickets::InvocationTicketIssuerV1;
 
 /// **One activation: the per-invocation arenas, the services record, and the
 /// published bases that generated code is given.**
@@ -132,11 +156,13 @@ use crate::native_int::NativeIntArenaV1;
 /// as any adopted result may live"* a property of the caller's scope rather
 /// than of this struct's drop order.
 pub struct BoundaryActivationV1 {
-    profile: BoundaryResourceProfileV2,
+    profile: BoundaryResourceProfileV3,
     epoch: u64,
     /// ⛔ Boxed for address stability — see the module doc.
     native_int_arena: Box<NativeIntArenaV1>,
     arena: Box<BoundaryArenaV1>,
+    /// Fixed backing and boxed owner are reserved before publishing services.
+    call_events: Box<InvocationTicketIssuerV1>,
     /// ⛔ Boxed for the same reason: generated code receives its address.
     services: Box<GeneratedActivationServicesV1>,
     /// The base [`BoundaryArenaV1::publish`] returned, remembered so the
@@ -169,7 +195,7 @@ pub struct BoundaryActivationV1 {
 /// the profile lives here, and [`BoundaryActivationV1::begin`] takes it from
 /// this binding rather than accepting one from its caller.
 pub struct BoundaryStoreBindingV1 {
-    profile: BoundaryResourceProfileV2,
+    profile: BoundaryResourceProfileV3,
     published_persistent_base: *mut u64,
 }
 
@@ -178,14 +204,17 @@ impl BoundaryStoreBindingV1 {
     /// persistent limits. ⛔ Once per store.
     pub fn open(
         store: &mut BoundaryValueStore,
-        profile: BoundaryResourceProfileV2,
-    ) -> Result<Self, InvocationEpochProfileMismatchV2> {
+        profile: BoundaryResourceProfileV3,
+    ) -> Result<Self, BoundaryStoreOpenErrorV2> {
         // Admit before publication: a refused profile must not alter the store.
-        admit_epoch_ceiling(profile.runtime.invocation_epochs)?;
+        admit_epoch_ceiling(profile.runtime.invocation_epochs)
+            .map_err(BoundaryStoreOpenErrorV2::ProfileMismatch)?;
         // Routed through `as_reserve_arguments` so the named->positional
         // mapping is spelled once in the whole crate.
         let (nodes, words, data, limbs) = profile.persistent.as_reserve_arguments();
-        store.reserve_persistent(nodes, words, data, limbs);
+        store.reserve_persistent(nodes, words, data, limbs)
+            .map_err(|failure| BoundaryStoreOpenErrorV2::CapacityExhausted(
+                region_reservation_fault(ken_host::CapacityScopeV1::Persistent, failure)))?;
         let published_persistent_base = store.publish_persistent();
         Ok(BoundaryStoreBindingV1 {
             profile,
@@ -194,7 +223,7 @@ impl BoundaryStoreBindingV1 {
     }
 
     /// The authorized profile. ⛔ Read-only.
-    pub fn profile(&self) -> BoundaryResourceProfileV2 {
+    pub fn profile(&self) -> BoundaryResourceProfileV3 {
         self.profile
     }
 
@@ -227,15 +256,22 @@ impl BoundaryActivationV1 {
         arena.bind_native_int(Some(native_base as *const u64));
         // 3 — reserve invocation storage from the AUTHORIZED invocation limits.
         let (nodes, words, data, limbs) = profile.invocation.as_reserve_arguments();
-        arena.reserve(nodes, words, data, limbs);
+        arena.reserve(nodes, words, data, limbs)
+            .map_err(|failure| region_reservation_fault(
+                ken_host::CapacityScopeV1::Invocation, failure))?;
+        let mut call_events = Box::new(InvocationTicketIssuerV1::reserve(
+            0, profile.call_events,
+        )?);
         // Consume the process-wide epoch only after all storage has been
         // reserved and before publishing a services pointer or running code.
         let epoch = mint_invocation_epoch(profile.runtime.invocation_epochs)?;
+        call_events.bind_epoch_before_publication(epoch);
         // 4 — publish, and only now build the services record.
         let published_boundary_base = arena.publish();
         let services = Box::new(GeneratedActivationServicesV1::new(
             native_base,
             published_boundary_base,
+            (&mut *call_events as *mut InvocationTicketIssuerV1).cast(),
         ));
 
         Ok(BoundaryActivationV1 {
@@ -243,6 +279,7 @@ impl BoundaryActivationV1 {
             epoch,
             native_int_arena,
             arena,
+            call_events,
             services,
             published_boundary_base,
             published_persistent_base,
@@ -254,6 +291,13 @@ impl BoundaryActivationV1 {
     /// Process-wide identity, minted before this activation was published.
     pub fn epoch(&self) -> u64 {
         self.epoch
+    }
+
+    pub fn call_event_issuer(&mut self) -> Option<&mut InvocationTicketIssuerV1> {
+        (!self.finished && self.is_published()).then_some(&mut self.call_events)
+    }
+    pub fn owned_call_event_address(&self) -> usize {
+        (&*self.call_events as *const InvocationTicketIssuerV1) as usize
     }
 
     /// The `services_ptr` generated code receives as its second parameter.
@@ -327,7 +371,7 @@ impl BoundaryActivationV1 {
 
     /// The profile this activation was authorized with. ⛔ Read-only: an
     /// activation cannot widen its own limits.
-    pub fn profile(&self) -> BoundaryResourceProfileV2 {
+    pub fn profile(&self) -> BoundaryResourceProfileV3 {
         self.profile
     }
 
@@ -602,10 +646,14 @@ mod tests {
     /// Eight **distinct** limits, so a transposition anywhere in `begin` is
     /// visible. ⛔ Equal limits would let every assertion below pass on a
     /// crossed wiring.
-    fn distinct_profile() -> BoundaryResourceProfileV2 {
-        BoundaryResourceProfileV2 {
+    fn distinct_profile() -> BoundaryResourceProfileV3 {
+        BoundaryResourceProfileV3 {
             runtime: RuntimeResourceLimitsV2 {
                 invocation_epochs: u64::MAX,
+            },
+            call_events: crate::boundary_resource_profile::InvocationCallLimitsV3 {
+                event_generations: 29,
+                live_pending_slots: 13,
             },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: 12,
@@ -620,6 +668,94 @@ mod tests {
                 native_int_limbs: 96,
             },
         }
+    }
+
+    fn refusal_from_real_reservation(
+        persistent: bool,
+        resource: BoundaryResource,
+        requested: usize,
+    ) -> ken_host::CapacityExhaustedV1 {
+        let mut profile = distinct_profile();
+        let limits = if persistent { &mut profile.persistent } else { &mut profile.invocation };
+        match resource {
+            BoundaryResource::Nodes => limits.nodes = requested,
+            BoundaryResource::Words => limits.words = requested,
+            BoundaryResource::DataBytes => limits.data_bytes = requested,
+            BoundaryResource::NativeIntLimbs => limits.native_int_limbs = requested,
+        }
+        let mut store = BoundaryValueStore::new();
+        if persistent {
+            match BoundaryStoreBindingV1::open(&mut store, profile).err().expect("open refuses") {
+                BoundaryStoreOpenErrorV2::CapacityExhausted(fault) => fault,
+                BoundaryStoreOpenErrorV2::ProfileMismatch(_) => panic!("wrong failure source"),
+            }
+        } else {
+            let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("open succeeds");
+            BoundaryActivationV1::begin(&binding).err().expect("begin refuses")
+        }
+    }
+
+    /// Durable capacity invariant. Both base-red paths at exact landed D1
+    /// e49cdc9b panicked at `(live_nodes + nodes) * NODE_WORDS` for each owner.
+    #[test]
+    fn unrepresentable_node_grants_do_not_panic_at_open_or_begin() {
+        let requested = usize::MAX / (crate::boundary_value::BOUNDARY_NODE_STRIDE as usize / 8) + 1;
+        let actual_limit = (isize::MAX as usize / 8)
+            / (crate::boundary_value::BOUNDARY_NODE_STRIDE as usize / 8);
+        for persistent in [false, true] {
+            let fault = refusal_from_real_reservation(persistent, BoundaryResource::Nodes, requested);
+            assert_eq!(fault.scope, if persistent { ken_host::CapacityScopeV1::Persistent } else { ken_host::CapacityScopeV1::Invocation });
+            assert_eq!(fault.resource, ken_host::CapacityResourceV1::Nodes);
+            assert_eq!(fault.limit, actual_limit as u128);
+            assert_eq!(fault.requested, requested as u128);
+        }
+    }
+
+    /// Durable capacity invariant. Both base-red paths at exact landed D1
+    /// e49cdc9b panicked at `Vec::resize` for the max child-word grant.
+    #[test]
+    fn max_word_grants_do_not_panic_at_open_or_begin() {
+        let actual_limit = isize::MAX as usize / 8;
+        for persistent in [false, true] {
+            let fault = refusal_from_real_reservation(persistent, BoundaryResource::Words, usize::MAX);
+            assert_eq!(fault.scope, if persistent { ken_host::CapacityScopeV1::Persistent } else { ken_host::CapacityScopeV1::Invocation });
+            assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+            assert_eq!(fault.limit, actual_limit as u128);
+            assert_eq!(fault.requested, usize::MAX as u128);
+        }
+    }
+
+    /// Independent positive baseline: a materially larger but reservable
+    /// deployment profile must remain usable at both real publication owners.
+    #[test]
+    fn reservable_large_grants_publish_at_open_and_begin() {
+        let mut profile = distinct_profile();
+        profile.invocation.nodes = 4_096;
+        profile.invocation.words = 8_192;
+        profile.persistent.nodes = 4_096;
+        profile.persistent.words = 8_192;
+        let mut store = BoundaryValueStore::new();
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("large open");
+        let activation = BoundaryActivationV1::begin(&binding).expect("large begin");
+        assert!(activation.is_published());
+        assert_eq!(activation.published_capacities().unwrap().0, 4_096);
+    }
+
+    /// The separately metered live-call backing also refuses an unreservable
+    /// declared grant before the activation publishes a services pointer.
+    #[test]
+    fn impossible_live_slot_grant_refuses_before_publication() {
+        let mut profile = distinct_profile();
+        profile.call_events.live_pending_slots = usize::MAX;
+        let mut store = BoundaryValueStore::new();
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile)
+            .expect("persistent region alone has ordinary limits");
+        let fault = BoundaryActivationV1::begin(&binding)
+            .err().expect("unrepresentable call-event backing cannot publish");
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Invocation);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::LivePendingSlots);
+        assert_eq!(fault.requested, usize::MAX as u128);
+        assert!(fault.limit < fault.requested);
     }
 
     #[test]
@@ -739,7 +875,7 @@ mod tests {
         let mut next_store = BoundaryValueStore::new();
         assert_eq!(
             BoundaryStoreBindingV1::open(&mut next_store, profile).err(),
-            Some(InvocationEpochProfileMismatchV2 { authorized: 1, attempted: 2 })
+            Some(BoundaryStoreOpenErrorV2::ProfileMismatch(InvocationEpochProfileMismatchV2 { authorized: 1, attempted: 2 }))
         );
         assert_eq!(next_store.image().0.node_capacity(), 0, "mismatch published storage");
         assert_eq!(BoundaryActivationV1::begin(&binding).err().unwrap().requested, 2);
@@ -768,7 +904,7 @@ mod tests {
         profile.runtime.invocation_epochs = 5;
         let mut later = BoundaryValueStore::new();
         assert_eq!(BoundaryStoreBindingV1::open(&mut later, profile).err(),
-            Some(InvocationEpochProfileMismatchV2 { authorized: 0, attempted: 5 }));
+            Some(BoundaryStoreOpenErrorV2::ProfileMismatch(InvocationEpochProfileMismatchV2 { authorized: 0, attempted: 5 })));
     }
 
     #[test]
@@ -857,6 +993,12 @@ mod tests {
         assert_eq!(persistent, activation.published_persistent_base() as u64);
         assert_ne!(persistent, 0, "ARENA_PERSISTENT was left unbound");
         assert_ne!(native, 0, "ARENA_NATIVE_INT was left unbound");
+        let owner = activation.owned_call_event_address();
+        assert_eq!(activation.services.call_events as usize, owner);
+        let moved = Box::new(activation);
+        assert_eq!(moved.services.call_events as usize, moved.owned_call_event_address());
+        assert_eq!(moved.owned_call_event_address(), owner,
+            "moving the activation cannot move its published issuer owner");
     }
 
     /// ⭐⭐ **`AC-2` — two activations get distinct mutable arena state.**

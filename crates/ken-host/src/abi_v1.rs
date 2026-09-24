@@ -1162,6 +1162,33 @@ pub unsafe fn ken_host_invocation_v1_finish_with_capacity(
     0
 }
 
+/// An activation-owned selected-call consuming gate rejected an exact ticket.
+/// A numeric status alone cannot authorize this typed terminal projection.
+///
+/// # Safety
+/// `context` is the unique live host observation context, consumed once.
+pub unsafe fn ken_host_invocation_v1_finish_with_integrity(
+    context: *mut c_void,
+    fault: crate::SelectedCallIntegrityFaultV1,
+) -> i64 {
+    if context.is_null() || !context.cast::<ProcessContext>().is_aligned() {
+        return -1;
+    }
+    let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
+    context.finalize_resources();
+    if let Some(mut sink) = context.observation.take() {
+        if write_observation_with_terminal(
+            &mut sink,
+            &context,
+            crate::SELECTED_CALL_INTEGRITY_STATUS_V1,
+            Some(crate::TerminalErrorV1::SelectedCallIntegrity(fault)),
+        ).is_err() {
+            return -1;
+        }
+    }
+    0
+}
+
 impl ProcessContext {
     fn finalize_resources(&mut self) {
         let settlements = {
@@ -2279,6 +2306,60 @@ mod tests {
             CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(_))
         ));
 
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Real process host observation: the in-flight integrity terminal keeps
+    /// the already completed resource-release prefix, rather than replacing
+    /// it with an unclassified root trap or dropping the prior effect.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn selected_call_integrity_finishes_the_live_host_observation_with_effect_prefix() {
+        let root = std::env::temp_dir().join(format!(
+            "ken-ticket-integrity-prefix-{}-{:?}", std::process::id(), std::thread::current().id(),
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("held.bin"), b"held").unwrap();
+        let root_path = crate::RootPath::new(&root).unwrap();
+        let parent = crate::open_root(&root_path).unwrap();
+        let leaf = crate::PathComponent::new(b"held.bin").unwrap();
+        let owner = crate::open_resource_at_v1(&parent, &leaf, crate::OpenRequest::Read).unwrap();
+        let observation_path = root.join("observation.bin");
+        let observation_file = std::fs::OpenOptions::new().create(true).truncate(true)
+            .write(true).open(&observation_path).unwrap();
+        let mut context = Box::new(ProcessContext {
+            _posture: ProcessPostureV1(()),
+            host: ProcessHost,
+            revocation: {
+                let mut revocation = RevocationDomain::default();
+                let _root_revocation = revocation.mint_root();
+                revocation
+            },
+            capabilities: CapabilityTableV1::default(),
+            resources: crate::ResourceTableV1::default(),
+            response_arena: Vec::new(),
+            effect_trace: Vec::new(),
+            observation: Some(observation_file),
+            plan_hash: 33,
+            capability: CapabilityTokenV1::from_erased_identity(0),
+        });
+        let (_, identity) = context.resources.insert_fs_handle_without_provenance_for_test(
+            owner, crate::RightSet::METADATA,
+        );
+        let raw = Box::into_raw(context) as *mut c_void;
+        let status = unsafe { ken_host_invocation_v1_finish_with_integrity(
+            raw, crate::SelectedCallIntegrityFaultV1::WrongTarget,
+        ) };
+        assert_eq!(status, 0);
+        let trace = crate::decode_linked_effect_trace(&std::fs::read(&observation_path).unwrap()).unwrap();
+        assert_eq!(trace.terminal_value, crate::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(trace.terminal_error, Some(crate::TerminalErrorV1::SelectedCallIntegrity(
+            crate::SelectedCallIntegrityFaultV1::WrongTarget,
+        )));
+        assert_eq!(trace.effect_trace.len(), 1);
+        assert_eq!(trace.effect_trace[0].operation, HostOpV1::ResourceRelease);
+        assert_eq!(trace.effect_trace[0].resource_bindings,
+            vec![(crate::ResourceBindingRole::Target, identity)]);
         std::fs::remove_dir_all(root).unwrap();
     }
 

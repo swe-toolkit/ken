@@ -75,7 +75,7 @@ pub struct BoundProcessExecutableArtifact {
     pub target_symbol: RuntimeSymbol,
     pub executable_path: PathBuf,
     pub executable_hash: u64,
-    boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     trap_catalog: BoundPlannerTrapCatalog,
 }
 
@@ -283,6 +283,47 @@ fn decode_signed_root_trap(
 /// Runs the linked checked-source artifact and returns its complete canonical
 /// observation. The trace sink is launcher-owned and outside the capability
 /// root; stdout/stderr and filesystem deltas are observed by this same call.
+/// Admit only a fault whose source, requested units and stated effective
+/// limit are consistent with the artifact's authorized deployment profile.
+/// Region reservations can fail below their declared bound when the physical
+/// backing cannot represent or allocate it; unlike epoch exhaustion their
+/// request is the attempted whole reservation, not the declared limit + 1.
+fn capacity_failure_matches_profile(
+    fault: ken_host::CapacityExhaustedV1,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
+) -> bool {
+    use ken_host::{CapacityResourceV1 as Resource, CapacityScopeV1 as Scope};
+    let (declared, physical_maximum) = match (fault.scope, fault.resource) {
+        (Scope::Runtime, Resource::InvocationEpochs) => {
+            let limit = u128::from(profile.runtime.invocation_epochs);
+            return fault.limit == limit && fault.requested == limit + 1;
+        }
+        (Scope::Invocation, Resource::EventGenerations) => {
+            let limit = u128::from(profile.call_events.event_generations);
+            return fault.limit == limit && fault.requested == limit + 1;
+        }
+        (Scope::Invocation, Resource::LivePendingSlots) => {
+            let limit = profile.call_events.live_pending_slots as u128;
+            return (fault.limit == limit && fault.requested == limit + 1)
+                || (fault.requested == limit && fault.limit < limit);
+        }
+        (Scope::Invocation | Scope::Persistent, resource) => {
+            let region = if fault.scope == Scope::Invocation { profile.invocation } else { profile.persistent };
+            let word_max = (isize::MAX as usize / std::mem::size_of::<u64>()) as u128;
+            let node_words = (crate::boundary_value::BOUNDARY_NODE_STRIDE as usize / 8) as u128;
+            match resource {
+                Resource::Nodes => (region.nodes as u128, word_max / node_words),
+                Resource::Words => (region.words as u128, word_max),
+                Resource::DataBytes => (region.data_bytes as u128, isize::MAX as u128),
+                Resource::NativeIntLimbs => (region.native_int_limbs as u128, word_max),
+                Resource::InvocationEpochs | Resource::EventGenerations | Resource::LivePendingSlots => return false,
+            }
+        }
+        _ => return false,
+    };
+    fault.requested == declared && fault.limit <= physical_maximum && fault.limit < fault.requested
+}
+
 pub fn run_bound_process_effect_observation(
     artifact: &BoundProcessExecutableArtifact,
     options: &NativeEffectRunOptionsV1,
@@ -349,17 +390,23 @@ pub fn run_bound_process_effect_observation_with_stdin(
     // A typed capacity terminal is valid only when its reserved root status
     // and exact bound profile agree. Neither a bare -7 nor an arbitrary
     // negative paired with a forged terminal variant grants fault authority.
-    if let Some(ken_host::TerminalErrorV1::CapacityExhausted(failure)) = &trace.terminal_error {
-        if trace.terminal_value != ken_host::CAPACITY_EXHAUSTED_STATUS_V1
-            || failure.scope != ken_host::CapacityScopeV1::Runtime
-            || failure.resource != ken_host::CapacityResourceV1::InvocationEpochs
-            || failure.limit
-                != u128::from(artifact.boundary_resource_profile.runtime.invocation_epochs)
-            || failure.requested != failure.limit + 1
-            || exit_status != 1
-        {
-            return Err(NativeEffectRunErrorV1::MalformedTrace);
+    match &trace.terminal_error {
+        Some(ken_host::TerminalErrorV1::CapacityExhausted(failure)) => {
+            if trace.terminal_value != ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+                || !capacity_failure_matches_profile(*failure, artifact.boundary_resource_profile)
+                || exit_status != 1
+            {
+                return Err(NativeEffectRunErrorV1::MalformedTrace);
+            }
         }
+        Some(ken_host::TerminalErrorV1::SelectedCallIntegrity(_)) => {
+            if trace.terminal_value != ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1
+                || exit_status != 1
+            {
+                return Err(NativeEffectRunErrorV1::MalformedTrace);
+            }
+        }
+        _ => {}
     }
     let terminal_error = if trace.terminal_error.is_some() {
         trace.terminal_error
@@ -419,7 +466,7 @@ pub struct ObjectLinkerExecutablePackage {
     /// authorized resource policy** share one identity, and a consumer checking
     /// identity would not be able to tell them apart. ⇒ Two profiles, two
     /// packages.
-    pub boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    pub boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -534,7 +581,7 @@ pub struct ObjectLinkerPackagingOptions {
     /// linked** — which is `AC-7`'s whole point, and is a different observation
     /// from a starter that links, runs, and then declines to execute.
     pub boundary_resource_profile:
-        Option<crate::boundary_resource_profile::BoundaryResourceProfileV2>,
+        Option<crate::boundary_resource_profile::BoundaryResourceProfileV3>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -543,9 +590,11 @@ pub struct ObjectLinkerPackagingError {
     pub field: &'static str,
     pub reason: String,
     /// Real linked nonprocess starter capacity refusal, decoded from the
-    /// opaque failed-begin handle's typed terminal wire (never inferred from
-    /// exit status or a smoke mismatch string).
+    /// activation-owned typed terminal wire (never inferred from exit status).
     pub capacity_failure: Option<ken_host::CapacityExhaustedV1>,
+    /// One-use selected-call gate refusal, decoded from the same owner-backed
+    /// linked terminal rather than inferred from an arbitrary negative token.
+    pub selected_call_integrity: Option<ken_host::SelectedCallIntegrityFaultV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -581,7 +630,7 @@ impl ObjectLinkerPackagingOptions {
 
     /// The same options, with a deployment-authorized profile named.
     pub fn starter_host_with_profile(
-        profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+        profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     ) -> Self {
         Self {
             boundary_resource_profile: Some(profile),
@@ -606,7 +655,7 @@ pub fn package_starter_executable_artifact(
     env: &NativeSeedEnvironment,
     output_dir: impl AsRef<Path>,
     producer: impl Into<String>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     package_starter_executable_artifact_with_options(
         program,
@@ -674,7 +723,7 @@ pub(crate) fn package_synthetic_starter_executable_artifact_with_profile(
     env: &NativeSeedEnvironment,
     output_dir: impl AsRef<Path>,
     producer: impl Into<String>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     authority: &crate::NativeProcessSymbols,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     package_starter_executable_artifact_with_authority(
@@ -876,7 +925,7 @@ fn package_starter_executable_artifact_with_authority(
 fn link_process_starter_object_artifact(
     object: crate::CraneliftObjectArtifact,
     output_dir: impl AsRef<Path>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<PathBuf, ObjectLinkerPackagingError> {
     let options = ObjectLinkerPackagingOptions::starter_host_with_profile(profile);
     let output_dir = output_dir.as_ref();
@@ -978,7 +1027,7 @@ pub fn build_bound_process_starter_executable_artifact(
     program: &RuntimeProgram,
     entrypoint: &BoundProcessEntrypoint,
     output_dir: impl AsRef<Path>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<BoundProcessExecutableArtifact, ObjectLinkerPackagingError> {
     if !entrypoint.root_execution_binding_is_valid() {
         return Err(packaging_error(
@@ -1468,7 +1517,7 @@ fn smoke_executable(
     executable_path: &Path,
     executable_relative_path: &str,
     expected_stdout: &str,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<ObjectLinkerSmokeReport, ObjectLinkerPackagingError> {
     let output = Command::new(executable_path).output().map_err(|err| {
         packaging_error(
@@ -1488,24 +1537,38 @@ fn smoke_executable(
             if trace.plan_hash == 0
                 && trace.target_abi_hash == ken_host::TARGET_ABI_MANIFEST_HASH
                 && trace.host_effect_abi_hash == ken_host::HOST_EFFECT_ABI_V1_HASH
-                && trace.terminal_value == ken_host::CAPACITY_EXHAUSTED_STATUS_V1
                 && trace.terminal_exit == ken_host::TerminalExitClass::ControlledTrap
                 && trace.effect_trace.is_empty()
             {
-                if let Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)) = trace.terminal_error {
-                    let limit = u128::from(profile.runtime.invocation_epochs);
-                    if fault.scope == ken_host::CapacityScopeV1::Runtime
-                        && fault.resource == ken_host::CapacityResourceV1::InvocationEpochs
-                        && fault.limit == limit
-                        && fault.requested == limit + 1
+                match trace.terminal_error {
+                    Some(ken_host::TerminalErrorV1::CapacityExhausted(fault))
+                        if trace.terminal_value == ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+                            && capacity_failure_matches_profile(fault, profile) =>
                     {
                         return Err(ObjectLinkerPackagingError {
                             stage: ObjectLinkerPackagingStage::SmokeExecution,
-                            field: "runtime.invocation_epochs",
-                            reason: format!("linked starter refused actual epoch begin: {fault:?}"),
+                            field: if fault.scope == ken_host::CapacityScopeV1::Runtime {
+                                "runtime.invocation_epochs"
+                            } else {
+                                "boundary_resource_profile"
+                            },
+                            reason: format!("linked starter refused authentic named capacity: {fault:?}"),
                             capacity_failure: Some(fault),
+                            selected_call_integrity: None,
                         });
                     }
+                    Some(ken_host::TerminalErrorV1::SelectedCallIntegrity(fault))
+                        if trace.terminal_value == ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1 =>
+                    {
+                        return Err(ObjectLinkerPackagingError {
+                            stage: ObjectLinkerPackagingStage::SmokeExecution,
+                            field: "selected_call_integrity",
+                            reason: format!("linked starter rejected a selected call ticket: {fault:?}"),
+                            capacity_failure: None,
+                            selected_call_integrity: Some(fault),
+                        });
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1737,6 +1800,14 @@ fn canonical_object_linker_package_bytes(package: &ObjectLinkerExecutablePackage
             .runtime
             .invocation_epochs
             .to_string(),
+    );
+    push_field(
+        &mut out, "call_event_generations",
+        &package.boundary_resource_profile.call_events.event_generations.to_string(),
+    );
+    push_field(
+        &mut out, "call_live_pending_slots",
+        &package.boundary_resource_profile.call_events.live_pending_slots.to_string(),
     );
     for scope in crate::boundary_resource_profile::BoundaryResourceScope::ALL {
         for resource in crate::boundary_resource_profile::BoundaryResource::ALL {
@@ -2037,24 +2108,27 @@ fn runtime_trap_code_tag(code: &crate::RuntimeTrapCode) -> &'static str {
 /// deployment-authorized profile. ⭐ The stub *carries* already-authorized
 /// numbers; ⛔ it is not their authority, and a package with no profile is
 /// refused before this text is ever written.
-fn starter_c_stub(profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2) -> String {
+fn starter_c_stub(profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3) -> String {
     format!(
         r#"#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-struct KenBoundaryResourceProfileV2 {{
+struct KenBoundaryResourceProfileV3 {{
     uint64_t version, size;
     uint64_t runtime_invocation_epochs;
+    uint64_t call_event_generations, call_live_pending_slots;
     uint64_t invocation_nodes, invocation_words, invocation_data_bytes, invocation_native_int_limbs;
     uint64_t persistent_nodes, persistent_words, persistent_data_bytes, persistent_native_int_limbs;
 }};
 
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV3 *profile, void **out_store, void **out_failure);
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
 extern long long ken_activation_v1_write_starter_capacity_failure(void *failure);
+extern long long ken_activation_v1_take_selected_call_failure(void *activation, void **out_failure);
+extern long long ken_activation_v1_write_starter_selected_call_failure(void *failure);
 extern long long ken_activation_v1_native_frame(const void *activation, const void **out_frame);
 extern long long ken_activation_v1_services(const void *activation, const void **out_services);
 extern long long ken_activation_v1_write_final_export(const void *activation, long long fallback, unsigned char *buffer, size_t capacity, size_t *out_len);
@@ -2063,9 +2137,10 @@ extern long long ken_activation_v1_destroy(void *activation);
 extern long long ken_nc23_entrypoint(const void *frame, const void *services);
 
 int main(void) {{
-    struct KenBoundaryResourceProfileV2 profile = {{
-        .version = {version}, .size = sizeof(struct KenBoundaryResourceProfileV2),
+    struct KenBoundaryResourceProfileV3 profile = {{
+        .version = {version}, .size = sizeof(struct KenBoundaryResourceProfileV3),
         .runtime_invocation_epochs = {runtime_epochs},
+        .call_event_generations = {call_generations}, .call_live_pending_slots = {call_slots},
         .invocation_nodes = {inv_nodes}, .invocation_words = {inv_words},
         .invocation_data_bytes = {inv_data}, .invocation_native_int_limbs = {inv_limbs},
         .persistent_nodes = {per_nodes}, .persistent_words = {per_words},
@@ -2076,7 +2151,12 @@ int main(void) {{
     void *capacity_failure = NULL;
     const void *frame = NULL;
     const void *services = NULL;
-    if (ken_boundary_store_v1_open(&profile, &store) != 0) return 1;
+    long long open_status = ken_boundary_store_v1_open(&profile, &store, &capacity_failure);
+    if (open_status != 0) {{
+        if (open_status == -7 && capacity_failure != NULL)
+            return ken_activation_v1_write_starter_capacity_failure(capacity_failure) == 0 ? 1 : 2;
+        return 2;
+    }}
     long long begin_status = ken_activation_v1_begin(store, &activation, &capacity_failure);
     if (begin_status != 0) {{
         if (begin_status == -7 && capacity_failure != NULL) {{
@@ -2098,6 +2178,16 @@ int main(void) {{
         return 1;
     }}
     long long value = ken_nc23_entrypoint(frame, services);
+    void *ticket_failure = NULL;
+    long long ticket_status = ken_activation_v1_take_selected_call_failure(activation, &ticket_failure);
+    if (ticket_status != 0) {{
+        int valid = ticket_failure != NULL && ticket_status == value &&
+            (ticket_status == -7 || ticket_status == -8);
+        int terminal = valid ? ken_activation_v1_write_starter_selected_call_failure(ticket_failure) : -1;
+        ken_activation_v1_destroy(activation);
+        ken_boundary_store_v1_destroy(store);
+        return terminal == 0 ? 1 : 2;
+    }}
     unsigned char rendered[512];
     size_t rendered_len = 0;
     int status = 0;
@@ -2115,6 +2205,8 @@ int main(void) {{
 "#,
         version = crate::boundary_resource_profile::BOUNDARY_RESOURCE_PROFILE_VERSION,
         runtime_epochs = profile.runtime.invocation_epochs,
+        call_generations = profile.call_events.event_generations,
+        call_slots = profile.call_events.live_pending_slots,
         inv_nodes = profile.invocation.nodes,
         inv_words = profile.invocation.words,
         inv_data = profile.invocation.data_bytes,
@@ -2128,7 +2220,7 @@ int main(void) {{
 
 #[cfg(test)]
 pub(crate) fn process_starter_c_stub(
-    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
     process_starter_c_stub_for_authority(1, 1, false, 1, &ken_host::FsRootSpec::default(), profile)
 }
@@ -2139,7 +2231,7 @@ fn process_starter_c_stub_for_authority(
     allow_root_execution: bool,
     root_denied_exit_status: i32,
     fs_root_spec: &ken_host::FsRootSpec,
-    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
     r#"#include <stdint.h>
 #include <stdio.h>
@@ -2172,9 +2264,10 @@ struct KenArena {
    dead -- nothing referenced it -- but a dead private copy of native-Int layout
    is still a private copy of native-Int layout, and neither the build nor the
    link discriminates it. */
-struct KenBoundaryResourceProfileV2 {
+struct KenBoundaryResourceProfileV3 {
     uint64_t version, size;
     uint64_t runtime_invocation_epochs;
+    uint64_t call_event_generations, call_live_pending_slots;
     uint64_t invocation_nodes, invocation_words, invocation_data_bytes, invocation_native_int_limbs;
     uint64_t persistent_nodes, persistent_words, persistent_data_bytes, persistent_native_int_limbs;
 };
@@ -2186,10 +2279,12 @@ struct KenHostInitResultV1 {
 };
 
 extern long long ken_nc23_entrypoint(const void *frame, const void *services);
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV3 *profile, void **out_store, void **out_failure);
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
 extern long long ken_activation_v1_finish_capacity_failure(void *context, void *failure);
+extern long long ken_activation_v1_take_selected_call_failure(void *activation, void **out_failure);
+extern long long ken_activation_v1_finish_selected_call_failure(void *context, void *failure);
 extern long long ken_activation_v1_services(const void *activation, const void **out_services);
 extern long long ken_activation_v1_bind_process_frame(void *activation, const void *process_input, void *host_context, uint64_t capability, const void **out_frame);
 extern long long ken_activation_v1_finish(void *activation, void *store, uint64_t escaping, uint64_t *out_word);
@@ -2345,9 +2440,10 @@ int main(int argc, char **argv, char **envp) {
         host_init.plan_hash != KEN_ENTRYPOINT_PLAN_HASH) {
         free(pool); free(cwd); return 1;
     }
-    struct KenBoundaryResourceProfileV2 profile = {
-        .version = __KEN_PROFILE_VERSION__, .size = sizeof(struct KenBoundaryResourceProfileV2),
+    struct KenBoundaryResourceProfileV3 profile = {
+        .version = __KEN_PROFILE_VERSION__, .size = sizeof(struct KenBoundaryResourceProfileV3),
         .runtime_invocation_epochs = __KEN_PROFILE_RUNTIME_EPOCHS__,
+        .call_event_generations = __KEN_PROFILE_CALL_GENERATIONS__, .call_live_pending_slots = __KEN_PROFILE_CALL_SLOTS__,
         .invocation_nodes = __KEN_PROFILE_INV_NODES__, .invocation_words = __KEN_PROFILE_INV_WORDS__,
         .invocation_data_bytes = __KEN_PROFILE_INV_DATA__, .invocation_native_int_limbs = __KEN_PROFILE_INV_LIMBS__,
         .persistent_nodes = __KEN_PROFILE_PER_NODES__, .persistent_words = __KEN_PROFILE_PER_WORDS__,
@@ -2358,8 +2454,11 @@ int main(int argc, char **argv, char **envp) {
     void *capacity_failure = NULL;
     const void *frame = NULL;
     const void *services = NULL;
-    if (ken_boundary_store_v1_open(&profile, &store) != 0) {
-        ken_host_invocation_v1_destroy(host_init.context);
+    long long open_status = ken_boundary_store_v1_open(&profile, &store, &capacity_failure);
+    if (open_status != 0) {
+        if (open_status == -7 && capacity_failure != NULL)
+            ken_activation_v1_finish_capacity_failure(host_init.context, capacity_failure);
+        else ken_host_invocation_v1_destroy(host_init.context);
         free(pool); free(cwd); return 1;
     }
     long long begin_status = ken_activation_v1_begin(store, &activation, &capacity_failure);
@@ -2378,7 +2477,18 @@ int main(int argc, char **argv, char **envp) {
         free(pool); free(cwd); return 1;
     }
     long long value = ken_nc23_entrypoint(frame, services);
-    long long finish_status = ken_host_invocation_v1_finish(host_init.context, value);
+    void *ticket_failure = NULL;
+    long long ticket_status = ken_activation_v1_take_selected_call_failure(activation, &ticket_failure);
+    long long finish_status;
+    if (ticket_status != 0) {
+        if (ticket_failure != NULL && ticket_status == value &&
+            (ticket_status == -7 || ticket_status == -8))
+            finish_status = ken_activation_v1_finish_selected_call_failure(host_init.context, ticket_failure);
+        else {
+            ken_host_invocation_v1_destroy(host_init.context);
+            finish_status = -1;
+        }
+    } else finish_status = ken_host_invocation_v1_finish(host_init.context, value);
     uint64_t adopted = 0;
     ken_activation_v1_finish(activation, store, 0, &adopted);
     ken_activation_v1_destroy(activation);
@@ -2386,6 +2496,7 @@ int main(int argc, char **argv, char **envp) {
     free(cwd);
     free(pool);
     if (finish_status != 0) return 1;
+    if (ticket_status != 0) return 1;
     if (value == -1) fputs("ken native trap: malformed borrowed process input\n", stderr);
     else if (value == -2) fputs("ken native trap: entrypoint returned a malformed ExitCode\n", stderr);
     else if (value == -3) fputs("ken native trap: malformed ExitCode::Failure payload\n", stderr);
@@ -2402,6 +2513,8 @@ int main(int argc, char **argv, char **envp) {
         &crate::boundary_resource_profile::BOUNDARY_RESOURCE_PROFILE_VERSION.to_string(),
     )
     .replace("__KEN_PROFILE_RUNTIME_EPOCHS__", &profile.runtime.invocation_epochs.to_string())
+    .replace("__KEN_PROFILE_CALL_GENERATIONS__", &profile.call_events.event_generations.to_string())
+    .replace("__KEN_PROFILE_CALL_SLOTS__", &profile.call_events.live_pending_slots.to_string())
     .replace("__KEN_PROFILE_INV_NODES__", &profile.invocation.nodes.to_string())
     .replace("__KEN_PROFILE_INV_WORDS__", &profile.invocation.words.to_string())
     .replace("__KEN_PROFILE_INV_DATA__", &profile.invocation.data_bytes.to_string())
@@ -2479,6 +2592,7 @@ fn packaging_error(
         field,
         reason: reason.into(),
         capacity_failure: None,
+        selected_call_integrity: None,
     }
 }
 
@@ -2558,6 +2672,8 @@ mod tests {
             signed_root_token(u64::from(u32::MAX) + 1),
             -3, // the pre-fold dynamic-constructor residual
             -4, // the pre-fold root generated-unit collapse
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1, // no owner-backed typed fault
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1, // no owner-backed gate fault
             i64::MIN,
         ];
         for terminal_value in values {
@@ -2837,6 +2953,194 @@ mod tests {
         let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("typed starter wire");
         assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::CapacityExhausted(expected)));
         assert!(trace.effect_trace.is_empty());
+    }
+
+    /// Real two-level selected worker: the inner worker captures the outer
+    /// runtime input, then its own one-use checked target returns that capture.
+    fn selected_worker_body_with(result: RuntimeExpr) -> RuntimeExpr {
+        let worker = RuntimeExpr::LexicalClosure {
+            captures: vec![RuntimeExpr::Var(0), RuntimeExpr::Value(RuntimeValue::Int(3.into()))],
+            params: vec!["y".to_string()],
+            body: Box::new(RuntimeExpr::Var(1)),
+        };
+        RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(), params: vec!["x".to_string()],
+                body: Box::new(RuntimeExpr::Let {
+                    value: Box::new(worker),
+                    body: Box::new(RuntimeExpr::Call {
+                        callee: Box::new(RuntimeExpr::Var(0)),
+                        args: vec![RuntimeExpr::Value(RuntimeValue::Int(100.into()))],
+                    }),
+                }),
+            }),
+            args: vec![result],
+        }
+    }
+
+    fn selected_worker_body() -> RuntimeExpr {
+        selected_worker_body_with(RuntimeExpr::Value(RuntimeValue::Int(10.into())))
+    }
+
+    /// Linked negative for an unrepresentable named persistent grant. This
+    /// uses the actual C open path, not a manufactured trace or a bare status.
+    #[test]
+    fn nonprocess_starter_preserves_named_persistent_reservation_fault() {
+        let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int(42.into()));
+        let program = starter_program(int_body(42), observation);
+        let (report, entrypoint) = packaged_entrypoint(&program);
+        let run_report = runtime_ir_run_report(&program);
+        let support = platform_support(&program, &entrypoint, &run_report);
+        let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+        let mut profile = env.profile();
+        profile.persistent.words = usize::MAX;
+        let dir = temp_output_dir("region-open-typed");
+        let refusal = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &dir,
+            "real-starter named persistent refusal", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect_err("unrepresentable persistent words must refuse at C open");
+        assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        let fault = refusal.capacity_failure.expect("linked terminal must be typed");
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Persistent);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+        assert_eq!(fault.requested, usize::MAX as u128);
+        assert_eq!(fault.limit, (isize::MAX as usize / 8) as u128);
+        let linked_path = dir.join(ObjectLinkerPackagingOptions::starter_host_with_profile(profile).executable_relative_path);
+        let linked = Command::new(linked_path).output().expect("linked starter ran");
+        assert_eq!(linked.status.code(), Some(1));
+        assert!(linked.stdout.is_empty());
+        let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("typed linked terminal");
+        assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)));
+        assert!(trace.effect_trace.is_empty());
+        let _ = report;
+    }
+
+    /// Real linked nonprocess path: generated issue declines zero generations,
+    /// C takes the activation-owned in-flight fault, and the observer decodes
+    /// the exact named terminal. No function body or effect executes.
+    #[test]
+    fn nonprocess_starter_preserves_in_flight_selected_generation_fault() {
+        let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int(10.into()));
+        let program = starter_program(selected_worker_body(), observation);
+        let (_report, entrypoint) = packaged_entrypoint(&program);
+        let run_report = runtime_ir_run_report(&program);
+        let support = platform_support(&program, &entrypoint, &run_report);
+        let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+        let mut profile = env.profile();
+        profile.call_events.event_generations = 1;
+        profile.call_events.live_pending_slots = 1;
+        let good = temp_output_dir("inflight-generation-at-limit");
+        let package = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &good,
+            "selected call at-limit one generation", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect("one selected event consumes the exact generation and slot limit");
+        assert!(package.smoke.passed);
+        assert_eq!(package.smoke.stdout, "10\n");
+        profile.call_events.event_generations = 0;
+        let dir = temp_output_dir("inflight-generation-typed");
+        let refusal = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &dir,
+            "real selected call in-flight exhaustion", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect_err("selected call cannot issue generation one under zero ceiling");
+        assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        assert_eq!(refusal.selected_call_integrity, None);
+        assert_eq!(refusal.capacity_failure, Some(ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Invocation,
+            resource: ken_host::CapacityResourceV1::EventGenerations,
+            limit: 0, requested: 1,
+        }));
+        let linked_path = dir.join(ObjectLinkerPackagingOptions::starter_host_with_profile(profile).executable_relative_path);
+        let linked = Command::new(linked_path).output().expect("linked starter ran");
+        assert_eq!(linked.status.code(), Some(1));
+        assert!(linked.stdout.is_empty(), "no selected callee result before issuance");
+        let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("typed terminal");
+        assert_eq!(trace.terminal_error, refusal.capacity_failure.map(ken_host::TerminalErrorV1::CapacityExhausted));
+        assert!(trace.effect_trace.is_empty());
+
+        profile.call_events.event_generations = 1;
+        profile.call_events.live_pending_slots = 0;
+        let no_slots = temp_output_dir("inflight-slot-typed");
+        let refusal = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &no_slots,
+            "real selected call no live slot", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect_err("zero live slots refuses at selected issue");
+        let expected = ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Invocation,
+            resource: ken_host::CapacityResourceV1::LivePendingSlots,
+            limit: 0, requested: 1,
+        };
+        assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        assert_eq!(refusal.selected_call_integrity, None);
+        assert_eq!(refusal.capacity_failure, Some(expected));
+        let linked_path = no_slots.join(ObjectLinkerPackagingOptions::starter_host_with_profile(profile).executable_relative_path);
+        let linked = Command::new(linked_path).output().expect("zero-slot linked starter ran");
+        assert_eq!(linked.status.code(), Some(1));
+        assert!(linked.stdout.is_empty());
+        let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("slot terminal decodes");
+        assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::CapacityExhausted(expected)));
+        assert!(trace.effect_trace.is_empty());
+    }
+
+    /// A selected worker's compiled gate, not an issuer-only unit test,
+    /// rejects both mutated inputs before its callee runs. The linked starter
+    /// obtains the owner-recorded integrity terminal and encodes wire tag 4.
+    #[test]
+    fn nonprocess_starter_preserves_selected_call_integrity_from_real_gate() {
+        use crate::cranelift_backend::{
+            SelectedTicketGateMutation, with_selected_ticket_gate_mutation,
+        };
+        let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int(10.into()));
+        let program = starter_program(selected_worker_body(), observation);
+        let run_report = runtime_ir_run_report(&program);
+        let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+        let mut profile = env.profile();
+        profile.call_events.event_generations = 1;
+        profile.call_events.live_pending_slots = 1;
+        for (mutation, expected, dir_name) in [
+            (SelectedTicketGateMutation::WrongTarget,
+                ken_host::SelectedCallIntegrityFaultV1::WrongTarget, "linked-wrong-target"),
+            (SelectedTicketGateMutation::DuplicateConsume,
+                ken_host::SelectedCallIntegrityFaultV1::Spent, "linked-duplicate"),
+        ] {
+            let dir = temp_output_dir(dir_name);
+            // Emit the same authenticated synthetic program directly to an
+            // object: the package builder runs JIT comparison first and would
+            // correctly refuse the deliberately mutated gate before linking.
+            let (object, reached) = with_selected_ticket_gate_mutation(mutation, ||
+                crate::cranelift_backend::emit_synthetic_runtime_ir_object_with_cranelift(
+                    &program, &run_report, &env, STARTER_ENTRY_SYMBOL,
+                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+                )
+            );
+            assert!(reached > 0, "the mutation never reached an emitted gate");
+            let object = object.expect("mutated gate still emits an object");
+            let options = ObjectLinkerPackagingOptions::starter_host_with_profile(profile);
+            let object_path = dir.join(&options.object_relative_path);
+            let stub_path = dir.join(&options.stub_relative_path);
+            let linked_path = dir.join(&options.executable_relative_path);
+            fs::write(&object_path, object.object_bytes).expect("compiled object written");
+            fs::write(&stub_path, starter_c_stub(&profile)).expect("real starter stub written");
+            link_starter_executable(&options.linker_command, &object_path, &stub_path,
+                &linked_path, Some(&ken_runtime_staticlib().expect("runtime support archive")))
+                .expect("real starter links with same activation ABI");
+            let linked = Command::new(&linked_path).output().expect("linked gate runs");
+            assert_eq!(linked.status.code(), Some(1));
+            assert!(linked.stdout.is_empty());
+            let trace = ken_host::decode_linked_effect_trace(&linked.stderr)
+                .expect("authentic gate terminal decodes");
+            assert_eq!(trace.terminal_value, ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+            assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::SelectedCallIntegrity(expected)));
+            assert!(trace.effect_trace.is_empty());
+            let classified = smoke_executable(&linked_path, &options.executable_relative_path,
+                "10\n", profile).expect_err("packaging must preserve the real gate refusal");
+            assert_eq!(classified.stage, ObjectLinkerPackagingStage::SmokeExecution);
+            assert_eq!(classified.selected_call_integrity, Some(expected));
+            assert_eq!(classified.capacity_failure, None);
+        }
     }
 
     fn generic_big_int_program() -> RuntimeProgram {
@@ -4343,25 +4647,25 @@ mod tests {
         assert_eq!(err.field, "platform_target");
     }
 
-    /// The authorized profile is in the package identity: all eight existing
-    /// boundary limits and the process-wide epoch limit are separate inputs.
+    /// The authorized profile is in the package identity: all eight region
+    /// limits, the process epoch, and both call-event bounds are separate inputs.
     ///
     /// ⚠ **Recording it as metadata alone would not do**, and that is the whole
     /// point: two packages built with **different authorized resource policy**
     /// would then share one identity, and a consumer checking identity could not
     /// tell them apart. ⇒ Two profiles, two packages.
     ///
-    /// Each limit is perturbed separately, including the epoch limit, so the
-    /// identity cannot pass by encoding only the boundary limits. A single
+    /// Each limit is perturbed separately, including epochs and call events,
+    /// so identity cannot pass by encoding only the region limits. A single
     /// "change the profile" assertion would miss an omitted field.
     ///
-    /// **MEASURED:** independently perturbing the epoch or any boundary limit
+    /// **MEASURED:** independently perturbing epoch, call event or region limit
     /// changes `object_linker_executable_package_hash` to a distinct identity.
     /// **CLAIMED:** the profile is part of the package identity.
     /// **THE GAP:** ⛔ that a consumer *checks* identity before trusting a
     /// package. That is the consumer's obligation and is not this node's.
     #[test]
-    fn each_authorized_boundary_and_epoch_limit_is_part_of_the_package_identity() {
+    fn each_authorized_deployment_limit_is_part_of_the_package_identity() {
         use crate::boundary_resource_profile::{BoundaryResource, BoundaryResourceScope};
 
         let observation = RuntimeObservation::Returned(RuntimeGroundValue::Bool(true));
@@ -4412,6 +4716,22 @@ mod tests {
             "the runtime epoch bound is not in package identity"
         );
         assert!(identities.insert(epoch_hash));
+        for resource in [
+            ken_host::CapacityResourceV1::EventGenerations,
+            ken_host::CapacityResourceV1::LivePendingSlots,
+        ] {
+            let mut perturbed = package.clone();
+            match resource {
+                ken_host::CapacityResourceV1::EventGenerations =>
+                    perturbed.boundary_resource_profile.call_events.event_generations -= 1,
+                ken_host::CapacityResourceV1::LivePendingSlots =>
+                    perturbed.boundary_resource_profile.call_events.live_pending_slots += 1,
+                _ => unreachable!("the two explicit call-event resources are closed"),
+            }
+            let moved = object_linker_executable_package_hash(&perturbed);
+            assert_ne!(moved, baseline, "the {resource:?} limit is absent from package identity");
+            assert!(identities.insert(moved), "two named resources hashed the same policy");
+        }
         for scope in BoundaryResourceScope::ALL {
             for resource in BoundaryResource::ALL {
                 let mut perturbed = package.clone();
@@ -4445,8 +4765,8 @@ mod tests {
         }
         assert_eq!(
             identities.len(),
-            2 + BoundaryResourceScope::ALL.len() * BoundaryResource::ALL.len(),
-            "baseline, epoch, and every existing boundary region limit differ"
+            4 + BoundaryResourceScope::ALL.len() * BoundaryResource::ALL.len(),
+            "baseline, epoch, both call resources and every boundary region limit differ"
         );
     }
 

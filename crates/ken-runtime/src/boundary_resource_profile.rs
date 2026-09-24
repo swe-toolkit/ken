@@ -10,19 +10,20 @@
 //! rules that it is **deployment resource policy**, ⛔ not compiler semantics
 //! and ⛔ not an emitter-derived formula.
 //!
-//! ## Eight boundary quantities and one process-wide epoch budget
+//! ## Eight region limits, one epoch limit, and two call-event limits
 //!
 //! Two regions — the **invocation** arena and the **persistent** image — each
-//! meter nodes, child words, data bytes, and native-`Int` limbs. The boundary
-//! product has eight limits, exactly the eight reserve arguments. The process
+//! meter nodes, child words, data bytes, and native-`Int` limbs. These are the
+//! eight region limits, exactly the eight reserve arguments. The process
 //! additionally meters activation epochs independently across all stores;
-//! ending one store cannot replenish this process-wide budget.
+//! ending one store cannot replenish this process-wide budget. Each activation
+//! separately limits call-event generations and live pending-call slots.
 //!
 //! ## ⛔ No default, and that is enforced by the compiler rather than by review
 //!
-//! [`BoundaryResourceProfileV2`] deliberately has **no `Default` impl** and
+//! [`BoundaryResourceProfileV3`] deliberately has **no `Default` impl** and
 //! **no partial constructor**, and its limits are named public fields. ⇒ Every
-//! construction site must write all nine numbers out, and there is no
+//! construction site must write all eleven limits out, and there is no
 //! `..Default::default()` to hide behind. ⚠ A `new()` taking four same-typed
 //! `usize` positionals would have been the transposition hazard this shape
 //! removes: swapping *words* and *data bytes* would compile, run, and be wrong.
@@ -181,14 +182,25 @@ pub struct RuntimeResourceLimitsV2 {
     pub invocation_epochs: u64,
 }
 
+/// Finite capacity for call-event authority owned by each activation. A
+/// generation is consumed permanently by an issuance attempt that succeeds;
+/// a live slot is reusable only after the checked one-use consumption.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct InvocationCallLimitsV3 {
+    pub event_generations: u64,
+    pub live_pending_slots: usize,
+}
+
 /// **The versioned, deployment-supplied boundary resource profile.**
 ///
 /// ⛔ No `Default`, no partial constructor, no widening. See the module doc for
 /// why that is structural rather than a convention.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct BoundaryResourceProfileV2 {
+pub struct BoundaryResourceProfileV3 {
     /// Process-wide limits; shared across stores and activations in this OS process.
     pub runtime: RuntimeResourceLimitsV2,
+    /// Per-activation call-event issuance and fixed live-ticket backing.
+    pub call_events: InvocationCallLimitsV3,
     /// Limits for the per-activation arena.
     pub invocation: BoundaryRegionLimitsV1,
     /// Limits for the store-owned persistent image.
@@ -200,9 +212,9 @@ pub struct BoundaryResourceProfileV2 {
 /// ⭐ Carried so a recorded package provenance can be read back and rejected by
 /// a runtime that does not implement its schema, rather than being reinterpreted
 /// under a layout it does not have.
-pub const BOUNDARY_RESOURCE_PROFILE_VERSION: u32 = 2;
+pub const BOUNDARY_RESOURCE_PROFILE_VERSION: u32 = 3;
 
-impl BoundaryResourceProfileV2 {
+impl BoundaryResourceProfileV3 {
     /// One limit, by the `(scope, resource)` pair.
     ///
     /// ⭐ Total over `ALL × ALL` — which is what lets `AC-4`'s eight cases be
@@ -236,10 +248,14 @@ impl BoundaryResourceProfileV2 {
 /// [`crate::object_linker_packaging::ObjectLinkerPackagingStage::ResourceProfile`]
 /// before anything is emitted. ⛔ If this were reachable as a fallback it would
 /// be the banned default wearing a constructor's name.
-pub const fn starter_smoke_profile() -> BoundaryResourceProfileV2 {
-    BoundaryResourceProfileV2 {
+pub const fn starter_smoke_profile() -> BoundaryResourceProfileV3 {
+    BoundaryResourceProfileV3 {
         runtime: RuntimeResourceLimitsV2 {
             invocation_epochs: u64::MAX,
+        },
+        call_events: InvocationCallLimitsV3 {
+            event_generations: u64::MAX,
+            live_pending_slots: 64,
         },
         invocation: BoundaryRegionLimitsV1 {
             nodes: 64,
@@ -335,11 +351,12 @@ mod tests {
     /// ⚠ ⛔ **A fixture with equal limits cannot detect a transposition** — the
     /// `(scope, resource)` lookup would return the right number for the wrong
     /// reason, and every assertion below would pass on a broken table.
-    fn distinct_profile() -> BoundaryResourceProfileV2 {
-        BoundaryResourceProfileV2 {
+    fn distinct_profile() -> BoundaryResourceProfileV3 {
+        BoundaryResourceProfileV3 {
             runtime: RuntimeResourceLimitsV2 {
                 invocation_epochs: u64::MAX,
             },
+            call_events: InvocationCallLimitsV3 { event_generations: 17, live_pending_slots: 9 },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: 11,
                 words: 22,
@@ -511,10 +528,11 @@ mod tests {
     /// ⚠ **Zero is a legal, explicit limit** — it means "no room", not "unset".
     #[test]
     fn a_zero_limit_is_explicit_and_is_not_an_absent_profile() {
-        let profile = BoundaryResourceProfileV2 {
+        let profile = BoundaryResourceProfileV3 {
             runtime: RuntimeResourceLimitsV2 {
                 invocation_epochs: u64::MAX,
             },
+            call_events: InvocationCallLimitsV3 { event_generations: 17, live_pending_slots: 9 },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: 0,
                 words: 0,

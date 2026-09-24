@@ -260,6 +260,8 @@ fn run_dynamic_constructor_dispatch_fixture(
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
+            selected_call_issue: None,
+            selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
             native_int_arena: None,
@@ -2000,6 +2002,8 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
+            selected_call_issue: None,
+            selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
             native_int_arena: None,
@@ -2309,10 +2313,10 @@ fn c1_d3_a_carried_operand_survives_case_env_and_nested_lowering() {
 pub(super) fn ac_c7_bind_arena(
     store: &mut crate::boundary_value::BoundaryValueStore,
 ) -> (crate::boundary_value::BoundaryArenaV1, *mut u64) {
-    store.reserve_persistent(64, 256, 512, 0);
+    store.reserve_persistent(64, 256, 512, 0).expect("test persistent region is reservable");
     let persistent = store.publish_persistent();
     let mut arena = crate::boundary_value::BoundaryArenaBuilder::new().finish();
-    arena.reserve(64, 256, 512, 0);
+    arena.reserve(64, 256, 512, 0).expect("test invocation region is reservable");
     arena.bind_persistent(Some(persistent as *const u64));
     let base = arena.publish();
     (arena, base)
@@ -6058,10 +6062,10 @@ fn b2f_d9_bind_wide_arena(
     store: &mut crate::boundary_value::BoundaryValueStore,
     native: &crate::native_int::NativeIntArenaV1,
 ) -> (crate::boundary_value::BoundaryArenaV1, *mut u64) {
-    store.reserve_persistent(64, 256, 512, 64);
+    store.reserve_persistent(64, 256, 512, 64).expect("test persistent region is reservable");
     let persistent = store.publish_persistent();
     let mut arena = crate::boundary_value::BoundaryArenaBuilder::new().finish();
-    arena.reserve(64, 256, 512, 64);
+    arena.reserve(64, 256, 512, 64).expect("test invocation region is reservable");
     arena.bind_persistent(Some(persistent as *const u64));
     arena.bind_native_int(Some(native as *const _ as *const u64));
     let base = arena.publish();
@@ -7418,6 +7422,155 @@ fn static_worker_witness_runs_and_distinguishes_capture_order() {
         observed, swapped_observed,
         "swapping the capture order must change the linked result"
     );
+}
+
+/// Durable selected-worker gate: the same compiled real call succeeds at a
+/// one-generation bound, and returns the exact typed in-flight resource fault
+/// at zero before a callee is invoked. This exercises generated issue and
+/// consume, not a direct invocation of the issuer test double.
+#[test]
+fn selected_worker_call_obeys_generated_generation_gate() {
+    let witness = static_worker_witness(true);
+    let baseline = crate::boundary_resource_profile::starter_smoke_profile();
+    let compiled = || crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
+        &witness, &NativeSeedEnvironment::empty(baseline),
+    ).expect("static worker lowers against the exact declared target");
+    let mut one = baseline;
+    one.call_events.event_generations = 1;
+    one.call_events.live_pending_slots = 1;
+    let success = compiled().run_with_profile(None, one).expect("at-limit selected call");
+    assert!(matches!(success.0, RuntimeObservation::Returned(_)));
+    let mut zero = one;
+    zero.call_events.event_generations = 0;
+    let refused = compiled().run_with_profile(None, zero).unwrap_err();
+    assert_eq!(refused, CraneliftBackendError::CapacityExhausted(
+        ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Invocation,
+            resource: ken_host::CapacityResourceV1::EventGenerations,
+            limit: 0,
+            requested: 1,
+        }
+    ));
+    let mut no_slots = one;
+    no_slots.call_events.live_pending_slots = 0;
+    assert_eq!(compiled().run_with_profile(None, no_slots).unwrap_err(),
+        CraneliftBackendError::CapacityExhausted(ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Invocation,
+            resource: ken_host::CapacityResourceV1::LivePendingSlots,
+            limit: 0,
+            requested: 1,
+        })
+    );
+}
+
+/// Real emitted gate negatives: a compile-preserving wrong selected callee or
+/// a second consume at the same gate returns an owner-recorded integrity fault,
+/// before any borrowed operand is packed into the callee frame.
+#[test]
+fn selected_worker_generated_gate_rejects_wrong_target_and_duplicate() {
+    use crate::cranelift_backend::lowering::calls::{
+        with_selected_ticket_gate_mutation, SelectedTicketGateMutation,
+    };
+    let witness = static_worker_witness(true);
+    let mut profile = crate::boundary_resource_profile::starter_smoke_profile();
+    profile.call_events.event_generations = 1;
+    profile.call_events.live_pending_slots = 1;
+    for (mutation, expected) in [
+        (SelectedTicketGateMutation::WrongTarget, ken_host::SelectedCallIntegrityFaultV1::WrongTarget),
+        (SelectedTicketGateMutation::DuplicateConsume, ken_host::SelectedCallIntegrityFaultV1::Spent),
+    ] {
+        let (compiled, applied) = with_selected_ticket_gate_mutation(mutation, || {
+            crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
+                &witness, &NativeSeedEnvironment::empty(profile),
+            ).expect("targeted gate still compiles")
+        });
+        assert!(applied > 0, "mutation did not reach a selected gate");
+        assert_eq!(compiled.run_with_profile(None, profile).unwrap_err(),
+            CraneliftBackendError::SelectedCallIntegrity(expected));
+    }
+}
+
+fn successive_selected_worker_witness(count: usize) -> RuntimeExpr {
+    let mut body = static_worker_witness(true);
+    for _ in 1..count {
+        body = RuntimeExpr::Let {
+            value: Box::new(static_worker_witness(true)),
+            body: Box::new(body),
+        };
+    }
+    body
+}
+
+/// At-limit and one-past for a sequence of actual generated selected calls.
+/// Each call consumes a real ticket, releasing slot zero but not replenishing
+/// the activation's monotonic generation budget.
+#[test]
+fn successive_selected_workers_refuse_one_past_generation_before_third_call() {
+    let mut profile = crate::boundary_resource_profile::starter_smoke_profile();
+    profile.call_events.event_generations = 2;
+    profile.call_events.live_pending_slots = 1;
+    let compiled = |count| crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
+        &successive_selected_worker_witness(count), &NativeSeedEnvironment::empty(profile),
+    ).expect("independently selected worker calls compile");
+    assert!(matches!(compiled(2).run_with_profile(None, profile).unwrap().0,
+        RuntimeObservation::Returned(_)));
+    assert_eq!(compiled(3).run_with_profile(None, profile).unwrap_err(),
+        CraneliftBackendError::CapacityExhausted(ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Invocation,
+            resource: ken_host::CapacityResourceV1::EventGenerations,
+            limit: 2, requested: 3,
+        }));
+}
+
+/// Once the first real call consumes slot zero, the second real selected call
+/// issues generation two in that slot. Replaying the first ticket to the
+/// emitted consuming gate rejects the stale generation before the second call.
+#[test]
+fn selected_worker_generated_gate_rejects_reused_slot_generation() {
+    use crate::activation_abi::with_replayed_spent_slot_ticket;
+    let mut profile = crate::boundary_resource_profile::starter_smoke_profile();
+    profile.call_events.event_generations = 2;
+    profile.call_events.live_pending_slots = 1;
+    let compiled = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
+        &successive_selected_worker_witness(2), &NativeSeedEnvironment::empty(profile),
+    ).expect("both selected worker calls compile");
+    let (refused, applied) = with_replayed_spent_slot_ticket(||
+        compiled.run_with_profile(None, profile));
+    assert_eq!(applied, 1, "exactly the second selected issuance was replayed");
+    assert_eq!(refused.unwrap_err(), CraneliftBackendError::SelectedCallIntegrity(
+        ken_host::SelectedCallIntegrityFaultV1::StaleGeneration));
+}
+
+/// A copied ticket outlives its first activation without carrying a services
+/// pointer. The next activation may reuse slot zero and generation one; its
+/// generated consuming gate still checks the process epoch and refuses it.
+#[test]
+fn selected_worker_generated_gate_rejects_copied_ticket_after_activation_reuse() {
+    use crate::activation_abi::{ken_selected_call_v1_issue, with_copied_old_ticket_at_issue};
+    use crate::invocation_tickets::SelectedCallTicketV1;
+    let mut profile = crate::boundary_resource_profile::starter_smoke_profile();
+    profile.call_events.event_generations = 1;
+    profile.call_events.live_pending_slots = 1;
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let binding = crate::boundary_activation::BoundaryStoreBindingV1::open(&mut store, profile)
+        .expect("first activation store");
+    let mut first = crate::boundary_activation::BoundaryActivationV1::begin(&binding)
+        .expect("first distinct process epoch");
+    let services = first.services_ptr().expect("owner-published services")
+        .cast::<crate::activation_services::GeneratedActivationServicesV1>();
+    let mut old = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+    assert_eq!(unsafe { ken_selected_call_v1_issue(services, 17, 29, old.as_mut_ptr()) }, 0);
+    let old = unsafe { old.assume_init() };
+    drop(first);
+    let witness = static_worker_witness(true);
+    let compiled = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
+        &witness, &NativeSeedEnvironment::empty(profile),
+    ).expect("same selected program still compiles");
+    let (refused, applied) = with_copied_old_ticket_at_issue(old, ||
+        compiled.run_with_profile(None, profile));
+    assert!(applied > 0, "old ticket was never supplied to the emitted gate");
+    assert_eq!(refused.unwrap_err(), CraneliftBackendError::SelectedCallIntegrity(
+        ken_host::SelectedCallIntegrityFaultV1::WrongActivation));
 }
 
 /// `AC-8`/judgment 3 -- **the binding is NOT affine.** An installed worker

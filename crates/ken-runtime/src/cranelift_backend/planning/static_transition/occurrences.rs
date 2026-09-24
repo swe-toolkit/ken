@@ -34,6 +34,12 @@ use crate::RuntimeExpr;
 pub(in crate::cranelift_backend) struct StaticOriginId(pub(super) u32);
 
 impl StaticOriginId {
+    /// Read the planner-minted body identity for the runtime ticket. This is
+    /// deliberately read-only: no lowering path can mint an origin from u32.
+    pub(in crate::cranelift_backend) const fn ticket_body_ordinal(self) -> u32 {
+        self.0
+    }
+
     /// Construct an origin for a TEST only.
     ///
     /// The field stays `pub(super)` so production code outside this module

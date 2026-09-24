@@ -103,7 +103,7 @@ impl CompiledModule<JITModule> {
     pub(super) fn run_with_profile(
         mut self,
         process_root: Option<*const std::ffi::c_void>,
-        profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+        profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     ) -> Result<(RuntimeObservation, Option<i64>), CraneliftBackendError> {
         if let Some(trap) = self.trap {
             return Ok((RuntimeObservation::Trapped(trap), None));
@@ -124,7 +124,12 @@ impl CompiledModule<JITModule> {
             }
         }
         let binding = crate::boundary_activation::BoundaryStoreBindingV1::open(&mut store, profile)
-            .map_err(CraneliftBackendError::ProfileMismatch)?;
+            .map_err(|failure| match failure {
+                crate::boundary_activation::BoundaryStoreOpenErrorV2::ProfileMismatch(error) =>
+                    CraneliftBackendError::ProfileMismatch(error),
+                crate::boundary_activation::BoundaryStoreOpenErrorV2::CapacityExhausted(error) =>
+                    CraneliftBackendError::CapacityExhausted(error),
+            })?;
         let mut activation = crate::boundary_activation::BoundaryActivationV1::begin(&binding)
             .map_err(CraneliftBackendError::CapacityExhausted)?;
         let process_root = process_root
@@ -142,6 +147,22 @@ impl CompiledModule<JITModule> {
             >(code)
         };
         let token = native(process_root, services);
+        if let Some(fault) = activation.call_event_issuer()
+            .and_then(|issuer| issuer.take_terminal_fault())
+        {
+            return match fault {
+                crate::invocation_tickets::IssuerTerminalFaultV1::Capacity(failure)
+                    if token == ken_host::CAPACITY_EXHAUSTED_STATUS_V1 =>
+                        Err(CraneliftBackendError::CapacityExhausted(failure)),
+                crate::invocation_tickets::IssuerTerminalFaultV1::Integrity(failure)
+                    if token == ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1 =>
+                        Err(CraneliftBackendError::SelectedCallIntegrity(failure)),
+                _ => Err(backend_module(
+                    "generated status disagrees with the activation-owned selected-call terminal"
+                        .to_string(),
+                )),
+            };
+        }
         let decoder = self
             .decoder
             .ok_or_else(|| backend(BackendFailure::NativeResultDecode { token }))?;

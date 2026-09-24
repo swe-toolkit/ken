@@ -4117,22 +4117,45 @@ pub struct RuntimeTrapProvenanceV1 {
 /// capacity refusal. The observer must reject this status without its exact
 /// typed terminal record, and must reject that record with any other status.
 pub const CAPACITY_EXHAUSTED_STATUS_V1: i64 = -7;
+/// Reserved generated-root status for an owner-recorded call-ticket integrity
+/// fault. This is not a planner trap or a capacity refusal.
+pub const SELECTED_CALL_INTEGRITY_STATUS_V1: i64 = -8;
+
+/// Failed one-use authentication at the activation-owned consuming gate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SelectedCallIntegrityFaultV1 {
+    WrongActivation,
+    InvalidSlot,
+    StaleGeneration,
+    Spent,
+    WrongTarget,
+}
 
 /// Scope of a declared native-runtime capacity. Only advertised resources
 /// belong here; adding a resource must extend the linked-wire codec.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CapacityScopeV1 {
     Runtime,
+    Invocation,
+    Persistent,
 }
 
 /// A named, actually metered capacity, not an allocator error or planner trap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CapacityResourceV1 {
     InvocationEpochs,
+    EventGenerations,
+    LivePendingSlots,
+    Nodes,
+    Words,
+    DataBytes,
+    NativeIntLimbs,
 }
 
-/// Exact refusal of a deployment-declared finite limit. `requested` is wider
-/// than the epoch counter so even a request after u64::MAX never wraps.
+/// Exact refusal of a named finite resource. `requested` is wider than the
+/// counter and the platform's `usize`; `limit` is the actual enforceable bound
+/// (the profile bound for tickets, or physical backing bound for a region whose
+/// declared grant cannot be represented). The artifact retains the profile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CapacityExhaustedV1 {
     pub scope: CapacityScopeV1,
@@ -4158,6 +4181,7 @@ pub enum TerminalErrorV1 {
     OperationUnavailable(HostOpV1),
     RuntimeTrap(RuntimeTrapProvenanceV1),
     CapacityExhausted(CapacityExhaustedV1),
+    SelectedCallIntegrity(SelectedCallIntegrityFaultV1),
     DriverFailure,
     RootExecutionDenied,
     HomeRootResolutionFailed(crate::HomeRootResolutionFailureV1),

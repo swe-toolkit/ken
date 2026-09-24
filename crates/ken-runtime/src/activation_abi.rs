@@ -27,24 +27,29 @@
 //! `§4` bans a second copy of the **arena, services, native-`Int` or
 //! activation** layouts in generated C. ⚠ The profile is not among them, and
 //! `D5` explicitly contemplates the stub *"embedding those already-authorized
-//! numbers"*. ⇒ [`KenBoundaryResourceProfileV2`] is deliberately the only
+//! numbers"*. ⇒ [`KenBoundaryResourceProfileV3`] is deliberately the only
 //! `#[repr(C)]` struct that crosses.
 //!
 //! ⭐ And it carries its own `version` and `size` so a C/Rust disagreement
 //! **fails closed** rather than being read under a layout it does not have —
-//! ⛔ nine bare positional `u64` parameters would have reintroduced exactly the
+//! ⛔ eleven bare positional `u64` parameters would have reintroduced exactly the
 //! transposition hazard that `BoundaryRegionLimitsV1`'s named fields removed,
 //! in the one language with no help against it.
 
 use std::ffi::c_void;
 use std::io::Write;
 
-use crate::boundary_activation::{BoundaryActivationV1, BoundaryStoreBindingV1};
+use crate::boundary_activation::{
+    BoundaryActivationV1, BoundaryStoreBindingV1, BoundaryStoreOpenErrorV2,
+};
 use crate::boundary_resource_profile::{
-    BOUNDARY_RESOURCE_PROFILE_VERSION, BoundaryRegionLimitsV1, BoundaryResourceProfileV2,
-    RuntimeResourceLimitsV2,
+    BOUNDARY_RESOURCE_PROFILE_VERSION, BoundaryRegionLimitsV1, BoundaryResourceProfileV3,
+    InvocationCallLimitsV3, RuntimeResourceLimitsV2,
 };
 use crate::boundary_value::{BoundaryValueStore, BoundaryWord};
+use crate::activation_services::GeneratedActivationServicesV1;
+use crate::invocation_tickets::{InvocationTicketIssuerV1, IssuerTerminalFaultV1,
+    SelectedCallTargetV1, SelectedCallTicketV1};
 
 /// Success.
 pub const KEN_ACTIVATION_OK: i64 = 0;
@@ -74,18 +79,21 @@ pub const KEN_ACTIVATION_ERR_PROFILE_MISMATCH: i64 = -8;
 
 /// **The deployment-authorized profile, as it crosses into C.**
 ///
-/// Nine named limits and no default — the C side supplies all nine or the
+/// Eleven named limits and no default — the C side supplies all eleven or the
 /// call is refused. ⭐ `version` and `size` make a layout disagreement a
 /// **checked refusal** instead of a silent misread.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct KenBoundaryResourceProfileV2 {
+pub struct KenBoundaryResourceProfileV3 {
     /// Must equal [`BOUNDARY_RESOURCE_PROFILE_VERSION`].
     pub version: u64,
-    /// Must equal `size_of::<KenBoundaryResourceProfileV2>()`.
+    /// Must equal `size_of::<KenBoundaryResourceProfileV3>()`.
     pub size: u64,
     /// Process-wide activation-epoch ceiling.
     pub runtime_invocation_epochs: u64,
+    /// Per-activation generation and simultaneous live-ticket ceilings.
+    pub call_event_generations: u64,
+    pub call_live_pending_slots: u64,
     /// Invocation-arena node ceiling.
     pub invocation_nodes: u64,
     /// Invocation-arena child-word ceiling.
@@ -104,21 +112,25 @@ pub struct KenBoundaryResourceProfileV2 {
     pub persistent_native_int_limbs: u64,
 }
 
-impl KenBoundaryResourceProfileV2 {
+impl KenBoundaryResourceProfileV3 {
     /// Convert to the Rust profile, refusing a layout this runtime does not
     /// implement.
     ///
     /// ⛔ No default and no widening: a wrong `version` or `size` is
     /// [`KEN_ACTIVATION_ERR_PROFILE`], ⛔ never a fallback profile.
-    fn to_rust(self) -> Option<BoundaryResourceProfileV2> {
+    fn to_rust(self) -> Option<BoundaryResourceProfileV3> {
         if self.version != u64::from(BOUNDARY_RESOURCE_PROFILE_VERSION)
-            || self.size != std::mem::size_of::<KenBoundaryResourceProfileV2>() as u64
+            || self.size != std::mem::size_of::<KenBoundaryResourceProfileV3>() as u64
         {
             return None;
         }
-        Some(BoundaryResourceProfileV2 {
+        Some(BoundaryResourceProfileV3 {
             runtime: RuntimeResourceLimitsV2 {
                 invocation_epochs: self.runtime_invocation_epochs,
+            },
+            call_events: InvocationCallLimitsV3 {
+                event_generations: self.call_event_generations,
+                live_pending_slots: usize::try_from(self.call_live_pending_slots).ok()?,
             },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: self.invocation_nodes as usize,
@@ -152,29 +164,253 @@ pub struct KenCapacityFailureV1 {
     fault: ken_host::CapacityExhaustedV1,
 }
 
+/// Owned in-flight terminal handed back from the activation exactly once.
+/// Neither C nor a raw negative generated status may fabricate it.
+pub struct KenSelectedCallFailureV1 {
+    fault: IssuerTerminalFaultV1,
+}
+
+#[cfg(test)]
+thread_local! {
+    static COPIED_OLD_TICKET_AT_ISSUE: std::cell::Cell<Option<SelectedCallTicketV1>> =
+        const { std::cell::Cell::new(None) };
+    static COPIED_OLD_TICKET_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static REPLAY_SPENT_SLOT_TICKET: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static FIRST_SPENT_SLOT_TICKET: std::cell::Cell<Option<SelectedCallTicketV1>> =
+        const { std::cell::Cell::new(None) };
+    static REPLAY_SPENT_SLOT_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn with_replayed_spent_slot_ticket<T>(action: impl FnOnce() -> T) -> (T, usize) {
+    REPLAY_SPENT_SLOT_TICKET.with(|cell| assert!(!cell.replace(true)));
+    FIRST_SPENT_SLOT_TICKET.with(|cell| cell.set(None));
+    REPLAY_SPENT_SLOT_APPLICATIONS.with(|cell| cell.set(0));
+    let outcome = action();
+    REPLAY_SPENT_SLOT_TICKET.with(|cell| cell.set(false));
+    FIRST_SPENT_SLOT_TICKET.with(|cell| cell.set(None));
+    let applications = REPLAY_SPENT_SLOT_APPLICATIONS.with(std::cell::Cell::get);
+    (outcome, applications)
+}
+
+#[cfg(test)]
+pub(crate) fn with_copied_old_ticket_at_issue<T>(
+    old: SelectedCallTicketV1,
+    action: impl FnOnce() -> T,
+) -> (T, usize) {
+    COPIED_OLD_TICKET_AT_ISSUE.with(|cell| {
+        assert!(cell.replace(Some(old)).is_none(), "nested replay fixture");
+    });
+    COPIED_OLD_TICKET_APPLICATIONS.with(|cell| cell.set(0));
+    let outcome = action();
+    COPIED_OLD_TICKET_AT_ISSUE.with(|cell| cell.set(None));
+    let applications = COPIED_OLD_TICKET_APPLICATIONS.with(std::cell::Cell::get);
+    (outcome, applications)
+}
+
+/// Issue one selected call from the live activation's checked service record.
+/// The generated caller must branch on the status before any operand load.
+///
+/// # Safety
+/// `services` is a live published activation service pointer and `out_ticket`
+/// is writable. Both belong to this one invocation; no pointer outlives it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_selected_call_v1_issue(
+    services: *const GeneratedActivationServicesV1,
+    body: u64,
+    callee: u64,
+    out_ticket: *mut SelectedCallTicketV1,
+) -> i64 {
+    if services.is_null() || out_ticket.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let service = unsafe { &*services };
+    if service.call_events.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let issuer = unsafe { &mut *service.call_events.cast::<InvocationTicketIssuerV1>() };
+    if let Some(fault) = issuer.terminal_fault() {
+        return match fault {
+            IssuerTerminalFaultV1::Capacity(_) => ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            IssuerTerminalFaultV1::Integrity(_) => ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+        };
+    }
+    match issuer.issue(SelectedCallTargetV1 { body, callee }) {
+        Ok(ticket) => {
+            #[cfg(test)]
+            let ticket = COPIED_OLD_TICKET_AT_ISSUE.with(|cell| match cell.get() {
+                Some(old) => {
+                    COPIED_OLD_TICKET_APPLICATIONS.with(|count| count.set(count.get() + 1));
+                    old
+                }
+                None => ticket,
+            });
+            #[cfg(test)]
+            let ticket = if REPLAY_SPENT_SLOT_TICKET.with(std::cell::Cell::get) {
+                FIRST_SPENT_SLOT_TICKET.with(|cell| match cell.get() {
+                    None => { cell.set(Some(ticket)); ticket }
+                    Some(first) => {
+                        REPLAY_SPENT_SLOT_APPLICATIONS.with(|count| count.set(count.get() + 1));
+                        first
+                    }
+                })
+            } else { ticket };
+            unsafe { *out_ticket = ticket };
+            KEN_ACTIVATION_OK
+        }
+        Err(fault) => {
+            issuer.record_terminal_fault(IssuerTerminalFaultV1::Capacity(fault));
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+        }
+    }
+}
+
+/// Consume exactly one selected ticket before accessing its borrowed inputs.
+/// A failed gate returns its recorded typed integrity terminal status.
+///
+/// # Safety
+/// `services` is live and `ticket` points to a readable ticket previously
+/// issued by an invocation; the ticket bytes are copied, never retained.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_selected_call_v1_consume(
+    services: *const GeneratedActivationServicesV1,
+    ticket: *const SelectedCallTicketV1,
+    body: u64,
+    callee: u64,
+) -> i64 {
+    if services.is_null() || ticket.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let service = unsafe { &*services };
+    if service.call_events.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let issuer = unsafe { &mut *service.call_events.cast::<InvocationTicketIssuerV1>() };
+    if let Some(fault) = issuer.terminal_fault() {
+        return match fault {
+            IssuerTerminalFaultV1::Capacity(_) => ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            IssuerTerminalFaultV1::Integrity(_) => ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+        };
+    }
+    match issuer.consume(unsafe { *ticket }, SelectedCallTargetV1 { body, callee }) {
+        Ok(()) => KEN_ACTIVATION_OK,
+        Err(fault) => {
+            issuer.record_terminal_fault(IssuerTerminalFaultV1::Integrity(fault));
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1
+        }
+    }
+}
+
+/// Move the authentic in-flight failure from the active owner to C. Return 0
+/// with a null out pointer if no generated fault occurred.
+///
+/// # Safety
+/// `activation` is a live unique handle and `out_failure` a writable slot.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_take_selected_call_failure(
+    activation: *mut KenActivationV1,
+    out_failure: *mut *mut KenSelectedCallFailureV1,
+) -> i64 {
+    if activation.is_null() || out_failure.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    unsafe { *out_failure = std::ptr::null_mut() };
+    let activation = unsafe { &mut *activation };
+    let Some(issuer) = activation.activation.call_event_issuer() else {
+        return KEN_ACTIVATION_ERR_FINISHED;
+    };
+    let Some(fault) = issuer.take_terminal_fault() else { return KEN_ACTIVATION_OK; };
+    unsafe { *out_failure = Box::into_raw(Box::new(KenSelectedCallFailureV1 { fault })) };
+    match fault {
+        IssuerTerminalFaultV1::Capacity(_) => ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+        IssuerTerminalFaultV1::Integrity(_) => ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+    }
+}
+
+/// Finish the authentic in-flight fault under the same host observation
+/// context and effect prefix as the generated entry used.
+///
+/// # Safety
+/// Both inputs must be live unique handles and are consumed exactly once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_finish_selected_call_failure(
+    context: *mut c_void,
+    failure: *mut KenSelectedCallFailureV1,
+) -> i64 {
+    if context.is_null() || failure.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    match unsafe { Box::from_raw(failure) }.fault {
+        IssuerTerminalFaultV1::Capacity(fault) => unsafe {
+            ken_host::ken_host_invocation_v1_finish_with_capacity(context, fault)
+        },
+        IssuerTerminalFaultV1::Integrity(fault) => unsafe {
+            ken_host::ken_host_invocation_v1_finish_with_integrity(context, fault)
+        },
+    }
+}
+
+/// Nonprocess image of the same owner-backed in-flight fault.
+///
+/// # Safety
+/// `failure` is a live unique handle, consumed exactly once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_write_starter_selected_call_failure(
+    failure: *mut KenSelectedCallFailureV1,
+) -> i64 {
+    if failure.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let fault = unsafe { Box::from_raw(failure) }.fault;
+    let (status, terminal) = match fault {
+        IssuerTerminalFaultV1::Capacity(fault) => (
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            ken_host::TerminalErrorV1::CapacityExhausted(fault),
+        ),
+        IssuerTerminalFaultV1::Integrity(fault) => (
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+            ken_host::TerminalErrorV1::SelectedCallIntegrity(fault),
+        ),
+    };
+    let trace = ken_host::LinkedEffectTrace {
+        plan_hash: 0,
+        target_abi_hash: ken_host::TARGET_ABI_MANIFEST_HASH,
+        host_effect_abi_hash: ken_host::HOST_EFFECT_ABI_V1_HASH,
+        terminal_value: status,
+        terminal_error: Some(terminal),
+        effect_trace: Vec::new(),
+        terminal_exit: ken_host::TerminalExitClass::ControlledTrap,
+    };
+    let Ok(bytes) = ken_host::encode_linked_effect_trace(&trace) else {
+        return KEN_ACTIVATION_ERR_EXPORT;
+    };
+    if std::io::stderr().write_all(&bytes).is_err() {
+        return KEN_ACTIVATION_ERR_EXPORT;
+    }
+    KEN_ACTIVATION_OK
+}
+
 /// Open a store and reserve/publish its persistent image from the authorized
 /// profile. ⛔ Once per store.
 ///
 /// # Safety
 ///
-/// `profile` must point to a readable [`KenBoundaryResourceProfileV2`] and
+/// `profile` must point to a readable [`KenBoundaryResourceProfileV3`] and
 /// `out_store` to a writable pointer slot.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ken_boundary_store_v1_open(
-    profile: *const KenBoundaryResourceProfileV2,
+    profile: *const KenBoundaryResourceProfileV3,
     out_store: *mut *mut KenBoundaryStoreV1,
+    out_failure: *mut *mut KenCapacityFailureV1,
 ) -> i64 {
-    if profile.is_null() || out_store.is_null() {
+    if profile.is_null() || out_store.is_null() || out_failure.is_null() {
         return KEN_ACTIVATION_ERR_NULL;
     }
-    unsafe { *out_store = std::ptr::null_mut() };
+    unsafe {
+        *out_store = std::ptr::null_mut();
+        *out_failure = std::ptr::null_mut();
+    }
     let Some(profile) = (unsafe { *profile }).to_rust() else {
         return KEN_ACTIVATION_ERR_PROFILE;
     };
     let mut store = BoundaryValueStore::new();
     let binding = match BoundaryStoreBindingV1::open(&mut store, profile) {
         Ok(binding) => binding,
-        Err(_) => return KEN_ACTIVATION_ERR_PROFILE_MISMATCH,
+        Err(BoundaryStoreOpenErrorV2::ProfileMismatch(_)) =>
+            return KEN_ACTIVATION_ERR_PROFILE_MISMATCH,
+        Err(BoundaryStoreOpenErrorV2::CapacityExhausted(fault)) => {
+            unsafe { *out_failure = Box::into_raw(Box::new(KenCapacityFailureV1 { fault })) };
+            return KEN_ACTIVATION_ERR_CAPACITY;
+        }
     };
     let handle = Box::into_raw(Box::new(KenBoundaryStoreV1 { store, binding }));
     unsafe { *out_store = handle };
@@ -480,12 +716,17 @@ pub unsafe extern "C" fn ken_activation_v1_destroy(activation: *mut KenActivatio
 /// ⭐ `D1`'s own warning is that a `crate-type` line is a **build-system**
 /// claim and not a **link** one. ⇒ The archive is checked against *this* list.
 /// ⛔ Pinned as the exact permitted set, so an addition reddens too.
-pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 11] = [
+pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 16] = [
     "ken_boundary_store_v1_open",
     "ken_boundary_store_v1_destroy",
     "ken_activation_v1_begin",
     "ken_activation_v1_finish_capacity_failure",
     "ken_activation_v1_write_starter_capacity_failure",
+    "ken_selected_call_v1_issue",
+    "ken_selected_call_v1_consume",
+    "ken_activation_v1_take_selected_call_failure",
+    "ken_activation_v1_finish_selected_call_failure",
+    "ken_activation_v1_write_starter_selected_call_failure",
     "ken_activation_v1_services",
     "ken_activation_v1_bind_process_frame",
     "ken_activation_v1_native_frame",
@@ -498,11 +739,13 @@ pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 11] = [
 mod tests {
     use super::*;
 
-    fn c_profile() -> KenBoundaryResourceProfileV2 {
-        KenBoundaryResourceProfileV2 {
+    fn c_profile() -> KenBoundaryResourceProfileV3 {
+        KenBoundaryResourceProfileV3 {
             version: u64::from(BOUNDARY_RESOURCE_PROFILE_VERSION),
-            size: std::mem::size_of::<KenBoundaryResourceProfileV2>() as u64,
+            size: std::mem::size_of::<KenBoundaryResourceProfileV3>() as u64,
             runtime_invocation_epochs: u64::MAX,
+            call_event_generations: 29,
+            call_live_pending_slots: 13,
             invocation_nodes: 12,
             invocation_words: 24,
             invocation_data_bytes: 36,
@@ -514,14 +757,156 @@ mod tests {
         }
     }
 
+    /// Durable capacity invariant: both opaque C owners preserve the exact
+    /// resource-bearing fault instead of allowing a Rust panic across extern C.
+    #[test]
+    fn c_open_and_begin_return_owned_typed_region_refusals() {
+        let mut profile = c_profile();
+        profile.persistent_words = u64::MAX;
+        let mut store = std::ptr::null_mut();
+        let mut failure = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut failure) }, KEN_ACTIVATION_ERR_CAPACITY);
+        assert!(store.is_null());
+        assert!(!failure.is_null());
+        let fault = unsafe { (*failure).fault };
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Persistent);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+        assert_eq!(fault.requested, u128::from(u64::MAX));
+        // Consume the opaque failure through the real nonprocess wire terminal.
+        assert_eq!(unsafe { ken_activation_v1_write_starter_capacity_failure(failure) }, KEN_ACTIVATION_OK);
+
+        let mut profile = c_profile();
+        profile.invocation_words = u64::MAX;
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut failure) }, KEN_ACTIVATION_OK);
+        let mut activation = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_begin(store, &mut activation, &mut failure) }, KEN_ACTIVATION_ERR_CAPACITY);
+        assert!(activation.is_null());
+        assert!(!failure.is_null());
+        let fault = unsafe { (*failure).fault };
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Invocation);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+        assert_eq!(fault.requested, u128::from(u64::MAX));
+        assert_eq!(unsafe { ken_activation_v1_write_starter_capacity_failure(failure) }, KEN_ACTIVATION_OK);
+        assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
+    }
+
+    /// Durable one-use ABI control on the very issue/consume helpers emitted by
+    /// Cranelift. Each negative uses a live activation; statuses are paired to
+    /// the owner's typed fault, never interpreted from a bare root token.
+    #[test]
+    fn selected_call_checked_services_gate_rejects_capacity_and_integrity() {
+        let mut profile = c_profile();
+        profile.call_event_generations = 2;
+        profile.call_live_pending_slots = 1;
+        let mut store = std::ptr::null_mut();
+        let mut before = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut before) }, 0);
+        let mut begin = || {
+            let mut activation = std::ptr::null_mut();
+            let mut fault = std::ptr::null_mut();
+            assert_eq!(unsafe { ken_activation_v1_begin(store, &mut activation, &mut fault) }, 0);
+            let mut services = std::ptr::null();
+            assert_eq!(unsafe { ken_activation_v1_services(activation, &mut services) }, 0);
+            (activation, services.cast::<GeneratedActivationServicesV1>())
+        };
+        let (a, services_a) = begin();
+        let mut first = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, first.as_mut_ptr()) }, 0);
+        let first = unsafe { first.assume_init() };
+        let mut untouched = first;
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, &mut untouched) },
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1);
+        assert_eq!(untouched, first, "no half ticket may be written on refusal");
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Capacity(
+            ken_host::CapacityExhaustedV1 {
+                scope: ken_host::CapacityScopeV1::Invocation,
+                resource: ken_host::CapacityResourceV1::LivePendingSlots,
+                limit: 1, requested: 2,
+            }
+        ));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (a, services_a) = begin();
+        let mut first = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, first.as_mut_ptr()) }, 0);
+        let first = unsafe { first.assume_init() };
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 30) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::WrongTarget));
+        drop(unsafe { Box::from_raw(fault) });
+        // Taking an opaque terminal must not rearm the issuer or allow the
+        // formerly mismatched selected call to invoke after refusal.
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut twice = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut twice) }, 0);
+        assert!(twice.is_null(), "the typed terminal is extracted only once");
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (a, services_a) = begin();
+        let mut first = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, first.as_mut_ptr()) }, 0);
+        let first = unsafe { first.assume_init() };
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 29) }, 0);
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::Spent));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (a, services_a) = begin();
+        let mut old = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, old.as_mut_ptr()) }, 0);
+        let old = unsafe { old.assume_init() };
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &old, 17, 29) }, 0);
+        let mut next = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, next.as_mut_ptr()) }, 0);
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &old, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::StaleGeneration));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (b, services_b) = begin();
+        let mut next = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_b, 17, 29, next.as_mut_ptr()) }, 0);
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_b, &old, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(b, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::WrongActivation));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(b) }, 0);
+        assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, 0);
+    }
+
     /// ⭐ **The whole C lifecycle, driven exactly as the stub will drive it**,
     /// with only handles and status values crossing.
     #[test]
     fn the_c_abi_drives_the_whole_lifecycle_with_handles_and_statuses_only() {
         let profile = c_profile();
         let mut store = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&profile, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) },
             KEN_ACTIVATION_OK
         );
         assert!(!store.is_null());
@@ -606,8 +991,9 @@ mod tests {
     fn two_activations_across_the_c_abi_get_distinct_services() {
         let profile = c_profile();
         let mut store = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&profile, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) },
             KEN_ACTIVATION_OK
         );
 
@@ -658,7 +1044,8 @@ mod tests {
         let mut profile = c_profile();
         profile.runtime_invocation_epochs = 0;
         let mut store = std::ptr::null_mut();
-        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store) }, KEN_ACTIVATION_OK);
+        let mut open_failure = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) }, KEN_ACTIVATION_OK);
         let mut activation = std::ptr::null_mut();
         let mut failure = std::ptr::null_mut();
         assert_eq!(
@@ -686,11 +1073,12 @@ mod tests {
     #[test]
     fn a_profile_from_a_layout_this_runtime_does_not_implement_is_refused() {
         let mut store = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
 
         let mut wrong_version = c_profile();
         wrong_version.version += 1;
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&wrong_version, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&wrong_version, &mut store, &mut open_failure) },
             KEN_ACTIVATION_ERR_PROFILE
         );
         assert!(
@@ -701,7 +1089,7 @@ mod tests {
         let mut wrong_size = c_profile();
         wrong_size.size += 8;
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&wrong_size, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&wrong_size, &mut store, &mut open_failure) },
             KEN_ACTIVATION_ERR_PROFILE
         );
         assert!(store.is_null());
@@ -711,11 +1099,12 @@ mod tests {
     fn c_abi_refuses_epoch_ceiling_mismatch_before_publishing_a_store() {
         let profile = c_profile();
         let mut store = std::ptr::null_mut();
-        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store) }, KEN_ACTIVATION_OK);
+        let mut open_failure = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) }, KEN_ACTIVATION_OK);
         let mut mismatch = profile;
         mismatch.runtime_invocation_epochs = u64::MAX - 1;
         let mut second = 1usize as *mut KenBoundaryStoreV1;
-        assert_eq!(unsafe { ken_boundary_store_v1_open(&mismatch, &mut second) },
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&mismatch, &mut second, &mut open_failure) },
             KEN_ACTIVATION_ERR_PROFILE_MISMATCH);
         assert!(second.is_null(), "refused profile returned a store handle");
         assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
@@ -728,15 +1117,16 @@ mod tests {
     fn every_entry_point_refuses_null_rather_than_dereferencing_it() {
         let profile = c_profile();
         let mut store_slot = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
         let mut services_slot = std::ptr::null();
         let mut word = 0u64;
 
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(std::ptr::null(), &mut store_slot) },
+            unsafe { ken_boundary_store_v1_open(std::ptr::null(), &mut store_slot, &mut open_failure) },
             KEN_ACTIVATION_ERR_NULL
         );
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&profile, std::ptr::null_mut()) },
+            unsafe { ken_boundary_store_v1_open(&profile, std::ptr::null_mut(), &mut open_failure) },
             KEN_ACTIVATION_ERR_NULL
         );
         assert_eq!(

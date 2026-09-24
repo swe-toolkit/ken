@@ -36,6 +36,7 @@ pub mod executable_artifact_contract;
 pub mod executable_entrypoint_packaging;
 pub mod hash;
 pub mod ir;
+mod invocation_tickets;
 #[cfg(test)]
 mod native_effect_v1;
 pub mod native_execution_differential;

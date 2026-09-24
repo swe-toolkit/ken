@@ -256,6 +256,7 @@ pub use surface::{
 pub(crate) use lowering::{
     scale_b_record_boundary_value, scale_b_record_native_int, CarriedComputationalLoopEdge,
     NativeIntLoweringMutation, PlannedTrapSeat, Px8trTrapProvenanceEvent,
+    SelectedTicketGateMutation, with_selected_ticket_gate_mutation,
     NATIVE_INT_LOWERING_MUTATION,
 };
 #[cfg(test)]
