@@ -1,12 +1,12 @@
 ---
 id: CAT-ARGPARSE-LAWS
 title: "Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust"
-status: active
+status: draft
 owner: foundation
 size: L
 gate: none
 tier: T1
-depends_on: [CAT-SCHEMA-LAWS, CAT-PARSING-CURSOR-LAWS, CAT-PARSING-DECODER-LAWS]
+depends_on: [CAT-SCHEMA-LAWS, CAT-PARSING-CURSOR-LAWS, CAT-PARSING-DECODER-LAWS, KERNEL-LITERAL-CHAR-VIEW]
 blocks: []
 github: null
 origin: "Proof-backfill follow-on CAT-ARGPARSE-LAWS named by docs/program/CATALOG-PROOF-COMPLETENESS-SURVEY.md, under operator ruling 2026-09-13 ('schedule the proof backfill before extending the catalog'). Chosen next because every package it imports now carries laws. Steward-filed per COORDINATION section 2."
@@ -68,9 +68,11 @@ laws landed (`6e235b746`, `3120a845c`). Deliverables 1 and 2 stopped on
 bounded attempts (`evt_3jdh6yptdct5m`, `evt_4ts4acq2t3jxf`). The cause is
 per-occurrence literal identity: `elab_str_lit` mints a fresh identity for
 each `"--"`, so the parser's prefix literal and the proof's never convert
-(Architect `evt_5sy6b16r05r48`; not an established K3 dependency). The
-kept extraction `71776ddd8` stays unlanded. Resume only on an operator
-ruling.
+(Architect `evt_5sy6b16r05r48`). The kept extraction `71776ddd8` stays
+unlanded. **Operator 2026-09-24:** resume laws 1 and 2 after
+`KERNEL-LITERAL-CHAR-VIEW` lands. Every `"--"` here is
+`string_to_list_char "--"`, which that node reduces to one `List Char`
+across occurrences (its AC-4). No parser or elaborator change.
 
 ## Acceptance criteria
 

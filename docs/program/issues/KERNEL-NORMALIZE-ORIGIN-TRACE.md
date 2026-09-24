@@ -1,7 +1,7 @@
 ---
 id: KERNEL-NORMALIZE-ORIGIN-TRACE
 title: "add an observational origin-tracking mode to ken-kernel's normalizer -- one reducer with a no-op observer for today's normalize and a collecting observer for a trace API -- so the bracket tree's child 1 can identify each compiler-authored bracket role's exact normalized occurrence without the shared dispatcher producing two host response routes; the traced Term must equal normalize's Term"
-status: active
+status: closed
 owner: kernel
 size: L
 gate: architect
@@ -13,6 +13,12 @@ origin: "Operator authorized 2026-09-23 ('add an origin-tracking mode to the ker
 ---
 
 # The normalizer must say where each bracket role went
+
+> **Closed 2026-09-24 on its section 5 STOP** (Architect `evt_10ygybsnbap2q`:
+> Ret keeps refusing). Operator authorized a redesign, filed as
+> `RT-BRACKET-SOURCE-EDGE`. Kept branch `7f1a04a40` is evidence only; its Ret
+> rule never lands. Any narrow Vis-observer slice is a new kernel node on a
+> fresh main-based branch (Architect `evt_2bx08mhm8d8gd`).
 
 ## Settled inputs
 

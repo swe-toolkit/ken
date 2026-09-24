@@ -1,12 +1,12 @@
 ---
 id: RT-SELECTED-PENDING-CALL-PACKAGE
 title: "design, before any code, a typed activation-owned selected pending-call package carried beside the pending ITree word from the executed source arm through the six transport families to a one-event consuming call gate, with a runtime call-event authority, so the four px7l/px7m rows have a legitimate package to check; bounded D0 census of the present substrate first, then a D1 pre-code specification; STOP and park only if D1 cannot specify owner, extent, identity or a complete route"
-status: active
+status: draft
 owner: runtime
 size: L
 gate: architect
 tier: T1
-depends_on: []
+depends_on: [RT-INVOCATION-RESOURCE-PRECURSOR]
 blocks: []
 github: null
 origin: "Operator 2026-09-23 ~15:00Z: 'concur with rec on L1 carrier', authorizing the new runtime representation the Architect named in evt_7v8he9tyxftp6 after the RT-SELECTED-ARM-CALLABLE-CARRIER D2 STOP (evt_6zf0n10f0djzs). Steward-filed per COORDINATION section 2."

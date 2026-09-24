@@ -16,10 +16,8 @@ These rulings remain operative and are retained verbatim.
 - **2026-08-25:** "there are three lanes authorized right now. language (lane
   2) was unblocking rt on priority, and when that was done should have unblocked
   foundation (lane 3) with module/import."
-- **2026-09-23, L3 REINSTATED, L2 STAYS IDLE:** operator asked to bring up
-  the other two lanes if the gpt-6-luna seats were working as expected, then
-  answered the L2 objective fork "Leave L2 idle for now". Roster is L1 + L3.
-  SUPERSEDES the 2026-09-21 one-lane reduction.
+- **2026-09-23:** L3 reinstated beside L1. **2026-09-24:** L2 reactivated
+  for the load-order fix. Roster is L1 + L2 + L3.
 
 ## Review of doc-only merges
 
@@ -60,18 +58,20 @@ investigation opens a repair, never a separate report node.
 
 ## Authorized roster
 
-**L1 Runtime and L3 Foundation; L2 Language for one WP, then idle.**
-**2026-09-23:** "seat the spec and kernel rings as needed": Kernel runs the L1
-kernel trace beside the carrier; Spec serves BYTES D2. No other ring starts
-without an operator lane change. Accepted work still routes immediately.
+**L1 Runtime, L2 Language, L3 Foundation.** **2026-09-24:** operator ruled
+BYTES K3/F4'/four postulates ("concur with rec."), the L1 bracket redesign
+("option (a)."), the L1 pending-call precursor ("authorize option (a) for
+pending-call. it has to be addressed."), ArgParse laws 1-2 resume after K3
+("concur with rec."), and the L2 load-order fix ("concur with rec on load
+order bug. fix it."). Kernel runs K3; Spec serves BYTES D2 after K3 lands.
 
 ## Current state
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-SELECTED-PENDING-CALL-PACKAGE` -- `active`, L, T1, pre-code design of the new runtime representation the operator authorized 2026-09-23 ("concur with rec on L1 carrier") after the carrier's D2 STOP. D0 census, then a D1 specification (Architect `evt_4chkm2xxyfang`); STOP at D1 means park | `KERNEL-NORMALIZE-ORIGIN-TRACE` -- `active` on the **kernel** ring, concurrent, L, T1, operator-authorized TCB growth: one reducer with a no-op/collecting observer and a traced-equals-normalize gate. When it lands, the bracket tree resumes on it, with `rt_escape` row 13 and `rt_span` row 14 as extra controls (Architect `evt_2817gkyjtdaa7`) | **BRACKET TREE HELD** until the kernel trace lands. Child 1 at `4b4c8565c543c148039ea06ac798c7c91eda2ce8` and child 2 checkpoint `21c039918` are held reviewed inputs, NEVER independently landed or moved. The held tree turns `linked_public_escape_is_exact_closed` red. Hard stop 0 |
-| L2 | language | Idle after its one WP (operator 2026-09-23) | None: `LANG-QUALIFIED-ACCESS-REQUIRES-IMPORT` merged with both same-WP regression repairs | None | Idle. A pre-existing load-order import defect (F2 plus its F1-seam residual) is held for the operator in the return brief |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-MAP-DOM-MEMBER-LAW` -- `active`, S, T1: private `set_member x (dom m) = member x m` (kick `evt_4yd9ymzzybmkc`) | `CAT-VALIDATION-AP-ERROR-LAW` -- `ready`, S, T1: private two-error `validation_ap` accumulation law (Architect `evt_2w12ppsrhs4mx`) | `CAT-ARGPARSE-LAWS` Laws 1-2 and `CAT-PARSING-LAWS` round trip held for the operator: per-occurrence literal identity, and the BYTES fork (fact 4 false; K3 literal bridge). Editing the census sentinel is NOT authorized |
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-BRACKET-SOURCE-EDGE` -- `ready`, M, T1: design-first D0, typed body-to-settlement Control IR edge on the px8ta artifact; STOP means park (Architect `evt_2bx08mhm8d8gd`) | `RT-INVOCATION-RESOURCE-PRECURSOR` -- `ready`, L, T1 (Architect `evt_2373feaep6zh9`), after the bracket D0; then retry body-322 capture and `RT-SELECTED-PENDING-CALL-PACKAGE` D1 | Child 1 `4b4c8565c`, child 2 `21c039918` and kernel branch `7f1a04a40` are held inputs, never moved or landed. Hard stop 0 |
+| L2 | language | Make module import resolution load-order independent (spec 33 §3.3) | Load-order fix (F2 plus the F1 seam residual) -- operator-authorized, frame basis owed by the Architect (`evt_6fee224w5d4gn`) | None | Frame lands, then kick |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-VALIDATION-AP-ERROR-LAW` -- `active`, S, T1 (kick `evt_4pkeggh2q2tqx`) | `CAT-VEC-MAP-IDENTITY-LAW` -- `ready`, S, T1 (Architect `evt_a7r2vmhr545`); after K3 lands: `CAT-ARGPARSE-LAWS` laws 1-2 and `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D2/D3 | Kernel ring runs `KERNEL-LITERAL-CHAR-VIEW` (K3, `ready`), which gates ArgParse and BYTES. Editing the census sentinel is NOT authorized |
 
 ## Update rule
 
