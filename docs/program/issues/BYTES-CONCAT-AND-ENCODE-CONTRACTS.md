@@ -1,7 +1,7 @@
 ---
 id: BYTES-CONCAT-AND-ENCODE-CONTRACTS
 title: "register four trusted byte contracts -- F1 bytes_concat list view, F2 one whole-ASCII-string encoding equation, F3 bytes_decode (bytes_encode s) = Ok s, F4' AsciiBytes bs -> IsUtf8 bs -- over a checked AllAscii witness built on KERNEL-LITERAL-CHAR-VIEW, so any client can reason from explicit ASCII literals; then finish CAT-PARSING-LAWS' printer round trip with them"
-status: draft
+status: active
 owner: foundation
 size: M
 gate: architect

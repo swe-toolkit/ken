@@ -63,7 +63,7 @@ BYTES K3/F4'/four postulates ("concur with rec."), the L1 bracket redesign
 ("option (a)."), the L1 pending-call precursor ("authorize option (a) for
 pending-call. it has to be addressed."), ArgParse laws 1-2 resume after K3
 ("concur with rec."), and the L2 load-order fix ("concur with rec on load
-order bug. fix it."). Kernel runs K3; Spec serves BYTES D2 after K3 lands.
+order bug. fix it."). K3 landed `bfdbb9789`; Spec serves BYTES D2.
 
 ## Current state
 
@@ -71,7 +71,7 @@ order bug. fix it."). Kernel runs K3; Spec serves BYTES D2 after K3 lands.
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-INVOCATION-RESOURCE-PRECURSOR` -- `active`, L, T1 (Architect `evt_2373feaep6zh9`); D1 checkpoint routed `evt_py71tk0sgzg6` | D2 issuance; then retry body-322 capture and `RT-SELECTED-PENDING-CALL-PACKAGE` D1 | Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed. Hard stop 0 |
 | L2 | language | Make module import resolution load-order independent (spec 33 §3.3) | `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` -- `active`, S, T1 (anchor `evt_1vrvf6yycd29t`) | None; L2 idles after landing | Respin for Architect BLOCK `evt_6qd91ye32jkvy` (per-edge descendant provenance) |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-VEC-MAP-IDENTITY-LAW` -- `active`, S, T1 (anchor `evt_38znmgveezp7d`) | `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` -- `ready`, S, T1 (Architect `evt_62vxwb1ymyc18`); after K3 lands: `CAT-ARGPARSE-LAWS` laws 1-2 and `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D2/D3 | Kernel ring's `KERNEL-LITERAL-CHAR-VIEW` (K3, `active`, routed `evt_1gzs8mgaytfb2`) gates ArgParse and BYTES. Editing the census sentinel is NOT authorized |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-VEC-MAP-IDENTITY-LAW` -- `active`, S, T1 (anchor `evt_38znmgveezp7d`) | In order: `CAT-ARGPARSE-LAWS` laws 1-2 (`ready`; K3 landed `bfdbb9789`); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2; `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (`ready`, Architect `evt_62vxwb1ymyc18`) | Spec enclave runs BYTES D2 (`active`). Editing the census sentinel is NOT authorized |
 
 ## Update rule
 
