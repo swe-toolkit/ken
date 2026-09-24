@@ -101,11 +101,16 @@ The chain is at HS2. A third advancing hard stop invokes Research.
   `evt_5bjtwy4ymq99s`).** Private proof-local observation and projection
   helpers that the laws need may stay (for example the WIP's
   `argparse_input_value_bytes` and `argparse_observed_bytes`). None of them
-  may compute a full parser outcome. In addition, **exactly one** private,
-  transparent, proof-only single-token **full-parser-outcome head adapter**
-  may be added, parameterized by the outcomes the proof splits on (for
-  example the selected `Option OptionSpec`, and the prefix `Bool` in the
-  `None` branch). Calling a second parser an observer does not exempt it.
+  may compute a full parser outcome, with one named exception: the existing
+  WIP's `argparse_missing_result_view` may stay, solely as a nonrecursive
+  helper from a schema result to the missing-positionals result for the
+  `Nil` base case, checked against the real `argparse_missing_positionals`.
+  In addition, **exactly one** private, transparent, proof-only single-token
+  **`Cons`-step full-parser-outcome adapter** may be added, parameterized by
+  the outcomes the proof splits on (for example the selected
+  `Option OptionSpec`, and the prefix `Bool` in the `None` branch). Any other
+  helper that selects tokens or recurses as a parser is prohibited,
+  whatever it is called.
   - It calls the existing `argparse_parse_tokens` for recursive tails and
     the existing `argparse_cons_validations` and `argparse_error` for
     assembly. It never recurses as an independent parser.
