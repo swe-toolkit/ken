@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-PRODUCER-AUTHENTICITY
-title: "CHILD 1 of 3 of RT-BRACKET-CONTROL-REGION-IR. The checked bracket producer and its AUTHENTICITY boundary. Capture the exact canonical template-call occurrence through checked lowering and wrap THAT occurrence; the compiler marker must be NON-RESOLVABLE FROM SOURCE; and the PRODUCER marks the acquire, acquired-body, final-settlement, outcome-merge and resume roles ITSELF, before inlining. Two shapes are REJECTED ON MEASUREMENT and must not be retried: ordinary prelude `proc` declarations as markers, because a Ken program can name `private_checked_resource_bracket_*` and the claimed compiler-private authority is therefore FORGEABLE (AC-4 unmet); and locating ports by scanning the expanded Runtime expression for an acquisition `HostOpV1` plus every `ResourceRelease`, because a LAWFUL PUBLIC EARLY RELEASE inside the bracket body adds a release and makes the finalizer port AMBIGUOUS. `HostOpV1` may VALIDATE already-marked ports; it may never DISCOVER which expression becomes a region. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
+title: "CHILD 1 of 3 of RT-BRACKET-CONTROL-REGION-IR. The checked bracket producer and its AUTHENTICITY boundary. Capture the exact canonical template-call occurrence through checked lowering and wrap THAT occurrence; the compiler marker must be NON-RESOLVABLE FROM SOURCE; and the PRODUCER marks the acquire, final-settlement, outcome-merge and resume roles ITSELF, before inlining (the body-to-settlement edge replacing the former acquired-body mark is defined only after RT-BRACKET-SOURCE-EDGE D0; full rewrite required before restart). Two shapes are REJECTED ON MEASUREMENT and must not be retried: ordinary prelude `proc` declarations as markers, because a Ken program can name `private_checked_resource_bracket_*` and the claimed compiler-private authority is therefore FORGEABLE (AC-4 unmet); and locating ports by scanning the expanded Runtime expression for an acquisition `HostOpV1` plus every `ResourceRelease`, because a LAWFUL PUBLIC EARLY RELEASE inside the bracket body adds a release and makes the finalizer port AMBIGUOUS. `HostOpV1` may VALIDATE already-marked ports; it may never DISCOVER which expression becomes a region. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
 status: draft
 owner: runtime
 size: M
@@ -52,13 +52,13 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 - **A compiler-only marker identity, not resolvable from source.** Injected
   after source elaboration, or carried in a checked compiler side plane. Not a
   public declaration.
-- **Producer-marked roles.** **SUPERSEDED for `acquired body` (2026-09-24):**
-  marking it as a normalized descendant is replaced by the source-edge
-  design in `RT-BRACKET-SOURCE-EDGE`; this child needs a frame rewrite
-  before any restart. Held evidence is preserved. The producer marks acquire,
-  acquired body, final
-  settlement, outcome merge and resume ITSELF, before inlining. `HostOpV1` may
-  validate those marked ports afterward; it may never discover them.
+- **Producer-marked roles.** The producer marks acquire, final settlement,
+  outcome merge and resume ITSELF, before inlining. `HostOpV1` may validate
+  those marked ports afterward; it may never discover them. The former
+  `acquired body` mark is withdrawn (2026-09-24): its successor, the
+  body-to-settlement edge, is defined only after `RT-BRACKET-SOURCE-EDGE` D0,
+  and this child's deliverable and ACs must be rewritten before any restart.
+  Held child-1 evidence is preserved.
 - **Reference evaluation unwraps `body` unchanged.**
 
 ## 4. Acceptance criteria
