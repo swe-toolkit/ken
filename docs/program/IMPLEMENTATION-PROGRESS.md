@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-24 16:35:53Z — from 735 issue file(s) in `docs/program/issues/`.
+2026-09-24 16:41:09Z — from 735 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -213,7 +213,7 @@ the committed file matches the generator's output.
 | `F1-37` | F1 [task-list #37] — bignum Int soundness review for K3 trusted-base promotion | draft | runtime | TBD | none | — |
 | `F3-39` | F3 [task-list #39] — reducer: degrade-not-wrap + retire legacy arms | draft | runtime | TBD | none | — |
 | `F4` | content-addressing + value-model design (aka PX8-F-PROOF) | draft | foundation+spec-enclave | M | none | — |
-| `KERNEL-CHECK-ABORT-ON-NONCONVERTIBLE-RECURSIVE-REFL` | Checker totality finding: a one-token mutation of argparse_parse_tokens makes ken check abort with a process stack overflow (rc=134) instead of returning a KernelRejected at the failing obligation; locate the diverging query and make it return a verdict | draft | kernel | M | architect | — |
+| `KERNEL-CHECK-ABORT-ON-ARGPARSE-INDEX-MUTATION` | Checker totality finding: a one-token mutation of argparse_parse_tokens makes ken check abort with a process stack overflow (rc=134) instead of returning a KernelRejected at the failing obligation; locate the diverging query and make it return a verdict | draft | kernel | M | architect | — |
 | `KERNEL-CONV-CONGRUENCE-CLOSURE` | Complete conv_struct_path's congruence closure for the five reachable arm-less formers — Omega, Cast, Quot, QuotClass, QuotElim — each a same-former congruence arm matching its real equality rule with a live source consumer + directional rejects; plus documented unreachability proofs for Refl, Let, and J (no arm). Completeness-only, trust-delta zero | merged | kernel | M | none | — |
 | `KERNEL-CONV-RECURSIVE-HEAD-TOTALITY` | Restore kernel conversion totality at the distinct recursive-head boundary — converting two separately declared, source-isomorphic recursive transparent globals under a stuck eliminator currently unfolds their distinct self GlobalIds without bound and stack-overflows, instead of returning false and halting as the landed spec §17 contract now requires. Implement the finite §3.5 cross-identity boundary (no clone-equality, bisimulation, certificate, self-id rewrite, or custom normalizer), preserving ordinary same-head recursion, finite δ, and distinct-nonrecursive common reducts, and wire the executable black-box matrix. | merged | kernel | M | none | https://github.com/swe-toolkit/ken/pull/3160 |
 | `KERNEL-CONV-TRUNC-CONGRUENCE` | Add the truncation-former congruence pair (Trunc + TruncProj) to conv_struct so the ordinary conversion gate (whnf + congruence) recognizes convertible-but-not-syntactically-identical truncation types/eliminations — unblocking V3-FO-EMBEDDING-ADEQUACY's quotation-preservation Or arm | merged | kernel | S | none | — |
@@ -837,7 +837,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (active) `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (merged) `CAT-DEQUE-POP-LAWS` (merged) `CAT-DEQUE-POPBACK-LAWS` (merged) `CAT-DERIVED-FILTER-MEMBERSHIP-LAW` (ready) `CAT-IDF-TRUST-FREE-PROVIDER` (active) `CAT-MAP-DOM-MEMBER-LAW` (merged) `CAT-VALIDATION-AP-ERROR-LAW` (merged) `CAT-VEC-MAP-IDENTITY-LAW` (merged) `KERNEL-CHECK-ABORT-ON-NONCONVERTIBLE-RECURSIVE-REFL` (draft) `KERNEL-LITERAL-CHAR-VIEW` (merged) `KERNEL-LITERAL-ROLLBACK-PURGE` (merged) `KERNEL-NORMALIZE-ORIGIN-TRACE` (closed) `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` (active) `LANG-KENFMT-AXIOM-CLOSING-PAREN` (ready) `RT-BRACKET-SOURCE-EDGE` (closed) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-INVOCATION-RESOURCE-PRECURSOR` (active) `RT-SELECTED-PENDING-CALL-PACKAGE` (ready)
+- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (active) `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (merged) `CAT-DEQUE-POP-LAWS` (merged) `CAT-DEQUE-POPBACK-LAWS` (merged) `CAT-DERIVED-FILTER-MEMBERSHIP-LAW` (ready) `CAT-IDF-TRUST-FREE-PROVIDER` (active) `CAT-MAP-DOM-MEMBER-LAW` (merged) `CAT-VALIDATION-AP-ERROR-LAW` (merged) `CAT-VEC-MAP-IDENTITY-LAW` (merged) `KERNEL-CHECK-ABORT-ON-ARGPARSE-INDEX-MUTATION` (draft) `KERNEL-LITERAL-CHAR-VIEW` (merged) `KERNEL-LITERAL-ROLLBACK-PURGE` (merged) `KERNEL-NORMALIZE-ORIGIN-TRACE` (closed) `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` (active) `LANG-KENFMT-AXIOM-CLOSING-PAREN` (ready) `RT-BRACKET-SOURCE-EDGE` (closed) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-INVOCATION-RESOURCE-PRECURSOR` (active) `RT-SELECTED-PENDING-CALL-PACKAGE` (ready)
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)

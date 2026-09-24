@@ -1,5 +1,5 @@
 ---
-id: KERNEL-CHECK-ABORT-ON-NONCONVERTIBLE-RECURSIVE-REFL
+id: KERNEL-CHECK-ABORT-ON-ARGPARSE-INDEX-MUTATION
 title: "Checker totality finding: a one-token mutation of argparse_parse_tokens makes ken check abort with a process stack overflow (rc=134) instead of returning a KernelRejected at the failing obligation; locate the diverging query and make it return a verdict"
 status: draft
 owner: kernel
@@ -22,13 +22,18 @@ origin: "Research evt_579nbhknhvcnn measured the abort while advising CAT-ARGPAR
 - Changing `Suc (Suc index)` to `Suc index` after a value option in
   `argparse_parse_tokens` makes `ken check` abort with a stack overflow,
   `rc=134`. On an 8x stack it is SIGKILLed, `rc=137`.
-- A proof-side `Suc index` to `index` in the Flag arm does the same.
+- A proof-side `Suc index` to `index` in the Flag arm does the same (fence
+  state not recorded; D0 re-measures).
 - It fails closed: nothing wrong is accepted. But the check names no
   obligation, and a small file exhausts the process.
 - The Architect's hypothesis, unmeasured: conversion diverges on a
   non-convertible `Refl` between recursive definitions. The landed
   `KERNEL-CONV-RECURSIVE-HEAD-TOTALITY` bounded one such case; whether this
-  is a second case of that boundary or a different cause is unknown.
+  is a second case of that boundary or a different cause is unknown. With
+  the fences ignored, the one checked obligation relating
+  `argparse_parse_tokens` to a copy of itself is
+  `full_validation_cons_bridge`, proved by `Refl`: the first place to look
+  (Architect, a hypothesis).
 
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.

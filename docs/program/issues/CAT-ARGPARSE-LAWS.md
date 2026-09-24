@@ -188,10 +188,11 @@ ruling, never another adapter.
   - **A process abort is not a redden** (Architect `evt_4xhp1k4y4w8sq`).
     The `Suc index` example aborts `ken check` with a stack overflow
     (`rc=134`). Each law's mutation must give `KernelRejected` at that law's
-    own obligation; for law 1, for example, `ParsedOption name value` to
-    `ParsedOption name argument` in the parser. If no law-2 mutation reddens
-    without aborting, STOP and report the rc and mutation. The abort is
-    `KERNEL-CHECK-ABORT-ON-NONCONVERTIBLE-RECURSIVE-REFL`, not this WP.
+    own obligation. For law 1, for example: in `argparse_parse_tokens`,
+    change `value` to `argument` in `ParsedOption (option_name spec)
+    value` (unmeasured whether it rejects or aborts). If no mutation for a
+    law reddens without aborting, STOP and report the rc and mutation. The
+    abort is `KERNEL-CHECK-ABORT-ON-ARGPARSE-INDEX-MUTATION`, not this WP.
 - **AC-3.** Under `crates/`, only consumer-view harnesses change, such as
   `src/r_layer_tests/cat_tier_e_argparse_import.rs`. Use Cursor's `AC-3c`
   rule: bring a MIRRORING assertion into agreement; for a DIRECTIONAL one

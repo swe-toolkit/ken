@@ -92,7 +92,7 @@ Use three things instead:
    - `(True, True)`: `compat h ec` with `sym eb` gives
      `Equal Bool True (p x)`.
    - `(False, True)`: `compat` with `eb` gives `Equal Bool (p x) False`.
-     Close with `bool_and_false_right (b : Bool) : Equal Bool (bool_and b
+     Close with the recursive hypothesis, then `bool_and_false_right (b : Bool) : Equal Bool (bool_and b
      False) False` (match `b`, `Proved` in both arms).
    - `(_, False)`: the recursive hypothesis.
 
@@ -113,18 +113,18 @@ statement. No change to `filter`, `mem` or any other definition.
 - **AC-1 (no new trust).** The added lines contain no `Axiom`, postulate,
   primitive or kernel change. The roots-loaded `Derived` `trusted_base()` is
   equal as a set at base and candidate.
-- **AC-2 (falsifiers).** Each is a scratch mutation, restored afterwards,
-  and each must fail the named law at its own obligation:
-  - swap the `True`/`False` arms of `filter`'s `match p h` in the prelude;
-  - a discriminating pair in the consumer-view harness, on the same shape.
-    **Without `compat`, the equation is false:** with `eqf` constant
+- **AC-2 (falsifiers).** Two, of different kinds.
+  - (i) A scratch mutation, restored afterwards, that must fail the law at
+    its own obligation: swap the `True`/`False` arms of `filter`'s
+    `match p h` in the prelude.
+  - (ii) A committed discriminating pair in the consumer-view harness, on
+    the same shape. **Without `compat`, the equation is false:** with `eqf` constant
     `True`, `p` "is `Zero`", `x = Suc Zero` and `xs = [Zero]`, the left side
     is `True` and the right side is `bool_and True False = False`, so
     `Proved` for that instance must be **rejected**. **With `compat`, it
     holds:** with `eqf` Nat equality and the same `p`, `x` and `xs`,
     `Proved` must be **accepted**.
-  The prelude arm-swap must fail at the law's own obligation. The harness
-  in `crates/ken-elaborator/tests` also pins that both statements resolve
+  The harness in `crates/ken-elaborator/tests` also pins that both statements resolve
   `filter` to the installed prelude identity, as `map_length` does for `map`
   (`cat3_collections_package.rs:252`).
 - **AC-3.** Targeted builds only, through `scripts/ken-cargo`. No-regression
