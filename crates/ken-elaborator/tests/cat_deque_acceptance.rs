@@ -201,8 +201,10 @@ fn transparent_deque_bodies_have_exact_derived_head_occurrence_populations() {
     assert_eq!(
         transparent_bodies_with_saturated_provider_head_occurrence(&env, reverse),
         BTreeSet::from([
+            "deque_pop_back_nil_view".to_owned(),
             "deque_pop_front_nil_view".to_owned(),
             "popBack".to_owned(),
+            "popBack_list_view".to_owned(),
             "popFront".to_owned(),
             "popFront_list_view".to_owned(),
             "toList".to_owned(),
@@ -216,6 +218,7 @@ fn transparent_deque_bodies_have_exact_derived_head_occurrence_populations() {
         transparent_bodies_with_saturated_provider_head_occurrence(&env, append),
         BTreeSet::from([
             "deque_append_snoc_assoc".to_owned(),
+            "deque_pop_back_nil_view".to_owned(),
             "deque_pop_front_nil_view".to_owned(),
             "popFront_list_view".to_owned(),
             "toList".to_owned(),
