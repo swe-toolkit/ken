@@ -433,23 +433,31 @@ theorem concat_map_append
   match xs {
     Nil ↦ Refl;
     Cons h t ↦
-      trans
-        (List b)
-        (list_append b (f h) (concat_map a b f (list_append a t ys)))
-        (list_append b (f h) (list_append b (concat_map a b f t) (concat_map a b f ys)))
-        (list_append b (list_append b (f h) (concat_map a b f t)) (concat_map a b f ys))
-        (cong
+      let
+        head_segment = f h;
+        mapped_tail = concat_map a b f t;
+        mapped_suffix = concat_map a b f ys;
+        mapped_appended_tail = concat_map a b f (list_append a t ys);
+        right_associated = list_append b head_segment (list_append b mapped_tail mapped_suffix);
+        left_associated = list_append b (list_append b head_segment mapped_tail) mapped_suffix
+      in
+        trans
           (List b)
-          (List b)
-          (concat_map a b f (list_append a t ys))
-          (list_append b (concat_map a b f t) (concat_map a b f ys))
-          (λw. list_append b (f h) w)
-          (concat_map_append a b f t ys))
-        (sym
-          (List b)
-          (list_append b (list_append b (f h) (concat_map a b f t)) (concat_map a b f ys))
-          (list_append b (f h) (list_append b (concat_map a b f t) (concat_map a b f ys)))
-          ((proof assoc for list_append) b (f h) (concat_map a b f t) (concat_map a b f ys)))
+          (list_append b head_segment mapped_appended_tail)
+          right_associated
+          left_associated
+          (cong
+            (List b)
+            (List b)
+            mapped_appended_tail
+            (list_append b mapped_tail mapped_suffix)
+            (λw. list_append b head_segment w)
+            (concat_map_append a b f t ys))
+          (sym
+            (List b)
+            left_associated
+            right_associated
+            ((proof assoc for list_append) b head_segment mapped_tail mapped_suffix))
   }
 
 fn range_from (start : Nat) (n : Nat) : List Nat =
