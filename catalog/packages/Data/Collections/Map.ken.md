@@ -15227,9 +15227,11 @@ theorem dom_member_hit
       (r : Tree k v)
       (q1 : Equal Bool (leq x key) True)
       (q2 : Equal Bool (leq key x) True)
-    : dom_member_goal k v leq x (Node k v l key val r) =
+    : Equal Bool
+        (set_member k leq x (Node k Unit (dom k v l) key MkUnit (dom k v r)))
+        (member k v leq x (Node k v l key val r)) =
   let
-    domain_node = set_member k leq x (dom k v (Node k v l key val r));
+    domain_node = set_member k leq x (Node k Unit (dom k v l) key MkUnit (dom k v r));
     source_node = member k v leq x (Node k v l key val r);
     domain_hit =
       cong
@@ -15262,9 +15264,11 @@ theorem dom_member_left
       (q1 : Equal Bool (leq x key) True)
       (q2 : Equal Bool (leq key x) False)
       (ih : dom_member_goal k v leq x l)
-    : dom_member_goal k v leq x (Node k v l key val r) =
+    : Equal Bool
+        (set_member k leq x (Node k Unit (dom k v l) key MkUnit (dom k v r)))
+        (member k v leq x (Node k v l key val r)) =
   let
-    domain_node = set_member k leq x (dom k v (Node k v l key val r));
+    domain_node = set_member k leq x (Node k Unit (dom k v l) key MkUnit (dom k v r));
     source_node = member k v leq x (Node k v l key val r);
     domain_left = set_member k leq x (dom k v l);
     source_left = member k v leq x l;
@@ -15310,9 +15314,11 @@ theorem dom_member_right
       (r : Tree k v)
       (q1 : Equal Bool (leq x key) False)
       (ih : dom_member_goal k v leq x r)
-    : dom_member_goal k v leq x (Node k v l key val r) =
+    : Equal Bool
+        (set_member k leq x (Node k Unit (dom k v l) key MkUnit (dom k v r)))
+        (member k v leq x (Node k v l key val r)) =
   let
-    domain_node = set_member k leq x (dom k v (Node k v l key val r));
+    domain_node = set_member k leq x (Node k Unit (dom k v l) key MkUnit (dom k v r));
     source_node = member k v leq x (Node k v l key val r);
     domain_right = set_member k leq x (dom k v r);
     source_right = member k v leq x r;
@@ -15358,7 +15364,9 @@ theorem dom_member_node
       (r : Tree k v)
       (left_member : dom_member_goal k v leq x l)
       (right_member : dom_member_goal k v leq x r)
-    : dom_member_goal k v leq x (Node k v l key val r) =
+    : Equal Bool
+        (set_member k leq x (Node k Unit (dom k v l) key MkUnit (dom k v r)))
+        (member k v leq x (Node k v l key val r)) =
   match bool_dichotomy (leq x key) {
     Inl q1 ↦
       match bool_dichotomy (leq key x) {
