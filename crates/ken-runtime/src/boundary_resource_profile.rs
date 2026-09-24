@@ -10,19 +10,20 @@
 //! rules that it is **deployment resource policy**, ⛔ not compiler semantics
 //! and ⛔ not an emitter-derived formula.
 //!
-//! ## Eight boundary quantities and one process-wide epoch budget
+//! ## Eight region limits, one epoch limit, and two call-event limits
 //!
 //! Two regions — the **invocation** arena and the **persistent** image — each
-//! meter nodes, child words, data bytes, and native-`Int` limbs. The boundary
-//! product has eight limits, exactly the eight reserve arguments. The process
+//! meter nodes, child words, data bytes, and native-`Int` limbs. These are the
+//! eight region limits, exactly the eight reserve arguments. The process
 //! additionally meters activation epochs independently across all stores;
-//! ending one store cannot replenish this process-wide budget.
+//! ending one store cannot replenish this process-wide budget. Each activation
+//! separately limits call-event generations and live pending-call slots.
 //!
 //! ## ⛔ No default, and that is enforced by the compiler rather than by review
 //!
 //! [`BoundaryResourceProfileV3`] deliberately has **no `Default` impl** and
 //! **no partial constructor**, and its limits are named public fields. ⇒ Every
-//! construction site must write all nine numbers out, and there is no
+//! construction site must write all eleven limits out, and there is no
 //! `..Default::default()` to hide behind. ⚠ A `new()` taking four same-typed
 //! `usize` positionals would have been the transposition hazard this shape
 //! removes: swapping *words* and *data bytes* would compile, run, and be wrong.
