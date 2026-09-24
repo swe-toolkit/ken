@@ -283,6 +283,38 @@ fn decode_signed_root_trap(
 /// Runs the linked checked-source artifact and returns its complete canonical
 /// observation. The trace sink is launcher-owned and outside the capability
 /// root; stdout/stderr and filesystem deltas are observed by this same call.
+/// Admit only a fault whose source, requested units and stated effective
+/// limit are consistent with the artifact's authorized deployment profile.
+/// Region reservations can fail below their declared bound when the physical
+/// backing cannot represent or allocate it; unlike epoch exhaustion their
+/// request is the attempted whole reservation, not the declared limit + 1.
+fn capacity_failure_matches_profile(
+    fault: ken_host::CapacityExhaustedV1,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+) -> bool {
+    use ken_host::{CapacityResourceV1 as Resource, CapacityScopeV1 as Scope};
+    let (declared, physical_maximum) = match (fault.scope, fault.resource) {
+        (Scope::Runtime, Resource::InvocationEpochs) => {
+            let limit = u128::from(profile.runtime.invocation_epochs);
+            return fault.limit == limit && fault.requested == limit + 1;
+        }
+        (Scope::Invocation | Scope::Persistent, resource) => {
+            let region = if fault.scope == Scope::Invocation { profile.invocation } else { profile.persistent };
+            let word_max = (isize::MAX as usize / std::mem::size_of::<u64>()) as u128;
+            let node_words = (crate::boundary_value::BOUNDARY_NODE_STRIDE as usize / 8) as u128;
+            match resource {
+                Resource::Nodes => (region.nodes as u128, word_max / node_words),
+                Resource::Words => (region.words as u128, word_max),
+                Resource::DataBytes => (region.data_bytes as u128, isize::MAX as u128),
+                Resource::NativeIntLimbs => (region.native_int_limbs as u128, word_max),
+                Resource::InvocationEpochs | Resource::EventGenerations | Resource::LivePendingSlots => return false,
+            }
+        }
+        _ => return false,
+    };
+    fault.requested == declared && fault.limit <= physical_maximum && fault.limit < fault.requested
+}
+
 pub fn run_bound_process_effect_observation(
     artifact: &BoundProcessExecutableArtifact,
     options: &NativeEffectRunOptionsV1,
@@ -351,11 +383,7 @@ pub fn run_bound_process_effect_observation_with_stdin(
     // negative paired with a forged terminal variant grants fault authority.
     if let Some(ken_host::TerminalErrorV1::CapacityExhausted(failure)) = &trace.terminal_error {
         if trace.terminal_value != ken_host::CAPACITY_EXHAUSTED_STATUS_V1
-            || failure.scope != ken_host::CapacityScopeV1::Runtime
-            || failure.resource != ken_host::CapacityResourceV1::InvocationEpochs
-            || failure.limit
-                != u128::from(artifact.boundary_resource_profile.runtime.invocation_epochs)
-            || failure.requested != failure.limit + 1
+            || !capacity_failure_matches_profile(*failure, artifact.boundary_resource_profile)
             || exit_status != 1
         {
             return Err(NativeEffectRunErrorV1::MalformedTrace);
@@ -1493,15 +1521,14 @@ fn smoke_executable(
                 && trace.effect_trace.is_empty()
             {
                 if let Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)) = trace.terminal_error {
-                    let limit = u128::from(profile.runtime.invocation_epochs);
-                    if fault.scope == ken_host::CapacityScopeV1::Runtime
-                        && fault.resource == ken_host::CapacityResourceV1::InvocationEpochs
-                        && fault.limit == limit
-                        && fault.requested == limit + 1
-                    {
+                    if capacity_failure_matches_profile(fault, profile) {
                         return Err(ObjectLinkerPackagingError {
                             stage: ObjectLinkerPackagingStage::SmokeExecution,
-                            field: "runtime.invocation_epochs",
+                            field: if fault.scope == ken_host::CapacityScopeV1::Runtime {
+                                "runtime.invocation_epochs"
+                            } else {
+                                "boundary_resource_profile"
+                            },
                             reason: format!("linked starter refused actual epoch begin: {fault:?}"),
                             capacity_failure: Some(fault),
                         });
@@ -2051,7 +2078,7 @@ struct KenBoundaryResourceProfileV2 {{
     uint64_t persistent_nodes, persistent_words, persistent_data_bytes, persistent_native_int_limbs;
 }};
 
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store, void **out_failure);
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
 extern long long ken_activation_v1_write_starter_capacity_failure(void *failure);
@@ -2076,7 +2103,12 @@ int main(void) {{
     void *capacity_failure = NULL;
     const void *frame = NULL;
     const void *services = NULL;
-    if (ken_boundary_store_v1_open(&profile, &store) != 0) return 1;
+    long long open_status = ken_boundary_store_v1_open(&profile, &store, &capacity_failure);
+    if (open_status != 0) {{
+        if (open_status == -7 && capacity_failure != NULL)
+            return ken_activation_v1_write_starter_capacity_failure(capacity_failure) == 0 ? 1 : 2;
+        return 2;
+    }}
     long long begin_status = ken_activation_v1_begin(store, &activation, &capacity_failure);
     if (begin_status != 0) {{
         if (begin_status == -7 && capacity_failure != NULL) {{
@@ -2186,7 +2218,7 @@ struct KenHostInitResultV1 {
 };
 
 extern long long ken_nc23_entrypoint(const void *frame, const void *services);
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store, void **out_failure);
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
 extern long long ken_activation_v1_finish_capacity_failure(void *context, void *failure);
@@ -2358,8 +2390,11 @@ int main(int argc, char **argv, char **envp) {
     void *capacity_failure = NULL;
     const void *frame = NULL;
     const void *services = NULL;
-    if (ken_boundary_store_v1_open(&profile, &store) != 0) {
-        ken_host_invocation_v1_destroy(host_init.context);
+    long long open_status = ken_boundary_store_v1_open(&profile, &store, &capacity_failure);
+    if (open_status != 0) {
+        if (open_status == -7 && capacity_failure != NULL)
+            ken_activation_v1_finish_capacity_failure(host_init.context, capacity_failure);
+        else ken_host_invocation_v1_destroy(host_init.context);
         free(pool); free(cwd); return 1;
     }
     long long begin_status = ken_activation_v1_begin(store, &activation, &capacity_failure);
@@ -2837,6 +2872,40 @@ mod tests {
         let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("typed starter wire");
         assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::CapacityExhausted(expected)));
         assert!(trace.effect_trace.is_empty());
+    }
+
+    /// Linked negative for an unrepresentable named persistent grant. This
+    /// uses the actual C open path, not a manufactured trace or a bare status.
+    #[test]
+    fn nonprocess_starter_preserves_named_persistent_reservation_fault() {
+        let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int(42.into()));
+        let program = starter_program(int_body(42), observation);
+        let (report, entrypoint) = packaged_entrypoint(&program);
+        let run_report = runtime_ir_run_report(&program);
+        let support = platform_support(&program, &entrypoint, &run_report);
+        let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+        let mut profile = env.profile();
+        profile.persistent.words = usize::MAX;
+        let dir = temp_output_dir("region-open-typed");
+        let refusal = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &dir,
+            "real-starter named persistent refusal", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect_err("unrepresentable persistent words must refuse at C open");
+        assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        let fault = refusal.capacity_failure.expect("linked terminal must be typed");
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Persistent);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+        assert_eq!(fault.requested, usize::MAX as u128);
+        assert_eq!(fault.limit, (isize::MAX as usize / 8) as u128);
+        let linked_path = dir.join(ObjectLinkerPackagingOptions::starter_host_with_profile(profile).executable_relative_path);
+        let linked = Command::new(linked_path).output().expect("linked starter ran");
+        assert_eq!(linked.status.code(), Some(1));
+        assert!(linked.stdout.is_empty());
+        let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("typed linked terminal");
+        assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)));
+        assert!(trace.effect_trace.is_empty());
+        let _ = report;
     }
 
     fn generic_big_int_program() -> RuntimeProgram {

@@ -2309,10 +2309,10 @@ fn c1_d3_a_carried_operand_survives_case_env_and_nested_lowering() {
 pub(super) fn ac_c7_bind_arena(
     store: &mut crate::boundary_value::BoundaryValueStore,
 ) -> (crate::boundary_value::BoundaryArenaV1, *mut u64) {
-    store.reserve_persistent(64, 256, 512, 0);
+    store.reserve_persistent(64, 256, 512, 0).expect("test persistent region is reservable");
     let persistent = store.publish_persistent();
     let mut arena = crate::boundary_value::BoundaryArenaBuilder::new().finish();
-    arena.reserve(64, 256, 512, 0);
+    arena.reserve(64, 256, 512, 0).expect("test invocation region is reservable");
     arena.bind_persistent(Some(persistent as *const u64));
     let base = arena.publish();
     (arena, base)
@@ -6058,10 +6058,10 @@ fn b2f_d9_bind_wide_arena(
     store: &mut crate::boundary_value::BoundaryValueStore,
     native: &crate::native_int::NativeIntArenaV1,
 ) -> (crate::boundary_value::BoundaryArenaV1, *mut u64) {
-    store.reserve_persistent(64, 256, 512, 64);
+    store.reserve_persistent(64, 256, 512, 64).expect("test persistent region is reservable");
     let persistent = store.publish_persistent();
     let mut arena = crate::boundary_value::BoundaryArenaBuilder::new().finish();
-    arena.reserve(64, 256, 512, 64);
+    arena.reserve(64, 256, 512, 64).expect("test invocation region is reservable");
     arena.bind_persistent(Some(persistent as *const u64));
     arena.bind_native_int(Some(native as *const _ as *const u64));
     let base = arena.publish();

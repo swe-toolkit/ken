@@ -4123,16 +4123,26 @@ pub const CAPACITY_EXHAUSTED_STATUS_V1: i64 = -7;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CapacityScopeV1 {
     Runtime,
+    Invocation,
+    Persistent,
 }
 
 /// A named, actually metered capacity, not an allocator error or planner trap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CapacityResourceV1 {
     InvocationEpochs,
+    EventGenerations,
+    LivePendingSlots,
+    Nodes,
+    Words,
+    DataBytes,
+    NativeIntLimbs,
 }
 
-/// Exact refusal of a deployment-declared finite limit. `requested` is wider
-/// than the epoch counter so even a request after u64::MAX never wraps.
+/// Exact refusal of a named finite resource. `requested` is wider than the
+/// counter and the platform's `usize`; `limit` is the actual enforceable bound
+/// (the profile bound for tickets, or physical backing bound for a region whose
+/// declared grant cannot be represented). The artifact retains the profile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CapacityExhaustedV1 {
     pub scope: CapacityScopeV1,

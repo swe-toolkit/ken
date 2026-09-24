@@ -39,7 +39,9 @@
 use std::ffi::c_void;
 use std::io::Write;
 
-use crate::boundary_activation::{BoundaryActivationV1, BoundaryStoreBindingV1};
+use crate::boundary_activation::{
+    BoundaryActivationV1, BoundaryStoreBindingV1, BoundaryStoreOpenErrorV2,
+};
 use crate::boundary_resource_profile::{
     BOUNDARY_RESOURCE_PROFILE_VERSION, BoundaryRegionLimitsV1, BoundaryResourceProfileV2,
     RuntimeResourceLimitsV2,
@@ -163,18 +165,27 @@ pub struct KenCapacityFailureV1 {
 pub unsafe extern "C" fn ken_boundary_store_v1_open(
     profile: *const KenBoundaryResourceProfileV2,
     out_store: *mut *mut KenBoundaryStoreV1,
+    out_failure: *mut *mut KenCapacityFailureV1,
 ) -> i64 {
-    if profile.is_null() || out_store.is_null() {
+    if profile.is_null() || out_store.is_null() || out_failure.is_null() {
         return KEN_ACTIVATION_ERR_NULL;
     }
-    unsafe { *out_store = std::ptr::null_mut() };
+    unsafe {
+        *out_store = std::ptr::null_mut();
+        *out_failure = std::ptr::null_mut();
+    }
     let Some(profile) = (unsafe { *profile }).to_rust() else {
         return KEN_ACTIVATION_ERR_PROFILE;
     };
     let mut store = BoundaryValueStore::new();
     let binding = match BoundaryStoreBindingV1::open(&mut store, profile) {
         Ok(binding) => binding,
-        Err(_) => return KEN_ACTIVATION_ERR_PROFILE_MISMATCH,
+        Err(BoundaryStoreOpenErrorV2::ProfileMismatch(_)) =>
+            return KEN_ACTIVATION_ERR_PROFILE_MISMATCH,
+        Err(BoundaryStoreOpenErrorV2::CapacityExhausted(fault)) => {
+            unsafe { *out_failure = Box::into_raw(Box::new(KenCapacityFailureV1 { fault })) };
+            return KEN_ACTIVATION_ERR_CAPACITY;
+        }
     };
     let handle = Box::into_raw(Box::new(KenBoundaryStoreV1 { store, binding }));
     unsafe { *out_store = handle };
@@ -514,14 +525,48 @@ mod tests {
         }
     }
 
+    /// Durable capacity invariant: both opaque C owners preserve the exact
+    /// resource-bearing fault instead of allowing a Rust panic across extern C.
+    #[test]
+    fn c_open_and_begin_return_owned_typed_region_refusals() {
+        let mut profile = c_profile();
+        profile.persistent_words = u64::MAX;
+        let mut store = std::ptr::null_mut();
+        let mut failure = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut failure) }, KEN_ACTIVATION_ERR_CAPACITY);
+        assert!(store.is_null());
+        assert!(!failure.is_null());
+        let fault = unsafe { (*failure).fault };
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Persistent);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+        assert_eq!(fault.requested, u128::from(u64::MAX));
+        // Consume the opaque failure through the real nonprocess wire terminal.
+        assert_eq!(unsafe { ken_activation_v1_write_starter_capacity_failure(failure) }, KEN_ACTIVATION_OK);
+
+        let mut profile = c_profile();
+        profile.invocation_words = u64::MAX;
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut failure) }, KEN_ACTIVATION_OK);
+        let mut activation = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_begin(store, &mut activation, &mut failure) }, KEN_ACTIVATION_ERR_CAPACITY);
+        assert!(activation.is_null());
+        assert!(!failure.is_null());
+        let fault = unsafe { (*failure).fault };
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Invocation);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+        assert_eq!(fault.requested, u128::from(u64::MAX));
+        assert_eq!(unsafe { ken_activation_v1_write_starter_capacity_failure(failure) }, KEN_ACTIVATION_OK);
+        assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
+    }
+
     /// ⭐ **The whole C lifecycle, driven exactly as the stub will drive it**,
     /// with only handles and status values crossing.
     #[test]
     fn the_c_abi_drives_the_whole_lifecycle_with_handles_and_statuses_only() {
         let profile = c_profile();
         let mut store = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&profile, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) },
             KEN_ACTIVATION_OK
         );
         assert!(!store.is_null());
@@ -606,8 +651,9 @@ mod tests {
     fn two_activations_across_the_c_abi_get_distinct_services() {
         let profile = c_profile();
         let mut store = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&profile, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) },
             KEN_ACTIVATION_OK
         );
 
@@ -658,7 +704,8 @@ mod tests {
         let mut profile = c_profile();
         profile.runtime_invocation_epochs = 0;
         let mut store = std::ptr::null_mut();
-        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store) }, KEN_ACTIVATION_OK);
+        let mut open_failure = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) }, KEN_ACTIVATION_OK);
         let mut activation = std::ptr::null_mut();
         let mut failure = std::ptr::null_mut();
         assert_eq!(
@@ -686,11 +733,12 @@ mod tests {
     #[test]
     fn a_profile_from_a_layout_this_runtime_does_not_implement_is_refused() {
         let mut store = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
 
         let mut wrong_version = c_profile();
         wrong_version.version += 1;
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&wrong_version, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&wrong_version, &mut store, &mut open_failure) },
             KEN_ACTIVATION_ERR_PROFILE
         );
         assert!(
@@ -701,7 +749,7 @@ mod tests {
         let mut wrong_size = c_profile();
         wrong_size.size += 8;
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&wrong_size, &mut store) },
+            unsafe { ken_boundary_store_v1_open(&wrong_size, &mut store, &mut open_failure) },
             KEN_ACTIVATION_ERR_PROFILE
         );
         assert!(store.is_null());
@@ -711,11 +759,12 @@ mod tests {
     fn c_abi_refuses_epoch_ceiling_mismatch_before_publishing_a_store() {
         let profile = c_profile();
         let mut store = std::ptr::null_mut();
-        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store) }, KEN_ACTIVATION_OK);
+        let mut open_failure = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut open_failure) }, KEN_ACTIVATION_OK);
         let mut mismatch = profile;
         mismatch.runtime_invocation_epochs = u64::MAX - 1;
         let mut second = 1usize as *mut KenBoundaryStoreV1;
-        assert_eq!(unsafe { ken_boundary_store_v1_open(&mismatch, &mut second) },
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&mismatch, &mut second, &mut open_failure) },
             KEN_ACTIVATION_ERR_PROFILE_MISMATCH);
         assert!(second.is_null(), "refused profile returned a store handle");
         assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
@@ -728,15 +777,16 @@ mod tests {
     fn every_entry_point_refuses_null_rather_than_dereferencing_it() {
         let profile = c_profile();
         let mut store_slot = std::ptr::null_mut();
+        let mut open_failure = std::ptr::null_mut();
         let mut services_slot = std::ptr::null();
         let mut word = 0u64;
 
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(std::ptr::null(), &mut store_slot) },
+            unsafe { ken_boundary_store_v1_open(std::ptr::null(), &mut store_slot, &mut open_failure) },
             KEN_ACTIVATION_ERR_NULL
         );
         assert_eq!(
-            unsafe { ken_boundary_store_v1_open(&profile, std::ptr::null_mut()) },
+            unsafe { ken_boundary_store_v1_open(&profile, std::ptr::null_mut(), &mut open_failure) },
             KEN_ACTIVATION_ERR_NULL
         );
         assert_eq!(

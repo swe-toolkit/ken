@@ -3204,10 +3204,11 @@ pub(crate) mod tests {
             persistent_room.1,
             persistent_room.2,
             limb_room.0,
-        );
+        ).expect("test persistent region is reservable");
         let persistent = store.publish_persistent();
         let mut arena = builder.finish();
-        arena.reserve(arena_room.0, arena_room.1, arena_room.2, limb_room.1);
+        arena.reserve(arena_room.0, arena_room.1, arena_room.2, limb_room.1)
+            .expect("test invocation region is reservable");
         arena.bind_persistent(Some(persistent));
         let base = arena.publish();
         Bound {
@@ -4957,7 +4958,7 @@ pub(crate) mod tests {
         // Persistent construction with no persistent region bound.
         {
             let mut arena = BoundaryArenaBuilder::new().finish();
-            arena.reserve(2, 4, 0, 0);
+            arena.reserve(2, 4, 0, 0).expect("test invocation region is reservable");
             arena.bind_persistent(None);
             let base = arena.publish();
             assert_eq!(
