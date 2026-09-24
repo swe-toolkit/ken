@@ -54,13 +54,17 @@ pub enum ActivationServiceField {
     /// authority every boundary-carrier producer and consumer allocates and
     /// projects through.
     BoundaryArena,
+    /// The activation-owned, fixed-backing call-event issuer. This is an
+    /// opaque Rust owner, not a source-valued slot or borrowed operand.
+    CallEvents,
 }
 
 impl ActivationServiceField {
     /// Every field, in layout order.
-    pub const ALL: [ActivationServiceField; 2] = [
+    pub const ALL: [ActivationServiceField; 3] = [
         ActivationServiceField::NativeIntArena,
         ActivationServiceField::BoundaryArena,
+        ActivationServiceField::CallEvents,
     ];
 
     /// This field's byte offset — its position, times the word width.
@@ -76,6 +80,8 @@ pub const SERVICES_NATIVE_INT_ARENA: i32 = ActivationServiceField::NativeIntAren
 /// Byte offset of the published boundary-arena header base. ⛔ Every
 /// boundary-carrier helper graph takes **only** this one as its arena argument.
 pub const SERVICES_BOUNDARY_ARENA: i32 = ActivationServiceField::BoundaryArena.offset();
+/// Offset of the opaque activation-owned issuer pointer.
+pub const SERVICES_CALL_EVENTS: i32 = ActivationServiceField::CallEvents.offset();
 
 /// Byte size of the record, **derived** from the field inventory.
 pub const ACTIVATION_SERVICES_BYTES: i32 = (ActivationServiceField::ALL.len() * 8) as i32;
@@ -151,6 +157,8 @@ pub struct GeneratedActivationServicesV1 {
     pub native_int_arena: *mut u64,
     /// The published `BoundaryArenaV1` header base.
     pub boundary_arena: *mut u64,
+    /// `*mut InvocationTicketIssuerV1` stored as an opaque service pointer.
+    pub call_events: *mut std::ffi::c_void,
 }
 
 impl Default for GeneratedActivationServicesV1 {
@@ -158,6 +166,7 @@ impl Default for GeneratedActivationServicesV1 {
         Self {
             native_int_arena: std::ptr::null_mut(),
             boundary_arena: std::ptr::null_mut(),
+            call_events: std::ptr::null_mut(),
         }
     }
 }
@@ -166,11 +175,8 @@ impl GeneratedActivationServicesV1 {
     /// Bind both services. ⛔ Both are required: a record is either wholly
     /// published or not handed to generated code at all, which is why there is
     /// no per-field setter and no partial constructor.
-    pub fn new(native_int_arena: *mut u64, boundary_arena: *mut u64) -> Self {
-        Self {
-            native_int_arena,
-            boundary_arena,
-        }
+    pub fn new(native_int_arena: *mut u64, boundary_arena: *mut u64, call_events: *mut std::ffi::c_void) -> Self {
+        Self { native_int_arena, boundary_arena, call_events }
     }
 
     /// The address generated code receives as its `services_ptr`.
@@ -182,6 +188,7 @@ impl GeneratedActivationServicesV1 {
     /// generated code is called only when both services are non-null.
     pub fn is_published(&self) -> bool {
         !self.native_int_arena.is_null() && !self.boundary_arena.is_null()
+            && !self.call_events.is_null()
     }
 }
 
@@ -208,9 +215,11 @@ mod tests {
         let base = std::ptr::addr_of!(record) as usize;
         let native = std::ptr::addr_of!(record.native_int_arena) as usize;
         let boundary = std::ptr::addr_of!(record.boundary_arena) as usize;
+        let calls = std::ptr::addr_of!(record.call_events) as usize;
 
         assert_eq!(native - base, SERVICES_NATIVE_INT_ARENA as usize);
         assert_eq!(boundary - base, SERVICES_BOUNDARY_ARENA as usize);
+        assert_eq!(calls - base, SERVICES_CALL_EVENTS as usize);
         assert_eq!(
             std::mem::size_of::<GeneratedActivationServicesV1>(),
             ACTIVATION_SERVICES_BYTES as usize
@@ -260,7 +269,7 @@ mod tests {
             UNIT_CALL_FRAME_BYTES as usize
         );
         assert_eq!(UnitCallFrameField::ALL.len(), 2);
-        assert_eq!(ActivationServiceField::ALL.len(), 2);
+        assert_eq!(ActivationServiceField::ALL.len(), 3);
     }
 
     /// ⛔ **A partially bound record is not publishable**, and the launcher's
@@ -271,8 +280,10 @@ mod tests {
         let pointer = &mut word as *mut u64;
 
         assert!(!GeneratedActivationServicesV1::default().is_published());
-        assert!(!GeneratedActivationServicesV1::new(pointer, std::ptr::null_mut()).is_published());
-        assert!(!GeneratedActivationServicesV1::new(std::ptr::null_mut(), pointer).is_published());
-        assert!(GeneratedActivationServicesV1::new(pointer, pointer).is_published());
+        let calls = pointer.cast::<std::ffi::c_void>();
+        assert!(!GeneratedActivationServicesV1::new(pointer, std::ptr::null_mut(), calls).is_published());
+        assert!(!GeneratedActivationServicesV1::new(std::ptr::null_mut(), pointer, calls).is_published());
+        assert!(!GeneratedActivationServicesV1::new(pointer, pointer, std::ptr::null_mut()).is_published());
+        assert!(GeneratedActivationServicesV1::new(pointer, pointer, calls).is_published());
     }
 }

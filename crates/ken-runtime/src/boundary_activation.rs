@@ -145,6 +145,7 @@ fn region_reservation_fault(
     }
 }
 use crate::native_int::NativeIntArenaV1;
+use crate::invocation_tickets::InvocationTicketIssuerV1;
 
 /// **One activation: the per-invocation arenas, the services record, and the
 /// published bases that generated code is given.**
@@ -160,6 +161,8 @@ pub struct BoundaryActivationV1 {
     /// ⛔ Boxed for address stability — see the module doc.
     native_int_arena: Box<NativeIntArenaV1>,
     arena: Box<BoundaryArenaV1>,
+    /// Fixed backing and boxed owner are reserved before publishing services.
+    call_events: Box<InvocationTicketIssuerV1>,
     /// ⛔ Boxed for the same reason: generated code receives its address.
     services: Box<GeneratedActivationServicesV1>,
     /// The base [`BoundaryArenaV1::publish`] returned, remembered so the
@@ -256,14 +259,19 @@ impl BoundaryActivationV1 {
         arena.reserve(nodes, words, data, limbs)
             .map_err(|failure| region_reservation_fault(
                 ken_host::CapacityScopeV1::Invocation, failure))?;
+        let mut call_events = Box::new(InvocationTicketIssuerV1::reserve(
+            0, profile.call_events,
+        )?);
         // Consume the process-wide epoch only after all storage has been
         // reserved and before publishing a services pointer or running code.
         let epoch = mint_invocation_epoch(profile.runtime.invocation_epochs)?;
+        call_events.bind_epoch_before_publication(epoch);
         // 4 — publish, and only now build the services record.
         let published_boundary_base = arena.publish();
         let services = Box::new(GeneratedActivationServicesV1::new(
             native_base,
             published_boundary_base,
+            (&mut *call_events as *mut InvocationTicketIssuerV1).cast(),
         ));
 
         Ok(BoundaryActivationV1 {
@@ -271,6 +279,7 @@ impl BoundaryActivationV1 {
             epoch,
             native_int_arena,
             arena,
+            call_events,
             services,
             published_boundary_base,
             published_persistent_base,
@@ -282,6 +291,13 @@ impl BoundaryActivationV1 {
     /// Process-wide identity, minted before this activation was published.
     pub fn epoch(&self) -> u64 {
         self.epoch
+    }
+
+    pub fn call_event_issuer(&mut self) -> Option<&mut InvocationTicketIssuerV1> {
+        (!self.finished && self.is_published()).then_some(&mut self.call_events)
+    }
+    pub fn owned_call_event_address(&self) -> usize {
+        (&*self.call_events as *const InvocationTicketIssuerV1) as usize
     }
 
     /// The `services_ptr` generated code receives as its second parameter.
