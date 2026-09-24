@@ -1,7 +1,7 @@
 ---
 id: CAT-DEQUE-POP-LAWS
 title: "Proof-backfill for Data/Collections/Deque.ken.md, keeping its zero-publication surface: prove in-package for an arbitrary deque that popFront agrees with the list view -- popFront q = None implies toList q = Nil, and popFront q = Some (x, rest) implies toList q = Cons x (toList rest) -- instead of only the pushed-then-popped round trip"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: architect
