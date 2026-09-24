@@ -76,6 +76,13 @@ across occurrences (its AC-4). No parser or elaborator change. K3 landed
 (`bfdbb9789`) and resolved literal identity. The **current** blocker is
 neutral-selector access; see the symptom inventory.
 
+**Operator 2026-09-24, second ruling ("concur with rec.").** The AC-1b
+retry could not name the parser's own diagnostic-code literals: each raw
+String literal is a separate identity, and K3 equates only their Char views.
+The operator authorized hoisting those codes into private named constants in
+production (AC-1c). The first ruling's "no parser change" is narrowed to
+that one edit.
+
 ## Symptom inventory
 
 1. Before K3: the computed prefix `Bool` stayed opaque inside the selected
@@ -93,8 +100,9 @@ The chain is at HS2. A third advancing hard stop invokes Research.
   primitive, `Omega` carrier, or kernel/TCB change. The production
   representation and shipped declarations are unchanged apart from added
   proofs and exports. For the laws 1-2 resumption after K3 there is **no
-  parser or elaborator change**: the 2026-09-23 shared-step factorization
-  fallback is withdrawn (2026-09-24). A distinct post-K3 structural blocker
+  elaborator change**, and the only parser change is AC-1c's constant hoist:
+  the 2026-09-23 shared-step factorization fallback stays withdrawn
+  (2026-09-24). A distinct post-K3 structural blocker
   is a STOP for its own ruling. Exported types are unchanged and `cc7_*`
   stays green. The Architect confirms meaning on the actual candidate.
 - **AC-1a (proof-local helpers; Architect `evt_7fzgaaqe3x855`,
@@ -131,27 +139,25 @@ The chain is at HS2. A third advancing hard stop invokes Research.
   - AC-2's production-site falsifiers are unchanged. With the adapter
     untouched, each must redden the bridge or the attached law at its own
     obligation.
-- **AC-1b (existing String certificate; Steward scope ruling after
-  Architect `evt_7p6se2kgws237`).** The first bridge probe failed because
-  production and the adapter each spell the diagnostic codes
-  (`"missing-option-value"`, `"unknown-option"`,
-  `"unexpected-positional"`) as separate raw String literals. K3 makes
-  their Char views convertible, not the raw Strings.
-  - One bounded retry of the **same** adapter's full-`Validation` bridge
-    may use the existing public
-    `Data.Text.StringBijection.string_to_list_char_injective` with the
-    existing `J`/`cong` transport. The certificate rests on the existing
-    TCB contract `string_to_list_char_retraction`. The stop condition
-    already permits existing String contracts; this bullet makes the
-    dependency explicit.
-  - Accounting: report the roots-loaded ArgParse `trusted_base()` at base
-    and at candidate. The two must be equal: ArgParse already loads that
-    axiom through Derived. The handback names each law that depends on
-    the axiom.
-  - Not allowed: hoisting the codes into production constants, weakening
-    the bridge to less than the full `Validation`, or adding a second
-    adapter. If this retry does not check, STOP for an explicit
-    contract or scope ruling.
+- **AC-1b (superseded by AC-1c).** The bounded retry through
+  `string_to_list_char_injective` could not name the parser's literal
+  occurrences and is closed. Do not reopen it.
+- **AC-1c (diagnostic-code constants; operator 2026-09-24).** In
+  `ArgParse.ken.md`, replace each raw diagnostic-code String literal that a
+  law must match with one private named `String` constant, declared once:
+  `"missing-option-value"`, `"unknown-option"` and `"unexpected-positional"`
+  in `argparse_parse_tokens` (`:368`, `:385`, `:396` at `ad9642456`), and
+  `"missing-positional"` (`:322`) only if a law needs it. Every production
+  occurrence and the AC-1a adapter reference the constant. The proof may name
+  it in theorem types.
+  - Values are byte-identical; exported names, types and `argparse_run`'s
+    behavior are unchanged, and `cc7_*` stays green.
+  - After the edit, no raw occurrence of a hoisted code remains in
+    `ArgParse.ken.md`.
+  - No other production edit, no new public name, no `Axiom`, postulate or
+    kernel change, and no String injectivity certificate.
+  - Report the roots-loaded ArgParse `trusted_base()` at base and candidate;
+    they must be equal.
 - **AC-2 (falsifier).** For each deliverable, the handback names one
   one-line natural-site mutation that makes that law's proof fail to check
   for its own property. For laws 1 and 2 the site is
@@ -171,8 +177,8 @@ The chain is at HS2. A third advancing hard stop invokes Research.
 ## Stop conditions
 
 - If the generic full-`Validation` bridge does not check with `Refl` or
-  existing transport, STOP. Do not add a second adapter or edit the parser or
-  elaborator. The chain is at HS2 (symptom inventory above); a third
+  existing transport over the AC-1c constants, STOP. Do not add a second
+  adapter, edit the parser beyond AC-1c, or edit the elaborator. The chain is at HS2 (symptom inventory above); a third
   advancing hard stop invokes Research.
 
 - If a law needs a fact about primitive `Bytes` or `String` that no existing

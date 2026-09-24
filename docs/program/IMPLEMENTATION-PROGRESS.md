@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-24 10:24:23Z — from 732 issue file(s) in `docs/program/issues/`.
+2026-09-24 11:46:04Z — from 732 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -218,7 +218,7 @@ the committed file matches the generator's output.
 | `KERNEL-ELIM-SHAPE-NORMALIZE-DIVERGES` | Eliminator/recursor shape derivation over a proof-carrying inductive family diverges -- derive_recursive_shape and structured_lift normalize a constructor premise before the occurrence test, the elimination-time twin of LANG-CTOR-PREMISE-ELABORATION-DIVERGES | merged | kernel | M | none | — |
 | `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` | Complete the intrinsic All former-lift guest-path resolution to descend through NESTED positive formers (List (Pair String X)), so the eliminator of a strictly-positive inductive whose recursive occurrence sits one former-nesting deeper than a direct application can be built — preserving strict positivity (positive former nestings only, never a negative-position path). | merged | kernel | M | kernel | — |
 | `KERNEL-LITERAL-CHAR-VIEW` | K3: the kernel reduces string_to_list_char on a checked String literal to its List Char and charToInt on a checked Char literal to its IntLit codepoint, so a generic client can build a checked ASCII witness for a fresh literal; no other primitive gains reduction | merged | kernel | M | architect | — |
-| `KERNEL-LITERAL-ROLLBACK-PURGE` | Soundness repair for K3: rolling back a declaration must drop its checked String literal payload, so a later declaration that reuses the freed id cannot inherit it -- the kernel must not convert string_to_list_char of an unrelated foreign String to a stale literal's characters, and the interpreter must not evaluate an Int definition to a String | active | kernel | S | architect | — |
+| `KERNEL-LITERAL-ROLLBACK-PURGE` | Soundness repair for K3: rolling back a declaration must drop its checked String literal payload, so a later declaration that reuses the freed id cannot inherit it -- the kernel must not convert string_to_list_char of an unrelated foreign String to a stale literal's characters, and the interpreter must not evaluate an Int definition to a String | merged | kernel | S | architect | — |
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | merged | kernel | L | none | — |
 | `KERNEL-NORMALIZE-ORIGIN-TRACE` | add an observational origin-tracking mode to ken-kernel's normalizer -- one reducer with a no-op observer for today's normalize and a collecting observer for a trace API -- so the bracket tree's child 1 can identify each compiler-authored bracket role's exact normalized occurrence without the shared dispatcher producing two host response routes; the traced Term must equal normalize's Term | closed | kernel | L | architect | — |
 | `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | merged | spec-enclave | M | none | — |
@@ -832,7 +832,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (active) `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (active) `CAT-DEQUE-POP-LAWS` (merged) `CAT-DEQUE-POPBACK-LAWS` (merged) `CAT-IDF-TRUST-FREE-PROVIDER` (ready) `CAT-MAP-DOM-MEMBER-LAW` (merged) `CAT-VALIDATION-AP-ERROR-LAW` (merged) `CAT-VEC-MAP-IDENTITY-LAW` (merged) `KERNEL-LITERAL-CHAR-VIEW` (merged) `KERNEL-LITERAL-ROLLBACK-PURGE` (active) `KERNEL-NORMALIZE-ORIGIN-TRACE` (closed) `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` (active) `RT-BRACKET-SOURCE-EDGE` (closed) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-INVOCATION-RESOURCE-PRECURSOR` (active) `RT-SELECTED-PENDING-CALL-PACKAGE` (draft)
+- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (active) `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (active) `CAT-DEQUE-POP-LAWS` (merged) `CAT-DEQUE-POPBACK-LAWS` (merged) `CAT-IDF-TRUST-FREE-PROVIDER` (ready) `CAT-MAP-DOM-MEMBER-LAW` (merged) `CAT-VALIDATION-AP-ERROR-LAW` (merged) `CAT-VEC-MAP-IDENTITY-LAW` (merged) `KERNEL-LITERAL-CHAR-VIEW` (merged) `KERNEL-LITERAL-ROLLBACK-PURGE` (merged) `KERNEL-NORMALIZE-ORIGIN-TRACE` (closed) `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` (active) `RT-BRACKET-SOURCE-EDGE` (closed) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-INVOCATION-RESOURCE-PRECURSOR` (active) `RT-SELECTED-PENDING-CALL-PACKAGE` (draft)
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
