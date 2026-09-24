@@ -81,6 +81,47 @@ fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgres
             Term::App(f, a) => {
                 let (f_w, fp) = whnf_progress(env, ctx, f);
                 iota |= fp.iota;
+                // K3: only the registered String -> List Char operation on
+                // an immutable checked String literal. No other primitive
+                // call, nor a neutral String argument, gains reduction.
+                if let Term::Const { id: op, level_args } = &f_w {
+                    if level_args.is_empty() {
+                        if let Some((char_type, nil, cons)) = env.literal_char_view(*op)
+                        {
+                            let (argument, progress) = whnf_progress(env, ctx, a);
+                            iota |= progress.iota;
+                            if let Term::Const {
+                                id: literal,
+                                level_args: literal_levels,
+                            } = argument
+                            {
+                                if literal_levels.is_empty() {
+                                    if let Some(value) = env.checked_literal(literal) {
+                                        let char_ty = Term::const_(char_type, vec![]);
+                                        let mut result = Term::app(
+                                            Term::constructor(nil, vec![]),
+                                            char_ty.clone(),
+                                        );
+                                        for scalar in value.as_str().chars().rev() {
+                                            result = Term::app(
+                                                Term::app(
+                                                    Term::app(
+                                                        Term::constructor(cons, vec![]),
+                                                        char_ty.clone(),
+                                                    ),
+                                                    Term::IntLit((scalar as u32).into()),
+                                                ),
+                                                result,
+                                            );
+                                        }
+                                        cur = result;
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 match &f_w {
                     Term::Lam(_, body) => {
                         cur = subst0(body, a);

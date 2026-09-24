@@ -656,6 +656,7 @@ name = "ken-kernel"
 version = "0.0.0"
 dependencies = [
  "num-bigint",
+ "unicode-normalization",
 ]
 
 [[package]]
