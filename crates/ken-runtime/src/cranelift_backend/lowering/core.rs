@@ -14758,6 +14758,396 @@ impl<'a> Lowering<'a> {
         }))
     }
 
+    /// Isolate the recursive match arm from `lower_expr`'s stack frame.
+    /// Native construction nests carried matches inside constructor descent;
+    /// the match arm's live locals must not be retained by every recursive
+    /// `lower_expr` call, even when that call is not itself a match.
+    fn lower_runtime_match_expr(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        static_origin: StaticOriginId,
+        scrutinee: &RuntimeExpr,
+        cases: &[crate::ir::RuntimeMatchCase],
+        default: &RuntimeTrap,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let scrutinee_occurrence = self.child_occurrence(static_origin, 0, scrutinee)?;
+        let producer_route = requires_heterogeneous_deforestation(scrutinee)
+            || self.declaration_call_produces_deforestable_aggregate(scrutinee);
+        if producer_route {
+            return self.lower_computational_producer_expr(
+                builder,
+                scrutinee_occurrence,
+                env,
+                &[EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                    cases,
+                    default,
+                    env,
+                    static_origin,
+                    retained_scrutinee_index: None,
+                    deferred_constructor_case: None,
+                })],
+            );
+        }
+        let lowered_scrutinee = self.lower_expr(builder, scrutinee_occurrence, env)?;
+        // ⭐⭐ `D3`'s CARRIED arm, and it MUST come first.
+        //
+        // ⚠ Every test below asks for a specific `Lowered` shape, and
+        // the chain ends in *"scrutinee is not a constructor value"*. A
+        // carried scrutinee would fall past all of them and land on
+        // that refusal — a **true sentence about the wrong thing**,
+        // which is worse than an error, because it names a cause that
+        // is not the cause. Classifying the phase first is what makes
+        // the rest of the chain a statement about `Lowered` only.
+        if let LoweringOperand::Carried(word) = lowered_scrutinee {
+            return self.lower_carried_match(
+                builder,
+                word,
+                cases,
+                default,
+                static_origin,
+                env,
+                None,
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) = lowered_scrutinee {
+            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            return self.lower_borrowed_match(
+                builder,
+                pointer,
+                cases,
+                default,
+                static_origin,
+                env,
+                &join_plan,
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::BorrowedOption {
+            present,
+            value,
+            none,
+            some,
+        }) = lowered_scrutinee
+        {
+            return self.lower_borrowed_option_match(
+                builder,
+                present,
+                value,
+                &none,
+                &some,
+                cases,
+                default,
+                static_origin,
+                env,
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::BoundedNat(nat)) = lowered_scrutinee {
+            return self.lower_bounded_nat_match(
+                builder,
+                nat,
+                false,
+                cases,
+                default,
+                static_origin,
+                env,
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::StructuralNat(nat)) = lowered_scrutinee {
+            return self.lower_bounded_nat_match(
+                builder,
+                BoundedNatV1::derived_from_validated(nat.value),
+                true,
+                cases,
+                default,
+                static_origin,
+                env,
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::HostResult {
+            success,
+            error,
+            ok,
+            err_constructor,
+            ok_constructor,
+        }) = lowered_scrutinee
+        {
+            return self.lower_dynamic_host_result_match(
+                builder,
+                success,
+                *error,
+                *ok,
+                &err_constructor,
+                &ok_constructor,
+                cases,
+                default,
+                static_origin,
+                env,
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = lowered_scrutinee {
+            return self.lower_dynamic_constructor_match(
+                builder,
+                dynamic,
+                DynamicConstructorContinuation::Ordinary {
+                    cases,
+                    default,
+                    env,
+                    static_origin,
+                },
+            );
+        }
+        if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = lowered_scrutinee {
+            // ⭐ These two cases are found by CONSTRUCTOR NAME, and a
+            // search yields no position — so both lookups enumerate and
+            // keep the index. The index, not the found body, is what the
+            // origin is derived from.
+            let true_case = cases.iter().enumerate().find(|(_, case)| {
+                case.binders == 0 && case.constructor.ends_with("::Bool::True")
+            });
+            let false_case = cases.iter().enumerate().find(|(_, case)| {
+                case.binders == 0 && case.constructor.ends_with("::Bool::False")
+            });
+            let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
+                return Err(unsupported(
+                    "Match",
+                    "Bool match requires zero-binder True and False cases",
+                ));
+            };
+            if let Some(selected) = known {
+                let (index, case) = if selected { true_case } else { false_case };
+                self.disposition_statically_unselected_match_cases(
+                    static_origin,
+                    Some(index),
+                )?;
+                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                return self.lower_expr(builder, body, env);
+            }
+            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            let true_block = builder.create_block();
+            let false_block = builder.create_block();
+            let merge = join_plan
+                .has_continuing_predecessor
+                .then(|| builder.create_block());
+            if let Some(merge) = merge {
+                self.append_planned_join_params(builder, merge, &join_plan);
+            }
+            builder
+                .ins()
+                .brif(value, true_block, &[], false_block, &[]);
+            let mut merge_kind = None;
+            let mut terminal_trap = None;
+            for (block, (index, case)) in
+                [(true_block, true_case), (false_block, false_case)]
+            {
+                builder.switch_to_block(block);
+                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                let lowered = self.lower_expr(builder, body, env)?;
+                if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
+                    terminal_trap.get_or_insert_with(|| trap.clone());
+                }
+                if self.seal_source_trap_branch(builder, &lowered)? {
+                    continue;
+                }
+                let merge = merge.ok_or_else(|| {
+                    backend_module(
+                        "join plan omitted a Bool Match merge despite a continuing \
+                         predecessor"
+                            .to_string(),
+                    )
+                })?;
+                self.jump_planned_join_arm(
+                    builder,
+                    merge,
+                    &join_plan,
+                    body.static_origin,
+                    lowered,
+                    &mut merge_kind,
+                    "Match",
+                )?;
+            }
+            let Some(merge) = merge else {
+                let unreachable = builder.create_block();
+                builder.switch_to_block(unreachable);
+                let trap = terminal_trap.ok_or_else(|| {
+                    backend_module(
+                        "Bool Match join omitted both a continuing predecessor and a \
+                         source trap"
+                            .to_string(),
+                    )
+                })?;
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
+            };
+            return self.finish_planned_join(
+                builder,
+                merge,
+                &join_plan,
+                merge_kind,
+                "Match",
+            );
+        }
+        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+        let refusal_operand_kind = match &lowered_scrutinee {
+            LoweringOperand::Specialized(value) => lowered_value_kind(value),
+            LoweringOperand::Carried(_) => {
+                unreachable!("the carried Match arm returned above")
+            }
+        };
+        let LoweringOperand::Specialized(Lowered::Constructor {
+            constructor,
+            args,
+            ..
+        }) = lowered_scrutinee else {
+            #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+            record_checked_ih_realization_observation(
+                CheckedIhRealizationObservation::MatchRefusal {
+                    site: CheckedIhMatchRefusalSite::GenericExpressionSelector,
+                    operand_kind: refusal_operand_kind,
+                },
+            );
+            return Err(unsupported("Match", "scrutinee is not a constructor value"));
+        };
+        let Some((index, case)) = cases
+            .iter()
+            .enumerate()
+            .find(|(_, case)| case.constructor == constructor)
+        else {
+            self.disposition_statically_unselected_match_cases(
+                static_origin,
+                None,
+            )?;
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
+        };
+        self.disposition_statically_unselected_match_cases(
+            static_origin,
+            Some(index),
+        )?;
+        if case.binders != args.len() {
+            return Err(unsupported(
+                "Match",
+                format!(
+                    "case {} expects {} binders but constructor has {} args",
+                    case.constructor,
+                    case.binders,
+                    args.len()
+                ),
+            ));
+        }
+        #[cfg(test)]
+        record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
+            site: "bound_constructor_fields@direct-descent",
+            eliminated_origin: static_origin,
+        });
+        let case_env = self.bound_constructor_fields(&args, env)?;
+        let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+        {
+            if let RuntimeExpr::LexicalClosure {
+                captures,
+                params,
+                body: closure_body,
+            } = body.expr
+            {
+                if params.len() != args.len() {
+                    return Err(unsupported(
+                        "Match",
+                        format!(
+                            "selected case closure expects {} parameters but the matched \
+                             constructor supplies {} fields",
+                            params.len(),
+                            args.len()
+                        ),
+                    ));
+                }
+
+                // The applied form is admitted; the D1 applied form is
+                // unmeasured. The case binder check above and this
+                // parameter check establish one exact run: every matched
+                // field becomes one closure parameter, in source order,
+                // before the capture suffix is appended.
+                #[cfg(test)]
+                let callee = self.generated_unit_call_body_callee(body.static_origin);
+                let mut inputs = args
+                    .iter()
+                    .map(|field| {
+                        let field = field
+                            .specialized_at("a static Match case closure parameter")?
+                            .clone();
+                        self.carry_call_input(
+                            builder,
+                            body.static_origin,
+                            LoweringOperand::Specialized(field),
+                            #[cfg(test)]
+                            GeneratedUnitCallInputCaller::StaticMatchCaseParameter,
+                            #[cfg(test)]
+                            callee,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                let matched_field_words = inputs
+                    .iter()
+                    .map(|input| match input {
+                        LoweringOperand::Carried(word) => word.word,
+                        LoweringOperand::Specialized(_) => unreachable!(
+                            "carry_call_input always returns a carried field"
+                        ),
+                    })
+                    .collect::<Vec<_>>();
+                inputs.extend(
+                    captures
+                        .iter()
+                        .enumerate()
+                        .map(|(position, capture)| {
+                            let capture = self.child_occurrence(
+                                body.static_origin,
+                                1 + position,
+                                capture,
+                            )?;
+                            let lowered = self.lower_expr(builder, capture, &case_env)?;
+                            self.carry_call_input(
+                                builder,
+                                capture.static_origin,
+                                lowered,
+                                #[cfg(test)]
+                                GeneratedUnitCallInputCaller::StaticMatchCaseCapture,
+                                #[cfg(test)]
+                                callee,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
+                #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                record_checked_ih_realization_observation(
+                    CheckedIhRealizationObservation::StaticMatchCaseCallAbi {
+                        matched_field_count: args.len(),
+                        capture_count: captures.len(),
+                        matched_field_prefix_in_source_order: inputs
+                            .iter()
+                            .take(args.len())
+                            .zip(&matched_field_words)
+                            .all(|(input, expected)| {
+                                matches!(
+                                    input,
+                                    LoweringOperand::Carried(word)
+                                        if word.word == *expected
+                                )
+                            }),
+                    },
+                );
+                let closure_body = self
+                    .child_occurrence(body.static_origin, 0, closure_body)?
+                    .static_origin;
+                return self.call_declared_unit(
+                    builder,
+                    closure_body,
+                    &inputs,
+                    #[cfg(test)]
+                    None,
+                );
+            }
+        }
+        self.lower_expr(builder, body, &case_env)
+    }
+
     /// Lowers one source occurrence.
     ///
     /// ## The per-variant child-position table
@@ -15188,386 +15578,8 @@ impl<'a> Lowering<'a> {
                     )?,
                 }))
             }
-            RuntimeExpr::Match {
-                scrutinee,
-                cases,
-                default,
-            } => {
-                let scrutinee_occurrence = self.child_occurrence(static_origin, 0, scrutinee)?;
-                let producer_route = requires_heterogeneous_deforestation(scrutinee)
-                    || self.declaration_call_produces_deforestable_aggregate(scrutinee);
-                if producer_route {
-                    return self.lower_computational_producer_expr(
-                        builder,
-                        scrutinee_occurrence,
-                        env,
-                        &[EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
-                            cases,
-                            default,
-                            env,
-                            static_origin,
-                            retained_scrutinee_index: None,
-                            deferred_constructor_case: None,
-                        })],
-                    );
-                }
-                let lowered_scrutinee = self.lower_expr(builder, scrutinee_occurrence, env)?;
-                // ⭐⭐ `D3`'s CARRIED arm, and it MUST come first.
-                //
-                // ⚠ Every test below asks for a specific `Lowered` shape, and
-                // the chain ends in *"scrutinee is not a constructor value"*. A
-                // carried scrutinee would fall past all of them and land on
-                // that refusal — a **true sentence about the wrong thing**,
-                // which is worse than an error, because it names a cause that
-                // is not the cause. Classifying the phase first is what makes
-                // the rest of the chain a statement about `Lowered` only.
-                if let LoweringOperand::Carried(word) = lowered_scrutinee {
-                    return self.lower_carried_match(
-                        builder,
-                        word,
-                        cases,
-                        default,
-                        static_origin,
-                        env,
-                        None,
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) = lowered_scrutinee {
-                    let join_plan = self.consumed_join_plan_token(static_origin)?;
-                    return self.lower_borrowed_match(
-                        builder,
-                        pointer,
-                        cases,
-                        default,
-                        static_origin,
-                        env,
-                        &join_plan,
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::BorrowedOption {
-                    present,
-                    value,
-                    none,
-                    some,
-                }) = lowered_scrutinee
-                {
-                    return self.lower_borrowed_option_match(
-                        builder,
-                        present,
-                        value,
-                        &none,
-                        &some,
-                        cases,
-                        default,
-                        static_origin,
-                        env,
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::BoundedNat(nat)) = lowered_scrutinee {
-                    return self.lower_bounded_nat_match(
-                        builder,
-                        nat,
-                        false,
-                        cases,
-                        default,
-                        static_origin,
-                        env,
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::StructuralNat(nat)) = lowered_scrutinee {
-                    return self.lower_bounded_nat_match(
-                        builder,
-                        BoundedNatV1::derived_from_validated(nat.value),
-                        true,
-                        cases,
-                        default,
-                        static_origin,
-                        env,
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::HostResult {
-                    success,
-                    error,
-                    ok,
-                    err_constructor,
-                    ok_constructor,
-                }) = lowered_scrutinee
-                {
-                    return self.lower_dynamic_host_result_match(
-                        builder,
-                        success,
-                        *error,
-                        *ok,
-                        &err_constructor,
-                        &ok_constructor,
-                        cases,
-                        default,
-                        static_origin,
-                        env,
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = lowered_scrutinee {
-                    return self.lower_dynamic_constructor_match(
-                        builder,
-                        dynamic,
-                        DynamicConstructorContinuation::Ordinary {
-                            cases,
-                            default,
-                            env,
-                            static_origin,
-                        },
-                    );
-                }
-                if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = lowered_scrutinee {
-                    // ⭐ These two cases are found by CONSTRUCTOR NAME, and a
-                    // search yields no position — so both lookups enumerate and
-                    // keep the index. The index, not the found body, is what the
-                    // origin is derived from.
-                    let true_case = cases.iter().enumerate().find(|(_, case)| {
-                        case.binders == 0 && case.constructor.ends_with("::Bool::True")
-                    });
-                    let false_case = cases.iter().enumerate().find(|(_, case)| {
-                        case.binders == 0 && case.constructor.ends_with("::Bool::False")
-                    });
-                    let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                        return Err(unsupported(
-                            "Match",
-                            "Bool match requires zero-binder True and False cases",
-                        ));
-                    };
-                    if let Some(selected) = known {
-                        let (index, case) = if selected { true_case } else { false_case };
-                        self.disposition_statically_unselected_match_cases(
-                            static_origin,
-                            Some(index),
-                        )?;
-                        let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                        return self.lower_expr(builder, body, env);
-                    }
-                    let join_plan = self.consumed_join_plan_token(static_origin)?;
-                    let true_block = builder.create_block();
-                    let false_block = builder.create_block();
-                    let merge = join_plan
-                        .has_continuing_predecessor
-                        .then(|| builder.create_block());
-                    if let Some(merge) = merge {
-                        self.append_planned_join_params(builder, merge, &join_plan);
-                    }
-                    builder
-                        .ins()
-                        .brif(value, true_block, &[], false_block, &[]);
-                    let mut merge_kind = None;
-                    let mut terminal_trap = None;
-                    for (block, (index, case)) in
-                        [(true_block, true_case), (false_block, false_case)]
-                    {
-                        builder.switch_to_block(block);
-                        let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                        let lowered = self.lower_expr(builder, body, env)?;
-                        if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                            terminal_trap.get_or_insert_with(|| trap.clone());
-                        }
-                        if self.seal_source_trap_branch(builder, &lowered)? {
-                            continue;
-                        }
-                        let merge = merge.ok_or_else(|| {
-                            backend_module(
-                                "join plan omitted a Bool Match merge despite a continuing \
-                                 predecessor"
-                                    .to_string(),
-                            )
-                        })?;
-                        self.jump_planned_join_arm(
-                            builder,
-                            merge,
-                            &join_plan,
-                            body.static_origin,
-                            lowered,
-                            &mut merge_kind,
-                            "Match",
-                        )?;
-                    }
-                    let Some(merge) = merge else {
-                        let unreachable = builder.create_block();
-                        builder.switch_to_block(unreachable);
-                        let trap = terminal_trap.ok_or_else(|| {
-                            backend_module(
-                                "Bool Match join omitted both a continuing predecessor and a \
-                                 source trap"
-                                    .to_string(),
-                            )
-                        })?;
-                        return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
-                    };
-                    return self.finish_planned_join(
-                        builder,
-                        merge,
-                        &join_plan,
-                        merge_kind,
-                        "Match",
-                    );
-                }
-                #[cfg(any(test, feature = "checked-ih-realization-observation"))]
-                let refusal_operand_kind = match &lowered_scrutinee {
-                    LoweringOperand::Specialized(value) => lowered_value_kind(value),
-                    LoweringOperand::Carried(_) => {
-                        unreachable!("the carried Match arm returned above")
-                    }
-                };
-                let LoweringOperand::Specialized(Lowered::Constructor {
-                    constructor,
-                    args,
-                    ..
-                }) = lowered_scrutinee else {
-                    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
-                    record_checked_ih_realization_observation(
-                        CheckedIhRealizationObservation::MatchRefusal {
-                            site: CheckedIhMatchRefusalSite::GenericExpressionSelector,
-                            operand_kind: refusal_operand_kind,
-                        },
-                    );
-                    return Err(unsupported("Match", "scrutinee is not a constructor value"));
-                };
-                let Some((index, case)) = cases
-                    .iter()
-                    .enumerate()
-                    .find(|(_, case)| case.constructor == constructor)
-                else {
-                    self.disposition_statically_unselected_match_cases(
-                        static_origin,
-                        None,
-                    )?;
-                    return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
-                };
-                self.disposition_statically_unselected_match_cases(
-                    static_origin,
-                    Some(index),
-                )?;
-                if case.binders != args.len() {
-                    return Err(unsupported(
-                        "Match",
-                        format!(
-                            "case {} expects {} binders but constructor has {} args",
-                            case.constructor,
-                            case.binders,
-                            args.len()
-                        ),
-                    ));
-                }
-                #[cfg(test)]
-                record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "bound_constructor_fields@direct-descent",
-                    eliminated_origin: static_origin,
-                });
-                let case_env = self.bound_constructor_fields(&args, env)?;
-                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                {
-                    if let RuntimeExpr::LexicalClosure {
-                        captures,
-                        params,
-                        body: closure_body,
-                    } = body.expr
-                    {
-                        if params.len() != args.len() {
-                            return Err(unsupported(
-                                "Match",
-                                format!(
-                                    "selected case closure expects {} parameters but the matched \
-                                     constructor supplies {} fields",
-                                    params.len(),
-                                    args.len()
-                                ),
-                            ));
-                        }
-
-                        // The applied form is admitted; the D1 applied form is
-                        // unmeasured. The case binder check above and this
-                        // parameter check establish one exact run: every matched
-                        // field becomes one closure parameter, in source order,
-                        // before the capture suffix is appended.
-                        #[cfg(test)]
-                        let callee = self.generated_unit_call_body_callee(body.static_origin);
-                        let mut inputs = args
-                            .iter()
-                            .map(|field| {
-                                let field = field
-                                    .specialized_at("a static Match case closure parameter")?
-                                    .clone();
-                                self.carry_call_input(
-                                    builder,
-                                    body.static_origin,
-                                    LoweringOperand::Specialized(field),
-                                    #[cfg(test)]
-                                    GeneratedUnitCallInputCaller::StaticMatchCaseParameter,
-                                    #[cfg(test)]
-                                    callee,
-                                )
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
-                        let matched_field_words = inputs
-                            .iter()
-                            .map(|input| match input {
-                                LoweringOperand::Carried(word) => word.word,
-                                LoweringOperand::Specialized(_) => unreachable!(
-                                    "carry_call_input always returns a carried field"
-                                ),
-                            })
-                            .collect::<Vec<_>>();
-                        inputs.extend(
-                            captures
-                                .iter()
-                                .enumerate()
-                                .map(|(position, capture)| {
-                                    let capture = self.child_occurrence(
-                                        body.static_origin,
-                                        1 + position,
-                                        capture,
-                                    )?;
-                                    let lowered = self.lower_expr(builder, capture, &case_env)?;
-                                    self.carry_call_input(
-                                        builder,
-                                        capture.static_origin,
-                                        lowered,
-                                        #[cfg(test)]
-                                        GeneratedUnitCallInputCaller::StaticMatchCaseCapture,
-                                        #[cfg(test)]
-                                        callee,
-                                    )
-                                })
-                                .collect::<Result<Vec<_>, _>>()?,
-                        );
-                        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
-                        record_checked_ih_realization_observation(
-                            CheckedIhRealizationObservation::StaticMatchCaseCallAbi {
-                                matched_field_count: args.len(),
-                                capture_count: captures.len(),
-                                matched_field_prefix_in_source_order: inputs
-                                    .iter()
-                                    .take(args.len())
-                                    .zip(&matched_field_words)
-                                    .all(|(input, expected)| {
-                                        matches!(
-                                            input,
-                                            LoweringOperand::Carried(word)
-                                                if word.word == *expected
-                                        )
-                                    }),
-                            },
-                        );
-                        let closure_body = self
-                            .child_occurrence(body.static_origin, 0, closure_body)?
-                            .static_origin;
-                        return self.call_declared_unit(
-                            builder,
-                            closure_body,
-                            &inputs,
-                            #[cfg(test)]
-                            None,
-                        );
-                    }
-                }
-                self.lower_expr(builder, body, &case_env)
+            RuntimeExpr::Match { scrutinee, cases, default } => {
+                self.lower_runtime_match_expr(builder, static_origin, scrutinee, cases, default, env)
             }
             RuntimeExpr::ComputationalMatch {
                 scrutinee,
