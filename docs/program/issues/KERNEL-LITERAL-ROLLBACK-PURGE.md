@@ -34,47 +34,73 @@ origin: "Adversary M8 hunt on K3 squash bfdbb9789 (evt_3e1de9jrqwbmq): SOUNDNESS
     **accepted**. The same sequence at the parent `88124a613` rejects it.
   - At runtime, `const i1 : Int = 7` on the freed id evaluates to
     `Str("zz")`.
-- The elaborator's `num_values` entries for popped literal ids also survive
-  rollback. This half likely predates K3 and is unmeasured at the parent.
+- `elab.rs::elab_str_lit` inserts the same checked String id into both the
+  kernel `checked_literals` table and the elaborator `num_values`
+  (`NumericLitVal::Str`). `eval.rs::eval` checks the kernel payload first,
+  then `num_values`. `compiler_driver.rs::literal_native_symbol` has the same
+  fallback. The `num_values` half may predate K3 and is unmeasured at the
+  parent. Char literals use core `IntLit` and have no table entry; no Char
+  repair is needed.
+- `GlobalEnv::checked_literal` is public and does a raw table lookup. Its
+  consumers are `conv.rs`, `ken-interp/src/eval.rs` and
+  `ken-elaborator/src/compiler_driver.rs`, plus fresh-registration code.
+- Frame boundary: Architect `evt_5b8cekxazqhtd`. Both tables share one
+  rollback-lifetime invariant, and it is repaired here as one node.
 
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
+One rollback-lifetime invariant across both literal tables:
+
 1. `remove_last` purges the popped id's `checked_literals` entry, beside the
    tables it already purges.
-2. The kernel conversion arm and the interpreter's literal lookup accept a
-   payload only when the id is a live `PrimReduction::Literal` declaration at
-   the checked carrier. The table alone is never authoritative.
+2. `GlobalEnv::checked_literal` returns a payload only when the id is a live
+   `Decl::Primitive { reduction: Literal, ty }` whose `ty` is exactly the
+   registered String carrier. A type that merely converts to String is not
+   the carrier. If the guard lives in the consumers instead, it must cover
+   all three, including `compiler_driver.rs`.
 3. The elaborator rollback sites drop `num_values` entries for the ids they
    pop.
 
-No new reduction, primitive, postulate or trust entry. The K3 acceptance
-tests stay green.
+No new reduction, registration path, primitive, postulate or trust entry.
+The K3 acceptance tests stay green without changed expectations.
 
 ## Acceptance
 
-- **AC-1 (base red first).** Commit the Adversary's sequence as a
-  regression test (`ElabEnv::elaborate_decl` in order): it is red at
-  `bfdbb9789`, with the false `Refl` accepted only for the reused id and
-  rejected for the adjacent controls. Include the runtime `Int` and `String`
-  cases.
-- **AC-2 (candidate).**
-  - Kernel side: the false theorem rejects, and so does every adjacent
-    control.
-  - Runtime side: each popped-id reuse evaluates to its own value.
-  - A genuine literal declared after the rollback still gets its own view.
-- **AC-3 (mutation controls).** Each is run alone:
-  - Remove only the `remove_last` purge: the kernel case reddens, or else it
-    stays green because deliverable 2 blocks it; the handback says which.
-  - Remove only the live-declaration check: the direct stale-table test
-    reddens.
+- **AC-1 (parent/base matrix, red first).** Commit the Adversary's sequence
+  (`ElabEnv::elaborate_decl` in order) as a regression. Record three rows
+  separately, at parent `88124a613` and at base `bfdbb9789`:
+  - kernel false `Refl` over the reused-id foreign String (expected
+    K3-specific: rejected at parent, accepted at base);
+  - runtime stale side table: the reused-id `Int` const evaluates to
+    `Str("zz")` (possibly older than K3; measure it, do not impute it);
+  - positive: a genuine literal declared after the rollback gets its own
+    view.
+  Every negative is paired with a reaching positive; no bare `expect_err`.
+- **AC-2 (candidate).** The false theorem rejects at its `Refl` obligation,
+  and so do the adjacent controls. Each popped-id reuse evaluates to its own
+  value. A fresh legitimate String and a fresh non-String literal after
+  rollback both behave correctly. The native metadata observer agrees with
+  the checked literal provenance.
+- **AC-3 (single-arm mutation controls; count the executed tests).**
+  - **Purge.** A kernel-local test asserts on the *raw* table, right after
+    `remove_last` and before id reuse, that the popped id is absent. The
+    guarded accessor must not stand in for this assertion. Deleting only the
+    purge reddens it, even though the guard masks the stale entry
+    downstream.
+  - **Live-declaration guard.** Keep the purge. Seed a stale payload
+    directly on a live declaration of the wrong kind or the wrong String
+    carrier, using kernel-internal test machinery. Deleting only the guard
+    reddens this control.
+  - **`num_values` cleanup.** Keep the purge and the guard. Deleting only
+    the rollback-site cleanup reddens the runtime reused-`Int` test.
 - **AC-4.** No new trust. Targeted builds only, through `scripts/ken-cargo`.
   No-regression means green in CI.
 
 ## Stop conditions
 
-Stop if the base does not reproduce the acceptance, if the repair needs a
+Stop if the base does not reproduce the kernel row, if the repair needs a
 new kernel reducer or a change to literal registration, or if any K3 AC test
 has to change its expectation.
