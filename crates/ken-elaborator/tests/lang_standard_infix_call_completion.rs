@@ -661,10 +661,10 @@ fn a_fixed_instance_argument_matches_an_alias_by_global_identity() {
     );
 }
 
-// Promise class: durable invariant. The post-selection check confirms the
-// whole instantiated carrier, not only its application head.
+// Promise class: durable invariant. A fixed checked argument is matched by ID
+// before a stale builder can reach carrier confirmation.
 #[test]
-fn a_rebound_fixed_argument_is_refused_by_full_carrier_confirmation() {
+fn a_rebound_fixed_argument_is_refused_before_builder_selection() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_file(&format!(
         "{PROVIDER_AND_HOME} \
@@ -687,19 +687,18 @@ fn a_rebound_fixed_argument_is_refused_by_full_carrier_confirmation() {
     assert!(
         matches!(
             result,
-            Err(ken_elaborator::ElabError::InstanceCarrierIdentityMismatch { .. })
+            Err(ken_elaborator::ElabError::NoInstance { ref class, ref ty, .. })
+                if class == "Ord" && ty == "Carrier"
         ),
-        "the current `Marker` spelling makes the core matcher select and \
-         instantiate the old instance, but its kernel-inferred carrier still \
-         contains the original Marker identity; full-carrier confirmation must \
-         catch that mismatch before the downstream application does: {result:?}",
+        "the old fixed Marker ID must not match the new Marker, even under \
+         the same Carrier head: {result:?}",
     );
 }
 
-// Promise class: durable invariant. An ambiguous identity-to-registry-key
-// adapter refuses rather than selecting by map iteration order.
+// Promise class: durable invariant. A mutable name-map alias cannot turn two
+// distinct checked instance heads into an ambiguous lookup or a wrong pick.
 #[test]
-fn two_registered_head_spellings_rebound_to_one_identity_are_refused() {
+fn two_registered_head_spellings_rebound_to_one_live_name_select_by_id() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_file(&format!(
         "{PROVIDER_AND_HOME} \
@@ -710,25 +709,15 @@ fn two_registered_head_spellings_rebound_to_one_identity_are_refused() {
     ))
     .expect("the first file registers two distinct instance heads");
 
-    // Manufacture the post-registration collision directly in the public name
-    // table. The registry still has distinct `Foo` and `Bar` keys, while both
-    // now resolve forward to the same `Foo` identity. This is the exact state
-    // the adapter must refuse without relying on source-import ambiguity.
+    let expected_foo = env.class_env.instance_search("Ord", "Foo")
+        .expect("Foo dictionary admitted");
     let foo_id = env.globals["Foo"];
     env.globals.insert("Bar".to_string(), foo_id);
-    let result = env.elaborate_file(
+    env.elaborate_file(
         "import Core.Operators.Standard (≤) \
-         fn ambiguous (x : Foo Bool) (y : Foo Bool) : Bool = x ≤ y",
-    );
-
-    assert!(
-        matches!(
-            result,
-            Err(ken_elaborator::ElabError::InstanceHeadSpellingsShareAnIdentity { .. })
-        ),
-        "two registry keys resolving to one carrier identity must refuse rather \
-         than let hash-map order select a dictionary: {result:?}",
-    );
+         fn selected (x : Foo Bool) (y : Foo Bool) : Bool = x ≤ y",
+    ).expect("a live alias does not alter either saved head ID");
+    assert_eq!(env.resolution_provenance.last().map(|p| p.instance_id), Some(expected_foo));
 }
 
 #[test]
@@ -789,44 +778,10 @@ fn ac2b_an_unrelated_local_operator_with_the_same_glyph_is_left_alone() {
     );
 }
 
-/// The carrier-identity confirmation, exercised on the state it exists for --
-/// **and the measurement partly refutes the reason it was added.**
-///
-/// The state is reachable through the public API because the
-/// duplicate-definition guard is per compilation unit while `ElabEnv::globals`
-/// persists across `elaborate_file` calls and `insert` overwrites. So a second
-/// file can rebind `Foo` to a new type after the first file registered an
-/// `Ord Foo` instance for the old one. At the occurrence the scan matches the
-/// single registered spelling -- `globals["Foo"]` is the NEW type today -- so
-/// the two-match ambiguity arm stays silent. That is the blindness the
-/// confirmation exists for.
-///
-/// **MEASURED, and the hazard is MISATTRIBUTED rather than silent.** With the
-/// confirmation forced to accept, this program does not elaborate either: the
-/// kernel rejects it with `TypeMismatch { expected: (g641 Dg649), found:
-/// (g641 Dg646) }`. The wrong dictionary is caught downstream. So what the
-/// confirmation buys is ATTRIBUTION -- a refusal naming the class and the
-/// spelling, instead of a raw kernel mismatch on two opaque dictionary
-/// identities that points at the whole declaration.
-///
-/// That is worth having, and it is not what the check was justified by. The
-/// justification was that a wrong dictionary would otherwise be accepted
-/// SILENTLY; on this fixture it is not, because the kernel refuses it. What
-/// the confirmation changes here is WHICH refusal the author sees, not
-/// WHETHER there is one. Recorded rather than quietly enjoyed, because the
-/// next reader weighing this check's cost should weigh the benefit it
-/// actually has, and a justification that has been measured away should not
-/// go on being cited.
-///
-/// **RESIDUAL, and it is the reason the check still earns its place.** These
-/// two carriers are distinct inductives, so their dictionary types differ and
-/// the kernel cannot miss it. I have NOT exhibited a rebind where the old and
-/// new carriers are convertible but distinct identities -- there the kernel's
-/// net may not catch it and the substitution would be silent after all. The
-/// confirmation does not depend on which case it is; the kernel's coverage
-/// does.
+/// A re-bound carrier has a distinct ID. The identity-keyed index refuses
+/// it before an old dictionary can be selected or checked downstream.
 #[test]
-fn a_rebound_carrier_name_is_refused_by_identity_not_accepted_by_spelling() {
+fn a_rebound_carrier_name_is_refused_before_dictionary_selection() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_file(&format!(
         "{PROVIDER_AND_HOME} \
@@ -845,13 +800,9 @@ fn a_rebound_carrier_name_is_refused_by_identity_not_accepted_by_spelling() {
          would hand one carrier's dictionary to another",
     );
     assert!(
-        matches!(
-            error,
-            ken_elaborator::ElabError::InstanceCarrierIdentityMismatch { .. }
-        ),
-        "the refusal must be the identity confirmation, naming the class and \
-         the spelling -- a kernel TypeMismatch here means the confirmation \
-         stopped firing and the downstream net is carrying it alone: {error:?}"
+        matches!(error, ken_elaborator::ElabError::NoInstance { ref class, .. }
+            if class == "Ord"),
+        "a dictionary for the old Foo ID must not be selected for the new Foo: {error:?}"
     );
 }
 

@@ -545,6 +545,12 @@ fn resolve_checked_ref(
         .get(name)
         .or_else(|| scope.binding_ids.get(name))
         .copied();
+    let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
+    let imported_qualified = name.rsplit_once('.')
+        .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
+    if selected.is_none() && (imported_bare || imported_qualified) {
+        return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
+    }
     Ok((canonical, selected))
 }
 
@@ -1367,18 +1373,21 @@ fn refresh_carried_instance_admission(elab: &mut ElabEnv) {
     let Some(admitted) = elab.class_env.direct_use_packages.as_ref() else {
         return;
     };
-    let public_identities: HashSet<&str> = admitted
+    let public_ids: HashSet<ken_kernel::GlobalId> = admitted
         .iter()
-        .filter_map(|package| elab.module_state.exports.get(package))
-        .flat_map(|pubmap| pubmap.values().map(String::as_str))
+        .filter_map(|package| {
+            elab.module_state.file_export_ids.get(package)
+                .or_else(|| elab.module_state.export_provenance.get(package).map(|p| &p.member_ids))
+        })
+        .flat_map(|tables| tables.values().flat_map(|members| members.values().copied()))
         .collect();
     let carried: Vec<ken_kernel::GlobalId> = elab
         .class_env
-        .instances
+        .instances_by_id
         .iter()
-        .filter_map(|((class_name, head_name), info)| {
-            (public_identities.contains(class_name.as_str())
-                || public_identities.contains(head_name.as_str()))
+        .filter_map(|((class_id, head), info)| {
+            (public_ids.contains(class_id)
+                || matches!(head, crate::classes::InstanceHeadKey::Global(id) if public_ids.contains(id)))
             .then_some(info.instance_id)
         })
         .collect();
@@ -2269,24 +2278,43 @@ fn rewrite_rdecl(
         &rdecl.kind,
         RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. }
     ) {
-        Some(resolve_class_ref(scope, exports, &rdecl.name, &rdecl.span)?)
+        Some(resolve_checked_ref(scope, exports, &rdecl.name, &rdecl.span)?)
     } else {
         None
     };
+    // A `where` dictionary is a declaration-local binder. It shadows the
+    // module scope, including an imported spelling, but is not a new global.
+    let local_scope = if let RDeclKind::View { constraints, .. } = &rdecl.kind {
+        if constraints.is_empty() { None } else {
+            let mut local = scope.clone();
+            for constraint in constraints {
+                local.bindings.insert(constraint.binder.clone(), constraint.binder.clone());
+                local.locals.insert(constraint.binder.clone());
+                local.binding_ids.remove(&constraint.binder);
+            }
+            if constraints.len() == 1 {
+                local.bindings.insert("d".to_string(), "d".to_string());
+                local.locals.insert("d".to_string());
+                local.binding_ids.remove("d");
+            }
+            Some(local)
+        }
+    } else { None };
+    let expr_scope = local_scope.as_ref().unwrap_or(scope);
     let ty = rdecl
         .ty
-        .map(|t| rewrite_rtype(scope, exports, t))
+        .map(|t| rewrite_rtype(expr_scope, exports, t))
         .transpose()?;
-    let body = rewrite_rexpr(scope, exports, rdecl.body)?;
+    let body = rewrite_rexpr(expr_scope, exports, rdecl.body)?;
     let requires = rdecl
         .requires
         .into_iter()
-        .map(|e| rewrite_rexpr(scope, exports, e))
+        .map(|e| rewrite_rexpr(expr_scope, exports, e))
         .collect::<Result<Vec<_>, ElabError>>()?;
     let ensures = rdecl
         .ensures
         .into_iter()
-        .map(|e| rewrite_rexpr(scope, exports, e))
+        .map(|e| rewrite_rexpr(expr_scope, exports, e))
         .collect::<Result<Vec<_>, ElabError>>()?;
     let kind = match rdecl.kind {
         RDeclKind::View {
@@ -2300,13 +2328,12 @@ fn rewrite_rdecl(
             constraints: constraints
                 .into_iter()
                 .map(|constraint| {
+                    let (class_name, class_id) = resolve_checked_ref(
+                        scope, exports, &constraint.class_name, &rdecl.span,
+                    )?;
                     Ok(crate::resolve::RInstanceConstraint {
-                        class_name: resolve_class_ref(
-                            scope,
-                            exports,
-                            &constraint.class_name,
-                            &rdecl.span,
-                        )?,
+                        class_name,
+                        class_id,
                         head_type: rewrite_rtype(scope, exports, constraint.head_type)?,
                         binder: constraint.binder,
                     })
@@ -2455,19 +2482,20 @@ fn rewrite_rdecl(
             head_type,
             constraints,
             fields,
+            ..
         } => RDeclKind::InstanceDecl {
+            class_id: direct_class_name.as_ref().and_then(|(_, id)| *id),
             head_params,
             head_type: rewrite_rtype(scope, exports, head_type)?,
             constraints: constraints
                 .into_iter()
                 .map(|constraint| {
+                    let (class_name, class_id) = resolve_checked_ref(
+                        scope, exports, &constraint.class_name, &rdecl.span,
+                    )?;
                     Ok(crate::resolve::RInstanceConstraint {
-                        class_name: resolve_class_ref(
-                            scope,
-                            exports,
-                            &constraint.class_name,
-                            &rdecl.span,
-                        )?,
+                        class_name,
+                        class_id,
                         head_type: rewrite_rtype(scope, exports, constraint.head_type)?,
                         binder: constraint.binder,
                     })
@@ -2478,8 +2506,13 @@ fn rewrite_rdecl(
                 .map(|(n, e)| Ok((n, rewrite_rexpr(scope, exports, e)?)))
                 .collect::<Result<Vec<_>, ElabError>>()?,
         },
-        RDeclKind::DeriveDecl { data_name } => RDeclKind::DeriveDecl {
-            data_name: resolve_ref(scope, exports, &data_name, &rdecl.span)?,
+        RDeclKind::DeriveDecl { data_name, .. } => {
+            let (data_name, data_id) = resolve_checked_ref(scope, exports, &data_name, &rdecl.span)?;
+            RDeclKind::DeriveDecl {
+                class_id: direct_class_name.as_ref().and_then(|(_, id)| *id),
+                data_name,
+                data_id,
+            }
         },
     };
     let name = match &kind {
@@ -2488,7 +2521,7 @@ fn rewrite_rdecl(
             proof_name,
         } => format!("{subject}::{proof_name}"),
         RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. } => {
-            direct_class_name.expect("direct class declaration name is resolved above")
+            direct_class_name.expect("direct class declaration name is resolved above").0
         }
         _ => rdecl.name,
     };
@@ -3993,6 +4026,13 @@ fn expand_scope(
                         &rdecl,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
+                    if matches!(inner, Decl::ClassDecl { .. }) {
+                        // Class-bearing references lack RCon. Once this local
+                        // declaration is checked, pin later constraints and
+                        // instances in THIS scope to its ID, including private
+                        // classes that never enter an export table.
+                        scope.binding_ids.insert(inner.name().to_string(), result.def_id);
+                    }
                     if is_pub && matches!(inner, Decl::ClassDecl { .. }) {
                         publish_checked_identity(
                             scope, &mut exports_here, inner.name(),
@@ -5973,6 +6013,338 @@ mod namespace_effect_tests {
                     other => panic!("memory import selected non-constant: {other:?}"),
                 }
             }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.2–5.5).
+    ///
+    /// MEASURED: two checked classes with one canonical spelling retain their
+    /// separate field telescopes and exact checked dictionary class heads.
+    /// File and memory imports each select their own provider, in either load
+    /// order. CLAIMED: class and instance consumers use checked IDs, not the
+    /// mutable last owner of a spelling. THE GAP: this does not exercise
+    /// parameterized-head instance search or constraint recursion.
+    #[test]
+    fn imported_classes_and_instances_keep_provider_id_after_same_name_shadow() {
+        let root = inline_owner_root("pub class C a { marker : Bool }\n");
+        fs::write(
+            root.path().join("B.ken"),
+            "import A (C)\ndata Local = MkLocal\ninstance C Local { marker = True }\n",
+        )
+        .expect("write selective file client");
+        fs::write(
+            root.path().join("BQ.ken"),
+            "import A as K\ndata Local = MkLocal\ninstance K.C Local { marker = True }\n",
+        )
+        .expect("write qualified file client");
+        for memory_first in [false, true] {
+            for (file_client, memory_client) in [
+                (
+                    "B",
+                    "import A (C)\ndata MemoryLocal = MkMemoryLocal\ninstance C MemoryLocal { marker = Zero }",
+                ),
+                (
+                    "BQ",
+                    "import A as K\ndata MemoryLocal = MkMemoryLocal\ninstance K.C MemoryLocal { marker = Zero }",
+                ),
+            ] {
+                let mut env = ElabEnv::new().expect("base environment");
+                let roots = [root.path().to_path_buf()];
+                let memory_source = "module A { pub class C a { marker : Nat } }";
+                let memory_id = if memory_first {
+                    env.elaborate_file(memory_source).expect("check memory class");
+                    let id = env.globals["C"];
+                    env.elaborate_file(memory_client)
+                        .expect("memory client selects Nat class");
+                    Some(id)
+                } else {
+                    None
+                };
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("check file class");
+                let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
+                let memory_id = memory_id.unwrap_or_else(|| {
+                    env.elaborate_file(memory_source)
+                        .expect("check later memory class");
+                    env.globals["C"]
+                });
+                assert_ne!(file_id, memory_id);
+                env.elaborate_module_from_roots_strict(&roots, file_client)
+                    .expect("file class's Bool marker accepts True");
+                if !memory_first {
+                    env.elaborate_file(memory_client)
+                        .expect("independent memory client selects Nat class");
+                }
+                let file_head = env.globals[&format!("{file_client}.Local")];
+                let memory_head = env.globals["MemoryLocal"];
+                for (class_id, head_id) in [(file_id, file_head), (memory_id, memory_head)] {
+                    let info = env.class_env.instances_by_id.get(&(
+                        class_id,
+                        crate::classes::InstanceHeadKey::Global(head_id),
+                    )).expect("instance keyed by selected class and head identities");
+                    let (_, ty) = env.env.const_type(info.instance_id)
+                        .expect("admitted dictionary has a checked type");
+                    match ty {
+                        ken_kernel::Term::App(class, head) => {
+                            assert!(matches!(class.as_ref(), ken_kernel::Term::Const { id, .. } if *id == class_id));
+                            assert!(matches!(head.as_ref(), ken_kernel::Term::IndFormer { id, .. } if *id == head_id));
+                        }
+                        other => panic!("wrong dictionary class type: {other:?}"),
+                    }
+                }
+                assert_eq!(
+                    env.class_env.class_by_id(file_id).unwrap().projection.field_types.len(),
+                    1
+                );
+                assert_eq!(
+                    env.class_env.class_by_id(memory_id).unwrap().projection.field_types.len(),
+                    1
+                );
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.2–5.5).
+    ///
+    /// MEASURED: after both same-spelling class providers have loaded, a
+    /// wrong-provider field is rejected by the selected class's checked
+    /// telescope, not by imports or orphan checking. Both directions reach
+    /// a locally owned head and their particular kernel mismatch.
+    #[test]
+    fn class_field_cannot_borrow_the_other_same_name_provider() {
+        let root = inline_owner_root("pub class C a { marker : Bool }\n");
+        fs::write(root.path().join("Wrong.ken"),
+            "import A (C)\ndata Local = MkLocal\ninstance C Local { marker = Zero }\n",
+        ).expect("write mismatched file client");
+        let mut env = ElabEnv::new().expect("base environment");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("file class has Bool field");
+        let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
+        env.elaborate_file("module A { pub class C a { marker : Nat } }")
+            .expect("memory class has Nat field");
+        let memory_id = env.globals["C"];
+        assert_ne!(file_id, memory_id);
+        assert!(matches!(
+            env.elaborate_module_from_roots_strict(&roots, "Wrong"),
+            Err(ElabError::KernelRejected {
+                error: ken_kernel::KernelError::TypeMismatch { .. }, ..
+            })
+        ), "file-selected Bool telescope must refuse memory-only Zero");
+        assert!(matches!(
+            env.elaborate_file("import A (C)\ndata MemoryLocal = MkMemoryLocal\ninstance C MemoryLocal { marker = True }"),
+            Err(ElabError::KernelRejected {
+                error: ken_kernel::KernelError::TypeMismatch { .. }, ..
+            })
+        ), "memory-selected Nat telescope must refuse file-only True");
+    }
+
+    /// Promise class: durable invariant (spec 33 §§5.3–5.5, 39 §6).
+    ///
+    /// MEASURED: two same-spelling canonical instances on the SAME Nat head
+    /// coexist because their class IDs differ. File and memory `where` lookups
+    /// select their own admitted dictionary, not the current name-map entry.
+    /// THE GAP: the parameterized-head matcher is checked separately.
+    #[test]
+    fn same_head_class_instances_search_by_selected_provider_identity() {
+        let root = inline_owner_root(
+            "pub class C a { marker : Bool }\ninstance C Nat { marker = True }\n",
+        );
+        fs::write(root.path().join("B.ken"),
+            "import A (C)\nconst file_selected : Bool where C Nat = d.marker\n",
+        ).expect("write file dictionary search");
+        let mut env = ElabEnv::new().expect("base environment");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("file class and dictionary checked");
+        let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
+        let nat_id = env.globals["Nat"];
+        let file_dictionary = env.class_env.instances_by_id[&(
+            file_id, crate::classes::InstanceHeadKey::Global(nat_id)
+        )].instance_id;
+        env.elaborate_file("module A { pub class C a { marker : Nat } instance C Nat { marker = Zero } }")
+            .expect("distinct memory class and dictionary checked");
+        let memory_id = env.globals["C"];
+        assert_ne!(file_id, memory_id);
+        let memory_dictionary = env.class_env.instances_by_id[&(
+            memory_id, crate::classes::InstanceHeadKey::Global(nat_id)
+        )].instance_id;
+        assert_ne!(file_dictionary, memory_dictionary);
+        env.elaborate_module_from_roots_strict(&roots, "B")
+            .expect("file class search selects Bool dictionary");
+        assert_eq!(env.resolution_provenance.last().map(|p| p.instance_id), Some(file_dictionary));
+        env.elaborate_file("import A (C)\nconst memory_selected : Nat where C Nat = d.marker")
+            .expect("memory class search selects Nat dictionary");
+        assert_eq!(env.resolution_provenance.last().map(|p| p.instance_id), Some(memory_dictionary));
+        for (name, ty) in [("B.file_selected", "Bool"), ("memory_selected", "Nat")] {
+            let (_, checked_ty) = env.env.const_type(env.globals[name]).expect("checked result");
+            assert_eq!(checked_ty, ken_kernel::Term::indformer(env.globals[ty], vec![]));
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§5.3–5.5, 39 §6).
+    ///
+    /// MEASURED: one class's parameterized Pair-head builder retains the
+    /// checked fixed Foo constructor in its saved pattern. A later same-name
+    /// Foo does not match the old builder despite the identical Pair head.
+    #[test]
+    fn fixed_instance_pattern_rejects_same_spelling_other_head_identity() {
+        let root = inline_owner_root(
+            "pub class C a { marker : Bool }\npub data Foo = MkFoo\ninstance C (Pair Foo a) { marker = True }\n",
+        );
+        let mut env = ElabEnv::new().expect("base environment");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("old fixed-head builder checks");
+        env.elaborate_file("import A (C,Foo)\nconst selected_old : Bool where C (Pair Foo Nat) = d.marker")
+            .expect("old Foo matches its checked builder");
+        let old_foo = env.module_state.file_export_ids["A"]["A"]["Foo"];
+        env.elaborate_file("module A { pub data Foo = MkNewFoo }")
+            .expect("second Foo occupies the same canonical spelling");
+        let new_foo = env.globals["A.Foo"];
+        assert_ne!(old_foo, new_foo);
+        let result = env.elaborate_file(
+            "import A (Foo as NewFoo)\nconst wrong : Bool where C (Pair NewFoo Nat) = d.marker",
+        );
+        assert!(matches!(result, Err(ElabError::NoInstance { ref class, ref ty, .. })
+            if class == "C" && ty == "Pair"),
+            "wrong fixed constructor must fail during candidate match: {result:?}");
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.2; 36 §1.6).
+    ///
+    /// MEASURED: an imported bound dictionary's projection uses the checked
+    /// file class's proc marker after a pure, unmarked same-name memory class
+    /// takes the current-name slot. The inverse memory selection stays pure.
+    #[test]
+    fn bound_dictionary_purity_uses_selected_class_id() {
+        let root = inline_owner_root("pub class C a { proc step : a ->[FS] a }\n");
+        fs::write(root.path().join("B.ken"),
+            "import A (C)\nfn rejected (d : C Int) (x : Int) : Int = d.step x\n",
+        ).expect("write pure caller of proc field");
+        let mut env = ElabEnv::new().expect("base environment");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("file class declares proc field");
+        let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
+        env.elaborate_file("module A { pub class C a { step : a -> a } }")
+            .expect("memory class declares ordinary field");
+        let memory_id = env.globals["C"];
+        assert_ne!(file_id, memory_id);
+        let refused = env.elaborate_module_from_roots_strict(&roots, "B");
+        assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
+            if reason.contains("false purity or effect escape") || reason.contains("EffectEscapes")),
+            "file proc classification cannot be borrowed as pure from memory: {refused:?}");
+        env.elaborate_file("import A (C)\nfn allowed (d : C Int) (x : Int) : Int = d.step x")
+            .expect("memory class's unmarked pure projection remains available");
+    }
+
+    /// Promise class: durable invariant (spec 33 §§5.2–5.4, 36 §1.6).
+    ///
+    /// MEASURED: an instance prerequisite binder projected into a marked fn
+    /// field uses its selected file class's proc metadata; the inverse memory
+    /// class has a pure field and permits the same shape. This reaches the
+    /// instance-field purity gate rather than only a top-level bound caller.
+    #[test]
+    fn constrained_instance_field_purity_tracks_imported_class_id() {
+        let root = inline_owner_root("pub class C a { proc step : a ->[FS] a }\n");
+        fs::write(root.path().join("B.ken"),
+            "import A (C)\nclass Sink a { fn step : Int -> Int }\ndata Local = MkLocal\ninstance Sink Local where (chosen : C Int) { step = chosen.step }\n",
+        ).expect("write rejected constrained file instance");
+        fs::write(root.path().join("BP.ken"),
+            "import A (C)\nclass SinkP a { proc step : Int ->[FS] Int }\ndata LocalP = MkLocalP\ninstance SinkP LocalP where (chosen : C Int) { step = chosen.step }\n",
+        ).expect("write accepted constrained file instance");
+        let mut env = ElabEnv::new().expect("base environment");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("file class proc field checked");
+        let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
+        env.elaborate_file("module A { pub class C a { step : a -> a } }")
+            .expect("memory class pure field checked");
+        assert_ne!(file_id, env.globals["C"]);
+        let refused = env.elaborate_module_from_roots_strict(&roots, "B");
+        assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
+            if reason.contains("Sink.step") && reason.contains("effectful")),
+            "file-selected proc prerequisite cannot inhabit a marked fn field: {refused:?}");
+        env.elaborate_module_from_roots_strict(&roots, "BP")
+            .expect("file proc prerequisite builds a proc instance field");
+        let file_sink = env.class_env.class("SinkP").expect("file SinkP checked").projection.type_id;
+        let local_head = env.globals["BP.LocalP"];
+        let info = &env.class_env.instances_by_id[&(
+            file_sink, crate::classes::InstanceHeadKey::Global(local_head)
+        )];
+        assert_eq!(info.constraints.len(), 1);
+        assert_eq!(info.constraints[0].class_id, file_id);
+        assert!(matches!(&info.constraints[0].core_type, ken_kernel::Term::App(class, _)
+            if matches!(class.as_ref(), ken_kernel::Term::Const { id, .. } if *id == file_id)));
+        env.elaborate_file(
+            "import A (C)\nclass MemorySink a { fn step : Int -> Int }\ndata MemoryLocal = MkMemoryLocal\ninstance MemorySink MemoryLocal where (chosen : C Int) { step = chosen.step }",
+        ).expect("memory-selected pure prerequisite permits marked fn implementation");
+    }
+
+    /// Promise class: durable invariant (spec 33 §5.2, 39 §6.2).
+    ///
+    /// MEASURED: replacing the current spelling view across separate source
+    /// units retains each prior checked class and record owner by GlobalId.
+    /// Neither view can turn a record into a class or erase the old projection.
+    #[test]
+    fn checked_class_and_record_owners_survive_same_spelling_occupancy() {
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_decl("record Shared { x : Bool }")
+            .expect("first record owner");
+        let record_id = env.globals["Shared"];
+        env.elaborate_decl("class Shared a { marker : Bool }")
+            .expect("later class owner in a separate unit");
+        let class_id = env.globals["Shared"];
+        assert_ne!(record_id, class_id);
+        assert_eq!(env.class_env.class("Shared").unwrap().projection.type_id, class_id);
+        assert!(env.class_env.class_by_id(record_id).is_none());
+        assert_eq!(env.class_env.projection_by_type_id(record_id).unwrap().field_names, ["x"]);
+        assert_eq!(env.class_env.projection_by_type_id(class_id).unwrap().field_names, ["marker"]);
+        env.elaborate_decl("record Shared { y : Int }")
+            .expect("later record owner in a third unit");
+        let later_record_id = env.globals["Shared"];
+        assert!(env.class_env.class("Shared").is_none());
+        assert_eq!(env.class_env.class_by_id(class_id).unwrap().projection.field_names, ["marker"]);
+        assert_eq!(env.class_env.projection_by_type_id(later_record_id).unwrap().field_names, ["y"]);
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.6).
+    ///
+    /// MEASURED: `derive` carries both selected class and selected head IDs
+    /// through a same-spelling class/type collision. The two checked generated
+    /// dictionaries have distinct exact kernel types, not merely distinct
+    /// generated display names.
+    #[test]
+    fn derive_keeps_selected_class_and_data_ids_after_shadow() {
+        let root = inline_owner_root("pub class Marker a { }\npub data Target = MkTarget\n");
+        fs::write(root.path().join("B.ken"),
+            "import A (Marker, Target)\nderive Marker for Target\n",
+        ).expect("write file derive client");
+        let mut env = ElabEnv::new().expect("base environment");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("file providers checked");
+        let ids = &env.module_state.file_export_ids["A"]["A"];
+        let file_class = ids["Marker"];
+        let file_head = ids["Target"];
+        env.elaborate_file("module A { pub class Marker a { } pub data Target = MkMemoryTarget }")
+            .expect("same-name memory providers checked");
+        let memory_class = env.globals["Marker"];
+        let memory_head = env.globals["A.Target"];
+        assert_ne!((file_class, file_head), (memory_class, memory_head));
+        env.elaborate_module_from_roots_strict(&roots, "B")
+            .expect("file derive uses file providers");
+        env.elaborate_file("import A (Marker,Target)\nderive Marker for Target")
+            .expect("memory derive uses memory providers");
+        for (class_id, head_id) in [(file_class, file_head), (memory_class, memory_head)] {
+            let info = env.class_env.instances_by_id.get(&(
+                class_id, crate::classes::InstanceHeadKey::Global(head_id)
+            )).expect("derived instance keyed by both checked identities");
+            let (_, checked_ty) = env.env.const_type(info.instance_id).expect("checked derive");
+            assert!(matches!(checked_ty, ken_kernel::Term::App(class, head)
+                if matches!(class.as_ref(), ken_kernel::Term::Const { id, .. } if *id == class_id)
+                && matches!(head.as_ref(), ken_kernel::Term::IndFormer { id, .. } if *id == head_id)));
         }
     }
 

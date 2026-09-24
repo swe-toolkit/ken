@@ -3240,7 +3240,7 @@ impl Parser {
     /// (`33 §5`, `39 §6`).
     fn parse_instance_decl(&mut self, start: usize) -> Result<Decl, ElabError> {
         self.advance(); // consume 'instance'
-        let (class_name, _) = self.expect_ident()?;
+        let class_name = self.parse_path()?;
         let head_type = self.parse_atom_type_app()?;
         let constraints = self.parse_instance_constraints(false, true)?;
         self.expect(&Token::LBrace)?;
@@ -3283,12 +3283,12 @@ impl Parser {
                 self.advance();
                 let (binder, _) = self.expect_ident()?;
                 self.expect(&Token::Colon)?;
-                let (cname, _) = self.expect_ident()?;
+                let cname = self.parse_path()?;
                 let cty = self.parse_type()?;
                 self.expect(&Token::RParen)?;
                 (Some(binder), cname, cty)
             } else {
-                let (cname, _) = self.expect_ident()?;
+                let cname = self.parse_path()?;
                 let cty = self.parse_type_app()?;
                 (None, cname, cty)
             };
@@ -3315,7 +3315,7 @@ impl Parser {
     /// `derive ClassName for DataName` (`33 §5.6`, `39 §6.6`).
     fn parse_derive_decl(&mut self, start: usize) -> Result<Decl, ElabError> {
         self.advance(); // consume 'derive'
-        let (class_name, _) = self.expect_ident()?;
+        let class_name = self.parse_path()?;
         // consume 'for' as a contextual keyword (it's an Ident token)
         match self.peek().clone() {
             Token::Ident(s) if s == "for" => {
@@ -3328,7 +3328,15 @@ impl Parser {
                 });
             }
         }
-        let (data_name, _) = self.expect_con()?;
+        // A qualified import keeps the data head's checked identity through
+        // resolution. Retain the former constructor-token requirement.
+        if !matches!(self.peek(), Token::ConId(_)) {
+            return Err(ElabError::ParseError {
+                msg: format!("expected data constructor name, found {:?}", self.peek()),
+                span: self.peek_span().clone(),
+            });
+        }
+        let data_name = self.parse_path()?;
         let end = self.tokens[self.pos - 1].1.end;
         Ok(Decl::DeriveDecl {
             class_name,

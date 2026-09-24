@@ -157,6 +157,8 @@ pub(crate) struct RRecordField {
 #[derive(Clone, Debug)]
 pub(crate) struct RInstanceConstraint {
     pub class_name: String,
+    /// Selected imported class identity; local classes defer to admission.
+    pub class_id: Option<ken_kernel::GlobalId>,
     pub head_type: RType,
     pub binder: String,
 }
@@ -230,6 +232,8 @@ pub(crate) enum RDeclKind {
     },
     /// `instance C HeadType [where …] { field = expr ; … }` (`39 §6`).
     InstanceDecl {
+        /// Selected imported class identity; local classes defer to admission.
+        class_id: Option<ken_kernel::GlobalId>,
         /// Free lowercase type variables generalized from the instance head.
         /// Each is implicitly bound at `Type0`.
         head_params: Vec<String>,
@@ -240,7 +244,11 @@ pub(crate) enum RDeclKind {
         fields: Vec<(String, RExpr)>,
     },
     /// `derive ClassName for DataName` (`33 §5.6`, `39 §6.6`).
-    DeriveDecl { data_name: String },
+    DeriveDecl {
+        class_id: Option<ken_kernel::GlobalId>,
+        data_name: String,
+        data_id: Option<ken_kernel::GlobalId>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -670,6 +678,7 @@ fn resolve_instance_constraints(
         }
         resolved.push(RInstanceConstraint {
             class_name: constraint.class_name.clone(),
+            class_id: None,
             head_type: rty,
             binder,
         });
@@ -1743,6 +1752,7 @@ pub(crate) fn resolve_decl_in_unit(
                 span: span.clone(),
                 contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::InstanceDecl {
+                    class_id: None,
                     head_params,
                     head_type: rhead,
                     constraints: rconstraints,
@@ -1764,7 +1774,9 @@ pub(crate) fn resolve_decl_in_unit(
             span: span.clone(),
             contains_infix_spine: false,
             kind: RDeclKind::DeriveDecl {
+                class_id: None,
                 data_name: data_name.clone(),
+                data_id: None,
             },
         }),
     }
