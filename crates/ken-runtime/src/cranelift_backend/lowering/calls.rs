@@ -1957,14 +1957,16 @@ impl<'a> Lowering<'a> {
             let consume = self.function_local.selected_call_consume.ok_or_else(|| {
                 backend_module("selected gate has no checked consuming helper".to_string())
             })?;
-            let (body, mut callee) = Self::selected_call_target_words(builder, target)?;
+            let (body, callee) = Self::selected_call_target_words(builder, target)?;
             #[cfg(test)]
-            if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
+            let callee = if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
                 == SelectedTicketGateMutation::WrongTarget
             {
                 SELECTED_TICKET_GATE_MUTATION_APPLIED.with(|cell| cell.set(cell.get() + 1));
-                callee = builder.ins().iadd_imm(callee, 1);
-            }
+                builder.ins().iadd_imm(callee, 1)
+            } else {
+                callee
+            };
             let call = builder.ins().call(consume, &[services, ticket, body, callee]);
             let [status] = builder.inst_results(call) else {
                 return Err(backend_module("selected gate returned no status".to_string()));

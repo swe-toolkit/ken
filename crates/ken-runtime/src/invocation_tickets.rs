@@ -49,6 +49,9 @@ pub struct InvocationTicketIssuerV1 {
     /// Generated status is only a signal. The exact fault is retained by
     /// the live activation owner, never reconstructed from a signed token.
     terminal_fault: Option<IssuerTerminalFaultV1>,
+    /// Fault extraction is one-use, but the fault itself remains sticky so a
+    /// repeated generated call cannot resume after the terminal was observed.
+    terminal_taken: bool,
 }
 
 impl InvocationTicketIssuerV1 {
@@ -68,7 +71,7 @@ impl InvocationTicketIssuerV1 {
             live: false,
         });
         Ok(Self { epoch, generation: 0, generation_limit: limits.event_generations,
-            slots: slots.into_boxed_slice(), terminal_fault: None })
+            slots: slots.into_boxed_slice(), terminal_fault: None, terminal_taken: false })
     }
 
     pub fn issue(&mut self, target: SelectedCallTargetV1) -> Result<SelectedCallTicketV1, CapacityExhaustedV1> {
@@ -128,7 +131,10 @@ impl InvocationTicketIssuerV1 {
 
     pub fn terminal_fault(&self) -> Option<IssuerTerminalFaultV1> { self.terminal_fault }
     pub fn take_terminal_fault(&mut self) -> Option<IssuerTerminalFaultV1> {
-        self.terminal_fault.take()
+        if self.terminal_taken { return None; }
+        let fault = self.terminal_fault?;
+        self.terminal_taken = true;
+        Some(fault)
     }
 
     pub fn backing_address(&self) -> usize { self.slots.as_ptr() as usize }

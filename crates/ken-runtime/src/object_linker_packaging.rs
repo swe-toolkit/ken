@@ -590,9 +590,11 @@ pub struct ObjectLinkerPackagingError {
     pub field: &'static str,
     pub reason: String,
     /// Real linked nonprocess starter capacity refusal, decoded from the
-    /// opaque failed-begin handle's typed terminal wire (never inferred from
-    /// exit status or a smoke mismatch string).
+    /// activation-owned typed terminal wire (never inferred from exit status).
     pub capacity_failure: Option<ken_host::CapacityExhaustedV1>,
+    /// One-use selected-call gate refusal, decoded from the same owner-backed
+    /// linked terminal rather than inferred from an arbitrary negative token.
+    pub selected_call_integrity: Option<ken_host::SelectedCallIntegrityFaultV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1535,12 +1537,14 @@ fn smoke_executable(
             if trace.plan_hash == 0
                 && trace.target_abi_hash == ken_host::TARGET_ABI_MANIFEST_HASH
                 && trace.host_effect_abi_hash == ken_host::HOST_EFFECT_ABI_V1_HASH
-                && trace.terminal_value == ken_host::CAPACITY_EXHAUSTED_STATUS_V1
                 && trace.terminal_exit == ken_host::TerminalExitClass::ControlledTrap
                 && trace.effect_trace.is_empty()
             {
-                if let Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)) = trace.terminal_error {
-                    if capacity_failure_matches_profile(fault, profile) {
+                match trace.terminal_error {
+                    Some(ken_host::TerminalErrorV1::CapacityExhausted(fault))
+                        if trace.terminal_value == ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+                            && capacity_failure_matches_profile(fault, profile) =>
+                    {
                         return Err(ObjectLinkerPackagingError {
                             stage: ObjectLinkerPackagingStage::SmokeExecution,
                             field: if fault.scope == ken_host::CapacityScopeV1::Runtime {
@@ -1548,10 +1552,23 @@ fn smoke_executable(
                             } else {
                                 "boundary_resource_profile"
                             },
-                            reason: format!("linked starter refused actual epoch begin: {fault:?}"),
+                            reason: format!("linked starter refused authentic named capacity: {fault:?}"),
                             capacity_failure: Some(fault),
+                            selected_call_integrity: None,
                         });
                     }
+                    Some(ken_host::TerminalErrorV1::SelectedCallIntegrity(fault))
+                        if trace.terminal_value == ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1 =>
+                    {
+                        return Err(ObjectLinkerPackagingError {
+                            stage: ObjectLinkerPackagingStage::SmokeExecution,
+                            field: "selected_call_integrity",
+                            reason: format!("linked starter rejected a selected call ticket: {fault:?}"),
+                            capacity_failure: None,
+                            selected_call_integrity: Some(fault),
+                        });
+                    }
+                    _ => {}
                 }
             }
         }
@@ -2575,6 +2592,7 @@ fn packaging_error(
         field,
         reason: reason.into(),
         capacity_failure: None,
+        selected_call_integrity: None,
     }
 }
 
@@ -3028,6 +3046,7 @@ mod tests {
             &crate::native_process_authority::synthetic_test_legacy_authority(),
         ).expect_err("selected call cannot issue generation one under zero ceiling");
         assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        assert_eq!(refusal.selected_call_integrity, None);
         assert_eq!(refusal.capacity_failure, Some(ken_host::CapacityExhaustedV1 {
             scope: ken_host::CapacityScopeV1::Invocation,
             resource: ken_host::CapacityResourceV1::EventGenerations,
@@ -3055,6 +3074,7 @@ mod tests {
             limit: 0, requested: 1,
         };
         assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        assert_eq!(refusal.selected_call_integrity, None);
         assert_eq!(refusal.capacity_failure, Some(expected));
         let linked_path = no_slots.join(ObjectLinkerPackagingOptions::starter_host_with_profile(profile).executable_relative_path);
         let linked = Command::new(linked_path).output().expect("zero-slot linked starter ran");
@@ -3107,7 +3127,7 @@ mod tests {
             link_starter_executable(&options.linker_command, &object_path, &stub_path,
                 &linked_path, Some(&ken_runtime_staticlib().expect("runtime support archive")))
                 .expect("real starter links with same activation ABI");
-            let linked = Command::new(linked_path).output().expect("linked gate runs");
+            let linked = Command::new(&linked_path).output().expect("linked gate runs");
             assert_eq!(linked.status.code(), Some(1));
             assert!(linked.stdout.is_empty());
             let trace = ken_host::decode_linked_effect_trace(&linked.stderr)
@@ -3115,6 +3135,11 @@ mod tests {
             assert_eq!(trace.terminal_value, ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
             assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::SelectedCallIntegrity(expected)));
             assert!(trace.effect_trace.is_empty());
+            let classified = smoke_executable(&linked_path, &options.executable_relative_path,
+                "10\n", profile).expect_err("packaging must preserve the real gate refusal");
+            assert_eq!(classified.stage, ObjectLinkerPackagingStage::SmokeExecution);
+            assert_eq!(classified.selected_call_integrity, Some(expected));
+            assert_eq!(classified.capacity_failure, None);
         }
     }
 
