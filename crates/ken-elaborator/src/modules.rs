@@ -3181,6 +3181,15 @@ fn prebind_synthesized_dictionaries(
                     span,
                     prelude_binding_names,
                 )?;
+                // A synthesized dictionary is a local producer too. Its
+                // future ID cannot be inferred from a stale global with this
+                // canonical spelling during either replay or ordered imports.
+                if scope.current_local_names.insert(name.surface.clone()) {
+                    scope.checked_local_ids.remove(&name.surface);
+                }
+                if synthesis_scope.current_local_names.insert(name.surface.clone()) {
+                    synthesis_scope.checked_local_ids.remove(&name.surface);
+                }
                 scope.bind_local(&name.surface, &name.canonical, span)?;
                 synthesis_scope.bind_local(&name.surface, &name.canonical, span)?;
                 let class_is_imported = synthesized_dictionary_class_is_imported(
@@ -4093,6 +4102,20 @@ fn expand_scope(
                         &rdecl,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
+                    if let DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                        class_name, head_name, span,
+                    } = decl_namespace_effect(inner) {
+                        // The declaration result names the class, not its
+                        // synthesized dictionary. Reuse the prebind planner's
+                        // canonical/surface pair for the admitted dictionary.
+                        if let Ok(name) = synthesized_dictionary_name(
+                            scope, &elab.module_state.exports, class_name, head_name, span,
+                        ) {
+                            record_checked_local(
+                                scope, &name.surface, &name.canonical, result.def_id,
+                            );
+                        }
+                    }
                     if matches!(inner, Decl::ClassDecl { .. }) {
                         record_checked_local(scope, inner.name(), &result.name, result.def_id);
                         // Class-bearing references lack RCon. Once this local
@@ -4718,6 +4741,129 @@ mod namespace_effect_tests {
             }
             other => panic!("re-imported y must select the same checked x: {other:?}"),
         }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3, 39 §6.1).
+    ///
+    /// MEASURED: a file dictionary and a new local instance have the same
+    /// generated spelling but distinct class/dictionary IDs. Both source
+    /// orders refuse an unused dictionary import, while isolated file and
+    /// local clients select their own checked dictionary ID. CLAIMED: a
+    /// pending synthesized producer is no more ambient than an ordinary local.
+    /// THE GAP: the derive test below covers the other synthesis producer.
+    #[test]
+    fn generated_instance_import_refuses_stale_provider_in_either_order() {
+        let prepared = || {
+            let root = tempfile::tempdir().expect("temporary root");
+            fs::write(root.path().join("Owner.ken"),
+                "pub class C a { marker : Bool }\ninstance C Nat { marker = True }\n",
+            ).expect("write file instance");
+            fs::write(root.path().join("P.ken"),
+                "export Owner (C, C_instance_Nat)\n",
+            ).expect("write file facade");
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "P")
+                .expect("file provider and facade check");
+            let id = env.globals["C_instance_Nat"];
+            (env, root, id)
+        };
+        let (mut imported, _root, file_id) = prepared();
+        imported.elaborate_file(
+            "module Owner { import P (C, C_instance_Nat) const chosen : C Nat = C_instance_Nat }",
+        ).expect("file dictionary is an independently usable import");
+        assert!(matches!(imported.env.lookup(imported.globals["Owner.chosen"]),
+            Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
+                if *id == file_id));
+
+        let (mut local, _root, old_id) = prepared();
+        local.elaborate_file(
+            "module Owner { class C a { marker : Nat } instance C Nat { marker = Zero } const chosen : C Nat = C_instance_Nat }",
+        ).expect("new local class and instance check without the import");
+        let local_id = local.globals["C_instance_Nat"];
+        assert_ne!(old_id, local_id);
+        assert!(matches!(local.env.lookup(local.globals["Owner.chosen"]),
+            Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
+                if *id == local_id));
+
+        for source in [
+            "module Owner { import P (C_instance_Nat) class C a { marker : Nat } instance C Nat { marker = Zero } }",
+            "module Owner { class C a { marker : Nat } instance C Nat { marker = Zero } import P (C_instance_Nat) }",
+        ] {
+            let (mut env, _root, selected_id) = prepared();
+            let result = env.elaborate_file(source);
+            assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
+                if name == "C_instance_Nat"),
+                "distinct file and pending local dictionaries must conflict: {result:?}");
+            assert_eq!(selected_id, old_id, "file provider must be stable across fixtures");
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3, 5.6).
+    ///
+    /// MEASURED: `derive` uses the same generated-name prebind and cannot
+    /// coalesce a pending new owner with a prior file dictionary. Both source
+    /// orders reject; isolated local and imported derivations remain usable.
+    #[test]
+    fn generated_derive_import_refuses_stale_provider_in_either_order() {
+        let prepared = || {
+            let root = tempfile::tempdir().expect("temporary root");
+            fs::write(root.path().join("Owner.ken"),
+                "pub class Marker a { }\npub data Head = MkHead\nderive Marker for Head\n",
+            ).expect("write file derive");
+            fs::write(root.path().join("P.ken"),
+                "export Owner (Marker, Head, Marker_instance_Head)\n",
+            ).expect("write derived facade");
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "P")
+                .expect("file derived provider and facade check");
+            let id = env.globals["Marker_instance_Owner.Head"];
+            (env, root, id)
+        };
+        let (mut imported, _root, file_id) = prepared();
+        imported.elaborate_file(
+            "module Owner { import P (Marker, Head, Marker_instance_Head) theorem chosen : Marker Head = Marker_instance_Head }",
+        ).expect("file derive is an independently usable import");
+        assert!(matches!(imported.env.lookup(imported.globals["Owner.chosen"]),
+            Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
+                if *id == file_id));
+
+        let (mut local, _root, old_id) = prepared();
+        local.elaborate_file(
+            "module Owner { class Marker a { } data Head = MkLocalHead derive Marker for Head theorem chosen : Marker Head = Marker_instance_Head }",
+        ).expect("local-only derived dictionary checks");
+        let local_id = local.globals["Marker_instance_Owner.Head"];
+        assert_ne!(old_id, local_id);
+        assert!(matches!(local.env.lookup(local.globals["Owner.chosen"]),
+            Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
+                if *id == local_id));
+
+        for source in [
+            "module Owner { import P (Marker_instance_Head) class Marker a { } data Head = MkLocalHead derive Marker for Head }",
+            "module Owner { class Marker a { } data Head = MkLocalHead derive Marker for Head import P (Marker_instance_Head) }",
+        ] {
+            let (mut env, _root, selected_id) = prepared();
+            let result = env.elaborate_file(source);
+            assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
+                if name == "Marker_instance_Head"),
+                "distinct derived owners must conflict: {result:?}");
+            assert_eq!(selected_id, old_id);
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3).
+    ///
+    /// MEASURED: a generated instance checked earlier in this unit can be
+    /// exported through an inline facade and re-imported by that same ID.
+    /// This checks the synthesis producer installs, not only invalidates,
+    /// its local ID before a later import.
+    #[test]
+    fn generated_instance_same_checked_identity_reimport_is_idempotent() {
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_file(
+            "class C a { } instance C Nat { } module Provider { export C_instance_Nat } import Provider (C_instance_Nat)",
+        ).expect("same checked synthesized dictionary has two lawful routes");
+        let id = env.globals["C_instance_Nat"];
+        assert_eq!(env.module_state.export_provenance["Provider"].member_ids["Provider"]["C_instance_Nat"], id);
     }
 
     fn env_with_ambient_item_and_facade() -> (ElabEnv, GlobalId) {
