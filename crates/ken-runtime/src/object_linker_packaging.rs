@@ -75,7 +75,7 @@ pub struct BoundProcessExecutableArtifact {
     pub target_symbol: RuntimeSymbol,
     pub executable_path: PathBuf,
     pub executable_hash: u64,
-    boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     trap_catalog: BoundPlannerTrapCatalog,
 }
 
@@ -290,7 +290,7 @@ fn decode_signed_root_trap(
 /// request is the attempted whole reservation, not the declared limit + 1.
 fn capacity_failure_matches_profile(
     fault: ken_host::CapacityExhaustedV1,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> bool {
     use ken_host::{CapacityResourceV1 as Resource, CapacityScopeV1 as Scope};
     let (declared, physical_maximum) = match (fault.scope, fault.resource) {
@@ -447,7 +447,7 @@ pub struct ObjectLinkerExecutablePackage {
     /// authorized resource policy** share one identity, and a consumer checking
     /// identity would not be able to tell them apart. ⇒ Two profiles, two
     /// packages.
-    pub boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    pub boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -562,7 +562,7 @@ pub struct ObjectLinkerPackagingOptions {
     /// linked** — which is `AC-7`'s whole point, and is a different observation
     /// from a starter that links, runs, and then declines to execute.
     pub boundary_resource_profile:
-        Option<crate::boundary_resource_profile::BoundaryResourceProfileV2>,
+        Option<crate::boundary_resource_profile::BoundaryResourceProfileV3>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -609,7 +609,7 @@ impl ObjectLinkerPackagingOptions {
 
     /// The same options, with a deployment-authorized profile named.
     pub fn starter_host_with_profile(
-        profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+        profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     ) -> Self {
         Self {
             boundary_resource_profile: Some(profile),
@@ -634,7 +634,7 @@ pub fn package_starter_executable_artifact(
     env: &NativeSeedEnvironment,
     output_dir: impl AsRef<Path>,
     producer: impl Into<String>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     package_starter_executable_artifact_with_options(
         program,
@@ -702,7 +702,7 @@ pub(crate) fn package_synthetic_starter_executable_artifact_with_profile(
     env: &NativeSeedEnvironment,
     output_dir: impl AsRef<Path>,
     producer: impl Into<String>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     authority: &crate::NativeProcessSymbols,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     package_starter_executable_artifact_with_authority(
@@ -904,7 +904,7 @@ fn package_starter_executable_artifact_with_authority(
 fn link_process_starter_object_artifact(
     object: crate::CraneliftObjectArtifact,
     output_dir: impl AsRef<Path>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<PathBuf, ObjectLinkerPackagingError> {
     let options = ObjectLinkerPackagingOptions::starter_host_with_profile(profile);
     let output_dir = output_dir.as_ref();
@@ -1006,7 +1006,7 @@ pub fn build_bound_process_starter_executable_artifact(
     program: &RuntimeProgram,
     entrypoint: &BoundProcessEntrypoint,
     output_dir: impl AsRef<Path>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<BoundProcessExecutableArtifact, ObjectLinkerPackagingError> {
     if !entrypoint.root_execution_binding_is_valid() {
         return Err(packaging_error(
@@ -1496,7 +1496,7 @@ fn smoke_executable(
     executable_path: &Path,
     executable_relative_path: &str,
     expected_stdout: &str,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<ObjectLinkerSmokeReport, ObjectLinkerPackagingError> {
     let output = Command::new(executable_path).output().map_err(|err| {
         packaging_error(
@@ -1764,6 +1764,14 @@ fn canonical_object_linker_package_bytes(package: &ObjectLinkerExecutablePackage
             .runtime
             .invocation_epochs
             .to_string(),
+    );
+    push_field(
+        &mut out, "call_event_generations",
+        &package.boundary_resource_profile.call_events.event_generations.to_string(),
+    );
+    push_field(
+        &mut out, "call_live_pending_slots",
+        &package.boundary_resource_profile.call_events.live_pending_slots.to_string(),
     );
     for scope in crate::boundary_resource_profile::BoundaryResourceScope::ALL {
         for resource in crate::boundary_resource_profile::BoundaryResource::ALL {
@@ -2064,21 +2072,22 @@ fn runtime_trap_code_tag(code: &crate::RuntimeTrapCode) -> &'static str {
 /// deployment-authorized profile. ⭐ The stub *carries* already-authorized
 /// numbers; ⛔ it is not their authority, and a package with no profile is
 /// refused before this text is ever written.
-fn starter_c_stub(profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2) -> String {
+fn starter_c_stub(profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3) -> String {
     format!(
         r#"#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-struct KenBoundaryResourceProfileV2 {{
+struct KenBoundaryResourceProfileV3 {{
     uint64_t version, size;
     uint64_t runtime_invocation_epochs;
+    uint64_t call_event_generations, call_live_pending_slots;
     uint64_t invocation_nodes, invocation_words, invocation_data_bytes, invocation_native_int_limbs;
     uint64_t persistent_nodes, persistent_words, persistent_data_bytes, persistent_native_int_limbs;
 }};
 
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store, void **out_failure);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV3 *profile, void **out_store, void **out_failure);
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
 extern long long ken_activation_v1_write_starter_capacity_failure(void *failure);
@@ -2090,9 +2099,10 @@ extern long long ken_activation_v1_destroy(void *activation);
 extern long long ken_nc23_entrypoint(const void *frame, const void *services);
 
 int main(void) {{
-    struct KenBoundaryResourceProfileV2 profile = {{
-        .version = {version}, .size = sizeof(struct KenBoundaryResourceProfileV2),
+    struct KenBoundaryResourceProfileV3 profile = {{
+        .version = {version}, .size = sizeof(struct KenBoundaryResourceProfileV3),
         .runtime_invocation_epochs = {runtime_epochs},
+        .call_event_generations = {call_generations}, .call_live_pending_slots = {call_slots},
         .invocation_nodes = {inv_nodes}, .invocation_words = {inv_words},
         .invocation_data_bytes = {inv_data}, .invocation_native_int_limbs = {inv_limbs},
         .persistent_nodes = {per_nodes}, .persistent_words = {per_words},
@@ -2147,6 +2157,8 @@ int main(void) {{
 "#,
         version = crate::boundary_resource_profile::BOUNDARY_RESOURCE_PROFILE_VERSION,
         runtime_epochs = profile.runtime.invocation_epochs,
+        call_generations = profile.call_events.event_generations,
+        call_slots = profile.call_events.live_pending_slots,
         inv_nodes = profile.invocation.nodes,
         inv_words = profile.invocation.words,
         inv_data = profile.invocation.data_bytes,
@@ -2160,7 +2172,7 @@ int main(void) {{
 
 #[cfg(test)]
 pub(crate) fn process_starter_c_stub(
-    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
     process_starter_c_stub_for_authority(1, 1, false, 1, &ken_host::FsRootSpec::default(), profile)
 }
@@ -2171,7 +2183,7 @@ fn process_starter_c_stub_for_authority(
     allow_root_execution: bool,
     root_denied_exit_status: i32,
     fs_root_spec: &ken_host::FsRootSpec,
-    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
     r#"#include <stdint.h>
 #include <stdio.h>
@@ -2204,9 +2216,10 @@ struct KenArena {
    dead -- nothing referenced it -- but a dead private copy of native-Int layout
    is still a private copy of native-Int layout, and neither the build nor the
    link discriminates it. */
-struct KenBoundaryResourceProfileV2 {
+struct KenBoundaryResourceProfileV3 {
     uint64_t version, size;
     uint64_t runtime_invocation_epochs;
+    uint64_t call_event_generations, call_live_pending_slots;
     uint64_t invocation_nodes, invocation_words, invocation_data_bytes, invocation_native_int_limbs;
     uint64_t persistent_nodes, persistent_words, persistent_data_bytes, persistent_native_int_limbs;
 };
@@ -2218,7 +2231,7 @@ struct KenHostInitResultV1 {
 };
 
 extern long long ken_nc23_entrypoint(const void *frame, const void *services);
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store, void **out_failure);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV3 *profile, void **out_store, void **out_failure);
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
 extern long long ken_activation_v1_finish_capacity_failure(void *context, void *failure);
@@ -2377,9 +2390,10 @@ int main(int argc, char **argv, char **envp) {
         host_init.plan_hash != KEN_ENTRYPOINT_PLAN_HASH) {
         free(pool); free(cwd); return 1;
     }
-    struct KenBoundaryResourceProfileV2 profile = {
-        .version = __KEN_PROFILE_VERSION__, .size = sizeof(struct KenBoundaryResourceProfileV2),
+    struct KenBoundaryResourceProfileV3 profile = {
+        .version = __KEN_PROFILE_VERSION__, .size = sizeof(struct KenBoundaryResourceProfileV3),
         .runtime_invocation_epochs = __KEN_PROFILE_RUNTIME_EPOCHS__,
+        .call_event_generations = __KEN_PROFILE_CALL_GENERATIONS__, .call_live_pending_slots = __KEN_PROFILE_CALL_SLOTS__,
         .invocation_nodes = __KEN_PROFILE_INV_NODES__, .invocation_words = __KEN_PROFILE_INV_WORDS__,
         .invocation_data_bytes = __KEN_PROFILE_INV_DATA__, .invocation_native_int_limbs = __KEN_PROFILE_INV_LIMBS__,
         .persistent_nodes = __KEN_PROFILE_PER_NODES__, .persistent_words = __KEN_PROFILE_PER_WORDS__,
@@ -2437,6 +2451,8 @@ int main(int argc, char **argv, char **envp) {
         &crate::boundary_resource_profile::BOUNDARY_RESOURCE_PROFILE_VERSION.to_string(),
     )
     .replace("__KEN_PROFILE_RUNTIME_EPOCHS__", &profile.runtime.invocation_epochs.to_string())
+    .replace("__KEN_PROFILE_CALL_GENERATIONS__", &profile.call_events.event_generations.to_string())
+    .replace("__KEN_PROFILE_CALL_SLOTS__", &profile.call_events.live_pending_slots.to_string())
     .replace("__KEN_PROFILE_INV_NODES__", &profile.invocation.nodes.to_string())
     .replace("__KEN_PROFILE_INV_WORDS__", &profile.invocation.words.to_string())
     .replace("__KEN_PROFILE_INV_DATA__", &profile.invocation.data_bytes.to_string())

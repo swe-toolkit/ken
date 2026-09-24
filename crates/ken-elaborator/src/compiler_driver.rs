@@ -2692,7 +2692,7 @@ pub fn compile_native_program_sources(
     package_name: &str,
     sources: Vec<CompilerSource>,
     output_dir: impl AsRef<Path>,
-    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
     let preparation = prepare_native_program_sources(package_name, sources)?;
     complete_native_program_preparation(preparation, output_dir, profile)
@@ -2705,7 +2705,7 @@ pub fn compile_native_program_sources(
 fn complete_native_program_preparation(
     preparation: NativeProgramPreparationV1,
     output_dir: impl AsRef<Path>,
-    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
     let plan = preparation.plan.as_ref();
     let host_spine = preparation.host_spine.as_ref();
