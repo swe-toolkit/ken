@@ -178,8 +178,9 @@ The chain is at HS2. A third advancing hard stop invokes Research.
 
 - If the generic full-`Validation` bridge does not check with `Refl` or
   existing transport over the AC-1c constants, STOP. Do not add a second
-  adapter, edit the parser beyond AC-1c, or edit the elaborator. The chain is at HS2 (symptom inventory above); a third
-  advancing hard stop invokes Research.
+  adapter, edit the parser beyond AC-1c, or edit the elaborator. The chain
+  is at HS2 (symptom inventory above); a third advancing hard stop invokes
+  Research.
 
 - If a law needs a fact about primitive `Bytes` or `String` that no existing
   TCB contract states, prove everything else and STOP on that fact. Do not
