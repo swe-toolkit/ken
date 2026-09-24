@@ -1,7 +1,7 @@
 ---
 id: RT-INVOCATION-RESOURCE-PRECURSOR
 title: "Pending-call precursor: named finite invocation-profile resources reserved at BoundaryActivationV1::begin, a runtime-wide no-wrap epoch, an activation-owned bounded slot and generation issuer behind a checked services ABI, and a typed CapacityExhausted fault carried end to end, so a selected call can be authenticated exactly once; not the pending-call build"
-status: draft
+status: active
 owner: runtime
 size: L
 gate: architect
@@ -22,9 +22,9 @@ named fault rather than an unclassified trap. This unblocks
 `RT-SELECTED-PENDING-CALL-PACKAGE` (the px7l/px7m rows: branching on a host
 result into multi-step effects, and effectful callbacks that capture data).
 
-Starts only after `RT-BRACKET-SOURCE-EDGE` D0 reaches an approved design or
-STOP disposition on the same runtime ring. That gate is scheduling only; it
-does not certify any bracket implementation.
+Scheduling gate met: `RT-BRACKET-SOURCE-EDGE` D0 closed on its STOP
+(2026-09-24). That gate was scheduling only; it certifies no bracket
+implementation.
 
 ## Fixed inputs -- Architect `evt_2373feaep6zh9` at `1a4495376`
 
