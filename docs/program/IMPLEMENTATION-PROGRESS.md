@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-24 10:11:57Z — from 731 issue file(s) in `docs/program/issues/`.
+2026-09-24 10:20:43Z — from 732 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -78,6 +78,7 @@ the committed file matches the generator's output.
 | `CAT-FMT-GATE-CORPUS-ENUMERATION` | The frozen-corpus formatter gate enumerates catalog by the `.ken.md` suffix plus one hand-named `.ken` path, and the catalog holds two `.ken` files -- so `FoKripke.ken` is outside the gate and nothing reds. Collect by a predicate over the suffix set instead, and assert the collected population EQUALS the matching file set rather than merely being non-empty. | draft | verify | S | none | — |
 | `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | merged | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
+| `CAT-IDF-TRUST-FREE-PROVIDER` | Trust-closure repair after Vec: move the canonical idf (and comp) to a small trust-free function-combinator provider, so loading Data.Vector.Vector cold no longer pulls five unrelated trusted assumptions into its manifest; pinned by a cold-load trusted_base set-equality check | ready | foundation | M | architect | — |
 | `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT` | Migrate the three orphan list_append proofs (assoc/left_unit/right_unit) from Core/Classes/LawfulFunctors into Data/Collections/Derived, the module that defines list_append, per Architect ruling evt_7khknqydxxd93. An attached proof f::law is part of f's definitional surface and can be soundly owned only by f's module; proving it elsewhere is an orphan attachment that resolves under full-catalog load but goes UnboundName under selective/standalone import. LawfulFunctors keeps its co-located bool_and/list_map/option_map proofs and gains the real standalone imports it owes; EffectfulClasses's prose owner-attribution is re-pointed to Derived. Carries the campaign rule for every future orphan attached proof. | merged | foundation | M | none | — |
 | `CAT-MAP-DEPENDENCY-CLOSURE-REPAIR` | Repair the Map package's dependency closure so Data/Collections/Map.ken.md elaborates from its own declared imports rather than relying on the map_build_acceptance.rs fixture to preload Compare/Transport/Derived/Or and to resolve undeclared list_append. | merged | foundation | unsized | none | — |
 | `CAT-MAP-DOM-MEMBER-LAW` | Proof-backfill for Data/Collections/Map.ken.md: prove privately that the public dom preserves membership exactly -- for every comparator leq, query x and raw tree m, set_member leq x (dom m) = member leq x m -- instead of only the selected size (dom r) counts | merged | foundation | S | architect | — |
@@ -810,6 +811,7 @@ is itself not yet `merged`/`closed`:
 
 - `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
+- `CAT-IDF-TRUST-FREE-PROVIDER` blocked by `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
@@ -830,7 +832,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (active) `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (active) `CAT-DEQUE-POP-LAWS` (merged) `CAT-DEQUE-POPBACK-LAWS` (merged) `CAT-MAP-DOM-MEMBER-LAW` (merged) `CAT-VALIDATION-AP-ERROR-LAW` (merged) `CAT-VEC-MAP-IDENTITY-LAW` (merged) `KERNEL-LITERAL-CHAR-VIEW` (merged) `KERNEL-LITERAL-ROLLBACK-PURGE` (active) `KERNEL-NORMALIZE-ORIGIN-TRACE` (closed) `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` (active) `RT-BRACKET-SOURCE-EDGE` (closed) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-INVOCATION-RESOURCE-PRECURSOR` (active) `RT-SELECTED-PENDING-CALL-PACKAGE` (draft)
+- **architect**: `BYTES-CONCAT-AND-ENCODE-CONTRACTS` (active) `CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW` (active) `CAT-DEQUE-POP-LAWS` (merged) `CAT-DEQUE-POPBACK-LAWS` (merged) `CAT-IDF-TRUST-FREE-PROVIDER` (ready) `CAT-MAP-DOM-MEMBER-LAW` (merged) `CAT-VALIDATION-AP-ERROR-LAW` (merged) `CAT-VEC-MAP-IDENTITY-LAW` (merged) `KERNEL-LITERAL-CHAR-VIEW` (merged) `KERNEL-LITERAL-ROLLBACK-PURGE` (active) `KERNEL-NORMALIZE-ORIGIN-TRACE` (closed) `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` (active) `RT-BRACKET-SOURCE-EDGE` (closed) `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft) `RT-INVOCATION-RESOURCE-PRECURSOR` (active) `RT-SELECTED-PENDING-CALL-PACKAGE` (draft)
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
