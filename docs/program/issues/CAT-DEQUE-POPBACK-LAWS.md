@@ -1,7 +1,7 @@
 ---
 id: CAT-DEQUE-POPBACK-LAWS
 title: "Proof-backfill for Data/Collections/Deque.ken.md, keeping its zero-publication surface: prove in-package for an arbitrary deque that popBack agrees with the list view -- popBack q = None implies toList q = Nil, and popBack q = Some (x, rest) implies toList q = list_append (toList rest) (Cons x Nil)"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect
