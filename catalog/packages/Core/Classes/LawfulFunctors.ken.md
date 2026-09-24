@@ -37,6 +37,8 @@ import Data.Collections.Derived (list_append)
 
 import Core.Classes.LawfulClasses as LC
 
+import Core.Function.Combinators (comp, idf)
+
 import Core.Logic.Transport (cong, sym, trans)
 
 pub class Semigroup a {
@@ -61,10 +63,9 @@ pub class Monoid a {
 ```
 
 The constructor classes `Functor` and `Foldable` are introduced in §4
-alongside their instances, each right after the small helper function its own
-field types need (`idf`/`comp` for `Functor`'s laws, `monoid_mempty`/
-`fold_map_step` for `Foldable`'s coherence law) — the same build order the
-original package source uses.
+alongside their instances. `Functor`'s laws use `idf` and `comp` from
+`Core.Function.Combinators`; `Foldable`'s coherence law uses the local
+`monoid_mempty` and `fold_map_step` helpers.
 
 ## 3. Using it
 
@@ -146,10 +147,6 @@ collapses to `Top` and uses `Proved`, while `Some v` remains an `Eq`-shaped goal
 and uses `Refl`.
 
 ```ken
-pub fn idf (a : Type) (x : a) : a = x
-
-pub fn comp (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = g (h x)
-
 pub class Functor (f : Type → Type) {
   map : (a : Type) → (b : Type) → (a → b) → f a → f b;
   id_law : (a : Type) → (x : f a) → Equal (f a) (map a a (idf a) x) x;

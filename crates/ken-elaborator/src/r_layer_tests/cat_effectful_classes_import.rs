@@ -14,6 +14,7 @@ use ken_kernel::{Decl as KernelDecl, GlobalId, Term};
 
 const EFFECTFUL_CLASSES: &str = "Core.Classes.EffectfulClasses";
 const LAWFUL_FUNCTORS: &str = "Core.Classes.LawfulFunctors";
+const COMBINATORS: &str = "Core.Function.Combinators";
 const DERIVED: &str = "Data.Collections.Derived";
 const TRANSPORT: &str = "Core.Logic.Transport";
 const EFFECTFUL_CLASSES_KEN_MD: &str =
@@ -79,10 +80,12 @@ fn expected_import_inventory() -> BTreeMap<String, BTreeSet<String>> {
                 "Functor".to_owned(),
                 "Functor_instance_List".to_owned(),
                 "Functor_instance_Option".to_owned(),
-                "comp".to_owned(),
-                "idf".to_owned(),
                 "list_map".to_owned(),
             ]),
+        ),
+        (
+            COMBINATORS.to_owned(),
+            BTreeSet::from(["comp".to_owned(), "idf".to_owned()]),
         ),
         (
             TRANSPORT.to_owned(),
@@ -168,7 +171,7 @@ fn effectful_classes_roots_loads_standalone() {
     );
 }
 
-/// MEASURED: the parser reports an exact three-module selective-import
+/// MEASURED: the parser reports an exact four-module selective-import
 /// inventory; the production roots loader resolves EC; and one real EC
 /// declaration mentions each ordinary, class, generated-dictionary, and
 /// attached-proof provider by exact `GlobalId`. CLAIMED: EC declares its whole
@@ -231,12 +234,12 @@ fn effectful_classes_import_closure_is_exact_and_identity_preserving() {
         ),
         (
             local_global(&env, "identity_map::fusion"),
-            global(&env, &format!("{LAWFUL_FUNCTORS}.comp")),
+            global(&env, &format!("{COMBINATORS}.comp")),
             "comp",
         ),
         (
             local_global(&env, "list_ap_id"),
-            global(&env, &format!("{LAWFUL_FUNCTORS}.idf")),
+            global(&env, &format!("{COMBINATORS}.idf")),
             "idf",
         ),
         (

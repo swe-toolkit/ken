@@ -193,7 +193,7 @@ fn empty_and_out_of_bounds_calls_are_rejected_by_their_indices() {
 #[test]
 fn entry_adds_no_trusted_declarations_beyond_its_providers() {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
-    for provider in ["Core.Classes.LawfulFunctors", "Core.Logic.Transport"] {
+    for provider in ["Core.Function.Combinators", "Core.Logic.Transport"] {
         env.elaborate_module_from_roots(&[catalog_root()], provider)
             .unwrap_or_else(|error| panic!("{provider} must roots-load: {error:?}"));
     }

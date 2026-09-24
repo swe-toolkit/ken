@@ -19,6 +19,7 @@ fn mk_env_with_lawful_functors() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
     catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
+    catalog_or::load_function_combinators(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("catalog/packages/Core/Classes/LawfulFunctors.ken.md must elaborate");
     env

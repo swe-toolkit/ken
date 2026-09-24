@@ -1,7 +1,7 @@
 //! CAT-MIGRATE-TIER-C-DATA-VALUE Vector closeout controls.
 //!
 //! Vector owns checked indexed families, operations, computation theorems,
-//! and one private map identity law. It consumes only LawfulFunctors/Transport,
+//! and one private map identity law. It consumes only Combinators/Transport,
 //! publishes no catalog surface, and adds no trust beyond those providers.
 //! `cat_vec_acceptance` retains the family-index, computation, and
 //! impossible-call behavior obligations.
@@ -180,7 +180,7 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 #[test]
 fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
     let mut provider_only = ElabEnv::new().expect("provider environment");
-    for provider in ["Core.Classes.LawfulFunctors", "Core.Logic.Transport"] {
+    for provider in ["Core.Function.Combinators", "Core.Logic.Transport"] {
         provider_only
             .elaborate_module_from_roots(&[catalog_root()], provider)
             .unwrap_or_else(|error| panic!("provider {provider} must roots-load: {error:?}"));
@@ -241,10 +241,7 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
         .into_iter()
         .map(|name| base.globals[name])
         .collect::<BTreeSet<_>>();
-    for name in [
-        "Core.Classes.LawfulFunctors.idf",
-        "Core.Logic.Transport.cong",
-    ] {
+    for name in ["Core.Function.Combinators.idf", "Core.Logic.Transport.cong"] {
         expected_external.insert(via_vector.globals[name]);
     }
     assert_eq!(
@@ -267,7 +264,7 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
     assert_eq!(
         shape.providers,
         [
-            ("Core.Classes.LawfulFunctors".to_owned(), "idf".to_owned()),
+            ("Core.Function.Combinators".to_owned(), "idf".to_owned()),
             ("Core.Logic.Transport".to_owned(), "cong".to_owned()),
         ]
         .into_iter()
@@ -355,7 +352,7 @@ fn vec_map_identity_raw_checked_proposition_is_not_reflexive_filler() {
                 ),
                 Term::var(1),
             ),
-            Term::app(global("Core.Classes.LawfulFunctors.idf"), Term::var(2)),
+            Term::app(global("Core.Function.Combinators.idf"), Term::var(2)),
         ),
         Term::var(0),
     );

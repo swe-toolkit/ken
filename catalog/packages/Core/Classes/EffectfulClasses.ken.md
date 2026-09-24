@@ -57,9 +57,9 @@ import Core.Classes.LawfulFunctors
     Functor,
     Functor_instance_List,
     Functor_instance_Option,
-    comp,
-    idf,
     list_map)
+
+import Core.Function.Combinators (comp, idf)
 
 import Core.Logic.Transport (cong, sym, trans)
 
