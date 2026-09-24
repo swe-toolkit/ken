@@ -28,7 +28,9 @@ values with a lawful `Semigroup e` operation.
 
 The carrier is an ordinary binary sum. Mapping preserves errors and transforms
 only successful values. `validation_ap` accumulates errors from both sides in
-left-to-right order.
+left-to-right order. The private law beside the operation checks that its
+two-error branch uses the supplied semigroup in that order for arbitrary
+error and value types; the concrete example below does not establish this.
 
 ```ken
 import Core.Classes.EffectfulClasses (Applicative, apply_to, compose, functor_map_of)
@@ -72,6 +74,14 @@ pub fn validation_ap
         Valid value ↦ Valid e b (f value)
       }
   }
+
+theorem validation_ap_accumulates_both_errors
+      (e : Type) (sg : Semigroup e) (a : Type) (b : Type) (left : e) (right : e)
+    : Equal
+        (Validation e b)
+        (validation_ap e sg a b (Invalid e (a → b) left) (Invalid e a right))
+        (Invalid e b (sg.op left right)) =
+  Refl
 ```
 
 ## 3. Using it
