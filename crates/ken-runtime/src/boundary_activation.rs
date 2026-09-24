@@ -642,6 +642,19 @@ mod tests {
                 requested: 3,
             }
         );
+        // The fault is produced by the real third begin, not constructed by
+        // this test. The same typed value must survive the linked wire intact.
+        let linked = ken_host::LinkedEffectTrace {
+            plan_hash: 1,
+            target_abi_hash: ken_host::TARGET_ABI_MANIFEST_HASH,
+            host_effect_abi_hash: ken_host::HOST_EFFECT_ABI_V1_HASH,
+            terminal_value: ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            terminal_error: Some(ken_host::TerminalErrorV1::CapacityExhausted(err)),
+            effect_trace: Vec::new(),
+            terminal_exit: ken_host::TerminalExitClass::ControlledTrap,
+        };
+        let encoded = ken_host::encode_linked_effect_trace(&linked).expect("real fault encodes");
+        assert_eq!(ken_host::decode_linked_effect_trace(&encoded), Ok(linked));
         profile.runtime.invocation_epochs = 0;
         let mut zero_store = BoundaryValueStore::new();
         let zero_binding = BoundaryStoreBindingV1::open(&mut zero_store, profile);
