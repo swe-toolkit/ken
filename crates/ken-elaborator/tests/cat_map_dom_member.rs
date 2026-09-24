@@ -52,9 +52,10 @@ fn map_loader_visible_export_inventory_is_exact() {
     .into_iter()
     .map(str::to_owned)
     .collect::<BTreeSet<_>>();
+    let visible = catalog_publication::published_module_surfaces(MAP_KEN_MD, MAP, "map_dom_member");
+    eprintln!("Map loader-visible exports: {visible:?}");
     assert_eq!(
-        catalog_publication::published_module_surfaces(MAP_KEN_MD, MAP, "map_dom_member"),
-        expected,
+        visible, expected,
         "Map's roots-loader public export set must match the base capture"
     );
 }
@@ -87,6 +88,11 @@ fn map_trusted_base_is_unchanged_from_provider_closure() {
         .expect("Map must roots-load after its providers");
     assert!(!owned.is_empty(), "Map must declare a real checked package");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    eprintln!(
+        "Map trusted base: provider closure {}, after Map {}",
+        before.len(),
+        after.len()
+    );
     assert_eq!(after, before, "Map must mint no trust beyond providers");
 }
 
