@@ -497,6 +497,57 @@ fn nonempty_owner_keeps_raw_constructor_while_clients_cannot_name_it() {
     }
 }
 
+/// Promise class: durable invariant for this discriminator fixture.
+///
+/// MEASURED: the real roots-loaded `validation_ap` combines two `Invalid`
+/// values with distinct `NonEmpty Nat` singleton heads, and checked client
+/// projections observe the first and second heads in left-to-right order.
+/// CLAIMED: neither error is dropped or swapped on this fixture. THE GAP:
+/// singleton `nonempty_append` exposes both heads; the generic private law
+/// and independent production-site mutations establish the arbitrary case.
+#[test]
+fn validation_ap_distinct_nonempty_nat_errors_keep_both_heads_in_order() {
+    let mut env = dependency_env();
+    for module in [NONEMPTY_MODULE, VALIDATION_MODULE] {
+        env.elaborate_module_from_roots(&[catalog_or::catalog_root()], module)
+            .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
+    }
+    env.elaborate_file(
+        "import Data.Collections.NonEmpty \
+           (NonEmpty, nonempty_cons, nonempty_head, nonempty_tail, \
+            Semigroup_instance_NonEmpty)\n\
+         import Data.Sums.Validation (Validation, Invalid, Valid, validation_ap)\n\
+         const validation_left : NonEmpty Nat = \
+           nonempty_cons Nat Zero (Nil Nat)\n\
+         const validation_right : NonEmpty Nat = \
+           nonempty_cons Nat (Suc Zero) (Nil Nat)\n\
+         const validation_result : Validation (NonEmpty Nat) Nat = \
+           validation_ap (NonEmpty Nat) (Semigroup_instance_NonEmpty Nat) \
+             Nat Nat \
+             (Invalid (NonEmpty Nat) (Nat → Nat) validation_left) \
+             (Invalid (NonEmpty Nat) Nat validation_right)\n\
+         fn observed_first (value : Validation (NonEmpty Nat) Nat) : Nat = \
+           match value { \
+             Invalid errors ↦ nonempty_head Nat errors; \
+             Valid _ ↦ Suc (Suc Zero) \
+           }\n\
+         fn observed_second (value : Validation (NonEmpty Nat) Nat) : Nat = \
+           match value { \
+             Invalid errors ↦ \
+               match nonempty_tail Nat errors { \
+                 Nil ↦ Suc (Suc Zero); \
+                 Cons head rest ↦ head \
+               }; \
+             Valid _ ↦ Suc (Suc Zero) \
+           }\n\
+         theorem first_error_is_left : \
+           Equal Nat (observed_first validation_result) Zero = Proved\n\
+         theorem second_error_is_right : \
+           Equal Nat (observed_second validation_result) (Suc Zero) = Proved",
+    )
+    .expect("two distinct errors must both remain observable in source order");
+}
+
 #[test]
 fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
     let mut env = dependency_env();
@@ -541,6 +592,7 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
             "Data.Sums.Validation.validation_map",
             "Data.Sums.Validation.validation_pure",
             "Data.Sums.Validation.validation_ap",
+            "Data.Sums.Validation.validation_ap_accumulates_both_errors",
             "Data.Sums.Validation.validation_map::id",
             "Data.Sums.Validation.validation_map::fusion",
             "Data.Sums.Validation.validation_ap_id",
