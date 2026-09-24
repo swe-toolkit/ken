@@ -11,7 +11,6 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::KernelError;
 
 const MODULE: &str = "Data.Vector.Vector";
-const VECTOR_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Vector/Vector.ken.md");
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -26,12 +25,20 @@ fn roots_env() -> ElabEnv {
     env
 }
 
-fn direct_env() -> ElabEnv {
-    let mut env = ElabEnv::new().expect("prelude bootstrap");
-    let extracted = ken_elaborator::literate::extract_ken_md(VECTOR_KEN_MD)
-        .expect("Vector literate source must extract");
-    env.elaborate_file(&extracted.source)
-        .expect("Vector source must elaborate and kernel-check");
+fn internal_vector_fixture_env() -> ElabEnv {
+    let mut env = roots_env();
+    // Existing fixtures inspect Vector's private operations. Bind aliases only
+    // in this synthetic test scope; external clients still use real imports.
+    let prefix = format!("{MODULE}.");
+    let aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            name.strip_prefix(&prefix)
+                .map(|suffix| (suffix.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(aliases);
     env
 }
 
@@ -94,7 +101,7 @@ fn roots_loader_registers_the_indexed_public_surface() {
 
 #[test]
 fn generic_operations_preserve_length_and_concrete_computations_hold() {
-    let mut env = direct_env();
+    let mut env = internal_vector_fixture_env();
     env.elaborate_file(
         "fn cat_vec_head (a : Type) (n : Nat) (xs : Vec a (Suc n)) : a = \
            head a n xs\n\
@@ -146,7 +153,7 @@ fn generic_operations_preserve_length_and_concrete_computations_hold() {
 
 #[test]
 fn empty_and_out_of_bounds_calls_are_rejected_by_their_indices() {
-    let mut env = direct_env();
+    let mut env = internal_vector_fixture_env();
 
     for (label, source) in [
         (
@@ -184,13 +191,18 @@ fn empty_and_out_of_bounds_calls_are_rejected_by_their_indices() {
 }
 
 #[test]
-fn entry_adds_no_trusted_declarations() {
+fn entry_adds_no_trusted_declarations_beyond_its_providers() {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
+    for provider in ["Core.Classes.LawfulFunctors", "Core.Logic.Transport"] {
+        env.elaborate_module_from_roots(&[catalog_root()], provider)
+            .unwrap_or_else(|error| panic!("{provider} must roots-load: {error:?}"));
+    }
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    let extracted = ken_elaborator::literate::extract_ken_md(VECTOR_KEN_MD)
-        .expect("Vector literate source must extract");
-    env.elaborate_file(&extracted.source)
-        .expect("Vector source must elaborate and kernel-check");
+    env.elaborate_module_from_roots(&[catalog_root()], MODULE)
+        .expect("Vector must roots-load after its providers");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(before, after, "Vector must add zero trusted declarations");
+    assert_eq!(
+        before, after,
+        "Vector must add no trust beyond its providers"
+    );
 }

@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ken_elaborator::modules::{
-    PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES, catalog_module_from_path,
-    is_prelude_floor_name,
+    catalog_module_from_path, is_prelude_floor_name, PRELUDE_COMPANION_BINDING_NAMES,
+    PRELUDE_FLOOR_NAMES,
 };
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Level, Term};
@@ -359,6 +359,44 @@ fn ambient_dependencies(root: &Path, entry: &str) -> Result<Vec<String>, String>
         }
     }
     Err("ambient dependency census exceeded the initial global inventory".to_string())
+}
+
+fn expected_vector_strict_floor_names() -> Vec<String> {
+    [
+        "And",
+        "Bottom",
+        "Equal",
+        "Prop",
+        "Proved",
+        "Top",
+        "Unit",
+        "and_fst",
+        "and_intro",
+        "and_snd",
+        "eqChar",
+        "is_sorted",
+        "leqChar",
+        "map",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect()
+}
+
+/// Promise class: transition sentinel for Vector's amended provider imports.
+/// Retire or rebaseline when a separately authorized Vector provider changes.
+/// MEASURED: strict roots loading of only the real Vector module consumes the
+/// stated compiler conveniences after its checked provider closure is loaded.
+/// CLAIMED: the corpus census's Vector row reflects the current loader path.
+/// THE GAP: this is one row, not a substitute for the full-corpus census in CI.
+#[test]
+fn vector_strict_floor_provider_transition_sentinel() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    let names = ambient_dependencies(&root, "Data.Vector.Vector")
+        .expect("Vector must resolve against the strict floor");
+    assert_eq!(names, expected_vector_strict_floor_names());
 }
 
 /// Transition sentinel for catalog migration: this is a behavioral census,
@@ -1256,11 +1294,10 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Vector now imports LawfulFunctors.idf and Transport.cong;
+            // strict mode still records the providers' compiler conveniences.
             "Data.Vector.Vector".to_string(),
-            ["Equal", "Proved"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            expected_vector_strict_floor_names(),
         ),
         (
             "Tooling.Testing.Property".to_string(),
@@ -1317,9 +1354,9 @@ fn catalog_ambient_passthrough_migration_census() {
     .map(str::to_string)
     .collect::<BTreeSet<_>>();
     let expected_residuals = ["Algorithm.Searching.OrderedSearch"]
-    .into_iter()
-    .map(str::to_string)
-    .collect::<BTreeSet<_>>();
+        .into_iter()
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
     assert_eq!(clean, expected_clean, "WP-4 strict-floor-clean sentinel");
     assert_eq!(
         residual_names, expected_residuals,

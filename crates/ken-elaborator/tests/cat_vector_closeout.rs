@@ -1,16 +1,16 @@
 //! CAT-MIGRATE-TIER-C-DATA-VALUE Vector closeout controls.
 //!
-//! Promise class: durable invariants. Vector owns its exact checked indexed
-//! families, operations, and computation theorems; consumes no catalog
-//! provider; publishes no catalog surface; and adds no trust. The existing
-//! `cat_vec_acceptance` target retains the family-index, computation, and
+//! Vector owns checked indexed families, operations, computation theorems,
+//! and one private map identity law. It consumes only LawfulFunctors/Transport,
+//! publishes no catalog surface, and adds no trust beyond those providers.
+//! `cat_vec_acceptance` retains the family-index, computation, and
 //! impossible-call behavior obligations.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{parser, Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, ImportKind};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_kernel::{Decl, GlobalId, Level, Term};
 
 const VECTOR: &str = "Data.Vector.Vector";
 const TRANSPORT: &str = "Core.Logic.Transport";
@@ -46,6 +46,7 @@ fn expected_owned_names() -> BTreeSet<String> {
         "map_vnil",
         "tail",
         "tail_vcons",
+        "vec_map_identity",
         "zip_with",
         "zip_with_vnil",
     ]
@@ -167,15 +168,33 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
         .collect()
 }
 
-/// MEASURED: ordinary isolated roots loading installs exactly the sixteen named
+/// Promise class: transition sentinel for the owned declarations in this
+/// proof-only increment. Retire or rebaseline at the first separately authorized
+/// Vector declaration extension; this inventory is not a permanent API promise.
+/// MEASURED: ordinary isolated roots loading installs these seventeen checked
 /// Vector identities, returns only identities from that population, and
-/// executes every checked fence. The trusted base equals the compiler base.
-/// CLAIMED: Vector is standalone, owns exactly its checked family, and adds no
+/// executes every checked fence. Provider-closure trust is unchanged by Vector.
+/// CLAIMED: only the one private law extends the owned inventory; it adds no
 /// local trust. THE GAP: constructors are not separate loader results; the
 /// qualified environment inventory closes that part of the population.
 #[test]
-fn vector_owned_inventory_is_exact_and_standalone_with_zero_local_trust() {
-    let base = ElabEnv::new().expect("base environment");
+fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
+    let mut provider_only = ElabEnv::new().expect("provider environment");
+    for provider in ["Core.Classes.LawfulFunctors", "Core.Logic.Transport"] {
+        provider_only
+            .elaborate_module_from_roots(&[catalog_root()], provider)
+            .unwrap_or_else(|error| panic!("provider {provider} must roots-load: {error:?}"));
+    }
+    let trust_before: BTreeSet<_> = provider_only.env.trusted_base().into_iter().collect();
+    provider_only
+        .elaborate_module_from_roots(&[catalog_root()], VECTOR)
+        .expect("Vector must roots-load over the existing provider closure");
+    let trust_after: BTreeSet<_> = provider_only.env.trusted_base().into_iter().collect();
+    eprintln!(
+        "Vector full-closure trust: before {}, after {}",
+        trust_before.len(),
+        trust_after.len()
+    );
     let (mut via_vector, loader_results) = load(VECTOR);
     assert_eq!(
         qualified_owned_names(&via_vector),
@@ -188,23 +207,24 @@ fn vector_owned_inventory_is_exact_and_standalone_with_zero_local_trust() {
         "every Vector loader result must belong to its qualified identity population"
     );
     assert_eq!(
-        via_vector.env.trusted_base(),
-        base.env.trusted_base(),
-        "Vector must add no trust beyond the compiler base"
+        trust_after, trust_before,
+        "Vector must add no trust beyond its checked provider closure"
     );
     via_vector
         .execute_loaded_entry_checked_fences(VECTOR)
         .expect("Vector Definition and every checked fence must elaborate");
 }
 
-/// MEASURED: every checked Vector type and body refers externally to exactly
-/// the compiler identities `{Proved, Nat, Zero, Suc, Equal}`. The parsed module
-/// contains no catalog import, public declaration, or re-export. CLAIMED:
-/// Vector is already a provider-free, consumer-only catalog unit and publishes
-/// no catalog surface. THE GAP: source forms `Type` and `Refl` elaborate into
-/// kernel terms without separate provider globals.
+/// Promise class: transition sentinel for this proof-only dependency edge;
+/// retire at the first separately authorized Vector provider change.
+/// MEASURED: checked Vector references exactly the compiler floor plus the
+/// canonical imported `idf`/`cong` identities; parsed imports list exactly
+/// those two providers, with no public declaration or re-export. CLAIMED:
+/// the private law uses the two authorized providers and Vector publishes no
+/// catalog surface. THE GAP: `Type` and `Refl` elaborate without separate
+/// provider globals; checked GlobalId comparisons close the provider edge.
 #[test]
-fn vector_has_exactly_the_compiler_floor_and_no_catalog_interface() {
+fn vector_imports_exact_checked_providers_and_publishes_nothing() {
     let base = ElabEnv::new().expect("base environment");
     let (via_vector, _) = load(VECTOR);
     let owned_ids = qualified_owned_ids(&via_vector);
@@ -217,10 +237,16 @@ fn vector_has_exactly_the_compiler_floor_and_no_catalog_interface() {
     for id in &owned_ids {
         external.remove(id);
     }
-    let expected_external = ["Proved", "Nat", "Zero", "Suc", "Equal"]
+    let mut expected_external = ["Proved", "Nat", "Zero", "Suc", "Equal"]
         .into_iter()
         .map(|name| base.globals[name])
         .collect::<BTreeSet<_>>();
+    for name in [
+        "Core.Classes.LawfulFunctors.idf",
+        "Core.Logic.Transport.cong",
+    ] {
+        expected_external.insert(via_vector.globals[name]);
+    }
     assert_eq!(
         external, expected_external,
         "Vector's checked external identity inventory changed"
@@ -240,8 +266,13 @@ fn vector_has_exactly_the_compiler_floor_and_no_catalog_interface() {
     let shape = package_shape();
     assert_eq!(
         shape.providers,
-        BTreeSet::new(),
-        "Vector must not acquire a catalog provider edge"
+        [
+            ("Core.Classes.LawfulFunctors".to_owned(), "idf".to_owned()),
+            ("Core.Logic.Transport".to_owned(), "cong".to_owned()),
+        ]
+        .into_iter()
+        .collect(),
+        "Vector must import exactly the two checked proof providers"
     );
     assert_eq!(
         shape.public_declarations,
@@ -285,4 +316,65 @@ fn vector_loader_visible_inventory_is_empty() {
             Ok(_) => panic!("Vector unexpectedly published {surface}"),
         }
     }
+}
+
+/// Promise class: durable invariant for the exact private proof obligation.
+/// MEASURED: the real roots loader installs a transparent checked theorem whose
+/// raw type is three binders followed by the exact `Equal (Vec a n)` endpoints,
+/// with canonical `map`/`idf` identities and de Bruijn-bound arguments.
+/// CLAIMED: the checked proof is about applying Vector's map to the public
+/// identity function, not merely about an equality that happens to reduce.
+/// THE GAP: this pins the stated raw theorem type, not an arbitrary equivalent
+/// rewriting; the authored law has precisely this contract.
+#[test]
+fn vec_map_identity_raw_checked_proposition_is_not_reflexive_filler() {
+    let (env, _) = load(VECTOR);
+    let name = format!("{VECTOR}.vec_map_identity");
+    let id = env.globals[&name];
+    let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("identity law must be loaded")
+    else {
+        panic!("{name} must be a checked transparent proof, not an assumption");
+    };
+
+    let global = |name: &str| Term::const_(env.globals[name], vec![]);
+    let vec_at = |a: Term, n: Term| {
+        Term::app(
+            Term::app(
+                Term::indformer(env.globals[&format!("{VECTOR}.Vec")], vec![]),
+                a,
+            ),
+            n,
+        )
+    };
+    let mapped = Term::app(
+        Term::app(
+            Term::app(
+                Term::app(
+                    Term::app(global(&format!("{VECTOR}.map")), Term::var(2)),
+                    Term::var(2),
+                ),
+                Term::var(1),
+            ),
+            Term::app(global("Core.Classes.LawfulFunctors.idf"), Term::var(2)),
+        ),
+        Term::var(0),
+    );
+    let proposition = Term::app(
+        Term::app(
+            Term::app(global("Equal"), vec_at(Term::var(2), Term::var(1))),
+            mapped,
+        ),
+        Term::var(0),
+    );
+    let expected = Term::pi(
+        Term::ty(Level::Zero),
+        Term::pi(
+            Term::indformer(env.globals["Nat"], vec![]),
+            Term::pi(vec_at(Term::var(1), Term::var(0)), proposition),
+        ),
+    );
+    assert_eq!(
+        ty, &expected,
+        "the checked map identity law changed its exact raw proposition"
+    );
 }
