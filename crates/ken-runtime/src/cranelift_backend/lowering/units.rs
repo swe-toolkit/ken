@@ -3249,6 +3249,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     &mut builder,
                     selected_context.clone(),
                     &inputs,
+                    None,
                     #[cfg(test)]
                     None,
                 )?;
@@ -3467,6 +3468,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                         &mut builder,
                         selected_context.clone(),
                         &context_inputs,
+                        None,
                         #[cfg(test)]
                         None,
                     );
@@ -3487,6 +3489,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                                 &mut builder,
                                 selected_context.clone(),
                                 &context_inputs,
+                                None,
                                 #[cfg(test)]
                                 None,
                             )?;
@@ -3500,6 +3503,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                         &mut builder,
                         selected_context.clone(),
                         &context_inputs,
+                        None,
                         #[cfg(test)]
                         None,
                     )?;

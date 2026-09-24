@@ -2598,6 +2598,26 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     } else {
         None
     };
+    // Runtime-selected calls use the activation's checked one-use authority;
+    // neither helper is a planner trap or a host-effect dispatch.
+    let mut ticket_sig = module.make_signature();
+    ticket_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
+    ticket_sig.params.push(AbiParam::new(types::I64));
+    ticket_sig.params.push(AbiParam::new(types::I64));
+    ticket_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
+    ticket_sig.returns.push(AbiParam::new(types::I64));
+    let selected_call_issue = module
+        .declare_function("ken_selected_call_v1_issue", Linkage::Import, &ticket_sig)
+        .map_err(|err| backend_module(err.to_string()))?;
+    let mut consume_sig = module.make_signature();
+    consume_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
+    consume_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
+    consume_sig.params.push(AbiParam::new(types::I64));
+    consume_sig.params.push(AbiParam::new(types::I64));
+    consume_sig.returns.push(AbiParam::new(types::I64));
+    let selected_call_consume = module
+        .declare_function("ken_selected_call_v1_consume", Linkage::Import, &consume_sig)
+        .map_err(|err| backend_module(err.to_string()))?;
     // ⭐ `RT-FNSPLIT-B2F` `D1` — forward-declare the WHOLE target-unit bundle
     // before any body (root or unit) is defined. A unit body may call any other
     // unit, so declaring every signature first is what makes the call graph
@@ -2651,6 +2671,8 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let helpers = ArtifactHelpers {
         seed_material: &seed_material,
         host_dispatch,
+        selected_call_issue,
+        selected_call_consume,
         native_int: &native_int,
         boundary_value_abi: &boundary_value_abi,
     };
@@ -8240,6 +8262,7 @@ impl<'a> Lowering<'a> {
                 deferred.target,
                 &deferred.operands,
                 None,
+                None,
             )?;
             self.fusion_claims
                 .as_mut()
@@ -8423,6 +8446,7 @@ impl<'a> Lowering<'a> {
             builder,
             target,
             &inputs,
+            None,
             #[cfg(test)]
             None,
         )?;
@@ -8889,6 +8913,7 @@ impl<'a> Lowering<'a> {
             builder,
             target,
             &inputs,
+            None,
             #[cfg(test)]
             None,
         )?;
@@ -9153,6 +9178,7 @@ impl<'a> Lowering<'a> {
             builder,
             target,
             &ordinary,
+            None,
             #[cfg(test)]
             None,
         )?;
@@ -11482,6 +11508,7 @@ impl<'a> Lowering<'a> {
             builder,
             target,
             &inputs,
+            None,
             #[cfg(test)]
             None,
         )?;
@@ -12363,6 +12390,7 @@ impl<'a> Lowering<'a> {
             builder,
             target,
             &operands,
+            None,
             #[cfg(test)]
             None,
         )?;

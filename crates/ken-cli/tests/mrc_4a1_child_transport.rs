@@ -331,7 +331,7 @@ fn census_source(root: &Path) -> PathBuf {
     let path = root.join("census.ken");
     std::fs::write(&path, CENSUS_PROGRAM).expect("source written");
     std::fs::write(root.join("resource-profile.json"),
-        r#"{"runtime":{"invocation_epochs":18446744073709551615},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#,
+        r#"{"runtime":{"invocation_epochs":18446744073709551615},"call_events":{"event_generations":18446744073709551615,"live_pending_slots":64},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#,
     ).expect("explicit resource policy written");
     path
 }

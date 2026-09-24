@@ -175,7 +175,15 @@ fn native_isa() -> Result<OwnedTargetIsa, CraneliftBackendError> {
 
 fn new_jit_module() -> Result<JITModule, CraneliftBackendError> {
     let isa = native_isa()?;
-    let builder = JITBuilder::with_isa(isa, default_libcall_names());
+    let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
+    builder.symbol(
+        "ken_selected_call_v1_issue",
+        crate::activation_abi::ken_selected_call_v1_issue as *const u8,
+    );
+    builder.symbol(
+        "ken_selected_call_v1_consume",
+        crate::activation_abi::ken_selected_call_v1_consume as *const u8,
+    );
     Ok(JITModule::new(builder))
 }
 

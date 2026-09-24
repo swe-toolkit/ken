@@ -5269,6 +5269,9 @@ fn d6c_the_sealed_binder_run_refuses_a_miscounted_or_permuted_run_at_its_produce
             Err(CraneliftBackendError::CapacityExhausted(fault)) => panic!(
                 "{mutation:?} on the governed witness hit runtime capacity, not its compile-time run guard: {fault:?}"
             ),
+            Err(CraneliftBackendError::SelectedCallIntegrity(fault)) => panic!(
+                "{mutation:?} on the governed witness hit selected-call integrity, not its compile-time run guard: {fault:?}"
+            ),
             Err(CraneliftBackendError::ProfileMismatch(mismatch)) => panic!(
                 "{mutation:?} on the governed witness hit process profile mismatch, not its compile-time run guard: {mismatch:?}"
             ),

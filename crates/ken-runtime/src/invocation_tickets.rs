@@ -3,7 +3,8 @@
 //! any caller may read its borrowed operands or invoke the selected body.
 
 use crate::boundary_resource_profile::InvocationCallLimitsV3;
-use ken_host::{CapacityExhaustedV1, CapacityResourceV1, CapacityScopeV1};
+use ken_host::{CapacityExhaustedV1, CapacityResourceV1, CapacityScopeV1,
+    SelectedCallIntegrityFaultV1};
 
 /// An exact runtime target, rather than the source text that named it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -25,12 +26,9 @@ pub struct SelectedCallTicketV1 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SelectedCallIntegrityFaultV1 {
-    WrongActivation,
-    InvalidSlot,
-    StaleGeneration,
-    Spent,
-    WrongTarget,
+pub enum IssuerTerminalFaultV1 {
+    Capacity(CapacityExhaustedV1),
+    Integrity(SelectedCallIntegrityFaultV1),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -48,6 +46,9 @@ pub struct InvocationTicketIssuerV1 {
     generation: u64,
     generation_limit: u64,
     slots: Box<[LiveSlot]>,
+    /// Generated status is only a signal. The exact fault is retained by
+    /// the live activation owner, never reconstructed from a signed token.
+    terminal_fault: Option<IssuerTerminalFaultV1>,
 }
 
 impl InvocationTicketIssuerV1 {
@@ -67,7 +68,7 @@ impl InvocationTicketIssuerV1 {
             live: false,
         });
         Ok(Self { epoch, generation: 0, generation_limit: limits.event_generations,
-            slots: slots.into_boxed_slice() })
+            slots: slots.into_boxed_slice(), terminal_fault: None })
     }
 
     pub fn issue(&mut self, target: SelectedCallTargetV1) -> Result<SelectedCallTicketV1, CapacityExhaustedV1> {
@@ -121,6 +122,15 @@ impl InvocationTicketIssuerV1 {
         self.epoch = epoch;
     }
 
+    pub(crate) fn record_terminal_fault(&mut self, fault: IssuerTerminalFaultV1) {
+        if self.terminal_fault.is_none() { self.terminal_fault = Some(fault); }
+    }
+
+    pub fn terminal_fault(&self) -> Option<IssuerTerminalFaultV1> { self.terminal_fault }
+    pub fn take_terminal_fault(&mut self) -> Option<IssuerTerminalFaultV1> {
+        self.terminal_fault.take()
+    }
+
     pub fn backing_address(&self) -> usize { self.slots.as_ptr() as usize }
     pub fn epoch(&self) -> u64 { self.epoch }
 }
@@ -167,6 +177,20 @@ mod tests {
         assert_eq!(next.generation, first.generation);
         assert_eq!(next_activation.consume(first, target(1)), Err(SelectedCallIntegrityFaultV1::WrongActivation));
         next_activation.consume(next, target(1)).unwrap();
+    }
+
+    /// Even an explicitly maximal u64 ceiling does not rearm generation zero.
+    /// u128 carries the one-past request through the typed capacity wire.
+    #[test]
+    fn generation_counter_overflow_is_refused_without_wrapping() {
+        let mut owner = issuer(31, u64::MAX, 1);
+        owner.generation = u64::MAX;
+        let fault = owner.issue(target(1)).unwrap_err();
+        assert_eq!((fault.scope, fault.resource, fault.limit, fault.requested),
+            (CapacityScopeV1::Invocation, CapacityResourceV1::EventGenerations,
+                u64::MAX as u128, u64::MAX as u128 + 1));
+        assert_eq!(owner.generation, u64::MAX);
+        assert!(owner.slots.iter().all(|slot| !slot.live));
     }
 
     #[test]
