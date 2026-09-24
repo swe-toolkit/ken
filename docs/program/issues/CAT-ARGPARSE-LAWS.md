@@ -155,9 +155,9 @@ ruling, never another adapter.
   - The final theorems still name `argparse_parse_tokens`. Positives must
     take both the ValueOption and the positional branches; an Invalid-only
     observer does not witness law 1.
-  - AC-2's production-site falsifiers are unchanged. With the adapter
-    untouched, each must redden the bridge or the attached law at its own
-    obligation.
+  - For laws 1 and 2, AC-2 is the two observations in AC-2 (a) and (b)
+    below (Architect `evt_58hr8a3vegsvc`). A bridge redden alone shows only
+    that the adapter copies the parser.
 - **AC-1b (superseded by AC-1c).** The bounded retry through
   `string_to_list_char_injective` could not name the parser's literal
   occurrences and is closed. Do not reopen it.
@@ -185,14 +185,35 @@ ruling, never another adapter.
   a value option, at whichever site owns that branch, must break law 2. No
   law may be vacuous: its hypotheses must be satisfiable, and removing any
   one must make it false.
-  - **A process abort is not a redden** (Architect `evt_4xhp1k4y4w8sq`).
-    The `Suc index` example aborts `ken check` with a stack overflow
-    (`rc=134`). Each law's mutation must give `KernelRejected` at that law's
-    own obligation. For law 1, for example: in `argparse_parse_tokens`,
-    change `value` to `argument` in `ParsedOption (option_name spec)
-    value` (unmeasured whether it rejects or aborts). If no mutation for a
-    law reddens without aborting, STOP and report the rc and mutation. The
-    abort is `KERNEL-CHECK-ABORT-ON-ARGPARSE-INDEX-MUTATION`, not this WP.
+  - **Laws 1 and 2 (Architect `evt_58hr8a3vegsvc`; replaces the earlier
+    "own obligation" text).** `full_validation_cons_bridge` is `Refl`
+    against a verbatim copy of the parser's `Cons` step, so every unmirrored
+    `Cons`-step mutation reddens at the bridge, whether or not a law
+    discriminates. Two observations per law:
+    - **(a) Faithfulness, one for both laws.** One `Cons`-step parser
+      mutation, adapter untouched, gives rc=1 `TypeMismatch` at
+      `full_validation_cons_bridge`.
+    - **(b) Discrimination, one run per law.** In a scratch copy, apply the
+      same one-line edit to the parser line and byte-for-byte to its mirror
+      in `argparse_cons_outcome_view`, then restore both. The bridge still
+      checks, and the run must give rc=1 `KernelRejected` at an obligation
+      of that law: for law 1, `value_bytes_from_input` or a helper it calls;
+      for law 2, `diagnostic_sequence_step`, `diagnostic_sequence_base` or a
+      helper either calls. If the other law fails first, fence that law
+      with `ken ignore` for that run only, say so, and restore it.
+      - Law 1: `ParsedOption (option_name spec) value` to
+        `ParsedOption (option_name spec) argument` (parser `:385`, adapter
+        `:452` at `f7e83e217`).
+      - Law 2: `argparse_unknown_option_code` to
+        `argparse_missing_option_value_code` (parser `:398`, adapter `:465`).
+      - Both are predicted from the definitions, not yet run.
+    - **A process abort is not a redden** (Architect `evt_4xhp1k4y4w8sq`).
+      If a mirrored mutation aborts (rc=134/137), STOP and report the rc and
+      the mutation. The abort is
+      `KERNEL-CHECK-ABORT-ON-ARGPARSE-INDEX-MUTATION`, not this WP.
+    - Mirrored mutations are scratch only; the committed parser and adapter
+      stay byte-identical to `f7e83e217` apart from open ACs. Law 3's text
+      above is unchanged.
 - **AC-3.** Under `crates/`, only consumer-view harnesses change, such as
   `src/r_layer_tests/cat_tier_e_argparse_import.rs`. Use Cursor's `AC-3c`
   rule: bring a MIRRORING assertion into agreement; for a DIRECTIONAL one

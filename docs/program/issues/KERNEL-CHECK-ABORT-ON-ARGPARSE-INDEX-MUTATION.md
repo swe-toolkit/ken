@@ -24,6 +24,11 @@ origin: "Research evt_579nbhknhvcnn measured the abort while advising CAT-ARGPAR
   `rc=134`. On an 8x stack it is SIGKILLed, `rc=137`.
 - A proof-side `Suc index` to `index` in the Flag arm does the same (fence
   state not recorded; D0 re-measures).
+- **Second reproducer, outside the `Cons` bridge** (Architect
+  `evt_58hr8a3vegsvc`): on WIP `f7e83e2178c834b0afc2764b5c3b3c3b129a5b8d`,
+  changing the `Nil` arm's `index` to `Suc index` in `argparse_parse_tokens`
+  (`:363`) also aborts. Log `/tmp/argparse-law2-nil-index-mutation.log`
+  (perishable).
 - It fails closed: nothing wrong is accepted. But the check names no
   obligation, and a small file exhausts the process.
 - The Architect's hypothesis, unmeasured: conversion diverges on a
@@ -32,8 +37,8 @@ origin: "Research evt_579nbhknhvcnn measured the abort while advising CAT-ARGPAR
   is a second case of that boundary or a different cause is unknown. With
   the fences ignored, the one checked obligation relating
   `argparse_parse_tokens` to a copy of itself is
-  `full_validation_cons_bridge`, proved by `Refl`: the first place to look
-  (Architect, a hypothesis).
+  `full_validation_cons_bridge`, proved by `Refl`. That is one candidate,
+  not the lead: the `Nil`-arm reproducer lies outside the bridge.
 
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.
