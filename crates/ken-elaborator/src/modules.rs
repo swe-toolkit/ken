@@ -304,6 +304,10 @@ struct Scope {
     /// Locals declared by the current expansion, even if a previous unit
     /// already minted this canonical spelling. Cleared after the ordered pass.
     current_local_names: HashSet<String>,
+    /// Local identities proven checked by an ordered expansion. New locals
+    /// remove a former occupant during prebinding; a stale ambient
+    /// `globals[canonical]` must never stand in for the current local.
+    checked_local_ids: HashMap<String, ken_kernel::GlobalId>,
     /// An `export Local` may precede Local's checked declaration. Delay its
     /// ID until that declaration finishes, then check any competing facade.
     pending_local_exports: HashMap<String, (String, Span)>,
@@ -337,11 +341,19 @@ impl Scope {
     ) -> Result<(), ElabError> {
         if self.locals.contains(bare) {
             let local_binding = self.bindings.get(bare).cloned();
-            let local_id = match local_binding.as_deref() {
-                Some(local) => globals.get(local),
-                None => globals.get(bare),
+            // Only this expansion's checked-local ledger can establish the
+            // identity of a current local. Before admission, `globals` can
+            // still hold another unit's declaration at the same spelling.
+            let local_id = match self.checked_local_ids.get(bare).copied() {
+                Some(id) => Some(id),
+                None if self.current_local_names.contains(bare) => None,
+                None => local_binding
+                    .as_deref()
+                    .and_then(|local| globals.get(local))
+                    .or_else(|| globals.get(bare))
+                    .copied(),
             };
-            if local_id.is_some_and(|local| *local == selected_id) {
+            if local_id == Some(selected_id) {
                 return Ok(());
             }
             let local_source = local_binding
@@ -352,9 +364,20 @@ impl Scope {
                          binding nor a resolved identity"
                     ))
                 })?;
+            let sources = if local_source == qualified {
+                vec![
+                    match local_id {
+                        Some(id) => format!("{local_source} (local {id:?})"),
+                        None => format!("{local_source} (pending local)"),
+                    },
+                    format!("{qualified} (import {selected_id:?})"),
+                ]
+            } else {
+                vec![local_source, qualified.to_string()]
+            };
             return Err(ElabError::AmbiguousReference {
                 name: bare.to_string(),
-                sources: vec![local_source, qualified.to_string()],
+                sources,
                 span: span.clone(),
             });
         }
@@ -405,6 +428,19 @@ impl Scope {
         self.bindings
             .insert(bare.to_string(), qualified.to_string());
         Ok(())
+    }
+}
+
+fn record_checked_local(
+    scope: &mut Scope,
+    bare: &str,
+    canonical: &str,
+    id: ken_kernel::GlobalId,
+) {
+    if scope.current_local_names.contains(bare)
+        && scope.bindings.get(bare).is_some_and(|binding| binding == canonical)
+    {
+        scope.checked_local_ids.insert(bare.to_string(), id);
     }
 }
 
@@ -3000,6 +3036,7 @@ fn prebind_scope_declarations(
         }
         let bare = inner.name().to_string();
         scope.current_local_names.insert(bare.clone());
+        scope.checked_local_ids.remove(&bare);
         let qualified = if unqualified_local {
             bare.clone()
         } else {
@@ -3010,6 +3047,7 @@ fn prebind_scope_declarations(
             Decl::DataDecl { ctors, .. } => {
                 for ctor in ctors {
                     scope.current_local_names.insert(ctor.name.clone());
+                    scope.checked_local_ids.remove(&ctor.name);
                     let qualified = qualify(prefix, &ctor.name);
                     scope.bind_local(&ctor.name, &qualified, &ctor.span)?;
                 }
@@ -3021,6 +3059,7 @@ fn prebind_scope_declarations(
                         ExplicitDataCtor::Signature { name, span, .. } => (name, span),
                     };
                     scope.current_local_names.insert(name.clone());
+                    scope.checked_local_ids.remove(name);
                     let qualified = qualify(prefix, name);
                     scope.bind_local(name, &qualified, span)?;
                 }
@@ -3770,6 +3809,9 @@ fn expand_scope(
                             rdecl,
                             pending_fixity_for(&declared_fixities, &rdecl.name),
                         )?;
+                        record_checked_local(
+                            scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
+                        );
                         ids.push(result);
                     } else {
                         let members: Vec<crate::resolve::RDecl> =
@@ -3846,6 +3888,9 @@ fn expand_scope(
                         for (rdecl, result) in members.iter().zip(results) {
                             register_effect_row(elab, &result);
                             register_declared_effect_row(elab, rdecl)?;
+                            record_checked_local(
+                                scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
+                            );
                             ids.push(result);
                         }
                     }
@@ -3958,6 +4003,28 @@ fn expand_scope(
                         &rdecl,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
+                    record_checked_local(scope, &bare, &result.name, result.def_id);
+                    match inner {
+                        Decl::DataDecl { ctors, .. } => {
+                            for ctor in ctors {
+                                let canonical = qualify(prefix, &ctor.name);
+                                let id = elab.globals[&canonical];
+                                record_checked_local(scope, &ctor.name, &canonical, id);
+                            }
+                        }
+                        Decl::ExplicitDataDecl { ctors, .. } => {
+                            for ctor in ctors {
+                                let name = match ctor {
+                                    ExplicitDataCtor::Simple(ctor) => &ctor.name,
+                                    ExplicitDataCtor::Signature { name, .. } => name,
+                                };
+                                let canonical = qualify(prefix, name);
+                                let id = elab.globals[&canonical];
+                                record_checked_local(scope, name, &canonical, id);
+                            }
+                        }
+                        _ => {}
+                    }
                     if let Decl::PropDecl { intros, .. } = inner {
                         let mut checked_intros = Vec::with_capacity(intros.len());
                         for intro in intros {
@@ -4027,6 +4094,7 @@ fn expand_scope(
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
                     if matches!(inner, Decl::ClassDecl { .. }) {
+                        record_checked_local(scope, inner.name(), &result.name, result.def_id);
                         // Class-bearing references lack RCon. Once this local
                         // declaration is checked, pin later constraints and
                         // instances in THIS scope to its ID, including private
@@ -4563,6 +4631,95 @@ mod namespace_effect_tests {
         }
     }
 
+    /// Promise class: durable invariant (spec 33 §3.3).
+    ///
+    /// MEASURED: the file import and a newly declared inline local use the
+    /// same canonical spelling but different checked identities. Their
+    /// collision refuses in both textual orders, including when `x` is not
+    /// used. Isolated local and import controls both resolve to the intended
+    /// checked ID. CLAIMED: a stale global cannot certify a prebound current
+    /// local as the same declaration as an import. THE GAP: the existing
+    /// ambient-local same-ID control separately keeps genuine repeated routes
+    /// idempotent after that local is already checked.
+    #[test]
+    fn current_local_refuses_stale_same_spelling_import_in_either_order() {
+        let prepared = || {
+            let root = inline_owner_root("pub const x : Nat = Zero\n");
+            fs::write(root.path().join("P.ken"), "export A (x)\n")
+                .expect("write file facade");
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "P")
+                .expect("load checked file provider and facade");
+            let file_id = env.module_state.file_export_ids["A"]["A"]["x"];
+            assert_eq!(env.globals["A.x"], file_id);
+            (env, root, file_id)
+        };
+
+        let (mut local, _root, file_id) = prepared();
+        local.elaborate_file(
+            "module A { const x : Nat = Suc Zero const y : Nat = x }",
+        ).expect("local-only source checks");
+        let local_id = local.globals["A.x"];
+        assert_ne!(file_id, local_id, "new local mints a distinct identity");
+        match local.env.lookup(local.globals["A.y"]) {
+            Some(ken_kernel::Decl::Transparent { body, .. }) => {
+                assert!(matches!(body, ken_kernel::Term::Const { id, .. } if *id == local_id));
+            }
+            other => panic!("local-only y must select its local x: {other:?}"),
+        }
+
+        let (mut imported, _root, imported_id) = prepared();
+        imported.elaborate_file("module A { import P (x) const y : Nat = x }")
+            .expect("import-only source checks");
+        match imported.env.lookup(imported.globals["A.y"]) {
+            Some(ken_kernel::Decl::Transparent { body, .. }) => {
+                assert!(matches!(body, ken_kernel::Term::Const { id, .. } if *id == imported_id));
+            }
+            other => panic!("import-only y must select the file x: {other:?}"),
+        }
+
+        for (source, pending) in [
+            ("module A { import P (x) const x : Nat = Suc Zero const y : Nat = Zero }", true),
+            ("module A { const x : Nat = Suc Zero import P (x) const y : Nat = Zero }", false),
+        ] {
+            let (mut env, _root, selected_id) = prepared();
+            assert_eq!(env.globals["A.x"], selected_id);
+            match env.elaborate_file(source) {
+                Err(ElabError::AmbiguousReference { name, sources, .. }) => {
+                    assert_eq!(name, "x");
+                    assert_eq!(sources.len(), 2);
+                    assert!(sources[0].contains(if pending { "pending local" } else { "local g" }),
+                        "local identity must be attributed honestly: {sources:?}");
+                    assert!(sources[1].contains(&format!("import {selected_id:?}")),
+                        "the selected file identity must be attributed: {sources:?}");
+                }
+                other => panic!("a current local cannot coalesce with stale file ID: {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3).
+    ///
+    /// MEASURED: after a current local is checked, an earlier inline child
+    /// re-exporting that exact ID may be imported back under the same bare
+    /// name. A canonical-spelling comparison alone is not the positive; the
+    /// checked export ID, local ID, and use in `y` must all coincide.
+    #[test]
+    fn checked_current_local_and_its_inline_reexport_are_one_identity() {
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_file(
+            "const x : Nat = Zero module Provider { export x } import Provider (x) const y : Nat = x",
+        ).expect("re-importing the local's exact checked ID is idempotent");
+        let local_id = env.globals["x"];
+        assert_eq!(env.module_state.export_provenance["Provider"].member_ids["Provider"]["x"], local_id);
+        match env.env.lookup(env.globals["y"]) {
+            Some(ken_kernel::Decl::Transparent { body, .. }) => {
+                assert!(matches!(body, ken_kernel::Term::Const { id, .. } if *id == local_id));
+            }
+            other => panic!("re-imported y must select the same checked x: {other:?}"),
+        }
+    }
+
     fn env_with_ambient_item_and_facade() -> (ElabEnv, GlobalId) {
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_file(
@@ -4640,35 +4797,26 @@ mod namespace_effect_tests {
         );
     }
 
-    /// Promise class: durable invariant.
+    /// Promise class: durable invariant (spec 33 §3.3).
     ///
-    /// MEASURED: `apply_import` accepts the facade route when its import is
-    /// textually above a local redeclaration prebound for the complete scope,
-    /// and the later declaration allocates a fresh identity. CLAIMED: ordered
-    /// application does not mistake the prebound same-identity local for a
-    /// distinct source. THE GAP: the changed id proves the later local ran.
+    /// MEASURED: an ambient facade and the prior local have one checked ID,
+    /// but the newly prebound local has none until admission. Importing the
+    /// old identity above that new local is ambiguous before any new ID is
+    /// minted. CLAIMED: a previously lawful ambient route cannot certify a
+    /// future declaration by equality with stale globals. THE GAP: the
+    /// import-only and checked-local same-ID controls above remain positive.
     #[test]
-    fn apply_import_accepts_the_same_identity_above_the_local() {
+    fn apply_import_rejects_stale_ambient_identity_above_current_local() {
         let (mut env, item_before) = env_with_ambient_item_and_facade();
 
-        env.elaborate_file(
+        let result = env.elaborate_file(
             "import Provider (item) \
              const item : Nat = Zero",
-        )
-        .expect("an import above the prebound local must accept its ambient identity");
-
-        assert_ne!(
-            env.globals["item"], item_before,
-            "the local below the import must still elaborate"
         );
-        assert_eq!(
-            env.module_state
-                .root_scope
-                .bindings
-                .get("item")
-                .map(String::as_str),
-            Some("item")
-        );
+        assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
+            if name == "item"), "new local must not coalesce with ambient provider: {result:?}");
+        assert_eq!(env.globals["item"], item_before,
+            "import-before-local must reject without minting the local");
     }
 
     /// Promise class: normative compatibility vector.
