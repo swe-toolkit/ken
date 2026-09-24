@@ -215,6 +215,55 @@ former), never a `Decl`, so no `trusted_base()` filter path reaches it, and
 the BigInt-equality decision it enables is a kernel *decision* (structurally
 analogous to constructor no-confusion), not a trusted assumption.
 
+## K3 — checked String literal NFC (`ken-kernel`)
+
+`ken-kernel/src/check.rs::declare_checked_string_literal` calls
+`raw.nfc().collect::<String>()` when admitting a kernel-checked String literal.
+This is the kernel's canonical NFC payload, not an elaborator-provided side
+value. The `String → List Char` conversion reads that immutable payload. This
+is required by `spec/30-surface/37 §2.1` and the
+`KERNEL-LITERAL-CHAR-VIEW` frame; moving NFC outside the kernel would make
+conversion trust an unchecked producer.
+
+The new direct kernel dependency is **`unicode-normalization = "=0.1.25"`**
+(default `std` feature). These are its complete resolved transitive crate
+closure for the exercised NFC path. Versions and checksums are from
+`Cargo.lock`; licenses and `unsafe` status were checked against each resolved
+crate's packaged `Cargo.toml` and source, not inferred from its earlier use
+in `ken-elaborator` or `ken-runtime`.
+
+| crate | version | Cargo.lock checksum | license | `unsafe` in exercised code |
+|---|---:|---|---|---|
+| `unicode-normalization` (direct) | `=0.1.25` | `5fd4f6878c9cb28d874b009da9e8d183b5abc80117c40bbd187a1fde336be6e8` | MIT OR Apache-2.0 | Yes: scoped `unsafe` in `src/normalize.rs`, detailed below |
+| `tinyvec` (transitive) | `1.11.0` | `3e61e67053d25a4e82c844e8424039d9745781b3fc4f32b8d55ed50f5f667ef3` | Zlib OR Apache-2.0 OR MIT | None: `src/lib.rs` forbids `unsafe_code` |
+| `tinyvec_macros` (transitive via `tinyvec/alloc`) | `0.1.1` | `1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20` | MIT OR Apache-2.0 OR Zlib | None: `src/lib.rs` forbids `unsafe_code` |
+
+`&str::nfc()` constructs a canonical `Recompositions` iterator over a
+canonical `Decompositions` iterator, then standard `String` collection.
+The iterators buffer combining characters in `tinyvec::TinyVec`; the
+`unicode-normalization` crate depends on `tinyvec` with `alloc` enabled,
+which brings `tinyvec_macros`. `unicode-normalization` has a crate-level
+`deny(unsafe_code)` but locally permits `unsafe` in `src/normalize.rs`:
+canonical decomposition checks `is_hangul_syllable` before calling
+`decompose_hangul`, whose `char::from_u32_unchecked` emits bounded Hangul
+Jamo; canonical recomposition calls `compose_hangul`, whose leading/vowel
+and syllable/trailing range guards precede its two
+`char::from_u32_unchecked` scalar constructions. These branches are
+reachable for Hangul literal input, even though plain ASCII does not enter
+them. No other upstream `unsafe` site was found in the packaged
+`unicode-normalization-0.1.25/src/` tree; both resolved `tinyvec` crates
+forbid `unsafe_code` outright. This is source-path accounting, not a proof
+that upstream code is memory-safe.
+
+**TCB scope:** this is a new external-code addition to the **compiled
+`ken-kernel` trusted computing base**, despite the same dependency's prior
+presence in outer crates and the existing lockfile. It changes no Ken
+`Decl` and adds **zero `trusted_base()` declaration identities**; zero IDs
+is a separate fact, not zero TCB growth. `Cargo.lock` already resolved all
+three versions/checksums above before the exact direct pin, so the pin
+requires no lockfile content change. CI's locked build verifies the resolved
+artifacts on publication.
+
 ## Elaborator `IntLit` emission (`ken-elaborator`) — ADR 0013 Layer 2
 ## fast-follow
 

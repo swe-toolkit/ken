@@ -16,4 +16,4 @@ rust-version.workspace = true
 num-bigint = "=0.4.6"
 # NFC canonicalization at the kernel-checked literal registration boundary.
 # Same existing dependency used by the elaborator and runtime.
-unicode-normalization = "0.1"
+unicode-normalization = "=0.1.25"
