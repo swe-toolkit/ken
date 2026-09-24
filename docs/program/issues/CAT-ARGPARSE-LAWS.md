@@ -108,9 +108,12 @@ The chain is at HS2. A third advancing hard stop invokes Research.
   In addition, **exactly one** private, transparent, proof-only single-token
   **`Cons`-step full-parser-outcome adapter** may be added, parameterized by
   the outcomes the proof splits on (for example the selected
-  `Option OptionSpec`, and the prefix `Bool` in the `None` branch). Any other
-  helper that selects tokens or recurses as a parser is prohibited,
-  whatever it is called.
+  `Option OptionSpec`, and the prefix `Bool` in the `None` branch). It
+  recurses only through the original parser on tails. Prohibited, whatever
+  it is called: any other full-`Validation` `Cons`-step outcome helper, and
+  any independently recursive function that assembles `ParsedArgument` or
+  `Diagnostic` parser results. Recursive observations that project only an
+  expected `List Bytes`, such as `argparse_input_value_bytes`, are allowed.
   - It calls the existing `argparse_parse_tokens` for recursive tails and
     the existing `argparse_cons_validations` and `argparse_error` for
     assembly. It never recurses as an independent parser.
