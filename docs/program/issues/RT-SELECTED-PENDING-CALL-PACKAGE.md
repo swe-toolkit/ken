@@ -1,7 +1,7 @@
 ---
 id: RT-SELECTED-PENDING-CALL-PACKAGE
 title: "design, before any code, a typed activation-owned selected pending-call package carried beside the pending ITree word from the executed source arm through the six transport families to a one-event consuming call gate, with a runtime call-event authority, so the four px7l/px7m rows have a legitimate package to check; bounded D0 census of the present substrate first, then a D1 pre-code specification; STOP and park only if D1 cannot specify owner, extent, identity or a complete route"
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: architect
