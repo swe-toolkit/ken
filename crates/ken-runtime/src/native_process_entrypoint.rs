@@ -311,7 +311,7 @@ fn list_value(values: impl IntoIterator<Item = RuntimeValue>) -> RuntimeValue {
 pub fn run_native_process_entrypoint(
     input: &NativeProcessInput,
     entrypoint: &RuntimeExpr,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> NativeProcessOutcome {
     let stderr = io::stderr();
     run_native_process_entrypoint_with_stderr(input, entrypoint, profile, &mut stderr.lock())
@@ -320,7 +320,7 @@ pub fn run_native_process_entrypoint(
 pub fn run_native_process_entrypoint_with_stderr<W>(
     input: &NativeProcessInput,
     entrypoint: &RuntimeExpr,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     stderr: &mut W,
 ) -> NativeProcessOutcome
 where
