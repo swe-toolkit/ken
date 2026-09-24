@@ -1394,17 +1394,59 @@ fn check_region_reservation(
     }
 }
 
+fn region_table_reservation_failure(
+    resource: crate::boundary_resource_profile::BoundaryResource,
+    backing_capacity: usize,
+    requested: u128,
+) -> BoundaryReservationFailureV1 {
+    use crate::boundary_resource_profile::BoundaryResource;
+    // Nodes occupy NODE_WORDS u64 cells each. All other tables' cells
+    // already use the unit named by their resource.
+    let limit = match resource {
+        BoundaryResource::Nodes => backing_capacity / NODE_WORDS,
+        BoundaryResource::Words | BoundaryResource::DataBytes | BoundaryResource::NativeIntLimbs => {
+            backing_capacity
+        }
+    };
+    BoundaryReservationFailureV1 { resource, limit: limit as u128, requested }
+}
+
 fn reserve_region_table<T>(
     table: &mut Vec<T>,
     length: usize,
     resource: crate::boundary_resource_profile::BoundaryResource,
     requested: u128,
 ) -> Result<(), BoundaryReservationFailureV1> {
-    table.try_reserve_exact(length - table.len()).map_err(|_| BoundaryReservationFailureV1 {
-        resource,
-        limit: table.capacity() as u128,
-        requested,
+    table.try_reserve_exact(length - table.len()).map_err(|_| {
+        region_table_reservation_failure(resource, table.capacity(), requested)
     })
+}
+
+#[cfg(test)]
+mod reservation_units_tests {
+    use super::*;
+    use crate::boundary_resource_profile::BoundaryResource;
+
+    #[test]
+    fn reservation_failure_reports_nodes_in_logical_nodes_not_backing_cells() {
+        let physical_cells = 3 * NODE_WORDS + 1;
+        assert_eq!(
+            region_table_reservation_failure(BoundaryResource::Nodes, physical_cells, 4),
+            BoundaryReservationFailureV1 {
+                resource: BoundaryResource::Nodes,
+                limit: 3,
+                requested: 4,
+            }
+        );
+        assert_eq!(
+            region_table_reservation_failure(BoundaryResource::Words, physical_cells, 4),
+            BoundaryReservationFailureV1 {
+                resource: BoundaryResource::Words,
+                limit: physical_cells as u128,
+                requested: 4,
+            }
+        );
+    }
 }
 
 impl BoundaryRegion {
@@ -1571,7 +1613,6 @@ impl BoundaryRegion {
         // table. The physical Vec maximum is a distinct bound from the
         // deployment profile, retained in the owner's typed error.
         let node_request = self.live_nodes as u128 + nodes as u128;
-        let node_words_request = node_request * NODE_WORDS as u128;
         let node_count = check_region_reservation(
             BoundaryResource::Nodes, node_request,
             (isize::MAX as usize / std::mem::size_of::<u64>()) / NODE_WORDS,
@@ -1591,7 +1632,7 @@ impl BoundaryRegion {
             isize::MAX as usize / std::mem::size_of::<u64>(),
         )?;
         let node_words = node_count * NODE_WORDS;
-        reserve_region_table(&mut self.nodes, node_words, BoundaryResource::Nodes, node_words_request)?;
+        reserve_region_table(&mut self.nodes, node_words, BoundaryResource::Nodes, node_request)?;
         reserve_region_table(&mut self.words, word_count, BoundaryResource::Words, word_request)?;
         reserve_region_table(&mut self.names, word_count, BoundaryResource::Words, word_request)?;
         reserve_region_table(&mut self.data, data_count, BoundaryResource::DataBytes, data_request)?;
