@@ -1,7 +1,7 @@
 ---
 id: RT-INVOCATION-RESOURCE-PRECURSOR
 title: "Pending-call precursor: named finite invocation-profile resources reserved at BoundaryActivationV1::begin, a runtime-wide no-wrap epoch, an activation-owned bounded slot and generation issuer behind a checked services ABI, and a typed CapacityExhausted fault carried end to end, so a selected call can be authenticated exactly once; not the pending-call build"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: architect
