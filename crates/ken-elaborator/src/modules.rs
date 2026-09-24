@@ -68,6 +68,9 @@ pub struct ModuleState {
     /// descendants it declared. A later in-memory owner may replace the
     /// global tables at these canonical spellings without changing this file.
     file_export_tables: FileExportTables,
+    /// Checked IDs from exactly those file tables, captured before another
+    /// unit can overwrite the same canonical spelling in `globals`.
+    file_export_ids: HashMap<String, ProviderExportIds>,
     /// Current export table → its own paths and origin, replaced at the same
     /// site as `exports` (file-backed or in-memory, without a fixed priority).
     export_provenance: HashMap<String, ExportProvenance>,
@@ -100,11 +103,15 @@ pub struct ModuleState {
 }
 
 type FileExportTables = HashMap<String, HashMap<String, HashMap<String, String>>>;
+type ProviderExportIds = HashMap<String, HashMap<String, ken_kernel::GlobalId>>;
 
 #[derive(Clone)]
 struct ExportProvenance {
     inline_paths: HashSet<String>,
     file_root: Option<String>,
+    /// Per-canonical-module public name → checked declaration identity,
+    /// including owned inline descendants and selected facade identities.
+    member_ids: ProviderExportIds,
 }
 
 /// The complete Ken-defined always-present type floor (`30-taxonomy §4`).
@@ -287,6 +294,13 @@ struct Scope {
     /// prefix. A later memory owner may replace `exports[canonical]` without
     /// changing a previously imported file's public interface.
     file_prefix_exports: HashMap<String, HashMap<String, String>>,
+    /// Fully spelled imported member → identity selected by that provider.
+    /// Bare selective aliases are separate: their spelling has no prefix.
+    qualified_ids: HashMap<String, ken_kernel::GlobalId>,
+    binding_ids: HashMap<String, ken_kernel::GlobalId>,
+    /// Export-name ID overrides for facade/in-scope republishing. A canonical
+    /// spelling alone can no longer recover the imported provider's ID.
+    exported_ids: HashMap<String, ken_kernel::GlobalId>,
     /// Names mentioned by a facade export remain deliberately unavailable to
     /// the body unless a separate import/local binding supplies them. Keeping
     /// this negative fact makes the normative facade-vs-binding failure an
@@ -308,6 +322,7 @@ impl Scope {
         globals: &HashMap<String, ken_kernel::GlobalId>,
         bare: &str,
         qualified: &str,
+        selected_id: Option<ken_kernel::GlobalId>,
         span: &Span,
     ) -> Result<(), ElabError> {
         if self.locals.contains(bare) {
@@ -316,7 +331,7 @@ impl Scope {
                 Some(local) => globals.get(local),
                 None => globals.get(bare),
             };
-            let imported_id = globals.get(qualified);
+            let imported_id = selected_id.as_ref().or_else(|| globals.get(qualified));
             if local_id
                 .zip(imported_id)
                 .is_some_and(|(local, imported)| local == imported)
@@ -342,7 +357,17 @@ impl Scope {
                 self.bindings
                     .insert(bare.to_string(), qualified.to_string());
             }
-            Some(existing) if existing == qualified => {}
+            Some(existing) if existing == qualified => {
+                if let Some((old, new)) = self.binding_ids.get(bare).zip(selected_id.as_ref()) {
+                    if old != new {
+                        return Err(ElabError::AmbiguousReference {
+                            name: bare.to_string(),
+                            sources: vec![format!("{existing} {old:?}"), format!("{qualified} {new:?}")],
+                            span: span.clone(),
+                        });
+                    }
+                }
+            }
             Some(existing) => {
                 return Err(ElabError::AmbiguousReference {
                     name: bare.to_string(),
@@ -350,6 +375,9 @@ impl Scope {
                     span: span.clone(),
                 });
             }
+        }
+        if let Some(id) = selected_id {
+            self.binding_ids.insert(bare.to_string(), id);
         }
         Ok(())
     }
@@ -471,6 +499,24 @@ fn resolve_ref(
 /// Resolve a class-environment reference through the unit's class namespace.
 /// Class-bearing declarations do not carry an RCon, so this is their single
 /// strict choke, parallel to [`resolve_ref`] for globals-routed forms.
+/// Return the selected provider's checked identity with its display name.
+/// Locals and unresolved SCC members have no ID yet and keep the existing
+/// string route until they are checked; imported members never re-lookup one.
+fn resolve_checked_ref(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    name: &str,
+    span: &Span,
+) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
+    let canonical = resolve_ref(scope, exports, name, span)?;
+    let selected = scope
+        .qualified_ids
+        .get(name)
+        .or_else(|| scope.binding_ids.get(name))
+        .copied();
+    Ok((canonical, selected))
+}
+
 fn resolve_class_ref(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
@@ -553,6 +599,7 @@ fn authorize_inline_descendants(
     inline_children: &HashMap<String, HashSet<String>>,
     owned_paths: &HashSet<String>,
     file_tables: Option<&HashMap<String, HashMap<String, String>>>,
+    member_ids: Option<&ProviderExportIds>,
     canonical: &str,
     surface: &str,
 ) {
@@ -572,6 +619,9 @@ fn authorize_inline_descendants(
                     .expect("inline declaration edge must name a direct child");
                 let surface_child = qualify(&alias, leaf);
                 scope.prefixes.insert(surface_child.clone(), child.clone());
+                if let Some(ids) = member_ids {
+                    bind_provider_members(scope, &surface_child, child, ids);
+                }
                 if let Some(tables) = file_tables {
                     let pubmap = tables
                         .get(child)
@@ -592,6 +642,7 @@ fn apply_import(
     inline_children: &HashMap<String, HashSet<String>>,
     file_inline_paths: &HashMap<String, HashSet<String>>,
     file_export_tables: &FileExportTables,
+    file_export_ids: &HashMap<String, ProviderExportIds>,
     export_provenance: &HashMap<String, ExportProvenance>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
@@ -646,6 +697,10 @@ fn apply_import(
         }
     };
     let file_tables = provider_file.and_then(|root| file_export_tables.get(root));
+    let selected_ids = match provider_file {
+        Some(file) => file_export_ids.get(file),
+        None => export_provenance.get(&canonical).map(|owner| &owner.member_ids),
+    };
     let pubmap = match provider_file {
         Some(_) => file_tables.and_then(|tables| tables.get(&canonical)),
         None => exports.get(&canonical),
@@ -672,8 +727,14 @@ fn apply_import(
                 .file_prefix_exports
                 .retain(|alias, _| alias != surface && !alias.starts_with(&descendant_prefix));
             scope
+                .qualified_ids
+                .retain(|name, _| !name.starts_with(&descendant_prefix));
+            scope
                 .prefixes
                 .insert(surface.to_string(), canonical.clone());
+            if let Some(ids) = selected_ids {
+                bind_provider_members(scope, surface, &canonical, ids);
+            }
             if let Some(tables) = file_tables {
                 scope
                     .file_prefix_exports
@@ -684,6 +745,7 @@ fn apply_import(
                         inline_children,
                         paths,
                         Some(tables),
+                        selected_ids,
                         &canonical,
                         surface,
                     );
@@ -694,6 +756,7 @@ fn apply_import(
                     inline_children,
                     paths,
                     None,
+                    selected_ids,
                     &canonical,
                     surface,
                 );
@@ -708,10 +771,15 @@ fn apply_import(
                         span: span.clone(),
                     })?;
                 let bare = item.rename.as_deref().unwrap_or(&item.name);
+                let selected_id = selected_ids
+                    .and_then(|ids| ids.get(&canonical))
+                    .and_then(|members| members.get(&item.name))
+                    .copied()
+                    .or_else(|| globals.get(q).copied());
                 if prelude_binding_names.contains(bare) {
                     let same_canonical_identity = globals
                         .get(bare)
-                        .zip(globals.get(q))
+                        .zip(selected_id.as_ref())
                         .is_some_and(|(installed, incoming)| installed == incoming);
                     if !same_canonical_identity {
                         return Err(ElabError::AmbiguousReference {
@@ -721,7 +789,7 @@ fn apply_import(
                         });
                     }
                 }
-                scope.bind_import(globals, bare, q, span)?;
+                scope.bind_import(globals, bare, q, selected_id, span)?;
             }
         }
     }
@@ -783,6 +851,37 @@ fn certify_standard_operator_home(
     Ok(())
 }
 
+fn checked_export_ids(
+    scope: &Scope,
+    exports: &HashMap<String, String>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+) -> HashMap<String, ken_kernel::GlobalId> {
+    exports
+        .iter()
+        .filter_map(|(surface, canonical)| {
+            scope
+                .exported_ids
+                .get(surface)
+                .copied()
+                .or_else(|| globals.get(canonical).copied())
+                .map(|id| (surface.clone(), id))
+        })
+        .collect()
+}
+
+fn bind_provider_members(
+    scope: &mut Scope,
+    surface: &str,
+    canonical: &str,
+    member_ids: &ProviderExportIds,
+) {
+    if let Some(members) = member_ids.get(canonical) {
+        for (leaf, id) in members {
+            scope.qualified_ids.insert(qualify(surface, leaf), *id);
+        }
+    }
+}
+
 fn publish_identity(
     exports_here: &mut HashMap<String, String>,
     surface_name: &str,
@@ -806,6 +905,29 @@ fn publish_identity(
 
 /// Publish only checked helpers belonging to the exact exported `prop` family.
 /// A rename changes the visible family path, never the helper's canonical ID.
+fn publish_checked_identity(
+    scope: &mut Scope,
+    exports_here: &mut HashMap<String, String>,
+    surface: &str,
+    canonical: &str,
+    id: ken_kernel::GlobalId,
+    span: &Span,
+) -> Result<(), ElabError> {
+    if let Some(existing_id) = scope.exported_ids.get(surface) {
+        if *existing_id != id {
+            return Err(ElabError::ReExportCollision {
+                surface_name: surface.to_string(),
+                existing: format!("{} {existing_id:?}", exports_here[surface]),
+                incoming: format!("{canonical} {id:?}"),
+                span: span.clone(),
+            });
+        }
+    }
+    publish_identity(exports_here, surface, canonical, span)?;
+    scope.exported_ids.insert(surface.to_string(), id);
+    Ok(())
+}
+
 fn publish_family_intros(
     exports_here: &mut HashMap<String, String>,
     prop_intros: &HashMap<String, Vec<String>>,
@@ -834,6 +956,8 @@ fn apply_export(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
     file_export_tables: &FileExportTables,
+    file_export_ids: &HashMap<String, ProviderExportIds>,
+    export_provenance: &HashMap<String, ExportProvenance>,
     selected_file: Option<&str>,
     prop_intros: &HashMap<String, Vec<String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
@@ -861,7 +985,18 @@ fn apply_export(
                         span: span.clone(),
                     })?;
                 let surface = published_name(item);
-                publish_identity(exports_here, surface, canonical, span)?;
+                let selected_id = selected_file
+                    .and_then(|file| file_export_ids.get(file))
+                    .or_else(|| export_provenance.get(module).map(|owner| &owner.member_ids))
+                    .and_then(|ids| ids.get(module))
+                    .and_then(|members| members.get(&item.name))
+                    .copied()
+                    .or_else(|| globals.get(canonical).copied())
+                    .ok_or_else(|| ElabError::UnboundName {
+                        name: format!("{module}.{}", item.name),
+                        span: span.clone(),
+                    })?;
+                publish_checked_identity(scope, exports_here, surface, canonical, selected_id, span)?;
                 publish_family_intros(exports_here, prop_intros, surface, canonical, span)?;
                 for name in [item.name.as_str(), surface] {
                     if !scope.bindings.contains_key(name) && !globals.contains_key(name) {
@@ -881,7 +1016,19 @@ fn apply_export(
                     });
                 }
                 let surface = published_name(item);
-                publish_identity(exports_here, surface, &canonical, span)?;
+                let selected_id = scope
+                    .qualified_ids
+                    .get(&item.name)
+                    .or_else(|| scope.binding_ids.get(&item.name))
+                    .copied()
+                    .or_else(|| globals.get(&canonical).copied())
+                    .ok_or_else(|| ElabError::UnboundName {
+                        name: item.name.clone(),
+                        span: span.clone(),
+                    })?;
+                publish_checked_identity(
+                    scope, exports_here, surface, &canonical, selected_id, span,
+                )?;
                 publish_family_intros(exports_here, prop_intros, surface, &canonical, span)?;
             }
         }
@@ -1237,9 +1384,26 @@ fn load_unit(
             })
             .collect();
         file_tables.insert(module.to_string(), exports.clone());
+        let mut member_ids: ProviderExportIds = owned_paths
+            .iter()
+            .filter_map(|path| {
+                elab.module_state
+                    .export_provenance
+                    .get(path)
+                    .and_then(|owner| owner.member_ids.get(path))
+                    .map(|ids| (path.clone(), ids.clone()))
+            })
+            .collect();
+        member_ids.insert(
+            module.to_string(),
+            checked_export_ids(&scope, &exports, &elab.globals),
+        );
         elab.module_state
             .file_export_tables
             .insert(module.to_string(), file_tables);
+        elab.module_state
+            .file_export_ids
+            .insert(module.to_string(), member_ids.clone());
         elab.module_state
             .file_inline_paths
             .insert(module.to_string(), owned_paths.clone());
@@ -1248,6 +1412,7 @@ fn load_unit(
             ExportProvenance {
                 inline_paths: owned_paths,
                 file_root: Some(module.to_string()),
+                member_ids,
             },
         );
         elab.module_state
@@ -1565,9 +1730,13 @@ fn rewrite_rtype_inner(
     Ok(match ty {
         RType::RCon(name, span) if kernel_head == Some(name.as_str()) => RType::RCon(name, span),
         RType::RCon(name, span) => {
-            let n = resolve_ref(scope, exports, &name, &span)?;
-            RType::RCon(n, span)
+            let (name, selected) = resolve_checked_ref(scope, exports, &name, &span)?;
+            match selected {
+                Some(id) => RType::RCheckedGlobal { name, id, span },
+                None => RType::RCon(name, span),
+            }
         }
+        RType::RCheckedGlobal { name, id, span } => RType::RCheckedGlobal { name, id, span },
         RType::RVarTy(i, n, s) => RType::RVarTy(i, n, s),
         RType::RPatternAliasTy(slot, name, span) => RType::RPatternAliasTy(slot, name, span),
         RType::RUniv(l, s) => RType::RUniv(l, s),
@@ -1666,9 +1835,13 @@ fn rewrite_rexpr_inner(
     Ok(match e {
         RExpr::RCon(name, span) if kernel_head == Some(name.as_str()) => RExpr::RCon(name, span),
         RExpr::RCon(name, span) => {
-            let n = resolve_ref(scope, exports, &name, &span)?;
-            RExpr::RCon(n, span)
+            let (name, selected) = resolve_checked_ref(scope, exports, &name, &span)?;
+            match selected {
+                Some(id) => RExpr::RCheckedGlobal { name, id, span },
+                None => RExpr::RCon(name, span),
+            }
         }
+        RExpr::RCheckedGlobal { name, id, span } => RExpr::RCheckedGlobal { name, id, span },
         RExpr::RVar(i, n, s) => RExpr::RVar(i, n, s),
         RExpr::RPatternAlias(slot, n, s) => RExpr::RPatternAlias(slot, n, s),
         RExpr::RRecursiveResult {
@@ -2629,6 +2802,7 @@ fn prebind_scope_declarations(
     inline_children: &HashMap<String, HashSet<String>>,
     file_inline_paths: &HashMap<String, HashSet<String>>,
     file_export_tables: &FileExportTables,
+    file_export_ids: &HashMap<String, ProviderExportIds>,
     export_provenance: &HashMap<String, ExportProvenance>,
     exports_here: &mut HashMap<String, String>,
 ) -> Result<(), ElabError> {
@@ -2694,6 +2868,7 @@ fn prebind_scope_declarations(
         inline_children,
         file_inline_paths,
         file_export_tables,
+        file_export_ids,
         export_provenance,
         exports_here,
     )
@@ -2712,6 +2887,7 @@ fn prebind_synthesized_dictionaries(
     inline_children: &HashMap<String, HashSet<String>>,
     file_inline_paths: &HashMap<String, HashSet<String>>,
     file_export_tables: &FileExportTables,
+    file_export_ids: &HashMap<String, ProviderExportIds>,
     export_provenance: &HashMap<String, ExportProvenance>,
     exports_here: &mut HashMap<String, String>,
 ) -> Result<(), ElabError> {
@@ -2742,6 +2918,7 @@ fn prebind_synthesized_dictionaries(
                     inline_children,
                     file_inline_paths,
                     file_export_tables,
+                    file_export_ids,
                     export_provenance,
                     globals,
                     prelude_binding_names,
@@ -3044,6 +3221,7 @@ fn expand_scope(
     }
 
     let mut exports_here: HashMap<String, String> = HashMap::new();
+    scope.exported_ids.clear();
     prebind_scope_declarations(
         scope,
         decls,
@@ -3057,6 +3235,7 @@ fn expand_scope(
         &elab.module_state.inline_children,
         &elab.module_state.file_inline_paths,
         &elab.module_state.file_export_tables,
+        &elab.module_state.file_export_ids,
         &elab.module_state.export_provenance,
         &mut exports_here,
     )?;
@@ -3094,6 +3273,7 @@ fn expand_scope(
                     &elab.module_state.inline_children,
                     &elab.module_state.file_inline_paths,
                     &elab.module_state.file_export_tables,
+                    &elab.module_state.file_export_ids,
                     &elab.module_state.export_provenance,
                     &elab.globals,
                     &elab.module_state.prelude_binding_names,
@@ -3133,6 +3313,8 @@ fn expand_scope(
                     scope,
                     &elab.module_state.exports,
                     &elab.module_state.file_export_tables,
+                    &elab.module_state.file_export_ids,
+                    &elab.module_state.export_provenance,
                     selected_file,
                     &elab.module_state.prop_intros,
                     &elab.globals,
@@ -3205,11 +3387,26 @@ fn expand_scope(
                     .collect();
                 // Install provider provenance at the same site as its export
                 // table, for file-backed and in-memory inline owners alike.
+                let mut member_ids: ProviderExportIds = owned_paths
+                    .iter()
+                    .filter_map(|path| {
+                        elab.module_state
+                            .export_provenance
+                            .get(path)
+                            .and_then(|owner| owner.member_ids.get(path))
+                            .map(|ids| (path.clone(), ids.clone()))
+                    })
+                    .collect();
+                member_ids.insert(
+                    child_prefix.clone(),
+                    checked_export_ids(&child_scope, &child_exports, &elab.globals),
+                );
                 elab.module_state.export_provenance.insert(
                     child_prefix.clone(),
                     ExportProvenance {
                         inline_paths: owned_paths.clone(),
                         file_root: elab.module_state.active_imports.last().cloned(),
+                        member_ids,
                     },
                 );
                 elab.module_state
@@ -3220,11 +3417,14 @@ fn expand_scope(
                 scope
                     .prefixes
                     .insert(child_prefix.clone(), child_prefix.clone());
+                let selected_ids = &elab.module_state.export_provenance[&child_prefix].member_ids;
+                bind_provider_members(scope, &child_prefix, &child_prefix, selected_ids);
                 authorize_inline_descendants(
                     scope,
                     &elab.module_state.inline_children,
                     &owned_paths,
                     None,
+                    Some(selected_ids),
                     &child_prefix,
                     &child_prefix,
                 );
@@ -3246,6 +3446,7 @@ fn expand_scope(
                     &elab.module_state.inline_children,
                     &elab.module_state.file_inline_paths,
                     &elab.module_state.file_export_tables,
+                    &elab.module_state.file_export_ids,
                     &elab.module_state.export_provenance,
                     &mut exports_here,
                 )?;
@@ -4070,7 +4271,7 @@ mod namespace_effect_tests {
         assert_eq!(before.get("item").map(String::as_str), Some("Owner.item"));
 
         scope
-            .bind_import(&globals, "item", "Provider.item", &Span::new(10, 20))
+            .bind_import(&globals, "item", "Provider.item", None, &Span::new(10, 20))
             .expect("two routes to one resolved identity must be idempotent");
 
         assert_eq!(
@@ -4102,7 +4303,7 @@ mod namespace_effect_tests {
             .bind_local("item", "Owner.item", &Span::new(0, 4))
             .expect("the local producer installs both local and canonical binding state");
 
-        match scope.bind_import(&globals, "item", "Provider.item", &Span::new(10, 20)) {
+        match scope.bind_import(&globals, "item", "Provider.item", None, &Span::new(10, 20)) {
             Err(ElabError::AmbiguousReference { name, sources, .. }) => {
                 assert_eq!(name, "item");
                 assert_eq!(
@@ -5387,6 +5588,72 @@ mod namespace_effect_tests {
             other => panic!("wrong refusal for memory-only leaf: {other:?}"),
         }
         assert!(!env.globals.contains_key("denied"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: a file owner and a later or earlier in-memory owner mint
+    /// distinct checked declarations at the SAME canonical leaf. File B's
+    /// imported alias must select the file's GlobalId even if the mutable
+    /// process-global spelling currently names the in-memory GlobalId; an
+    /// independent memory import must select the in-memory ID. CLAIMED:
+    /// source-to-resolved references carry the chosen provider's identity.
+    /// THE GAP: descendant/export checks alone cannot catch an ID re-lookup.
+    #[test]
+    fn file_import_retains_checked_leaf_identity_across_same_name_memory_owner() {
+        let root = inline_owner_root(
+            "module N { module Q { pub const leak : Nat = Zero } }\n",
+        );
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\nconst selected : Nat = K.N.Q.leak\n",
+        )
+        .expect("write file-backed client");
+        for memory_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let memory_source =
+                "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }";
+            let first_memory_id = if memory_first {
+                env.elaborate_file(memory_source)
+                    .expect("first in-memory A has a checked leaf");
+                Some(env.globals["A.N.Q.leak"])
+            } else {
+                None
+            };
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+                .expect("load file A's checked leaf");
+            let file_id = env.globals["A.N.Q.leak"];
+            let memory_id = if memory_first {
+                first_memory_id
+            } else {
+                env.elaborate_file(memory_source)
+                    .expect("later in-memory A has a distinct checked leaf");
+                Some(env.globals["A.N.Q.leak"])
+            };
+            assert_ne!(file_id, memory_id.expect("both owners are checked"));
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+                .expect("B imports file A even with the memory A in process");
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals["B.selected"])
+                .expect("checked B selection");
+            match body {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, file_id, "memory_first={memory_first}"),
+                other => panic!("file import selected non-constant: {other:?}"),
+            }
+            if !memory_first {
+                env.elaborate_file("import A as M\nconst memory_selected : Nat = M.N.Q.leak")
+                    .expect("separate in-memory importer selects its current owner");
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["memory_selected"])
+                    .expect("checked memory selection");
+                match body {
+                    ken_kernel::Term::Const { id, .. } => assert_eq!(id, memory_id.unwrap()),
+                    other => panic!("memory import selected non-constant: {other:?}"),
+                }
+            }
+        }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).

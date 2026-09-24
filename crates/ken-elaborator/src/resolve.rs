@@ -272,6 +272,9 @@ pub(crate) enum RExpr {
     /// landed per-position occurrence.
     RPatternAlias(usize, String, Span),
     RCon(String, Span),
+    /// Checked identity selected by a module import; unlike RCon this must
+    /// never be re-looked-up through the mutable process-global name table.
+    RCheckedGlobal { name: String, id: GlobalId, span: Span },
     RUniv(Option<u32>, Span),
     RApp(Box<RExpr>, Box<RExpr>, Span),
     RLam(String, Box<RExpr>, Span),
@@ -424,7 +427,9 @@ impl RExpr {
             | RExpr::RBinOp(_, _, _, s)
             | RExpr::RStandardOp { span: s, .. }
             | RExpr::RInfixSpine { span: s, .. } => s,
-            RExpr::RMatch { span, .. } | RExpr::RIf { span, .. } => span,
+            RExpr::RMatch { span, .. }
+            | RExpr::RIf { span, .. }
+            | RExpr::RCheckedGlobal { span, .. } => span,
         }
     }
 }
@@ -440,6 +445,9 @@ pub(crate) enum RType {
     REffectArr(Box<RType>, EffectRowSyntax, Box<RType>, Span),
     RUniv(Option<u32>, Span),
     RCon(String, Span),
+    /// Checked provider identity captured at import resolution, not a name
+    /// to recover later from the mutable globals table.
+    RCheckedGlobal { name: String, id: GlobalId, span: Span },
     RVarTy(usize, String, Span),
     /// A record-pattern binding used in a type annotation in its arm body.
     RPatternAliasTy(usize, String, Span),
@@ -480,6 +488,7 @@ impl RType {
             | RType::RApp(_, _, s)
             | RType::RTrunc(_, s)
             | RType::RProj(_, _, s) => s,
+            RType::RCheckedGlobal { span, .. } => span,
         }
     }
 }

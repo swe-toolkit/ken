@@ -797,6 +797,16 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         }
         RType::RUniv(Some(n), _) => Ok(Term::ty(level_from_nat(*n))),
 
+        RType::RCheckedGlobal { id, .. } => {
+            let id = *id;
+            if cx.env.constructor(id).is_some() {
+                Ok(Term::Constructor { id, level_args: vec![] })
+            } else if cx.env.inductive(id).is_some() {
+                Ok(Term::IndFormer { id, level_args: vec![] })
+            } else {
+                Ok(Term::const_(id, vec![]))
+            }
+        }
         RType::RCon(name, span) => {
             if name == "Omega" {
                 return Ok(Term::omega(Level::Zero));
@@ -8411,6 +8421,20 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             span: span.clone(),
         }),
 
+        RExpr::RCheckedGlobal { name, id, .. } => {
+            let id = *id;
+            if let Some((ind, k)) = cx.env.constructor(id) {
+                let ty = ind.constructors[k].type_.clone();
+                return Ok((Term::Constructor { id, level_args: vec![] }, ty));
+            }
+            if let Some(ind) = cx.env.inductive(id) {
+                return Ok((Term::IndFormer { id, level_args: vec![] }, ind.former_type.clone()));
+            }
+            let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
+                ElabError::Internal(format!("no checked type for imported global '{name}' {id:?}"))
+            })?;
+            Ok((Term::const_(id, vec![]), ty.clone()))
+        }
         RExpr::RCon(name, span) => {
             if let Some((term, ty, install_depth)) = cx.local_dicts.get(name) {
                 let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
@@ -9595,7 +9619,7 @@ fn peel_named_rtype_app<'a>(ty: &'a RType, name: &str, arity: usize) -> Option<V
 /// `instance_search` key lookup (`37 §6`, L3b).
 fn rtype_head_name(ty: &RType) -> String {
     match ty {
-        RType::RCon(name, _) => name.clone(),
+        RType::RCon(name, _) | RType::RCheckedGlobal { name, .. } => name.clone(),
         RType::RApp(f, _, _) => rtype_head_name(f),
         RType::RVarTy(_, name, _) => name.clone(),
         // A truncation head, consistent with head_type_name.
@@ -9654,6 +9678,9 @@ fn instantiate_instance_rtype(ty: &RType, args: &[RType], param_count: usize) ->
 fn rtypes_match(left: &RType, right: &RType) -> bool {
     match (left, right) {
         (RType::RCon(left, _), RType::RCon(right, _)) => left == right,
+        (RType::RCheckedGlobal { id: left, .. }, RType::RCheckedGlobal { id: right, .. }) => left == right,
+        (RType::RCon(left, _), RType::RCheckedGlobal { name: right, .. })
+        | (RType::RCheckedGlobal { name: left, .. }, RType::RCon(right, _)) => left == right,
         (RType::RVarTy(left, _, _), RType::RVarTy(right, _, _)) => left == right,
         (RType::RUniv(left, _), RType::RUniv(right, _)) => left == right,
         (RType::RApp(left_f, left_a, _), RType::RApp(right_f, right_a, _)) => {
@@ -9689,7 +9716,12 @@ fn match_instance_head(
                 }
             }
         }
-        RType::RCon(name, _) => matches!(requested, RType::RCon(other, _) if name == other),
+        RType::RCon(name, _) => matches!(requested,
+            RType::RCon(other, _) if name == other
+        ) || matches!(requested, RType::RCheckedGlobal { name: other, .. } if name == other),
+        RType::RCheckedGlobal { id, .. } => matches!(requested,
+            RType::RCheckedGlobal { id: other, .. } if id == other
+        ),
         RType::RApp(pattern_f, pattern_a, _) => match requested {
             RType::RApp(requested_f, requested_a, _) => {
                 match_instance_head(pattern_f, requested_f, param_count, args)
@@ -10330,6 +10362,7 @@ fn type_contains_effect_row(ty: &RType) -> bool {
         RType::RProj(_, _, _) => false,
         RType::RUniv(_, _)
         | RType::RCon(_, _)
+        | RType::RCheckedGlobal { .. }
         | RType::RVarTy(_, _, _)
         | RType::RPatternAliasTy(_, _, _) => false,
     }
@@ -10652,7 +10685,7 @@ fn infer_expr_row_type(
     projection_ctx: Option<&ProjectionPurityCtx<'_>>,
 ) -> crate::effects::RowType {
     match expr {
-        RExpr::RCon(name, _) => effect_rows
+        RExpr::RCon(name, _) | RExpr::RCheckedGlobal { name, .. } => effect_rows
             .get(name)
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
@@ -12276,7 +12309,10 @@ fn elab_record_decl(
 /// Extract the outermost type constructor name from a resolved type.
 fn head_type_name(ty: &RType) -> String {
     match ty {
-        RType::RCon(s, _) | RType::RVarTy(_, s, _) | RType::RPatternAliasTy(_, s, _) => s.clone(),
+        RType::RCon(s, _)
+        | RType::RCheckedGlobal { name: s, .. }
+        | RType::RVarTy(_, s, _)
+        | RType::RPatternAliasTy(_, s, _) => s.clone(),
         RType::RApp(f, _, _) => head_type_name(f),
         RType::RUniv(_, _) => "Type".to_string(),
         RType::RArr(_, _, _) | RType::REffectArr(_, _, _, _) | RType::RPi(_, _, _, _) => {
@@ -14022,6 +14058,7 @@ pub(crate) fn elaborate_mutual_group(
 pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
     match expr {
         RExpr::RCon(n, _) => n == name,
+        RExpr::RCheckedGlobal { .. } => false,
         RExpr::RVar(_, _, _)
         | RExpr::RPatternAlias(_, _, _)
         | RExpr::RCell(_, _, _)
@@ -14102,6 +14139,7 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
 pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
     match ty {
         RType::RCon(n, _) => n == name,
+        RType::RCheckedGlobal { .. } => false,
         RType::RPi(_, domain, codomain, _)
         | RType::RSigma(_, domain, codomain, _)
         | RType::RArr(domain, codomain, _)
