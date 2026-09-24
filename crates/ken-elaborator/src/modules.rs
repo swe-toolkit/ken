@@ -582,7 +582,7 @@ fn resolve_attached_ref(
         return Ok((format!("{canonical_subject}::{proof_name}"), None));
     }
     Err(ElabError::UnboundName {
-        name: selected,
+        name: format!("{canonical_subject}::{proof_name}"),
         span: span.clone(),
     })
 }
@@ -6292,7 +6292,7 @@ mod namespace_effect_tests {
         )
         .expect("write memory-only attached-proof negative");
         match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Bad") {
-            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "K.id::extra"),
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.id::extra"),
             other => panic!("file import cannot borrow memory-only proof: {other:?}"),
         }
         fs::write(
@@ -6301,7 +6301,7 @@ mod namespace_effect_tests {
         )
         .expect("write memory-only selective selector negative");
         match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "BadDirect") {
-            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "id::extra"),
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.id::extra"),
             other => panic!("selective file subject cannot borrow memory proof: {other:?}"),
         }
         env.elaborate_file(
