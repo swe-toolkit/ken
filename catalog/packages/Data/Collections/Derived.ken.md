@@ -1415,8 +1415,7 @@ reference implementation.
 2. **Public API.** `OrdResult`, `list_append`, `nth`, `take`, `drop`,
    `sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
    `filter`, `mem`, `length`, `min`, `take_drop_decomposition`,
-   `map_length`, `length_take_min` (CAT-3 D1); private `mem_filter` and
-   `mem_filter_sound` (filter-membership backfill); `nth::some_below_length`,
+   `map_length`, `length_take_min` (CAT-3 D1); `nth::some_below_length`,
    `nth::at_or_beyond_is_none` (the two lookup bounds); `reverse`,
    `reverse::involutive`,
    `zip`, `concat_map`, `range`, `foldl` and their proofs (DS-4); `count`,
