@@ -38,9 +38,11 @@ stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-- Move the single existing `idf`, and `comp` with it, into one new small
-  catalog provider with no trusted assumptions in its closure. The name is
-  settled at Architect review. Do not copy or redeclare a second `idf`, add
+- Move the single existing `pub fn idf`, and `pub fn comp` with it, into the
+  new trust-free provider `Core.Function.Combinators` at
+  `catalog/packages/Core/Function/Combinators.ken.md` (name settled by the
+  Architect, `evt_1x2e11te39vmz`). Its closure has no trusted assumptions.
+  LawfulFunctors keeps no copy. Do not copy or redeclare a second `idf`, add
   a private Vector substitute, or put generic functions into
   `Core.Logic.Transport` because it is already imported.
 - LawfulFunctors imports the moved functions and still states and checks
@@ -61,10 +63,13 @@ stop and report the mismatch; do not build around it.
   a set** with a separately fresh compiler base. At `33a2f27c2` this fails
   (112 against 107); on the candidate the sets are equal. A count or a
   relative delta over preloaded providers does not satisfy this AC.
-- **AC-2 (mutation).** Reintroducing only the
-  `Core.Classes.LawfulFunctors` import in Vector reddens the cold-closure
-  check. The unmutated cold load and the Vec proof are the positive
-  controls.
+- **AC-2 (mutation).** In a scratch candidate, add exactly
+  `import Core.Classes.LawfulFunctors (Functor)` to Vector (its
+  `pub class Functor` stays public), keeping the new canonical `idf` import.
+  The mutated Vector must still roots-load and its proof must still check;
+  the cold-closure set-equality assertion **alone** reddens, showing the
+  actual provider closure. Restore and recheck. The unmutated cold Vector
+  check is the positive control.
 - **AC-3 (consumer sweep).** Sweep every provider consumer, import cycle and
   conformance reference to the changed canonical ids. Do not infer
   completeness from a green Vec-only suite. The LawfulFunctors laws and
