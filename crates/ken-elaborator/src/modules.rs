@@ -465,6 +465,8 @@ fn resolve_attached_ref(
 /// file-backed export is never evidence that the path is owned by this scope.
 fn lexical_inline_import(
     prefix: &str,
+    file_root: Option<&str>,
+    unit_inline_modules: Option<&HashSet<String>>,
     module: &str,
     inline_children: &HashMap<String, HashSet<String>>,
 ) -> Option<String> {
@@ -488,8 +490,21 @@ fn lexical_inline_import(
             }
             canonical = child;
         }
-        if fully_declared {
+        // An edge at the file root can predate this file: a separately
+        // elaborated inline module may share the file unit's dotted name.
+        // The current unit must have declared the child itself, and the edge
+        // must also have been installed by the ordered expansion above.
+        if fully_declared
+            && (file_root.is_none()
+                || unit_inline_modules.is_some_and(|declared| declared.contains(&canonical)))
+        {
             return Some(canonical);
+        }
+        // The dots in a loaded unit's path are directories, not lexical
+        // ancestors. Stop at the actual file unit before a bare import can
+        // capture a separately elaborated inline child of its path prefix.
+        if file_root == Some(owner) {
+            break;
         }
         owner = owner.rsplit_once('.').map_or("", |(parent, _)| parent);
     }
@@ -528,12 +543,20 @@ fn apply_import(
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
     owner: &str,
+    file_root: Option<&str>,
+    unit_inline_modules: Option<&HashSet<String>>,
     module: &str,
     kind: &ImportKind,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let canonical =
-        lexical_inline_import(owner, module, inline_children).unwrap_or_else(|| module.to_string());
+    let canonical = lexical_inline_import(
+        owner,
+        file_root,
+        unit_inline_modules,
+        module,
+        inline_children,
+    )
+    .unwrap_or_else(|| module.to_string());
     let pubmap = exports
         .get(&canonical)
         .ok_or_else(|| ElabError::UnboundName {
@@ -1041,6 +1064,7 @@ fn load_unit(
             elab,
             &decls,
             module,
+            Some(&local_modules),
             &mut scope,
             &mut unit_definitions,
             true,
@@ -2412,6 +2436,8 @@ fn prebind_scope_declarations(
     scope: &mut Scope,
     decls: &[Decl],
     prefix: &str,
+    file_root: Option<&str>,
+    unit_inline_modules: Option<&HashSet<String>>,
     exports: &HashMap<String, HashMap<String, String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
@@ -2495,6 +2521,8 @@ fn prebind_scope_declarations(
                     globals,
                     prelude_binding_names,
                     prefix,
+                    file_root,
+                    unit_inline_modules,
                     module,
                     kind,
                     span,
@@ -2761,6 +2789,7 @@ fn expand_scope(
     elab: &mut ElabEnv,
     decls: &[Decl],
     prefix: &str,
+    unit_inline_modules: Option<&HashSet<String>>,
     scope: &mut Scope,
     unit_definitions: &mut HashSet<String>,
     allow_boundary: bool,
@@ -2792,6 +2821,8 @@ fn expand_scope(
         scope,
         decls,
         prefix,
+        elab.module_state.active_imports.last().map(String::as_str),
+        unit_inline_modules,
         &elab.module_state.exports,
         &elab.globals,
         &elab.module_state.prelude_binding_names,
@@ -2833,6 +2864,8 @@ fn expand_scope(
                     &elab.globals,
                     &elab.module_state.prelude_binding_names,
                     prefix,
+                    elab.module_state.active_imports.last().map(String::as_str),
+                    unit_inline_modules,
                     module,
                     kind,
                     span,
@@ -2862,6 +2895,7 @@ fn expand_scope(
                     elab,
                     inner,
                     &child_prefix,
+                    unit_inline_modules,
                     &mut child_scope,
                     unit_definitions,
                     false,
@@ -3394,7 +3428,15 @@ pub fn expand_and_elaborate(
     }
     let mut scope = elab.module_state.root_scope.clone();
     let mut unit_definitions = HashSet::new();
-    let expanded = expand_scope(elab, decls, "", &mut scope, &mut unit_definitions, true);
+    let expanded = expand_scope(
+        elab,
+        decls,
+        "",
+        None,
+        &mut scope,
+        &mut unit_definitions,
+        true,
+    );
     if direct_call {
         elab.class_env.current_package = previous_package;
         elab.class_env.direct_use_packages = previous_direct_use;
@@ -3815,6 +3857,147 @@ mod namespace_effect_tests {
             "inline N must not load the distinct N.ken"
         );
         assert_eq!(env.env.trusted_base(), trust_before);
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.2).
+    ///
+    /// MEASURED: a `Data.Foo` file unit's bare `import N` resolves the actual
+    /// file `N.ken` even after a separate inline `Data.N` has been elaborated;
+    /// both cold and preloaded N cases retain N.x's exact GlobalId in the body.
+    /// CLAIMED: a loaded unit's lexical ancestor walk stops at that unit root,
+    /// never capturing a similarly spelled child of the `Data` namespace.
+    /// THE GAP: the existing inline-owner/sibling controls show that clipping
+    /// the file walk does not forbid genuine same-unit inline children.
+    #[test]
+    fn file_unit_import_cannot_capture_external_inline_ancestor() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::create_dir_all(root.path().join("Data")).expect("create file-unit directory");
+        fs::write(root.path().join("N.ken"), "pub const x : Nat = Suc Zero\n")
+            .expect("write file-backed N");
+        fs::write(
+            root.path().join("Data/Foo.ken"),
+            "import N\npub const observed : Nat = N.x\n",
+        )
+        .expect("write Data.Foo file unit");
+        fs::write(
+            root.path().join("Data/Owned.ken"),
+            "module N { pub const x : Nat = Zero }\n\
+             module P { import N\npub const selected : Nat = N.x }\n",
+        )
+        .expect("write actual same-unit inline sibling");
+        let roots = [root.path().to_path_buf()];
+        for preload_n in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_file("module Data { module N { pub const x : Nat = Zero } }")
+                .expect("separate inline Data.N");
+            if preload_n {
+                env.elaborate_module_from_roots(&roots, "N")
+                    .expect("preload the distinct file-backed N");
+            }
+            env.elaborate_module_from_roots(&roots, "Data.Foo")
+                .expect("Data.Foo must import the file-backed N");
+            assert!(env.module_state.loaded_units.contains_key("N"));
+            assert_ne!(env.globals["N.x"], env.globals["Data.N.x"]);
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals["Data.Foo.observed"])
+                .expect("observed is transparent");
+            match body {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, env.globals["N.x"]),
+                other => panic!("observed must reference N.x, got {other:?}"),
+            }
+            env.elaborate_module_from_roots(&roots, "Data.Owned")
+                .expect("same-unit sibling import must remain relative");
+            let (_, sibling_body) = env
+                .env
+                .transparent_body(env.globals["Data.Owned.P.selected"])
+                .expect("sibling selector is transparent");
+            assert_ne!(env.globals["Data.Owned.N.x"], env.globals["N.x"]);
+            match sibling_body {
+                ken_kernel::Term::Const { id, .. } => {
+                    assert_eq!(id, env.globals["Data.Owned.N.x"])
+                }
+                other => panic!("same-unit sibling must reference its own N.x, got {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.2).
+    ///
+    /// MEASURED: a previously elaborated inline `Data.Foo.N` cannot satisfy
+    /// the later loaded `Data/Foo.ken` unit's bare `import N` at its own root;
+    /// cold and preloaded N orders both select the file-backed N.x identity.
+    /// CLAIMED: even a same-spelling root edge belongs to its declaring unit,
+    /// not a later file with the same qualified name. THE GAP: the positive
+    /// file-owned N case below establishes that a legitimate root child works.
+    #[test]
+    fn file_unit_root_import_requires_its_own_inline_declaration() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::create_dir_all(root.path().join("Data")).expect("create file-unit directory");
+        fs::write(root.path().join("N.ken"), "pub const x : Nat = Suc Zero\n")
+            .expect("write file-backed N");
+        fs::write(
+            root.path().join("Data/Foo.ken"),
+            "import N\npub const observed : Nat = N.x\n",
+        )
+        .expect("write loaded Data.Foo unit");
+        let roots = [root.path().to_path_buf()];
+        for preload_n in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            env.elaborate_file(
+                "module Data { module Foo { module N { pub const x : Nat = Zero } } }",
+            )
+            .expect("separately declared inline Data.Foo.N");
+            if preload_n {
+                env.elaborate_module_from_roots(&roots, "N")
+                    .expect("preload actual file-backed N");
+            }
+            env.elaborate_module_from_roots(&roots, "Data.Foo")
+                .expect("load the real Data/Foo.ken despite earlier inline name");
+            assert!(env.module_state.loaded_units.contains_key("N"));
+            assert_ne!(env.globals["Data.Foo.N.x"], env.globals["N.x"]);
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals["Data.Foo.observed"])
+                .expect("observed is transparent");
+            match body {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, env.globals["N.x"]),
+                other => panic!("observed must reference file-backed N.x, got {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.2).
+    ///
+    /// MEASURED: the same file unit explicitly declares N before its import,
+    /// and its own N.x is selected instead of a separately loaded file N.x.
+    /// CLAIMED: the file-unit floor does not forbid genuinely declared inline
+    /// children. THE GAP: the negative case above supplies the distinct
+    /// provider against which declaration ownership must discriminate.
+    #[test]
+    fn file_unit_root_import_keeps_its_declared_inline_child() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::create_dir_all(root.path().join("Data")).expect("create file-unit directory");
+        fs::write(root.path().join("N.ken"), "pub const x : Nat = Suc Zero\n")
+            .expect("write file-backed decoy N");
+        fs::write(
+            root.path().join("Data/Foo.ken"),
+            "module N { pub const x : Nat = Zero }\n\
+             import N\npub const observed : Nat = N.x\n",
+        )
+        .expect("write file unit with own inline N");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Data.Foo")
+            .expect("real same-unit inline child must be importable");
+        assert!(!env.module_state.loaded_units.contains_key("N"));
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals["Data.Foo.observed"])
+            .expect("observed is transparent");
+        match body {
+            ken_kernel::Term::Const { id, .. } => assert_eq!(id, env.globals["Data.Foo.N.x"]),
+            other => panic!("observed must reference locally declared N.x, got {other:?}"),
+        }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
