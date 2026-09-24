@@ -30,6 +30,8 @@ import Application.Input.Schema
     SchemaIssue,
     schema_issue_origin,
     schema_issue_code,
+    schema_expected_issue_list,
+    schema_observed_issue_list,
     schema_validate_fields,
     schema_help)
 
@@ -44,12 +46,17 @@ import Capability.Parsing.Cursor
 import Capability.Parsing.Decoder
   (Decoder, decoder_pure, decoder_bind, decoder_satisfy, DecoderFailed, Decoded)
 
-import Core.Logic.Transport (cong, trans)
+import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Collections.Derived (list_append)
 
 import Data.Collections.NonEmpty
-  (NonEmpty, nonempty_cons, nonempty_map, Semigroup_instance_NonEmpty)
+  (NonEmpty,
+    nonempty_append,
+    nonempty_cons,
+    nonempty_map,
+    nonempty_to_list,
+    Semigroup_instance_NonEmpty)
 
 import Data.Sums.Validation (Invalid, Valid, Validation, validation_ap, validation_map)
 
@@ -340,6 +347,12 @@ fn argparse_missing_positionals
         (nonempty_map (SchemaIssue Nat) Diagnostic argparse_schema_issue_diagnostic issues)
   }
 
+const argparse_missing_option_value_code : String = "missing-option-value"
+
+const argparse_unknown_option_code : String = "unknown-option"
+
+const argparse_unexpected_positional_code : String = "unexpected-positional"
+
 fn argparse_parse_tokens
       (options : List OptionSpec)
       (positionals : List PositionalSpec)
@@ -365,7 +378,7 @@ fn argparse_parse_tokens
                       index
                       Zero
                       (arg_length argument)
-                      "missing-option-value")
+                      argparse_missing_option_value_code)
                     (argparse_missing_positionals positionals (Suc index));
                 Cons value more ↦
                   argparse_cons_validations
@@ -382,7 +395,7 @@ fn argparse_parse_tokens
                   index
                   (Suc (Suc Zero))
                   (arg_length argument)
-                  "unknown-option")
+                  argparse_unknown_option_code)
                 (argparse_parse_tokens options positionals rest (Suc index));
             False ↦
               match positionals {
@@ -393,7 +406,7 @@ fn argparse_parse_tokens
                       index
                       Zero
                       (arg_length argument)
-                      "unexpected-positional")
+                      argparse_unexpected_positional_code)
                     (argparse_parse_tokens options positionals rest (Suc index));
                 Cons positional more ↦
                   argparse_cons_validations
@@ -405,6 +418,1348 @@ fn argparse_parse_tokens
       }
   }
 
+const argparse_long_prefix_view : List Char = string_to_list_char "--"
+
+fn argparse_cons_outcome_view
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+      (selected : Option OptionSpec)
+      (prefix : Bool)
+    : Validation (NonEmpty Diagnostic) (List ParsedArgument) =
+  match selected {
+    Some spec ↦
+      match option_mode spec {
+        FlagOption ↦
+          argparse_cons_validations
+            (argparse_valid_argument (ParsedFlag (option_name spec)))
+            (argparse_parse_tokens options positionals rest (Suc index));
+        ValueOption ↦
+          match rest {
+            Nil ↦
+              argparse_cons_validations
+                (argparse_error
+                  ParsedArgument
+                  index
+                  Zero
+                  (arg_length argument)
+                  argparse_missing_option_value_code)
+                (argparse_missing_positionals positionals (Suc index));
+            Cons value more ↦
+              argparse_cons_validations
+                (argparse_valid_argument (ParsedOption (option_name spec) value))
+                (argparse_parse_tokens options positionals more (Suc (Suc index)))
+          }
+      };
+    None ↦
+      match prefix {
+        True ↦
+          argparse_cons_validations
+            (argparse_error
+              ParsedArgument
+              index
+              (Suc (Suc Zero))
+              (arg_length argument)
+              argparse_unknown_option_code)
+            (argparse_parse_tokens options positionals rest (Suc index));
+        False ↦
+          match positionals {
+            Nil ↦
+              argparse_cons_validations
+                (argparse_error
+                  ParsedArgument
+                  index
+                  Zero
+                  (arg_length argument)
+                  argparse_unexpected_positional_code)
+                (argparse_parse_tokens options positionals rest (Suc index));
+            Cons positional more ↦
+              argparse_cons_validations
+                (argparse_valid_argument
+                  (ParsedPositional (positional_name positional) argument))
+                (argparse_parse_tokens options more rest (Suc index))
+          }
+      }
+  }
+
+proof full_validation_cons_bridge for argparse_parse_tokens
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+    : Equal
+        (Validation (NonEmpty Diagnostic) (List ParsedArgument))
+        (argparse_parse_tokens options positionals (Cons Bytes argument rest) index)
+        (argparse_cons_outcome_view
+          options
+          positionals
+          argument
+          rest
+          index
+          (argparse_find_option argument options)
+          (argparse_has_prefix_chars argument argparse_long_prefix_view)) =
+  Refl
+
+fn argparse_argument_bytes (parsed : List ParsedArgument) : List Bytes =
+  match parsed {
+    Nil ↦ Nil Bytes;
+    Cons argument rest ↦
+      match argument {
+        ParsedFlag name ↦ argparse_argument_bytes rest;
+        ParsedOption name value ↦ Cons Bytes value (argparse_argument_bytes rest);
+        ParsedPositional name value ↦ Cons Bytes value (argparse_argument_bytes rest)
+      }
+  }
+
+fn argparse_input_value_bytes
+      (options : List OptionSpec) (positionals : List PositionalSpec) (arguments : List Bytes)
+    : List Bytes =
+  match arguments {
+    Nil ↦ Nil Bytes;
+    Cons argument rest ↦
+      match argparse_find_option argument options {
+        Some spec ↦
+          match option_mode spec {
+            FlagOption ↦ argparse_input_value_bytes options positionals rest;
+            ValueOption ↦
+              match rest {
+                Nil ↦ Nil Bytes;
+                Cons value more ↦
+                  Cons Bytes value (argparse_input_value_bytes options positionals more)
+              }
+          };
+        None ↦
+          match argparse_has_prefix_chars argument (string_to_list_char "--") {
+            True ↦ argparse_input_value_bytes options positionals rest;
+            False ↦
+              match positionals {
+                Nil ↦ argparse_input_value_bytes options positionals rest;
+                Cons positional more ↦
+                  Cons Bytes argument (argparse_input_value_bytes options more rest)
+              }
+          }
+      }
+  }
+
+fn argparse_cons_input_bytes_view
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (selected : Option OptionSpec)
+      (prefix : Bool)
+    : List Bytes =
+  match selected {
+    Some spec ↦
+      match option_mode spec {
+        FlagOption ↦ argparse_input_value_bytes options positionals rest;
+        ValueOption ↦
+          match rest {
+            Nil ↦ Nil Bytes;
+            Cons value more ↦
+              Cons Bytes value (argparse_input_value_bytes options positionals more)
+          }
+      };
+    None ↦
+      match prefix {
+        True ↦ argparse_input_value_bytes options positionals rest;
+        False ↦
+          match positionals {
+            Nil ↦ argparse_input_value_bytes options positionals rest;
+            Cons positional more ↦
+              Cons Bytes argument (argparse_input_value_bytes options more rest)
+          }
+      }
+  }
+
+theorem argparse_cons_input_bytes_bridge
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+    : Equal
+        (List Bytes)
+        (argparse_input_value_bytes options positionals (Cons Bytes argument rest))
+        (argparse_cons_input_bytes_view
+          options
+          positionals
+          argument
+          rest
+          (argparse_find_option argument options)
+          (argparse_has_prefix_chars argument argparse_long_prefix_view)) =
+  Refl
+
+fn argparse_observed_bytes
+      (checked : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Option (List Bytes) =
+  match checked {
+    Invalid errors ↦ None (List Bytes);
+    Valid parsed ↦ Some (List Bytes) (argparse_argument_bytes parsed)
+  }
+
+fn argparse_expected_bytes_if_valid
+      (expected : List Bytes) (checked : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Option (List Bytes) =
+  match checked {
+    Invalid errors ↦ None (List Bytes);
+    Valid parsed ↦ Some (List Bytes) expected
+  }
+
+fn argparse_prepend_bytes (argument : ParsedArgument) (rest : List Bytes) : List Bytes =
+  match argument {
+    ParsedFlag name ↦ rest;
+    ParsedOption name value ↦ Cons Bytes value rest;
+    ParsedPositional name value ↦ Cons Bytes value rest
+  }
+
+fn argparse_prepend_valid_bytes
+      (argument : ParsedArgument) (seen : Option (List Bytes))
+    : Option (List Bytes) =
+  match seen {
+    None ↦ None (List Bytes);
+    Some rest ↦ Some (List Bytes) (argparse_prepend_bytes argument rest)
+  }
+
+theorem argparse_cons_valid_flag_case
+      (name : String) (parsed : List ParsedArgument)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedFlag name))
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed)))
+        (argparse_prepend_valid_bytes
+          (ParsedFlag name)
+          (argparse_observed_bytes
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed))) =
+  Refl
+
+theorem argparse_cons_flag_observation
+      (name : String) (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations (argparse_valid_argument (ParsedFlag name)) tail))
+        (argparse_prepend_valid_bytes (ParsedFlag name) (argparse_observed_bytes tail)) =
+  match tail {
+    Invalid errors ↦ Proved;
+    Valid parsed ↦ Refl
+  }
+
+theorem argparse_cons_valid_option_case
+      (name : String) (value : Bytes) (parsed : List ParsedArgument)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedOption name value))
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed)))
+        (argparse_prepend_valid_bytes
+          (ParsedOption name value)
+          (argparse_observed_bytes
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed))) =
+  Refl
+
+theorem argparse_cons_option_observation
+      (name : String)
+      (value : Bytes)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations (argparse_valid_argument (ParsedOption name value)) tail))
+        (argparse_prepend_valid_bytes
+          (ParsedOption name value)
+          (argparse_observed_bytes tail)) =
+  match tail {
+    Invalid errors ↦ Proved;
+    Valid parsed ↦ argparse_cons_valid_option_case name value parsed
+  }
+
+theorem argparse_cons_valid_positional_case
+      (name : String) (value : Bytes) (parsed : List ParsedArgument)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedPositional name value))
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed)))
+        (argparse_prepend_valid_bytes
+          (ParsedPositional name value)
+          (argparse_observed_bytes
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed))) =
+  Refl
+
+theorem argparse_cons_positional_observation
+      (name : String)
+      (value : Bytes)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedPositional name value))
+            tail))
+        (argparse_prepend_valid_bytes
+          (ParsedPositional name value)
+          (argparse_observed_bytes tail)) =
+  match tail {
+    Invalid errors ↦ Proved;
+    Valid parsed ↦ argparse_cons_valid_positional_case name value parsed
+  }
+
+theorem argparse_cons_accepted_observation
+      (argument : ParsedArgument)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations (argparse_valid_argument argument) tail))
+        (argparse_prepend_valid_bytes argument (argparse_observed_bytes tail)) =
+  match argument {
+    ParsedFlag name ↦ argparse_cons_flag_observation name tail;
+    ParsedOption name value ↦ argparse_cons_option_observation name value tail;
+    ParsedPositional name value ↦ argparse_cons_positional_observation name value tail
+  }
+
+theorem argparse_cons_flag_expected
+      (name : String)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (expected : List Bytes)
+    : Equal
+        (Option (List Bytes))
+        (argparse_prepend_valid_bytes
+          (ParsedFlag name)
+          (argparse_expected_bytes_if_valid expected tail))
+        (argparse_expected_bytes_if_valid
+          (argparse_prepend_bytes (ParsedFlag name) expected)
+          (argparse_cons_validations (argparse_valid_argument (ParsedFlag name)) tail)) =
+  match tail {
+    Invalid errors ↦ Proved;
+    Valid parsed ↦ Refl
+  }
+
+theorem argparse_cons_valid_option_expected_case
+      (name : String) (value : Bytes) (parsed : List ParsedArgument) (expected : List Bytes)
+    : Equal
+        (Option (List Bytes))
+        (argparse_prepend_valid_bytes
+          (ParsedOption name value)
+          (argparse_expected_bytes_if_valid
+            expected
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed)))
+        (argparse_expected_bytes_if_valid
+          (argparse_prepend_bytes (ParsedOption name value) expected)
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedOption name value))
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed))) =
+  Refl
+
+theorem argparse_cons_option_expected
+      (name : String)
+      (value : Bytes)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (expected : List Bytes)
+    : Equal
+        (Option (List Bytes))
+        (argparse_prepend_valid_bytes
+          (ParsedOption name value)
+          (argparse_expected_bytes_if_valid expected tail))
+        (argparse_expected_bytes_if_valid
+          (argparse_prepend_bytes (ParsedOption name value) expected)
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedOption name value))
+            tail)) =
+  match tail {
+    Invalid errors ↦ Proved;
+    Valid parsed ↦ argparse_cons_valid_option_expected_case name value parsed expected
+  }
+
+theorem argparse_cons_valid_positional_expected_case
+      (name : String) (value : Bytes) (parsed : List ParsedArgument) (expected : List Bytes)
+    : Equal
+        (Option (List Bytes))
+        (argparse_prepend_valid_bytes
+          (ParsedPositional name value)
+          (argparse_expected_bytes_if_valid
+            expected
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed)))
+        (argparse_expected_bytes_if_valid
+          (argparse_prepend_bytes (ParsedPositional name value) expected)
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedPositional name value))
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed))) =
+  Refl
+
+theorem argparse_cons_positional_expected
+      (name : String)
+      (value : Bytes)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (expected : List Bytes)
+    : Equal
+        (Option (List Bytes))
+        (argparse_prepend_valid_bytes
+          (ParsedPositional name value)
+          (argparse_expected_bytes_if_valid expected tail))
+        (argparse_expected_bytes_if_valid
+          (argparse_prepend_bytes (ParsedPositional name value) expected)
+          (argparse_cons_validations
+            (argparse_valid_argument (ParsedPositional name value))
+            tail)) =
+  match tail {
+    Invalid errors ↦ Proved;
+    Valid parsed ↦ argparse_cons_valid_positional_expected_case name value parsed expected
+  }
+
+theorem argparse_cons_accepted_expected
+      (argument : ParsedArgument)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (expected : List Bytes)
+    : Equal
+        (Option (List Bytes))
+        (argparse_prepend_valid_bytes argument (argparse_expected_bytes_if_valid expected tail))
+        (argparse_expected_bytes_if_valid
+          (argparse_prepend_bytes argument expected)
+          (argparse_cons_validations (argparse_valid_argument argument) tail)) =
+  match argument {
+    ParsedFlag name ↦ argparse_cons_flag_expected name tail expected;
+    ParsedOption name value ↦ argparse_cons_option_expected name value tail expected;
+    ParsedPositional name value ↦ argparse_cons_positional_expected name value tail expected
+  }
+
+theorem argparse_cons_bytes_step
+      (argument : ParsedArgument)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (expected : List Bytes)
+      (htail : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes tail)
+        (argparse_expected_bytes_if_valid expected tail))
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations (argparse_valid_argument argument) tail))
+        (argparse_expected_bytes_if_valid
+          (argparse_prepend_bytes argument expected)
+          (argparse_cons_validations (argparse_valid_argument argument) tail)) =
+  trans
+    (Option (List Bytes))
+    (argparse_observed_bytes
+      (argparse_cons_validations (argparse_valid_argument argument) tail))
+    (argparse_prepend_valid_bytes argument (argparse_observed_bytes tail))
+    (argparse_expected_bytes_if_valid
+      (argparse_prepend_bytes argument expected)
+      (argparse_cons_validations (argparse_valid_argument argument) tail))
+    (argparse_cons_accepted_observation argument tail)
+    (trans
+      (Option (List Bytes))
+      (argparse_prepend_valid_bytes argument (argparse_observed_bytes tail))
+      (argparse_prepend_valid_bytes argument (argparse_expected_bytes_if_valid expected tail))
+      (argparse_expected_bytes_if_valid
+        (argparse_prepend_bytes argument expected)
+        (argparse_cons_validations (argparse_valid_argument argument) tail))
+      (cong
+        (Option (List Bytes))
+        (Option (List Bytes))
+        (argparse_observed_bytes tail)
+        (argparse_expected_bytes_if_valid expected tail)
+        (argparse_prepend_valid_bytes argument)
+        htail)
+      (argparse_cons_accepted_expected argument tail expected))
+
+theorem argparse_cons_rejected_bytes
+      (errors : NonEmpty Diagnostic)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (expected : List Bytes)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_validations
+            (Invalid (NonEmpty Diagnostic) ParsedArgument errors)
+            tail))
+        (argparse_expected_bytes_if_valid
+          expected
+          (argparse_cons_validations
+            (Invalid (NonEmpty Diagnostic) ParsedArgument errors)
+            tail)) =
+  match tail {
+    Invalid later ↦ Proved;
+    Valid parsed ↦ Proved
+  }
+
+fn argparse_missing_result_view
+      (checked : Validation (NonEmpty (SchemaIssue Nat)) (List Bool))
+    : Validation (NonEmpty Diagnostic) (List ParsedArgument) =
+  match checked {
+    Valid inspected ↦ Valid (NonEmpty Diagnostic) (List ParsedArgument) (Nil ParsedArgument);
+    Invalid issues ↦
+      Invalid
+        (NonEmpty Diagnostic)
+        (List ParsedArgument)
+        (nonempty_map (SchemaIssue Nat) Diagnostic argparse_schema_issue_diagnostic issues)
+  }
+
+theorem argparse_missing_bytes_for_schema_result
+      (checked : Validation (NonEmpty (SchemaIssue Nat)) (List Bool))
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes (argparse_missing_result_view checked))
+        (argparse_expected_bytes_if_valid (Nil Bytes) (argparse_missing_result_view checked)) =
+  match checked {
+    Valid inspected ↦ Proved;
+    Invalid issues ↦ Proved
+  }
+
+theorem argparse_missing_bytes
+      (positionals : List PositionalSpec) (index : Nat)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes (argparse_missing_positionals positionals index))
+        (argparse_expected_bytes_if_valid
+          (Nil Bytes)
+          (argparse_missing_positionals positionals index)) =
+  argparse_missing_bytes_for_schema_result
+    (schema_validate_fields
+      Nat
+      Bool
+      (argparse_missing_field_check index)
+      (argparse_positional_schema_fields positionals))
+
+theorem argparse_observation_transport
+      (source : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (target : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (expected : List Bytes)
+      (bridge : Equal (Validation (NonEmpty Diagnostic) (List ParsedArgument)) source target)
+      (target_law : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes target)
+        (argparse_expected_bytes_if_valid expected target))
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes source)
+        (argparse_expected_bytes_if_valid expected source) =
+  trans
+    (Option (List Bytes))
+    (argparse_observed_bytes source)
+    (argparse_observed_bytes target)
+    (argparse_expected_bytes_if_valid expected source)
+    (cong
+      (Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (Option (List Bytes))
+      source
+      target
+      argparse_observed_bytes
+      bridge)
+    (trans
+      (Option (List Bytes))
+      (argparse_observed_bytes target)
+      (argparse_expected_bytes_if_valid expected target)
+      (argparse_expected_bytes_if_valid expected source)
+      target_law
+      (cong
+        (Validation (NonEmpty Diagnostic) (List ParsedArgument))
+        (Option (List Bytes))
+        target
+        source
+        (argparse_expected_bytes_if_valid expected)
+        (sym (Validation (NonEmpty Diagnostic) (List ParsedArgument)) source target bridge)))
+
+theorem argparse_unknown_bytes_case
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            True))
+        (argparse_expected_bytes_if_valid
+          (argparse_cons_input_bytes_view
+            options
+            positionals
+            argument
+            rest
+            (None OptionSpec)
+            True)
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            True)) =
+  argparse_cons_rejected_bytes
+    (nonempty_cons
+      Diagnostic
+      (argparse_diagnostic
+        index
+        (Suc (Suc Zero))
+        (arg_length argument)
+        argparse_unknown_option_code)
+      (Nil Diagnostic))
+    (argparse_parse_tokens options positionals rest (Suc index))
+    (argparse_input_value_bytes options positionals rest)
+```
+
+```ken
+theorem argparse_false_bytes_case
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            False))
+        (argparse_expected_bytes_if_valid
+          (argparse_cons_input_bytes_view
+            options
+            positionals
+            argument
+            rest
+            (None OptionSpec)
+            False)
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            False)) =
+  match positionals {
+    Nil ↦
+      argparse_cons_rejected_bytes
+        (nonempty_cons
+          Diagnostic
+          (argparse_diagnostic
+            index
+            Zero
+            (arg_length argument)
+            argparse_unexpected_positional_code)
+          (Nil Diagnostic))
+        (argparse_parse_tokens options (Nil PositionalSpec) rest (Suc index))
+        (argparse_input_value_bytes options (Nil PositionalSpec) rest);
+    Cons positional more ↦
+      argparse_cons_bytes_step
+        (ParsedPositional (positional_name positional) argument)
+        (argparse_parse_tokens options more rest (Suc index))
+        (argparse_input_value_bytes options more rest)
+        (argparse_parse_tokens::value_bytes_from_input options more rest (Suc index))
+  }
+
+theorem argparse_none_bytes_case
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+      (prefix : Bool)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            prefix))
+        (argparse_expected_bytes_if_valid
+          (argparse_cons_input_bytes_view
+            options
+            positionals
+            argument
+            rest
+            (None OptionSpec)
+            prefix)
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            prefix)) =
+  match prefix {
+    True ↦ argparse_unknown_bytes_case options positionals argument rest index;
+    False ↦ argparse_false_bytes_case options positionals argument rest index
+  }
+
+theorem argparse_cons_view_bytes
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+      (selected : Option OptionSpec)
+      (prefix : Bool)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes
+          (argparse_cons_outcome_view options positionals argument rest index selected prefix))
+        (argparse_expected_bytes_if_valid
+          (argparse_cons_input_bytes_view options positionals argument rest selected prefix)
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            selected
+            prefix)) =
+  match selected {
+    Some spec ↦
+      match spec {
+        MkOptionSpec name short mode description ↦
+          match mode {
+            FlagOption ↦
+              argparse_cons_bytes_step
+                (ParsedFlag name)
+                (argparse_parse_tokens options positionals rest (Suc index))
+                (argparse_input_value_bytes options positionals rest)
+                (argparse_parse_tokens::value_bytes_from_input
+                  options
+                  positionals
+                  rest
+                  (Suc index));
+            ValueOption ↦
+              match rest {
+                Nil ↦
+                  argparse_cons_rejected_bytes
+                    (nonempty_cons
+                      Diagnostic
+                      (argparse_diagnostic
+                        index
+                        Zero
+                        (arg_length argument)
+                        argparse_missing_option_value_code)
+                      (Nil Diagnostic))
+                    (argparse_missing_positionals positionals (Suc index))
+                    (Nil Bytes);
+                Cons value more ↦
+                  argparse_cons_bytes_step
+                    (ParsedOption name value)
+                    (argparse_parse_tokens options positionals more (Suc (Suc index)))
+                    (argparse_input_value_bytes options positionals more)
+                    (argparse_parse_tokens::value_bytes_from_input
+                      options
+                      positionals
+                      more
+                      (Suc (Suc index)))
+              }
+          }
+      };
+    None ↦ argparse_none_bytes_case options positionals argument rest index prefix
+  }
+```
+
+```ken
+proof value_bytes_from_input for argparse_parse_tokens
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (arguments : List Bytes)
+      (index : Nat)
+    : Equal
+        (Option (List Bytes))
+        (argparse_observed_bytes (argparse_parse_tokens options positionals arguments index))
+        (argparse_expected_bytes_if_valid
+          (argparse_input_value_bytes options positionals arguments)
+          (argparse_parse_tokens options positionals arguments index)) =
+  match arguments {
+    Nil ↦ argparse_missing_bytes positionals index;
+    Cons argument rest ↦
+      argparse_observation_transport
+        (argparse_parse_tokens options positionals (Cons Bytes argument rest) index)
+        (argparse_cons_outcome_view
+          options
+          positionals
+          argument
+          rest
+          index
+          (argparse_find_option argument options)
+          (argparse_has_prefix_chars argument argparse_long_prefix_view))
+        (argparse_input_value_bytes options positionals (Cons Bytes argument rest))
+        (argparse_parse_tokens::full_validation_cons_bridge
+          options
+          positionals
+          argument
+          rest
+          index)
+        (argparse_cons_view_bytes
+          options
+          positionals
+          argument
+          rest
+          index
+          (argparse_find_option argument options)
+          (argparse_has_prefix_chars argument argparse_long_prefix_view))
+  }
+
+fn argparse_observed_diagnostics
+      (a : Type) (checked : Validation (NonEmpty Diagnostic) a)
+    : List Diagnostic =
+  match checked {
+    Invalid errors ↦ nonempty_to_list Diagnostic errors;
+    Valid accepted ↦ Nil Diagnostic
+  }
+
+fn argparse_expected_missing_diagnostics
+      (positionals : List PositionalSpec) (index : Nat)
+    : List Diagnostic =
+  map
+    (SchemaIssue Nat)
+    Diagnostic
+    argparse_schema_issue_diagnostic
+    (schema_expected_issue_list
+      Nat
+      Bool
+      (argparse_missing_field_check index)
+      (argparse_positional_schema_fields positionals))
+
+theorem argparse_missing_diagnostic_projection
+      (checked : Validation (NonEmpty (SchemaIssue Nat)) (List Bool))
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_missing_result_view checked))
+        (map
+          (SchemaIssue Nat)
+          Diagnostic
+          argparse_schema_issue_diagnostic
+          (schema_observed_issue_list Nat Bool checked)) =
+  match checked {
+    Valid inspected ↦ Proved;
+    Invalid issues ↦
+      nonempty_map::list_view
+        (SchemaIssue Nat)
+        Diagnostic
+        argparse_schema_issue_diagnostic
+        issues
+  }
+
+proof diagnostic_sequence_base for argparse_parse_tokens
+      (options : List OptionSpec) (positionals : List PositionalSpec) (index : Nat)
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_parse_tokens options positionals (Nil Bytes) index))
+        (argparse_expected_missing_diagnostics positionals index) =
+  trans
+    (List Diagnostic)
+    (argparse_observed_diagnostics
+      (List ParsedArgument)
+      (argparse_parse_tokens options positionals (Nil Bytes) index))
+    (map
+      (SchemaIssue Nat)
+      Diagnostic
+      argparse_schema_issue_diagnostic
+      (schema_observed_issue_list
+        Nat
+        Bool
+        (schema_validate_fields
+          Nat
+          Bool
+          (argparse_missing_field_check index)
+          (argparse_positional_schema_fields positionals))))
+    (argparse_expected_missing_diagnostics positionals index)
+    (argparse_missing_diagnostic_projection
+      (schema_validate_fields
+        Nat
+        Bool
+        (argparse_missing_field_check index)
+        (argparse_positional_schema_fields positionals)))
+    (cong
+      (List (SchemaIssue Nat))
+      (List Diagnostic)
+      (schema_observed_issue_list
+        Nat
+        Bool
+        (schema_validate_fields
+          Nat
+          Bool
+          (argparse_missing_field_check index)
+          (argparse_positional_schema_fields positionals)))
+      (schema_expected_issue_list
+        Nat
+        Bool
+        (argparse_missing_field_check index)
+        (argparse_positional_schema_fields positionals))
+      (map (SchemaIssue Nat) Diagnostic argparse_schema_issue_diagnostic)
+      (schema_validate_fields::invalid_issue_sequence
+        Nat
+        Bool
+        (argparse_missing_field_check index)
+        (argparse_positional_schema_fields positionals)))
+
+theorem argparse_accepted_error_order
+      (argument : ParsedArgument)
+      (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_cons_validations (argparse_valid_argument argument) tail))
+        (argparse_observed_diagnostics (List ParsedArgument) tail) =
+  match tail {
+    Invalid errors ↦ Refl;
+    Valid parsed ↦ Proved
+  }
+
+theorem argparse_rejected_valid_case
+      (diagnostic : Diagnostic) (parsed : List ParsedArgument)
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_cons_validations
+            (Invalid
+              (NonEmpty Diagnostic)
+              ParsedArgument
+              (nonempty_cons Diagnostic diagnostic (Nil Diagnostic)))
+            (Valid (NonEmpty Diagnostic) (List ParsedArgument) parsed)))
+        (Cons Diagnostic diagnostic (Nil Diagnostic)) =
+  Refl
+
+theorem argparse_rejected_error_order
+      (diagnostic : Diagnostic) (tail : Validation (NonEmpty Diagnostic) (List ParsedArgument))
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_cons_validations
+            (Invalid
+              (NonEmpty Diagnostic)
+              ParsedArgument
+              (nonempty_cons Diagnostic diagnostic (Nil Diagnostic)))
+            tail))
+        (Cons
+          Diagnostic
+          diagnostic
+          (argparse_observed_diagnostics (List ParsedArgument) tail)) =
+  match tail {
+    Invalid errors ↦
+      nonempty_append::list_view
+        Diagnostic
+        (nonempty_cons Diagnostic diagnostic (Nil Diagnostic))
+        errors;
+    Valid parsed ↦ argparse_rejected_valid_case diagnostic parsed
+  }
+
+fn argparse_cons_diagnostic_head
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+      (selected : Option OptionSpec)
+      (prefix : Bool)
+    : List Diagnostic =
+  match selected {
+    Some spec ↦
+      match option_mode spec {
+        FlagOption ↦ Nil Diagnostic;
+        ValueOption ↦
+          match rest {
+            Nil ↦
+              Cons
+                Diagnostic
+                (argparse_diagnostic
+                  index
+                  Zero
+                  (arg_length argument)
+                  argparse_missing_option_value_code)
+                (Nil Diagnostic);
+            Cons value more ↦ Nil Diagnostic
+          }
+      };
+    None ↦
+      match prefix {
+        True ↦
+          Cons
+            Diagnostic
+            (argparse_diagnostic
+              index
+              (Suc (Suc Zero))
+              (arg_length argument)
+              argparse_unknown_option_code)
+            (Nil Diagnostic);
+        False ↦
+          match positionals {
+            Nil ↦
+              Cons
+                Diagnostic
+                (argparse_diagnostic
+                  index
+                  Zero
+                  (arg_length argument)
+                  argparse_unexpected_positional_code)
+                (Nil Diagnostic);
+            Cons positional more ↦ Nil Diagnostic
+          }
+      }
+  }
+
+fn argparse_cons_diagnostic_tail
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+      (selected : Option OptionSpec)
+      (prefix : Bool)
+    : List Diagnostic =
+  match selected {
+    Some spec ↦
+      match option_mode spec {
+        FlagOption ↦
+          argparse_observed_diagnostics
+            (List ParsedArgument)
+            (argparse_parse_tokens options positionals rest (Suc index));
+        ValueOption ↦
+          match rest {
+            Nil ↦
+              argparse_observed_diagnostics
+                (List ParsedArgument)
+                (argparse_missing_positionals positionals (Suc index));
+            Cons value more ↦
+              argparse_observed_diagnostics
+                (List ParsedArgument)
+                (argparse_parse_tokens options positionals more (Suc (Suc index)))
+          }
+      };
+    None ↦
+      match prefix {
+        True ↦
+          argparse_observed_diagnostics
+            (List ParsedArgument)
+            (argparse_parse_tokens options positionals rest (Suc index));
+        False ↦
+          match positionals {
+            Nil ↦
+              argparse_observed_diagnostics
+                (List ParsedArgument)
+                (argparse_parse_tokens options positionals rest (Suc index));
+            Cons positional more ↦
+              argparse_observed_diagnostics
+                (List ParsedArgument)
+                (argparse_parse_tokens options more rest (Suc index))
+          }
+      }
+  }
+
+theorem argparse_none_diagnostic_true
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            True))
+        (list_append
+          Diagnostic
+          (argparse_cons_diagnostic_head
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            True)
+          (argparse_cons_diagnostic_tail
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            True)) =
+  argparse_rejected_error_order
+    (argparse_diagnostic
+      index
+      (Suc (Suc Zero))
+      (arg_length argument)
+      argparse_unknown_option_code)
+    (argparse_parse_tokens options positionals rest (Suc index))
+
+theorem argparse_none_diagnostic_false
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            False))
+        (list_append
+          Diagnostic
+          (argparse_cons_diagnostic_head
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            False)
+          (argparse_cons_diagnostic_tail
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            False)) =
+  match positionals {
+    Nil ↦
+      argparse_rejected_error_order
+        (argparse_diagnostic
+          index
+          Zero
+          (arg_length argument)
+          argparse_unexpected_positional_code)
+        (argparse_parse_tokens options (Nil PositionalSpec) rest (Suc index));
+    Cons positional more ↦
+      argparse_accepted_error_order
+        (ParsedPositional (positional_name positional) argument)
+        (argparse_parse_tokens options more rest (Suc index))
+  }
+
+theorem argparse_none_diagnostic_step
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+      (prefix : Bool)
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_cons_outcome_view
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            prefix))
+        (list_append
+          Diagnostic
+          (argparse_cons_diagnostic_head
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            prefix)
+          (argparse_cons_diagnostic_tail
+            options
+            positionals
+            argument
+            rest
+            index
+            (None OptionSpec)
+            prefix)) =
+  match prefix {
+    True ↦ argparse_none_diagnostic_true options positionals argument rest index;
+    False ↦ argparse_none_diagnostic_false options positionals argument rest index
+  }
+
+theorem argparse_cons_diagnostic_step
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+      (selected : Option OptionSpec)
+      (prefix : Bool)
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_cons_outcome_view options positionals argument rest index selected prefix))
+        (list_append
+          Diagnostic
+          (argparse_cons_diagnostic_head
+            options
+            positionals
+            argument
+            rest
+            index
+            selected
+            prefix)
+          (argparse_cons_diagnostic_tail
+            options
+            positionals
+            argument
+            rest
+            index
+            selected
+            prefix)) =
+  match selected {
+    Some spec ↦
+      match spec {
+        MkOptionSpec name short mode description ↦
+          match mode {
+            FlagOption ↦
+              argparse_accepted_error_order
+                (ParsedFlag name)
+                (argparse_parse_tokens options positionals rest (Suc index));
+            ValueOption ↦
+              match rest {
+                Nil ↦
+                  argparse_rejected_error_order
+                    (argparse_diagnostic
+                      index
+                      Zero
+                      (arg_length argument)
+                      argparse_missing_option_value_code)
+                    (argparse_missing_positionals positionals (Suc index));
+                Cons value more ↦
+                  argparse_accepted_error_order
+                    (ParsedOption name value)
+                    (argparse_parse_tokens options positionals more (Suc (Suc index)))
+              }
+          }
+      };
+    None ↦ argparse_none_diagnostic_step options positionals argument rest index prefix
+  }
+
+proof diagnostic_sequence_step for argparse_parse_tokens
+      (options : List OptionSpec)
+      (positionals : List PositionalSpec)
+      (argument : Bytes)
+      (rest : List Bytes)
+      (index : Nat)
+    : Equal
+        (List Diagnostic)
+        (argparse_observed_diagnostics
+          (List ParsedArgument)
+          (argparse_parse_tokens options positionals (Cons Bytes argument rest) index))
+        (list_append
+          Diagnostic
+          (argparse_cons_diagnostic_head
+            options
+            positionals
+            argument
+            rest
+            index
+            (argparse_find_option argument options)
+            (argparse_has_prefix_chars argument argparse_long_prefix_view))
+          (argparse_cons_diagnostic_tail
+            options
+            positionals
+            argument
+            rest
+            index
+            (argparse_find_option argument options)
+            (argparse_has_prefix_chars argument argparse_long_prefix_view))) =
+  trans
+    (List Diagnostic)
+    (argparse_observed_diagnostics
+      (List ParsedArgument)
+      (argparse_parse_tokens options positionals (Cons Bytes argument rest) index))
+    (argparse_observed_diagnostics
+      (List ParsedArgument)
+      (argparse_cons_outcome_view
+        options
+        positionals
+        argument
+        rest
+        index
+        (argparse_find_option argument options)
+        (argparse_has_prefix_chars argument argparse_long_prefix_view)))
+    (list_append
+      Diagnostic
+      (argparse_cons_diagnostic_head
+        options
+        positionals
+        argument
+        rest
+        index
+        (argparse_find_option argument options)
+        (argparse_has_prefix_chars argument argparse_long_prefix_view))
+      (argparse_cons_diagnostic_tail
+        options
+        positionals
+        argument
+        rest
+        index
+        (argparse_find_option argument options)
+        (argparse_has_prefix_chars argument argparse_long_prefix_view)))
+    (cong
+      (Validation (NonEmpty Diagnostic) (List ParsedArgument))
+      (List Diagnostic)
+      (argparse_parse_tokens options positionals (Cons Bytes argument rest) index)
+      (argparse_cons_outcome_view
+        options
+        positionals
+        argument
+        rest
+        index
+        (argparse_find_option argument options)
+        (argparse_has_prefix_chars argument argparse_long_prefix_view))
+      (argparse_observed_diagnostics (List ParsedArgument))
+      (argparse_parse_tokens::full_validation_cons_bridge
+        options
+        positionals
+        argument
+        rest
+        index))
+    (argparse_cons_diagnostic_step
+      options
+      positionals
+      argument
+      rest
+      index
+      (argparse_find_option argument options)
+      (argparse_has_prefix_chars argument argparse_long_prefix_view))
+```
+
+```ken
 fn argparse_parsed_command
       (name : String) (parsed : Validation (NonEmpty Diagnostic) (List ParsedArgument))
     : Validation (NonEmpty Diagnostic) ParsedCommand =
@@ -659,8 +2014,12 @@ equality primitive, postulate, `Axiom`, or trusted-base entry. Raw argv values
 cross the parser directly as `Bytes`; lengths and elements are structural.
 
 The two public help proofs use structural induction on the specification lists
-and the checked `cong` and `trans` transport lemmas. The parser's byte
-preservation and complete, ordered diagnostic accumulation are not yet proved
-here. The current `NonEmpty` and `Schema` APIs do not provide the full-list
-projection laws needed for the latter; these guarantees remain behavior tested
-by CC7, not checked claims in this package.
+and the checked `cong` and `trans` transport lemmas. The private
+`argparse_parse_tokens::value_bytes_from_input` proof equates the observed
+values in every valid parse with the original input `Bytes` terms, including
+value options and positionals. The private `diagnostic_sequence_step` proof
+splits each `Cons` into its located head diagnostic, if any, followed by the
+original parser's tail diagnostics. Repeating that checked step follows every
+token in order; `diagnostic_sequence_base` uses Schema's ordered issue-list
+law for missing positionals. Both proofs use the same full-`Validation`
+bridge to the original parser, with no independently recursive error parser.
