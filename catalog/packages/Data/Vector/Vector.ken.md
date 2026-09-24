@@ -29,9 +29,14 @@ vectors with the same length.
 
 `Vec` and `Fin` are ordinary indexed inductive families. `VNil` targets length
 `Zero`; `VCons` extends a vector at length `n` to length `Suc n`. Neither
-constructor of `Fin` targets `Fin Zero`.
+constructor of `Fin` targets `Fin Zero`. The identity law uses the checked
+`idf` function and `cong` equality congruence from their catalog providers.
 
 ```ken
+import Core.Classes.LawfulFunctors (idf)
+
+import Core.Logic.Transport (cong)
+
 data Vec (a : Type) : Nat → Type where {
   VNil : Vec a Zero;
   VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)
@@ -96,6 +101,21 @@ theorem map_vnil
     : Equal (Vec b Zero) (map a b Zero f (VNil a)) (VNil b) =
   Proved
 
+theorem vec_map_identity
+      (a : Type) (n : Nat) (xs : Vec a n)
+    : Equal (Vec a n) (map a a n (idf a) xs) xs =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      cong
+        (Vec a m)
+        (Vec a (Suc m))
+        (map a a m (idf a) tail_xs)
+        tail_xs
+        (VCons a m x)
+        (vec_map_identity a m tail_xs)
+  }
+
 theorem zip_with_vnil
       (a : Type) (b : Type) (c : Type) (f : a → b → c)
     : Equal (Vec c Zero) (zip_with a b c Zero f (VNil a) (VNil b)) (VNil c) =
@@ -142,6 +162,11 @@ and first-index cases reduce to reflexive equalities and close with `Refl`.
 The empty `map` and `zip_with` results reduce to the same nullary constructor,
 so their equalities collapse and close with `Proved`.
 
+Mapping `idf a` over any vector returns the same vector. The empty case reduces
+to the same nullary constructor; in the successor case, `cong` lifts the
+recursive proof under `VCons a m x`. The theorem is private: it checks the
+operation without adding a public name.
+
 ## Design notes
 
 `Fin` is preferred to an unrestricted `Nat` plus a separate less-than proof.
@@ -173,7 +198,8 @@ only tails whose indices have been refined to the same predecessor.
 This entry realizes the length-indexed vector contract in
 `spec/50-stdlib/60-length-indexed-vectors.md` using the ordinary `Nat`, indexed
 `data`, structural recursion, dependent `match`, `Equal`, `Refl`, and `Proved`
-surfaces.
+surfaces. The private identity law reuses the checked catalog definitions
+`Core.Classes.LawfulFunctors.idf` and `Core.Logic.Transport.cong`.
 
 The public API is `Vec`, `VNil`, `VCons`, `Fin`, `FZero`, `FSuc`, `head`,
 `tail`, `map`, `zip_with`, and `lookup`, together with the five computation
@@ -182,9 +208,10 @@ theorems above.
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
 adds no axiom, postulate, primitive, foreign declaration, or unresolved hole.
-Its `trusted_base()` delta is zero.
+Its local `trusted_base()` delta is zero relative to the complete imported
+provider closure; imported trust, if any, remains visible in that closure.
 
 Targeted validation checks the package through the roots-based module loader,
 the exact family indices and constructor targets, generic operation types,
-rejection of empty and out-of-bounds calls, computation theorems, and the
-before/after trusted-base set.
+rejection of empty and out-of-bounds calls, computation and identity theorems,
+and the provider-closure before/after trusted-base set.
