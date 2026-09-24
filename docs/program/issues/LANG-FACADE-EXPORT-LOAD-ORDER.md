@@ -44,27 +44,50 @@ Re-establish these; the Adversary's scratch test was deleted.
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.
 
-## Deliverable
+## Deliverable -- provider rule pinned by the Architect (`evt_66d3vzv6d2c7`)
 
-Give the facade edge one order-independent provider identity, consistent
-with how the landed WP resolves `import N` beside a same-unit inline
-`module N`. **The Architect pins which provider that is at frame review.**
-The Adversary's reading of `§3.2` is the file `N` in every order: exempt
-`ExportForm::Facade` from the pre-scan's inline filter, and select the
-provider from `file_export_tables` in `apply_export`'s facade arm. No
-`apply_export` path may read the ambient bare-name table.
+The facade follows the landed WP's Case A/B classifier, not "always file
+`N`". Route `export N (…)` through the same classifier and provider
+selection as `import N`: `lexical_inline_import` over this unit's ordered
+inline set, then the same pubmap and member-id selection `apply_import`
+uses. Factor that selection into one helper called by both `apply_import`
+and `apply_export`'s facade arm, and delete the `ExportDecl` arm's separate
+`selected_file` computation.
+
+1. Available same-unit child → that child's exports at its canonical path.
+2. Same-unit child declared later or not yet expanded → `UnboundName N` at
+   the facade: never ambient `exports["N"]` and never file `N`.
+3. Absolute → the catalog-root file `N` for file units, and the paired
+   export provenance for in-memory units, exactly as `import`.
+
+The pre-scan keeps filtering facade edges through `declared_inline_import`.
+Do not exempt `ExportForm::Facade`. No `apply_export` path reads a
+bare-name export table.
 
 ## Acceptance
 
-- **AC-1 (red first).** The repro above, in all four entry orders (A, D,
-  C1, C2) and both declaration orders, plus the `module P` variant. At base
-  the verdicts differ by order. On the candidate each entry gives the same
-  verdict and the same provider `GlobalId` in every order.
-- **AC-2 (mutation).** Restoring only the ambient fall-through in
-  `apply_export` reddens AC-1.
-- **AC-3.** The landed WP's Case A and Case B pins and the whole-catalog
-  load stay green. Targeted builds only, through `scripts/ken-cargo`.
-  No-regression means green in CI.
+- **AC-1 (red first, expected values).** On the candidate:
+  - The `module N` then `export N (x)` order: A, D, C1 and C2 are all
+    admitted, and `D.y`'s body is the inline `A.N.x` GlobalId, never file
+    `N.x`, in every entry order.
+  - The `export N (x)` then `module N` order: all four reject
+    `UnboundName N` at A's facade.
+  - File positive: A without an inline `N` selects file `N.x` cold and in
+    every order.
+  - `module P` variant: the consumer must reach the name through `P`'s
+    interface. State the exact consumer spelling and show it resolves in
+    the positive order. A variant whose every entry fails at D's own
+    `import A (x)` measures D, not the facade, and does not count.
+  At base the verdicts differ by entry order.
+- **AC-2 (two mutations, one per rejected rule).** Both must redden AC-1.
+  - (a) Restoring the bare `exports.get(module)` fall-through re-admits C1
+    in the later-declared order.
+  - (b) Selecting file `N` in the Available branch (the always-file rule)
+    changes the positive order's provider to file `N.x`.
+- **AC-3.** The landed WP's Case A and Case B pins, `l4_export_reexport`,
+  `file_facade_uses_source_file_exports_not_memory_shadow` and the
+  whole-catalog load stay green. Targeted builds only, through
+  `scripts/ken-cargo`. No-regression means green in CI.
 
 ## Stop conditions
 
