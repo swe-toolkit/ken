@@ -2531,9 +2531,37 @@ fn prebind_scope_declarations(
         }
     }
 
+    prebind_synthesized_dictionaries(
+        scope,
+        decls,
+        prefix,
+        file_root,
+        unit_inline_modules,
+        ordered_inline_modules,
+        exports,
+        globals,
+        prelude_binding_names,
+        inline_children,
+        exports_here,
+    )
+}
+
+fn prebind_synthesized_dictionaries(
+    scope: &mut Scope,
+    decls: &[Decl],
+    prefix: &str,
+    file_root: Option<&str>,
+    unit_inline_modules: &HashSet<String>,
+    ordered_inline_modules: &HashSet<String>,
+    exports: &HashMap<String, HashMap<String, String>>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+    prelude_binding_names: &HashSet<String>,
+    inline_children: &HashMap<String, HashSet<String>>,
+    exports_here: &mut HashMap<String, String>,
+) -> Result<(), ElabError> {
     // Instance and derive declarations reference a class, but also produce one
     // ordinary global dictionary. A scope with no producer needs no import
-    // replay; in particular, its same-file child modules are not expanded yet.
+    // replay, whether before or after its same-file children expand.
     let has_synthesized_dictionary = decls.iter().any(|decl| {
         matches!(
             decl_namespace_effect(decl.unwrap_pub()),
@@ -2995,6 +3023,24 @@ fn expand_scope(
                     &child_prefix,
                     &child_prefix,
                 );
+                // The initial prebind ran before any same-unit child could
+                // expand. Replay dictionary aliases now that this earlier
+                // child has a real export table and an ordered owner edge.
+                // Later children remain absent from ordered_inline_modules,
+                // so this cannot borrow a caller's identically named export.
+                prebind_synthesized_dictionaries(
+                    scope,
+                    decls,
+                    prefix,
+                    elab.module_state.active_imports.last().map(String::as_str),
+                    unit_inline_modules,
+                    ordered_inline_modules,
+                    &elab.module_state.exports,
+                    &elab.globals,
+                    &elab.module_state.prelude_binding_names,
+                    &elab.module_state.inline_children,
+                    &mut exports_here,
+                )?;
                 if is_standard_operator_home {
                     certify_standard_operator_home(
                         elab,
