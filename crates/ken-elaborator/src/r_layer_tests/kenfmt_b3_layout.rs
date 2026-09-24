@@ -153,6 +153,41 @@ fn selective_import_items_wrap_without_inventory_or_fixed_point_drift() {
     }
 }
 
+/// Promise class: durable invariant.
+/// MEASURED: the valid axiom retains its parsed declaration and every source
+/// token through two formats. CLAIMED: a terminal parenthesized application
+/// in an axiom's type cannot lose its closing delimiter. THE GAP: an
+/// AST-only check could miss a token loss, so check_unit compares token shapes
+/// and reparses the formatted text before testing idempotence.
+#[test]
+fn terminal_type_parens_in_axiom_survive_formatting() {
+    check_unit(
+        "axiom terminal application",
+        "axiom lost_closing_paren : (a : Bytes) → Equal Bytes a (bytes_concat a a)\n",
+    );
+    check_unit(
+        "axiom nested terminal application",
+        "axiom nested_parens : (a : Bytes) → Equal Bytes a (wrap (bytes_concat a a))\n",
+    );
+}
+
+/// Promise class: durable invariant.
+/// MEASURED: the alias retains its parsed declaration and every source token
+/// through two formats. CLAIMED: a terminal parenthesized type argument in
+/// `def` cannot lose its closing delimiter. THE GAP: the axiom-only case
+/// cannot reach the alias's declaration-span consumer; this case reaches it.
+#[test]
+fn terminal_type_parens_in_alias_survive_formatting() {
+    check_unit(
+        "alias terminal application",
+        "def Wrapped = List (Option Nat)\n",
+    );
+    check_unit(
+        "alias nested terminal application",
+        "def DoubleWrapped = List (Option (List Nat))\n",
+    );
+}
+
 #[test]
 fn ac4_all_source_parentheses_and_precedence_are_preserved() {
     let source = "fn redundant (a : Int) (b : Int) : Int = (a + b)\nfn required (a : Int) (b : Int) (c : Int) : Int = (a + b) * c\n";
