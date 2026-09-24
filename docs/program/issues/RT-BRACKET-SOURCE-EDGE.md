@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-SOURCE-EDGE
 title: "Bracket redesign D0: mark the checked bracket's body-to-settlement sequencing edge at the authenticated bind producer as a typed explicit Control IR edge, instead of assigning AcquiredBody through a Ret payload; measure it on the px8ta nested-bracket artifact, STOP and park if the source-to-control tie cannot survive normalization and lowering"
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: architect
@@ -13,6 +13,15 @@ origin: "Operator 2026-09-24 ~03:50Z, 'option (a).': authorize a redesign of bra
 ---
 
 # Mark the edge, not the Ret
+
+> **Closed on its D0 STOP, parked (2026-09-24).** On `ba4a32e07` the two
+> nested brackets share one `g587` / `bind g249` template; normalization
+> yields two distinct release sites, but lowering builds one generic
+> `ResourceRelease` case, so no authenticated source-bind to own-release to
+> lowered-edge tie exists without an order or shape guess
+> (runtime-implementer `evt_72p4vjyzr71gb`). The px8ta row stays ignored. A
+> future attempt needs a genuinely source-carried edge design first. Held
+> refs `4b4c8565c`, `21c039918` and `7f1a04a40` remain unmoved.
 
 ## Objective
 
