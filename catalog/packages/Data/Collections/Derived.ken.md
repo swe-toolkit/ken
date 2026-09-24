@@ -1049,14 +1049,19 @@ reference implementation.
    combinator/law or string op (Approach A, Architect ruling
    `evt_4k1yqah3yvpds`) — deriving trivially structural folds keeps the
    audited primitive set small (subsume-don't-proliferate).
-5. **`trusted_base()` delta.** **Zero.** Every proof in this package is a
-   genuine, kernel-checked term; no law field is postulated anywhere.
+5. **`trusted_base()` delta.** **Zero beyond imported providers.** Every
+   proof in this package is a genuine, kernel-checked term; no law field is
+   postulated here. The roots-loaded provider closure already contains five
+   opaque assumptions: `Ord Int`'s `refl`, `antisym`, `trans`, and `total`, and
+   `StringBijection`'s `string_to_list_char_retraction`. The private
+   `concat_map_append` proof uses structural induction and the checked
+   `list_append::assoc`, `cong`, `sym`, and `trans` proofs, not these axioms.
 6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
    lifting the tail IH under the head constructor; private
    `concat_map_append` lifts the IH under `list_append` and uses
    `list_append::assoc` in reverse. The `nth` bounds proofs split the list
-   before the index so lookup, length, and order reduce together. `§4.3`: full case-split
-   specialized to `List Bool`/`bool_leq`,
+   before the index so lookup, length, and order reduce together. `§4.3`:
+   full case-split specialized to `List Bool`/`bool_leq`,
    closing by `Proved`/`Refl`/`cong`/`trans`/`sym` per branch — no postulate
    anywhere in the verified-sort slice. `§4.4`: every law field closes by
    `Refl` (each concrete operation reduces definitionally once applied, no
