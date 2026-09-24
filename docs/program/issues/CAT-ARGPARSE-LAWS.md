@@ -1,7 +1,7 @@
 ---
 id: CAT-ARGPARSE-LAWS
 title: "Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust"
-status: ready
+status: active
 owner: foundation
 size: L
 gate: none
@@ -63,7 +63,7 @@ list:
 The ring chooses the exact statements. Each must quantify over arbitrary
 input and must fail if the implementation changes the behavior it names.
 
-**Parked for the operator (2026-09-23).** Deliverable 3 and its provider
+**History (2026-09-23 park, resolved).** Deliverable 3 and its provider
 laws landed (`6e235b746`, `3120a845c`). Deliverables 1 and 2 stopped on
 bounded attempts (`evt_3jdh6yptdct5m`, `evt_4ts4acq2t3jxf`). The cause is
 per-occurrence literal identity: `elab_str_lit` mints a fresh identity for
@@ -72,7 +72,27 @@ each `"--"`, so the parser's prefix literal and the proof's never convert
 unlanded. **Operator 2026-09-24:** resume laws 1 and 2 after
 `KERNEL-LITERAL-CHAR-VIEW` lands. Every `"--"` here is
 `string_to_list_char "--"`, which that node reduces to one `List Char`
-across occurrences (its AC-4). No parser or elaborator change.
+across occurrences (its AC-4). No parser or elaborator change. K3 landed
+(`bfdbb9789`) and resolved literal identity. The **current** blocker is
+neutral-selector access; see the symptom inventory.
+
+**Operator 2026-09-24, second ruling ("concur with rec.").** The AC-1b
+retry could not name the parser's own diagnostic-code literals: each raw
+String literal is a separate identity, and K3 equates only their Char views.
+The operator authorized hoisting those codes into private named constants in
+production (AC-1c). The first ruling's "no parser change" is narrowed to
+that one edit.
+
+## Symptom inventory
+
+1. Before K3: the computed prefix `Bool` stayed opaque inside the selected
+   helper when the theorem split a separate result. The obstacle is access
+   through a computed nested selector.
+2. After K3: the theorem's own match on a neutral `argparse_find_option`
+   did not refine the parser's own eliminator. This is the same
+   proof-access predicate.
+
+The chain is at HS2. A third advancing hard stop invokes Research.
 
 ## Acceptance criteria
 
@@ -80,10 +100,64 @@ across occurrences (its AC-4). No parser or elaborator change.
   primitive, `Omega` carrier, or kernel/TCB change. The production
   representation and shipped declarations are unchanged apart from added
   proofs and exports. For the laws 1-2 resumption after K3 there is **no
-  parser or elaborator change**: the 2026-09-23 shared-step factorization
-  fallback is withdrawn (2026-09-24). A distinct post-K3 structural blocker
+  elaborator change**, and the only parser change is AC-1c's constant hoist:
+  the 2026-09-23 shared-step factorization fallback stays withdrawn
+  (2026-09-24). A distinct post-K3 structural blocker
   is a STOP for its own ruling. Exported types are unchanged and `cc7_*`
   stays green. The Architect confirms meaning on the actual candidate.
+- **AC-1a (proof-local helpers; Architect `evt_7fzgaaqe3x855`,
+  `evt_5bjtwy4ymq99s`).** Private proof-local observation and projection
+  helpers that the laws need may stay (for example the WIP's
+  `argparse_input_value_bytes` and `argparse_observed_bytes`). None of them
+  may compute a full parser outcome, with one named exception: the existing
+  WIP's `argparse_missing_result_view` may stay, solely as a nonrecursive
+  helper from a schema result to the missing-positionals result for the
+  `Nil` base case, checked against the real `argparse_missing_positionals`.
+  In addition, **exactly one** private, transparent, proof-only single-token
+  **`Cons`-step full-parser-outcome adapter** may be added, parameterized by
+  the outcomes the proof splits on (for example the selected
+  `Option OptionSpec`, and the prefix `Bool` in the `None` branch). It
+  recurses only through the original parser on tails. Prohibited, whatever
+  it is called: any other full-`Validation` `Cons`-step outcome helper, and
+  any independently recursive function that assembles `ParsedArgument` or
+  `Diagnostic` parser results. Recursive observations that project only an
+  expected `List Bytes`, such as `argparse_input_value_bytes`, are allowed.
+  - It calls the existing `argparse_parse_tokens` for recursive tails and
+    the existing `argparse_cons_validations` and `argparse_error` for
+    assembly. It never recurses as an independent parser.
+  - It is not public, is not called by `argparse_run` or any production
+    function, adds no trust, and does not replace the parser in any law
+    statement.
+  - The first load-bearing lemma is a checked, arbitrary-input bridge on the
+    **full `Validation`**, from the actual parser's `Cons` step to the
+    adapter at its computed selectors, before any outcome is specialized. A
+    bridge between copied observers, or only at `Option (List Bytes)`, does
+    not count.
+  - The final theorems still name `argparse_parse_tokens`. Positives must
+    take both the ValueOption and the positional branches; an Invalid-only
+    observer does not witness law 1.
+  - AC-2's production-site falsifiers are unchanged. With the adapter
+    untouched, each must redden the bridge or the attached law at its own
+    obligation.
+- **AC-1b (superseded by AC-1c).** The bounded retry through
+  `string_to_list_char_injective` could not name the parser's literal
+  occurrences and is closed. Do not reopen it.
+- **AC-1c (diagnostic-code constants; operator 2026-09-24).** In
+  `ArgParse.ken.md`, replace each raw diagnostic-code String literal that a
+  law must match with one private named `String` constant, declared once:
+  `"missing-option-value"`, `"unknown-option"` and `"unexpected-positional"`
+  in `argparse_parse_tokens` (`:368`, `:385`, `:396` at `ad9642456`), and
+  `"missing-positional"` (`:322`) only if a law needs it. Every production
+  occurrence and the AC-1a adapter reference the constant. The proof may name
+  it in theorem types.
+  - Values are byte-identical; exported names, types and `argparse_run`'s
+    behavior are unchanged, and `cc7_*` stays green.
+  - After the edit, no raw occurrence of a hoisted code remains in
+    `ArgParse.ken.md`.
+  - No other production edit, no new public name, no `Axiom`, postulate or
+    kernel change, and no String injectivity certificate.
+  - Report the roots-loaded ArgParse `trusted_base()` at base and candidate;
+    they must be equal.
 - **AC-2 (falsifier).** For each deliverable, the handback names one
   one-line natural-site mutation that makes that law's proof fail to check
   for its own property. For laws 1 and 2 the site is
@@ -101,6 +175,11 @@ across occurrences (its AC-4). No parser or elaborator change.
   means green in CI.
 
 ## Stop conditions
+
+- If the generic full-`Validation` bridge does not check with `Refl` or
+  existing transport over the AC-1c constants, STOP. Do not add a second
+  adapter, edit the parser beyond AC-1c, or edit the elaborator. The chain is at HS2 (symptom inventory above); a third
+  advancing hard stop invokes Research.
 
 - If a law needs a fact about primitive `Bytes` or `String` that no existing
   TCB contract states, prove everything else and STOP on that fact. Do not

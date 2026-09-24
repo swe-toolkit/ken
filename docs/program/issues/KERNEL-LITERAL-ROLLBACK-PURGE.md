@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LITERAL-ROLLBACK-PURGE
 title: "Soundness repair for K3: rolling back a declaration must drop its checked String literal payload, so a later declaration that reuses the freed id cannot inherit it -- the kernel must not convert string_to_list_char of an unrelated foreign String to a stale literal's characters, and the interpreter must not evaluate an Int definition to a String"
-status: ready
+status: merged
 owner: kernel
 size: S
 gate: architect

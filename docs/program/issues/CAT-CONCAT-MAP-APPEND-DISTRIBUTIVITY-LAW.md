@@ -1,7 +1,7 @@
 ---
 id: CAT-CONCAT-MAP-APPEND-DISTRIBUTIVITY-LAW
 title: "Proof-backfill for Data/Collections/Derived.ken.md: prove privately that concat_map distributes over list_append -- for every a, b, f, xs and ys, concat_map a b f (list_append a xs ys) = list_append b (concat_map a b f xs) (concat_map a b f ys) -- with a test that pins the law's checked proposition, not only its name and trust"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect
