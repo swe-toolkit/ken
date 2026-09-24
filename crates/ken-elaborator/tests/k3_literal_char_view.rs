@@ -69,8 +69,9 @@ fn fresh_ascii_literal_closes_generic_checked_finite_code_witness() {
 fn deep_checked_literal_view_admits_a_list_on_the_default_sized_stack() {
     // 2 MiB is the Linux libtest default, stated here to make depth a
     // deterministic code property rather than a machine/environment setting.
-    // Before the checker-spine repair, depth 80 checked on this stack, while
-    // depth 88 overflowed; after it, depth 256 checks without more stack.
+    // In this client, bypassing the checker-spine repair makes its 96-scalar
+    // case stack-overflow; with the repair, both 96 and 256 check. This does
+    // not assert a first-failing depth or an unbounded stack guarantee.
     const CHECKER_STACK_BYTES: usize = 2 * 1024 * 1024;
     std::thread::Builder::new()
         .name("k3-list-check-2mib".into())
