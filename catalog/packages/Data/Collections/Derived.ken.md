@@ -138,12 +138,15 @@ before this file.
 
 Ordinary transparent recursive definitions over `List`/`Nat`; no primitive
 or postulated law is added. `take_drop_decomposition`, `map_length`, and
-`length_take_min` are the three proof-returning laws this slice ships. The
-`filter` membership characterization is deliberately held out until its
-comparator/Iff statement is pinned — no bare `Prop`-returning wrapper is
-shipped for it prematurely. The two attached `nth` laws connect successful
-lookup and out-of-bounds lookup to the structural `length` fold in both
-directions.
+`length_take_min` are the three original proof-returning laws. The private
+`mem_filter` theorem characterizes membership through the installed prelude
+`filter`: given `compat`, a matching head has the same predicate result as
+`x`. The private `mem_filter_sound` theorem needs no compatibility premise:
+membership after filtering implies membership before filtering. Both laws
+range over any element type, comparator, predicate, query and list; neither
+adds a wrapper or a new trust assumption. The two attached `nth` laws connect
+successful lookup and out-of-bounds lookup to the structural `length` fold in
+both directions.
 
 Migrated here per the attached-proof ownership rule — an attached proof
 `f::law` belongs to the module that defines `f` — the three `list_append`
@@ -255,6 +258,386 @@ pub proof right_unit for list_append
         t
         (Cons a h)
         ((proof right_unit for list_append) a t)
+  }
+
+theorem bool_and_false_right (b : Bool) : Equal Bool (bool_and b False) False =
+  match b {
+    True ↦ Proved;
+    False ↦ Proved
+  }
+
+theorem mem_filter_head_true
+      (a : Type)
+      (eqf : a → a → Bool)
+      (p : a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (eb : Equal Bool (p h) True)
+    : Equal Bool
+        (mem a eqf x (filter a p (Cons a h t)))
+        (mem a eqf x (Cons a h (filter a p t))) =
+  cong
+    Bool
+    Bool
+    (p h)
+    True
+    (λq.
+      mem
+        a
+        eqf
+        x
+        (match q {
+          True ↦ Cons a h (filter a p t);
+          False ↦ filter a p t
+        }))
+    eb
+
+theorem mem_filter_head_false
+      (a : Type)
+      (eqf : a → a → Bool)
+      (p : a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (eb : Equal Bool (p h) False)
+    : Equal Bool (mem a eqf x (filter a p (Cons a h t))) (mem a eqf x (filter a p t)) =
+  cong
+    Bool
+    Bool
+    (p h)
+    False
+    (λq.
+      mem
+        a
+        eqf
+        x
+        (match q {
+          True ↦ Cons a h (filter a p t);
+          False ↦ filter a p t
+        }))
+    eb
+
+theorem mem_cons_head_true
+      (a : Type)
+      (eqf : a → a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (ec : Equal Bool (eqf x h) True)
+    : Equal Bool (mem a eqf x (Cons a h t)) True =
+  cong
+    Bool
+    Bool
+    (eqf x h)
+    True
+    (λq.
+      match q {
+        True ↦ True;
+        False ↦ mem a eqf x t
+      })
+    ec
+
+theorem mem_cons_head_false
+      (a : Type)
+      (eqf : a → a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (ec : Equal Bool (eqf x h) False)
+    : Equal Bool (mem a eqf x (Cons a h t)) (mem a eqf x t) =
+  cong
+    Bool
+    Bool
+    (eqf x h)
+    False
+    (λq.
+      match q {
+        True ↦ True;
+        False ↦ mem a eqf x t
+      })
+    ec
+
+theorem mem_filter_cons_case
+      (a : Type)
+      (eqf : a → a → Bool)
+      (p : a → Bool)
+      (x : a)
+      (compat : (y : a) → IsTrue (eqf x y) → Equal Bool (p y) (p x))
+      (h : a)
+      (t : List a)
+      (ih : Equal Bool (mem a eqf x (filter a p t)) (bool_and (mem a eqf x t) (p x)))
+      (b : Bool)
+      (c : Bool)
+    : Equal Bool (p h) b
+      → Equal Bool (eqf x h) c
+      → Equal Bool
+        (mem a eqf x (filter a p (Cons a h t)))
+        (bool_and (mem a eqf x (Cons a h t)) (p x)) =
+  match b {
+    True ↦
+      match c {
+        True ↦
+          λeb.
+            λec.
+              trans
+                Bool
+                (mem a eqf x (filter a p (Cons a h t)))
+                (mem a eqf x (Cons a h (filter a p t)))
+                (bool_and (mem a eqf x (Cons a h t)) (p x))
+                (mem_filter_head_true a eqf p x h t eb)
+                (trans
+                  Bool
+                  (mem a eqf x (Cons a h (filter a p t)))
+                  True
+                  (bool_and (mem a eqf x (Cons a h t)) (p x))
+                  (mem_cons_head_true a eqf x h (filter a p t) ec)
+                  (trans
+                    Bool
+                    True
+                    (p x)
+                    (bool_and (mem a eqf x (Cons a h t)) (p x))
+                    (trans Bool True (p h) (p x) (sym Bool (p h) True eb) (compat h ec))
+                    (sym
+                      Bool
+                      (bool_and (mem a eqf x (Cons a h t)) (p x))
+                      (p x)
+                      (cong
+                        Bool
+                        Bool
+                        (mem a eqf x (Cons a h t))
+                        True
+                        (λq. bool_and q (p x))
+                        (mem_cons_head_true a eqf x h t ec)))));
+        False ↦
+          λeb.
+            λec.
+              trans
+                Bool
+                (mem a eqf x (filter a p (Cons a h t)))
+                (mem a eqf x (Cons a h (filter a p t)))
+                (bool_and (mem a eqf x (Cons a h t)) (p x))
+                (mem_filter_head_true a eqf p x h t eb)
+                (trans
+                  Bool
+                  (mem a eqf x (Cons a h (filter a p t)))
+                  (mem a eqf x (filter a p t))
+                  (bool_and (mem a eqf x (Cons a h t)) (p x))
+                  (mem_cons_head_false a eqf x h (filter a p t) ec)
+                  (trans
+                    Bool
+                    (mem a eqf x (filter a p t))
+                    (bool_and (mem a eqf x t) (p x))
+                    (bool_and (mem a eqf x (Cons a h t)) (p x))
+                    ih
+                    (sym
+                      Bool
+                      (bool_and (mem a eqf x (Cons a h t)) (p x))
+                      (bool_and (mem a eqf x t) (p x))
+                      (cong
+                        Bool
+                        Bool
+                        (mem a eqf x (Cons a h t))
+                        (mem a eqf x t)
+                        (λq. bool_and q (p x))
+                        (mem_cons_head_false a eqf x h t ec)))))
+      };
+    False ↦
+      match c {
+        True ↦
+          λeb.
+            λec.
+              trans
+                Bool
+                (mem a eqf x (filter a p (Cons a h t)))
+                False
+                (bool_and (mem a eqf x (Cons a h t)) (p x))
+                (trans
+                  Bool
+                  (mem a eqf x (filter a p (Cons a h t)))
+                  (bool_and (mem a eqf x t) (p x))
+                  False
+                  (trans
+                    Bool
+                    (mem a eqf x (filter a p (Cons a h t)))
+                    (mem a eqf x (filter a p t))
+                    (bool_and (mem a eqf x t) (p x))
+                    (mem_filter_head_false a eqf p x h t eb)
+                    ih)
+                  (trans
+                    Bool
+                    (bool_and (mem a eqf x t) (p x))
+                    (bool_and (mem a eqf x t) False)
+                    False
+                    (cong
+                      Bool
+                      Bool
+                      (p x)
+                      False
+                      (λq. bool_and (mem a eqf x t) q)
+                      (trans Bool (p x) (p h) False (sym Bool (p h) (p x) (compat h ec)) eb))
+                    (bool_and_false_right (mem a eqf x t))))
+                (sym
+                  Bool
+                  (bool_and (mem a eqf x (Cons a h t)) (p x))
+                  False
+                  (trans
+                    Bool
+                    (bool_and (mem a eqf x (Cons a h t)) (p x))
+                    (p x)
+                    False
+                    (cong
+                      Bool
+                      Bool
+                      (mem a eqf x (Cons a h t))
+                      True
+                      (λq. bool_and q (p x))
+                      (mem_cons_head_true a eqf x h t ec))
+                    (trans Bool (p x) (p h) False (sym Bool (p h) (p x) (compat h ec)) eb)));
+        False ↦
+          λeb.
+            λec.
+              trans
+                Bool
+                (mem a eqf x (filter a p (Cons a h t)))
+                (mem a eqf x (filter a p t))
+                (bool_and (mem a eqf x (Cons a h t)) (p x))
+                (mem_filter_head_false a eqf p x h t eb)
+                (trans
+                  Bool
+                  (mem a eqf x (filter a p t))
+                  (bool_and (mem a eqf x t) (p x))
+                  (bool_and (mem a eqf x (Cons a h t)) (p x))
+                  ih
+                  (sym
+                    Bool
+                    (bool_and (mem a eqf x (Cons a h t)) (p x))
+                    (bool_and (mem a eqf x t) (p x))
+                    (cong
+                      Bool
+                      Bool
+                      (mem a eqf x (Cons a h t))
+                      (mem a eqf x t)
+                      (λq. bool_and q (p x))
+                      (mem_cons_head_false a eqf x h t ec))))
+      }
+  }
+
+theorem mem_filter
+      (a : Type)
+      (eqf : a → a → Bool)
+      (p : a → Bool)
+      (x : a)
+      (compat : (y : a) → IsTrue (eqf x y) → Equal Bool (p y) (p x))
+      (xs : List a)
+    : Equal Bool (mem a eqf x (filter a p xs)) (bool_and (mem a eqf x xs) (p x)) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      mem_filter_cons_case
+        a
+        eqf
+        p
+        x
+        compat
+        h
+        t
+        (mem_filter a eqf p x compat t)
+        (p h)
+        (eqf x h)
+        (Refl)
+        (Refl)
+  }
+
+theorem mem_filter_sound_cons_case
+      (a : Type)
+      (eqf : a → a → Bool)
+      (p : a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (ih : IsTrue (mem a eqf x (filter a p t)) → IsTrue (mem a eqf x t))
+      (b : Bool)
+      (c : Bool)
+    : Equal Bool (p h) b
+      → Equal Bool (eqf x h) c
+      → IsTrue (mem a eqf x (filter a p (Cons a h t)))
+      → IsTrue (mem a eqf x (Cons a h t)) =
+  match c {
+    True ↦ λeb. λec. λhm. mem_cons_head_true a eqf x h t ec;
+    False ↦
+      match b {
+        True ↦
+          λeb.
+            λec.
+              λhm.
+                trans
+                  Bool
+                  (mem a eqf x (Cons a h t))
+                  (mem a eqf x t)
+                  True
+                  (mem_cons_head_false a eqf x h t ec)
+                  (ih
+                    (trans
+                      Bool
+                      (mem a eqf x (filter a p t))
+                      (mem a eqf x (filter a p (Cons a h t)))
+                      True
+                      (sym
+                        Bool
+                        (mem a eqf x (filter a p (Cons a h t)))
+                        (mem a eqf x (filter a p t))
+                        (trans
+                          Bool
+                          (mem a eqf x (filter a p (Cons a h t)))
+                          (mem a eqf x (Cons a h (filter a p t)))
+                          (mem a eqf x (filter a p t))
+                          (mem_filter_head_true a eqf p x h t eb)
+                          (mem_cons_head_false a eqf x h (filter a p t) ec)))
+                      hm));
+        False ↦
+          λeb.
+            λec.
+              λhm.
+                trans
+                  Bool
+                  (mem a eqf x (Cons a h t))
+                  (mem a eqf x t)
+                  True
+                  (mem_cons_head_false a eqf x h t ec)
+                  (ih
+                    (trans
+                      Bool
+                      (mem a eqf x (filter a p t))
+                      (mem a eqf x (filter a p (Cons a h t)))
+                      True
+                      (sym
+                        Bool
+                        (mem a eqf x (filter a p (Cons a h t)))
+                        (mem a eqf x (filter a p t))
+                        (mem_filter_head_false a eqf p x h t eb))
+                      hm))
+      }
+  }
+
+theorem mem_filter_sound
+      (a : Type) (eqf : a → a → Bool) (p : a → Bool) (x : a) (xs : List a)
+    : IsTrue (mem a eqf x (filter a p xs)) → IsTrue (mem a eqf x xs) =
+  match xs {
+    Nil ↦ λhm. absurd hm;
+    Cons h t ↦
+      mem_filter_sound_cons_case
+        a
+        eqf
+        p
+        x
+        h
+        t
+        (mem_filter_sound a eqf p x t)
+        (p h)
+        (eqf x h)
+        (Refl)
+        (Refl)
   }
 
 theorem map_length
@@ -995,9 +1378,10 @@ trust level; this package ships the functions only, honestly.
 ## 6. Findings
 
 - **Kernel-reduction defect:** none.
-- **Abstraction candidate:** `§4.1`'s `filter` membership characterization
-  is deliberately held out until its comparator/Iff statement is pinned —
-  not shipped as a premature wrapper.
+- **Abstraction candidate:** `§4.1` now proves private `mem_filter` with an
+  explicit comparator/predicate compatibility premise, and proves private
+  `mem_filter_sound` without that premise. Both address the installed prelude
+  `filter`; neither publishes a new wrapper.
 - **Runtime-performance characteristic (non-blocking, forward-tracked).**
   `crates/ken-elaborator/tests/l3_strings_surface_acceptance.rs`'s
   `derived_string_ops_reduce_over_real_roundtrip` test exercises the pinned
@@ -1031,7 +1415,8 @@ reference implementation.
 2. **Public API.** `OrdResult`, `list_append`, `nth`, `take`, `drop`,
    `sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
    `filter`, `mem`, `length`, `min`, `take_drop_decomposition`,
-   `map_length`, `length_take_min` (CAT-3 D1); `nth::some_below_length`,
+   `map_length`, `length_take_min` (CAT-3 D1); private `mem_filter` and
+   `mem_filter_sound` (filter-membership backfill); `nth::some_below_length`,
    `nth::at_or_beyond_is_none` (the two lookup bounds); `reverse`,
    `reverse::involutive`,
    `zip`, `concat_map`, `range`, `foldl` and their proofs (DS-4); `count`,
@@ -1065,8 +1450,11 @@ reference implementation.
    `concat_map_append` proof uses structural induction and the checked
    `list_append::assoc`, `cong`, `sym`, and `trans` proofs, not these axioms.
 6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
-   lifting the tail IH under the head constructor; private
-   `concat_map_append` lifts the IH under `list_append` and uses
+   lifting the tail IH under the head constructor; private `mem_filter`
+   and `mem_filter_sound` split named predicate/comparator outcomes and use
+   `cong` over the prelude `filter` branch, with compatibility needed only
+   for the first law. Private `concat_map_append` lifts the IH under
+   `list_append` and uses
    `list_append::assoc` in reverse. The `nth` bounds proofs split the list
    before the index so lookup, length, and order reduce together. `§4.3`:
    full case-split specialized to `List Bool`/`bool_leq`,
@@ -1086,6 +1474,9 @@ reference implementation.
    concatenates it (after `Transport.ken.md`'s tangled source) ahead of
    several rosetta examples that reuse it per the DRY rule.
 8. **Validation evidence.**
+   `crates/ken-elaborator/tests/cat_derived_filter_membership_law.rs` —
+   pins both private checked contracts to the installed prelude `filter`
+   and distinguishes incompatible from compatible concrete equations.
    `crates/ken-elaborator/tests/cat3_collections_package.rs` — confirms the
    CAT-3 D1/D2/D3 surface elaborates with zero `trusted_base()` delta, that
    every law is proof-returning (not a bare `Prop` wrapper) and postulates
