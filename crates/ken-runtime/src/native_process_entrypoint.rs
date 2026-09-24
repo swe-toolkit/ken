@@ -311,14 +311,16 @@ fn list_value(values: impl IntoIterator<Item = RuntimeValue>) -> RuntimeValue {
 pub fn run_native_process_entrypoint(
     input: &NativeProcessInput,
     entrypoint: &RuntimeExpr,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> NativeProcessOutcome {
     let stderr = io::stderr();
-    run_native_process_entrypoint_with_stderr(input, entrypoint, &mut stderr.lock())
+    run_native_process_entrypoint_with_stderr(input, entrypoint, profile, &mut stderr.lock())
 }
 
 pub fn run_native_process_entrypoint_with_stderr<W>(
     input: &NativeProcessInput,
     entrypoint: &RuntimeExpr,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
     stderr: &mut W,
 ) -> NativeProcessOutcome
 where
@@ -328,7 +330,7 @@ where
 
     let report = match run_process_expr_with_cranelift(
         entrypoint,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(profile),
         &runtime.staged_process_input,
     ) {
         Ok(report) => report,
@@ -580,7 +582,7 @@ mod tests {
             };
             let mut stderr = Vec::new();
             let outcome =
-                run_native_process_entrypoint_with_stderr(&input, &entrypoint, &mut stderr);
+                run_native_process_entrypoint_with_stderr(&input, &entrypoint, crate::boundary_resource_profile::starter_smoke_profile(), &mut stderr);
             assert_eq!(outcome.exit_status, expected);
             assert!(stderr.is_empty());
         }
@@ -627,7 +629,7 @@ mod tests {
         };
         let mut stderr = Vec::new();
         let entrypoint = environment_key_length_entrypoint();
-        let outcome = run_native_process_entrypoint_with_stderr(&input, &entrypoint, &mut stderr);
+        let outcome = run_native_process_entrypoint_with_stderr(&input, &entrypoint, crate::boundary_resource_profile::starter_smoke_profile(), &mut stderr);
         assert_eq!(outcome.exit_status, 2);
         assert!(stderr.is_empty());
     }
@@ -667,7 +669,7 @@ mod tests {
         let mut stderr = Vec::new();
         let malformed_entrypoint = RuntimeExpr::Value(RuntimeValue::Int((0).into()));
         let malformed =
-            run_native_process_entrypoint_with_stderr(&input, &malformed_entrypoint, &mut stderr);
+            run_native_process_entrypoint_with_stderr(&input, &malformed_entrypoint, crate::boundary_resource_profile::starter_smoke_profile(), &mut stderr);
         assert_eq!(malformed.exit_status, 1);
         assert!(String::from_utf8(stderr)
             .unwrap()
@@ -681,6 +683,7 @@ mod tests {
         let malformed_failure = run_native_process_entrypoint_with_stderr(
             &input,
             &malformed_failure_entrypoint,
+            crate::boundary_resource_profile::starter_smoke_profile(),
             &mut malformed_failure_stderr,
         );
         assert_eq!(malformed_failure.exit_status, 1);
@@ -698,7 +701,7 @@ mod tests {
         };
         let mut clean_stderr = Vec::new();
         let clean =
-            run_native_process_entrypoint_with_stderr(&input, &success(), &mut clean_stderr);
+            run_native_process_entrypoint_with_stderr(&input, &success(), crate::boundary_resource_profile::starter_smoke_profile(), &mut clean_stderr);
         assert_eq!(clean.exit_status, 0);
         assert!(clean_stderr.is_empty());
 
@@ -708,7 +711,7 @@ mod tests {
             message: "fixture trap".to_string(),
         });
         let trapped =
-            run_native_process_entrypoint_with_stderr(&input, &trap_entrypoint, &mut trap_stderr);
+            run_native_process_entrypoint_with_stderr(&input, &trap_entrypoint, crate::boundary_resource_profile::starter_smoke_profile(), &mut trap_stderr);
         assert_eq!(trapped.exit_status, 1);
         let report = String::from_utf8(trap_stderr).unwrap();
         assert!(report.contains("ken native trap"));
@@ -730,7 +733,7 @@ mod tests {
             args: vec![],
         };
         let outcome =
-            run_native_process_entrypoint_with_stderr(&input, &effect_entrypoint, &mut stderr);
+            run_native_process_entrypoint_with_stderr(&input, &effect_entrypoint, crate::boundary_resource_profile::starter_smoke_profile(), &mut stderr);
         assert_eq!(outcome.exit_status, 1);
         let report = String::from_utf8(stderr).unwrap();
         assert!(report.contains("unsupported runtime-IR lowering: Effect"));

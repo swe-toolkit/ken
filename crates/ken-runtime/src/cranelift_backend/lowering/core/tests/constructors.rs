@@ -113,7 +113,7 @@ fn c2_ac3_missing_dynamic_role_refuses_at_some_zero_unit_epoch() {
             "c2_missing_role",
             Linkage::Local,
             &expr,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             BTreeMap::new(),
             None,
             false,
@@ -160,7 +160,7 @@ fn run_dynamic_constructor_dispatch_fixture(
     let mut context = module.make_context();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     // Declared before `compiler`, because the plan installed below **borrows**
     // this term (B2A-S D2) and so must outlive the `Lowering` that holds it.
     // Locals drop in reverse order, so declaring it here is the whole fix.
@@ -367,7 +367,7 @@ fn run_dynamic_constructor_dispatch_fixture(
         compiler.unsupported,
     );
     compiled
-        .run(None)
+        .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
         .map(|(_, token)| token.expect("fixture returns one scalar"))
 }
 
@@ -564,7 +564,7 @@ fn dynamic_constructor_fields_precede_outer_environment_in_declaration_order() {
 
 #[test]
 fn cranelift_runs_constructor_match_and_record_projection_seeds() {
-    let env = NativeSeedEnvironment::empty();
+    let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     for name in ["adt-constructor-match", "record-construction-projection"] {
         let example = nc5_seed_examples()
             .into_iter()
@@ -644,7 +644,7 @@ fn run_final_kind_discriminator_fixture(fixture: &RuntimeExpr, symbol: &str) -> 
         symbol,
         Linkage::Local,
         fixture,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -661,9 +661,9 @@ fn run_final_kind_discriminator_fixture(fixture: &RuntimeExpr, symbol: &str) -> 
         capability: 1_u64 << 32,
     };
     let status = compiled
-        .run(Some(
+        .run_with_profile(Some(
             (&ingress as *const crate::boundary_activation::GeneratedRootIngressV1).cast(),
-        ))
+        ), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the CarrierWord final-kind fixture runs")
         .1
         .expect("the process root returns a status");
@@ -977,10 +977,10 @@ fn constructor_field_middle_binder_preserves_trailing_environment_order() {
             message: "px7p middle outer default".to_string(),
         },
     };
-    let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty())
+    let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("the selected middle field composes without moving its trailing sibling");
     assert_eq!(
-        compiled.run(None).expect("middle-field fixture runs").0,
+        compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("middle-field fixture runs").0,
         RuntimeObservation::Returned(RuntimeGroundValue::Int((34).into()))
     );
 }
@@ -1082,10 +1082,10 @@ fn constructor_field_missing_case_owns_default_before_fields() {
         }],
         default: default.clone(),
     };
-    let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty())
+    let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("a missing constructor selects its frame-owned default");
     assert_eq!(
-        compiled.run(None).expect("default trap is observable").0,
+        compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("default trap is observable").0,
         RuntimeObservation::Trapped(default)
     );
 }
@@ -1293,11 +1293,11 @@ fn heterogeneous_frame_environment_and_binder_order_are_preserved() {
         )),
         args: vec![inner_call],
     };
-    let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty())
+    let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("frame environment fixture lowers");
     assert_eq!(
         compiled
-            .run(None)
+            .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
             .expect("frame environment fixture runs")
             .0,
         RuntimeObservation::Returned(RuntimeGroundValue::Int((34).into()))
@@ -1452,7 +1452,7 @@ fn pattern_default_trap_is_observation_not_backend_error() {
         }),
     };
 
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("trap report succeeds");
 
     assert_eq!(report.observation, example.observation);
@@ -1885,7 +1885,7 @@ fn emit_process_entrypoint_object_with_symbols(
         entry_symbol,
         Linkage::Export,
         entrypoint,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -2073,7 +2073,7 @@ pub(in crate::cranelift_backend::lowering) fn bind_bare_test_trap_lane(
 /// turns it red.
 #[test]
 fn c1_d3_producer_screens_admissibility_before_it_touches_the_carrier() {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut module = new_jit_module().expect("JIT module constructs");
     let mut signature = module.make_signature();
     signature.returns.push(AbiParam::new(types::I64));
@@ -2211,7 +2211,7 @@ fn c1_d3_a_carried_operand_survives_case_env_and_nested_lowering() {
         body: Box::new(RuntimeExpr::Var(0)),
     };
     let (plan, root_origin) = planned_root_occurrence(&nested_read);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
 
     let mut func = Function::new();
@@ -2692,7 +2692,7 @@ fn d1_compile_carried_match_consumer<'src>(
             _ => panic!("the focused carried-Match fixture uses small Int case results"),
         })
         .collect::<Vec<_>>();
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (module, code) = ac_c7_try_compile_edge_with_operands(
         &seed_env,
         plan,
@@ -2808,7 +2808,7 @@ fn carried_bool_dispatch_refuses_payload_two() {
 fn d1_compile_borrowed_word_producer() -> (cranelift_jit::JITModule, *const u8) {
     static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
     let (plan, origin) = planned_root_occurrence(&SOURCE);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     c2_compile_edge_with_arg(
         "d1_borrowed_bool_hostile",
         &seed_env,
@@ -3183,7 +3183,7 @@ fn d1_compile_nat_spill_producer(
 ) -> (cranelift_jit::JITModule, *const u8) {
     static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
     let (plan, origin) = planned_root_occurrence(&SOURCE);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     c2_compile_edge_with_arg(
         "d1_nat_spill_producer",
         &seed_env,
@@ -3601,7 +3601,7 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
         "the two runtime arms need distinct identities or selection is vacuous"
     );
 
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let producer_plan = plan.clone();
     let producer_symbols = symbols.clone();
     let (_producer_module, producer) = c2_compile_edge_with_arg(
@@ -3839,7 +3839,7 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
     )
     .expect("the C2 covered-class fixture plans");
     let origin = plan.root_static_origin().expect("root occurrence exists");
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let resource = 0x1020_3040_5060_7080_i64;
     // ⛔ `RT-CARRIER-BYTESPAN-OBSERVE` `D2` — REAL BACKING STORAGE, and the
     // fabricated `0x1122_3344_5566_7788` it replaces is now UNLAWFUL.
@@ -4006,7 +4006,7 @@ fn host_result_transfer_materializes_only_the_runtime_selected_payload() {
     let malformed_status = -((malformed_identity
         << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
         | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
 
     let success_plan = plan.clone();
     let success_constructor = constructor.clone();
@@ -4237,7 +4237,7 @@ fn ac_c7_project_edge(fields: [(&str, &str); 2], project: &str) -> (i64, u64, u6
     let record_occurrence = plan
         .source_aggregate_occurrence(record_origin, PlannedAggregateShape::Record)
         .expect("the planned record has an ownership record at its own origin");
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_compile_edge(&seed_env, plan, move |compiler, builder| {
         // ── PRODUCER: a compile-time record crosses the one-way seam ──────
         let record = Lowered::Record {
@@ -4495,7 +4495,7 @@ fn ac_c7_match_edge(scrutinee: &str, inner: &str) -> (i64, u64, u64) {
     );
 
     let lowered = ac_c7_lowered_wrap(&plan, scrutinee_origin, scrutinee, inner);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_compile_edge(&seed_env, plan, move |compiler, builder| {
         let word = compiler.transfer_into_carrier(builder, scrutinee_origin, &lowered)?;
         let eliminated = compiler.lower_expr(
@@ -4655,7 +4655,7 @@ fn ac_c7_computational_match_edge(scrutinee: &str, inner: &str) -> (i64, u64, u6
     );
 
     let lowered = ac_c7_lowered_wrap(&plan, scrutinee_origin, scrutinee, inner);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_compile_edge(&seed_env, plan, move |compiler, builder| {
         let word = compiler.transfer_into_carrier(builder, scrutinee_origin, &lowered)?;
         let eliminated = compiler.lower_expr(
@@ -4713,7 +4713,7 @@ fn direct_none_frame_recursive_ret_vis_compile() -> Result<(), CraneliftBackendE
     let scrutinee_origin = plan.child_static_origin(root, 0).unwrap();
     let match_origin = plan.child_static_origin(root, 1).unwrap();
     let lowered = ac_c7_lowered_wrap(&plan, scrutinee_origin, "Absent", "Gamma");
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     ac_c7_try_compile_edge(&seed_env, plan, move |compiler, builder| {
         let word = compiler.transfer_into_carrier(builder, scrutinee_origin, &lowered)?;
         let eliminated = compiler.lower_expr(
@@ -4887,7 +4887,7 @@ fn ac_c4_recursive_edge(
     );
 
     let lowered = ac_c7_lowered_wrap(&plan, scrutinee_origin, "Wrap", "Leaf");
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_try_compile_edge(&seed_env, plan, move |compiler, builder| {
         let word = compiler.transfer_into_carrier(builder, scrutinee_origin, &lowered)?;
         let eliminated = compiler.lower_expr(
@@ -5217,7 +5217,7 @@ fn ac_c4_ownership_edge_with_case_body(
     );
 
     let lowered = ac_c4_lowered_wrap2(&plan, scrutinee_origin, "Wrap2", "Alpha", "Leaf");
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
 
     struct Reset;
     impl Drop for Reset {
@@ -5554,7 +5554,7 @@ fn ac_c4_recursor_capsule(residual: LoweringOperand) -> Lowered {
 /// ⚠ Promise class: **durable invariant**.
 #[test]
 fn c1_d3_ac_c4_the_recursor_capsule_is_refused_before_its_residual_is_read() {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut module = new_jit_module().expect("JIT module constructs");
     let mut signature = module.make_signature();
     signature.returns.push(AbiParam::new(types::I64));
@@ -5675,7 +5675,7 @@ fn c1_d3_ac_c4_the_recursor_capsule_is_refused_before_its_residual_is_read() {
 fn b2f_d9_dispatch(payloads: &[i64]) -> Vec<crate::boundary_value::BoundaryWord> {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_try_compile_edge_with_operands(
         &seed_env,
         plan,
@@ -5937,7 +5937,7 @@ fn b2f_d9_no_spillable_tag_can_make_the_immediate_producer_answer_shape() {
 fn b2f_d9_bytes_edge(literal: Lowered) -> (crate::boundary_value::BoundaryWord, Option<u64>, Vec<u8>) {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_compile_edge(&seed_env, plan, move |compiler, builder| {
         Ok(compiler.transfer_into_carrier(builder, root, &literal)?.word)
     });
@@ -6087,7 +6087,7 @@ fn b2f_d9_wide_int(
 ) {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_try_compile_edge_with_operands(
         &seed_env,
         plan,
@@ -6311,7 +6311,7 @@ fn b2f_d9_the_same_body_takes_the_small_arm_on_a_trimmed_pair() {
 fn b2f_d9_a_no_pair_spillable_crosses_on_its_own_tag() {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_try_compile_edge_with_operands(
         &seed_env,
         plan,
@@ -6518,7 +6518,7 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
     );
 
     reset_invocation_return_transport_decisions();
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut destination_compiler = bare_carrier_test_lowering(&seed_env, plan.clone());
     destination_compiler.defining_emission_owner = Some(owner);
     destination_compiler.defining_unit = Some(defining_unit);
@@ -6749,7 +6749,7 @@ fn attempt_worker_construction(
     let body_origin = plan
         .child_static_origin(closure_origin, 0)
         .expect("a lexical closure plans its body as child 0");
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
     if let Some(target) = install(body_origin, closure_origin) {
         compiler
@@ -6990,7 +6990,7 @@ fn lower_against_static_worker(
         .child_static_origin(closure_origin, 0)
         .expect("a lexical closure plans its body as child 0");
     let (subject_plan, subject_origin) = planned_root_occurrence(subject);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = bare_carrier_test_lowering(&seed_env, subject_plan);
     if declare_target {
         compiler
@@ -7400,18 +7400,18 @@ fn static_worker_witness_runs_and_distinguishes_capture_order() {
     let ordered = static_worker_witness(true);
     let compiled = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         &ordered,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     )
     .expect("the ordinary witness compiles");
-    let observed = compiled.run(None).expect("the witness runs").0;
+    let observed = compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("the witness runs").0;
     let swapped = static_worker_witness(false);
     let swapped_observed =
         crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
             &swapped,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         )
         .expect("the capture-swapped witness compiles")
-        .run(None)
+        .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the swapped witness runs")
         .0;
     assert_ne!(
@@ -7448,11 +7448,11 @@ fn static_worker_unused_binding_succeeds() {
     };
     let compiled = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         &expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     )
     .expect("an unused worker binding is lawful and must compile");
     assert_eq!(
-        compiled.run(None).expect("the unused-binding fixture runs").0,
+        compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("the unused-binding fixture runs").0,
         RuntimeObservation::Returned(RuntimeGroundValue::Int(42.into()))
     );
 }
@@ -7492,11 +7492,11 @@ fn static_worker_twice_called_binding_succeeds() {
     };
     let compiled = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         &expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     )
     .expect("a twice-called worker binding is lawful and must compile");
     compiled
-        .run(None)
+        .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the twice-called fixture runs");
 }
 
@@ -7570,10 +7570,10 @@ fn two_same_shape_workers(first_body: u32, second_body: u32, swap_second: bool) 
 fn run_worker_fixture(expr: &RuntimeExpr) -> RuntimeObservation {
     crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     )
     .expect("the worker fixture compiles")
-    .run(None)
+    .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
     .expect("the worker fixture runs")
     .0
 }
@@ -7741,7 +7741,7 @@ fn static_worker_capture_omission_fails_closed() {
     };
     let error = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         &omitted,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     )
     .err()
     .expect("omitting a capture the body reads must fail closed");
@@ -7781,7 +7781,7 @@ fn ac5_restoring_carried_capture_narrowing_reds_the_ordinary_witness() {
     // Positive control first: without the mutation this exact program runs.
     let baseline = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         &witness,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     );
     assert!(
         baseline.is_ok(),
@@ -7792,7 +7792,7 @@ fn ac5_restoring_carried_capture_narrowing_reds_the_ordinary_witness() {
         || {
             crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
                 &witness,
-                &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             )
             .err()
         },
@@ -7806,7 +7806,7 @@ fn ac5_restoring_carried_capture_narrowing_reds_the_ordinary_witness() {
     assert!(
         crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
             &witness,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         )
         .is_ok(),
         "the mutation must not leak past its scope"
@@ -7825,7 +7825,7 @@ fn ac5_redirecting_the_resolved_worker_target_reds_the_same_shape_witness() {
     let program = two_same_shape_workers(1, 1, false);
     let baseline = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         &program,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     );
     assert!(
         baseline.is_ok(),
@@ -7836,7 +7836,7 @@ fn ac5_redirecting_the_resolved_worker_target_reds_the_same_shape_witness() {
         || {
             crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
                 &program,
-                &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             )
             .err()
         },
@@ -7849,7 +7849,7 @@ fn ac5_redirecting_the_resolved_worker_target_reds_the_same_shape_witness() {
     assert!(
         crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
             &program,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         )
         .is_ok(),
         "the mutation must not leak past its scope"
@@ -7928,7 +7928,7 @@ fn a_capture_operand_reconciles_only_against_its_own_ruled_position() {
     let right = origins[0];
     let wrong = origins[1];
 
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
     let path =
         SynthesizedAggregatePath::root(SynthesizedAggregateRoot::CheckedIhCapturedEnvironment);
@@ -8018,7 +8018,7 @@ fn a_construction_time_occurrence_lookup_fails_closed() {
             .expect("a planned graph has an emittable unit")
             .function(),
     );
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
     let ok_root = SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk);
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
@@ -8230,7 +8230,7 @@ fn a_dynamic_alternative_with_no_planned_record_refuses() {
         "the resource surface must supply an alternative to probe"
     );
 
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let compiler = bare_carrier_test_lowering(&seed_env, plan);
     let plan = &compiler.static_transition_plan;
 
@@ -8481,7 +8481,7 @@ fn attempt_capture_contract(
     let body_origin = plan
         .child_static_origin(closure_origin, 0)
         .expect("a lexical closure plans its body as child 0");
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
     if let Some(capture_slots) = capture_slots() {
         let mut slots = (0..declared_arity)
@@ -8924,7 +8924,7 @@ fn ac1_the_current_carried_route_fixture_does_not_reach_the_inherited_join_arm()
 fn d2_runtime_span_edge(source: &[u8], declared_len: i64) -> (i64, Option<u64>, Vec<u8>, usize) {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let address = source.as_ptr() as i64;
     let (_module, code) = ac_c7_compile_edge(&seed_env, plan, move |compiler, builder| {
         let pointer = builder
@@ -9118,7 +9118,7 @@ fn d2_a_negative_runtime_length_fails_closed_rather_than_looping() {
 fn d2_masked_reply_edge(source: &[u8], success_value: i64) -> (Option<u64>, Vec<u8>) {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let address = source.as_ptr() as i64;
     let length = source.len() as i64;
     let (_module, code) = c2_compile_edge_with_arg(
@@ -9235,7 +9235,7 @@ fn d4_observe(
 ) -> (i64, Option<Vec<u8>>) {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_module, code) = ac_c7_compile_edge(&seed_env, plan, move |compiler, builder| {
         // ⛔ The non-span operand is built HERE because it needs an SSA value.
         // A `Bool` never denotes a byte span, which is the whole point.
@@ -9372,7 +9372,7 @@ fn d4_a_non_span_is_a_distinct_outcome_from_an_observable_span() {
 fn d4_a_seat_whose_need_is_not_a_byte_span_is_refused() {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let outcome = ac_c7_try_compile_edge(&seed_env, plan, move |compiler, builder| {
         let word = compiler.transfer_into_carrier(builder, root, &Lowered::Bytes(vec![1, 2]))?;
         let (pointer, _len, _outcome) = compiler.observe_carried_bytes_span(

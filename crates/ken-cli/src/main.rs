@@ -51,6 +51,8 @@ fn dispatch() -> i32 {
         "native-build" => native_build_file(
             args.get(2).map(OsString::as_os_str),
             args.get(3).map(OsString::as_os_str),
+            args.get(4).map(OsString::as_os_str),
+            args.get(5).is_some(),
         ),
         "fmt" => {
             format_files(&args[2..]);
@@ -78,16 +80,112 @@ fn dispatch() -> i32 {
 
 /// Returns the process exit code rather than taking the exit, so that 4a.1's
 /// envelope is written while this result is still a value. See `main`.
-fn native_build_file(path: Option<&OsStr>, output_dir: Option<&OsStr>) -> i32 {
+fn parse_native_resource_profile(
+    bytes: &[u8],
+) -> Result<ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2, String> {
+    use ken_runtime::boundary_resource_profile::{
+        BoundaryRegionLimitsV1, BoundaryResourceProfileV2, RuntimeResourceLimitsV2,
+    };
+    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    let object = value.as_object().ok_or("profile must be a JSON object")?;
+    let keys = ["runtime", "invocation", "persistent"];
+    if object.len() != keys.len() || keys.iter().any(|key| !object.contains_key(*key)) {
+        return Err("profile must name exactly runtime, invocation, persistent".into());
+    }
+    let region = |name: &str| -> Result<BoundaryRegionLimitsV1, String> {
+        let fields = object[name]
+            .as_object()
+            .ok_or(format!("{name} must be an object"))?;
+        let names = ["nodes", "words", "data_bytes", "native_int_limbs"];
+        if fields.len() != names.len() || names.iter().any(|key| !fields.contains_key(*key)) {
+            return Err(format!(
+                "{name} must name exactly nodes, words, data_bytes, native_int_limbs"
+            ));
+        }
+        let get = |field: &str| -> Result<usize, String> {
+            let n = fields[field]
+                .as_u64()
+                .ok_or(format!("{name}.{field} must be a nonnegative integer"))?;
+            usize::try_from(n).map_err(|_| format!("{name}.{field} exceeds the host address space"))
+        };
+        Ok(BoundaryRegionLimitsV1 {
+            nodes: get("nodes")?,
+            words: get("words")?,
+            data_bytes: get("data_bytes")?,
+            native_int_limbs: get("native_int_limbs")?,
+        })
+    };
+    let runtime = object["runtime"]
+        .as_object()
+        .ok_or("runtime must be an object")?;
+    if runtime.len() != 1 || !runtime.contains_key("invocation_epochs") {
+        return Err("runtime must name exactly invocation_epochs".into());
+    }
+    let invocation_epochs = runtime["invocation_epochs"]
+        .as_u64()
+        .ok_or("runtime.invocation_epochs must be a nonnegative integer")?;
+    Ok(BoundaryResourceProfileV2 {
+        runtime: RuntimeResourceLimitsV2 { invocation_epochs },
+        invocation: region("invocation")?,
+        persistent: region("persistent")?,
+    })
+}
+
+#[cfg(test)]
+mod capacity_profile_tests {
+    use super::*;
+
+    #[test]
+    fn native_profile_requires_all_nine_explicit_numbers_and_admits_zero() {
+        let valid = br#"{"runtime":{"invocation_epochs":0},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+        let profile = parse_native_resource_profile(valid).expect("zero is explicit, not absent");
+        assert_eq!(profile.runtime.invocation_epochs, 0);
+        assert_eq!(profile.invocation.nodes, 1);
+        assert_eq!(profile.persistent.native_int_limbs, 8);
+        let missing = br#"{"runtime":{},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+        assert!(parse_native_resource_profile(missing).unwrap_err().contains("invocation_epochs"));
+        let extra = br#"{"runtime":{"invocation_epochs":0,"pending_slots":1},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+        assert!(parse_native_resource_profile(extra).unwrap_err().contains("runtime"));
+    }
+}
+
+fn native_build_file(
+    path: Option<&OsStr>,
+    output_dir: Option<&OsStr>,
+    profile_path: Option<&OsStr>,
+    extra_argument: bool,
+) -> i32 {
     let Some(path) = path else {
         eprintln!("ken native-build: missing <file> argument");
-        eprintln!("Usage: ken native-build <file.ken> <output-dir>");
+        eprintln!("Usage: ken native-build <file.ken> <output-dir> <resource-profile.json>");
         std::process::exit(1);
     };
     let Some(output_dir) = output_dir else {
         eprintln!("ken native-build: missing <output-dir> argument");
-        eprintln!("Usage: ken native-build <file.ken> <output-dir>");
-        std::process::exit(1);
+        eprintln!("Usage: ken native-build <file.ken> <output-dir> <resource-profile.json>");
+        return 1;
+    };
+    let Some(profile_path) = profile_path else {
+        eprintln!("ken native-build: missing <resource-profile.json> argument");
+        return 1;
+    };
+    if extra_argument {
+        eprintln!("ken native-build: unexpected argument after resource profile");
+        return 1;
+    }
+    let profile_bytes = match std::fs::read(profile_path) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            eprintln!("ken native-build: cannot read resource profile: {error}");
+            return 1;
+        }
+    };
+    let profile = match parse_native_resource_profile(&profile_bytes) {
+        Ok(profile) => profile,
+        Err(error) => {
+            eprintln!("ken native-build: invalid resource profile: {error}");
+            return 1;
+        }
     };
     let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
         eprintln!(
@@ -106,6 +204,7 @@ fn native_build_file(path: Option<&OsStr>, output_dir: Option<&OsStr>) -> i32 {
         format,
         "native-program",
         PathBuf::from(output_dir),
+        profile,
     ) {
         Ok(output) => {
             println!("{}", output.artifact.executable_path.display());
@@ -426,7 +525,7 @@ fn print_help() {
     println!("  run <file>    Elaborate and run a Ken source file (Console IO)");
     println!("  check <file>  Elaborate a Ken source file and verify its fences,");
     println!("                without driving IO (for pure-library entries)");
-    println!("  native-build <file> <output-dir>");
+    println!("  native-build <file> <output-dir> <resource-profile.json>");
     println!("                Build the checked Program I main as a native artifact");
     println!("  fmt [--check] <paths...>");
     println!("                Canonicalize Ken source, or check without writing");

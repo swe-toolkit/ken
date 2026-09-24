@@ -410,6 +410,7 @@ fn assert_retained_unit_call_target_mutation_child() {
             ken_cli::SourceFormat::Ken,
             "px8f_write_all_retained_target_control",
             dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
     let error = match result {
@@ -484,6 +485,7 @@ fn assert_retained_result_closure_proof_mutation_child() {
             ken_cli::SourceFormat::Ken,
             "px8f_write_all_retained_result_closure_control",
             dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
     match expected {
@@ -539,6 +541,7 @@ fn assert_handler_owned_deferred_response_mutation_child() {
                 ken_cli::SourceFormat::Ken,
                 "px8f_write_all_handler_owned_response_control",
                 dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         });
     assert_eq!(
@@ -832,6 +835,7 @@ fn run_linked_checked_write_all() {
         ken_cli::SourceFormat::Ken,
         "px8f_write_all_native",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("checked writeAll reaches linked native lowering");
     eprintln!("PX8-F: running linked fixture");
@@ -1008,6 +1012,7 @@ fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() 
                             ken_cli::SourceFormat::Ken,
                             "px8f_grafted_spine_ac3_exact",
                             dir.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
                     },
                 );
@@ -1049,6 +1054,7 @@ fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() 
                         ken_cli::SourceFormat::Ken,
                         "px8f_grafted_spine_ac3_mutated",
                         dir.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 });
             mutated_compile
@@ -1138,6 +1144,7 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                         ken_cli::SourceFormat::Ken,
                         package,
                         dir.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 })
             };

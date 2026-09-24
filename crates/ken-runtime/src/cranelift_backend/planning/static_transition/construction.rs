@@ -1774,7 +1774,7 @@ mod tests {
         use crate::cranelift_backend::lowering::core::{
             compile_expr_into_object_module, NativeSeedEnvironment,
         };
-        let seed_env = NativeSeedEnvironment::empty();
+        let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         compile_expr_into_object_module(
             new_object_module_for_lowering_tests("ac3")
                 .map_err(|error| format!("{error:?}"))?,

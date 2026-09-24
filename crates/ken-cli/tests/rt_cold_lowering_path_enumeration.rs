@@ -593,6 +593,7 @@ fn entry_outcome(entry: &str) -> String {
             ken_cli::SourceFormat::Ken,
             &format!("rt_cold_enum_{entry}"),
             root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         ) {
             Ok(_) => "OK".to_string(),
             Err(error) => format!("{error:?}"),

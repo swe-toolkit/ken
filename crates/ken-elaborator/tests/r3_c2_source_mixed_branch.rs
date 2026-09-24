@@ -69,12 +69,12 @@
 //! candidate, ledger, or Runtime mechanism is touched. Production stays unarmed.
 
 use ken_elaborator::checked_core::{
-    checked_core_body_view_for_selection, CheckedCoreBodyTerm, CheckedCoreBodyViewSelection,
-    CheckedCoreMatchBranchView, CheckedCoreMatchView, StableSymbol, SymbolNamespace,
+    CheckedCoreBodyTerm, CheckedCoreBodyViewSelection, CheckedCoreMatchBranchView,
+    CheckedCoreMatchView, StableSymbol, SymbolNamespace, checked_core_body_view_for_selection,
 };
 use ken_elaborator::compiler_driver::{
-    compile_ken_package_sources, compile_native_program_sources, prepare_native_program_sources,
     CompilerManifest, CompilerSource, CompilerTargetKind, TargetSelector,
+    compile_ken_package_sources, compile_native_program_sources, prepare_native_program_sources,
 };
 use ken_elaborator::erasure::erase_checked_core_package_for_target;
 use std::path::{Path, PathBuf};
@@ -540,11 +540,9 @@ fn r3_4b_feature_artifact_worker_impl() {
     let compile = || {
         compile_native_program_sources(
             "r3_4b_feature_identity_pkg",
-            vec![CompilerSource::new(
-                "src/main.ken",
-                R3_4B_IDENTITY_SOURCE,
-            )],
+            vec![CompilerSource::new("src/main.ken", R3_4B_IDENTITY_SOURCE)],
             &output_dir,
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     };
 

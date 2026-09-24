@@ -94,6 +94,7 @@ fn linked_route_exposes_real_ordered_role_labelled_bindings() {
         ken_cli::SourceFormat::Ken,
         "px8x-single-schema-observation",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("checked resource program reaches the linked artifact");
     let options = ken_runtime::NativeEffectRunOptionsV1 {

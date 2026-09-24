@@ -82,7 +82,7 @@ fn d5_source(inorder_arm: &str) -> String {
 
 fn native_exit(source: &str, package: &str) -> i32 {
     let root = tempfile::tempdir().expect("temporary native-build root");
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, package, root.path())
+    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, package, root.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
         .unwrap_or_else(|e| {
             panic!("{package}: two-recursive-position traversal must reach a native artifact: {e:#?}")
         });

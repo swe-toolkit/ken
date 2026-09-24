@@ -563,7 +563,7 @@ fn checked_core_imported_value_crosses_an_accepted_var_capture() {
         .expect("the imported value crosses the ordinary Var capture");
     assert_eq!(interpreted.observation.observation, example.observation);
 
-    let native = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty());
+    let native = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()));
     let error = native.expect_err(
         "the representable capture reaches the separate dependency-linking gap",
     );

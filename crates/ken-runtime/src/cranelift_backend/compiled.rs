@@ -13,7 +13,7 @@ use std::mem;
 use cranelift_jit::JITModule;
 use cranelift_module::FuncId;
 
-use super::surface::{backend, backend_module, BackendFailure, CraneliftBackendError};
+use super::surface::{BackendFailure, CraneliftBackendError, backend, backend_module};
 use crate::{RuntimeGroundValue, RuntimeObservation, RuntimeTrap};
 
 pub(super) struct CompiledModule<M> {
@@ -100,9 +100,10 @@ impl<M> CompiledModule<M> {
 }
 
 impl CompiledModule<JITModule> {
-    pub(super) fn run(
+    pub(super) fn run_with_profile(
         mut self,
         process_root: Option<*const std::ffi::c_void>,
+        profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
     ) -> Result<(RuntimeObservation, Option<i64>), CraneliftBackendError> {
         if let Some(trap) = self.trap {
             return Ok((RuntimeObservation::Trapped(trap), None));
@@ -122,11 +123,9 @@ impl CompiledModule<JITModule> {
                 ));
             }
         }
-        let binding = crate::boundary_activation::BoundaryStoreBindingV1::open(
-            &mut store,
-            crate::boundary_resource_profile::starter_smoke_profile(),
-        );
-        let mut activation = crate::boundary_activation::BoundaryActivationV1::begin(&binding);
+        let binding = crate::boundary_activation::BoundaryStoreBindingV1::open(&mut store, profile);
+        let mut activation = crate::boundary_activation::BoundaryActivationV1::begin(&binding)
+            .map_err(CraneliftBackendError::CapacityExhausted)?;
         let process_root = process_root
             .or_else(|| activation.native_frame_ptr())
             .ok_or_else(|| {
@@ -134,16 +133,11 @@ impl CompiledModule<JITModule> {
             })?;
         let services = activation
             .services_ptr()
-            .ok_or_else(|| {
-                backend_module("activation did not publish its services".to_string())
-            })?;
+            .ok_or_else(|| backend_module("activation did not publish its services".to_string()))?;
         let native = unsafe {
             mem::transmute::<
                 _,
-                extern "C" fn(
-                    *const std::ffi::c_void,
-                    *const std::ffi::c_void,
-                ) -> i64,
+                extern "C" fn(*const std::ffi::c_void, *const std::ffi::c_void) -> i64,
             >(code)
         };
         let token = native(process_root, services);
@@ -183,9 +177,8 @@ impl CompiledModule<JITModule> {
             ),
             ResultDecoder::ProcessStatus => RuntimeGroundValue::Int(token.into()),
             ResultDecoder::Bool => RuntimeGroundValue::Bool(token != 0),
-            ResultDecoder::Boundary => match crate::boundary_value::BoundaryWord(token as u64)
-                .tag()
-            {
+            ResultDecoder::Boundary => {
+                match crate::boundary_value::BoundaryWord(token as u64).tag() {
                 Some(crate::boundary_value::BoundaryTag::ImmediateBool) => {
                     RuntimeGroundValue::Bool(
                         crate::boundary_value::BoundaryWord(token as u64).payload() != 0,
@@ -204,15 +197,11 @@ impl CompiledModule<JITModule> {
                             &mut store,
                             Some(crate::boundary_value::BoundaryWord(token as u64)),
                         )
-                        .map_err(|_| {
-                            backend(BackendFailure::NativeResultDecode { token })
-                        })?
-                        .ok_or_else(|| {
-                            backend(BackendFailure::NativeResultDecode { token })
-                        })?;
-                    store.observe_adopted_ground(adopted).ok_or_else(|| {
-                        backend(BackendFailure::NativeResultDecode { token })
-                    })?
+                            .map_err(|_| backend(BackendFailure::NativeResultDecode { token }))?
+                            .ok_or_else(|| backend(BackendFailure::NativeResultDecode { token }))?;
+                        store
+                            .observe_adopted_ground(adopted)
+                            .ok_or_else(|| backend(BackendFailure::NativeResultDecode { token }))?
                 }
                 // `RT-FNUNIT-RESULT-TOKEN` `D3`. The one arm this node adds.
                 //
@@ -250,7 +239,8 @@ impl CompiledModule<JITModule> {
                 | Some(crate::boundary_value::BoundaryTag::InvocationHostResult) => {
                     return Err(backend(BackendFailure::NativeResultDecode { token }));
                 }
-            },
+                }
+            }
             ResultDecoder::Table => self
                 .result_table
                 .get(&token)

@@ -124,6 +124,7 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
         ken_cli::SourceFormat::Ken,
         "px8l-recursive-declaration",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("admitted recursive declaration compiles through the finite closure");
     assert_eq!(
@@ -262,6 +263,7 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         ken_cli::SourceFormat::Ken,
         "px8l-nondecreasing-cycle",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect_err("the kernel SCT gate must reject a non-decreasing recursive cycle");
     assert!(

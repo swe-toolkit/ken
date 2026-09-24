@@ -115,6 +115,7 @@ fn the_positioned_int_seats_decode_carried_and_complete_native_construction() {
         ken_cli::SourceFormat::Ken,
         "rt_exactint_carried_observe",
         root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     );
     let error = format!("{result:?}");
 

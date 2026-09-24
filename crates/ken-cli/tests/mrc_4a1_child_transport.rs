@@ -330,6 +330,9 @@ fn case_root(case: &str) -> PathBuf {
 fn census_source(root: &Path) -> PathBuf {
     let path = root.join("census.ken");
     std::fs::write(&path, CENSUS_PROGRAM).expect("source written");
+    std::fs::write(root.join("resource-profile.json"),
+        r#"{"runtime":{"invocation_epochs":18446744073709551615},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#,
+    ).expect("explicit resource policy written");
     path
 }
 
@@ -405,6 +408,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             "native-build",
             source.to_str().unwrap(),
             out.to_str().unwrap(),
+            root.join("resource-profile.json").to_str().unwrap(),
         ],
         Some((session, &sink)),
         &parent,
@@ -471,6 +475,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             "native-build",
             absent_source.to_str().unwrap(),
             absent_root.join("out").to_str().unwrap(),
+            absent_root.join("resource-profile.json").to_str().unwrap(),
         ],
         None,
         &parent,
@@ -485,6 +490,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             "native-build",
             present_source.to_str().unwrap(),
             present_root.join("out").to_str().unwrap(),
+            present_root.join("resource-profile.json").to_str().unwrap(),
         ],
         Some(("mrc-4a1-parity", &present_obs.join("parity.envelope"))),
         &parent,
@@ -537,6 +543,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
                     "native-build",
                     child_source.to_str().unwrap(),
                     child_root.join("out").to_str().unwrap(),
+                    child_root.join("resource-profile.json").to_str().unwrap(),
                 ])
                 .env("KEN_MRC_CENSUS_SESSION", &session)
                 .env("KEN_MRC_CENSUS_PARENT", &parent)
@@ -613,6 +620,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             "native-build",
             inert_source.to_str().unwrap(),
             inert_root.join("out").to_str().unwrap(),
+            inert_root.join("resource-profile.json").to_str().unwrap(),
         ],
         None,
         &parent,

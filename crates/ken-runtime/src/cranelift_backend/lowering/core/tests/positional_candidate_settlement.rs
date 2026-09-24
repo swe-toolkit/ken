@@ -451,7 +451,7 @@ fn d3_run_two_parameter(declaration: &RuntimeDeclaration) -> i64 {
         "d3_two_parameter_binding",
         Linkage::Local,
         &program,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         declarations,
         None,
         true,
@@ -473,7 +473,7 @@ fn d3_run_two_parameter(declaration: &RuntimeDeclaration) -> i64 {
         capability: 0,
     };
     compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the two-parameter binding fixture runs")
         .1
         .expect("the two-parameter binding fixture returns an exit code")
@@ -595,7 +595,7 @@ fn d3_run_role_discriminator(declaration: &RuntimeDeclaration) -> i64 {
         "d3_role_discriminator",
         Linkage::Local,
         &program,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         declarations,
         None,
         true,
@@ -617,7 +617,7 @@ fn d3_run_role_discriminator(declaration: &RuntimeDeclaration) -> i64 {
         capability: 0,
     };
     compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the role discriminator fixture runs")
         .1
         .expect("the role discriminator fixture returns an exit code")
@@ -1005,7 +1005,7 @@ fn d3_the_ported_producer_call_scrutinee_runs_unhooked_on_the_functionized_lane(
     let example = seed_call_port_producer_match_example();
 
     reset_producer_match_unit_ports();
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("AC-1b: the D1 firing population must still build and run");
     assert_eq!(
         report.observation, example.observation,
@@ -1785,8 +1785,8 @@ fn d3_payload_arm(
     reset_d8d_bindings();
     let expr = d8l2_payload_witness(false, 41);
     let (outcome, answer) = with_d3_mutation(mutation, || {
-        match compile_expr(&expr, &NativeSeedEnvironment::empty()) {
-            Ok(compiled) => match compiled.run(None) {
+        match compile_expr(&expr, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile())) {
+            Ok(compiled) => match compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()) {
                 Ok((observation, _)) => ("Ok".to_string(), format!("{observation:?}")),
                 Err(error) => ("Ok".to_string(), format!("run-err {error:?}")),
             },
@@ -3651,7 +3651,7 @@ fn r3_the_base_uncomposed_slot_population_stays_singleton_and_rehomed_expects_no
             symbol,
             cranelift_module::Linkage::Export,
             &entry,
-            &crate::NativeSeedEnvironment::empty(),
+            &crate::NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             declarations,
             None,
             false,

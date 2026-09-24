@@ -7663,7 +7663,7 @@ mod px7l_tests {
         match emit_runtime_ir_object_with_cranelift(
             &program,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
             "ken_d7_1b_marker_gate",
         ) {
             Ok(_) => None,

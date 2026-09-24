@@ -3277,7 +3277,7 @@ mod tests {
             &entrypoint,
             &support,
             run_report,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             output_dir,
             "native differential unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),

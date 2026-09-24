@@ -44,7 +44,7 @@ fn run_checked_bounded_nat_fixture(
     let mut context = module.make_context();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = Lowering {
         grafted_spine_builder: None,
         grafted_spine_graph: None,
@@ -367,7 +367,7 @@ fn run_checked_bounded_nat_fixture(
         compiler.unsupported,
     );
     compiled
-        .run(None)
+        .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
         .map(|(_, value)| value.expect("PX8-N fixture returns one scalar"))
 }
 
@@ -584,7 +584,7 @@ fn run_borrowed_fixture(expr: &RuntimeExpr, root: &BorrowedFixtureValue) -> i64 
         "px4_borrowed_fixture",
         Linkage::Local,
         expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -600,7 +600,7 @@ fn run_borrowed_fixture(expr: &RuntimeExpr, root: &BorrowedFixtureValue) -> i64 
         capability: 1_u64 << 32,
     };
     compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("borrowed fixture runs")
         .1
         .expect("borrowed fixture returns scalar")
@@ -692,7 +692,7 @@ fn run_b2f_context_fixture(
         "b2f_host_context_envelope",
         Linkage::Local,
         &expression,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -715,7 +715,7 @@ fn run_b2f_context_fixture(
     };
     B2F_EXPECTED_HOST_CONTEXT.with(|cell| cell.set(ingress.host_context as usize));
     let result = compiled
-        .run(Some((&ingress as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&ingress as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the context-propagation fixture runs")
         .1
         .expect("the process fixture returns a status");
@@ -890,7 +890,7 @@ fn compile_b2f_fixture(
         symbol,
         Linkage::Local,
         expression,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -986,7 +986,7 @@ fn compile_directory_reply_fixture(
         "abi_a3_directory_reply_decoder",
         Linkage::Local,
         &directory_reply_fixture(),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -1013,7 +1013,7 @@ fn run_directory_reply_fixture(payload: Vec<u8>) -> i64 {
         capability: 1_u64 << 32,
     };
     compiled
-        .run(Some((&ingress as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&ingress as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("directory decoder fixture runs")
         .1
         .expect("directory decoder returns a status")
@@ -1190,7 +1190,7 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
     set_process_slot_mutation(ProcessSlotMutation::Exact);
     let exact = compile_b2f_process_pair_fixture()
         .expect("the exact declared pair compiles")
-        .run(Some((&ingress as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&ingress as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the exact declared pair runs")
         .1
         .expect("the exact declared pair returns a status");
@@ -1223,7 +1223,7 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
     let recovery_red = std::panic::catch_unwind(|| {
         let recovered = compile_b2f_process_pair_fixture()
             .expect("the explicit launch-ingress recovery mutation still emits")
-            .run(Some((&ingress as *const RootIngressFixture).cast()))
+            .run_with_profile(Some((&ingress as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
             .expect("the explicit launch-ingress recovery mutation runs")
             .1
             .expect("the explicit launch-ingress recovery mutation returns a status");
@@ -1647,7 +1647,7 @@ fn run_abi_s6_d5a_reifier_fixture(
         "abi_s6_d5a_reifier",
         Linkage::Local,
         &expression(&symbols),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -1669,7 +1669,7 @@ fn run_abi_s6_d5a_reifier_fixture(
         capability: 0,
     };
     let (_, result) = compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("ABI-S6 reifier fixture runs");
     result.expect("fixture returns a scalar ExitCode payload")
 }
@@ -1921,7 +1921,7 @@ fn abi_s6_d5a_all_anonymous_mapping_operations_lower_as_one_native_set() {
         "abi_s6_d5a_mapping_views",
         Linkage::Local,
         &abi_s6_mapping_view_sequence(&symbols),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -1946,7 +1946,7 @@ fn abi_s6_d5a_all_anonymous_mapping_operations_lower_as_one_native_set() {
         capability: 0,
     };
     let (_, result) = compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the mapping operation sequence runs");
     assert_eq!(result, Some(92));
     assert_eq!(fixture.call_index, 3);
@@ -2372,7 +2372,7 @@ fn unsupported_effect_is_distinct_from_backend_failure() {
         }),
     };
 
-    let err = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let err = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect_err("effect must reject");
 
     assert!(matches!(
@@ -2835,7 +2835,7 @@ fn run_px8n_arm_fixture(
         "px8n_fs_write_at",
         Linkage::Local,
         &expression(&symbols),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -2861,7 +2861,7 @@ fn run_px8n_arm_fixture(
         capability: 0,
     };
     let (_, result) = compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .unwrap();
     (result.unwrap(), fixture)
 }
@@ -3667,7 +3667,7 @@ fn mapping_window_seats_are_either_phase_without_widening_buffer_freeze() {
 fn compile_resource_token_seat_probe() -> (JITModule, *const u8) {
     static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
     let (plan, origin) = planned_root_occurrence(&SOURCE);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     c2_compile_edge_with_arg(
         "resource_token_transport_tag_probe",
         &seed_env,
@@ -3800,7 +3800,7 @@ fn compile_wrong_resource_tag_order_probe() -> (JITModule, *const u8) {
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
     let class = module.declare_func_in_func(class_probe, &mut context.func);
     let scalar = module.declare_func_in_func(scalar_probe, &mut context.func);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = super::constructors::bare_carrier_test_lowering(&seed_env, plan);
     compiler.function_local.boundary_carrier = Some(BoundaryCarrierRefs {
         class,
@@ -4119,7 +4119,7 @@ fn run_console_fixture(
         "d5_console_transport",
         Linkage::Local,
         &build(&symbols),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -4140,7 +4140,7 @@ fn run_console_fixture(
         capability: 0,
     };
     let (_, result) = compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .unwrap();
     Ok((result.unwrap(), probe))
 }
@@ -4200,7 +4200,7 @@ fn run_fs_open_fixture(
         "m3_fs_open_constructor_dispatch",
         Linkage::Local,
         expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -4221,7 +4221,7 @@ fn run_fs_open_fixture(
         capability: 1_u64 << 32,
     };
     let (_, result) = compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .unwrap();
     Ok((result.unwrap(), probe))
 }
@@ -4351,7 +4351,7 @@ fn run_capacity_fixture(
         "d7_carried_capacity",
         Linkage::Local,
         &build(&symbols),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -4372,7 +4372,7 @@ fn run_capacity_fixture(
         capability: 0,
     };
     let (_, result) = compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .unwrap();
     Ok((result.unwrap(), probe))
 }
@@ -5020,7 +5020,7 @@ fn run_ac1_specialized_sibling(producer: &str) -> (i64, i64) {
         "ac1_specialized_sibling",
         Linkage::Local,
         &program,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         declarations,
         None,
         true,
@@ -5051,7 +5051,7 @@ fn run_ac1_specialized_sibling(producer: &str) -> (i64, i64) {
         capability: 0,
     };
     let status = compiled
-        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .run_with_profile(Some((&invocation as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
         .expect("the specialized sibling fixture runs")
         .1
         .expect("the specialized sibling fixture returns an exit code");

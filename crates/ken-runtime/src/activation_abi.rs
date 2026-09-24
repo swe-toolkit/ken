@@ -27,12 +27,12 @@
 //! `§4` bans a second copy of the **arena, services, native-`Int` or
 //! activation** layouts in generated C. ⚠ The profile is not among them, and
 //! `D5` explicitly contemplates the stub *"embedding those already-authorized
-//! numbers"*. ⇒ [`KenBoundaryResourceProfileV1`] is deliberately the only
+//! numbers"*. ⇒ [`KenBoundaryResourceProfileV2`] is deliberately the only
 //! `#[repr(C)]` struct that crosses.
 //!
 //! ⭐ And it carries its own `version` and `size` so a C/Rust disagreement
 //! **fails closed** rather than being read under a layout it does not have —
-//! ⛔ eight bare positional `u64` parameters would have reintroduced exactly the
+//! ⛔ nine bare positional `u64` parameters would have reintroduced exactly the
 //! transposition hazard that `BoundaryRegionLimitsV1`'s named fields removed,
 //! in the one language with no help against it.
 
@@ -40,7 +40,8 @@ use std::ffi::c_void;
 
 use crate::boundary_activation::{BoundaryActivationV1, BoundaryStoreBindingV1};
 use crate::boundary_resource_profile::{
-    BoundaryRegionLimitsV1, BoundaryResourceProfileV1, BOUNDARY_RESOURCE_PROFILE_VERSION,
+    BOUNDARY_RESOURCE_PROFILE_VERSION, BoundaryRegionLimitsV1, BoundaryResourceProfileV2,
+    RuntimeResourceLimitsV2,
 };
 use crate::boundary_value::{BoundaryValueStore, BoundaryWord};
 
@@ -63,19 +64,24 @@ pub const KEN_ACTIVATION_ERR_EXPORT: i64 = -5;
 /// The rendering does not fit the caller's buffer. ⛔ Nothing partial is
 /// written: a truncated integer is a wrong answer, not a short one.
 pub const KEN_ACTIVATION_ERR_BUFFER: i64 = -6;
+/// The runtime's process-wide epoch authority refused the declared limit.
+/// A typed opaque failure handle is returned alongside this status.
+pub const KEN_ACTIVATION_ERR_CAPACITY: i64 = -7;
 
 /// **The deployment-authorized profile, as it crosses into C.**
 ///
-/// ⛔ Eight named limits and no default — the C side supplies all eight or the
+/// Nine named limits and no default — the C side supplies all nine or the
 /// call is refused. ⭐ `version` and `size` make a layout disagreement a
 /// **checked refusal** instead of a silent misread.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct KenBoundaryResourceProfileV1 {
+pub struct KenBoundaryResourceProfileV2 {
     /// Must equal [`BOUNDARY_RESOURCE_PROFILE_VERSION`].
     pub version: u64,
-    /// Must equal `size_of::<KenBoundaryResourceProfileV1>()`.
+    /// Must equal `size_of::<KenBoundaryResourceProfileV2>()`.
     pub size: u64,
+    /// Process-wide activation-epoch ceiling.
+    pub runtime_invocation_epochs: u64,
     /// Invocation-arena node ceiling.
     pub invocation_nodes: u64,
     /// Invocation-arena child-word ceiling.
@@ -94,19 +100,22 @@ pub struct KenBoundaryResourceProfileV1 {
     pub persistent_native_int_limbs: u64,
 }
 
-impl KenBoundaryResourceProfileV1 {
+impl KenBoundaryResourceProfileV2 {
     /// Convert to the Rust profile, refusing a layout this runtime does not
     /// implement.
     ///
     /// ⛔ No default and no widening: a wrong `version` or `size` is
     /// [`KEN_ACTIVATION_ERR_PROFILE`], ⛔ never a fallback profile.
-    fn to_rust(self) -> Option<BoundaryResourceProfileV1> {
+    fn to_rust(self) -> Option<BoundaryResourceProfileV2> {
         if self.version != u64::from(BOUNDARY_RESOURCE_PROFILE_VERSION)
-            || self.size != std::mem::size_of::<KenBoundaryResourceProfileV1>() as u64
+            || self.size != std::mem::size_of::<KenBoundaryResourceProfileV2>() as u64
         {
             return None;
         }
-        Some(BoundaryResourceProfileV1 {
+        Some(BoundaryResourceProfileV2 {
+            runtime: RuntimeResourceLimitsV2 {
+                invocation_epochs: self.runtime_invocation_epochs,
+            },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: self.invocation_nodes as usize,
                 words: self.invocation_words as usize,
@@ -134,16 +143,21 @@ pub struct KenActivationV1 {
     activation: BoundaryActivationV1,
 }
 
+/// Opaque error handle: C never decodes or invents a capacity payload.
+pub struct KenCapacityFailureV1 {
+    fault: ken_host::CapacityExhaustedV1,
+}
+
 /// Open a store and reserve/publish its persistent image from the authorized
 /// profile. ⛔ Once per store.
 ///
 /// # Safety
 ///
-/// `profile` must point to a readable [`KenBoundaryResourceProfileV1`] and
+/// `profile` must point to a readable [`KenBoundaryResourceProfileV2`] and
 /// `out_store` to a writable pointer slot.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ken_boundary_store_v1_open(
-    profile: *const KenBoundaryResourceProfileV1,
+    profile: *const KenBoundaryResourceProfileV2,
     out_store: *mut *mut KenBoundaryStoreV1,
 ) -> i64 {
     if profile.is_null() || out_store.is_null() {
@@ -184,14 +198,58 @@ pub unsafe extern "C" fn ken_boundary_store_v1_destroy(store: *mut KenBoundarySt
 pub unsafe extern "C" fn ken_activation_v1_begin(
     store: *mut KenBoundaryStoreV1,
     out_activation: *mut *mut KenActivationV1,
+    out_failure: *mut *mut KenCapacityFailureV1,
 ) -> i64 {
-    if store.is_null() || out_activation.is_null() {
+    if store.is_null() || out_activation.is_null() || out_failure.is_null() {
         return KEN_ACTIVATION_ERR_NULL;
     }
+    unsafe {
+        *out_activation = std::ptr::null_mut();
+        *out_failure = std::ptr::null_mut();
+    }
     let store = unsafe { &*store };
-    let activation = BoundaryActivationV1::begin(&store.binding);
-    let handle = Box::into_raw(Box::new(KenActivationV1 { activation }));
-    unsafe { *out_activation = handle };
+    match BoundaryActivationV1::begin(&store.binding) {
+        Ok(activation) => {
+            unsafe { *out_activation = Box::into_raw(Box::new(KenActivationV1 { activation })) };
+            KEN_ACTIVATION_OK
+        }
+        Err(fault) => {
+            unsafe { *out_failure = Box::into_raw(Box::new(KenCapacityFailureV1 { fault })) };
+            KEN_ACTIVATION_ERR_CAPACITY
+        }
+    }
+}
+
+/// Consume a failed begin's exact error and the live host observation context.
+/// This pre-launch path emits a typed linked terminal trace, with no generated
+/// call or partially published activation.
+///
+/// # Safety
+/// Both handles must be live, unique, and consumed only once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_finish_capacity_failure(
+    context: *mut c_void,
+    failure: *mut KenCapacityFailureV1,
+) -> i64 {
+    if context.is_null() || failure.is_null() {
+        return KEN_ACTIVATION_ERR_NULL;
+    }
+    let failure = unsafe { Box::from_raw(failure) };
+    unsafe { ken_host::ken_host_invocation_v1_finish_with_capacity(context, failure.fault) }
+}
+
+/// Discard an error from a non-process starter, which has no host observation.
+///
+/// # Safety
+/// The handle must come from a failed begin and be consumed exactly once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_discard_capacity_failure(
+    failure: *mut KenCapacityFailureV1,
+) -> i64 {
+    if failure.is_null() {
+        return KEN_ACTIVATION_ERR_NULL;
+    }
+    drop(unsafe { Box::from_raw(failure) });
     KEN_ACTIVATION_OK
 }
 
@@ -396,10 +454,12 @@ pub unsafe extern "C" fn ken_activation_v1_destroy(activation: *mut KenActivatio
 /// ⭐ `D1`'s own warning is that a `crate-type` line is a **build-system**
 /// claim and not a **link** one. ⇒ The archive is checked against *this* list.
 /// ⛔ Pinned as the exact permitted set, so an addition reddens too.
-pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 9] = [
+pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 11] = [
     "ken_boundary_store_v1_open",
     "ken_boundary_store_v1_destroy",
     "ken_activation_v1_begin",
+    "ken_activation_v1_finish_capacity_failure",
+    "ken_activation_v1_discard_capacity_failure",
     "ken_activation_v1_services",
     "ken_activation_v1_bind_process_frame",
     "ken_activation_v1_native_frame",
@@ -412,10 +472,11 @@ pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 9] = [
 mod tests {
     use super::*;
 
-    fn c_profile() -> KenBoundaryResourceProfileV1 {
-        KenBoundaryResourceProfileV1 {
+    fn c_profile() -> KenBoundaryResourceProfileV2 {
+        KenBoundaryResourceProfileV2 {
             version: u64::from(BOUNDARY_RESOURCE_PROFILE_VERSION),
-            size: std::mem::size_of::<KenBoundaryResourceProfileV1>() as u64,
+            size: std::mem::size_of::<KenBoundaryResourceProfileV2>() as u64,
+            runtime_invocation_epochs: u64::MAX,
             invocation_nodes: 12,
             invocation_words: 24,
             invocation_data_bytes: 36,
@@ -440,8 +501,9 @@ mod tests {
         assert!(!store.is_null());
 
         let mut activation = std::ptr::null_mut();
+        let mut failure = std::ptr::null_mut();
         assert_eq!(
-            unsafe { ken_activation_v1_begin(store, &mut activation) },
+            unsafe { ken_activation_v1_begin(store, &mut activation, &mut failure) },
             KEN_ACTIVATION_OK
         );
 
@@ -525,8 +587,15 @@ mod tests {
 
         let mut first = std::ptr::null_mut();
         let mut second = std::ptr::null_mut();
-        unsafe { ken_activation_v1_begin(store, &mut first) };
-        unsafe { ken_activation_v1_begin(store, &mut second) };
+        let mut failure = std::ptr::null_mut();
+        assert_eq!(
+            unsafe { ken_activation_v1_begin(store, &mut first, &mut failure) },
+            KEN_ACTIVATION_OK
+        );
+        assert_eq!(
+            unsafe { ken_activation_v1_begin(store, &mut second, &mut failure) },
+            KEN_ACTIVATION_OK
+        );
 
         let (mut a, mut b) = (std::ptr::null(), std::ptr::null());
         unsafe { ken_activation_v1_services(first, &mut a) };
@@ -541,6 +610,32 @@ mod tests {
         unsafe { ken_activation_v1_destroy(first) };
         unsafe { ken_activation_v1_destroy(second) };
         unsafe { ken_boundary_store_v1_destroy(store) };
+    }
+
+    /// Promise: durable invariant; zero is an explicit deployment limit.
+    /// This exercises the real C boundary and its opaque failure handle, not
+    /// a Rust-only synthetic constructor for a terminal fault.
+    #[test]
+    fn zero_epoch_profile_refuses_before_publishing_an_activation_handle() {
+        let mut profile = c_profile();
+        profile.runtime_invocation_epochs = 0;
+        let mut store = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store) }, KEN_ACTIVATION_OK);
+        let mut activation = std::ptr::null_mut();
+        let mut failure = std::ptr::null_mut();
+        assert_eq!(
+            unsafe { ken_activation_v1_begin(store, &mut activation, &mut failure) },
+            KEN_ACTIVATION_ERR_CAPACITY,
+        );
+        assert!(activation.is_null(), "an exhausted epoch published an activation");
+        assert!(!failure.is_null(), "a typed capacity failure has no owner");
+        let fault = unsafe { (*failure).fault };
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Runtime);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::InvocationEpochs);
+        assert_eq!(fault.limit, 0);
+        assert!(fault.requested > fault.limit, "refusal must name a real request");
+        assert_eq!(unsafe { ken_activation_v1_discard_capacity_failure(failure) }, KEN_ACTIVATION_OK);
+        assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
     }
 
     /// ⛔ **A profile whose layout this runtime does not implement is REFUSED**,
@@ -560,7 +655,10 @@ mod tests {
             unsafe { ken_boundary_store_v1_open(&wrong_version, &mut store) },
             KEN_ACTIVATION_ERR_PROFILE
         );
-        assert!(store.is_null(), "a refused open must not hand back a handle");
+        assert!(
+            store.is_null(),
+            "a refused open must not hand back a handle"
+        );
 
         let mut wrong_size = c_profile();
         wrong_size.size += 8;
@@ -590,7 +688,13 @@ mod tests {
             KEN_ACTIVATION_ERR_NULL
         );
         assert_eq!(
-            unsafe { ken_activation_v1_begin(std::ptr::null_mut(), &mut store_slot.cast()) },
+            unsafe {
+                ken_activation_v1_begin(
+                    std::ptr::null_mut(),
+                    &mut store_slot.cast(),
+                    std::ptr::null_mut(),
+                )
+            },
             KEN_ACTIVATION_ERR_NULL
         );
         assert_eq!(
@@ -599,12 +703,7 @@ mod tests {
         );
         assert_eq!(
             unsafe {
-                ken_activation_v1_finish(
-                    std::ptr::null_mut(),
-                    std::ptr::null_mut(),
-                    0,
-                    &mut word,
-                )
+                ken_activation_v1_finish(std::ptr::null_mut(), std::ptr::null_mut(), 0, &mut word)
             },
             KEN_ACTIVATION_ERR_NULL
         );
@@ -630,6 +729,7 @@ mod tests {
             KEN_ACTIVATION_ERR_ADOPT,
             KEN_ACTIVATION_ERR_EXPORT,
             KEN_ACTIVATION_ERR_BUFFER,
+            KEN_ACTIVATION_ERR_CAPACITY,
         ];
         let distinct = statuses.iter().collect::<std::collections::BTreeSet<_>>();
         assert_eq!(distinct.len(), statuses.len());
@@ -670,7 +770,10 @@ mod tests {
 /// most-significant limb is printed *unpadded* and every lower limb is padded to
 /// 16 hex digits. Padding the top limb too would emit leading zeroes that the C
 /// stub never emitted.
-pub fn format_final_export(export: Option<crate::native_int::RuntimeIntV1>, fallback: i64) -> String {
+pub fn format_final_export(
+    export: Option<crate::native_int::RuntimeIntV1>,
+    fallback: i64,
+) -> String {
     use crate::native_int::RuntimeIntV1;
     use crate::values::Sign;
     match export {
@@ -714,7 +817,10 @@ mod export_rendering_tests {
     fn the_rendered_export_matches_the_c_stubs_bytes_for_every_shape() {
         assert_eq!(format_final_export(None, 42), "42\n");
         assert_eq!(format_final_export(None, -7), "-7\n");
-        assert_eq!(format_final_export(Some(RuntimeIntV1::Small(42)), 0), "42\n");
+        assert_eq!(
+            format_final_export(Some(RuntimeIntV1::Small(42)), 0),
+            "42\n"
+        );
         assert_eq!(
             format_final_export(Some(RuntimeIntV1::Small(-42)), 0),
             "-42\n"

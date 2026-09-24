@@ -8,7 +8,13 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
     let dir = output_dir(name);
     std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path())
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        name,
+        dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
         .expect("PX7-F checked program reaches the native resource lane");
     let oriented = output
         .runtime_program
@@ -290,6 +296,136 @@ fn linked_public_escape_is_exact_closed() {
             ken_runtime::ResourceErrorV1::Closed
         ))
     ));
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bounded_epoch_refuses_before_the_checked_program_issues_an_effect() {
+    use ken_runtime::boundary_resource_profile::starter_smoke_profile;
+    for (limit, expected_trace_len) in [(0u64, 0usize), (1u64, 3usize)] {
+        // Each executable launches in its own OS process. The positive limit
+        // admits its first epoch; zero refuses the same checked program before
+        // generated code can execute. The same wire decoder serves both.
+        let dir = output_dir(&format!("epoch-profile-{limit}"));
+        std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
+        let mut profile = starter_smoke_profile();
+        profile.runtime.invocation_epochs = limit;
+        let output = ken_cli::build_native_program(
+            ESCAPE_CLOSED,
+            ken_cli::SourceFormat::Ken,
+            "epoch-profile",
+            dir.path(),
+            profile,
+        )
+        .expect("the explicit epoch profile packages with the checked source");
+        let observation = ken_runtime::run_bound_process_effect_observation(
+            &output.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: Vec::new(),
+                environment: Vec::new(),
+                cwd: dir.path().to_owned(),
+                plan_hash: output.plan_transport_hash,
+            },
+        )
+        .expect("the linked trace decodes");
+        assert_eq!(observation.effect_trace.len(), expected_trace_len);
+        if limit == 0 {
+            assert_eq!(observation.exit_status, 1);
+            let exact_failure = ken_runtime::CapacityExhaustedV1 {
+                scope: ken_runtime::CapacityScopeV1::Runtime,
+                resource: ken_runtime::CapacityResourceV1::InvocationEpochs,
+                limit: 0,
+                requested: 1,
+            };
+            assert_eq!(
+                observation.terminal_error,
+                Some(ken_runtime::TerminalErrorV1::CapacityExhausted(
+                    exact_failure
+                ),)
+            );
+            // The REAL linked path above is the positive control. A forged
+            // linked trace with the same plan but a different negative token
+            // or resource ceiling must not pass the profile-bound observer.
+            use std::os::unix::fs::PermissionsExt;
+            let fixture_path = dir.path().join("forged-trace");
+            let script_path = dir.path().join("forged-starter.sh");
+            std::fs::write(
+                &script_path,
+                format!(
+                    "#!/bin/sh\ncp '{}' \"$KEN_HOST_OBSERVATION_PATH\"\nexit 1\n",
+                    fixture_path.display(),
+                ),
+            )
+            .unwrap();
+            let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms).unwrap();
+            let mut forged = output.artifact.clone();
+            forged.executable_path = script_path;
+            for (token, fault) in [
+                (-8i64, Some(exact_failure)),
+                (
+                    -7,
+                    Some(ken_runtime::CapacityExhaustedV1 {
+                        limit: 1,
+                        requested: 2,
+                        ..exact_failure
+                    }),
+                ),
+                (-7, None),
+            ] {
+                let trace = ken_runtime::LinkedEffectTrace {
+                    plan_hash: output.plan_transport_hash,
+                    target_abi_hash: ken_runtime::TARGET_ABI_MANIFEST_HASH,
+                    host_effect_abi_hash: ken_runtime::HOST_EFFECT_ABI_V1_HASH,
+                    terminal_value: -7,
+                    terminal_error: fault.map(ken_runtime::TerminalErrorV1::CapacityExhausted),
+                    effect_trace: Vec::new(),
+                    terminal_exit: ken_runtime::TerminalExitClass::ControlledTrap,
+                };
+                let mut bytes = ken_runtime::encode_linked_effect_trace(&trace).unwrap();
+                if token != -7 {
+                    // Wire-format compatibility vector: magic(8), plan(8),
+                    // target hash(32), host hash(32), then terminal i64.
+                    bytes[80..88].copy_from_slice(&token.to_le_bytes());
+                }
+                std::fs::write(&fixture_path, bytes).unwrap();
+                let refusal = ken_runtime::run_bound_process_effect_observation(
+                    &forged,
+                    &ken_runtime::NativeEffectRunOptionsV1 {
+                        arguments: Vec::new(),
+                        environment: Vec::new(),
+                        cwd: dir.path().to_owned(),
+                        plan_hash: output.plan_transport_hash,
+                    },
+                )
+                .expect_err("forged terminal cannot borrow capacity authority");
+                if fault.is_none() {
+                    assert!(
+                        matches!(
+                            refusal,
+                            ken_runtime::NativeEffectRunErrorV1::UnclassifiedRuntimeTrap {
+                                terminal_value: -7
+                            }
+                        ),
+                        "{refusal:?}"
+                    );
+                } else {
+                    assert!(
+                        matches!(refusal, ken_runtime::NativeEffectRunErrorV1::MalformedTrace),
+                        "{refusal:?}"
+                    );
+                }
+            }
+        } else {
+            assert_eq!(observation.exit_status, 0, "{observation:?}");
+            assert!(observation.terminal_error.is_none());
+            assert_eq!(
+                observation.effect_trace[2].operation,
+                ken_runtime::HostOpV1::FsHandleMetadata
+            );
+        }
+    }
 }
 
 #[cfg(target_os = "linux")]

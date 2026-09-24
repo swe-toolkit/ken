@@ -17,12 +17,13 @@ use std::collections::BTreeMap;
 use cranelift_module::Linkage;
 
 use crate::{
-    fnv1a_64, proof_erasure_boundary_facts_from_program, proof_erasure_witness_error,
-    validate_supported_runtime_artifact_certificate, KenCheckedProofErasureBoundaryReport,
-    ProofErasureBoundaryWitnessError, ProofErasureBoundaryWitnessStage, RuntimeArtifactCertificate,
-    RuntimeArtifactIdentity, RuntimeArtifactValidationError, RuntimeArtifactValidationReport,
-    RuntimeDeclarationKind, RuntimeEffectBoundary, RuntimeExample, RuntimeExpr, RuntimeIrRunReport,
-    RuntimeIrTargetIdentity, RuntimeLowerabilityStatus, RuntimeProgram, RuntimeValue,
+    KenCheckedProofErasureBoundaryReport, ProofErasureBoundaryWitnessError,
+    ProofErasureBoundaryWitnessStage, RuntimeArtifactCertificate, RuntimeArtifactIdentity,
+    RuntimeArtifactValidationError, RuntimeArtifactValidationReport, RuntimeDeclarationKind,
+    RuntimeEffectBoundary, RuntimeExample, RuntimeExpr, RuntimeIrRunReport,
+    RuntimeIrTargetIdentity, RuntimeLowerabilityStatus, RuntimeProgram, RuntimeValue, fnv1a_64,
+    proof_erasure_boundary_facts_from_program, proof_erasure_witness_error,
+    validate_supported_runtime_artifact_certificate,
 };
 
 // Owner-named sibling imports (§10.3: `artifact::api -> artifact, planning,
@@ -32,12 +33,12 @@ use crate::cranelift_backend::planning::{
     native_join_plan_for_program, oriented_subcontinuation_plan_for_program,
 };
 use crate::cranelift_backend::surface::{
-    backend_module, unsupported, CraneliftBackendError, CraneliftObjectArtifact,
-    CraneliftRunReport, InterpreterOracleObservation, NativeArtifactIdentity,
-    NativeDifferentialReport, NativeDifferentialStage, NativeDifferentialVerdict,
-    NativeEvidenceFact, NativeFidelity, NativeRunEvidence, NativeRuntimeIrComparisonReport,
-    NativeRuntimeIrComparisonVerdict, NativeSeedEnvironment, NativeToolchainReport,
-    NativeTrustReport, ValidatedNativeRunError,
+    CraneliftBackendError, CraneliftObjectArtifact, CraneliftRunReport,
+    InterpreterOracleObservation, NativeArtifactIdentity, NativeDifferentialReport,
+    NativeDifferentialStage, NativeDifferentialVerdict, NativeEvidenceFact, NativeFidelity,
+    NativeRunEvidence, NativeRuntimeIrComparisonReport, NativeRuntimeIrComparisonVerdict,
+    NativeSeedEnvironment, NativeToolchainReport, NativeTrustReport, ValidatedNativeRunError,
+    backend_module, unsupported,
 };
 
 // ⛔ TRANSITIONAL: these six still live in the residual parent and arrive in
@@ -52,7 +53,8 @@ pub fn run_nc6_seed_examples(
     program: &RuntimeProgram,
 ) -> Result<Vec<CraneliftRunReport>, CraneliftBackendError> {
     reject_program_blockers(program)?;
-    let env = NativeSeedEnvironment::nc5_seed();
+    let env =
+        NativeSeedEnvironment::nc5_seed(crate::boundary_resource_profile::starter_smoke_profile());
     program
         .examples
         .iter()
@@ -69,7 +71,8 @@ pub fn run_nc8_validated_seed_examples(
     // the set admission proved, so it cannot run before that proof exists.
     let admission = program_admission(program)?;
     reject_admitted_program_blockers(program, admission.compilation())?;
-    let env = NativeSeedEnvironment::nc5_seed();
+    let env =
+        NativeSeedEnvironment::nc5_seed(crate::boundary_resource_profile::starter_smoke_profile());
     program
         .examples
         .iter()
@@ -227,7 +230,6 @@ pub(crate) fn run_synthetic_runtime_ir_report_with_cranelift(
     )
 }
 
-
 /// The shared body. ⛔ Reachable only with an **already resolved** authority,
 /// which arrives paired with the trust it was admitted on. The only production
 /// producer of that pair is `program_admission`, which fails closed; the only
@@ -341,7 +343,6 @@ pub(crate) fn emit_synthetic_runtime_ir_object_with_cranelift(
     )
 }
 
-
 /// The shared body. ⛔ See `run_runtime_ir_report_with_authority`.
 pub(crate) fn emit_runtime_ir_object_with_authority(
     program: &RuntimeProgram,
@@ -402,7 +403,7 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
         &entry_symbol,
         Linkage::Export,
         entrypoint,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         program
             .declarations
             .iter()
@@ -638,9 +639,7 @@ pub fn reject_program_blockers(program: &RuntimeProgram) -> Result<(), Cranelift
 }
 
 /// The package-level trust rule for a program nothing has admitted.
-fn reject_unadmitted_package_trust(
-    program: &RuntimeProgram,
-) -> Result<(), CraneliftBackendError> {
+fn reject_unadmitted_package_trust(program: &RuntimeProgram) -> Result<(), CraneliftBackendError> {
     if !program.erased_core.metadata.assumptions.is_empty()
         || !program
             .erased_core
@@ -678,8 +677,13 @@ pub(crate) fn reject_admitted_program_blockers(
     program: &RuntimeProgram,
     admitted: crate::AdmittedNativeCompilation<'_>,
 ) -> Result<(), CraneliftBackendError> {
-    let assumption_keys: std::collections::BTreeSet<crate::RuntimeSymbol> =
-        program.erased_core.metadata.assumptions.keys().cloned().collect();
+    let assumption_keys: std::collections::BTreeSet<crate::RuntimeSymbol> = program
+        .erased_core
+        .metadata
+        .assumptions
+        .keys()
+        .cloned()
+        .collect();
     if assumption_keys != *admitted.admitted_trust() {
         return Err(unsupported(
             "RuntimeProgram",
@@ -701,9 +705,7 @@ pub(crate) fn reject_admitted_program_blockers(
 
 /// Everything both forms share: every blocker that is **independent** of trust
 /// provenance. Unchanged by this node.
-fn reject_residual_program_blockers(
-    program: &RuntimeProgram,
-) -> Result<(), CraneliftBackendError> {
+fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), CraneliftBackendError> {
     if !program.erased_core.metadata.effects.is_empty() {
         return Err(unsupported(
             "RuntimeProgram",
@@ -881,7 +883,7 @@ pub(crate) fn run_process_expr_with_cranelift(
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
-    let (observation, native_returned) = compiled.run(None)?;
+    let (observation, native_returned) = compiled.run_with_profile(None, env.profile())?;
     Ok(CraneliftRunReport {
         example: "native-process-entrypoint".to_string(),
         observation,
@@ -947,7 +949,7 @@ fn run_example_native(
         None => compiled.assumptions.clone(),
     };
     let unsupported = compiled.unsupported.clone();
-    let (observation, native_returned) = compiled.run(None)?;
+    let (observation, native_returned) = compiled.run_with_profile(None, env.profile())?;
     Ok(CraneliftRunReport {
         example: example.name.clone(),
         observation,
@@ -1064,6 +1066,9 @@ fn differential_error_report(
     preflight: bool,
 ) -> NativeDifferentialReport {
     let verdict = match err {
+        CraneliftBackendError::CapacityExhausted(fault) => {
+            NativeDifferentialVerdict::CapacityExhausted(fault)
+        }
         CraneliftBackendError::Unsupported(err) => NativeDifferentialVerdict::Unsupported {
             stage: if preflight {
                 NativeDifferentialStage::BoundaryPreflight
@@ -1094,6 +1099,9 @@ fn runtime_ir_comparison_error_report(
 ) -> NativeRuntimeIrComparisonReport {
     let example = run_report.target.example.clone();
     let verdict = match err {
+        CraneliftBackendError::CapacityExhausted(fault) => {
+            NativeRuntimeIrComparisonVerdict::CapacityExhausted(fault)
+        }
         CraneliftBackendError::Unsupported(err) => NativeRuntimeIrComparisonVerdict::Unsupported {
             stage,
             construct: err.construct,

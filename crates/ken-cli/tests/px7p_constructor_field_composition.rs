@@ -163,6 +163,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
         ken_cli::SourceFormat::Ken,
         "px7p-constructor-field-composition",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("constructor field composes through its selected consumer");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -228,6 +229,7 @@ fn ignored_field_twin_remains_green() {
         ken_cli::SourceFormat::Ken,
         "px7p-ignored-field-opposite",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("the byte-near ignored-field opposite remains on ordinary lowering");
 }
@@ -259,6 +261,7 @@ fn dynamic_carrier_producer_payload_reaches_linked_process_exit() {
         ken_cli::SourceFormat::Ken,
         "px7p-dynamic-carrier-producer",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("the generic dynamic carrier preserves its producer continuation");
     let long_component = std::ffi::OsString::from("a".repeat(300));

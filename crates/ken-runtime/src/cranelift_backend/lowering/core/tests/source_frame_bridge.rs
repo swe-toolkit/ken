@@ -319,7 +319,7 @@ fn d8l2_the_composed_call_returns_the_ordinary_payload_it_consumed() {
             reset_d8d_bindings();
             reset_d8j_discharged();
             let expr = d8l2_payload_witness(worker_last, payload);
-            let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty()).unwrap_or_else(
+            let compiled = compile_expr(&expr, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile())).unwrap_or_else(
                 |error| {
                     panic!(
                         "the payload witness must compile in both orientations. Selected-first \
@@ -329,7 +329,7 @@ fn d8l2_the_composed_call_returns_the_ordinary_payload_it_consumed() {
                 },
             );
             assert_eq!(
-                compiled.run(None).expect("the payload witness runs").0,
+                compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("the payload witness runs").0,
                 RuntimeObservation::Returned(RuntimeGroundValue::Int(payload.into())),
                 "the composed call must return the ordinary payload it consumed. ⛔ The EXACT \
                  value, not merely one that differs from the other payload's: two wrong answers \
@@ -352,7 +352,7 @@ fn d8l2_the_composed_call_returns_the_ordinary_payload_it_consumed() {
     // and the one it was not.
     for (worker_last, refuses) in [(false, true), (true, false)] {
         set_envelope_defect(EnvelopeDefect::DensePrefix);
-        let outcome = compile_expr(&d8l2_payload_witness(worker_last, 41), &NativeSeedEnvironment::empty());
+        let outcome = compile_expr(&d8l2_payload_witness(worker_last, 41), &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()));
         set_envelope_defect(EnvelopeDefect::Exact);
         assert_eq!(
             outcome.is_err(),
@@ -503,7 +503,7 @@ fn d8m_compile(expr: &RuntimeExpr, frame_id: u64) -> Option<CraneliftBackendErro
         "ken_d8m",
         Linkage::Export,
         expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -665,7 +665,7 @@ fn d8m_compile_without_plan(expr: &RuntimeExpr) -> Option<CraneliftBackendError>
         "ken_d8m_plain",
         Linkage::Export,
         expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -898,7 +898,7 @@ pub(in crate::cranelift_backend::lowering) fn d8n_compile() -> Option<CraneliftB
         "ken_d8n",
         Linkage::Export,
         &entry,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         declarations,
         None,
         true,
@@ -1957,7 +1957,7 @@ fn d8m_two_occurrence_compile_with(
         "ken_d8m2",
         Linkage::Export,
         &entry,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         declarations,
         None,
         true,
@@ -2767,7 +2767,7 @@ fn d8m_ordinary_compile() -> Option<CraneliftBackendError> {
         "ken_d8m_ordinary",
         Linkage::Export,
         &entry,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::from([(D8M_ORDINARY_SYMBOL, &declaration)]),
         None,
         true,
@@ -5266,6 +5266,9 @@ fn d6c_the_sealed_binder_run_refuses_a_miscounted_or_permuted_run_at_its_produce
                 "{mutation:?} on the governed witness must be refused by the sealed run's own \
                  postcondition, a typed Module failure; got another backend failure: {other:?}"
             ),
+            Err(CraneliftBackendError::CapacityExhausted(fault)) => panic!(
+                "{mutation:?} on the governed witness hit runtime capacity, not its compile-time run guard: {fault:?}"
+            ),
             Err(CraneliftBackendError::Unsupported(unsupported)) => panic!(
                 "{mutation:?} on the governed witness was refused by a LOWERING guard rather than \
                  by the sealed run's postcondition, which is the downstream misattribution this \
@@ -5692,7 +5695,7 @@ fn d8f_compile_with(
         "ken_d8f",
         Linkage::Export,
         &entry,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::from([(D8F_SYMBOL, &declaration)]),
         None,
         true,

@@ -181,6 +181,7 @@ fn every_checked_family_program_reaches_its_expected_terminal_state() {
             ken_cli::SourceFormat::Ken,
             "rt_cold_checked_family",
             root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         ) {
             Ok(_) => "OK".to_string(),
             Err(error) => format!("{error:?}"),

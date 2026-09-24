@@ -43,6 +43,7 @@ fn differential(case: &str, source: &str) -> Differential {
         ken_cli::SourceFormat::Ken,
         &format!("rt_span_prov_{}", case.replace('-', "_")),
         root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(

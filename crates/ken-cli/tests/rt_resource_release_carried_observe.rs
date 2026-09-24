@@ -143,6 +143,7 @@ fn the_carried_resource_route_observes_resource_scalar_and_completes_native_cons
         ken_cli::SourceFormat::Ken,
         "rt_resource_release_carried_observe",
         root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     );
     let error = format!("{result:?}");
 

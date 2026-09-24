@@ -95,7 +95,7 @@ fn assert_agreement(
     expected_operations: &[ken_runtime::HostOpV1],
 ) {
     let dir = output_dir(name);
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path())
+    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
         .expect("dynamic HostResult producer reaches the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,

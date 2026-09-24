@@ -6080,7 +6080,7 @@ mod tests {
     fn run_px8j_source_machine_install(
         malformation: Option<Px8jInstallMalformation>,
     ) -> Result<SourceContinuation<'static>, CraneliftBackendError> {
-        let seed_env = NativeSeedEnvironment::empty();
+        let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         let mut compiler = root_authority_test_lowering(&seed_env);
         compiler.native_join_plan = None;
         compiler.root_terminal_authority = None;
@@ -6220,7 +6220,7 @@ mod tests {
 
 
     fn run_px8ds_source_consumer(mutation: Px8dsEdgeMutation) -> Result<(), CraneliftBackendError> {
-        let seed_env = NativeSeedEnvironment::empty();
+        let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         let mut compiler = root_authority_test_lowering(&seed_env);
         compiler.native_join_plan = None;
         compiler.root_terminal_authority = None;

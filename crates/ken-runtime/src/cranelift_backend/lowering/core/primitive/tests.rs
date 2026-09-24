@@ -21,7 +21,7 @@ fn cranelift_runs_scalar_seed_and_verifies_function() {
         .find(|example| example.name == "closed-scalar-primitive")
         .expect("seed exists");
 
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("native run succeeds");
 
     assert!(report.verifier_passed);
@@ -52,7 +52,7 @@ fn cranelift_reports_bytes_and_string_immediates_as_ground_values() {
             observation,
         };
 
-        let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+        let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
             .expect("native run succeeds");
 
         assert!(report.verifier_passed);
@@ -70,13 +70,13 @@ fn cranelift_runs_closure_seed_with_explicit_runtime_capture_environment() {
         .find(|example| example.name == "closure-capture-application")
         .expect("seed exists");
 
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::nc5_seed())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::nc5_seed(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("native run succeeds");
 
     assert!(report.verifier_passed);
     assert_eq!(report.observation, example.observation);
 
-    let err = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let err = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect_err("missing capture must reject loudly");
     assert!(matches!(
         err,
@@ -93,7 +93,7 @@ fn explicit_partial_primitive_reports_trap_not_backend_bug() {
         .find(|example| example.name == "explicit-partial-primitive-trap")
         .expect("seed exists");
 
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("trap report succeeds");
 
     assert!(report.verifier_passed);
@@ -132,7 +132,7 @@ fn safe_bytes_at_oob_lowers_to_none_with_bounds_obligation() {
         }),
     };
 
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("safe bytes_at native lowering succeeds");
     assert!(report.verifier_passed);
     assert_eq!(report.observation, example.observation);
@@ -193,7 +193,7 @@ fn safe_bytes_slice_and_decode_native_results_are_explicit() {
     ];
 
     for example in examples {
-        let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+        let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
             .expect("safe Bytes native lowering succeeds");
         assert!(report.verifier_passed);
         assert_eq!(report.observation, example.observation);
@@ -219,7 +219,7 @@ fn checked_partial_primitive_still_rejects_unknown_arguments() {
         }),
     };
 
-    let err = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let err = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect_err("unknown argument must reject before trap reporting");
 
     assert!(matches!(
@@ -250,7 +250,7 @@ fn overflowing_int_primitive_promotes_before_native_wrapping_semantics() {
         )),
     };
 
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("native lowering promotes before overflow");
     assert_eq!(report.observation, example.observation);
 }
@@ -335,7 +335,7 @@ fn int_to_uint64_raw_preserves_the_exact_big_native_int() {
         observation: RuntimeObservation::Returned(RuntimeGroundValue::Int(value)),
     };
 
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("the raw UInt64 conversion preserves the exact native Int pair");
     assert_eq!(report.observation, example.observation);
 }
@@ -413,7 +413,7 @@ fn px8i_wrapping_and_trap_mutations_are_causal_at_live_binop_lowering() {
     };
 
     NATIVE_INT_LOWERING_MUTATION.with(|mutation| mutation.set(NativeIntLoweringMutation::Wrapping));
-    let wrapping = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let wrapping = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("wrapping mutation still emits the live native expression");
     NATIVE_INT_LOWERING_MUTATION.with(|mutation| mutation.set(NativeIntLoweringMutation::Exact));
     assert_ne!(wrapping.observation, example.observation);
@@ -423,7 +423,7 @@ fn px8i_wrapping_and_trap_mutations_are_causal_at_live_binop_lowering() {
     );
 
     NATIVE_INT_LOWERING_MUTATION.with(|mutation| mutation.set(NativeIntLoweringMutation::Trap));
-    let trapped = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty());
+    let trapped = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()));
     NATIVE_INT_LOWERING_MUTATION.with(|mutation| mutation.set(NativeIntLoweringMutation::Exact));
     assert!(matches!(
         trapped,
@@ -451,7 +451,7 @@ fn px8i_jit_terminal_requires_uncorrupted_local_export_evidence() {
         NativeIntLoweringMutation::CorruptTerminalExport,
     ] {
         NATIVE_INT_LOWERING_MUTATION.with(|cell| cell.set(mutation));
-        let result = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty());
+        let result = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()));
         NATIVE_INT_LOWERING_MUTATION.with(|cell| cell.set(NativeIntLoweringMutation::Exact));
         assert!(matches!(
             result,
@@ -470,7 +470,7 @@ fn run_exact_int(expr: RuntimeExpr, expected: crate::RuntimeIntV1) {
         ir: expr,
         observation: RuntimeObservation::Returned(RuntimeGroundValue::Int(expected)),
     };
-    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("exact Int expression lowers and executes");
     assert_eq!(direct, example.observation);
     assert_eq!(report.observation, example.observation);
