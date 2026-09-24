@@ -362,25 +362,10 @@ fn ambient_dependencies(root: &Path, entry: &str) -> Result<Vec<String>, String>
 }
 
 fn expected_vector_strict_floor_names() -> Vec<String> {
-    [
-        "And",
-        "Bottom",
-        "Equal",
-        "Prop",
-        "Proved",
-        "Top",
-        "Unit",
-        "and_fst",
-        "and_intro",
-        "and_snd",
-        "eqChar",
-        "is_sorted",
-        "leqChar",
-        "map",
-    ]
-    .into_iter()
-    .map(str::to_string)
-    .collect()
+    ["Equal", "Proved"]
+        .into_iter()
+        .map(str::to_string)
+        .collect()
 }
 
 /// Promise class: transition sentinel for Vector's amended provider imports.
@@ -1294,7 +1279,7 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            // Vector now imports LawfulFunctors.idf and Transport.cong;
+            // Vector imports Combinators.idf and Transport.cong;
             // strict mode still records the providers' compiler conveniences.
             "Data.Vector.Vector".to_string(),
             expected_vector_strict_floor_names(),
@@ -1345,6 +1330,7 @@ fn catalog_ambient_passthrough_migration_census() {
         .map(|(entry, _)| entry.clone())
         .collect::<BTreeSet<_>>();
     let expected_clean = [
+        "Core.Function.Combinators",
         "Core.Logic.Or",
         "Core.Logic.OrdResult",
         "Core.Logic.Transport",

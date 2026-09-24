@@ -35,7 +35,9 @@ error and value types; the concrete example below does not establish this.
 ```ken
 import Core.Classes.EffectfulClasses (Applicative, apply_to, compose, functor_map_of)
 
-import Core.Classes.LawfulFunctors (Functor, Semigroup, comp, idf)
+import Core.Classes.LawfulFunctors (Functor, Semigroup)
+
+import Core.Function.Combinators (comp, idf)
 
 import Core.Logic.Transport (cong)
 

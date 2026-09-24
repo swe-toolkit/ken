@@ -96,6 +96,7 @@ fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
                 .projection
                 .type_id
         }
+        "idf" | "comp" => env.globals[&format!("Core.Function.Combinators.{surface}")],
         _ => {
             let qualified = format!("{LAWFUL_FUNCTORS}.{surface}");
             *env.globals
@@ -342,9 +343,7 @@ fn authorized_surfaces() -> BTreeSet<String> {
         "Functor",
         "Monoid",
         "Semigroup",
-        "comp",
         "fold_map_step",
-        "idf",
         "list_map",
         "list_map::fusion",
         "list_map::id",
@@ -531,7 +530,8 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
 
     env.elaborate_file(
         "import Core.Classes.LawfulFunctors \
-           (Functor, Foldable, Monoid, Semigroup as selected_semigroup, comp, idf, list_map, fold_map_step, monoid_mempty)\n\
+           (Functor, Foldable, Monoid, Semigroup as selected_semigroup, list_map, fold_map_step, monoid_mempty)\n\
+         import Core.Function.Combinators (comp, idf)\n\
          fn ec_closure_functor_identity \
            (f : Type → Type) (dict : Functor f) : Functor f = dict\n\
          fn ec_closure_foldable_identity \

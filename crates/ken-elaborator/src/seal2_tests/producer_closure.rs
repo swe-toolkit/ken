@@ -334,7 +334,7 @@ const ENUMERATED_CARRIER_ENVIRONMENTS: &[EnumeratedCarrierEnvironment] = &[
     EnumeratedCarrierEnvironment {
         roots: &["Core/Classes/LawfulFunctors.ken.md"],
         load: lawful_functors_surface,
-        loaded_witnesses: &["Core.Classes.LawfulFunctors.idf"],
+        loaded_witnesses: &["Core.Classes.LawfulFunctors.list_map"],
     },
 ];
 

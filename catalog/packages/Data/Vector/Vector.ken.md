@@ -33,7 +33,7 @@ constructor of `Fin` targets `Fin Zero`. The identity law uses the checked
 `idf` function and `cong` equality congruence from their catalog providers.
 
 ```ken
-import Core.Classes.LawfulFunctors (idf)
+import Core.Function.Combinators (idf)
 
 import Core.Logic.Transport (cong)
 
@@ -199,7 +199,7 @@ This entry realizes the length-indexed vector contract in
 `spec/50-stdlib/60-length-indexed-vectors.md` using the ordinary `Nat`, indexed
 `data`, structural recursion, dependent `match`, `Equal`, `Refl`, and `Proved`
 surfaces. The private identity law reuses the checked catalog definitions
-`Core.Classes.LawfulFunctors.idf` and `Core.Logic.Transport.cong`.
+`Core.Function.Combinators.idf` and `Core.Logic.Transport.cong`.
 
 The public API is `Vec`, `VNil`, `VCons`, `Fin`, `FZero`, `FSuc`, `head`,
 `tail`, `map`, `zip_with`, and `lookup`, together with the five computation
@@ -208,8 +208,9 @@ theorems above.
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
 adds no axiom, postulate, primitive, foreign declaration, or unresolved hole.
-Its local `trusted_base()` delta is zero relative to the complete imported
-provider closure; imported trust, if any, remains visible in that closure.
+Its cold roots-loaded `trusted_base()` set equals a separately fresh compiler
+base set. The imported identity and congruence providers contribute no trusted
+items, and Vector adds none.
 
 Targeted validation checks the package through the roots-based module loader,
 the exact family indices and constructor targets, generic operation types,

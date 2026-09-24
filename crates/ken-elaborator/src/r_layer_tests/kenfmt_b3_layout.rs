@@ -3,7 +3,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ken_elaborator::layout::{display_width, format_ken, render, Doc, CANONICAL_WIDTH, INDENT_WIDTH};
+use ken_elaborator::layout::{
+    display_width, format_ken, render, Doc, CANONICAL_WIDTH, INDENT_WIDTH,
+};
 use ken_elaborator::lossless::parse_lossless;
 use ken_elaborator::resolve::resolve_decls;
 use ken_elaborator::{Decl, ElabEnv, ElabError, ExportForm, ImportKind};
@@ -99,8 +101,8 @@ fn ac3_wide_declaration_signatures_nest_and_keep_fitting_binders_flat() {
 /// the exact broken rendering plus the no-break mutation closes that gap.
 #[test]
 fn selective_import_items_wrap_without_inventory_or_fixed_point_drift() {
-    let source = "import Core.Classes.LawfulFunctors\n  (Foldable, Foldable_instance_List, Foldable_instance_Option, Functor, Functor_instance_List, Functor_instance_Option, comp, idf, list_map)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
-    let expected = "import Core.Classes.LawfulFunctors\n  (Foldable,\n    Foldable_instance_List,\n    Foldable_instance_Option,\n    Functor,\n    Functor_instance_List,\n    Functor_instance_Option,\n    comp,\n    idf,\n    list_map)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
+    let source = "import Core.Classes.LawfulFunctors\n  (Foldable, Foldable_instance_List, Foldable_instance_Option, Functor, Functor_instance_List, Functor_instance_Option, list_map)\n\nimport Core.Function.Combinators (comp, idf)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
+    let expected = "import Core.Classes.LawfulFunctors\n  (Foldable,\n    Foldable_instance_List,\n    Foldable_instance_Option,\n    Functor,\n    Functor_instance_List,\n    Functor_instance_Option,\n    list_map)\n\nimport Core.Function.Combinators (comp, idf)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
 
     let inventory = |text: &str| {
         parse_lossless(text)
@@ -142,7 +144,8 @@ fn selective_import_items_wrap_without_inventory_or_fixed_point_drift() {
     for narrow in [
         "import Core.Logic.Transport (cong, sym, trans)\n",
         "import Data.Collections.Derived (concat_map, list_append)\n",
-        "import Core.Classes.LawfulFunctors (Functor, Functor_instance_Option, idf)\n",
+        "import Core.Classes.LawfulFunctors (Functor, Functor_instance_Option)\n",
+        "import Core.Function.Combinators (idf)\n",
         "import Provider (first as local_first, second)\n",
     ] {
         assert!(display_width(narrow.trim_end()) <= 86);
@@ -264,7 +267,8 @@ fn ac6_representable_declaration_blocks_break_in_both_orientations() {
 
 #[test]
 fn ac6_reachable_fmt9_fences_remain_parse_preserved_after_horizontal_supersession() {
-    let oracle = include_str!("../../../../conformance/surface/formatting/seed-canonical-format.md");
+    let oracle =
+        include_str!("../../../../conformance/surface/formatting/seed-canonical-format.md");
     let fmt9 = oracle
         .split_once("## FMT9 —")
         .expect("FMT9 oracle section must exist")
@@ -558,7 +562,9 @@ fn ac6_comma_boundary_break_carries_the_module_surface_wrap() {
     );
     assert!(
         mutated.lines().count() == 1
-            && mutated.lines().any(|line| display_width(line) > CANONICAL_WIDTH),
+            && mutated
+                .lines()
+                .any(|line| display_width(line) > CANONICAL_WIDTH),
         "dropping the comma-boundary break must revert to a single over-width run: {mutated}"
     );
 }

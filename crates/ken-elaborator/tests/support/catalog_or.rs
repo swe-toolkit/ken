@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{ElabEnv, modules::ModuleState};
+use ken_elaborator::{modules::ModuleState, ElabEnv};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 
 pub fn catalog_root() -> PathBuf {
@@ -166,6 +166,13 @@ pub fn load_derived_importing_fixture_many(env: &mut ElabEnv, imports: &[&str]) 
 
 pub fn load_derived_importing_fixture(env: &mut ElabEnv, imported: &str) {
     load_derived_importing_fixture_many(env, &[imported]);
+}
+
+/// Flat legacy fixtures must load the new canonical function provider before
+/// elaborating LawfulFunctors' selective import.
+pub fn load_function_combinators(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Function.Combinators")
+        .expect("Core.Function.Combinators must roots-load");
 }
 
 /// Load LawfulFunctors as a real module so ordered fixtures record its export
