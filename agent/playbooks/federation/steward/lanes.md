@@ -70,7 +70,7 @@ order bug. fix it."). Kernel runs K3; Spec serves BYTES D2 after K3 lands.
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-BRACKET-SOURCE-EDGE` -- `ready`, M, T1: design-first D0, typed body-to-settlement Control IR edge on the px8ta artifact; STOP means park (Architect `evt_2bx08mhm8d8gd`) | `RT-INVOCATION-RESOURCE-PRECURSOR` -- `ready`, L, T1 (Architect `evt_2373feaep6zh9`), after the bracket D0; then retry body-322 capture and `RT-SELECTED-PENDING-CALL-PACKAGE` D1 | Child 1 `4b4c8565c`, child 2 `21c039918` and kernel branch `7f1a04a40` are held inputs, never moved or landed. Hard stop 0 |
-| L2 | language | Make module import resolution load-order independent (spec 33 §3.3) | Load-order fix (F2 plus the F1 seam residual) -- operator-authorized, frame basis owed by the Architect (`evt_6fee224w5d4gn`) | None | Frame lands, then kick |
+| L2 | language | Make module import resolution load-order independent (spec 33 §3.3) | `LANG-IMPORT-LOAD-ORDER-INDEPENDENCE` -- `ready`, S, T1 (Architect `evt_57xafyyc22b2f`) | None | Frame lands, then kick |
 | L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-VALIDATION-AP-ERROR-LAW` -- `active`, S, T1 (kick `evt_4pkeggh2q2tqx`) | `CAT-VEC-MAP-IDENTITY-LAW` -- `ready`, S, T1 (Architect `evt_a7r2vmhr545`); after K3 lands: `CAT-ARGPARSE-LAWS` laws 1-2 and `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D2/D3 | Kernel ring runs `KERNEL-LITERAL-CHAR-VIEW` (K3, `ready`), which gates ArgParse and BYTES. Editing the census sentinel is NOT authorized |
 
 ## Update rule
