@@ -27,6 +27,12 @@ origin: "Operator 2026-09-23 ~15:00Z: 'concur with rec on L1 carrier', authorizi
 - An allocation failure today travels `BOUNDARY_ERR_CAPACITY=-6 -> -1 ->
   UnclassifiedRuntimeTrap`, which is not a typed fault.
 
+> **Resumes after `RT-INVOCATION-RESOURCE-PRECURSOR` lands (operator
+> 2026-09-24).** The first D0 census below was attempted and ended in the D1
+> STOP (`evt_4rgbwg2vgk6kc`). On resumption, D0 is a capture of **body 322's
+> own six S/C members** on current main; sibling 343's 3+3 frame is no
+> substitute. D1 then proceeds on the precursor's resources.
+
 ## Deliverables
 
 - **D0, bounded census of the present substrate** (Architect
@@ -74,8 +80,9 @@ origin: "Operator 2026-09-23 ~15:00Z: 'concur with rec on L1 carrier', authorizi
 - If D1 cannot specify a representable owner, extent, identity and
   complete route, that is the §5 STOP. The Steward parks the attempt. A
   record name with no production site or transport is not D1.
-- If the design needs a metered allocation or a bounded counter, the typed
-  profile-attributed resource-fault path is a separate operator fork. STOP
-  before designing it here, and do not amend `TerminalErrorV1`.
+- Operator 2026-09-24 authorized the resource fork as
+  `RT-INVOCATION-RESOURCE-PRECURSOR`. Once it lands, this node consumes its
+  bounded resources and typed terminal path. A genuinely new, unprofiled
+  resource is still a STOP.
 - **Held work:** never move `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the
   child-2 checkpoint.

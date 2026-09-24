@@ -1,12 +1,12 @@
 ---
 id: RT-INVOCATION-RESOURCE-PRECURSOR
 title: "Pending-call precursor: named finite invocation-profile resources reserved at BoundaryActivationV1::begin, a runtime-wide no-wrap epoch, an activation-owned bounded slot and generation issuer behind a checked services ABI, and a typed CapacityExhausted fault carried end to end, so a selected call can be authenticated exactly once; not the pending-call build"
-status: ready
+status: draft
 owner: runtime
 size: L
 gate: architect
 tier: T1
-depends_on: []
+depends_on: [RT-BRACKET-SOURCE-EDGE]
 blocks: [RT-SELECTED-PENDING-CALL-PACKAGE]
 github: null
 origin: "Operator 2026-09-24 ~04:05Z: 'authorize option (a) for pending-call. it has to be addressed.' Resource fork: Architect evt_6dgk3tmqpbqbm, evt_1fft79t02kw31. Frame basis: Architect evt_2373feaep6zh9. Sequenced after RT-BRACKET-SOURCE-EDGE's D0 on the runtime ring (Steward). Steward-filed per COORDINATION section 2."
@@ -21,6 +21,10 @@ call, and every declared resource limit it relies on fails as a typed,
 named fault rather than an unclassified trap. This unblocks
 `RT-SELECTED-PENDING-CALL-PACKAGE` (the px7l/px7m rows: branching on a host
 result into multi-step effects, and effectful callbacks that capture data).
+
+Starts only after `RT-BRACKET-SOURCE-EDGE` D0 reaches an approved design or
+STOP disposition on the same runtime ring. That gate is scheduling only; it
+does not certify any bracket implementation.
 
 ## Fixed inputs -- Architect `evt_2373feaep6zh9` at `1a4495376`
 
@@ -57,9 +61,12 @@ stop and report the mismatch; do not build around it.
   used. Deployment supplies the profile; zero is an explicit bound; no
   implicit default. `begin` reserves everything before publication and
   returns a typed failure otherwise. A distinct typed `CapacityExhausted`
-  fault (scope, resource, limit, request) travels through generated status,
-  the terminal boundary, `ken-host::TerminalErrorV1`, the linked trace wire in
-  both directions, and packaging, on a reserved non-colliding tag. Unknown
+  fault (scope, resource, limit, request) has two sources: `begin` and
+  epoch failures are a pre-launch typed terminal projection (generated code
+  never runs); in-flight slot and generation exhaustion goes through
+  generated status. Both keep the exact resource through the terminal
+  boundary, `ken-host::TerminalErrorV1`, the linked trace wire in both
+  directions, and packaging, on a reserved non-colliding tag. Unknown
   tags are rejected. It may land alone only if it has a real
   resource-consuming owner and at-limit/one-past controls; enums and wire
   tags alone are inert scaffolding.

@@ -79,20 +79,15 @@ across occurrences (its AC-4). No parser or elaborator change.
 - **AC-1.** No new trust: the added lines contain no `Axiom`, postulate,
   primitive, `Omega` carrier, or kernel/TCB change. The production
   representation and shipped declarations are unchanged apart from added
-  proofs and exports, with one exception (Steward, 2026-09-23, after the
-  measured stop `evt_6s7xaffe0nz4`). The implementer first makes a bounded, checked
-  exact-goal J-transport attempt against the actual unfolded parser match,
-  and the Architect reviews it. If that attempt stays stuck, one shared
-  private step may be factored out, used by both the production parser and
-  the proof, preserving every old arm and the callback, index and effect
-  semantics. Exported types are unchanged and `cc7_*` stays green. AC-2
-  keeps a natural-site mutation for each law, including after factoring.
-  The Architect confirms meaning on the actual candidate.
+  proofs and exports. For the laws 1-2 resumption after K3 there is **no
+  parser or elaborator change**: the 2026-09-23 shared-step factorization
+  fallback is withdrawn (2026-09-24). A distinct post-K3 structural blocker
+  is a STOP for its own ruling. Exported types are unchanged and `cc7_*`
+  stays green. The Architect confirms meaning on the actual candidate.
 - **AC-2 (falsifier).** For each deliverable, the handback names one
   one-line natural-site mutation that makes that law's proof fail to check
   for its own property. For laws 1 and 2 the site is
-  `argparse_parse_tokens`, or the single shared production step it calls if
-  AC-1's factorization is used. For law 3 it is `command_schema` or
+  `argparse_parse_tokens`. For law 3 it is `command_schema` or
   `command_help`. For example, `Suc index` instead of `Suc (Suc index)` after
   a value option, at whichever site owns that branch, must break law 2. No
   law may be vacuous: its hypotheses must be satisfiable, and removing any

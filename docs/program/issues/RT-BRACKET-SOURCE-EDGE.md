@@ -44,7 +44,12 @@ stop and report the mismatch; do not build around it.
 
 ## Deliverable -- D0, on a fresh branch from current main
 
-Record the body-completion exit (Ret success or error, and controlled trap
+D0 is **scratch evidence, not landable code**. It closes by its measured
+evidence and an approved design or STOP disposition, from which the Steward
+frames the implementation successor. No inert marker, partial edge or
+partial owner lands from this node (the held-tree rule stands).
+
+Prototype the body-completion exit (Ret success or error, and controlled trap
 where it applies) to *that bind's own* settlement-continuation entry as a
 typed explicit Control IR edge. Index it by exact source occurrence plus
 call/return context and parent region. Authenticate it from the checked

@@ -84,10 +84,11 @@ not use integer comparison.
 - **AC-3 (consistency).** For a paired literal, the interpreter and native
   values of the view and codes equal the kernel's converted terms.
 - **AC-4 (occurrence identity).** Two separate occurrences of the same
-  literal, in different declarations, have views that convert:
-  `string_to_list_char "--"` in one and in the other reduce to the same
-  `List Char`, with the same Char head term per codepoint. A different
-  literal's view does not convert. `CAT-ARGPARSE-LAWS` laws 1 and 2 resume
+  literal, in different declarations, have whole views and heads that are
+  definitionally convertible from their checked equal scalar payloads:
+  `string_to_list_char "--"` in one converts with the other. Syntactic
+  identity or interning of literal ids is not required. A genuinely
+  different literal's view does not convert. `CAT-ARGPARSE-LAWS` laws 1 and 2 resume
   on this (operator 2026-09-24).
 - **AC-5.** Targeted builds only, through `scripts/ken-cargo`. No-regression
   means green in CI.

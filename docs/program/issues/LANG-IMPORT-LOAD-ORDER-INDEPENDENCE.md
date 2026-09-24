@@ -67,7 +67,11 @@ semantics.
     rejects `A` alone and `C2`.
   - **Case B (embedding API).** An unrelated inline `A.N` (`decoy`) is
     elaborated first; then `A.ken`'s `module P { import N; … N.decoy }`
-    precedes its own later `module N`.
+    precedes its own later `module N`. The base discriminator is: the
+    preloaded external `A.N.decoy` is admitted and bound to that GlobalId,
+    while cold `A` rejects. Case B is unmeasured on this SHA; if that is not
+    the exact base observation, STOP and revise the fixture before
+    implementing. A bare negative without its cause does not count.
 - **AC-2 (candidate).** `A`, `C1` and `C2` all reject `UnboundName N` at
   `A`'s premature import, in fresh environments, in any caller order. Case B
   rejects at the same import cold and preloaded. Positives: a `module N`

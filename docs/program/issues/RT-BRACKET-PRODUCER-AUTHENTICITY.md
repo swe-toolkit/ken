@@ -52,7 +52,11 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 - **A compiler-only marker identity, not resolvable from source.** Injected
   after source elaboration, or carried in a checked compiler side plane. Not a
   public declaration.
-- **Producer-marked roles.** The producer marks acquire, acquired body, final
+- **Producer-marked roles.** **SUPERSEDED for `acquired body` (2026-09-24):**
+  marking it as a normalized descendant is replaced by the source-edge
+  design in `RT-BRACKET-SOURCE-EDGE`; this child needs a frame rewrite
+  before any restart. Held evidence is preserved. The producer marks acquire,
+  acquired body, final
   settlement, outcome merge and resume ITSELF, before inlining. `HostOpV1` may
   validate those marked ports afterward; it may never discover them.
 - **Reference evaluation unwraps `body` unchanged.**
