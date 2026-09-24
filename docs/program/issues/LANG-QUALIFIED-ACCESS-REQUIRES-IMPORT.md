@@ -1,7 +1,7 @@
 ---
 id: LANG-QUALIFIED-ACCESS-REQUIRES-IMPORT
 title: "make resolve_ref grant qualified access P.foo only through a granted authority -- a qualified import of P (import P or import P as N), P's local inline declaration in the current file unit, or P being an inline child of a module the current module imports in qualified form -- always checking foo against P's public export table, as spec 33-declarations sections 3.1-3.2 state, instead of resolving against any already-loaded module's exports"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
