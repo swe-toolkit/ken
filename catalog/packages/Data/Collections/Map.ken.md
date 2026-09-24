@@ -15187,6 +15187,13 @@ computation as relation membership.
 arbitrary shared evidence and checks source/target order and both `d.leq`
 consumption sites against that computation.
 
+The private checked `dom_preserves_membership` law establishes that
+`set_member` on `dom m` agrees with `member` on `m` for every comparator,
+query, and raw tree. It reuses the existing lookup branch bridges on the
+original tree and its unit-valued view, carrying the same two decisions to
+both; it assumes no `Ordered` witness. This is a membership fact about
+`dom`, not a proof of the later reachability correspondence.
+
 Comparator lawfulness alone is insufficient: in an unordered successor tree,
 `fold` can visit a misplaced key that `set_member` lookup rejects, creating a
 path that is absent from the lookup-defined relation. The faithfulness and
@@ -15204,6 +15211,180 @@ pub fn dom (k : Type) (v : Type) (m : Tree k v) : Tree k Unit =
   match m {
     Leaf ↦ Leaf k Unit;
     Node l key val r ↦ Node k Unit (dom k v l) key MkUnit (dom k v r)
+  }
+
+fn dom_member_goal (k : Type) (v : Type) (leq : k → k → Bool) (x : k) (m : Tree k v) : Prop =
+  Equal Bool (set_member k leq x (dom k v m)) (member k v leq x m)
+
+theorem dom_member_hit
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (l : Tree k v)
+      (key : k)
+      (val : v)
+      (r : Tree k v)
+      (q1 : Equal Bool (leq x key) True)
+      (q2 : Equal Bool (leq key x) True)
+    : dom_member_goal k v leq x (Node k v l key val r) =
+  let
+    domain_node = set_member k leq x (dom k v (Node k v l key val r));
+    source_node = member k v leq x (Node k v l key val r);
+    domain_hit =
+      cong
+        (Option Unit)
+        Bool
+        (lookup k Unit leq x (Node k Unit (dom k v l) key MkUnit (dom k v r)))
+        (Some Unit MkUnit)
+        (is_some Unit)
+        (lookup_stop_bridge k Unit leq x (dom k v l) key MkUnit (dom k v r) q1 q2);
+    source_hit =
+      cong
+        (Option v)
+        Bool
+        (lookup k v leq x (Node k v l key val r))
+        (Some v val)
+        (is_some v)
+        (lookup_stop_bridge k v leq x l key val r q1 q2)
+  in
+    trans Bool domain_node True source_node domain_hit (sym Bool source_node True source_hit)
+
+theorem dom_member_left
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (l : Tree k v)
+      (key : k)
+      (val : v)
+      (r : Tree k v)
+      (q1 : Equal Bool (leq x key) True)
+      (q2 : Equal Bool (leq key x) False)
+      (ih : dom_member_goal k v leq x l)
+    : dom_member_goal k v leq x (Node k v l key val r) =
+  let
+    domain_node = set_member k leq x (dom k v (Node k v l key val r));
+    source_node = member k v leq x (Node k v l key val r);
+    domain_left = set_member k leq x (dom k v l);
+    source_left = member k v leq x l;
+    domain_step =
+      cong
+        (Option Unit)
+        Bool
+        (lookup k Unit leq x (Node k Unit (dom k v l) key MkUnit (dom k v r)))
+        (lookup k Unit leq x (dom k v l))
+        (is_some Unit)
+        (lookup_into_l_bridge k Unit leq x (dom k v l) key MkUnit (dom k v r) q1 q2);
+    source_step =
+      cong
+        (Option v)
+        Bool
+        (lookup k v leq x (Node k v l key val r))
+        (lookup k v leq x l)
+        (is_some v)
+        (lookup_into_l_bridge k v leq x l key val r q1 q2)
+  in
+    trans
+      Bool
+      domain_node
+      domain_left
+      source_node
+      domain_step
+      (trans
+        Bool
+        domain_left
+        source_left
+        source_node
+        ih
+        (sym Bool source_node source_left source_step))
+
+theorem dom_member_right
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (l : Tree k v)
+      (key : k)
+      (val : v)
+      (r : Tree k v)
+      (q1 : Equal Bool (leq x key) False)
+      (ih : dom_member_goal k v leq x r)
+    : dom_member_goal k v leq x (Node k v l key val r) =
+  let
+    domain_node = set_member k leq x (dom k v (Node k v l key val r));
+    source_node = member k v leq x (Node k v l key val r);
+    domain_right = set_member k leq x (dom k v r);
+    source_right = member k v leq x r;
+    domain_step =
+      cong
+        (Option Unit)
+        Bool
+        (lookup k Unit leq x (Node k Unit (dom k v l) key MkUnit (dom k v r)))
+        (lookup k Unit leq x (dom k v r))
+        (is_some Unit)
+        (lookup_into_r_bridge k Unit leq x (dom k v l) key MkUnit (dom k v r) q1);
+    source_step =
+      cong
+        (Option v)
+        Bool
+        (lookup k v leq x (Node k v l key val r))
+        (lookup k v leq x r)
+        (is_some v)
+        (lookup_into_r_bridge k v leq x l key val r q1)
+  in
+    trans
+      Bool
+      domain_node
+      domain_right
+      source_node
+      domain_step
+      (trans
+        Bool
+        domain_right
+        source_right
+        source_node
+        ih
+        (sym Bool source_node source_right source_step))
+
+theorem dom_member_node
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (l : Tree k v)
+      (key : k)
+      (val : v)
+      (r : Tree k v)
+      (left_member : dom_member_goal k v leq x l)
+      (right_member : dom_member_goal k v leq x r)
+    : dom_member_goal k v leq x (Node k v l key val r) =
+  match bool_dichotomy (leq x key) {
+    Inl q1 ↦
+      match bool_dichotomy (leq key x) {
+        Inl q2 ↦ dom_member_hit k v leq x l key val r q1 q2;
+        Inr q2 ↦ dom_member_left k v leq x l key val r q1 q2 left_member
+      };
+    Inr q1 ↦ dom_member_right k v leq x l key val r q1 right_member
+  }
+
+theorem dom_preserves_membership
+      (k : Type) (v : Type) (leq : k → k → Bool) (x : k) (m : Tree k v)
+    : Equal Bool (set_member k leq x (dom k v m)) (member k v leq x m) =
+  match m {
+    Leaf ↦ Proved;
+    Node l key val r ↦
+      dom_member_node
+        k
+        v
+        leq
+        x
+        l
+        key
+        val
+        r
+        (dom_preserves_membership k v leq x l)
+        (dom_preserves_membership k v leq x r)
   }
 
 fn succ (k : Type) (leq : k → k → Bool) (x : k) (r : Tree k (Tree k Unit)) : Tree k Unit =
