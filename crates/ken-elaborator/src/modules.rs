@@ -479,14 +479,16 @@ fn lexical_inline_import(
 ) -> InlineImport {
     if let Some(canonical) = declared_inline_import(prefix, file_root, module, unit_inline_modules)
     {
-        let (parent, _) = canonical
-            .rsplit_once('.')
-            .expect("relative inline child must have a parent");
-        if ordered_inline_modules.contains(&canonical)
-            && inline_children
+        // An in-memory unit's empty-prefix root has no parent→child edge in
+        // inline_children. Its own ordered expansion is the provenance for
+        // that root child; nested children still need their recorded edge.
+        let own_edge = match canonical.rsplit_once('.') {
+            Some((parent, _)) => inline_children
                 .get(parent)
-                .is_some_and(|children| children.contains(&canonical))
-        {
+                .is_some_and(|children| children.contains(&canonical)),
+            None => file_root.is_none(),
+        };
+        if ordered_inline_modules.contains(&canonical) && own_edge {
             InlineImport::Available(canonical)
         } else {
             InlineImport::Unavailable
@@ -793,12 +795,17 @@ fn declared_inline_import(
         return None;
     }
     let mut current = owner;
-    while !current.is_empty() {
+    loop {
+        // The empty prefix is the lexical root of a direct in-memory unit,
+        // but never an ancestor of a loaded file unit's dotted path.
+        if current.is_empty() && file_root.is_some() {
+            break;
+        }
         let canonical = qualify(current, module);
         if declared.contains(&canonical) {
             return Some(canonical);
         }
-        if file_root == Some(current) {
+        if current.is_empty() || file_root == Some(current) {
             break;
         }
         current = current.rsplit_once('.').map_or("", |(parent, _)| parent);
@@ -4308,6 +4315,98 @@ mod namespace_effect_tests {
                 other => panic!(
                     "preload {preload_inline} replay {with_replay} must reject later A.N: {other:?}"
                 ),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: at the empty-prefix in-memory unit root, `import N` before
+    /// its own `module N` rejects at that import both cold and after a separate
+    /// unit installed `N.external`. CLAIMED: a later local root child is not
+    /// an absolute import of ambient N. THE GAP: when the preloaded call
+    /// succeeds, the checked body/ID below identifies the wrong provider;
+    /// the ordered-root positive below proves the same syntax can work.
+    #[test]
+    fn in_memory_root_import_refuses_later_child_even_when_external_n_is_loaded() {
+        const SOURCE: &str = "import N\nconst borrowed : Nat = N.external\n\
+                              module N { pub const own : Nat = Zero }\n";
+        for preload_external in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if preload_external {
+                env.elaborate_file("module N { pub const external : Nat = Suc Zero }")
+                    .expect("independent earlier in-memory unit");
+            }
+            let external_id = env.globals.get("N.external").copied();
+            let result = env.elaborate_file(SOURCE);
+            let own_id = env.globals.get("N.own").copied();
+            let borrowed_id = env.globals.get("borrowed").and_then(|id| {
+                let (_, body) = env.env.transparent_body(*id)?;
+                match body {
+                    ken_kernel::Term::Const { id, .. } => Some(id),
+                    other => panic!("borrowed must be a global selector: {other:?}"),
+                }
+            });
+            eprintln!(
+                "in-memory root probe: preload={preload_external} result={result:?} \
+                 external={external_id:?} own={own_id:?} borrowed={borrowed_id:?}"
+            );
+            if result.is_ok() {
+                assert_eq!(
+                    borrowed_id, external_id,
+                    "wrong provider is the earlier unit"
+                );
+                assert_ne!(
+                    own_id, external_id,
+                    "own declaration is a distinct identity"
+                );
+            }
+            match result {
+                Err(ElabError::UnboundName { name, span }) => {
+                    assert_eq!(name, "N");
+                    assert_eq!((span.start, span.end), (0, "import N".len()));
+                }
+                other => panic!(
+                    "later root child must reject regardless of preload {preload_external}: {other:?}"
+                ),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: `module N` expanded before an in-memory import at the root
+    /// or in sibling P selects this unit's N.own, not the other unit's
+    /// preloaded N.external. CLAIMED: the empty-root declaration order, not
+    /// an unconditional refusal or ambient selection, governs both scopes.
+    /// THE GAP: the paired later-child case supplies the negative boundary.
+    #[test]
+    fn in_memory_root_import_keeps_earlier_declared_child() {
+        const ROOT: &str = "module N { pub const own : Nat = Zero }\n\
+                            import N\nconst selected : Nat = N.own\n";
+        const SIBLING: &str = "module N { pub const own : Nat = Zero }\n\
+                               module P { import N\npub const selected : Nat = N.own }\n";
+        for (source, selected_name) in [(ROOT, "selected"), (SIBLING, "P.selected")] {
+            for preload_external in [false, true] {
+                let mut env = ElabEnv::new().expect("base environment");
+                if preload_external {
+                    env.elaborate_file("module N { pub const external : Nat = Suc Zero }")
+                        .expect("independent earlier in-memory unit");
+                }
+                env.elaborate_file(source)
+                    .expect("earlier same-unit root child must remain importable");
+                let own_id = env.globals["N.own"];
+                if preload_external {
+                    assert_ne!(own_id, env.globals["N.external"]);
+                }
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals[selected_name])
+                    .expect("selected is transparent");
+                match body {
+                    ken_kernel::Term::Const { id, .. } => assert_eq!(id, own_id),
+                    other => panic!("{selected_name} must use this unit's N.own: {other:?}"),
+                }
             }
         }
     }
