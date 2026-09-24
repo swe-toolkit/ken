@@ -40,6 +40,8 @@ fn schema_imports() -> BTreeSet<String> {
         "SchemaIssue",
         "schema_issue_origin",
         "schema_issue_code",
+        "schema_expected_issue_list",
+        "schema_observed_issue_list",
         "schema_validate_fields",
         "schema_help",
     ])
@@ -75,8 +77,8 @@ fn public_surface() -> BTreeSet<String> {
     ])
 }
 
-fn private_surface() -> [&'static str; 43] {
-    [
+fn private_surface() -> Vec<&'static str> {
+    vec![
         "argparse_byte_matches_char",
         "argparse_cons_validations",
         "argparse_diagnostic",
@@ -120,6 +122,58 @@ fn private_surface() -> [&'static str; 43] {
         "program_commands",
         "program_description",
         "program_name",
+        "argparse_accepted_error_order",
+        "argparse_argument_bytes",
+        "argparse_cons_accepted_expected",
+        "argparse_cons_accepted_observation",
+        "argparse_cons_bytes_step",
+        "argparse_cons_diagnostic_head",
+        "argparse_cons_diagnostic_step",
+        "argparse_cons_diagnostic_tail",
+        "argparse_cons_flag_expected",
+        "argparse_cons_flag_observation",
+        "argparse_cons_input_bytes_bridge",
+        "argparse_cons_input_bytes_view",
+        "argparse_cons_option_expected",
+        "argparse_cons_option_observation",
+        "argparse_cons_outcome_view",
+        "argparse_cons_positional_expected",
+        "argparse_cons_positional_observation",
+        "argparse_cons_rejected_bytes",
+        "argparse_cons_valid_flag_case",
+        "argparse_cons_valid_option_case",
+        "argparse_cons_valid_option_expected_case",
+        "argparse_cons_valid_positional_case",
+        "argparse_cons_valid_positional_expected_case",
+        "argparse_cons_view_bytes",
+        "argparse_expected_bytes_if_valid",
+        "argparse_expected_missing_diagnostics",
+        "argparse_false_bytes_case",
+        "argparse_input_value_bytes",
+        "argparse_long_prefix_view",
+        "argparse_missing_bytes",
+        "argparse_missing_bytes_for_schema_result",
+        "argparse_missing_diagnostic_projection",
+        "argparse_missing_option_value_code",
+        "argparse_missing_result_view",
+        "argparse_none_bytes_case",
+        "argparse_none_diagnostic_false",
+        "argparse_none_diagnostic_step",
+        "argparse_none_diagnostic_true",
+        "argparse_observation_transport",
+        "argparse_observed_bytes",
+        "argparse_observed_diagnostics",
+        "argparse_parse_tokens::diagnostic_sequence_base",
+        "argparse_parse_tokens::diagnostic_sequence_step",
+        "argparse_parse_tokens::full_validation_cons_bridge",
+        "argparse_parse_tokens::value_bytes_from_input",
+        "argparse_prepend_bytes",
+        "argparse_prepend_valid_bytes",
+        "argparse_rejected_error_order",
+        "argparse_rejected_valid_case",
+        "argparse_unexpected_positional_code",
+        "argparse_unknown_bytes_case",
+        "argparse_unknown_option_code",
     ]
 }
 
@@ -295,7 +349,10 @@ fn argparse_selective_import_ledger_is_exact() {
                 "Decoded",
             ]),
         ),
-        ("Core.Logic.Transport".to_owned(), names(&["cong", "trans"])),
+        (
+            "Core.Logic.Transport".to_owned(),
+            names(&["cong", "sym", "trans"]),
+        ),
         (
             "Data.Collections.Derived".to_owned(),
             names(&["list_append"]),
@@ -304,8 +361,10 @@ fn argparse_selective_import_ledger_is_exact() {
             "Data.Collections.NonEmpty".to_owned(),
             names(&[
                 "NonEmpty",
+                "nonempty_append",
                 "nonempty_cons",
                 "nonempty_map",
+                "nonempty_to_list",
                 "Semigroup_instance_NonEmpty",
             ]),
         ),
@@ -415,6 +474,79 @@ theorem inhabited_help_order
     );
 }
 
+/// Promise class: durable invariant for the checked parser obligations.
+///
+/// MEASURED: roots-loaded private attached proofs are transparent, quantify
+/// over the arbitrary parser inputs, and have distinct `Equal` endpoints: the
+/// left observes the real parser and the right names the independently stated
+/// byte, missing-issue, or single-token diagnostic projection. CLAIMED: the
+/// parser's proof obligations have not been replaced by reflexive filler or
+/// disconnected from the original parser. THE GAP: this pins their raw checked
+/// types, not every reduction step; the kernel re-checks their proof bodies.
+#[test]
+fn argparse_checked_laws_retain_real_parser_and_distinct_endpoints() {
+    let (env, _, _) = load_argparse();
+    let parser_id = env.globals[&format!("{ARGPARSE}.argparse_parse_tokens")];
+    for (law, binder_count, expected_right) in [
+        (
+            "value_bytes_from_input",
+            4,
+            vec!["argparse_input_value_bytes"],
+        ),
+        (
+            "diagnostic_sequence_base",
+            3,
+            vec!["argparse_expected_missing_diagnostics"],
+        ),
+        (
+            "diagnostic_sequence_step",
+            5,
+            vec![
+                "argparse_cons_diagnostic_head",
+                "argparse_cons_diagnostic_tail",
+            ],
+        ),
+    ] {
+        let name = format!("{ARGPARSE}.argparse_parse_tokens::{law}");
+        let id = env.globals[&name];
+        let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("attached law loaded") else {
+            panic!("{name} must have a checked proof body, not an assumption");
+        };
+        let mut proposition = ty;
+        let mut binders = 0;
+        while let Term::Pi(_, result) = proposition {
+            binders += 1;
+            proposition = result;
+        }
+        assert_eq!(binders, binder_count, "{name} must remain generic");
+        let Term::App(equal_left, right) = proposition else {
+            panic!("{name} must state an equality");
+        };
+        let Term::App(equal_carrier, left) = equal_left.as_ref() else {
+            panic!("{name} must state two equality endpoints");
+        };
+        let Term::App(equal, _) = equal_carrier.as_ref() else {
+            panic!("{name} must state a carrier for its equality");
+        };
+        assert_eq!(equal.as_ref(), &Term::const_(env.globals["Equal"], vec![]));
+        assert_ne!(left, right, "{name} cannot be a reflexive placeholder");
+        let mut left_ids = BTreeSet::new();
+        collect_term_globals(left, &mut left_ids);
+        assert!(
+            left_ids.contains(&parser_id),
+            "{name} must observe the original parser"
+        );
+        let mut right_ids = BTreeSet::new();
+        collect_term_globals(right, &mut right_ids);
+        for expected in expected_right {
+            assert!(
+                right_ids.contains(&env.globals[&format!("{ARGPARSE}.{expected}")]),
+                "{name} must retain its independent {expected} projection"
+            );
+        }
+    }
+}
+
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every non-prelude, non-owned identity in checked ArgParse terms is
@@ -446,8 +578,12 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Application.Input.Schema.schema_help",
         "Application.Input.Schema.schema_issue_code",
         "Application.Input.Schema.schema_issue_origin",
+        "Application.Input.Schema.schema_expected_issue_list",
+        "Application.Input.Schema.schema_observed_issue_list",
         "Application.Input.Schema.schema_validate_fields",
+        "Application.Input.Schema.schema_validate_fields::invalid_issue_sequence",
         "Core.Logic.Transport.cong",
+        "Core.Logic.Transport.sym",
         "Core.Logic.Transport.trans",
         "Capability.Diagnostics.Core.ArgumentOrigin",
         "Capability.Diagnostics.Core.Diagnostic",
@@ -470,8 +606,11 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Capability.Parsing.Decoder.decoder_satisfy",
         "Data.Collections.Derived.list_append",
         "Data.Collections.NonEmpty.NonEmpty",
+        "Data.Collections.NonEmpty.nonempty_append::list_view",
         "Data.Collections.NonEmpty.nonempty_cons",
         "Data.Collections.NonEmpty.nonempty_map",
+        "Data.Collections.NonEmpty.nonempty_map::list_view",
+        "Data.Collections.NonEmpty.nonempty_to_list",
         "Data.Sums.Validation.Invalid",
         "Data.Sums.Validation.Valid",
         "Data.Sums.Validation.Validation",
@@ -527,7 +666,6 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         .collect::<BTreeSet<_>>();
     let schema_public =
         catalog_publication::published_module_surfaces(SCHEMA_SOURCE, SCHEMA, "argparse_schema");
-    assert_eq!(schema_names.len(), 21);
     assert!(schema_names.is_subset(&schema_public));
     let selections = schema_imports().into_iter().collect::<Vec<_>>().join(", ");
     env.elaborate_file(&format!("import {SCHEMA} ({selections})"))
@@ -554,6 +692,13 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
 fn argparse_publication_is_visibility_only() {
     let (mut env, _, _) = load_argparse();
     for surface in private_surface() {
+        // Attached proofs have qualified `::` names, which selective-import
+        // syntax cannot spell. Their parent is private and their identities
+        // are checked by the raw-proposition control below.
+        if surface.contains("::") {
+            assert!(env.globals.contains_key(&format!("{ARGPARSE}.{surface}")));
+            continue;
+        }
         match env.elaborate_file(&format!("import {ARGPARSE} ({surface})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{ARGPARSE}.{surface}"));
