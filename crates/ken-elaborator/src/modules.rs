@@ -201,6 +201,18 @@ impl ModuleState {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Proved is the surface name of the fixed kernel tt introduction,
+        // excluded from trusted_base rather than an arbitrary ambient global.
+        // Reject a forged spelling before admitting it to strict resolution.
+        let proved = globals.get("Proved").copied().ok_or_else(|| {
+            ElabError::Internal("prelude Proved has no fixed kernel tt identity".to_string())
+        })?;
+        if proved != env.tt_id() {
+            return Err(ElabError::Internal(
+                "prelude Proved differs from fixed kernel tt identity".to_string(),
+            ));
+        }
+
         self.prelude_binding_names = self.prelude_names.clone();
         self.strict_builtin_names = globals
             .iter()
@@ -218,6 +230,7 @@ impl ModuleState {
             self.prelude_binding_names.insert(name.clone());
             self.strict_builtin_names.insert(name);
         }
+        self.strict_builtin_names.insert("Proved".to_string());
         Ok(())
     }
 }
@@ -3512,6 +3525,41 @@ mod namespace_effect_tests {
     use crate::parser::parse_decls;
     use crate::ElabEnv;
     use ken_kernel::GlobalId;
+
+    /// Promise class: durable invariant (spec 16 §1.4; 33 §3.3).
+    ///
+    /// MEASURED: the default Proved name denotes the kernel's fixed tt_id,
+    /// which is absent from the assumption ledger; replacing that spelling
+    /// with a distinct checked ID makes the strict roster refuse it.
+    /// CLAIMED: only this fixed introduction may gain strict compiler-name
+    /// admission, not arbitrary global names. THE GAP: the facade/import
+    /// control in the Pair suite separately checks the selected identity.
+    #[test]
+    fn strict_proved_name_requires_exact_kernel_intro_identity() {
+        let mut env = ElabEnv::new().expect("base environment");
+        let proved = env.globals["Proved"];
+        assert_eq!(proved, env.env.tt_id());
+        let native: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+        assert!(
+            !native.contains(&proved),
+            "fixed prelude tt adds no assumption"
+        );
+        assert!(env.module_state.strict_builtin_names.contains("Proved"));
+
+        let other = env.globals["True"];
+        assert_ne!(proved, other, "the control must move the identity");
+        env.globals.insert("Proved".to_string(), other);
+        match env
+            .module_state
+            .capture_strict_builtin_names(&env.env, &env.globals, &native)
+        {
+            Err(ElabError::Internal(message)) => {
+                assert!(message.contains("Proved"), "wrong guard: {message}");
+                assert!(message.contains("tt"), "must name fixed intro: {message}");
+            }
+            other => panic!("forged Proved identity must be refused: {other:?}"),
+        }
+    }
 
     #[derive(Debug, PartialEq, Eq)]
     enum OwnedNamespaceEffect {
