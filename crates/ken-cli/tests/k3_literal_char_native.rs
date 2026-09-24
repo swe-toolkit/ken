@@ -55,6 +55,7 @@ fn checked_literal_view_codes_match_interpreter_and_native() {
         ken_cli::SourceFormat::Ken,
         "k3-literal-char-native",
         &dir.join("native"),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("the identical checked program native-builds");
     let native = Command::new(&built.artifact.executable_path)

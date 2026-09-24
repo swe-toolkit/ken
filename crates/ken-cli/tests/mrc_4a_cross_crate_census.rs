@@ -62,6 +62,7 @@ fn build(case: &str) -> bool {
         ken_cli::SourceFormat::Ken,
         "mrc_4a_census",
         &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .is_ok()
 }

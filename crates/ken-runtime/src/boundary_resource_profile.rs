@@ -10,19 +10,19 @@
 //! rules that it is **deployment resource policy**, ⛔ not compiler semantics
 //! and ⛔ not an emitter-derived formula.
 //!
-//! ## The eight quantities, and why exactly eight
+//! ## Eight boundary quantities and one process-wide epoch budget
 //!
 //! Two regions — the **invocation** arena and the **persistent** image — each
-//! metering four resources: nodes, child words, data bytes, and native-`Int`
-//! limbs. ⭐ **Eight is not a design choice made here**: it is exactly what the
-//! two existing reserve operations consume, so the profile is total over what
-//! the runtime can actually be asked to reserve, with nothing left implicit.
+//! meter nodes, child words, data bytes, and native-`Int` limbs. The boundary
+//! product has eight limits, exactly the eight reserve arguments. The process
+//! additionally meters activation epochs independently across all stores;
+//! ending one store cannot replenish this process-wide budget.
 //!
 //! ## ⛔ No default, and that is enforced by the compiler rather than by review
 //!
-//! [`BoundaryResourceProfileV1`] deliberately has **no `Default` impl** and
+//! [`BoundaryResourceProfileV2`] deliberately has **no `Default` impl** and
 //! **no partial constructor**, and its limits are named public fields. ⇒ Every
-//! construction site must write all eight numbers out, and there is no
+//! construction site must write all nine numbers out, and there is no
 //! `..Default::default()` to hide behind. ⚠ A `new()` taking four same-typed
 //! `usize` positionals would have been the transposition hazard this shape
 //! removes: swapping *words* and *data bytes* would compile, run, and be wrong.
@@ -164,8 +164,21 @@ impl BoundaryRegionLimitsV1 {
     /// question *"which number is which"*, and the two would drift silently —
     /// a transposition compiles and runs.
     pub const fn as_reserve_arguments(self) -> (usize, usize, usize, usize) {
-        (self.nodes, self.words, self.data_bytes, self.native_int_limbs)
+        (
+            self.nodes,
+            self.words,
+            self.data_bytes,
+            self.native_int_limbs,
+        )
     }
+}
+
+/// The process-wide finite budget for activation epochs. Unlike an
+/// invocation arena limit it cannot reset when a store is dropped.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RuntimeResourceLimitsV2 {
+    /// Highest permitted process-wide epoch counter. Zero admits no activation.
+    pub invocation_epochs: u64,
 }
 
 /// **The versioned, deployment-supplied boundary resource profile.**
@@ -173,7 +186,9 @@ impl BoundaryRegionLimitsV1 {
 /// ⛔ No `Default`, no partial constructor, no widening. See the module doc for
 /// why that is structural rather than a convention.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct BoundaryResourceProfileV1 {
+pub struct BoundaryResourceProfileV2 {
+    /// Process-wide limits; shared across stores and activations in this OS process.
+    pub runtime: RuntimeResourceLimitsV2,
     /// Limits for the per-activation arena.
     pub invocation: BoundaryRegionLimitsV1,
     /// Limits for the store-owned persistent image.
@@ -185,9 +200,9 @@ pub struct BoundaryResourceProfileV1 {
 /// ⭐ Carried so a recorded package provenance can be read back and rejected by
 /// a runtime that does not implement its schema, rather than being reinterpreted
 /// under a layout it does not have.
-pub const BOUNDARY_RESOURCE_PROFILE_VERSION: u32 = 1;
+pub const BOUNDARY_RESOURCE_PROFILE_VERSION: u32 = 2;
 
-impl BoundaryResourceProfileV1 {
+impl BoundaryResourceProfileV2 {
     /// One limit, by the `(scope, resource)` pair.
     ///
     /// ⭐ Total over `ALL × ALL` — which is what lets `AC-4`'s eight cases be
@@ -208,7 +223,7 @@ impl BoundaryResourceProfileV1 {
     }
 }
 
-/// **The profile this crate's own starter/differential callers choose.**
+/// **Explicit policy selected by this crate's own starter/differential callers.**
 ///
 /// ⛔⛔ **NOT a default, and the distinction is the whole of `§3c`.** The ban is
 /// on the **emitter** inventing, widening or silently defaulting a profile. This
@@ -221,8 +236,11 @@ impl BoundaryResourceProfileV1 {
 /// [`crate::object_linker_packaging::ObjectLinkerPackagingStage::ResourceProfile`]
 /// before anything is emitted. ⛔ If this were reachable as a fallback it would
 /// be the banned default wearing a constructor's name.
-pub const fn starter_smoke_profile() -> BoundaryResourceProfileV1 {
-    BoundaryResourceProfileV1 {
+pub const fn starter_smoke_profile() -> BoundaryResourceProfileV2 {
+    BoundaryResourceProfileV2 {
+        runtime: RuntimeResourceLimitsV2 {
+            invocation_epochs: u64::MAX,
+        },
         invocation: BoundaryRegionLimitsV1 {
             nodes: 64,
             words: 256,
@@ -317,8 +335,11 @@ mod tests {
     /// ⚠ ⛔ **A fixture with equal limits cannot detect a transposition** — the
     /// `(scope, resource)` lookup would return the right number for the wrong
     /// reason, and every assertion below would pass on a broken table.
-    fn distinct_profile() -> BoundaryResourceProfileV1 {
-        BoundaryResourceProfileV1 {
+    fn distinct_profile() -> BoundaryResourceProfileV2 {
+        BoundaryResourceProfileV2 {
+            runtime: RuntimeResourceLimitsV2 {
+                invocation_epochs: u64::MAX,
+            },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: 11,
                 words: 22,
@@ -480,13 +501,20 @@ mod tests {
         // ⭐ The discriminator that matters: a zero limit is an EXPLICIT
         // deployment choice, so exhausting it must not be reported as an
         // absent profile. Conflating the two is how a default sneaks back in.
-        assert!(!exhausted.to_string().contains("no boundary resource profile"));
+        assert!(
+            !exhausted
+                .to_string()
+                .contains("no boundary resource profile")
+        );
     }
 
     /// ⚠ **Zero is a legal, explicit limit** — it means "no room", not "unset".
     #[test]
     fn a_zero_limit_is_explicit_and_is_not_an_absent_profile() {
-        let profile = BoundaryResourceProfileV1 {
+        let profile = BoundaryResourceProfileV2 {
+            runtime: RuntimeResourceLimitsV2 {
+                invocation_epochs: u64::MAX,
+            },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: 0,
                 words: 0,
@@ -501,8 +529,14 @@ mod tests {
             },
         };
         for resource in BoundaryResource::ALL {
-            assert_eq!(profile.limit(BoundaryResourceScope::Invocation, resource), 0);
-            assert_eq!(profile.limit(BoundaryResourceScope::Persistent, resource), 1);
+            assert_eq!(
+                profile.limit(BoundaryResourceScope::Invocation, resource),
+                0
+            );
+            assert_eq!(
+                profile.limit(BoundaryResourceScope::Persistent, resource),
+                1
+            );
         }
         assert_eq!(profile.invocation.as_reserve_arguments(), (0, 0, 0, 0));
     }

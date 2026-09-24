@@ -13,16 +13,16 @@ use std::path::Path;
 use ken_kernel::{Context, Decl, GlobalEnv, GlobalId, Term};
 
 use crate::checked_core::{
-    canonical_decl_bytes, canonical_symbol_bytes, canonical_term_bytes,
-    checked_core_declaration_body_view, emit_checked_core_package, semantic_fingerprint,
-    validate_checked_core_package, AssumptionTrustKind, AssumptionTrustMetadata,
-    CheckedCoreArtifactInputs, CheckedCoreBodyTerm, CheckedCoreBodyViewError,
-    CheckedCoreBodyViewSelection, CheckedCorePackage, CheckedCorePackageError,
-    CheckedCorePackageHeader, CheckedCoreSemanticInputs, ConstructorMetadata, DataMetadata,
-    LowerabilityStatus, PartialityMetadata, PrimitiveMetadata, PrimitiveReductionMetadata,
-    RecursionAdmission, RecursionMetadata, StableSymbol, StableSymbolTable, SymbolNamespace,
+    AssumptionTrustKind, AssumptionTrustMetadata, CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
+    CheckedCoreBodyViewError, CheckedCoreBodyViewSelection, CheckedCorePackage,
+    CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
+    ConstructorMetadata, DataMetadata, LowerabilityStatus, PartialityMetadata, PrimitiveMetadata,
+    PrimitiveReductionMetadata, RecursionAdmission, RecursionMetadata, StableSymbol,
+    StableSymbolTable, SymbolNamespace, canonical_decl_bytes, canonical_symbol_bytes,
+    canonical_term_bytes, checked_core_declaration_body_view, emit_checked_core_package,
+    semantic_fingerprint, validate_checked_core_package,
 };
-use crate::program_admission::{admit_checked_main, CheckedMainDescriptor, ProgramAdmissionError};
+use crate::program_admission::{CheckedMainDescriptor, ProgramAdmissionError, admit_checked_main};
 use crate::{ElabEnv, ElabError};
 
 const PRODUCER: &str = "ken-elaborator:compiler-driver:nc10";
@@ -861,15 +861,12 @@ fn collect_checked_perform_nodes(
                         .cloned()
                         .ok_or(CompilerDriverError::MissingStableSymbol { id: constructor })?;
                     if let Some(operation) = self.operations.get(&constructor).copied() {
-                        let family_symbol = match crate::export::host_operation_family_v1(
-                            operation,
-                        ) {
+                        let family_symbol = match crate::export::host_operation_family_v1(operation)
+                        {
                             crate::export::HostOpFamilyV1::Clock => self.clock_family.clone(),
                             crate::export::HostOpFamilyV1::Console => self.console_family.clone(),
                             crate::export::HostOpFamilyV1::Fs => self.fs_family.clone(),
-                            crate::export::HostOpFamilyV1::Entropy => {
-                                self.entropy_family.clone()
-                            }
+                            crate::export::HostOpFamilyV1::Entropy => self.entropy_family.clone(),
                         };
                         self.nodes.insert(CheckedPerformNodeV1::Host {
                             family_symbol,
@@ -982,12 +979,10 @@ fn collect_checked_perform_nodes(
                 ))
             })?;
             let Term::Constructor { id: outer_id, .. } = outer else {
-                return Err(Self::fail(
-                    format!(
+                return Err(Self::fail(format!(
                         "dynamic Vis operation has no finite structural inventory in {:?}: {normalized:?}",
                         self.active_declarations
-                    ),
-                ));
+                )));
             };
             let leaf = if *outer_id == self.in_l {
                 outer_args.last().copied()
@@ -1870,10 +1865,7 @@ impl ComputationalIHTemplateCollector<'_> {
                         level_args,
                     )
                     .map_err(|_| {
-                        Self::runtime_shape_mismatch(
-                            owner,
-                            "kernel method type generation failed",
-                        )
+                        Self::runtime_shape_mismatch(owner, "kernel method type generation failed")
                     })?;
                     prepared_methods.push(self.prepare_method(
                         owner,
@@ -2287,8 +2279,8 @@ pub fn prepare_native_program_sources(
     // plan bytes against a full native build's, rather than recomputing them.
     let plan_bytes_retained = plan_bytes.clone();
     let plan_transport_hash = fingerprint(&plan_bytes);
-    let host_spine =
-        checked_host_spine_v1(&env.prelude_env, &symbols).map_err(NativeProgramBuildError::Driver)?;
+    let host_spine = checked_host_spine_v1(&env.prelude_env, &symbols)
+        .map_err(NativeProgramBuildError::Driver)?;
     let host_spine_bytes = canonical_checked_host_spine_v1_bytes(&host_spine);
     // The production package owns the exact live-environment closure, including
     // prelude definitions referenced by `main`; source-only generic packages
@@ -2700,9 +2692,10 @@ pub fn compile_native_program_sources(
     package_name: &str,
     sources: Vec<CompilerSource>,
     output_dir: impl AsRef<Path>,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
     let preparation = prepare_native_program_sources(package_name, sources)?;
-    complete_native_program_preparation(preparation, output_dir)
+    complete_native_program_preparation(preparation, output_dir, profile)
 }
 
 /// Consume the compiler-owned preparation by value and finish object emission.
@@ -2712,11 +2705,13 @@ pub fn compile_native_program_sources(
 fn complete_native_program_preparation(
     preparation: NativeProgramPreparationV1,
     output_dir: impl AsRef<Path>,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
     let plan = preparation.plan.as_ref();
     let host_spine = preparation.host_spine.as_ref();
     let NativeProgramPreparationV1 {
-        plan_transport_hash, ..
+        plan_transport_hash,
+        ..
     } = &preparation;
     let artifact = ken_runtime::build_bound_process_starter_executable_artifact(
         &preparation.runtime_program,
@@ -2756,24 +2751,18 @@ fn complete_native_program_preparation(
                 file_operation_write: host_spine.file_operation_write.to_string(),
                 file_operation_change_mode: host_spine.file_operation_change_mode.to_string(),
                 file_operation_append: host_spine.file_operation_append.to_string(),
-                file_operation_metadata: host_spine
-                    .file_operation_metadata
-                    .to_string(),
+                file_operation_metadata: host_spine.file_operation_metadata.to_string(),
                 file_metadata: host_spine.file_metadata.to_string(),
                 file_kind_file: host_spine.file_kind_file.to_string(),
                 file_kind_directory: host_spine.file_kind_directory.to_string(),
                 file_kind_symlink: host_spine.file_kind_symlink.to_string(),
                 file_kind_other: host_spine.file_kind_other.to_string(),
                 file_operation_rename: host_spine.file_operation_rename.to_string(),
-                file_operation_read_directory: host_spine
-                    .file_operation_read_directory
-                    .to_string(),
+                file_operation_read_directory: host_spine.file_operation_read_directory.to_string(),
                 file_operation_create_directory: host_spine
                     .file_operation_create_directory
                     .to_string(),
-                file_operation_remove_file: host_spine
-                    .file_operation_remove_file
-                    .to_string(),
+                file_operation_remove_file: host_spine.file_operation_remove_file.to_string(),
                 file_operation_remove_directory: host_spine
                     .file_operation_remove_directory
                     .to_string(),
@@ -2825,11 +2814,9 @@ fn complete_native_program_preparation(
             },
         },
         output_dir,
-            // `RT-FNSPLIT-C3-ACTIVATION` `D4` — the deployment caller names its
-        // resource policy; the emitter may not invent one. ⚠ The driver has no
-        // CLI surface for it yet, so it names the runtime's own starter policy
-        // explicitly rather than letting a default exist.
-        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        // Deployment policy enters as a required argument above; this emitter
+        // carries the exact profile and never invents a smoke fallback.
+        profile,
     )
     .map_err(NativeProgramBuildError::Packaging)?;
     let NativeProgramPreparationV1 {
@@ -3642,10 +3629,7 @@ fn checked_host_spine_v1(
         operations.insert(resolve_id(id)?, operation);
     }
     for (id, operation) in [
-        (
-            prelude.private_fs_open_id,
-            ken_host::HostOpV1::FsOpen,
-        ),
+        (prelude.private_fs_open_id, ken_host::HostOpV1::FsOpen),
         (
             prelude.private_fs_handle_metadata_id,
             ken_host::HostOpV1::FsHandleMetadata,
@@ -3654,10 +3638,7 @@ fn checked_host_spine_v1(
             prelude.private_buffer_allocate_id,
             ken_host::HostOpV1::BufferAllocate,
         ),
-        (
-            prelude.private_fs_read_at_id,
-            ken_host::HostOpV1::FsReadAt,
-        ),
+        (prelude.private_fs_read_at_id, ken_host::HostOpV1::FsReadAt),
         (
             prelude.private_fs_write_at_id,
             ken_host::HostOpV1::FsWriteAt,
@@ -4249,9 +4230,7 @@ fn add_data_metadata(
         );
         if let Some((origin, _, _)) = env.env.all_support_origin(ind.id) {
             if let Some(origin) = symbols.get(&origin) {
-                semantic
-                    .all_support_origins
-                    .insert(family, origin.clone());
+                semantic.all_support_origins.insert(family, origin.clone());
             }
         }
     }
@@ -5336,8 +5315,8 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 mod tests {
     use super::*;
     use crate::checked_core::{
-        emit_checked_core_package, CheckedCoreArtifactInputs, ClassInstanceKind,
-        ClassInstanceMetadata, ObligationMetadata, ObligationStatus,
+        CheckedCoreArtifactInputs, ClassInstanceKind, ClassInstanceMetadata, ObligationMetadata,
+        ObligationStatus, emit_checked_core_package,
     };
     use crate::erasure::erase_checked_core_package_for_target;
 
@@ -5407,10 +5386,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let package_name = "r3_gate_4a_equality";
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new(
-                "src/main.ken",
-                GATE_4A_EQUALITY_SOURCE,
-            )],
+            vec![CompilerSource::new("src/main.ken", GATE_4A_EQUALITY_SOURCE)],
         )
         .expect("the already-green recursive native source reaches preparation");
 
@@ -5441,7 +5417,11 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
                 .expect("system time after epoch")
                 .as_nanos()
         ));
-        let output = complete_native_program_preparation(preparation, &output_dir)
+        let output = complete_native_program_preparation(
+            preparation,
+            &output_dir,
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
             .expect("the already-green source completes native object emission");
         let _ = std::fs::remove_dir_all(&output_dir);
 
@@ -5547,7 +5527,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
 
     #[test]
     fn erased_whole_match_does_not_precede_the_runtime_match_census() {
-        use ken_kernel::{declare_inductive, CtorSpec, InductiveSpec, Level};
+        use ken_kernel::{CtorSpec, InductiveSpec, Level, declare_inductive};
 
         let mut env = GlobalEnv::new();
         let family_id = declare_inductive(&mut env, |family_id| InductiveSpec {
@@ -6089,9 +6069,11 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             entrypoint.argument_packaging.shape,
             ExecutableArgumentShape::ClosedNullary
         ));
-        assert!(entrypoint
+        assert!(
+            entrypoint
             .required_runtime_support
-            .contains(&ExecutableRuntimeSupport::RuntimeValues));
+                .contains(&ExecutableRuntimeSupport::RuntimeValues)
+        );
         assert!(matches!(
             entrypoint.result_observation.shape,
             ExecutableResultShape::RuntimeValue
@@ -6315,11 +6297,13 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         .unwrap();
         let entrypoint = package_executable_entrypoint(&package, &closures[0]).unwrap();
 
-        assert!(entrypoint
+        assert!(
+            entrypoint
             .unsupported_lanes
             .values()
             .flatten()
-            .any(|lane| lane.lane == "unresolved_checked_core_symbol"));
+                .any(|lane| lane.lane == "unresolved_checked_core_symbol")
+        );
         assert!(matches!(
             entrypoint.closed_entry,
             ExecutableEntrypointVerdict::Unavailable { .. }
@@ -6397,9 +6381,11 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             entrypoint.argument_packaging.shape,
             ExecutableArgumentShape::UnsupportedRuntimeArguments { parameter_count: 1 }
         ));
-        assert!(entrypoint
+        assert!(
+            entrypoint
             .required_runtime_support
-            .contains(&ExecutableRuntimeSupport::FunctionCalls));
+                .contains(&ExecutableRuntimeSupport::FunctionCalls)
+        );
     }
 
     #[test]
@@ -6491,15 +6477,19 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         .unwrap();
         let closure = &closures[0];
         assert!(closure.semantic.obligations.contains_key(&obligation));
-        assert!(closure
+        assert!(
+            closure
             .semantic
             .obligation_metadata
-            .contains_key(&obligation));
+                .contains_key(&obligation)
+        );
         assert!(closure.semantic.assumptions.contains_key(&assumption));
-        assert!(closure
+        assert!(
+            closure
             .semantic
             .assumption_trust_metadata
-            .contains_key(&assumption));
+                .contains_key(&assumption)
+        );
         assert!(closure.semantic.trusted_base_delta.contains_key(&target));
         assert!(closure.report.assumptions.contains(&assumption));
         assert!(closure.report.trusted_base_delta.contains(&target));
@@ -6593,11 +6583,13 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             Some(&dependency)
         );
         assert!(report.external_symbols.contains(&imported));
-        assert!(!report
+        assert!(
+            !report
             .unsupported_lanes
             .values()
             .flatten()
-            .any(|lane| lane.lane == "unresolved_checked_core_symbol"));
+                .any(|lane| lane.lane == "unresolved_checked_core_symbol")
+        );
         assert_eq!(
             report.dictionary_runtime_fields.get(&dictionary),
             Some(&BTreeSet::from(["eq".to_string()]))
@@ -6646,12 +6638,14 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
                 || closure.external_symbols.contains(&true_symbol),
             "declaration references without package metadata must remain explicit externals"
         );
-        assert!(closure
+        assert!(
+            closure
             .report
             .unsupported_lanes
             .values()
             .flatten()
-            .any(|lane| lane.lane == "unresolved_checked_core_symbol"));
+                .any(|lane| lane.lane == "unresolved_checked_core_symbol")
+        );
         assert!(matches!(
             closure.report.runtime_lowering,
             ReportFact::Unavailable(UnavailableLane { ref lane, .. })
@@ -6717,13 +6711,15 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             selector(package_name, target),
         )
         .unwrap();
-        assert!(closures[0]
+        assert!(
+            closures[0]
             .report
             .unsupported_lanes
             .get(&helper)
             .unwrap()
             .iter()
-            .any(|lane| lane.lane == "non_lowerable_closure_member"));
+                .any(|lane| lane.lane == "non_lowerable_closure_member")
+        );
         assert!(matches!(
             closures[0].report.runtime_lowering,
             ReportFact::Unavailable(_)
@@ -6840,13 +6836,14 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
 
         let lanes = &out.report.selected_targets[0].lanes;
         assert!(lanes.iter().any(|lane| lane.lane == "non_runtime_target"));
-        assert!(out
-            .report
+        assert!(
+            out.report
             .unsupported_lanes
             .get(&target)
             .unwrap()
             .iter()
-            .any(|lane| lane.lane == "non_runtime_target"));
+                .any(|lane| lane.lane == "non_runtime_target")
+        );
         assert!(has_lane(
             &out.executable_entrypoints[0].unsupported_lanes,
             &target,
@@ -6867,17 +6864,20 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             compile_ken_package_sources(&manifest, vec![real_source()], TargetSelector::Manifest)
                 .expect("unsupported target metadata remains reportable");
 
-        assert!(out.report.selected_targets[0]
+        assert!(
+            out.report.selected_targets[0]
             .lanes
             .iter()
-            .any(|lane| lane.lane == "unsupported_target_metadata"));
-        assert!(out
-            .report
+                .any(|lane| lane.lane == "unsupported_target_metadata")
+        );
+        assert!(
+            out.report
             .unsupported_lanes
             .get(&target)
             .unwrap()
             .iter()
-            .any(|lane| lane.lane == "unsupported_target_metadata"));
+                .any(|lane| lane.lane == "unsupported_target_metadata")
+        );
     }
 
     #[test]
@@ -7012,16 +7012,46 @@ mod d1b_role_c1_roster_identity {
             ("result_ok", record.spine.result_ok.clone()),
             ("option_some", record.spine.option_some.clone()),
             ("file_error", record.spine.file_error.clone()),
-            ("file_operation_read", record.spine.file_operation_read.clone()),
-            ("file_operation_write", record.spine.file_operation_write.clone()),
-            ("file_operation_change_mode", record.spine.file_operation_change_mode.clone()),
-            ("resource_kind_mismatch", record.spine.resource_kind_mismatch.clone()),
-            ("resource_buffer_limit", record.spine.resource_buffer_limit.clone()),
-            ("resource_allocation_failed", record.spine.resource_allocation_failed.clone()),
-            ("resource_invalid_offset", record.spine.resource_invalid_offset.clone()),
-            ("resource_invalid_bounds", record.spine.resource_invalid_bounds.clone()),
-            ("resource_no_progress", record.spine.resource_no_progress.clone()),
-            ("resource_kind_buffer", record.spine.resource_kind_buffer.clone()),
+            (
+                "file_operation_read",
+                record.spine.file_operation_read.clone(),
+            ),
+            (
+                "file_operation_write",
+                record.spine.file_operation_write.clone(),
+            ),
+            (
+                "file_operation_change_mode",
+                record.spine.file_operation_change_mode.clone(),
+            ),
+            (
+                "resource_kind_mismatch",
+                record.spine.resource_kind_mismatch.clone(),
+            ),
+            (
+                "resource_buffer_limit",
+                record.spine.resource_buffer_limit.clone(),
+            ),
+            (
+                "resource_allocation_failed",
+                record.spine.resource_allocation_failed.clone(),
+            ),
+            (
+                "resource_invalid_offset",
+                record.spine.resource_invalid_offset.clone(),
+            ),
+            (
+                "resource_invalid_bounds",
+                record.spine.resource_invalid_bounds.clone(),
+            ),
+            (
+                "resource_no_progress",
+                record.spine.resource_no_progress.clone(),
+            ),
+            (
+                "resource_kind_buffer",
+                record.spine.resource_kind_buffer.clone(),
+            ),
             ("read_some", record.spine.read_some.clone()),
             ("read_eof", record.spine.read_eof.clone()),
             ("wrote", record.spine.wrote.clone()),
@@ -7101,8 +7131,14 @@ mod d1b_role_c1_roster_identity {
                 record.spine.resource_kind_mapping.clone(),
             ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
-            ("io_error_permission_denied", record.spine.io_errors[1].clone()),
-            ("io_error_capability_denied", record.spine.io_errors[2].clone()),
+            (
+                "io_error_permission_denied",
+                record.spine.io_errors[1].clone(),
+            ),
+            (
+                "io_error_capability_denied",
+                record.spine.io_errors[2].clone(),
+            ),
             ("io_error_broken_pipe", record.spine.io_errors[3].clone()),
             ("io_error_interrupted", record.spine.io_errors[4].clone()),
             ("io_error_already_exists", record.spine.io_errors[5].clone()),
@@ -7136,7 +7172,26 @@ mod d1b_role_c1_roster_identity {
 
         // Operations are keyed by symbol rather than positional, so each
         // canonical operation symbol must be a KEY of the emitted map.
-        for field in ["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"] {
+        for field in [
+            "op_console_read",
+            "op_console_write",
+            "op_console_flush",
+            "op_console_is_terminal",
+            "op_clock_wall_now",
+            "op_clock_monotonic_now",
+            "op_clock_sleep_until",
+            "op_entropy_random_bytes",
+            "op_fs_read_file",
+            "op_fs_write_file",
+            "op_fs_append_file",
+            "op_fs_metadata",
+            "op_fs_read_directory",
+            "op_fs_create_directory",
+            "op_fs_remove_file",
+            "op_fs_remove_directory",
+            "op_fs_rename",
+            "op_fs_change_mode",
+        ] {
             let expected = canonical
                 .get(field)
                 .unwrap_or_else(|| panic!("no canonical roster entry named {field}"));
@@ -7148,9 +7203,27 @@ mod d1b_role_c1_roster_identity {
 
         // COMPLETENESS, so the loops above cannot go quietly partial: every
         // canonical role is covered by one of the three checks.
-        let mut covered: BTreeSet<&'static str> =
-            emitted.iter().map(|(field, _)| *field).collect();
-        covered.extend(["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"]);
+        let mut covered: BTreeSet<&'static str> = emitted.iter().map(|(field, _)| *field).collect();
+        covered.extend([
+            "op_console_read",
+            "op_console_write",
+            "op_console_flush",
+            "op_console_is_terminal",
+            "op_clock_wall_now",
+            "op_clock_monotonic_now",
+            "op_clock_sleep_until",
+            "op_entropy_random_bytes",
+            "op_fs_read_file",
+            "op_fs_write_file",
+            "op_fs_append_file",
+            "op_fs_metadata",
+            "op_fs_read_directory",
+            "op_fs_create_directory",
+            "op_fs_remove_file",
+            "op_fs_remove_directory",
+            "op_fs_rename",
+            "op_fs_change_mode",
+        ]);
         let uncovered: Vec<&&'static str> = canonical
             .keys()
             .filter(|field| !covered.contains(*field))

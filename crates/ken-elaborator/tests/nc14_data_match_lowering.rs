@@ -364,7 +364,7 @@ fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
     let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &runtime,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         "ken_nested_ih_backedge_forward_frontier",
     );
     let observations = realization_scope.finish();
@@ -657,7 +657,7 @@ fn checked_ih_abi_and_match_refusal_site_are_discriminated_before_authority() {
     let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &runtime,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         "ken_checked_ih_unplanned_control",
     );
     let observations = scope.finish();
@@ -763,7 +763,7 @@ fn scalar_merge_observations_for_program(
     let _later_native_result = ken_runtime::emit_runtime_ir_object_with_cranelift(
         program,
         &runtime,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         entry_symbol,
     );
     scope.finish()

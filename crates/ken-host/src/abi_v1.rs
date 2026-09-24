@@ -12,11 +12,11 @@ use std::io::{self, Read, Write};
 
 use crate::revocation_v1::RevocationDomain;
 use crate::{
-    dispatch_host_op_v1, CanonicalOutcomeV1, CanonicalReplyV1, CanonicalRequestV1, Cap,
-    CapabilityGrantV1, CapabilityTableV1, CapabilityTokenV1, ConsoleStreamV1, CreatePolicyV1,
+    AUTH_FULL, AUTH_NONE, AUTH_PARTIAL, CanonicalOutcomeV1, CanonicalReplyV1, CanonicalRequestV1,
+    Cap, CapabilityGrantV1, CapabilityTableV1, CapabilityTokenV1, ConsoleStreamV1, CreatePolicyV1,
     EffectEvent, FileErrorCauseV1, FsHandle, FsRootSpec, HostEffectBackendV1, HostOpV1,
     IoErrorIdentityV1, OpenRequest, PathComponent, RootPath, RootedHandle, SymlinkPolicy,
-    AUTH_FULL, AUTH_NONE, AUTH_PARTIAL,
+    dispatch_host_op_v1,
 };
 
 #[cfg(target_os = "linux")]
@@ -496,8 +496,7 @@ impl HostEffectBackendV1 for ProcessHost {
         if stream != ConsoleStreamV1::Stdin {
             return Err(IoErrorIdentityV1::Unsupported);
         }
-        let limit = usize::try_from(limit)
-            .map_err(|_| IoErrorIdentityV1::InvalidInput)?;
+        let limit = usize::try_from(limit).map_err(|_| IoErrorIdentityV1::InvalidInput)?;
         if limit == 0 {
             return Ok(CanonicalReplyV1::ReadChunk(Vec::new()));
         }
@@ -515,9 +514,7 @@ impl HostEffectBackendV1 for ProcessHost {
     }
 
     fn clock_wall_now(&mut self) -> Vec<u8> {
-        let nanoseconds = match std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-        {
+        let nanoseconds = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
             Ok(duration) => i128::try_from(duration.as_nanos())
                 .expect("a SystemTime duration always fits signed nanoseconds"),
             Err(error) => -i128::try_from(error.duration().as_nanos())
@@ -603,8 +600,8 @@ impl HostEffectBackendV1 for ProcessHost {
         bytes: &[u8],
     ) -> Result<(), FileErrorCauseV1> {
         let (parent, leaf) = Self::parent(grant, path)?;
-        let handle = crate::open_at(&parent, &leaf, OpenRequest::AppendOrCreate)
-            .map_err(host_error)?;
+        let handle =
+            crate::open_at(&parent, &leaf, OpenRequest::AppendOrCreate).map_err(host_error)?;
         crate::append(&handle, bytes).map_err(host_error)
     }
 
@@ -614,8 +611,7 @@ impl HostEffectBackendV1 for ProcessHost {
         path: &[u8],
     ) -> Result<crate::FileMetadataV1, FileErrorCauseV1> {
         let (parent, leaf) = Self::parent(grant, path)?;
-        let handle = crate::open_at(&parent, &leaf, OpenRequest::Read)
-            .map_err(host_error)?;
+        let handle = crate::open_at(&parent, &leaf, OpenRequest::Read).map_err(host_error)?;
         let metadata = crate::metadata(&handle).map_err(host_error)?;
         Ok(crate::FileMetadataV1 {
             size: metadata.size,
@@ -634,8 +630,8 @@ impl HostEffectBackendV1 for ProcessHost {
         path: &[u8],
     ) -> Result<Vec<crate::DirEntryV1>, FileErrorCauseV1> {
         let (parent, leaf) = Self::parent(grant, path)?;
-        let handle = crate::open_at(&parent, &leaf, OpenRequest::ReadDirectory)
-            .map_err(host_error)?;
+        let handle =
+            crate::open_at(&parent, &leaf, OpenRequest::ReadDirectory).map_err(host_error)?;
         crate::read_directory(&handle)
             .map(|entries| {
                 entries
@@ -694,8 +690,7 @@ impl HostEffectBackendV1 for ProcessHost {
         destination: &[u8],
     ) -> Result<(), FileErrorCauseV1> {
         let (source_parent, source_leaf) = Self::parent(grant, source)?;
-        let (destination_parent, destination_leaf) =
-            Self::parent(grant, destination)?;
+        let (destination_parent, destination_leaf) = Self::parent(grant, destination)?;
         crate::rename(
             &source_parent,
             &source_leaf,
@@ -757,24 +752,21 @@ impl HostEffectBackendV1 for ProcessHost {
         length: u64,
         protection: crate::MappingProtectionV1,
     ) -> Result<crate::MappingRegionV1, crate::SemanticErrorV1> {
-        let metadata = crate::resource_metadata_v1(handle)
-            .map_err(|error| crate::SemanticErrorV1::Io(crate::io_error_identity_v1(
-                &error.into_io_error(),
-            )))?;
+        let metadata = crate::resource_metadata_v1(handle).map_err(|error| {
+            crate::SemanticErrorV1::Io(crate::io_error_identity_v1(&error.into_io_error()))
+        })?;
         if metadata.size < length {
             return Err(crate::SemanticErrorV1::Resource(
                 crate::ResourceErrorV1::InvalidBounds,
             ));
         }
-        crate::MappingRegionV1::try_new_mapped_file(handle, length, protection).map_err(
-            |error| {
+        crate::MappingRegionV1::try_new_mapped_file(handle, length, protection).map_err(|error| {
                 if crate::mapping_v1::is_allocation_failure(error) {
                     crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::AllocationFailed)
                 } else {
                     crate::SemanticErrorV1::Io(error)
                 }
-            },
-        )
+        })
     }
 
     fn resource_unmap(&mut self, region: crate::MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
@@ -1135,6 +1127,41 @@ pub unsafe extern "C" fn ken_host_invocation_v1_finish(
     0
 }
 
+/// Finish a host invocation that was admitted, but whose native activation
+/// refused a declared epoch limit before the generated entry could run.
+/// The Rust activation owner supplies the exact typed failure; a signed token
+/// by itself is never an authority to write this terminal variant.
+///
+/// # Safety
+/// `context` is the unique live handle returned by host invocation init,
+/// consumed exactly once by this call (not also by ordinary finish).
+pub unsafe fn ken_host_invocation_v1_finish_with_capacity(
+    context: *mut c_void,
+    failure: crate::CapacityExhaustedV1,
+) -> i64 {
+    if context.is_null()
+        || !context.cast::<ProcessContext>().is_aligned()
+        || failure.requested <= failure.limit
+    {
+        return -1;
+    }
+    let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
+    context.finalize_resources();
+    if let Some(mut sink) = context.observation.take() {
+        if write_observation_with_terminal(
+            &mut sink,
+            &context,
+            crate::CAPACITY_EXHAUSTED_STATUS_V1,
+            Some(crate::TerminalErrorV1::CapacityExhausted(failure)),
+        )
+        .is_err()
+        {
+            return -1;
+        }
+    }
+    0
+}
+
 impl ProcessContext {
     fn finalize_resources(&mut self) {
         let settlements = {
@@ -1189,14 +1216,24 @@ fn write_observation(
     context: &ProcessContext,
     terminal_value: i64,
 ) -> io::Result<()> {
+    write_observation_with_terminal(sink, context, terminal_value, None)
+}
+
+fn write_observation_with_terminal(
+    sink: &mut impl Write,
+    context: &ProcessContext,
+    terminal_value: i64,
+    terminal_error: Option<crate::TerminalErrorV1>,
+) -> io::Result<()> {
+    let terminal_exit = crate::terminal_exit_class(terminal_value, terminal_error.as_ref());
     let bytes = crate::encode_linked_effect_trace(&crate::LinkedEffectTrace {
         plan_hash: context.plan_hash,
         target_abi_hash: crate::TARGET_ABI_MANIFEST_HASH,
         host_effect_abi_hash: crate::HOST_EFFECT_ABI_V1_HASH,
         terminal_value,
-        terminal_error: None,
+        terminal_error,
         effect_trace: context.effect_trace.clone(),
-        terminal_exit: crate::terminal_exit_class(terminal_value, None),
+        terminal_exit,
     })
     .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
     sink.write_all(&bytes)?;
@@ -1552,8 +1589,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
         return -(0x1_0000_i64 + i64::from(op as u16));
     }
     let (capability, resource, request) = match op {
-        HostOpV1::ConsoleRead
-            if request_size == std::mem::size_of::<ConsoleReadRequestV1>() => {
+        HostOpV1::ConsoleRead if request_size == std::mem::size_of::<ConsoleReadRequestV1>() => {
             if !request.cast::<ConsoleReadRequestV1>().is_aligned() {
                 return -1;
             }
@@ -1589,8 +1625,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::ClockWallNow
-            if request_size == std::mem::size_of::<UnitRequestV1>() => {
+        HostOpV1::ClockWallNow if request_size == std::mem::size_of::<UnitRequestV1>() => {
             if !request.cast::<UnitRequestV1>().is_aligned() {
                 return -1;
             }
@@ -1659,9 +1694,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::FsAppendFile
-            if request_size == std::mem::size_of::<FsAppendFileRequestV1>() =>
-        {
+        HostOpV1::FsAppendFile if request_size == std::mem::size_of::<FsAppendFileRequestV1>() => {
             if !request.cast::<FsAppendFileRequestV1>().is_aligned() {
                 return -1;
             }
@@ -1681,9 +1714,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::FsMetadata
-            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
-        {
+        HostOpV1::FsMetadata if request_size == std::mem::size_of::<FsPathRequestV1>() => {
             if !request.cast::<FsPathRequestV1>().is_aligned() {
                 return -1;
             }
@@ -1699,9 +1730,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::FsReadDirectory
-            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
-        {
+        HostOpV1::FsReadDirectory if request_size == std::mem::size_of::<FsPathRequestV1>() => {
             if !request.cast::<FsPathRequestV1>().is_aligned() {
                 return -1;
             }
@@ -1749,9 +1778,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 request,
             )
         }
-        HostOpV1::FsRemoveFile
-            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
-        {
+        HostOpV1::FsRemoveFile if request_size == std::mem::size_of::<FsPathRequestV1>() => {
             if !request.cast::<FsPathRequestV1>().is_aligned() {
                 return -1;
             }
@@ -1767,17 +1794,16 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::FsRename
-            if request_size == std::mem::size_of::<FsRenameRequestV1>() =>
-        {
+        HostOpV1::FsRename if request_size == std::mem::size_of::<FsRenameRequestV1>() => {
             if !request.cast::<FsRenameRequestV1>().is_aligned() {
                 return -1;
             }
             let wire = unsafe { &*(request.cast::<FsRenameRequestV1>()) };
-            let (Some(source), Some(destination)) = (
-                unsafe { borrowed_slice(&wire.source) },
-                unsafe { borrowed_slice(&wire.destination) },
-            ) else {
+            let (Some(source), Some(destination)) =
+                (unsafe { borrowed_slice(&wire.source) }, unsafe {
+                    borrowed_slice(&wire.destination)
+                })
+            else {
                 return -1;
             };
             (
@@ -1970,9 +1996,9 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
             };
             (
                 None,
-                crate::ResourceInputsV1::Target(
-                    crate::ResourceTokenV1::from_erased_identity(wire.resource),
-                ),
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.resource,
+                )),
                 CanonicalRequestV1::MappingAcquireFile {
                     length: wire.length,
                     protection,
@@ -2457,7 +2483,9 @@ mod tests {
         // satisfied by a compensating duplicate.
         for row in crate::HOST_EFFECT_ABI_V1_CATALOG {
             assert!(
-                HostOpV1::ALL.iter().any(|operation| *operation as u16 == row.1),
+                HostOpV1::ALL
+                    .iter()
+                    .any(|operation| *operation as u16 == row.1),
                 "generated catalog row {:#06x} has no operation in the derived inventory",
                 row.1
             );
@@ -2640,9 +2668,7 @@ mod tests {
         };
         set_reply(
             &mut reply,
-            CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(
-                entries.clone(),
-            )),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries.clone())),
             context,
         );
         assert_eq!(reply.tag, REPLY_BYTES);
@@ -2653,9 +2679,8 @@ mod tests {
         assert_eq!(
             encoded,
             &[
-                2, 0, 0, 0, 0, 0, 0, 0,
-                1, 0, 0, 0, 0, 0, 0, 0, b'a', 0,
-                2, 0, 0, 0, 0, 0, 0, 0, 0xff, b'z', 3,
+                2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, b'a', 0, 2, 0, 0, 0, 0, 0, 0, 0,
+                0xff, b'z', 3,
             ]
         );
         assert_eq!(decode_directory_entries_reply_v1(encoded), Some(entries));
@@ -2687,18 +2712,12 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn abi_a3_raw_dispatch_executes_all_four_directory_operations() {
-        let directory = std::env::temp_dir().join(format!(
-            "ken-abi-a3-raw-directory-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("ken-abi-a3-raw-directory-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(directory.join("listing/subdir")).unwrap();
         std::fs::write(directory.join("listing/file.bin"), b"payload").unwrap();
-        std::os::unix::fs::symlink(
-            "file.bin",
-            directory.join("listing/link"),
-        )
-        .unwrap();
+        std::os::unix::fs::symlink("file.bin", directory.join("listing/link")).unwrap();
         std::fs::write(directory.join("remove.bin"), b"remove").unwrap();
         std::fs::create_dir(directory.join("empty-dir")).unwrap();
         let initialized = context(&directory);
@@ -2735,10 +2754,7 @@ mod tests {
         assert_eq!(listing_reply.tag, REPLY_BYTES);
         assert!(!listing_reply.bytes.data.is_null());
         let encoded = unsafe {
-            std::slice::from_raw_parts(
-                listing_reply.bytes.data,
-                listing_reply.bytes.len,
-            )
+            std::slice::from_raw_parts(listing_reply.bytes.data, listing_reply.bytes.len)
         };
         let mut entries = decode_directory_entries_reply_v1(encoded)
             .expect("raw DirectoryEntries payload decodes exactly");
@@ -3259,10 +3275,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn fs_append_file_raw_dispatch_appends_exact_bytes() {
-        let directory = std::env::temp_dir().join(format!(
-            "ken-fs-append-native-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("ken-fs-append-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         std::fs::write(directory.join("data.bin"), b"before").unwrap();
@@ -3342,10 +3356,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn fs_metadata_raw_dispatch_returns_exact_file_and_directory_fields() {
-        let directory = std::env::temp_dir().join(format!(
-            "ken-fs-metadata-native-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("ken-fs-metadata-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(directory.join("known-dir")).unwrap();
         std::fs::write(directory.join("known.bin"), b"five!").unwrap();
@@ -3358,9 +3370,9 @@ mod tests {
         .into_iter()
         .enumerate()
         {
-            let expected_size = std::fs::metadata(directory.join(
-                std::str::from_utf8(path).expect("fixture path is UTF-8"),
-            ))
+            let expected_size = std::fs::metadata(
+                directory.join(std::str::from_utf8(path).expect("fixture path is UTF-8")),
+            )
             .unwrap()
             .len();
             let request = FsPathRequestV1 {
@@ -3443,10 +3455,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn fs_rename_raw_dispatch_performs_the_exact_state_transition() {
-        let directory = std::env::temp_dir().join(format!(
-            "ken-fs-rename-native-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("ken-fs-rename-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         std::fs::write(directory.join("a.bin"), b"original").unwrap();
@@ -3489,10 +3499,7 @@ mod tests {
         assert_eq!(reply.detail, 0);
         assert_eq!(reply.bytes.len, 0);
         assert!(!directory.join("a.bin").exists());
-        assert_eq!(
-            std::fs::read(directory.join("b.bin")).unwrap(),
-            b"original"
-        );
+        assert_eq!(std::fs::read(directory.join("b.bin")).unwrap(), b"original");
         let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
         let [event] = context.effect_trace.as_slice() else {
             panic!("one raw rename must record exactly one event")
@@ -3520,10 +3527,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn console_read_raw_dispatch_no_longer_falls_to_the_deferred_boundary() {
-        let directory = std::env::temp_dir().join(format!(
-            "ken-console-read-native-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("ken-console-read-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         let initialized = context(&directory);
@@ -3567,10 +3572,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn clock_wall_now_raw_dispatch_returns_a_plausible_instant_response() {
-        let directory = std::env::temp_dir().join(format!(
-            "ken-clock-wall-native-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("ken-clock-wall-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         let initialized = context(&directory);
@@ -3601,12 +3604,8 @@ mod tests {
         assert_eq!(reply.tag, REPLY_BYTES);
         assert_eq!(reply.detail, 0);
         assert_eq!(reply.bytes.len, std::mem::size_of::<i128>());
-        let bytes = unsafe {
-            std::slice::from_raw_parts(reply.bytes.data, reply.bytes.len)
-        };
-        let bytes: [u8; 16] = bytes
-            .try_into()
-            .expect("the response is one signed i128");
+        let bytes = unsafe { std::slice::from_raw_parts(reply.bytes.data, reply.bytes.len) };
+        let bytes: [u8; 16] = bytes.try_into().expect("the response is one signed i128");
         let reading = i128::from_be_bytes(bytes);
         let before = i128::from_be_bytes(before.try_into().unwrap());
         let after = i128::from_be_bytes(after.try_into().unwrap());
@@ -3647,11 +3646,13 @@ mod tests {
         std::fs::write(directory.join("shared"), b"readable").unwrap();
         let initialized = context(&directory);
         let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
-        assert!(context
+        assert!(
+            context
             .capabilities
             .resolve(context.capability)
             .unwrap()
-            .revoke(&mut context.revocation));
+                .revoke(&mut context.revocation)
+        );
 
         let path = b"shared";
         let request = FsReadFileRequestV1 {
@@ -3793,7 +3794,8 @@ mod tests {
     #[test]
     fn posture_failure_prevents_context_publication() {
         let root = RootPath::new(std::env::current_dir().unwrap()).unwrap();
-        assert!(initialize_process_context(
+        assert!(
+            initialize_process_context(
             root,
             FsRootSpec::default(),
             AUTH_FULL,
@@ -3802,7 +3804,8 @@ mod tests {
             Err(PostureErrorV1::HostPostureUnavailable),
             Some(EffectiveUidSnapshotV1::scripted(1000)),
         )
-        .is_err());
+            .is_err()
+        );
     }
 
     #[test]

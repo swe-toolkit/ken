@@ -534,6 +534,7 @@ fn differential(case: &str, entry: &str) -> Differential {
         ken_cli::SourceFormat::Ken,
         &format!("rt_parity_{}", case.replace('-', "_")),
         root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -1609,6 +1610,7 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
                         ken_cli::SourceFormat::Ken,
                         &format!("rt_parity_static_response_demand_{label}"),
                         root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 });
             result.expect("the fixed response-demand product must compile");
@@ -1801,6 +1803,7 @@ fn static_response_context_demand_controls_reach_and_restore() {
                     ken_cli::SourceFormat::Ken,
                     "rt_parity_static_response_demand_control",
                     root.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                 )
             });
             (root, observed)
@@ -1928,6 +1931,7 @@ macro_rules! full_demand_compile {
                 ken_cli::SourceFormat::Ken,
                 &format!("rt_parity_static_response_full_grid_{}", $entry),
                 root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         });
         (root, observed)
@@ -2262,6 +2266,7 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
                     ken_cli::SourceFormat::Ken,
                     "rt_parity_static_response_retarget",
                     root.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                 )
             });
             (root, observed)
@@ -2378,6 +2383,7 @@ fn owner_body_control(
                 ken_cli::SourceFormat::Ken,
                 &format!("rt_parity_static_response_owner_grid_{entry}"),
                 root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         });
         (root, observed)
@@ -2513,6 +2519,7 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
                             ken_cli::SourceFormat::Ken,
                             &format!("rt_parity_direct_application_pairing_{label}"),
                             root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
                     },
                 );
@@ -2624,6 +2631,7 @@ fn direct_application_control_arm(
                     ken_cli::SourceFormat::Ken,
                     "rt_parity_direct_application_control",
                     root.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                 )
             });
         (root, result, observations, applications)
@@ -2990,6 +2998,7 @@ fn checked_ih_generated_entry_arrival_cannot_be_replaced_by_producer_source() {
                             ken_cli::SourceFormat::Ken,
                             &format!("rt_parity_generated_entry_e_from_s_{label}"),
                             root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
                     })
                 });
@@ -3059,6 +3068,7 @@ fn assert_generated_entry_arrival_mutation_child() {
                 ken_cli::SourceFormat::Ken,
                 &format!("rt_parity_generated_entry_arrival_{}", mode.replace('-', "_")),
                 root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         })
     });
@@ -3778,6 +3788,7 @@ fn composed_return_ret_sink_population_is_unique() {
                             ken_cli::SourceFormat::Ken,
                             &format!("rt_parity_composed_return_ret_sink_{label}"),
                             root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
                     },
                 );
@@ -3929,6 +3940,7 @@ fn composed_return_ret_sink_lookup_controls_refuse() {
                             label.replace('-', "_")
                         ),
                         root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 });
             assert!(
@@ -3975,6 +3987,7 @@ fn composed_return_ret_sink_is_byte_inert() {
                                     ken_cli::SourceFormat::Ken,
                                     "rt_parity_composed_return_ret_sink_inert",
                                     exact_root.path(),
+                                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                                 )
                             },
                         );
@@ -3995,6 +4008,7 @@ fn composed_return_ret_sink_is_byte_inert() {
                                     ken_cli::SourceFormat::Ken,
                                     "rt_parity_composed_return_ret_sink_inert",
                                     suppressed_root.path(),
+                                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                                 )
                             },
                         );
@@ -4062,6 +4076,7 @@ fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
                         ken_cli::SourceFormat::Ken,
                         "rt_parity_forward_ret_authority_live",
                         exact_root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 },
             );
@@ -4075,6 +4090,7 @@ fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
                         ken_cli::SourceFormat::Ken,
                         "rt_parity_forward_ret_authority_live",
                         suppressed_root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 },
             );
@@ -4170,6 +4186,7 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
                                     ken_cli::SourceFormat::Ken,
                                     &format!("rt_parity_forward_ret_role_witness_{label}"),
                                     root.path(),
+                                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                                 )
                             })
                         })
@@ -4289,6 +4306,7 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
                         ken_cli::SourceFormat::Ken,
                         &format!("rt_parity_forward_edge_collapsibility_{label}"),
                         root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 });
             result.expect("the collapsibility fixture must compile");
@@ -4391,6 +4409,7 @@ fn composed_return_forward_ret_authority_population_is_exact() {
                             ken_cli::SourceFormat::Ken,
                             &format!("rt_parity_forward_ret_authority_population_{label}"),
                             root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
                     })
                 });
@@ -4602,6 +4621,7 @@ fn composed_return_forward_ret_authority_controls_refuse() {
                             label.replace('-', "_")
                         ),
                         root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 });
             assert!(
@@ -4654,6 +4674,7 @@ fn checked_ih_inheritance_and_fresh_result_route_are_byte_inert() {
                 ken_cli::SourceFormat::Ken,
                 "rt_parity_continuation_inheritance_inert",
                 exact_root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
             .expect("exact continuation-inheritance artifact");
             let suppressed = ken_runtime::with_checked_ih_continuation_inheritance_mutation(
@@ -4664,6 +4685,7 @@ fn checked_ih_inheritance_and_fresh_result_route_are_byte_inert() {
                         ken_cli::SourceFormat::Ken,
                         "rt_parity_continuation_inheritance_inert",
                         suppressed_root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 },
             )
@@ -5178,6 +5200,7 @@ fn forward_ret_edge_substituted_word_reds() {
                         ken_cli::SourceFormat::Ken,
                         "rt_parity_forward_ret_substituted",
                         root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                     .expect("the substituted-edge control reaches linked native lowering");
                     ken_runtime::run_bound_process_effect_observation(
@@ -5392,6 +5415,7 @@ fn assert_option2_unrelated_owner_child() {
                 ken_cli::SourceFormat::Ken,
                 "rt_parity_option2_unrelated_owner",
                 root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         },
     );

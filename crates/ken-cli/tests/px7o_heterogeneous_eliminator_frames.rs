@@ -77,6 +77,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
         ken_cli::SourceFormat::Ken,
         "px7o-heterogeneous-eliminator-frames",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("heterogeneous eliminators reach the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -142,6 +143,7 @@ fn ignored_payload_twin_remains_an_opposite_only() {
         ken_cli::SourceFormat::Ken,
         "px7o-ignored-payload-opposite",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("the byte-near ignored-payload opposite still lowers");
 }

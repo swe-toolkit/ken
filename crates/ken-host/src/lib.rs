@@ -38,7 +38,8 @@ mod resource_close_v1;
 mod revocation_v1;
 
 pub use abi_v1::{
-    admit_root_execution, observe_effective_uid_v1, EffectiveUidSnapshotV1, RootExecutionDeniedV1,
+    EffectiveUidSnapshotV1, RootExecutionDeniedV1, admit_root_execution,
+    ken_host_invocation_v1_finish_with_capacity, observe_effective_uid_v1,
 };
 pub use capability::*;
 pub use effect_v1::*;
@@ -1382,10 +1383,12 @@ mod tests {
                 ("libc", "0.2.186", &[][..]),
             ]
         );
-        assert!(TARGET_ABI
+        assert!(
+            TARGET_ABI
             .dependencies
             .iter()
-            .all(|dependency| dependency.checksum.len() == 64));
+                .all(|dependency| dependency.checksum.len() == 64)
+        );
         assert_eq!(TARGET_ABI.backend, "linux_raw");
         assert!(!TARGET_ABI_CANONICAL.contains("SIG"));
 
@@ -1476,8 +1479,13 @@ mod tests {
             "        layout_fact(\"C_UCHAR_WIDTH\", bit_width::<core::ffi::c_uchar>()),\n        layout_fact(\"POINTER_WIDTH\", bit_width::<*const core::ffi::c_void>()),",
             1,
         );
-        let producer_only =
-            build_support::verify_inventory_closure(&injected_build, &host, consumer, probe, &facts)
+        let producer_only = build_support::verify_inventory_closure(
+            &injected_build,
+            &host,
+            consumer,
+            probe,
+            &facts,
+        )
                 .expect_err("a producer-only ABI layout fact must fail closed");
         assert_eq!(
             producer_only,
@@ -1973,10 +1981,12 @@ mod abi_m1_d0_probe {
             "C_DOUBLE_ALIGNMENT",
         ]);
         assert_eq!(actual, expected);
-        assert!(TARGET_ABI
+        assert!(
+            TARGET_ABI
             .families
             .iter()
-            .all(|projection| projection.facility_version == 1));
+                .all(|projection| projection.facility_version == 1)
+        );
     }
 
     /// Promise class: durable invariant. Each projection hash covers exactly

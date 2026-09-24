@@ -347,7 +347,7 @@ fn c1_a_real_carrier_reaches_lowering_and_its_reports_carry_the_admitted_trust()
         let report = ken_runtime::run_example_with_interpreter_observation(
             &program,
             example,
-            &ken_runtime::NativeSeedEnvironment::empty(),
+            &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
             ken_runtime::InterpreterOracleObservation {
                 artifact: identity.clone(),
                 observation: example.observation.clone(),
@@ -400,7 +400,7 @@ fn c1_the_user_foreign_still_fails_in_admission_before_the_residual_blockers() {
     let report = ken_runtime::run_example_with_interpreter_observation(
         &dirty,
         example,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         ken_runtime::InterpreterOracleObservation {
             artifact: identity,
             observation: example.observation.clone(),
@@ -488,7 +488,7 @@ fn c1_the_object_artifact_carries_the_admitted_trust() {
     let object = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &run_report,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         "ken_c1_object_surface_control",
     )
     .expect("the real carrier emits an object through the production path");

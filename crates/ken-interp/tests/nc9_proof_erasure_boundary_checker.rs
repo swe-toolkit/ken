@@ -340,7 +340,7 @@ fn native_trust_report_records_nc9_separately_from_nc8_and_f1() {
     let report = run_ken_checked_proof_erasure_example_with_interpreter_observation(
         &program,
         &example,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         oracle,
         nc9_report,
     )
@@ -397,7 +397,7 @@ fn native_trust_report_attachment_recheck_names_concrete_mismatch_lane() {
     let err = run_ken_checked_proof_erasure_example_with_interpreter_observation(
         &program,
         &example,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         oracle,
         nc9_report,
     )

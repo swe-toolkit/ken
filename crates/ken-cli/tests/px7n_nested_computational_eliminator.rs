@@ -83,6 +83,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
         ken_cli::SourceFormat::Ken,
         "px7n-nested-computational-eliminator",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("nested computational eliminators compose in the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(

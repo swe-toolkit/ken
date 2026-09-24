@@ -78,6 +78,7 @@ fn dasm_c2_artifact_identity_worker_impl(output_dir: &Path) {
             ken_cli::SourceFormat::Ken,
             "dasm_c2_artifact_identity_pkg",
             output_dir,
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     };
 

@@ -56,6 +56,9 @@ pub struct CheckedProgramEntry {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Scenario {
+    /// Deployment resource policy for the native lane. Named by each fixture;
+    /// never inferred from the program or silently supplied by this runner.
+    pub boundary_resource_profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2,
     pub process_input: RawProcessInput,
     pub ambient: AmbientScript,
     pub program_caps: ProgramCapsShape,
@@ -673,6 +676,7 @@ fn execute_scenario_on_compiler_stack(
         ken_cli::SourceFormat::Ken,
         &scenario.entry.package_name,
         roots.artifacts(),
+        scenario.boundary_resource_profile,
     )
     .map_err(|error| HarnessError::NativeBuild(error.to_string()))?;
 
@@ -2448,6 +2452,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         let path = b"dir/./px6.bin".to_vec();
         let bytes = vec![b'r', 0xff, b'x'];
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![path.clone(), bytes.clone()],
                 environment: vec![(b"PX6_ENV".to_vec(), vec![0xfe, b'v'])],
@@ -2476,6 +2481,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     fn clock_wall_scenario() -> Scenario {
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput::default(),
             ambient: AmbientScript {
                 use_real_wall_clock: true,
@@ -2494,6 +2500,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     fn console_read_scenario() -> Scenario {
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput::default(),
             ambient: AmbientScript {
                 stdin: vec![0xff, b'a', 0],
@@ -2520,6 +2527,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         initial_filesystem: Vec<SeedNode>,
     ) -> Scenario {
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![path.clone(), bytes.clone()],
                 environment: Vec::new(),
@@ -2642,6 +2650,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         expected_paths: Vec<Vec<u8>>,
     ) -> Scenario {
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments,
                 environment: Vec::new(),
@@ -2771,6 +2780,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             FS_RENAME_SOURCE.replace("AFull", "ANone")
         };
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![source.clone(), destination.clone()],
                 environment: Vec::new(),
@@ -2941,6 +2951,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         expected_fs: ExpectedFsEffect,
     ) -> Scenario {
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![path],
                 environment: Vec::new(),
@@ -3210,6 +3221,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn denial_scenario() -> Scenario {
         let path = b"../escape".to_vec();
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![path.clone()],
                 environment: Vec::new(),
@@ -3267,6 +3279,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         let raw_path = b"dir/./x".to_vec();
         let normalized_path = b"dir/x".to_vec();
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![raw_path.clone(), normalized_path.clone()],
                 environment: Vec::new(),
@@ -3294,6 +3307,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn execution_start_cwd_root_scenario() -> Scenario {
         let path = b"x".to_vec();
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![path.clone(), path.clone()],
                 environment: Vec::new(),
@@ -3329,6 +3343,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn change_mode_scenario() -> Scenario {
         let path = b"mode.bin".to_vec();
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![path.clone()],
                 environment: Vec::new(),
@@ -3351,6 +3366,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn change_directory_mode_scenario() -> Scenario {
         let path = b"mode-dir".to_vec();
         Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             process_input: RawProcessInput {
                 arguments: vec![path.clone()],
                 environment: Vec::new(),

@@ -568,6 +568,28 @@ pub fn encode_linked_effect_trace(
     match &trace.terminal_error {
         None => put_u8(&mut out, 0),
         Some(crate::TerminalErrorV1::RootExecutionDenied) => put_u8(&mut out, 1),
+        Some(crate::TerminalErrorV1::CapacityExhausted(failure)) => {
+            if trace.terminal_value != crate::CAPACITY_EXHAUSTED_STATUS_V1
+                || failure.requested <= failure.limit
+            {
+                return Err(EffectTraceWireError);
+            }
+            put_u8(&mut out, 3);
+            put_u8(
+                &mut out,
+                match failure.scope {
+                    crate::CapacityScopeV1::Runtime => 0,
+                },
+            );
+            put_u8(
+                &mut out,
+                match failure.resource {
+                    crate::CapacityResourceV1::InvocationEpochs => 0,
+                },
+            );
+            out.extend_from_slice(&failure.limit.to_le_bytes());
+            out.extend_from_slice(&failure.requested.to_le_bytes());
+        }
         Some(crate::TerminalErrorV1::HomeRootResolutionFailed(failure)) => {
             put_u8(&mut out, 2);
             match failure {
@@ -1110,6 +1132,29 @@ pub fn decode_linked_effect_trace(bytes: &[u8]) -> Result<LinkedEffectTrace, Eff
     let terminal_error = match cursor.u8()? {
         0 => None,
         1 => Some(crate::TerminalErrorV1::RootExecutionDenied),
+        3 => {
+            let scope = match cursor.u8()? {
+                0 => crate::CapacityScopeV1::Runtime,
+                _ => return Err(EffectTraceWireError),
+            };
+            let resource = match cursor.u8()? {
+                0 => crate::CapacityResourceV1::InvocationEpochs,
+                _ => return Err(EffectTraceWireError),
+            };
+            let limit = u128::from_le_bytes(cursor.take(16)?.try_into().unwrap());
+            let requested = u128::from_le_bytes(cursor.take(16)?.try_into().unwrap());
+            if terminal_value != crate::CAPACITY_EXHAUSTED_STATUS_V1 || requested <= limit {
+                return Err(EffectTraceWireError);
+            }
+            Some(crate::TerminalErrorV1::CapacityExhausted(
+                crate::CapacityExhaustedV1 {
+                    scope,
+                    resource,
+                    limit,
+                    requested,
+                },
+            ))
+        }
         2 => Some(crate::TerminalErrorV1::HomeRootResolutionFailed(
             match cursor.u8()? {
                 0 => crate::HomeRootResolutionFailureV1::NoAccountRecord,
@@ -1186,6 +1231,69 @@ pub fn decode_linked_effect_trace(bytes: &[u8]) -> Result<LinkedEffectTrace, Eff
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Promise: normative compatibility vector for the reserved typed terminal
+    /// tag and durable invariant for unknown/malformed refusal. The positive
+    /// image exercises the same decoder as the negative one-byte mutations.
+    #[test]
+    fn capacity_terminal_round_trips_and_rejects_forged_wire_tags() {
+        let failure = crate::CapacityExhaustedV1 {
+            scope: crate::CapacityScopeV1::Runtime,
+            resource: crate::CapacityResourceV1::InvocationEpochs,
+            limit: 0,
+            requested: 1,
+        };
+        let trace = LinkedEffectTrace {
+            plan_hash: 11,
+            target_abi_hash: crate::TARGET_ABI_MANIFEST_HASH,
+            host_effect_abi_hash: crate::HOST_EFFECT_ABI_V1_HASH,
+            terminal_value: crate::CAPACITY_EXHAUSTED_STATUS_V1,
+            terminal_error: Some(crate::TerminalErrorV1::CapacityExhausted(failure)),
+            effect_trace: Vec::new(),
+            terminal_exit: crate::TerminalExitClass::ControlledTrap,
+        };
+        let encoded = encode_linked_effect_trace(&trace).expect("typed capacity encodes");
+        assert_eq!(decode_linked_effect_trace(&encoded).unwrap(), trace);
+        let tag_at = MAGIC.len() + 8 + 32 + 32 + 8;
+        for (offset, replacement) in [(tag_at, 0xff), (tag_at + 1, 1), (tag_at + 2, 1)] {
+            let mut malformed = encoded.clone();
+            malformed[offset] = replacement;
+            assert_eq!(
+                decode_linked_effect_trace(&malformed),
+                Err(EffectTraceWireError)
+            );
+        }
+        let mut truncated = encoded.clone();
+        truncated.truncate(tag_at + 3 + 16);
+        assert_eq!(
+            decode_linked_effect_trace(&truncated),
+            Err(EffectTraceWireError)
+        );
+        let mut wrong_status = encoded.clone();
+        let status_at = MAGIC.len() + 8 + 32 + 32;
+        wrong_status[status_at..status_at + 8].copy_from_slice(&(-8i64).to_le_bytes());
+        assert_eq!(
+            decode_linked_effect_trace(&wrong_status),
+            Err(EffectTraceWireError)
+        );
+        let mut inconsistent = trace;
+        inconsistent.terminal_value = -8;
+        assert_eq!(
+            encode_linked_effect_trace(&inconsistent),
+            Err(EffectTraceWireError)
+        );
+        inconsistent.terminal_value = crate::CAPACITY_EXHAUSTED_STATUS_V1;
+        inconsistent.terminal_error = Some(crate::TerminalErrorV1::CapacityExhausted(
+            crate::CapacityExhaustedV1 {
+                requested: 0,
+                ..failure
+            },
+        ));
+        assert_eq!(
+            encode_linked_effect_trace(&inconsistent),
+            Err(EffectTraceWireError)
+        );
+    }
 
     /// ABI-S3 AC-3b. No cancellation surface exists on the sleep operation --
     /// no field, token, or status, INCLUDING an unused or reserved one (D2;
@@ -1270,10 +1378,7 @@ mod tests {
     }
 
     fn encode_roundtrip(bytes: &[u8]) -> CanonicalRequestV1 {
-        let mut cursor = Cursor {
-            bytes,
-            position: 0,
-        };
+        let mut cursor = Cursor { bytes, position: 0 };
         get_request(&mut cursor).expect("decodes")
     }
 
@@ -1983,9 +2088,7 @@ mod tests {
             capability: None,
             resource_bindings: Vec::new(),
             request: CanonicalRequestV1::FsHandleMetadata,
-            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Io(
-                IoErrorIdentityV1::Revoked,
-            )),
+            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked)),
         });
 
         let encoded = encode_linked_effect_trace(&expected).unwrap();

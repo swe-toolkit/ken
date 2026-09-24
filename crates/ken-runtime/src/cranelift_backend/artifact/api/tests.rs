@@ -8,6 +8,41 @@ use super::*;
 
 use std::collections::BTreeSet;
 
+/// Promise: durable JIT resource boundary. The exact same compiled Boolean
+/// body runs under explicit roomy policy but refuses at a zero epoch limit,
+/// before code execution, with the typed resource rather than BackendFailure.
+#[test]
+fn jit_epoch_policy_is_explicit_and_prelaunch_refusal_is_typed() {
+    let expr = RuntimeExpr::Value(RuntimeValue::Bool(true));
+    let zero = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args(["--exact", "cranelift_backend::artifact::api::tests::jit_zero_epoch_child"])
+        .env("KEN_JIT_EPOCH_ZERO_CHILD", "1")
+        .output()
+        .expect("isolated JIT zero-epoch test");
+    assert!(zero.status.success(), "zero-epoch child: {zero:?}");
+    assert!(String::from_utf8_lossy(&zero.stdout).contains("1 passed; 0 failed"));
+    let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let compiled = super::super::compile_expr(&expr, &env).expect("same body compiles");
+    let (result, _) = compiled.run_with_profile(None, env.profile()).expect("roomy JIT epoch");
+    assert_eq!(result, RuntimeObservation::Returned(RuntimeGroundValue::Bool(true)));
+}
+
+#[test]
+fn jit_zero_epoch_child() {
+    if std::env::var_os("KEN_JIT_EPOCH_ZERO_CHILD").is_none() { return; }
+    let expr = RuntimeExpr::Value(RuntimeValue::Bool(true));
+    let mut profile = crate::boundary_resource_profile::starter_smoke_profile();
+    profile.runtime.invocation_epochs = 0;
+    let env = NativeSeedEnvironment::empty(profile);
+    let compiled = super::super::compile_expr(&expr, &env).expect("compile unaffected by policy");
+    let fault = compiled.run_with_profile(None, env.profile()).unwrap_err();
+    assert_eq!(fault, CraneliftBackendError::CapacityExhausted(ken_host::CapacityExhaustedV1 {
+        scope: ken_host::CapacityScopeV1::Runtime,
+        resource: ken_host::CapacityResourceV1::InvocationEpochs,
+        limit: 0, requested: 1,
+    }));
+}
+
 // RT-SPLIT slice 7, rule 8: `total_primitive` moved from facade file scope to
 // its lawful facade-LCA home. Import-only edit in a ruled test module.
 use crate::cranelift_backend::test_support::total_primitive;
@@ -180,7 +215,7 @@ fn nc22_cranelift_agrees_with_runtime_ir_report_for_broad_starter_shapes() {
     let report = run_synthetic_runtime_ir_report_with_cranelift(
         &program,
         run_report,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         &crate::native_process_authority::synthetic_test_legacy_authority(),
     );
 
@@ -240,7 +275,7 @@ fn nc22_imported_dependency_lowers_as_stable_unsupported_native_lane() {
     let report = run_synthetic_runtime_ir_report_with_cranelift(
         &program,
         run_report,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         &crate::native_process_authority::synthetic_test_legacy_authority(),
     );
 
@@ -271,7 +306,7 @@ fn nc22_runtime_ir_report_identity_mismatch_rejects_before_native_lowering() {
     let report = run_synthetic_runtime_ir_report_with_cranelift(
         &program,
         run_report,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         &crate::native_process_authority::synthetic_test_legacy_authority(),
     );
 
@@ -310,7 +345,7 @@ fn nc22_ambiguous_runtime_ir_report_target_rejects_before_native_lowering() {
     let report = run_synthetic_runtime_ir_report_with_cranelift(
         &program,
         run_report,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         &crate::native_process_authority::synthetic_test_legacy_authority(),
     );
 
@@ -342,7 +377,7 @@ fn nc8_valid_certificate_records_f2_validation_separate_from_f1() {
     let report = run_synthetic_validated_example_with_interpreter_observation(
         &program,
         &example,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         oracle,
         &certificate,
         &crate::native_process_authority::synthetic_test_legacy_authority(),
@@ -1004,7 +1039,7 @@ fn a_package_backed_program_without_a_role_record_refuses_before_lowering() {
     let refused = run_runtime_ir_report_with_cranelift(
         &program,
         run_report.clone(),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     );
     assert!(
         matches!(
@@ -1034,7 +1069,7 @@ fn a_package_backed_program_without_a_role_record_refuses_before_lowering() {
     let ran = run_synthetic_runtime_ir_report_with_cranelift(
         &program,
         run_report,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         &crate::native_process_authority::synthetic_test_legacy_authority(),
     );
     assert_eq!(
@@ -1084,14 +1119,14 @@ fn the_synthetic_entrypoint_consumes_the_authority_it_is_given() {
     let with_legacy = emit_synthetic_runtime_ir_object_with_cranelift(
         &program,
         &run_report,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         "ken_d1b_role_c1_authority_probe",
         &legacy,
     );
     let with_foreign = emit_synthetic_runtime_ir_object_with_cranelift(
         &program,
         &run_report,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         "ken_d1b_role_c1_authority_probe",
         &foreign,
     );

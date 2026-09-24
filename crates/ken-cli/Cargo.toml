@@ -23,8 +23,8 @@ ken-kernel = { path = "../ken-kernel" }
 ken-elaborator = { path = "../ken-elaborator" }
 ken-interp = { path = "../ken-interp" }
 ken-runtime = { path = "../ken-runtime" }
+serde_json = "1"
 
 [dev-dependencies]
 ken-runtime = { path = "../ken-runtime", features = ["px8-ds-test-support"] }
-serde_json = "1"
 tempfile = "3"

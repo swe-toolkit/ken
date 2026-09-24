@@ -31,25 +31,25 @@
 //! across projections.
 
 use cranelift_codegen::ir::condcodes::IntCC;
-use cranelift_codegen::ir::{types, AbiParam, Function, InstBuilder, MemFlags, UserFuncName};
+use cranelift_codegen::ir::{AbiParam, Function, InstBuilder, MemFlags, UserFuncName, types};
 use cranelift_codegen::verify_function;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{FuncId, Linkage, Module};
 
 use crate::boundary_value::{
-    boundary_domain_mask, boundary_int_marker_mask, BoundaryClass, BoundaryImmediateDomain,
-    BoundaryReferentOwner, BoundaryTag, ARENA_DATA, ARENA_DATA_CAPACITY, ARENA_DATA_COUNT,
-    ARENA_FROZEN, ARENA_LIMBS, ARENA_LIMB_CAPACITY, ARENA_LIMB_COUNT, ARENA_NAMES,
-    ARENA_NAME_COUNT, ARENA_NATIVE_INT, ARENA_NODES, ARENA_NODE_CAPACITY, ARENA_NODE_COUNT,
-    ARENA_PERSISTENT, ARENA_SEALED, ARENA_WORDS, ARENA_WORD_CAPACITY, ARENA_WORD_COUNT,
-    BOUNDARY_ERR_BOUNDS, BOUNDARY_ERR_CAPACITY, BOUNDARY_ERR_CLASS, BOUNDARY_ERR_ESCAPE,
-    BOUNDARY_ERR_FROZEN, BOUNDARY_ERR_RELATION, BOUNDARY_ERR_RETIRED_LANE, BOUNDARY_ERR_SEALED,
-    BOUNDARY_ERR_SHAPE, BOUNDARY_ERR_TAG, BOUNDARY_INT_REGION_LIMBS, BOUNDARY_NODE_STRIDE,
-    BOUNDARY_OK, BOUNDARY_TAG_BITS, BOUNDARY_TAG_MASK, NODE_CLASS, NODE_EXTENT, NODE_FIELDS_AT,
-    NODE_FIELD_COUNT, NODE_INT_SEALED, NODE_LIMBS_AT, NODE_LIMB_COUNT, NODE_OWNER, NODE_PAYLOAD,
-    NODE_SLOT, NODE_TAG_ID,
+    ARENA_DATA, ARENA_DATA_CAPACITY, ARENA_DATA_COUNT, ARENA_FROZEN, ARENA_LIMB_CAPACITY,
+    ARENA_LIMB_COUNT, ARENA_LIMBS, ARENA_NAME_COUNT, ARENA_NAMES, ARENA_NATIVE_INT,
+    ARENA_NODE_CAPACITY, ARENA_NODE_COUNT, ARENA_NODES, ARENA_PERSISTENT, ARENA_SEALED,
+    ARENA_WORD_CAPACITY, ARENA_WORD_COUNT, ARENA_WORDS, BOUNDARY_ERR_BOUNDS, BOUNDARY_ERR_CAPACITY,
+    BOUNDARY_ERR_CLASS, BOUNDARY_ERR_ESCAPE, BOUNDARY_ERR_FROZEN, BOUNDARY_ERR_RELATION,
+    BOUNDARY_ERR_RETIRED_LANE, BOUNDARY_ERR_SEALED, BOUNDARY_ERR_SHAPE, BOUNDARY_ERR_TAG,
+    BOUNDARY_INT_REGION_LIMBS, BOUNDARY_NODE_STRIDE, BOUNDARY_OK, BOUNDARY_TAG_BITS,
+    BOUNDARY_TAG_MASK, BoundaryClass, BoundaryImmediateDomain, BoundaryReferentOwner, BoundaryTag,
+    NODE_CLASS, NODE_EXTENT, NODE_FIELD_COUNT, NODE_FIELDS_AT, NODE_INT_SEALED, NODE_LIMB_COUNT,
+    NODE_LIMBS_AT, NODE_OWNER, NODE_PAYLOAD, NODE_SLOT, NODE_TAG_ID, boundary_domain_mask,
+    boundary_int_marker_mask,
 };
-use crate::cranelift_backend::{backend_module, CraneliftBackendError};
+use crate::cranelift_backend::{CraneliftBackendError, backend_module};
 
 #[cfg(test)]
 thread_local! {
@@ -3016,12 +3016,12 @@ pub(crate) mod tests {
     }
     use super::*;
     use crate::boundary_value::{
-        boundary_code_id, boundary_immediate_admits, boundary_immediate_domain,
+        BOUNDARY_IMMEDIATE_INT_MAX, BOUNDARY_IMMEDIATE_INT_MIN, BOUNDARY_NODE_STRIDE,
+        BOUNDARY_PAYLOAD_BITS, BOUNDARY_REGION_HEADER_BYTES, BOUNDARY_TAG_CLASS_RELATION,
+        BoundaryArenaBuilder, BoundaryArenaV1, BoundaryValueStore, BoundaryWord, NodeField,
+        RegionHeaderField, boundary_code_id, boundary_immediate_admits, boundary_immediate_domain,
         boundary_int_marker_admits, boundary_relation_admits, materialize_borrowed,
-        materialize_ground, materialize_host_result, BoundaryArenaBuilder, BoundaryArenaV1,
-        BoundaryValueStore, BoundaryWord, NodeField, RegionHeaderField, BOUNDARY_IMMEDIATE_INT_MAX,
-        BOUNDARY_IMMEDIATE_INT_MIN, BOUNDARY_NODE_STRIDE, BOUNDARY_PAYLOAD_BITS,
-        BOUNDARY_REGION_HEADER_BYTES, BOUNDARY_TAG_CLASS_RELATION,
+        materialize_ground, materialize_host_result,
     };
     // Statuses only the controls assert on — the production graph never returns
     // them from a helper, so they belong to the test scope rather than to the
@@ -3334,10 +3334,7 @@ pub(crate) mod tests {
         );
 
         let unissued_field = RuntimeGroundValue::Record {
-            fields: vec![(
-                "unissued_field".to_string(),
-                RuntimeGroundValue::Bool(true),
-            )],
+            fields: vec![("unissued_field".to_string(), RuntimeGroundValue::Bool(true))],
         };
         assert!(
             materialize_ground(&mut store, &unissued_field).is_none(),
@@ -3361,8 +3358,14 @@ pub(crate) mod tests {
         // ⭐ And the issued word is what the carrier actually carries -- chosen
         // far above anything `intern_symbol` numbers to, so a re-mint could not
         // land on it by coincidence.
-        assert_eq!(store.carrier_identity("ctor:fixture::Unissued::Ctor"), Some(0x7700_1234));
-        assert_eq!(store.carrier_symbol(0x7700_1234), Some("ctor:fixture::Unissued::Ctor"));
+        assert_eq!(
+            store.carrier_identity("ctor:fixture::Unissued::Ctor"),
+            Some(0x7700_1234)
+        );
+        assert_eq!(
+            store.carrier_symbol(0x7700_1234),
+            Some("ctor:fixture::Unissued::Ctor")
+        );
 
         // ⛔ Two authorities for one symbol is a caller bug, refused rather than
         // silently overwritten -- an overwrite would let a later issuer win and
@@ -4373,15 +4376,20 @@ pub(crate) mod tests {
 
     /// A profile that is generous everywhere, so a single tightened limit is
     /// unambiguously the one that fired.
-    fn ac4_roomy() -> crate::boundary_resource_profile::BoundaryResourceProfileV1 {
-        use crate::boundary_resource_profile::{BoundaryRegionLimitsV1, BoundaryResourceProfileV1};
+    fn ac4_roomy() -> crate::boundary_resource_profile::BoundaryResourceProfileV2 {
+        use crate::boundary_resource_profile::{
+            BoundaryRegionLimitsV1, BoundaryResourceProfileV2, RuntimeResourceLimitsV2,
+        };
         let roomy = BoundaryRegionLimitsV1 {
             nodes: 64,
             words: 256,
             data_bytes: 512,
             native_int_limbs: 64,
         };
-        BoundaryResourceProfileV1 {
+        BoundaryResourceProfileV2 {
+            runtime: RuntimeResourceLimitsV2 {
+                invocation_epochs: u64::MAX,
+            },
             invocation: roomy,
             persistent: roomy,
         }
@@ -4392,7 +4400,7 @@ pub(crate) mod tests {
         scope: crate::boundary_resource_profile::BoundaryResourceScope,
         resource: crate::boundary_resource_profile::BoundaryResource,
         limit: usize,
-    ) -> crate::boundary_resource_profile::BoundaryResourceProfileV1 {
+    ) -> crate::boundary_resource_profile::BoundaryResourceProfileV2 {
         use crate::boundary_resource_profile::{BoundaryResource, BoundaryResourceScope};
         let mut profile = ac4_roomy();
         let limits = match scope {
@@ -4416,11 +4424,12 @@ pub(crate) mod tests {
     ) -> (BoundaryTag, BoundaryClass) {
         use crate::boundary_resource_profile::BoundaryResourceScope;
         match scope {
-            BoundaryResourceScope::Persistent => (BoundaryTag::PersistentGround, BoundaryClass::Int),
-            BoundaryResourceScope::Invocation => (
-                BoundaryTag::InvocationHostResult,
-                BoundaryClass::HostResult,
-            ),
+            BoundaryResourceScope::Persistent => {
+                (BoundaryTag::PersistentGround, BoundaryClass::Int)
+            }
+            BoundaryResourceScope::Invocation => {
+                (BoundaryTag::InvocationHostResult, BoundaryClass::HostResult)
+            }
         }
     }
 
@@ -4473,9 +4482,10 @@ pub(crate) mod tests {
         b.ins().return_(&[status]);
         b.switch_to_block(ok);
         let word = b.ins().load(types::I64, MemFlags::trusted(), out, 0);
-        let marker = b
-            .ins()
-            .iconst(types::I64, crate::boundary_value::BOUNDARY_INT_REGION_LIMBS as i64);
+        let marker = b.ins().iconst(
+            types::I64,
+            crate::boundary_value::BOUNDARY_INT_REGION_LIMBS as i64,
+        );
         let call = b.ins().call(refs.store_int_tag, &[base, word, marker]);
         let status = b.inst_results(call)[0];
         let good = b.ins().icmp_imm(IntCC::Equal, status, BOUNDARY_OK);
@@ -7752,7 +7762,10 @@ pub(crate) mod tests {
         store.seal_persistent();
 
         let slots_before = store.store_resident_slots();
-        assert!(store.adopt(child).is_ok(), "the compound child adopts alone");
+        assert!(
+            store.adopt(child).is_ok(),
+            "the compound child adopts alone"
+        );
         assert!(
             store.store_resident_slots() > slots_before,
             "and minting it moves the store's slot count — so 'unchanged' in the \
@@ -7764,9 +7777,6 @@ pub(crate) mod tests {
             "and it acquires a NODE_SLOT, so NULL_SLOT above is discriminating"
         );
     }
-
-
-
 
     /// **`AC-6` — `HostResult` and `BorrowedOpaque` are never placed in the
     /// permanent store.**
@@ -8056,7 +8066,7 @@ pub(crate) mod tests {
     #[test]
     fn b2v_every_emitted_tag_admission_test_is_the_plans() {
         use crate::boundary_value::{
-            BoundaryEmissionPlan, BoundaryTagAdmission, BOUNDARY_ERR_TAG, BOUNDARY_TAG_BITS,
+            BOUNDARY_ERR_TAG, BOUNDARY_TAG_BITS, BoundaryEmissionPlan, BoundaryTagAdmission,
         };
 
         let plan = BoundaryEmissionPlan::derive();
@@ -8559,7 +8569,7 @@ pub(crate) mod tests {
     #[test]
     fn b2v_the_emitted_immediate_class_is_the_plans() {
         use crate::boundary_value::{
-            BoundaryEmissionPlan, BoundaryTagAdmission, BOUNDARY_ERR_CLASS, BOUNDARY_OK,
+            BOUNDARY_ERR_CLASS, BOUNDARY_OK, BoundaryEmissionPlan, BoundaryTagAdmission,
         };
 
         let plan = BoundaryEmissionPlan::derive();
@@ -8779,7 +8789,7 @@ pub(crate) mod tests {
     /// remains the whole-graph pin plus review. Named, not implied.
     #[test]
     fn b2v_every_emitted_class_guard_is_the_plans() {
-        use crate::boundary_value::{BoundaryEmissionPlan, BOUNDARY_ERR_CLASS};
+        use crate::boundary_value::{BOUNDARY_ERR_CLASS, BoundaryEmissionPlan};
 
         let plan = BoundaryEmissionPlan::derive();
         // ⛔ Perturb ONLY the int-magnitude class set. `Record` is an admitted
@@ -8941,7 +8951,10 @@ pub(crate) mod tests {
         let cells = [
             (BoundaryResourceScope::Persistent, BoundaryResource::Nodes),
             (BoundaryResourceScope::Persistent, BoundaryResource::Words),
-            (BoundaryResourceScope::Persistent, BoundaryResource::DataBytes),
+            (
+                BoundaryResourceScope::Persistent,
+                BoundaryResource::DataBytes,
+            ),
             (
                 BoundaryResourceScope::Persistent,
                 BoundaryResource::NativeIntLimbs,
@@ -8954,8 +8967,9 @@ pub(crate) mod tests {
             let limit = 2usize;
             let profile = ac4_profile_with(scope, resource, limit);
             let mut store = BoundaryValueStore::new();
-            let binding = BoundaryStoreBindingV1::open(&mut store, profile);
-            let activation = BoundaryActivationV1::begin(&binding);
+            let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("matching process epoch ceiling");
+            let activation =
+                BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
             let base = match scope {
                 BoundaryResourceScope::Invocation => activation.published_boundary_base(),
                 BoundaryResourceScope::Persistent => activation.published_boundary_base(),
@@ -9082,7 +9096,7 @@ pub(crate) mod tests {
     fn ac4_invocation_data_and_limbs_are_unreachable_by_the_admitted_relation() {
         use crate::boundary_activation::{BoundaryActivationV1, BoundaryStoreBindingV1};
         use crate::boundary_resource_profile::{BoundaryResource, BoundaryResourceScope};
-        use crate::boundary_value::{boundary_relation_admits, BOUNDARY_TAG_CLASS_RELATION};
+        use crate::boundary_value::{BOUNDARY_TAG_CLASS_RELATION, boundary_relation_admits};
 
         // 1 — the relation itself: no invocation tag admits a body-bearing class.
         let invocation_tags = [
@@ -9128,8 +9142,8 @@ pub(crate) mod tests {
             0,
         );
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, profile);
-        let activation = BoundaryActivationV1::begin(&binding);
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("matching process epoch ceiling");
+        let activation = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
         let (_m, code) = compile_producer(4, emit_ac4_bytes_len_probe);
         let f: extern "C" fn(*mut u64, i64, i64, i64) -> i64 = unsafe { std::mem::transmute(code) };
         let status = f(
@@ -9148,5 +9162,4 @@ pub(crate) mod tests {
              is reachable after all and owes a real at-limit-plus-one fixture"
         );
     }
-
 }

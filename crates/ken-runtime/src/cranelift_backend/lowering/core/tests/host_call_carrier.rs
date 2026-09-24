@@ -210,7 +210,7 @@ fn run_trap_exit_fixture(
     set_trap_frame_binding_mutation(frame);
     set_trap_identity_mutation(identity);
     set_trap_caller_protocol_mutation(protocol);
-    run_example_with_seed_observation(fixture, &NativeSeedEnvironment::empty())
+    run_example_with_seed_observation(fixture, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
 }
 
 #[test]
@@ -366,7 +366,7 @@ fn the_generated_root_translates_a_runtime_reached_trap_exactly() {
         },
         observation: RuntimeObservation::Trapped(trap),
     };
-    let report = run_example_with_seed_observation(&fixture, &NativeSeedEnvironment::empty())
+    let report = run_example_with_seed_observation(&fixture, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
         .expect("the functionized root translates its planner trap identity");
     assert_eq!(report.observation, fixture.observation);
 }
@@ -706,7 +706,7 @@ fn b2f_emits_one_defined_target_unit_per_planned_function_unit() {
             "b2f_unit_population_probe",
             Linkage::Local,
             expr,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             BTreeMap::new(),
             None,
             false,
@@ -838,7 +838,7 @@ fn d4_a_lexical_closure_declaration_retains_a_binding_and_still_runs() {
             "d4_lexical_closure_declaration",
             Linkage::Local,
             &expr,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             BTreeMap::from([(symbol.as_str(), declaration)]),
             None,
             false,
@@ -850,7 +850,7 @@ fn d4_a_lexical_closure_declaration_retains_a_binding_and_still_runs() {
             panic!("the {label} lexical-closure declaration must compile: {error:?}")
         });
         assert_eq!(
-            compiled.run(None).expect("the declaration call runs").0,
+            compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("the declaration call runs").0,
             RuntimeObservation::Returned(RuntimeGroundValue::Int(expected.into())),
             "D4: the {label} case must still compute its own value after the \
              retained binding was extended to the LexicalClosure seed form"
@@ -2547,7 +2547,7 @@ fn an_unrepresentable_transfer_is_refused_before_any_unit_is_declared() {
 /// would measure nothing while looking like a discriminator.
 #[cfg(test)]
 fn b2f_seed_capture_program(symbol: &str, value: RuntimeGroundValue) -> NativeSeedEnvironment {
-    let mut env = NativeSeedEnvironment::empty();
+    let mut env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     env.insert(symbol, value);
     env
 }
@@ -2658,7 +2658,7 @@ fn b2f_mints_one_defined_artifact_static_object_per_seed_environment_entry() {
         crate::cranelift_backend::lowering::seed_material::b2f_last_seed_material_emission()
     }
 
-    let (empty_declared, empty_defined) = objects_emitted(&NativeSeedEnvironment::empty());
+    let (empty_declared, empty_defined) = objects_emitted(&NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()));
     let seeded = b2f_seed_capture_program("s", RuntimeGroundValue::Int(7i64.into()));
     let (seeded_declared, seeded_defined) = objects_emitted(&seeded);
 
@@ -2904,10 +2904,10 @@ fn d7_ctor(name: &str) -> RuntimeExpr {
 fn d7_run(expr: &RuntimeExpr) -> String {
     match crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     ) {
         Err(error) => format!("COMPILE-ERR {error:?}"),
-        Ok(compiled) => match compiled.run(None) {
+        Ok(compiled) => match compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()) {
             Err(error) => format!("RUN-ERR {error:?}"),
             Ok(observation) => format!("OK {observation:?}"),
         },
@@ -3321,10 +3321,10 @@ fn rt_trace_field<'a>(entry: &'a str, key: &str) -> Option<&'a str> {
 fn rt_run(expr: &RuntimeExpr) -> String {
     match crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     ) {
         Err(error) => format!("COMPILE-ERR {error:?}"),
-        Ok(compiled) => match compiled.run(None) {
+        Ok(compiled) => match compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()) {
             Err(error) => format!("RUN-ERR {error:?}"),
             Ok((observation, _token)) => format!("OK {observation:?}"),
         },
@@ -3446,7 +3446,7 @@ fn d2_ac6_1_the_canonical_seed_runs_through_the_ported_callee_unit() {
         .find(|example| example.name == "closure-capture-application")
         .expect("seed exists");
 
-    let (outcome, ports) = d2_run_ported(&example, &NativeSeedEnvironment::nc5_seed());
+    let (outcome, ports) = d2_run_ported(&example, &NativeSeedEnvironment::nc5_seed(crate::boundary_resource_profile::starter_smoke_profile()));
     let report = outcome.expect("the ported callee unit compiles and runs");
     assert_eq!(
         report.observation, example.observation,
@@ -3490,7 +3490,7 @@ fn d2_ac6_2_a_missing_seed_capture_refuses_loudly_before_the_ported_handoff() {
         .find(|example| example.name == "closure-capture-application")
         .expect("seed exists");
 
-    let (outcome, ports) = d2_run_ported(&example, &NativeSeedEnvironment::empty());
+    let (outcome, ports) = d2_run_ported(&example, &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()));
     let error = outcome.expect_err("a missing seed capture must refuse");
     assert!(
         matches!(
@@ -3529,7 +3529,7 @@ fn d2_ac6_2_a_missing_seed_capture_refuses_loudly_before_the_ported_handoff() {
 fn d2_ac6_3_the_ported_unit_receives_parameters_before_captures() {
     let example = d2_order_sensitive_example();
 
-    let (outcome, ports) = d2_run_ported(&example, &NativeSeedEnvironment::nc5_seed());
+    let (outcome, ports) = d2_run_ported(&example, &NativeSeedEnvironment::nc5_seed(crate::boundary_resource_profile::starter_smoke_profile()));
     let report = outcome.expect("the order-sensitive fixture compiles and runs");
     assert_eq!(
         ports, 1,
@@ -3629,7 +3629,7 @@ fn d5_c2_the_witness_reaches_the_seam_and_emits_the_exact_planner_target() {
             "d5_c2_population",
             Linkage::Local,
             entry,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             decls,
             None,
             false,
@@ -3968,7 +3968,7 @@ fn d5_mutual_compile(
         "d5_mutual",
         Linkage::Local,
         &entry,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         declarations,
         None,
         false,
@@ -4303,7 +4303,7 @@ fn d5_c4_a_duplicated_checked_occurrence_is_refused_after_its_lawful_first() {
         "d5_duplicate",
         Linkage::Local,
         &entry,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::from([
             (D5_MUTUAL_A, &a),
             (D5_MUTUAL_B, &b),

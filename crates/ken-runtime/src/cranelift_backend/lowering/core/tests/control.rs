@@ -152,7 +152,7 @@ fn assert_exact_frame_scope(witness: FrameScopeHarnessWitness) {
 
 #[test]
 fn checked_frame_branch_scope_harness_uses_live_lowering_ledger() {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut lowering = root_authority_test_lowering(&seed_env);
 
     assert_exact_frame_scope(CheckedFrameBranchScope::harness(
@@ -195,7 +195,7 @@ fn run_px8j_malformed_recursor_consumer(
     let mut context = module.make_context();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     // The consumer under test lowers exactly one of these two fixtures, so the
     // plan is that fixture's own: every origin the lowering derives below is a
     // real positional child of a really-planned occurrence.
@@ -593,7 +593,7 @@ fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
 
 #[test]
 fn oriented_dynamic_edge_ledger_is_affine_and_sibling_isolated() {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut lowering = root_authority_test_lowering(&seed_env);
     let (_, mut segment, mut edges) = oriented_dynamic_sibling_fixture();
     let edge = edges.remove(0);
@@ -633,7 +633,7 @@ fn run_px8ds_edge_consumer(
     consumer: Px8jDirectRecursorConsumer,
     mutation: Px8dsEdgeMutation,
 ) -> Result<LoweringOperand, CraneliftBackendError> {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = root_authority_test_lowering(&seed_env);
     compiler.native_join_plan = None;
     compiler.root_terminal_authority = None;
@@ -797,7 +797,7 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
     // consuming one checked frame twice must still reject before CFG. Direct-API
     // PX8DS-fixture style; exercises the frame consume the dynamic-splice-edge
     // mutation suite does not reach.
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (_expr, decl, plan) = occurrence_exact_marker_fixture(false, false);
     let RuntimeDeclarationKind::Transparent { body } = decl.kind else {
         panic!("fixture declaration is transparent");
@@ -846,7 +846,7 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
 
 #[test]
 fn oriented_source_open_occurrence_cross_checks_the_closure_selected_parent() {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = root_authority_test_lowering(&seed_env);
     let (_, _, mut edges) = oriented_dynamic_sibling_fixture();
     let edge = edges.remove(0);
@@ -892,7 +892,7 @@ fn oriented_source_open_occurrence_cross_checks_the_closure_selected_parent() {
 
 #[test]
 fn distinguished_root_authority_is_checked_affine_and_cursor_bound() {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut lowering = root_authority_test_lowering(&seed_env);
     let authority = lowering
         .take_distinguished_root_answer_authority()
@@ -1897,7 +1897,7 @@ fn unmarked_equal_shape_frame_cannot_consume_retained_join_site() {
         "ken_px8h_unmarked_equal_shape",
         Linkage::Export,
         &expression,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         false,
@@ -2247,7 +2247,7 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
 }
 #[test]
 fn distinguished_root_cannot_discharge_missing_match_site_marker() {
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut lowering = Lowering {
         grafted_spine_builder: None,
         grafted_spine_graph: None,
@@ -2451,7 +2451,7 @@ fn checked_join_marker_without_exact_plan_site_rejects_before_emission() {
         "ken_px8h_missing_join_site",
         Linkage::Export,
         &expression,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         false,
@@ -2481,7 +2481,7 @@ fn process_lowering_without_checked_root_authority_rejects_before_cfg() {
             constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
             args: Vec::new(),
         },
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -2549,7 +2549,7 @@ fn valid_root_plus_missing_marked_scalar_cut_rejects_before_emission() {
         "ken_px8h_root_marker_class_separation",
         Linkage::Export,
         &expression,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         true,
@@ -2582,7 +2582,7 @@ fn self_consistent_appended_orphan_join_site_rejects_before_emission() {
         "ken_px8h_orphan_join_site",
         Linkage::Export,
         &RuntimeExpr::Value(RuntimeValue::Int((7).into())),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
         false,
@@ -4688,7 +4688,7 @@ fn computational_match_declaration_ref_emits_and_runs_the_declaration_owned_unit
         "row2_out_of_order_declaration_call",
         Linkage::Local,
         &expr,
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::from([(symbol.as_str(), &declaration)]),
         None,
         false,
@@ -4709,7 +4709,7 @@ fn computational_match_declaration_ref_emits_and_runs_the_declaration_owned_unit
         "the exact DeclarationRef occurrence must resolve one typed call edge"
     );
     assert_eq!(
-        compiled.run(None).expect("the emitted call runs").0,
+        compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("the emitted call runs").0,
         RuntimeObservation::Returned(RuntimeGroundValue::Int((73).into())),
         "the caller ran some path other than the declaration-owned unit"
     );
@@ -4876,7 +4876,7 @@ fn a_closure_stored_as_constructor_data_cannot_cross_a_unit_boundary() {
             "d6_activation_blocker",
             Linkage::Local,
             &entry,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             declarations,
             None,
             false,
@@ -5054,7 +5054,7 @@ fn d1_ret_vis_producer(captures: Vec<RuntimeExpr>) -> RuntimeExpr {
 #[test]
 fn the_branch_local_partition_mints_a_declared_body_for_a_capture_free_recursive_position() {
     let fixture = d1_ret_vis_producer(Vec::new());
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (plan, root) = planned_root_occurrence(&fixture);
     let mut lowering = root_authority_test_lowering(&seed_env);
     lowering.static_transition_plan = plan;
@@ -5100,7 +5100,7 @@ fn the_partition_still_refuses_a_capture_bearing_recursive_position() {
     // non-empty capture list. This is the case all sixteen RT-BRANCH witnesses
     // are in, and RT-CAPTURE-SUPPLY closed as word-only.
     let fixture = d1_ret_vis_producer(vec![RuntimeExpr::Var(0)]);
-    let seed_env = NativeSeedEnvironment::empty();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let (plan, root) = planned_root_occurrence(&fixture);
     let mut lowering = root_authority_test_lowering(&seed_env);
     lowering.static_transition_plan = plan;
