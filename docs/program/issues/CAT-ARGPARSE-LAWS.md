@@ -1,7 +1,7 @@
 ---
 id: CAT-ARGPARSE-LAWS
 title: "Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust"
-status: active
+status: merged
 owner: foundation
 size: L
 gate: none
