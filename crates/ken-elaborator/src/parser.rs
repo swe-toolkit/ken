@@ -4198,7 +4198,23 @@ impl Parser {
                 self.advance();
                 let ty = self.parse_type()?;
                 self.expect(&Token::RParen)?;
-                Ok(ty)
+                let span = Span::new(start, self.tokens[self.pos - 1].1.end);
+                // Type atoms must retain the delimiters they consumed. A
+                // declaration ending at this type's span otherwise drops its
+                // final `)` when the formatter selects its source tokens.
+                Ok(match ty {
+                    Type::TPi(x, a, b, _) => Type::TPi(x, a, b, span),
+                    Type::TSigma(x, a, b, _) => Type::TSigma(x, a, b, span),
+                    Type::TArr(a, b, _) => Type::TArr(a, b, span),
+                    Type::TEffectArr(a, row, b, _) => Type::TEffectArr(a, row, b, span),
+                    Type::TUniv(level, _) => Type::TUniv(level, span),
+                    Type::TCon(name, _) => Type::TCon(name, span),
+                    Type::TVar(name, _) => Type::TVar(name, span),
+                    Type::TRefine(x, a, phi, _) => Type::TRefine(x, a, phi, span),
+                    Type::TApp(f, arg, _) => Type::TApp(f, arg, span),
+                    Type::TTrunc(inner, _) => Type::TTrunc(inner, span),
+                    Type::TProj(base, field, _) => Type::TProj(base, field, span),
+                })
             }
             // `‖A‖` in annotation position (LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES
             // D1). Same token both sides, symmetric with `(A)`: consume the
