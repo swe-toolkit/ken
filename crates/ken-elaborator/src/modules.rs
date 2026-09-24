@@ -201,17 +201,9 @@ impl ModuleState {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Proved is the surface name of the fixed kernel tt introduction,
-        // excluded from trusted_base rather than an arbitrary ambient global.
-        // Reject a forged spelling before admitting it to strict resolution.
-        let proved = globals.get("Proved").copied().ok_or_else(|| {
-            ElabError::Internal("prelude Proved has no fixed kernel tt identity".to_string())
-        })?;
-        if proved != env.tt_id() {
-            return Err(ElabError::Internal(
-                "prelude Proved differs from fixed kernel tt identity".to_string(),
-            ));
-        }
+        // A fixed proof constant is neither a type-floor member nor a
+        // postulate. Validate its kernel identity before reserving its name.
+        require_fixed_proved_identity(env, globals)?;
 
         self.prelude_binding_names = self.prelude_names.clone();
         self.strict_builtin_names = globals
@@ -230,8 +222,22 @@ impl ModuleState {
             self.prelude_binding_names.insert(name.clone());
             self.strict_builtin_names.insert(name);
         }
+        self.prelude_binding_names.insert("Proved".to_string());
         self.strict_builtin_names.insert("Proved".to_string());
         Ok(())
+    }
+}
+
+fn require_fixed_proved_identity(
+    env: &ken_kernel::GlobalEnv,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+) -> Result<(), ElabError> {
+    let expected = env.tt_id();
+    match globals.get("Proved").copied() {
+        Some(actual) if actual == expected => Ok(()),
+        actual => Err(ElabError::Internal(format!(
+            "Proved identity mismatch: expected fixed kernel tt {expected:?}, found {actual:?}"
+        ))),
     }
 }
 
@@ -1186,6 +1192,11 @@ fn elaborate_module_from_roots_with_mode(
     entry: &str,
     mode: ResolutionMode,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
+    // The public globals map may change after the pre-source capture. Recheck
+    // before loading or reusing any strict unit; do not heal a forged map.
+    if mode == ResolutionMode::Strict {
+        require_fixed_proved_identity(&elab.env, &elab.globals)?;
+    }
     if roots.len() != 1 {
         return Err(ElabError::ParseError {
             msg: format!(
@@ -3559,6 +3570,144 @@ mod namespace_effect_tests {
             }
             other => panic!("forged Proved identity must be refused: {other:?}"),
         }
+    }
+
+    /// Promise class: durable invariant (spec 16 §1.4; 33 §3.3).
+    ///
+    /// MEASURED: bare Proved declarations at roots, under public inline
+    /// modules, and as data constructors collide with the installed binding
+    /// before the kernel allocates an id, in both legacy and strict units.
+    /// CLAIMED: source declarations cannot replace the fixed tt introduction.
+    /// THE GAP: public-map mutation bypasses source prebinding and is checked
+    /// independently by the strict-entry control below.
+    #[test]
+    fn proved_source_redeclarations_fail_at_prebind_without_global_allocation() {
+        let mut baseline = ElabEnv::new().expect("base environment");
+        let expected_next = baseline.env.fresh_id();
+        for (label, source, strict) in [
+            ("bare-legacy", "const Proved : Nat = Zero", false),
+            (
+                "nested-public-legacy",
+                "module M { pub const Proved : Nat = Zero }",
+                false,
+            ),
+            ("constructor-legacy", "data Token = Proved", false),
+            ("bare-strict", "const Proved : Nat = Zero", true),
+            (
+                "nested-public-strict",
+                "module M { pub const Proved : Nat = Zero }",
+                true,
+            ),
+            ("constructor-strict", "data Token = Proved", true),
+        ] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let tt = env.env.tt_id();
+            let result = if strict {
+                let root = tempfile::tempdir().expect("temporary strict module root");
+                fs::write(root.path().join("Entry.ken"), source).expect("write prebind-clash unit");
+                env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+            } else {
+                env.elaborate_file(source)
+            };
+            match result {
+                Err(ElabError::AmbiguousReference { name, sources, .. }) => {
+                    assert_eq!(name, "Proved", "{label}");
+                    assert!(sources.contains(&"<prelude>.Proved".to_string()), "{label}");
+                    assert_eq!(sources.len(), 2, "{label}");
+                }
+                Err(other) => panic!("{label}: expected prebind clash, got {other:?}"),
+                Ok(_) => panic!("{label}: source redefined fixed Proved"),
+            }
+            assert_eq!(env.globals["Proved"], tt, "{label}");
+            assert_eq!(env.env.fresh_id(), expected_next, "{label}: allocated id");
+        }
+
+        let mut lexical = ElabEnv::new().expect("base environment");
+        lexical
+            .elaborate_file("fn keep (Proved : Nat) : Nat = Zero")
+            .expect("a narrow lexical binder is not a global redeclaration");
+        assert_eq!(lexical.globals["Proved"], lexical.env.tt_id());
+    }
+
+    /// Promise class: durable invariant (spec 16 §1.4; 33 §§3.2–3.3).
+    ///
+    /// MEASURED: a distinct checked, same-Top proof substituted into the
+    /// public globals map is refused at every strict roots entry, both cold
+    /// and with both units cached. No loader state changes on refusal.
+    /// CLAIMED: neither a file facade nor a cache can launder a postcapture
+    /// non-tt Proved into strict source. THE GAP: source declarations are
+    /// blocked separately by the prebind-reservation test above.
+    #[test]
+    fn strict_roots_refuses_checked_same_top_proved_forgery_before_load_or_reuse() {
+        let root = tempfile::tempdir().expect("temporary strict module root");
+        fs::write(root.path().join("ProofTerms.ken"), "export Proved")
+            .expect("write real proof facade");
+        fs::write(
+            root.path().join("Entry.ken"),
+            "import ProofTerms (Proved)\n\
+             theorem selected_intro : Eq Bool True True = Proved",
+        )
+        .expect("write strict consumer");
+        let roots = [root.path().to_path_buf()];
+        for reuse in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let trusted_before = env.env.trusted_base();
+            env.elaborate_file("theorem alternate_intro : Top = Proved")
+                .expect("distinct Top proof is checked, not postulated");
+            assert_eq!(env.env.trusted_base(), trusted_before);
+            let alternate = env.globals["alternate_intro"];
+            let tt = env.env.tt_id();
+            assert_ne!(alternate, tt);
+            let (_, alternate_ty) = env.env.const_type(alternate).expect("checked proof type");
+            assert_eq!(
+                alternate_ty,
+                ken_kernel::Term::const_(env.env.top_id(), vec![])
+            );
+            if reuse {
+                env.elaborate_module_from_roots_strict(&roots, "Entry")
+                    .expect("unmodified real facade and consumer elaborate");
+                assert_eq!(env.module_state.exports["ProofTerms"]["Proved"], "Proved");
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["Entry.selected_intro"])
+                    .expect("selected proof has a checked body");
+                match body {
+                    ken_kernel::Term::Const { id, .. } => assert_eq!(id, tt),
+                    other => panic!("facade selected a non-tt body: {other:?}"),
+                }
+            }
+            let loaded_before = env.module_state.loaded_units.clone();
+            let roots_before = env.module_state.catalog_roots.clone();
+            assert_eq!(
+                env.globals.insert("Proved".to_string(), alternate),
+                Some(tt)
+            );
+            match env.elaborate_module_from_roots_strict(&roots, "Entry") {
+                Err(ElabError::Internal(message)) => {
+                    assert!(message.contains("Proved identity mismatch"), "{message}");
+                    assert!(message.contains(&format!("{tt:?}")), "{message}");
+                    assert!(message.contains(&format!("{alternate:?}")), "{message}");
+                }
+                Err(other) => panic!("reuse={reuse}: wrong refusal: {other:?}"),
+                Ok(_) => panic!("reuse={reuse}: strict roots laundered non-tt Proved"),
+            }
+            assert_eq!(env.globals["Proved"], alternate, "must not heal caller map");
+            assert_eq!(env.module_state.loaded_units, loaded_before);
+            assert_eq!(env.module_state.catalog_roots, roots_before);
+        }
+
+        let mut missing = ElabEnv::new().expect("base environment");
+        missing.globals.remove("Proved");
+        match missing.elaborate_module_from_roots_strict(&roots, "Entry") {
+            Err(ElabError::Internal(message)) => {
+                assert!(message.contains("Proved identity mismatch"), "{message}");
+                assert!(message.contains("None"), "missing identity: {message}");
+            }
+            Err(other) => panic!("missing Proved must fail at identity gate: {other:?}"),
+            Ok(_) => panic!("missing Proved passed strict roots entry"),
+        }
+        assert!(missing.module_state.catalog_roots.is_empty());
+        assert!(missing.module_state.loaded_units.is_empty());
     }
 
     #[derive(Debug, PartialEq, Eq)]
