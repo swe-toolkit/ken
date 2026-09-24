@@ -3581,23 +3581,13 @@ fn expand_scope(
                     false,
                 )?;
                 ids.extend(child_ids);
-                // THIS DISCHARGES A CONTRACT, NOT A SYMPTOM.
-                //
-                // `local_prebinding_preserves_legacy_map_union_stack_budget`
-                // promises that persistent local declaration bindings must not
-                // enlarge `expand_scope`'s long-lived legacy frame. An earlier
-                // form of this arm bound the decl's span and cloned
-                // `child_prefix` so both could outlive the recursive call --
-                // small in magnitude, and a true violation of exactly that.
-                //
-                // MEASURED: removing it does NOT fix the overflow that test
-                // reports. The overflow comes from the `RStandardOp` descent in
-                // `rewrite_rexpr_inner`, which is a DIFFERENT FRAME and which
-                // correctness requires. So this edit is a no-op for the red and
-                // the fix for the contract, and those are not the same job.
-                // Keep it for the second reason: once the budget is
-                // re-baselined, a total-stack pin can no longer see 8 bytes of
-                // creep, and nothing else is watching this frame.
+                // Keep the decl's span and an unnecessary `child_prefix`
+                // clone out of the recursive expansion frame. The stated-stack
+                // Map sentinel measures the whole elaboration path, not this
+                // frame alone: later checked-ID carrier work also crossed its
+                // limit by growing `infer`'s application recursion. That growth
+                // is repaired at its own frame (`infer_spelling_global`), not
+                // by relaxing the sentinel's stack budget.
                 //
                 // `certify_standard_operator_home` no-ops for every module but
                 // one, so gate it here rather than charge every recursion level

@@ -8331,6 +8331,55 @@ fn unassociated_infix_error(span: &Span) -> Result<(Term, Term), ElabError> {
     )))
 }
 
+// A spelling-routed global is a leaf, but its constructor, inductive, and
+// dictionary cases carry temporaries. Keep those out of `infer`'s recursive
+// dispatch frame: every nested application pays that frame before reaching
+// this leaf, even when no spelling lookup is performed at that depth.
+#[inline(never)]
+fn infer_spelling_global(
+    cx: &mut ElabCtx,
+    name: &str,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if let Some((term, ty, install_depth)) = cx.local_dicts.get(name) {
+        let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+            ElabError::Internal(format!("dictionary '{name}' used outside its declaration context"))
+        })? as i64;
+        return Ok((weaken(term, growth), weaken(ty, growth)));
+    }
+    let id = cx
+        .globals
+        .get(name)
+        .copied()
+        .ok_or_else(|| ElabError::UnresolvedCon {
+            name: name.to_string(),
+            span: span.clone(),
+        })?;
+    if let Some((ind, k)) = cx.env.constructor(id) {
+        return Ok((
+            Term::Constructor {
+                id,
+                level_args: vec![],
+            },
+            ind.constructors[k].type_.clone(),
+        ));
+    }
+    if let Some(ind) = cx.env.inductive(id) {
+        return Ok((
+            Term::IndFormer {
+                id,
+                level_args: vec![],
+            },
+            ind.former_type.clone(),
+        ));
+    }
+    let (_, decl_ty) = cx
+        .env
+        .const_type(id)
+        .ok_or_else(|| ElabError::Internal(format!("no type for global '{name}'")))?;
+    Ok((Term::const_(id, vec![]), decl_ty.clone()))
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -8443,55 +8492,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             })?;
             Ok((Term::const_(id, vec![]), ty.clone()))
         }
-        RExpr::RCon(name, span) => {
-            if let Some((term, ty, install_depth)) = cx.local_dicts.get(name) {
-                let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
-                    ElabError::Internal(format!(
-                        "dictionary '{name}' used outside its declaration context"
-                    ))
-                })? as i64;
-                return Ok((weaken(term, growth), weaken(ty, growth)));
-            }
-            let id = cx
-                .globals
-                .get(name)
-                .copied()
-                .ok_or_else(|| ElabError::UnresolvedCon {
-                    name: name.clone(),
-                    span: span.clone(),
-                })?;
-            // Constructor: Term::Constructor with the ctor's declared type.
-            let ctor_ty = cx
-                .env
-                .constructor(id)
-                .map(|(ind, k)| ind.constructors[k].type_.clone());
-            if let Some(ty) = ctor_ty {
-                return Ok((
-                    Term::Constructor {
-                        id,
-                        level_args: vec![],
-                    },
-                    ty,
-                ));
-            }
-            // Inductive type former: Term::IndFormer.
-            let ind_ty = cx.env.inductive(id).map(|ind| ind.former_type.clone());
-            if let Some(ty) = ind_ty {
-                return Ok((
-                    Term::IndFormer {
-                        id,
-                        level_args: vec![],
-                    },
-                    ty,
-                ));
-            }
-            // Regular constant (postulate/def/primitive).
-            let (_, decl_ty) = cx
-                .env
-                .const_type(id)
-                .ok_or_else(|| ElabError::Internal(format!("no type for global '{}'", name)))?;
-            Ok((Term::const_(id, vec![]), decl_ty.clone()))
-        }
+        RExpr::RCon(name, span) => infer_spelling_global(cx, name, span),
 
         RExpr::RUniv(None, _) => {
             let l = cx.metas.fresh();
