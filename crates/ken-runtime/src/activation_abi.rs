@@ -842,6 +842,13 @@ mod tests {
         assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
             ken_host::SelectedCallIntegrityFaultV1::WrongTarget));
         drop(unsafe { Box::from_raw(fault) });
+        // Taking an opaque terminal must not rearm the issuer or allow the
+        // formerly mismatched selected call to invoke after refusal.
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut twice = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut twice) }, 0);
+        assert!(twice.is_null(), "the typed terminal is extracted only once");
         assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
 
         let (a, services_a) = begin();
