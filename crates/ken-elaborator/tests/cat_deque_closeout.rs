@@ -2,8 +2,9 @@
 //!
 //! Promise class: durable invariants. Deque owns its exact checked carrier,
 //! operation, and law family; publishes no catalog surface; consumes
-//! `Data.Collections.Derived`'s canonical `list_append` and `reverse` plus
-//! `Core.Logic.Transport.sym`, adding no trust beyond those provider closures.
+//! `Data.Collections.Derived`'s canonical `list_append`, `reverse`, and
+//! attached proofs plus `Core.Logic.Transport.sym`/`trans`, adding no trust
+//! beyond those provider closures.
 //! The existing
 //! `transparent_deque_bodies_have_exact_derived_head_occurrence_populations`
 //! and concrete sequence tests in `cat_deque_acceptance` retain the per-body
@@ -38,17 +39,23 @@ fn expected_owned_names() -> BTreeSet<String> {
     [
         "Deque",
         "MkDeque",
+        "MkPopBackNone",
+        "MkPopBackSome",
         "MkPopFrontNone",
         "MkPopFrontSome",
         "MkPopPreserves",
+        "PopBackListView",
         "PopFrontListView",
         "PopPreserves",
         "deque_append_snoc_assoc",
         "deque_cong",
+        "deque_pop_back_nil_view",
+        "deque_pop_back_reversed",
         "deque_pop_front_nil_view",
         "deque_pop_front_reversed",
         "empty",
         "popBack",
+        "popBack_list_view",
         "popBack_pushBack",
         "popFront",
         "popFront_list_view",
@@ -256,15 +263,72 @@ fn pop_front_list_view_checks_in_loaded_package_and_on_inhabited_deques() {
     }
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: isolated roots loading checks the arbitrary-`q` private PopBack
+/// law, then in-module applications inhabit the direct-back, reversed-front,
+/// and empty-result branches. CLAIMED: the law ties both result constructors
+/// to the exact residual list view for all deques. THE GAP: the three examples
+/// show each operation route; the loaded kernel-checked proof supplies the
+/// universal quantifier. The natural-site mutations separately check that
+/// both production branches remain attached to this law.
+#[test]
+fn pop_back_list_view_checks_in_loaded_package_and_on_inhabited_deques() {
+    let (loaded, _) = load(DEQUE);
+    let law_id = loaded.globals[&format!("{DEQUE}.popBack_list_view")];
+    assert!(
+        matches!(loaded.env.lookup(law_id), Some(Decl::Transparent { .. })),
+        "the arbitrary-deque PopBack law must be checked and transparent"
+    );
+
+    let extracted = ken_elaborator::literate::extract_ken_md(DEQUE_KEN_MD)
+        .expect("Deque literate source must extract");
+    let in_module = format!(
+        "{}\n\
+         const deque_back_direct : Deque Bool = \
+           MkDeque Bool (Cons Bool True (Nil Bool)) (Cons Bool False (Nil Bool))\n\
+         const deque_back_direct_view : \
+           PopBackListView Bool deque_back_direct (popBack Bool deque_back_direct) = \
+           popBack_list_view Bool deque_back_direct\n\
+         const deque_back_rebalanced : Deque Bool = \
+           MkDeque Bool (Cons Bool True (Cons Bool False (Nil Bool))) (Nil Bool)\n\
+         const deque_back_rebalanced_view : \
+           PopBackListView Bool deque_back_rebalanced (popBack Bool deque_back_rebalanced) = \
+           popBack_list_view Bool deque_back_rebalanced\n\
+         const deque_back_empty : Deque Bool = MkDeque Bool (Nil Bool) (Nil Bool)\n\
+         const deque_back_empty_view : \
+           PopBackListView Bool deque_back_empty (popBack Bool deque_back_empty) = \
+           popBack_list_view Bool deque_back_empty",
+        extracted.source
+    );
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("Derived provider closure must be available");
+    env.elaborate_file(&in_module)
+        .expect("Deque package and all three in-module PopBack applications must check");
+    for name in [
+        "deque_back_direct_view",
+        "deque_back_rebalanced_view",
+        "deque_back_empty_view",
+    ] {
+        let id = env.globals[name];
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{name} must be a checked proof, not an assumption"
+        );
+    }
+}
+
 /// MEASURED: every checked Deque type and body refers to the exact nine-name
-/// compiler floor plus three canonical Derived identities and Transport.sym.
+/// compiler floor plus four canonical Derived identities and Transport.sym/trans.
 /// Deque and Derived roots loads agree on their shared closure; in a separate
-/// Transport-first environment, Deque's proof helper refers to that same
-/// environment's canonical sym identity. CLAIMED: Deque's direct dependency is
-/// `{Derived.list_append, Derived.list_append::right_unit, Derived.reverse,
-/// Transport.sym}`. THE GAP: attached proof selection adds right-unit without
-/// widening the Derived import; Transport.sym is explicitly imported. Source
-/// forms `J` and `Refl` elaborate into kernel terms without provider globals.
+/// Transport-first environment, each Deque proof helper refers to the same
+/// environment's preloaded canonical proof identity. CLAIMED: the direct
+/// dependency is exactly `Derived.{list_append, list_append::right_unit,
+/// reverse, reverse::involutive}` and `Transport.{sym, trans}`. THE GAP: attached
+/// proof selection brings both laws with their subjects without widening the
+/// Derived import; both Transport proofs are explicitly imported. Source `J`
+/// and `Refl` elaborate into kernel terms without provider globals.
 #[test]
 fn deque_direct_provider_inventory_is_exact_and_canonical() {
     let base = ElabEnv::new().expect("base environment");
@@ -274,35 +338,65 @@ fn deque_direct_provider_inventory_is_exact_and_canonical() {
     let append_name = format!("{DERIVED}.list_append");
     let reverse_name = format!("{DERIVED}.reverse");
     let right_unit_name = format!("{DERIVED}.list_append::right_unit");
+    let involutive_name = format!("{DERIVED}.reverse::involutive");
     let sym_name = format!("{TRANSPORT}.sym");
+    let trans_name = format!("{TRANSPORT}.trans");
     let append = via_deque.globals[&append_name];
     let reverse = via_deque.globals[&reverse_name];
     let right_unit = via_deque.globals[&right_unit_name];
+    let involutive = via_deque.globals[&involutive_name];
     let sym = via_deque.globals[&sym_name];
+    let trans = via_deque.globals[&trans_name];
     assert_eq!(append, via_derived.globals[&append_name]);
     assert_eq!(reverse, via_derived.globals[&reverse_name]);
     assert_eq!(right_unit, via_derived.globals[&right_unit_name]);
+    assert_eq!(involutive, via_derived.globals[&involutive_name]);
     assert_eq!(sym, via_derived.globals[&sym_name]);
+    assert_eq!(trans, via_derived.globals[&trans_name]);
 
-    // GlobalIds are allocated per roots-load order. Preload the independent
-    // Transport root into one environment, then load Deque in that same
-    // environment and verify the law references exactly its canonical sym.
+    // GlobalIds are allocated per roots-load order. Preload both canonical
+    // providers in one environment before Deque, then inspect the checked
+    // proof bodies against identities from that same environment.
     let canonical_sym = via_transport.globals[&sym_name];
+    let canonical_trans = via_transport.globals[&trans_name];
+    via_transport
+        .elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("Derived must independently load before Deque");
+    let canonical_involutive = via_transport.globals[&involutive_name];
     via_transport
         .elaborate_module_from_roots(&[catalog_root()], DEQUE)
-        .expect("Deque must reuse the independently loaded Transport provider");
-    assert_eq!(via_transport.globals[&sym_name], canonical_sym);
-    let helper = via_transport.globals[&format!("{DEQUE}.deque_pop_front_nil_view")];
-    let helper_references = declaration_references(
-        via_transport
-            .env
-            .lookup(helper)
-            .expect("the private reverse-result proof helper must be checked"),
-    );
+        .expect("Deque must reuse the independently loaded providers");
+    for (name, expected) in [
+        (&sym_name, canonical_sym),
+        (&trans_name, canonical_trans),
+        (&involutive_name, canonical_involutive),
+    ] {
+        assert_eq!(via_transport.globals[name], expected);
+    }
+    let helper_refs = |name: &str| {
+        let helper = via_transport.globals[&format!("{DEQUE}.{name}")];
+        declaration_references(
+            via_transport
+                .env
+                .lookup(helper)
+                .expect("the private reverse-result proof helper must be checked"),
+        )
+    };
     assert!(
-        helper_references.contains(&canonical_sym),
-        "Deque's checked reverse-result helper must use the independent Transport.sym identity"
+        helper_refs("deque_pop_front_nil_view").contains(&canonical_sym),
+        "PopFront helper must use the preloaded Transport.sym"
     );
+    let back_refs = helper_refs("deque_pop_back_nil_view");
+    for (name, provider) in [
+        ("Transport.sym", canonical_sym),
+        ("Transport.trans", canonical_trans),
+        ("Derived.reverse::involutive", canonical_involutive),
+    ] {
+        assert!(
+            back_refs.contains(&provider),
+            "PopBack helper must use preloaded {name}"
+        );
+    }
 
     let owned_ids = qualified_owned_ids(&via_deque);
     let mut external = BTreeSet::new();
@@ -322,7 +416,7 @@ fn deque_direct_provider_inventory_is_exact_and_canonical() {
     .collect::<BTreeSet<_>>();
     let expected_external = expected_floor
         .into_iter()
-        .chain([append, reverse, right_unit, sym])
+        .chain([append, reverse, right_unit, involutive, sym, trans])
         .collect::<BTreeSet<_>>();
     assert_eq!(
         external, expected_external,
@@ -334,8 +428,9 @@ fn deque_direct_provider_inventory_is_exact_and_canonical() {
             (DERIVED.to_owned(), "list_append".to_owned()),
             (DERIVED.to_owned(), "reverse".to_owned()),
             (TRANSPORT.to_owned(), "sym".to_owned()),
+            (TRANSPORT.to_owned(), "trans".to_owned()),
         ]),
-        "Deque must select exactly Derived.list_append/reverse and Transport.sym"
+        "Deque must select exactly Derived.list_append/reverse and Transport.sym/trans"
     );
 }
 
@@ -374,9 +469,9 @@ fn deque_loader_visible_inventory_is_empty() {
 }
 
 /// MEASURED: independently withholding each of the two Derived selections
-/// and the explicit Transport.sym selection from the extracted module reaches
-/// the exact missing name's `UnresolvedCon` boundary, while ordinary roots
-/// loading above succeeds. CLAIMED: all three selections are individually
+/// and the two Transport selections from the extracted module reaches the
+/// exact missing name's `UnresolvedCon` boundary, while ordinary roots
+/// loading above succeeds. CLAIMED: all four selections are individually
 /// necessary, not ambient through a transitive provider. THE GAP: none; each
 /// negative changes only one selective import, with the complete unchanged
 /// provider closure loaded as a positive availability control.
@@ -417,8 +512,8 @@ fn all_deque_provider_imports_are_individually_load_bearing() {
     assert_eq!(derived_import.2.len(), 2, "Deque selects two Derived names");
     assert_eq!(
         transport_import.2.len(),
-        1,
-        "Deque selects only Transport.sym"
+        2,
+        "Deque selects Transport.sym and Transport.trans"
     );
 
     let derived_binding = |provider_name: &str| {
@@ -454,26 +549,39 @@ fn all_deque_provider_imports_are_individually_load_bearing() {
         }
     }
 
-    let sym_binding = transport_import.2[0]
-        .rename
-        .clone()
-        .unwrap_or_else(|| transport_import.2[0].name.clone());
-    assert_eq!(transport_import.2[0].name, "sym");
-    let mut source = extracted.source.clone();
-    source.replace_range(
-        transport_import.1.clone(),
-        &format!("import {TRANSPORT} (cong)"),
-    );
-    let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
-        .expect("Derived's complete provider closure, including Transport.sym, must load");
-    assert!(
-        env.globals.contains_key(&format!("{TRANSPORT}.sym")),
-        "Transport.sym must be available, but unimported in the negative"
-    );
-    match env.elaborate_file(&source) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, sym_binding),
-        Err(other) => panic!("withholding Transport.sym failed for the wrong reason: {other:?}"),
-        Ok(_) => panic!("Deque unexpectedly used Transport.sym without its import"),
+    let transport_binding = |provider_name: &str| {
+        transport_import
+            .2
+            .iter()
+            .find(|item| item.name == provider_name)
+            .map(|item| item.rename.clone().unwrap_or_else(|| item.name.clone()))
+            .unwrap_or_else(|| panic!("Deque must import Transport.{provider_name}"))
+    };
+    for (retained, missing) in [("trans", "sym"), ("sym", "trans")] {
+        let retained_local = transport_binding(retained);
+        let missing_local = transport_binding(missing);
+        let retained_item = if retained_local == retained {
+            retained.to_owned()
+        } else {
+            format!("{retained} as {retained_local}")
+        };
+        let mut source = extracted.source.clone();
+        source.replace_range(
+            transport_import.1.clone(),
+            &format!("import {TRANSPORT} ({retained_item})"),
+        );
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
+            .expect("Derived's full provider closure, including Transport, must load");
+        let qualified = format!("{TRANSPORT}.{missing}");
+        assert!(
+            env.globals.contains_key(&qualified),
+            "{qualified} must be available, but unimported in the negative"
+        );
+        match env.elaborate_file(&source) {
+            Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, missing_local),
+            Err(other) => panic!("withholding Transport.{missing} failed differently: {other:?}"),
+            Ok(_) => panic!("Deque unexpectedly elaborated without imported Transport.{missing}"),
+        }
     }
 }

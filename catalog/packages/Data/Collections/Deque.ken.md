@@ -13,7 +13,7 @@ reverses the other list once and continues from there.
 ```ken
 import Data.Collections.Derived (list_append, reverse)
 
-import Core.Logic.Transport (sym)
+import Core.Logic.Transport (sym, trans)
 
 data Deque a = MkDeque (List a) (List a)
 
@@ -135,6 +135,16 @@ data PopFrontListView (a : Type) (q : Deque a) : Option (Pair a (Deque a)) → T
     → PopFrontListView a q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x rest))
 }
 
+data PopBackListView (a : Type) (q : Deque a) : Option (Pair a (Deque a)) → Type where {
+  MkPopBackNone :
+    Equal (List a) (toList a q) (Nil a) → PopBackListView a q (None (Pair a (Deque a)));
+  MkPopBackSome :
+    (x : a)
+    → (rest : Deque a)
+    → Equal (List a) (toList a q) (list_append a (toList a rest) (Cons a x (Nil a)))
+    → PopBackListView a q (Some (Pair a (Deque a)) (mk_pair a (Deque a) x rest))
+}
+
 fn deque_pop_front_reversed (a : Type) (reversed : List a) : Option (Pair a (Deque a)) =
   match reversed {
     Nil ↦ None (Pair a (Deque a));
@@ -170,6 +180,85 @@ fn popFront_list_view (a : Type) (q : Deque a) : PopFrontListView a q (popFront 
       }
   }
 
+fn deque_pop_back_reversed (a : Type) (reversed : List a) : Option (Pair a (Deque a)) =
+  match reversed {
+    Nil ↦ None (Pair a (Deque a));
+    Cons x rest ↦ Some (Pair a (Deque a)) (mk_pair a (Deque a) x (MkDeque a (Nil a) rest))
+  }
+
+fn deque_pop_back_nil_view
+      (a : Type) (front : List a) (reversed : List a)
+    : Equal (List a) (reverse a front) reversed
+      → PopBackListView a (MkDeque a front (Nil a)) (deque_pop_back_reversed a reversed) =
+  let
+    front_with_empty_back = list_append a front (Nil a);
+    reverse_round_trip = reverse a (reverse a front);
+    empty_back_is_front = list_append::right_unit a front;
+    front_is_reverse_round_trip =
+      sym (List a) reverse_round_trip front (reverse::involutive a front)
+  in
+    match reversed {
+      Nil ↦
+        λsame.
+          MkPopBackNone
+            a
+            (MkDeque a front (Nil a))
+            (trans
+              (List a)
+              front_with_empty_back
+              front
+              (Nil a)
+              empty_back_is_front
+              (trans
+                (List a)
+                front
+                reverse_round_trip
+                (Nil a)
+                front_is_reverse_round_trip
+                (deque_cong (List a) (List a) (reverse a front) (Nil a) (reverse a) same)));
+      Cons x rest ↦
+        λsame.
+          MkPopBackSome
+            a
+            (MkDeque a front (Nil a))
+            x
+            (MkDeque a (Nil a) rest)
+            (trans
+              (List a)
+              front_with_empty_back
+              front
+              (list_append a (reverse a rest) (Cons a x (Nil a)))
+              empty_back_is_front
+              (trans
+                (List a)
+                front
+                reverse_round_trip
+                (list_append a (reverse a rest) (Cons a x (Nil a)))
+                front_is_reverse_round_trip
+                (deque_cong
+                  (List a)
+                  (List a)
+                  (reverse a front)
+                  (Cons a x rest)
+                  (reverse a)
+                  same)))
+    }
+
+fn popBack_list_view (a : Type) (q : Deque a) : PopBackListView a q (popBack a q) =
+  match q {
+    MkDeque front back ↦
+      match back {
+        Nil ↦ deque_pop_back_nil_view a front (reverse a front) Refl;
+        Cons x rest ↦
+          MkPopBackSome
+            a
+            (MkDeque a front (Cons a x rest))
+            x
+            (MkDeque a front rest)
+            (deque_append_snoc_assoc a front (reverse a rest) x)
+      }
+  }
+
 fn popFront_pushFront
       (a : Type) (x : a) (q : Deque a)
     : PopPreserves a x q (popFront a (pushFront a x q)) =
@@ -193,16 +282,26 @@ back to a private list argument and carries an equality back to `reverse`;
 it uses the canonical `list_append::right_unit` and `Transport.sym` proofs
 to remove the residual empty back. The implementation of `popFront` is unchanged.
 
+The private `PopBackListView` is indexed by the actual `popBack` result.
+`popBack_list_view` proves for every deque that `None` leaves an empty list
+view, while `Some (x, rest)` decomposes the original view into the residual
+view followed by the singleton `x`. For an empty back, the proof generalizes
+the reversed front to a private list argument and carries an equality back
+to `reverse`; `reverse::involutive` recovers the front before the
+`list_append::right_unit` step. The direct back-pop case reuses the checked
+snoc-association lemma. The implementation of `popBack` is unchanged.
+
 ## Trust and derivation
 
 `Deque` is an ordinary strictly positive inductive. Its operations reuse the
 transparent `list_append` and `reverse` definitions from
-`Data.Collections.Derived` and the canonical `Core.Logic.Transport.sym` proof;
-every law is a checked proof term. Relative to those provider closures, the
-package adds no axiom, postulate, primitive, foreign
-declaration, unresolved hole, or consumer-local `trusted_base()` entry. Loading
-the full closure inherits the provider's existing audited trust footprint
-without widening or duplicating it.
+`Data.Collections.Derived`, its checked `reverse::involutive` and
+`list_append::right_unit` proofs, and the canonical `Core.Logic.Transport`
+`sym` and `trans` proofs. Every law is a checked proof term. Relative to
+those provider closures, the package adds no axiom, postulate, primitive,
+foreign declaration, unresolved hole, or consumer-local `trusted_base()`
+entry. Loading the full closure inherits the provider's existing audited
+trust footprint without widening or duplicating it.
 
 ## References
 

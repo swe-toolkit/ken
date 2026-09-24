@@ -292,8 +292,11 @@ goal with an ABSTRACT shared element `y` does not itself collapse to bare
 `Top` (the kernel's own equality-at-inductive reduction produces a
 right-nested Σ pairing the stuck, `y`-abstract element equality with the
 collapsed tail equality, so `Proved`/`Refl` alone both fail); lifting `Proved`
-through `Cons` via `cong` is the direct, minimal proof. `zip` truncates at
-the shorter list (`Nil` on either empty), NOT the length-indexed `Vec` zip:
+through `Cons` via `cong` is the direct, minimal proof. The checked
+`reverse::involutive` law is available alongside `reverse` to recover a
+list from its reversed view; `reverse_snoc` remains an internal lemma.
+`zip` truncates at the shorter list (`Nil` on either empty), NOT the
+length-indexed `Vec` zip:
 this is ordinary non-dependent recursion carrying none of the
 sibling-convoy/dependent-match capability gate that a length-indexed zip
 would need — fully mechanical. `concat_map` ships with only its two
@@ -331,7 +334,7 @@ theorem reverse_snoc
         (reverse_snoc a t y)
   }
 
-proof involutive for reverse
+pub proof involutive for reverse
       (a : Type) (xs : List a)
     : Equal (List a) (reverse a (reverse a xs)) xs =
   match xs {
