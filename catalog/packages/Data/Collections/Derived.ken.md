@@ -299,9 +299,13 @@ list from its reversed view; `reverse_snoc` remains an internal lemma.
 length-indexed `Vec` zip:
 this is ordinary non-dependent recursion carrying none of the
 sibling-convoy/dependent-match capability gate that a length-indexed zip
-would need — fully mechanical. `concat_map` ships with only its two
-structural (`Nil`/`Cons`) equations — no bespoke length law, since that
-would need a `sum` combinator not in this floor (subsume-don't-proliferate).
+would need — fully mechanical. `concat_map` retains its two structural
+(`Nil`/`Cons`) equations and a private distributivity proof over
+`list_append`. Its step lifts the tail
+induction hypothesis through head-list append, then reverses
+`list_append::assoc` to meet the other side. There is no bespoke length law:
+that would need a `sum` combinator not in this floor
+(subsume-don't-proliferate).
 `range n` produces `[0, 1, .., n-1]` via a `start`-threaded helper
 (`range_from`) so the recursion is structural on `n` while the contents
 count up. `foldl` similarly ships with only its two structural equations —
@@ -418,6 +422,42 @@ pub fn concat_map (a : Type) (b : Type) (f : a → List b) (xs : List a) : List 
   match xs {
     Nil ↦ Nil b;
     Cons h t ↦ list_append b (f h) (concat_map a b f t)
+  }
+
+theorem concat_map_append
+      (a : Type) (b : Type) (f : a → List b) (xs : List a) (ys : List a)
+    : Equal
+        (List b)
+        (concat_map a b f (list_append a xs ys))
+        (list_append b (concat_map a b f xs) (concat_map a b f ys)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      let
+        head_segment = f h;
+        mapped_tail = concat_map a b f t;
+        mapped_suffix = concat_map a b f ys;
+        mapped_appended_tail = concat_map a b f (list_append a t ys);
+        right_associated = list_append b head_segment (list_append b mapped_tail mapped_suffix);
+        left_associated = list_append b (list_append b head_segment mapped_tail) mapped_suffix
+      in
+        trans
+          (List b)
+          (list_append b head_segment mapped_appended_tail)
+          right_associated
+          left_associated
+          (cong
+            (List b)
+            (List b)
+            mapped_appended_tail
+            (list_append b mapped_tail mapped_suffix)
+            (λw. list_append b head_segment w)
+            (concat_map_append a b f t ys))
+          (sym
+            (List b)
+            left_associated
+            right_associated
+            ((proof assoc for list_append) b head_segment mapped_tail mapped_suffix))
   }
 
 fn range_from (start : Nat) (n : Nat) : List Nat =
@@ -1017,13 +1057,19 @@ reference implementation.
    combinator/law or string op (Approach A, Architect ruling
    `evt_4k1yqah3yvpds`) — deriving trivially structural folds keeps the
    audited primitive set small (subsume-don't-proliferate).
-5. **`trusted_base()` delta.** **Zero.** Every proof in this package is a
-   genuine, kernel-checked term; no law field is postulated anywhere.
+5. **`trusted_base()` delta.** **Zero beyond imported providers.** Every
+   proof in this package is a genuine, kernel-checked term; no law field is
+   postulated here. The roots-loaded provider closure already contains five
+   opaque assumptions: `Ord Int`'s `refl`, `antisym`, `trans`, and `total`, and
+   `StringBijection`'s `string_to_list_char_retraction`. The private
+   `concat_map_append` proof uses structural induction and the checked
+   `list_append::assoc`, `cong`, `sym`, and `trans` proofs, not these axioms.
 6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
-   lifting the tail IH under the head constructor, the same shape
-   throughout. The `nth` bounds proofs split the list before the index so
-   lookup, length, and order reduce together. `§4.3`: full case-split
-   specialized to `List Bool`/`bool_leq`,
+   lifting the tail IH under the head constructor; private
+   `concat_map_append` lifts the IH under `list_append` and uses
+   `list_append::assoc` in reverse. The `nth` bounds proofs split the list
+   before the index so lookup, length, and order reduce together. `§4.3`:
+   full case-split specialized to `List Bool`/`bool_leq`,
    closing by `Proved`/`Refl`/`cong`/`trans`/`sym` per branch — no postulate
    anywhere in the verified-sort slice. `§4.4`: every law field closes by
    `Refl` (each concrete operation reduces definitionally once applied, no
