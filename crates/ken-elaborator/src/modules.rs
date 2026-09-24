@@ -721,6 +721,116 @@ fn authorize_inline_descendants(
     }
 }
 
+/// The selected interface and checked IDs are one provider, not two
+/// independently looked-up same-spelling tables. Import and facade export
+/// must make the same lexical inline versus absolute choice.
+struct ModuleProvider<'a> {
+    canonical: String,
+    pubmap: &'a HashMap<String, String>,
+    member_ids: &'a ProviderExportIds,
+    members: &'a HashMap<String, ken_kernel::GlobalId>,
+    file_tables: Option<&'a HashMap<String, HashMap<String, String>>>,
+    authorized_paths: Option<std::borrow::Cow<'a, HashSet<String>>>,
+}
+
+fn select_module_provider<'a>(
+    exports: &'a HashMap<String, HashMap<String, String>>,
+    inline_children: &HashMap<String, HashSet<String>>,
+    file_inline_paths: &'a HashMap<String, HashSet<String>>,
+    file_export_tables: &'a FileExportTables,
+    file_export_ids: &'a HashMap<String, ProviderExportIds>,
+    export_provenance: &'a HashMap<String, ExportProvenance>,
+    owner: &str,
+    file_root: Option<&str>,
+    unit_inline_modules: &HashSet<String>,
+    ordered_inline_modules: &HashSet<String>,
+    module: &str,
+    span: &Span,
+) -> Result<ModuleProvider<'a>, ElabError> {
+    let (canonical, authorized_paths, provider_file) = match lexical_inline_import(
+        owner,
+        file_root,
+        unit_inline_modules,
+        ordered_inline_modules,
+        module,
+        inline_children,
+    ) {
+        InlineImport::Available(path) => {
+            let paths = unit_inline_modules
+                .intersection(ordered_inline_modules)
+                .cloned()
+                .collect();
+            (path, Some(std::borrow::Cow::Owned(paths)), None)
+        }
+        InlineImport::Unavailable => {
+            return Err(ElabError::UnboundName {
+                name: module.to_string(),
+                span: span.clone(),
+            });
+        }
+        InlineImport::Absolute => {
+            // A file unit selects its catalog-root file, while an in-memory
+            // unit selects the current export table and its paired origin.
+            if file_root.is_some() {
+                (
+                    module.to_string(),
+                    file_inline_paths
+                        .get(module)
+                        .map(std::borrow::Cow::Borrowed),
+                    Some(module),
+                )
+            } else {
+                let provenance = export_provenance.get(module);
+                (
+                    module.to_string(),
+                    provenance.map(|owner| std::borrow::Cow::Borrowed(&owner.inline_paths)),
+                    provenance.and_then(|owner| owner.file_root.as_deref()),
+                )
+            }
+        }
+    };
+    let file_tables = provider_file.and_then(|root| file_export_tables.get(root));
+    let pubmap = match provider_file {
+        Some(_) => file_tables.and_then(|tables| tables.get(&canonical)),
+        None => exports.get(&canonical),
+    }
+    .ok_or_else(|| ElabError::UnboundName {
+        name: module.to_string(),
+        span: span.clone(),
+    })?;
+    let member_ids = match provider_file {
+        Some(file) => file_export_ids.get(file),
+        None => export_provenance
+            .get(&canonical)
+            .map(|owner| &owner.member_ids),
+    }
+    .ok_or_else(|| {
+        ElabError::Internal(format!(
+            "selected provider '{canonical}' has no checked export identities"
+        ))
+    })?;
+    let members = member_ids.get(&canonical).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "selected provider '{canonical}' has no checked member IDs"
+        ))
+    })?;
+    for leaf in pubmap.keys() {
+        if !members.contains_key(leaf) {
+            return Err(ElabError::Internal(format!(
+                "public member '{canonical}.{leaf}' has no checked ID in its selected provider"
+            )));
+        }
+    }
+    Ok(ModuleProvider {
+        canonical,
+        pubmap,
+        member_ids,
+        members,
+        file_tables,
+        authorized_paths,
+    })
+}
+
 fn apply_import(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
@@ -739,74 +849,28 @@ fn apply_import(
     kind: &ImportKind,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let own_paths;
-    let (canonical, authorized_paths, provider_file) = match lexical_inline_import(
+    let provider = select_module_provider(
+        exports,
+        inline_children,
+        file_inline_paths,
+        file_export_tables,
+        file_export_ids,
+        export_provenance,
         owner,
         file_root,
         unit_inline_modules,
         ordered_inline_modules,
         module,
-        inline_children,
-    ) {
-        InlineImport::Available(path) => {
-            own_paths = unit_inline_modules
-                .intersection(ordered_inline_modules)
-                .cloned()
-                .collect::<HashSet<_>>();
-            (path, Some(&own_paths), None)
-        }
-        InlineImport::Unavailable => {
-            return Err(ElabError::UnboundName {
-                name: module.to_string(),
-                span: span.clone(),
-            });
-        }
-        InlineImport::Absolute => {
-            // Roots imports select their explicit file, while in-memory
-            // imports select the current export table and its paired origin.
-            // Neither kind wins merely by having a map at this spelling.
-            if file_root.is_some() {
-                (
-                    module.to_string(),
-                    file_inline_paths.get(module),
-                    Some(module),
-                )
-            } else {
-                let provenance = export_provenance.get(module);
-                (
-                    module.to_string(),
-                    provenance.map(|owner| &owner.inline_paths),
-                    provenance.and_then(|owner| owner.file_root.as_deref()),
-                )
-            }
-        }
-    };
-    let file_tables = provider_file.and_then(|root| file_export_tables.get(root));
-    let pubmap = match provider_file {
-        Some(_) => file_tables.and_then(|tables| tables.get(&canonical)),
-        None => exports.get(&canonical),
-    }
-    .ok_or_else(|| ElabError::UnboundName {
-        name: module.to_string(),
-        span: span.clone(),
-    })?;
-    let selected_ids = match provider_file {
-        Some(file) => file_export_ids.get(file),
-        None => export_provenance.get(&canonical).map(|owner| &owner.member_ids),
-    }
-    .ok_or_else(|| ElabError::Internal(format!(
-        "selected import provider '{canonical}' has no checked export identities"
-    )))?;
-    let provider_members = selected_ids.get(&canonical).ok_or_else(|| {
-        ElabError::Internal(format!("selected provider '{canonical}' has no checked member IDs"))
-    })?;
-    for leaf in pubmap.keys() {
-        if !provider_members.contains_key(leaf) {
-            return Err(ElabError::Internal(format!(
-                "public member '{canonical}.{leaf}' has no checked ID in its selected provider"
-            )));
-        }
-    }
+        span,
+    )?;
+    let ModuleProvider {
+        canonical,
+        pubmap,
+        member_ids: selected_ids,
+        members: provider_members,
+        file_tables,
+        authorized_paths,
+    } = provider;
     match kind {
         ImportKind::Qualified | ImportKind::Aliased(_) => {
             let surface = match kind {
@@ -835,7 +899,7 @@ fn apply_import(
                 scope
                     .file_prefix_exports
                     .insert(surface.to_string(), pubmap.clone());
-                if let Some(paths) = authorized_paths {
+                if let Some(paths) = authorized_paths.as_deref() {
                     authorize_inline_descendants(
                         scope,
                         inline_children,
@@ -846,7 +910,7 @@ fn apply_import(
                         surface,
                     );
                 }
-            } else if let Some(paths) = authorized_paths {
+            } else if let Some(paths) = authorized_paths.as_deref() {
                 authorize_inline_descendants(
                     scope,
                     inline_children,
@@ -1087,10 +1151,15 @@ fn published_name(item: &ImportItem) -> &str {
 fn apply_export(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
+    inline_children: &HashMap<String, HashSet<String>>,
+    file_inline_paths: &HashMap<String, HashSet<String>>,
     file_export_tables: &FileExportTables,
     file_export_ids: &HashMap<String, ProviderExportIds>,
     export_provenance: &HashMap<String, ExportProvenance>,
-    selected_file: Option<&str>,
+    owner: &str,
+    file_root: Option<&str>,
+    unit_inline_modules: &HashSet<String>,
+    ordered_inline_modules: &HashSet<String>,
     prop_intros: &HashMap<String, Vec<String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     exports_here: &mut HashMap<String, String>,
@@ -1099,24 +1168,22 @@ fn apply_export(
 ) -> Result<(), ElabError> {
     match form {
         ExportForm::Facade { module, items } => {
-            let pubmap = match selected_file {
-                Some(file) => file_export_tables
-                    .get(file)
-                    .and_then(|tables| tables.get(module)),
-                None => exports.get(module),
-            }
-            .ok_or_else(|| ElabError::UnboundName {
-                name: module.clone(),
-                span: span.clone(),
-            })?;
-            let source_members = match selected_file {
-                Some(file) => file_export_ids.get(file),
-                None => export_provenance.get(module).map(|owner| &owner.member_ids),
-            }
-            .and_then(|ids| ids.get(module))
-            .ok_or_else(|| ElabError::Internal(format!(
-                "facade provider '{module}' has no checked export identities"
-            )))?;
+            let provider = select_module_provider(
+                exports,
+                inline_children,
+                file_inline_paths,
+                file_export_tables,
+                file_export_ids,
+                export_provenance,
+                owner,
+                file_root,
+                unit_inline_modules,
+                ordered_inline_modules,
+                module,
+                span,
+            )?;
+            let pubmap = provider.pubmap;
+            let source_members = provider.members;
             for item in items {
                 let canonical = pubmap
                     .get(&item.name)
@@ -3527,34 +3594,18 @@ fn expand_scope(
                 i += 1;
             }
             Decl::ExportDecl { form, span } => {
-                let file_root = elab.module_state.active_imports.last().map(String::as_str);
-                let selected_file = match form {
-                    ExportForm::Facade { module, .. }
-                        if file_root.is_some()
-                            && declared_inline_import(
-                                prefix,
-                                file_root,
-                                module,
-                                unit_inline_modules,
-                            )
-                            .is_none() =>
-                    {
-                        Some(module.as_str())
-                    }
-                    ExportForm::Facade { module, .. } if file_root.is_none() => elab
-                        .module_state
-                        .export_provenance
-                        .get(module)
-                        .and_then(|owner| owner.file_root.as_deref()),
-                    _ => None,
-                };
                 apply_export(
                     scope,
                     &elab.module_state.exports,
+                    &elab.module_state.inline_children,
+                    &elab.module_state.file_inline_paths,
                     &elab.module_state.file_export_tables,
                     &elab.module_state.file_export_ids,
                     &elab.module_state.export_provenance,
-                    selected_file,
+                    prefix,
+                    elab.module_state.active_imports.last().map(String::as_str),
+                    unit_inline_modules,
+                    ordered_inline_modules,
                     &elab.module_state.prop_intros,
                     &elab.globals,
                     &mut exports_here,
@@ -6121,27 +6172,68 @@ mod namespace_effect_tests {
         assert!(!env.globals.contains_key("denied"));
     }
 
-    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3).
     ///
-    /// MEASURED: a local public `A.leak` and a facade-selected file
-    /// `A.leak` share their canonical spelling but not their checked ID, and
-    /// compete for the SAME public surface in one interface. CLAIMED: facade
-    /// collision compares checked IDs, not only strings. THE GAP: the file
-    /// identity is recorded before the competing local is elaborated.
+    /// MEASURED: a checked file A exists, but `export A` inside an in-memory
+    /// `module A` refuses at its facade instead of borrowing that file's ID.
+    /// CLAIMED: an inline unit being expanded is unavailable even to its own
+    /// facade. THE GAP: the separate file-facade control measures a genuinely
+    /// absolute file A, and the available-child cases measure selected IDs.
     #[test]
-    fn facade_reexport_refuses_two_ids_under_one_identical_canonical_name() {
+    fn facade_inside_self_module_cannot_borrow_ambient_file_id() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file provider checked");
         let file_id = env.globals["A.leak"];
-        match env.elaborate_file("module A { pub const leak : Nat = Suc Zero export A (leak) }") {
-            Err(ElabError::ReExportCollision { surface_name, existing, incoming, .. }) => {
+        let source = "module A { pub const leak : Nat = Suc Zero export A (leak) }";
+        match env.elaborate_file(source) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "A");
+                assert_eq!(span.start, source.find("export A (leak)").unwrap());
+            }
+            other => panic!("same-unit A is not an absolute facade: {other:?}"),
+        }
+        assert_ne!(file_id, env.globals["A.leak"]);
+    }
+
+    /// Promise class: durable invariant (spec 33 §4.3).
+    ///
+    /// MEASURED: F republishes file A.leak, then an in-memory A checks a
+    /// distinct A.leak and republishes F's selected leaf under the same
+    /// surface. Both providers have the SAME canonical spelling but distinct
+    /// GlobalIds, and the export site raises ReExportCollision. CLAIMED: an
+    /// interface cannot identify two checked declarations by one public name
+    /// merely because their canonical spellings agree. THE GAP: the L4
+    /// distinct-spelling collision cannot detect removal of the checked-ID
+    /// guard, so this case must preserve both same-spelling IDs.
+    #[test]
+    fn facade_selected_equal_canonical_distinct_ids_collide_at_export() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        fs::write(root.path().join("F.ken"), "export A (leak)\n")
+            .expect("write file facade F");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "F")
+            .expect("file F must republish A's checked leaf");
+        let file_id = env.globals["A.leak"];
+        assert_eq!(env.module_state.file_export_ids["F"]["F"]["leak"], file_id);
+
+        let source = "module A { pub const leak : Nat = Suc Zero\n\
+                      import F (leak as selected)\n\
+                      export selected as leak }";
+        match env.elaborate_file(source) {
+            Err(ElabError::ReExportCollision {
+                surface_name,
+                existing,
+                incoming,
+                span,
+            }) => {
                 assert_eq!(surface_name, "leak");
                 assert_eq!(existing, "A.leak");
                 assert_eq!(incoming, "A.leak");
+                assert_eq!(span.start, source.find("export selected as leak").unwrap());
             }
-            other => panic!("two IDs under one public spelling must clash: {other:?}"),
+            other => panic!("same-canonical distinct checked IDs must clash: {other:?}"),
         }
         assert_ne!(file_id, env.globals["A.leak"]);
     }
@@ -6210,28 +6302,27 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a forward local and a facade to the file owner publish one
-    /// spelling at both surface and canonical levels but two IDs. CLAIMED:
-    /// delayed local-ID reconciliation cannot conceal a real collision.
-    /// THE GAP: an earlier `pub` would exercise eager collision only.
+    /// MEASURED: a forward local export is pending and a same-unit facade
+    /// follows it, while a checked file A has the same canonical leaf.
+    /// CLAIMED: neither the unready local nor the ambient file can authorize
+    /// `export A` inside the unit A being expanded. THE GAP: a separate pin
+    /// checks forward local ID reconciliation without a facade.
     #[test]
-    fn forward_local_and_file_facade_collide_when_ids_differ() {
+    fn forward_local_export_cannot_authorize_unavailable_self_facade() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file provider checked");
         let old = env.globals["A.leak"];
-        match env.elaborate_file(
-            "module A { export leak\nexport A (leak)\nconst leak : Nat = Suc Zero }",
-        ) {
-            Err(ElabError::ReExportCollision { surface_name, existing, incoming, .. }) => {
-                assert_eq!(surface_name, "leak");
-                assert_eq!(existing, "A.leak");
-                assert_eq!(incoming, "A.leak");
+        let source = "module A { export leak\nexport A (leak)\nconst leak : Nat = Suc Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "A");
+                assert_eq!(span.start, source.find("export A (leak)").unwrap());
             }
-            other => panic!("forward export and facade must clash by ID: {other:?}"),
+            other => panic!("forward export cannot enable self facade: {other:?}"),
         }
-        assert_ne!(old, env.globals["A.leak"]);
+        assert_eq!(old, env.globals["A.leak"], "the later local never elaborated");
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
