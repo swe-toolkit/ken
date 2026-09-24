@@ -1,7 +1,7 @@
 ---
 id: RT-SELECTED-PENDING-CALL-BUILD
 title: "Build the selected pending-call package designed in RT-SELECTED-PENDING-CALL-PACKAGE D1: a companion package beside the pending ITree word, built in the executed arm from its own ordered S/C members, carried through the six transport families to D2's one-event consuming gate, so the px7l/px7m rows can lower natively; first checkpoint measures backing classes, arm-edge dominance and traversed families before the build proceeds"
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: architect
@@ -16,17 +16,12 @@ origin: "RT-SELECTED-PENDING-CALL-PACKAGE AC-3: Architect D1 disposition 'REPRES
 
 ## Settled inputs -- at `1303e5cd4`
 
-- **The design is D1**, Architect `evt_3y5xkyf1v02dj`, items 1-5:
-  - placement beside the pending word, never in `LoweringOperand` or
-    `CarriedBoundaryWord`;
-  - contents: plan id, defining function, 5 ticket words and `W` member
-    words;
-  - the F1-F6 transport;
-  - the static-candidate gate over `call_declared_unit_target`;
-  - D2's issuer as the only call-event authority;
-  - exactly one call.
-
-  The receiver reads it there; this frame does not restate it.
+- **The design is D1**, recorded verbatim in
+  `RT-SELECTED-PENDING-CALL-PACKAGE.md`, section `D1 disposition (Architect
+  evt_3y5xkyf1v02dj, at 1303e5cd4)`. Build items 1-5 from there: the
+  placement, the contents, F1-F6 transport, the static-candidate gate over
+  `call_declared_unit_target`, D2's issuer as the only call-event authority,
+  and exactly one call. This frame does not restate it.
 - **D0 census** `evt_3ywcecyzbyqkh`. Body 322's six members [S0, S1, S2,
   C0, C1, C2] are planner declarations only on main. The first refusal is
   `reject_carried_residual_arguments`, and it is not a D2 typed fault.
@@ -54,7 +49,11 @@ natively. Any row that stays ignored gets a measured reason in its
   - (a) each of the six members' backing class, (a) to (e) of D1 item 2;
   - (b) that closure 326's package construction site is dominated by the
     selected arm edge of the dynamic Bool `brif`;
-  - (c) which of F1-F6 the fixture actually traverses.
+  - (c) which of F1-F6 the fixture actually traverses;
+  - (d) for each of the four target rows, its first refusal on the base and
+    whether it is in the AC-1 admission population. A row outside the
+    population stays ignored with that measured reason; it is not a new
+    admission.
 - **AC-1 (admission, D1 item 0).**
   - A package is planned only for a pending producer `Match` whose arms
     declare different recursive body units: the population
@@ -109,3 +108,5 @@ natively. Any row that stays ignored gets a measured reason in its
   for a ruling, not a new class.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
