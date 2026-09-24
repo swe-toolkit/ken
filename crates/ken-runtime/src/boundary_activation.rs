@@ -741,6 +741,23 @@ mod tests {
         assert_eq!(activation.published_capacities().unwrap().0, 4_096);
     }
 
+    /// The separately metered live-call backing also refuses an unreservable
+    /// declared grant before the activation publishes a services pointer.
+    #[test]
+    fn impossible_live_slot_grant_refuses_before_publication() {
+        let mut profile = distinct_profile();
+        profile.call_events.live_pending_slots = usize::MAX;
+        let mut store = BoundaryValueStore::new();
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile)
+            .expect("persistent region alone has ordinary limits");
+        let fault = BoundaryActivationV1::begin(&binding)
+            .err().expect("unrepresentable call-event backing cannot publish");
+        assert_eq!(fault.scope, ken_host::CapacityScopeV1::Invocation);
+        assert_eq!(fault.resource, ken_host::CapacityResourceV1::LivePendingSlots);
+        assert_eq!(fault.requested, usize::MAX as u128);
+        assert!(fault.limit < fault.requested);
+    }
+
     #[test]
     fn one_past_max_epoch_has_an_exact_nonwrapping_request() {
         assert_eq!(requested_epoch_after(u64::MAX), u128::from(u64::MAX) + 1);
@@ -976,6 +993,12 @@ mod tests {
         assert_eq!(persistent, activation.published_persistent_base() as u64);
         assert_ne!(persistent, 0, "ARENA_PERSISTENT was left unbound");
         assert_ne!(native, 0, "ARENA_NATIVE_INT was left unbound");
+        let owner = activation.owned_call_event_address();
+        assert_eq!(activation.services.call_events as usize, owner);
+        let moved = Box::new(activation);
+        assert_eq!(moved.services.call_events as usize, moved.owned_call_event_address());
+        assert_eq!(moved.owned_call_event_address(), owner,
+            "moving the activation cannot move its published issuer owner");
     }
 
     /// ⭐⭐ **`AC-2` — two activations get distinct mutable arena state.**

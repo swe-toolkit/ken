@@ -32,7 +32,7 @@
 //!
 //! ⭐ And it carries its own `version` and `size` so a C/Rust disagreement
 //! **fails closed** rather than being read under a layout it does not have —
-//! ⛔ nine bare positional `u64` parameters would have reintroduced exactly the
+//! ⛔ eleven bare positional `u64` parameters would have reintroduced exactly the
 //! transposition hazard that `BoundaryRegionLimitsV1`'s named fields removed,
 //! in the one language with no help against it.
 
@@ -47,6 +47,9 @@ use crate::boundary_resource_profile::{
     InvocationCallLimitsV3, RuntimeResourceLimitsV2,
 };
 use crate::boundary_value::{BoundaryValueStore, BoundaryWord};
+use crate::activation_services::GeneratedActivationServicesV1;
+use crate::invocation_tickets::{InvocationTicketIssuerV1, IssuerTerminalFaultV1,
+    SelectedCallTargetV1, SelectedCallTicketV1};
 
 /// Success.
 pub const KEN_ACTIVATION_OK: i64 = 0;
@@ -76,7 +79,7 @@ pub const KEN_ACTIVATION_ERR_PROFILE_MISMATCH: i64 = -8;
 
 /// **The deployment-authorized profile, as it crosses into C.**
 ///
-/// Nine named limits and no default — the C side supplies all nine or the
+/// Eleven named limits and no default — the C side supplies all eleven or the
 /// call is refused. ⭐ `version` and `size` make a layout disagreement a
 /// **checked refusal** instead of a silent misread.
 #[repr(C)]
@@ -159,6 +162,221 @@ pub struct KenActivationV1 {
 /// Opaque error handle: C never decodes or invents a capacity payload.
 pub struct KenCapacityFailureV1 {
     fault: ken_host::CapacityExhaustedV1,
+}
+
+/// Owned in-flight terminal handed back from the activation exactly once.
+/// Neither C nor a raw negative generated status may fabricate it.
+pub struct KenSelectedCallFailureV1 {
+    fault: IssuerTerminalFaultV1,
+}
+
+#[cfg(test)]
+thread_local! {
+    static COPIED_OLD_TICKET_AT_ISSUE: std::cell::Cell<Option<SelectedCallTicketV1>> =
+        const { std::cell::Cell::new(None) };
+    static COPIED_OLD_TICKET_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static REPLAY_SPENT_SLOT_TICKET: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static FIRST_SPENT_SLOT_TICKET: std::cell::Cell<Option<SelectedCallTicketV1>> =
+        const { std::cell::Cell::new(None) };
+    static REPLAY_SPENT_SLOT_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn with_replayed_spent_slot_ticket<T>(action: impl FnOnce() -> T) -> (T, usize) {
+    REPLAY_SPENT_SLOT_TICKET.with(|cell| assert!(!cell.replace(true)));
+    FIRST_SPENT_SLOT_TICKET.with(|cell| cell.set(None));
+    REPLAY_SPENT_SLOT_APPLICATIONS.with(|cell| cell.set(0));
+    let outcome = action();
+    REPLAY_SPENT_SLOT_TICKET.with(|cell| cell.set(false));
+    FIRST_SPENT_SLOT_TICKET.with(|cell| cell.set(None));
+    let applications = REPLAY_SPENT_SLOT_APPLICATIONS.with(std::cell::Cell::get);
+    (outcome, applications)
+}
+
+#[cfg(test)]
+pub(crate) fn with_copied_old_ticket_at_issue<T>(
+    old: SelectedCallTicketV1,
+    action: impl FnOnce() -> T,
+) -> (T, usize) {
+    COPIED_OLD_TICKET_AT_ISSUE.with(|cell| {
+        assert!(cell.replace(Some(old)).is_none(), "nested replay fixture");
+    });
+    COPIED_OLD_TICKET_APPLICATIONS.with(|cell| cell.set(0));
+    let outcome = action();
+    COPIED_OLD_TICKET_AT_ISSUE.with(|cell| cell.set(None));
+    let applications = COPIED_OLD_TICKET_APPLICATIONS.with(std::cell::Cell::get);
+    (outcome, applications)
+}
+
+/// Issue one selected call from the live activation's checked service record.
+/// The generated caller must branch on the status before any operand load.
+///
+/// # Safety
+/// `services` is a live published activation service pointer and `out_ticket`
+/// is writable. Both belong to this one invocation; no pointer outlives it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_selected_call_v1_issue(
+    services: *const GeneratedActivationServicesV1,
+    body: u64,
+    callee: u64,
+    out_ticket: *mut SelectedCallTicketV1,
+) -> i64 {
+    if services.is_null() || out_ticket.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let service = unsafe { &*services };
+    if service.call_events.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let issuer = unsafe { &mut *service.call_events.cast::<InvocationTicketIssuerV1>() };
+    if let Some(fault) = issuer.terminal_fault() {
+        return match fault {
+            IssuerTerminalFaultV1::Capacity(_) => ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            IssuerTerminalFaultV1::Integrity(_) => ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+        };
+    }
+    match issuer.issue(SelectedCallTargetV1 { body, callee }) {
+        Ok(ticket) => {
+            #[cfg(test)]
+            let ticket = COPIED_OLD_TICKET_AT_ISSUE.with(|cell| match cell.get() {
+                Some(old) => {
+                    COPIED_OLD_TICKET_APPLICATIONS.with(|count| count.set(count.get() + 1));
+                    old
+                }
+                None => ticket,
+            });
+            #[cfg(test)]
+            let ticket = if REPLAY_SPENT_SLOT_TICKET.with(std::cell::Cell::get) {
+                FIRST_SPENT_SLOT_TICKET.with(|cell| match cell.get() {
+                    None => { cell.set(Some(ticket)); ticket }
+                    Some(first) => {
+                        REPLAY_SPENT_SLOT_APPLICATIONS.with(|count| count.set(count.get() + 1));
+                        first
+                    }
+                })
+            } else { ticket };
+            unsafe { *out_ticket = ticket };
+            KEN_ACTIVATION_OK
+        }
+        Err(fault) => {
+            issuer.record_terminal_fault(IssuerTerminalFaultV1::Capacity(fault));
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+        }
+    }
+}
+
+/// Consume exactly one selected ticket before accessing its borrowed inputs.
+/// A failed gate returns its recorded typed integrity terminal status.
+///
+/// # Safety
+/// `services` is live and `ticket` points to a readable ticket previously
+/// issued by an invocation; the ticket bytes are copied, never retained.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_selected_call_v1_consume(
+    services: *const GeneratedActivationServicesV1,
+    ticket: *const SelectedCallTicketV1,
+    body: u64,
+    callee: u64,
+) -> i64 {
+    if services.is_null() || ticket.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let service = unsafe { &*services };
+    if service.call_events.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let issuer = unsafe { &mut *service.call_events.cast::<InvocationTicketIssuerV1>() };
+    if let Some(fault) = issuer.terminal_fault() {
+        return match fault {
+            IssuerTerminalFaultV1::Capacity(_) => ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            IssuerTerminalFaultV1::Integrity(_) => ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+        };
+    }
+    match issuer.consume(unsafe { *ticket }, SelectedCallTargetV1 { body, callee }) {
+        Ok(()) => KEN_ACTIVATION_OK,
+        Err(fault) => {
+            issuer.record_terminal_fault(IssuerTerminalFaultV1::Integrity(fault));
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1
+        }
+    }
+}
+
+/// Move the authentic in-flight failure from the active owner to C. Return 0
+/// with a null out pointer if no generated fault occurred.
+///
+/// # Safety
+/// `activation` is a live unique handle and `out_failure` a writable slot.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_take_selected_call_failure(
+    activation: *mut KenActivationV1,
+    out_failure: *mut *mut KenSelectedCallFailureV1,
+) -> i64 {
+    if activation.is_null() || out_failure.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    unsafe { *out_failure = std::ptr::null_mut() };
+    let activation = unsafe { &mut *activation };
+    let Some(issuer) = activation.activation.call_event_issuer() else {
+        return KEN_ACTIVATION_ERR_FINISHED;
+    };
+    let Some(fault) = issuer.take_terminal_fault() else { return KEN_ACTIVATION_OK; };
+    unsafe { *out_failure = Box::into_raw(Box::new(KenSelectedCallFailureV1 { fault })) };
+    match fault {
+        IssuerTerminalFaultV1::Capacity(_) => ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+        IssuerTerminalFaultV1::Integrity(_) => ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+    }
+}
+
+/// Finish the authentic in-flight fault under the same host observation
+/// context and effect prefix as the generated entry used.
+///
+/// # Safety
+/// Both inputs must be live unique handles and are consumed exactly once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_finish_selected_call_failure(
+    context: *mut c_void,
+    failure: *mut KenSelectedCallFailureV1,
+) -> i64 {
+    if context.is_null() || failure.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    match unsafe { Box::from_raw(failure) }.fault {
+        IssuerTerminalFaultV1::Capacity(fault) => unsafe {
+            ken_host::ken_host_invocation_v1_finish_with_capacity(context, fault)
+        },
+        IssuerTerminalFaultV1::Integrity(fault) => unsafe {
+            ken_host::ken_host_invocation_v1_finish_with_integrity(context, fault)
+        },
+    }
+}
+
+/// Nonprocess image of the same owner-backed in-flight fault.
+///
+/// # Safety
+/// `failure` is a live unique handle, consumed exactly once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_write_starter_selected_call_failure(
+    failure: *mut KenSelectedCallFailureV1,
+) -> i64 {
+    if failure.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let fault = unsafe { Box::from_raw(failure) }.fault;
+    let (status, terminal) = match fault {
+        IssuerTerminalFaultV1::Capacity(fault) => (
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            ken_host::TerminalErrorV1::CapacityExhausted(fault),
+        ),
+        IssuerTerminalFaultV1::Integrity(fault) => (
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+            ken_host::TerminalErrorV1::SelectedCallIntegrity(fault),
+        ),
+    };
+    let trace = ken_host::LinkedEffectTrace {
+        plan_hash: 0,
+        target_abi_hash: ken_host::TARGET_ABI_MANIFEST_HASH,
+        host_effect_abi_hash: ken_host::HOST_EFFECT_ABI_V1_HASH,
+        terminal_value: status,
+        terminal_error: Some(terminal),
+        effect_trace: Vec::new(),
+        terminal_exit: ken_host::TerminalExitClass::ControlledTrap,
+    };
+    let Ok(bytes) = ken_host::encode_linked_effect_trace(&trace) else {
+        return KEN_ACTIVATION_ERR_EXPORT;
+    };
+    if std::io::stderr().write_all(&bytes).is_err() {
+        return KEN_ACTIVATION_ERR_EXPORT;
+    }
+    KEN_ACTIVATION_OK
 }
 
 /// Open a store and reserve/publish its persistent image from the authorized
@@ -498,12 +716,17 @@ pub unsafe extern "C" fn ken_activation_v1_destroy(activation: *mut KenActivatio
 /// ⭐ `D1`'s own warning is that a `crate-type` line is a **build-system**
 /// claim and not a **link** one. ⇒ The archive is checked against *this* list.
 /// ⛔ Pinned as the exact permitted set, so an addition reddens too.
-pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 11] = [
+pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 16] = [
     "ken_boundary_store_v1_open",
     "ken_boundary_store_v1_destroy",
     "ken_activation_v1_begin",
     "ken_activation_v1_finish_capacity_failure",
     "ken_activation_v1_write_starter_capacity_failure",
+    "ken_selected_call_v1_issue",
+    "ken_selected_call_v1_consume",
+    "ken_activation_v1_take_selected_call_failure",
+    "ken_activation_v1_finish_selected_call_failure",
+    "ken_activation_v1_write_starter_selected_call_failure",
     "ken_activation_v1_services",
     "ken_activation_v1_bind_process_frame",
     "ken_activation_v1_native_frame",
@@ -565,6 +788,107 @@ mod tests {
         assert_eq!(fault.requested, u128::from(u64::MAX));
         assert_eq!(unsafe { ken_activation_v1_write_starter_capacity_failure(failure) }, KEN_ACTIVATION_OK);
         assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
+    }
+
+    /// Durable one-use ABI control on the very issue/consume helpers emitted by
+    /// Cranelift. Each negative uses a live activation; statuses are paired to
+    /// the owner's typed fault, never interpreted from a bare root token.
+    #[test]
+    fn selected_call_checked_services_gate_rejects_capacity_and_integrity() {
+        let mut profile = c_profile();
+        profile.call_event_generations = 2;
+        profile.call_live_pending_slots = 1;
+        let mut store = std::ptr::null_mut();
+        let mut before = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store, &mut before) }, 0);
+        let mut begin = || {
+            let mut activation = std::ptr::null_mut();
+            let mut fault = std::ptr::null_mut();
+            assert_eq!(unsafe { ken_activation_v1_begin(store, &mut activation, &mut fault) }, 0);
+            let mut services = std::ptr::null();
+            assert_eq!(unsafe { ken_activation_v1_services(activation, &mut services) }, 0);
+            (activation, services.cast::<GeneratedActivationServicesV1>())
+        };
+        let (a, services_a) = begin();
+        let mut first = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, first.as_mut_ptr()) }, 0);
+        let first = unsafe { first.assume_init() };
+        let mut untouched = first;
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, &mut untouched) },
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1);
+        assert_eq!(untouched, first, "no half ticket may be written on refusal");
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Capacity(
+            ken_host::CapacityExhaustedV1 {
+                scope: ken_host::CapacityScopeV1::Invocation,
+                resource: ken_host::CapacityResourceV1::LivePendingSlots,
+                limit: 1, requested: 2,
+            }
+        ));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (a, services_a) = begin();
+        let mut first = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, first.as_mut_ptr()) }, 0);
+        let first = unsafe { first.assume_init() };
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 30) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::WrongTarget));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (a, services_a) = begin();
+        let mut first = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, first.as_mut_ptr()) }, 0);
+        let first = unsafe { first.assume_init() };
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 29) }, 0);
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &first, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::Spent));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (a, services_a) = begin();
+        let mut old = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, old.as_mut_ptr()) }, 0);
+        let old = unsafe { old.assume_init() };
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &old, 17, 29) }, 0);
+        let mut next = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_a, 17, 29, next.as_mut_ptr()) }, 0);
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_a, &old, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(a, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::StaleGeneration));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(a) }, 0);
+
+        let (b, services_b) = begin();
+        let mut next = std::mem::MaybeUninit::<SelectedCallTicketV1>::uninit();
+        assert_eq!(unsafe { ken_selected_call_v1_issue(services_b, 17, 29, next.as_mut_ptr()) }, 0);
+        assert_eq!(unsafe { ken_selected_call_v1_consume(services_b, &old, 17, 29) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        let mut fault = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_activation_v1_take_selected_call_failure(b, &mut fault) },
+            ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+        assert_eq!(unsafe { (*fault).fault }, IssuerTerminalFaultV1::Integrity(
+            ken_host::SelectedCallIntegrityFaultV1::WrongActivation));
+        drop(unsafe { Box::from_raw(fault) });
+        assert_eq!(unsafe { ken_activation_v1_destroy(b) }, 0);
+        assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, 0);
     }
 
     /// ⭐ **The whole C lifecycle, driven exactly as the stub will drive it**,

@@ -842,7 +842,7 @@ fn native_build_subcommand_reaches_the_same_public_producer() {
     let profile_path = dir.join("resource-profile.json");
     std::fs::write(&source_path, PURE_PROGRAM).unwrap();
     std::fs::write(&profile_path,
-        r#"{"runtime":{"invocation_epochs":18446744073709551615},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#,
+        r#"{"runtime":{"invocation_epochs":18446744073709551615},"call_events":{"event_generations":18446744073709551615,"live_pending_slots":64},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#,
     ).unwrap();
     let built = Command::new(env!("CARGO_BIN_EXE_ken"))
         .arg("native-build")

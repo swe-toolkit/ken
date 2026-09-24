@@ -1162,6 +1162,33 @@ pub unsafe fn ken_host_invocation_v1_finish_with_capacity(
     0
 }
 
+/// An activation-owned selected-call consuming gate rejected an exact ticket.
+/// A numeric status alone cannot authorize this typed terminal projection.
+///
+/// # Safety
+/// `context` is the unique live host observation context, consumed once.
+pub unsafe fn ken_host_invocation_v1_finish_with_integrity(
+    context: *mut c_void,
+    fault: crate::SelectedCallIntegrityFaultV1,
+) -> i64 {
+    if context.is_null() || !context.cast::<ProcessContext>().is_aligned() {
+        return -1;
+    }
+    let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
+    context.finalize_resources();
+    if let Some(mut sink) = context.observation.take() {
+        if write_observation_with_terminal(
+            &mut sink,
+            &context,
+            crate::SELECTED_CALL_INTEGRITY_STATUS_V1,
+            Some(crate::TerminalErrorV1::SelectedCallIntegrity(fault)),
+        ).is_err() {
+            return -1;
+        }
+    }
+    0
+}
+
 impl ProcessContext {
     fn finalize_resources(&mut self) {
         let settlements = {

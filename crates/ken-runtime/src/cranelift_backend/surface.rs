@@ -114,6 +114,7 @@ pub struct NativeArtifactIdentity {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NativeDifferentialVerdict {
     CapacityExhausted(ken_host::CapacityExhaustedV1),
+    SelectedCallIntegrity(ken_host::SelectedCallIntegrityFaultV1),
     F1InterpreterAgreement {
         stage: NativeDifferentialStage,
     },
@@ -136,6 +137,7 @@ pub enum NativeDifferentialVerdict {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NativeRuntimeIrComparisonVerdict {
     CapacityExhausted(ken_host::CapacityExhaustedV1),
+    SelectedCallIntegrity(ken_host::SelectedCallIntegrityFaultV1),
     RuntimeIrNativeAgreement {
         stage: NativeDifferentialStage,
     },
@@ -176,6 +178,7 @@ pub enum CraneliftBackendError {
     Unsupported(UnsupportedLowering),
     Backend(BackendFailure),
     CapacityExhausted(ken_host::CapacityExhaustedV1),
+    SelectedCallIntegrity(ken_host::SelectedCallIntegrityFaultV1),
     ProfileMismatch(crate::boundary_activation::InvocationEpochProfileMismatchV2),
 }
 
@@ -227,6 +230,9 @@ impl fmt::Display for CraneliftBackendError {
             CraneliftBackendError::Backend(err) => write!(f, "Cranelift backend failure: {err}"),
             CraneliftBackendError::CapacityExhausted(fault) => {
                 write!(f, "runtime capacity exhausted: {fault:?}")
+            }
+            CraneliftBackendError::SelectedCallIntegrity(fault) => {
+                write!(f, "selected call ticket integrity fault: {fault:?}")
             }
             CraneliftBackendError::ProfileMismatch(mismatch) => {
                 write!(f, "process epoch profile mismatch: {mismatch:?}")

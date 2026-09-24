@@ -4117,6 +4117,19 @@ pub struct RuntimeTrapProvenanceV1 {
 /// capacity refusal. The observer must reject this status without its exact
 /// typed terminal record, and must reject that record with any other status.
 pub const CAPACITY_EXHAUSTED_STATUS_V1: i64 = -7;
+/// Reserved generated-root status for an owner-recorded call-ticket integrity
+/// fault. This is not a planner trap or a capacity refusal.
+pub const SELECTED_CALL_INTEGRITY_STATUS_V1: i64 = -8;
+
+/// Failed one-use authentication at the activation-owned consuming gate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SelectedCallIntegrityFaultV1 {
+    WrongActivation,
+    InvalidSlot,
+    StaleGeneration,
+    Spent,
+    WrongTarget,
+}
 
 /// Scope of a declared native-runtime capacity. Only advertised resources
 /// belong here; adding a resource must extend the linked-wire codec.
@@ -4168,6 +4181,7 @@ pub enum TerminalErrorV1 {
     OperationUnavailable(HostOpV1),
     RuntimeTrap(RuntimeTrapProvenanceV1),
     CapacityExhausted(CapacityExhaustedV1),
+    SelectedCallIntegrity(SelectedCallIntegrityFaultV1),
     DriverFailure,
     RootExecutionDenied,
     HomeRootResolutionFailed(crate::HomeRootResolutionFailureV1),

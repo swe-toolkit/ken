@@ -79,6 +79,8 @@ use source::{SourceCarriedControlMutation, SourceContinuationTerminal, with_sour
 // inside any of them, matching how the earlier emitter/vocabulary slices
 // left their hub types here and moved only the mutating methods.
 pub(in crate::cranelift_backend) mod calls;
+#[cfg(test)]
+pub(crate) use calls::{with_selected_ticket_gate_mutation, SelectedTicketGateMutation};
 
 // The test-glob chain (`core.rs`'s `use super::*`, then `core/tests/mod.rs`'s
 // own `use super::*`) re-exports these downward to `core/tests/control.rs`,
@@ -910,6 +912,8 @@ impl OwnedSourceOccurrence {
 struct ArtifactHelpers<'h> {
     seed_material: &'h seed_material::SeedMaterial,
     host_dispatch: Option<FuncId>,
+    selected_call_issue: FuncId,
+    selected_call_consume: FuncId,
     native_int: &'h crate::native_int_clif::NativeIntLocalFuncs,
     boundary_value_abi: &'h crate::boundary_value_clif::BoundaryLocalFuncs,
 }
@@ -935,6 +939,8 @@ impl ArtifactHelpers<'_> {
             host_dispatch: self
                 .host_dispatch
                 .map(|id| module.declare_func_in_func(id, func)),
+            selected_call_issue: Some(module.declare_func_in_func(self.selected_call_issue, func)),
+            selected_call_consume: Some(module.declare_func_in_func(self.selected_call_consume, func)),
             // ⛔ Dataflow results, not identities: `None` here is correct, and
             // each function derives its own from its entry block.
             host_dispatch_context: None,
@@ -1120,6 +1126,9 @@ struct FunctionLocalRefs {
     /// `D3` removes).
     seed_material: seed_material::SeedMaterialRefs,
     host_dispatch: Option<FuncRef>,
+    /// Checked imported FFI helpers, resolved per generated function.
+    selected_call_issue: Option<FuncRef>,
+    selected_call_consume: Option<FuncRef>,
     host_dispatch_context: Option<cranelift_codegen::ir::Value>,
     services_pointer: Option<cranelift_codegen::ir::Value>,
     native_int_arena: Option<cranelift_codegen::ir::Value>,
