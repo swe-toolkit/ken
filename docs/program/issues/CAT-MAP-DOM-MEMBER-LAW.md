@@ -1,7 +1,7 @@
 ---
 id: CAT-MAP-DOM-MEMBER-LAW
 title: "Proof-backfill for Data/Collections/Map.ken.md: prove privately that the public dom preserves membership exactly -- for every comparator leq, query x and raw tree m, set_member leq x (dom m) = member leq x m -- instead of only the selected size (dom r) counts"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect
