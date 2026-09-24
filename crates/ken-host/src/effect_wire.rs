@@ -551,6 +551,20 @@ fn put_error(out: &mut Vec<u8>, error: &SemanticErrorV1) -> Result<(), EffectTra
     Ok(())
 }
 
+fn capacity_scope_resource_is_valid(
+    scope: crate::CapacityScopeV1,
+    resource: crate::CapacityResourceV1,
+) -> bool {
+    use crate::{CapacityResourceV1 as Resource, CapacityScopeV1 as Scope};
+    match (scope, resource) {
+        (Scope::Runtime, Resource::InvocationEpochs)
+        | (Scope::Invocation, Resource::EventGenerations | Resource::LivePendingSlots)
+        | (Scope::Invocation | Scope::Persistent,
+            Resource::Nodes | Resource::Words | Resource::DataBytes | Resource::NativeIntLimbs) => true,
+        _ => false,
+    }
+}
+
 pub fn encode_linked_effect_trace(
     trace: &LinkedEffectTrace,
 ) -> Result<Vec<u8>, EffectTraceWireError> {
@@ -569,7 +583,8 @@ pub fn encode_linked_effect_trace(
         None => put_u8(&mut out, 0),
         Some(crate::TerminalErrorV1::RootExecutionDenied) => put_u8(&mut out, 1),
         Some(crate::TerminalErrorV1::CapacityExhausted(failure)) => {
-            if trace.terminal_value != crate::CAPACITY_EXHAUSTED_STATUS_V1
+            if !capacity_scope_resource_is_valid(failure.scope, failure.resource)
+                || trace.terminal_value != crate::CAPACITY_EXHAUSTED_STATUS_V1
                 || failure.requested <= failure.limit
             {
                 return Err(EffectTraceWireError);
@@ -579,12 +594,20 @@ pub fn encode_linked_effect_trace(
                 &mut out,
                 match failure.scope {
                     crate::CapacityScopeV1::Runtime => 0,
+                    crate::CapacityScopeV1::Invocation => 1,
+                    crate::CapacityScopeV1::Persistent => 2,
                 },
             );
             put_u8(
                 &mut out,
                 match failure.resource {
                     crate::CapacityResourceV1::InvocationEpochs => 0,
+                    crate::CapacityResourceV1::EventGenerations => 1,
+                    crate::CapacityResourceV1::LivePendingSlots => 2,
+                    crate::CapacityResourceV1::Nodes => 3,
+                    crate::CapacityResourceV1::Words => 4,
+                    crate::CapacityResourceV1::DataBytes => 5,
+                    crate::CapacityResourceV1::NativeIntLimbs => 6,
                 },
             );
             out.extend_from_slice(&failure.limit.to_le_bytes());
@@ -1135,12 +1158,23 @@ pub fn decode_linked_effect_trace(bytes: &[u8]) -> Result<LinkedEffectTrace, Eff
         3 => {
             let scope = match cursor.u8()? {
                 0 => crate::CapacityScopeV1::Runtime,
+                1 => crate::CapacityScopeV1::Invocation,
+                2 => crate::CapacityScopeV1::Persistent,
                 _ => return Err(EffectTraceWireError),
             };
             let resource = match cursor.u8()? {
                 0 => crate::CapacityResourceV1::InvocationEpochs,
+                1 => crate::CapacityResourceV1::EventGenerations,
+                2 => crate::CapacityResourceV1::LivePendingSlots,
+                3 => crate::CapacityResourceV1::Nodes,
+                4 => crate::CapacityResourceV1::Words,
+                5 => crate::CapacityResourceV1::DataBytes,
+                6 => crate::CapacityResourceV1::NativeIntLimbs,
                 _ => return Err(EffectTraceWireError),
             };
+            if !capacity_scope_resource_is_valid(scope, resource) {
+                return Err(EffectTraceWireError);
+            }
             let limit = u128::from_le_bytes(cursor.take(16)?.try_into().unwrap());
             let requested = u128::from_le_bytes(cursor.take(16)?.try_into().unwrap());
             if terminal_value != crate::CAPACITY_EXHAUSTED_STATUS_V1 || requested <= limit {

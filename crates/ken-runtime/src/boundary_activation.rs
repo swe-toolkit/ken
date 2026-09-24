@@ -119,8 +119,31 @@ use crate::boundary_resource_profile::{
 use crate::boundary_value::{
     ARENA_DATA_CAPACITY, ARENA_LIMB_CAPACITY, ARENA_NATIVE_INT, ARENA_NODE_CAPACITY,
     ARENA_PERSISTENT, ARENA_WORD_CAPACITY, BoundaryArenaBuilder, BoundaryArenaV1,
-    BoundaryValueStore, BoundaryWord,
+    BoundaryReservationFailureV1, BoundaryValueStore, BoundaryWord,
 };
+
+/// A store either rejects the first process epoch authority or refuses to
+/// publish its persistent backing. Both are pre-publication failures.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BoundaryStoreOpenErrorV2 {
+    ProfileMismatch(InvocationEpochProfileMismatchV2),
+    CapacityExhausted(ken_host::CapacityExhaustedV1),
+}
+
+fn region_reservation_fault(
+    scope: ken_host::CapacityScopeV1,
+    failure: BoundaryReservationFailureV1,
+) -> ken_host::CapacityExhaustedV1 {
+    let resource = match failure.resource {
+        BoundaryResource::Nodes => ken_host::CapacityResourceV1::Nodes,
+        BoundaryResource::Words => ken_host::CapacityResourceV1::Words,
+        BoundaryResource::DataBytes => ken_host::CapacityResourceV1::DataBytes,
+        BoundaryResource::NativeIntLimbs => ken_host::CapacityResourceV1::NativeIntLimbs,
+    };
+    ken_host::CapacityExhaustedV1 {
+        scope, resource, limit: failure.limit, requested: failure.requested,
+    }
+}
 use crate::native_int::NativeIntArenaV1;
 
 /// **One activation: the per-invocation arenas, the services record, and the
@@ -179,13 +202,16 @@ impl BoundaryStoreBindingV1 {
     pub fn open(
         store: &mut BoundaryValueStore,
         profile: BoundaryResourceProfileV2,
-    ) -> Result<Self, InvocationEpochProfileMismatchV2> {
+    ) -> Result<Self, BoundaryStoreOpenErrorV2> {
         // Admit before publication: a refused profile must not alter the store.
-        admit_epoch_ceiling(profile.runtime.invocation_epochs)?;
+        admit_epoch_ceiling(profile.runtime.invocation_epochs)
+            .map_err(BoundaryStoreOpenErrorV2::ProfileMismatch)?;
         // Routed through `as_reserve_arguments` so the named->positional
         // mapping is spelled once in the whole crate.
         let (nodes, words, data, limbs) = profile.persistent.as_reserve_arguments();
-        store.reserve_persistent(nodes, words, data, limbs);
+        store.reserve_persistent(nodes, words, data, limbs)
+            .map_err(|failure| BoundaryStoreOpenErrorV2::CapacityExhausted(
+                region_reservation_fault(ken_host::CapacityScopeV1::Persistent, failure)))?;
         let published_persistent_base = store.publish_persistent();
         Ok(BoundaryStoreBindingV1 {
             profile,
@@ -227,7 +253,9 @@ impl BoundaryActivationV1 {
         arena.bind_native_int(Some(native_base as *const u64));
         // 3 — reserve invocation storage from the AUTHORIZED invocation limits.
         let (nodes, words, data, limbs) = profile.invocation.as_reserve_arguments();
-        arena.reserve(nodes, words, data, limbs);
+        arena.reserve(nodes, words, data, limbs)
+            .map_err(|failure| region_reservation_fault(
+                ken_host::CapacityScopeV1::Invocation, failure))?;
         // Consume the process-wide epoch only after all storage has been
         // reserved and before publishing a services pointer or running code.
         let epoch = mint_invocation_epoch(profile.runtime.invocation_epochs)?;
@@ -622,6 +650,77 @@ mod tests {
         }
     }
 
+    fn refusal_from_real_reservation(
+        persistent: bool,
+        resource: BoundaryResource,
+        requested: usize,
+    ) -> ken_host::CapacityExhaustedV1 {
+        let mut profile = distinct_profile();
+        let limits = if persistent { &mut profile.persistent } else { &mut profile.invocation };
+        match resource {
+            BoundaryResource::Nodes => limits.nodes = requested,
+            BoundaryResource::Words => limits.words = requested,
+            BoundaryResource::DataBytes => limits.data_bytes = requested,
+            BoundaryResource::NativeIntLimbs => limits.native_int_limbs = requested,
+        }
+        let mut store = BoundaryValueStore::new();
+        if persistent {
+            match BoundaryStoreBindingV1::open(&mut store, profile).err().expect("open refuses") {
+                BoundaryStoreOpenErrorV2::CapacityExhausted(fault) => fault,
+                BoundaryStoreOpenErrorV2::ProfileMismatch(_) => panic!("wrong failure source"),
+            }
+        } else {
+            let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("open succeeds");
+            BoundaryActivationV1::begin(&binding).err().expect("begin refuses")
+        }
+    }
+
+    /// Durable capacity invariant. Both base-red paths at exact landed D1
+    /// e49cdc9b panicked at `(live_nodes + nodes) * NODE_WORDS` for each owner.
+    #[test]
+    fn unrepresentable_node_grants_do_not_panic_at_open_or_begin() {
+        let requested = usize::MAX / (crate::boundary_value::BOUNDARY_NODE_STRIDE as usize / 8) + 1;
+        let actual_limit = (isize::MAX as usize / 8)
+            / (crate::boundary_value::BOUNDARY_NODE_STRIDE as usize / 8);
+        for persistent in [false, true] {
+            let fault = refusal_from_real_reservation(persistent, BoundaryResource::Nodes, requested);
+            assert_eq!(fault.scope, if persistent { ken_host::CapacityScopeV1::Persistent } else { ken_host::CapacityScopeV1::Invocation });
+            assert_eq!(fault.resource, ken_host::CapacityResourceV1::Nodes);
+            assert_eq!(fault.limit, actual_limit as u128);
+            assert_eq!(fault.requested, requested as u128);
+        }
+    }
+
+    /// Durable capacity invariant. Both base-red paths at exact landed D1
+    /// e49cdc9b panicked at `Vec::resize` for the max child-word grant.
+    #[test]
+    fn max_word_grants_do_not_panic_at_open_or_begin() {
+        let actual_limit = isize::MAX as usize / 8;
+        for persistent in [false, true] {
+            let fault = refusal_from_real_reservation(persistent, BoundaryResource::Words, usize::MAX);
+            assert_eq!(fault.scope, if persistent { ken_host::CapacityScopeV1::Persistent } else { ken_host::CapacityScopeV1::Invocation });
+            assert_eq!(fault.resource, ken_host::CapacityResourceV1::Words);
+            assert_eq!(fault.limit, actual_limit as u128);
+            assert_eq!(fault.requested, usize::MAX as u128);
+        }
+    }
+
+    /// Independent positive baseline: a materially larger but reservable
+    /// deployment profile must remain usable at both real publication owners.
+    #[test]
+    fn reservable_large_grants_publish_at_open_and_begin() {
+        let mut profile = distinct_profile();
+        profile.invocation.nodes = 4_096;
+        profile.invocation.words = 8_192;
+        profile.persistent.nodes = 4_096;
+        profile.persistent.words = 8_192;
+        let mut store = BoundaryValueStore::new();
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("large open");
+        let activation = BoundaryActivationV1::begin(&binding).expect("large begin");
+        assert!(activation.is_published());
+        assert_eq!(activation.published_capacities().unwrap().0, 4_096);
+    }
+
     #[test]
     fn one_past_max_epoch_has_an_exact_nonwrapping_request() {
         assert_eq!(requested_epoch_after(u64::MAX), u128::from(u64::MAX) + 1);
@@ -739,7 +838,7 @@ mod tests {
         let mut next_store = BoundaryValueStore::new();
         assert_eq!(
             BoundaryStoreBindingV1::open(&mut next_store, profile).err(),
-            Some(InvocationEpochProfileMismatchV2 { authorized: 1, attempted: 2 })
+            Some(BoundaryStoreOpenErrorV2::ProfileMismatch(InvocationEpochProfileMismatchV2 { authorized: 1, attempted: 2 }))
         );
         assert_eq!(next_store.image().0.node_capacity(), 0, "mismatch published storage");
         assert_eq!(BoundaryActivationV1::begin(&binding).err().unwrap().requested, 2);
@@ -768,7 +867,7 @@ mod tests {
         profile.runtime.invocation_epochs = 5;
         let mut later = BoundaryValueStore::new();
         assert_eq!(BoundaryStoreBindingV1::open(&mut later, profile).err(),
-            Some(InvocationEpochProfileMismatchV2 { authorized: 0, attempted: 5 }));
+            Some(BoundaryStoreOpenErrorV2::ProfileMismatch(InvocationEpochProfileMismatchV2 { authorized: 0, attempted: 5 })));
     }
 
     #[test]
