@@ -131,6 +131,27 @@ The chain is at HS2. A third advancing hard stop invokes Research.
   - AC-2's production-site falsifiers are unchanged. With the adapter
     untouched, each must redden the bridge or the attached law at its own
     obligation.
+- **AC-1b (existing String certificate; Steward scope ruling after
+  Architect `evt_7p6se2kgws237`).** The first bridge probe failed because
+  production and the adapter each spell the diagnostic codes
+  (`"missing-option-value"`, `"unknown-option"`,
+  `"unexpected-positional"`) as separate raw String literals. K3 makes
+  their Char views convertible, not the raw Strings.
+  - One bounded retry of the **same** adapter's full-`Validation` bridge
+    may use the existing public
+    `Data.Text.StringBijection.string_to_list_char_injective` with the
+    existing `J`/`cong` transport. The certificate rests on the existing
+    TCB contract `string_to_list_char_retraction`. The stop condition
+    already permits existing String contracts; this bullet makes the
+    dependency explicit.
+  - Accounting: report the roots-loaded ArgParse `trusted_base()` at base
+    and at candidate. The two must be equal: ArgParse already loads that
+    axiom through Derived. The handback names each law that depends on
+    the axiom.
+  - Not allowed: hoisting the codes into production constants, weakening
+    the bridge to less than the full `Validation`, or adding a second
+    adapter. If this retry does not check, STOP for an explicit
+    contract or scope ruling.
 - **AC-2 (falsifier).** For each deliverable, the handback names one
   one-line natural-site mutation that makes that law's proof fail to check
   for its own property. For laws 1 and 2 the site is

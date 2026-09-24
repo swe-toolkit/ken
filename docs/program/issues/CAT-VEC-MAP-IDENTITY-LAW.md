@@ -1,7 +1,7 @@
 ---
 id: CAT-VEC-MAP-IDENTITY-LAW
 title: "Proof-backfill for Data/Vector/Vector.ken.md: prove privately that map with the identity function returns its input -- for every a, n and xs : Vec a n, map a a n (idf a) xs = xs, using the existing public identity function idf -- with a test that pins the law's checked proposition, not only its name and trust"
-status: active
+status: merged
 owner: foundation
 size: S
 gate: architect
