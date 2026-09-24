@@ -4157,6 +4157,120 @@ mod namespace_effect_tests {
         }
     }
 
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3).
+    ///
+    /// MEASURED: a later A.N never becomes available at P's import, whether
+    /// C loaded file N first, A was the entry, or C loads N after A. CLAIMED:
+    /// dependency pre-scan, textual resolution and caller order agree at the
+    /// exact import site. THE GAP: the distinct bodies and IDs below rule out
+    /// a passing error caused by a missing or interchangeable N provider.
+    #[test]
+    fn later_same_unit_sibling_rejects_regardless_of_file_import_order() {
+        const A: &str = "module P { import N\npub const premature : Nat = N.x }\n\
+                         module N { pub const x : Nat = Zero }\n";
+        let root = inline_owner_root(A);
+        fs::write(
+            root.path().join("N.ken"),
+            "pub const x : Nat = Suc (Suc Zero)\n",
+        )
+        .expect("write distinct file-backed N");
+        fs::write(
+            root.path().join("C1.ken"),
+            "import N\nimport A\npub const ready : Nat = Zero\n",
+        )
+        .expect("write file-first caller");
+        fs::write(
+            root.path().join("C2.ken"),
+            "import A\nimport N\npub const ready : Nat = Zero\n",
+        )
+        .expect("write file-last caller");
+        let roots = [root.path().to_path_buf()];
+        let mut results = Vec::new();
+        for entry in ["C1", "A", "C2"] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let result = env.elaborate_module_from_roots(&roots, entry);
+            let file_id = env.globals.get("N.x").copied();
+            let inline_id = env.globals.get("A.N.x").copied();
+            let body_id = env.globals.get("A.P.premature").and_then(|id| {
+                let (_, body) = env.env.transparent_body(*id)?;
+                match body {
+                    ken_kernel::Term::Const { id, .. } => Some(id),
+                    other => panic!("premature body must reference N.x: {other:?}"),
+                }
+            });
+            eprintln!(
+                "load-order probe: entry={entry} result={result:?} \
+                 file={file_id:?} inline={inline_id:?} body={body_id:?}"
+            );
+            results.push((entry, result, file_id, inline_id, body_id));
+        }
+        for (entry, result, file_id, inline_id, body_id) in results {
+            if entry == "C1" && result.is_ok() {
+                assert_eq!(body_id, file_id, "C1 must use file N, not inline A.N");
+                assert_ne!(file_id, inline_id, "distinct provider identities");
+            }
+            match result {
+                Err(ElabError::UnboundName { name, span }) => {
+                    assert_eq!(name, "N", "entry {entry} must reject at import N");
+                    assert_eq!(span.start, A.find("import N").unwrap());
+                }
+                other => panic!("entry {entry} must reject later A.N at import: {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3 per-unit closure).
+    ///
+    /// MEASURED: an external A.N.decoy was checked before loading A.ken, but
+    /// neither that edge nor a cold run makes A.P's premature import valid.
+    /// CLAIMED: an ordered edge must originate in this file unit, not merely
+    /// exist globally or appear in the unit's all-declarations pre-scan.
+    /// THE GAP: the preloaded run records its actual external GlobalId and
+    /// body, distinguishing a wrong provider from an unrelated late failure.
+    #[test]
+    fn external_inline_edge_cannot_predeclare_later_same_unit_sibling() {
+        const A: &str = "module P { import N\npub const bound : Nat = N.decoy }\n\
+                         module N { pub const x : Nat = Zero }\n";
+        let root = inline_owner_root(A);
+        let roots = [root.path().to_path_buf()];
+        let mut results = Vec::new();
+        for preload_inline in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if preload_inline {
+                env.elaborate_file(
+                    "module A { module N { pub const decoy : Nat = Suc Zero } }",
+                )
+                .expect("independent inline A.N.decoy");
+            }
+            let external_id = env.globals.get("A.N.decoy").copied();
+            let result = env.elaborate_module_from_roots(&roots, "A");
+            let body_id = env.globals.get("A.P.bound").and_then(|id| {
+                let (_, body) = env.env.transparent_body(*id)?;
+                match body {
+                    ken_kernel::Term::Const { id, .. } => Some(id),
+                    other => panic!("bound body must reference decoy: {other:?}"),
+                }
+            });
+            eprintln!(
+                "external-edge probe: preload={preload_inline} \
+                 result={result:?} external={external_id:?} body={body_id:?}"
+            );
+            results.push((preload_inline, result, external_id, body_id));
+        }
+        for (preload_inline, result, external_id, body_id) in results {
+            if preload_inline && result.is_ok() {
+                assert_eq!(body_id, external_id, "base must bind the external decoy");
+            }
+            match result {
+                Err(ElabError::UnboundName { name, span }) => {
+                    assert_eq!(name, "N", "preload {preload_inline} must reject at import");
+                    assert_eq!(span.start, A.find("import N").unwrap());
+                }
+                other => panic!("preload {preload_inline} must reject later A.N: {other:?}"),
+            }
+        }
+    }
+
     /// Promise class: durable invariant (spec 33 §3.3 per-unit closure).
     ///
     /// MEASURED: two unimported spellings in inline sibling P reject even
