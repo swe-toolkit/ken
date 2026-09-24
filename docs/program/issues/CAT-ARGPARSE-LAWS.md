@@ -91,8 +91,17 @@ that one edit.
 2. After K3: the theorem's own match on a neutral `argparse_find_option`
    did not refine the parser's own eliminator. This is the same
    proof-access predicate.
+3. After K3, AC-1c and the checked full bridge (`acbebbfa9`): the proof's
+   match on `option_mode spec` in `argparse_cons_view_bytes` built a motive
+   that does not abstract `option_mode spec` in the goal, so the
+   `FlagOption` arm's goal stays neutral. Keyed on a proof-side match over a
+   computed scrutinee that is not a variable (Architect `evt_8dr2qm391x53`).
 
-The chain is at HS2. A third advancing hard stop invokes Research.
+All three share one predicate: the proof case-splits on a computed scrutinee
+that is not a bound variable, and the goal mentions it only through
+δ-unfolding or a different spelling. The chain is at **HS3** (Architect
+`evt_8dr2qm391x53`). Research advises in-thread before the Architect's
+mechanism ruling; the WIP stays parked. The next re-trigger is the 6th.
 
 ## Acceptance criteria
 
@@ -179,8 +188,7 @@ The chain is at HS2. A third advancing hard stop invokes Research.
 - If the generic full-`Validation` bridge does not check with `Refl` or
   existing transport over the AC-1c constants, STOP. Do not add a second
   adapter, edit the parser beyond AC-1c, or edit the elaborator. The chain
-  is at HS2 (symptom inventory above); a third advancing hard stop invokes
-  Research.
+  is at HS3 (symptom inventory above).
 
 - If a law needs a fact about primitive `Bytes` or `String` that no existing
   TCB contract states, prove everything else and STOP on that fact. Do not
