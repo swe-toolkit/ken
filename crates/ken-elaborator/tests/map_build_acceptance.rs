@@ -1485,19 +1485,20 @@ fn cat4_union_intersection_difference_execute_over_nat_body() {
 /// bindings must not enlarge `expand_scope`'s long-lived legacy frame. The
 /// union application below is the smallest existing Map acceptance arm that
 /// crossed the CI worker's stack limit when prebinding temporaries lived in
-/// that recursive frame.
+/// that recursive frame. The same end-to-end pin also caught checked-ID
+/// carrier growth in the expression inferencer's application recursion.
 ///
-/// Promise class: durable invariant. Intended local-scope extensions remain
-/// green while any change that restores the enlarged legacy frame goes red at
-/// the stated stack.
+/// Promise class: durable invariant. Scope extensions must preserve the
+/// stated end-to-end stack budget; the original inline-parent mutation
+/// reddened this control at that same budget.
 ///
 /// **MEASURED:** this legacy Map workload elaborates and evaluates on the
 /// explicit [`D1_LEGACY_MAP_STACK_BYTES`] thread stack.
-/// **CLAIMED:** mode-independent local declaration prebinding stays in the
-/// persistent scope and does not consume the repaired legacy frame budget.
-/// **THE GAP:** the workload must reach the affected `expand_scope` recursion;
-/// the exact inline-parent mutation closes that gap by making this test abort
-/// with SIGABRT while the candidate remains green.
+/// **CLAIMED:** the elaboration path, including local prebinding and nested
+/// expression inference, stays within its explicit thread-stack budget.
+/// **THE GAP:** a stack red alone does not attribute the frame that grew;
+/// the original inline-parent mutation reaches `expand_scope`, while the
+/// checked-ID carrier A/B isolates a separate `infer` frame regression.
 #[test]
 fn local_prebinding_preserves_legacy_map_union_stack_budget() {
     std::thread::Builder::new()

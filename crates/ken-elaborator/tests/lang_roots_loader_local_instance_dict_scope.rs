@@ -106,6 +106,87 @@ fn strict_same_unit_instance_and_derive_names_select_the_synthesized_canonicals(
     assert_eq!(env.env.trusted_base(), trust_before);
 }
 
+/// Promise class: durable invariant (spec 33 §3.3).
+///
+/// MEASURED: a strict file unit declares an inline class owner, imports its
+/// public C only after expansion, synthesizes an instance, and two theorems
+/// select the exact canonical dictionary through the imported C and the
+/// Entry.Classes.C owner path.
+/// CLAIMED: synthesis replay honors that unit's ordered inline provenance.
+/// THE GAP: later same-unit children must remain unavailable at their import;
+/// the module-order negative controls exercise that direction independently.
+#[test]
+fn earlier_inline_class_import_replay_binds_the_exact_instance_dictionary() {
+    let root = FixtureRoot::new("inline-class-replay");
+    root.write(
+        "Entry.ken",
+        "module Classes { pub class C a {} } \
+         import Classes (C) \
+         instance C Nat {} \
+         theorem selected : C Nat = C_instance_Nat \
+         theorem owner_selected : Entry.Classes.C Nat = C_instance_Nat",
+    );
+
+    let mut env = ElabEnv::new().expect("base environment");
+    let trust_before = env.env.trusted_base();
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .expect("earlier inline owner and replayed import must bind its dictionary alias");
+    // The inline owner is Entry.Classes; classes themselves currently retain
+    // their unqualified compiler identity C (as in the file-backed controls).
+    let class = env.globals["C"];
+    let canonical = env.globals["C_instance_Nat"];
+    let (_, dictionary_type) = env
+        .env
+        .const_type(canonical)
+        .expect("checked dictionary type");
+    assert!(term_mentions_global(&dictionary_type, class));
+    assert_is_exact_const(&transparent_body(&env, "Entry.selected"), canonical);
+    assert_is_exact_const(&transparent_body(&env, "Entry.owner_selected"), canonical);
+    assert_eq!(env.env.trusted_base(), trust_before);
+}
+
+/// Promise class: durable invariant (spec 33 §3.3).
+///
+/// MEASURED: a later same-unit inline class cannot be imported at an earlier
+/// position, cold or after an independent Classes.ken was loaded. The refusal
+/// is at that import, before an instance or its dictionary could be built.
+/// CLAIMED: replay never fabricates future availability or borrows an ambient
+/// provider. THE GAP: the earlier-inline positive above proves the valid
+/// ordered edge remains importable rather than rejecting every such import.
+#[test]
+fn later_inline_class_import_refuses_an_external_file_provider() {
+    let root = FixtureRoot::new("later-inline-class");
+    root.write("Classes.ken", "pub class C a {}");
+    root.write(
+        "Entry.ken",
+        "import Classes (C) \
+         module Classes { pub class C a {} } \
+         instance C Nat {} \
+         theorem selected : C Nat = C_instance_Nat",
+    );
+    for preload in [false, true] {
+        let mut env = ElabEnv::new().expect("base environment");
+        let trust_before = env.env.trusted_base();
+        if preload {
+            env.elaborate_module_from_roots_strict(&[root.0.clone()], "Classes")
+                .expect("independent file-backed class is checked");
+        }
+        let error = env
+            .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+            .expect_err("later inline owner must not inherit external availability");
+        match error {
+            ElabError::UnboundName { name, span } => {
+                assert_eq!(name, "Classes", "preload={preload}");
+                assert_eq!((span.start, span.end), (0, "import Classes (C)".len()));
+            }
+            other => panic!("preload={preload}: expected import refusal, got {other:?}"),
+        }
+        assert!(!env.globals.contains_key("Entry.selected"));
+        assert!(!env.globals.contains_key("C_instance_Nat"));
+        assert_eq!(env.env.trusted_base(), trust_before);
+    }
+}
+
 #[test]
 fn legacy_roots_same_unit_alias_selects_the_same_synthesis_identity() {
     let root = FixtureRoot::new("legacy-same-unit");

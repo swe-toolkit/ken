@@ -72,8 +72,9 @@ pub struct ClassView<'a> {
 }
 
 impl ClassInfo {
-    fn into_named_field(self) -> NamedFieldInfo {
+    fn into_named_field(self, owner_name: String) -> NamedFieldInfo {
         NamedFieldInfo {
+            owner_name,
             projection: ProjectionInfo {
                 type_id: self.type_id,
                 head_param: self.param,
@@ -138,8 +139,18 @@ enum NamedFieldKind {
 
 /// The sole private registry entry for every named-field owner.
 struct NamedFieldInfo {
+    owner_name: String,
     projection: ProjectionInfo,
     kind: NamedFieldKind,
+}
+
+/// A constructor-headed instance is keyed on the actual checked head. Other
+/// shapes never borrow an invented `GlobalId` from a spelling.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum InstanceHeadKey {
+    Global(GlobalId),
+    Parameter(String),
+    Structural(Term),
 }
 
 /// Per-instance metadata.
@@ -149,6 +160,8 @@ pub(crate) struct InstanceInfo {
     pub instance_id: GlobalId,
     /// Class this instance inhabits. Used only by surface projection purity.
     pub class_name: String,
+    /// The checked class declaration selected when the instance was admitted.
+    pub class_id: GlobalId,
     /// Inferred effect row for each instance field, in class-field order.
     pub field_effect_rows: Vec<crate::effects::RowType>,
     /// Module where this instance was declared (for orphan check).
@@ -182,6 +195,7 @@ pub struct InstanceResolution {
 #[derive(Clone)]
 pub(crate) struct InstanceConstraintInfo {
     pub class_name: String,
+    pub class_id: GlobalId,
     /// Surface-resolved shape, used to select the recursively required head.
     pub head_type: RType,
     /// Kernel type in the instance-head parameter context, used to close the
@@ -192,14 +206,15 @@ pub(crate) struct InstanceConstraintInfo {
 /// The typeclass environment: class registry, canonical instance registry,
 /// structural postulate IDs, and per-module tracking for the orphan check.
 pub struct ClassEnv {
-    named_field_owners: HashMap<String, NamedFieldInfo>,
-    /// Canonical instances: `(class_name, head_type_name)` → `InstanceInfo`.
-    /// For property classes this may hold multiple under different keys, but
-    /// only one per `(class, head)` pair (property instances on the same head
-    /// are accepted by Ω-PI, so no duplicate-key registration occurs — each
-    /// instance is still a distinct value; the property check just waives the
-    /// overlap error at the *second* registration).
+    /// Every admitted class and record survives subsequent name occupancy.
+    named_field_owners: HashMap<GlobalId, NamedFieldInfo>,
+    current_names: HashMap<String, GlobalId>,
+    /// Current spelling view retained for legacy callers and diagnostics.
+    /// It is not the selection or overlap index: a later same-spelling owner
+    /// can replace this view without removing either admitted checked entry.
     pub(crate) instances: HashMap<(String, String), InstanceInfo>,
+    /// Authoritative selection key; the spelling map is an inspection view.
+    pub(crate) instances_by_id: HashMap<(GlobalId, InstanceHeadKey), InstanceInfo>,
     /// `RecordNil : Omega 0` — the Σ-chain prop terminator.
     pub record_nil_id: GlobalId,
     /// `record_nil_val : RecordNil` — the unique inhabitant.
@@ -230,36 +245,39 @@ impl ClassEnv {
     /// borrowed view.
     pub fn class_entries(&self) -> impl Iterator<Item = ClassView<'_>> + '_ {
         self.named_field_owners
-            .iter()
-            .filter_map(|(owner_name, info)| match &info.kind {
+            .values()
+            .filter_map(|info| match &info.kind {
                 NamedFieldKind::Class(class_info) => {
-                    Some(class_info.view(info.projection.view(owner_name)))
+                    Some(class_info.view(info.projection.view(&info.owner_name)))
                 }
                 NamedFieldKind::Record => None,
             })
     }
 
     pub fn class(&self, name: &str) -> Option<ClassView<'_>> {
-        let (owner_name, info) = self.named_field_owners.get_key_value(name)?;
+        self.class_by_id(*self.current_names.get(name)?)
+    }
+
+    pub fn class_by_id(&self, id: GlobalId) -> Option<ClassView<'_>> {
+        let info = self.named_field_owners.get(&id)?;
         match &info.kind {
             NamedFieldKind::Class(class_info) => {
-                Some(class_info.view(info.projection.view(owner_name)))
+                Some(class_info.view(info.projection.view(&info.owner_name)))
             }
             NamedFieldKind::Record => None,
         }
     }
 
     pub fn projection_by_type_id(&self, id: GlobalId) -> Option<ProjectionView<'_>> {
-        self.named_field_owners
-            .iter()
-            .find_map(|(owner_name, info)| {
-                (info.projection.type_id == id).then(|| info.projection.view(owner_name))
-            })
+        let info = self.named_field_owners.get(&id)?;
+        Some(info.projection.view(&info.owner_name))
     }
 
     pub fn register_class(&mut self, name: String, info: ClassInfo) {
+        let id = info.type_id;
         self.named_field_owners
-            .insert(name, info.into_named_field());
+            .insert(id, info.into_named_field(name.clone()));
+        self.current_names.insert(name, id);
     }
 
     pub(crate) fn register_record(
@@ -269,9 +287,11 @@ impl ClassEnv {
         field_names: Vec<String>,
         field_types: Vec<Term>,
     ) {
+        self.current_names.insert(name.clone(), type_id);
         self.named_field_owners.insert(
-            name,
+            type_id,
             NamedFieldInfo {
+                owner_name: name,
                 projection: ProjectionInfo {
                     type_id,
                     head_param: None,
@@ -285,7 +305,9 @@ impl ClassEnv {
     pub fn initialized(record_nil_id: GlobalId, record_nil_val_id: GlobalId) -> Self {
         Self {
             named_field_owners: HashMap::new(),
+            current_names: HashMap::new(),
             instances: HashMap::new(),
+            instances_by_id: HashMap::new(),
             record_nil_id,
             record_nil_val_id,
             current_module: 0,
@@ -305,7 +327,9 @@ impl ClassEnv {
     pub fn sentinel() -> Self {
         ClassEnv {
             named_field_owners: HashMap::new(),
+            current_names: HashMap::new(),
             instances: HashMap::new(),
+            instances_by_id: HashMap::new(),
             record_nil_id: GlobalId(0),
             record_nil_val_id: GlobalId(0),
             current_module: 0,
@@ -323,7 +347,7 @@ impl ClassEnv {
         self.current_module += 1;
     }
 
-    /// Look up the canonical instance for `(class_name, head_type_name)`.
+    /// Legacy spelling inspection. Imported selection uses `instances_by_id`.
     pub fn instance_search(&self, class_name: &str, head_name: &str) -> Option<GlobalId> {
         self.instances
             .get(&(class_name.to_string(), head_name.to_string()))

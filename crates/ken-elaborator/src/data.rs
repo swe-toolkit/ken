@@ -679,6 +679,15 @@ fn rtype_to_kernel_checked(
     ctor_id_set: &HashSet<GlobalId>,
 ) -> Result<Term, ElabError> {
     match rty {
+        RType::RCheckedGlobal { id, .. } => {
+            if ind_id_set.contains(id) {
+                Ok(Term::IndFormer { id: *id, level_args: vec![] })
+            } else if ctor_id_set.contains(id) {
+                Ok(Term::Constructor { id: *id, level_args: vec![] })
+            } else {
+                Ok(Term::const_(*id, vec![]))
+            }
+        }
         RType::RCon(name, span) => {
             if name == "Omega" {
                 Ok(Term::omega(Level::Zero))

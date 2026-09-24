@@ -158,11 +158,12 @@ fn ac3_overlap_check_first_ok_second_errors() {
     // second declaration path.
     // Insert a fake instance for (Eq2, Int).
     use ken_kernel::GlobalId;
-    env4.class_env.instances.insert(
-        ("Eq2".to_string(), "Int".to_string()),
-        ken_elaborator::classes::InstanceInfo {
+    let eq2_id = env4.class_env.class("Eq2").unwrap().projection.type_id;
+    let int_id = env4.globals["Int"];
+    let prior = ken_elaborator::classes::InstanceInfo {
             instance_id: GlobalId(999),
             class_name: "Eq2".to_string(),
+            class_id: eq2_id,
             field_effect_rows: vec![],
             module_id: 0,
             head_param_count: 0,
@@ -170,8 +171,9 @@ fn ac3_overlap_check_first_ok_second_errors() {
             constraints: vec![],
             defining_package: "<local>".to_string(),
             declaration_span: Default::default(),
-        },
-    );
+        };
+    env4.class_env.instances.insert(("Eq2".to_string(), "Int".to_string()), prior.clone());
+    env4.class_env.instances_by_id.insert((eq2_id, ken_elaborator::classes::InstanceHeadKey::Global(int_id)), prior);
     // Now try to declare a second instance for (Eq2, Int) → OverlappingInstances.
     // We need to drive the real elaboration path. The overlap check fires early.
     // Declare the class info so the resolver finds it:
@@ -229,11 +231,12 @@ fn ac4_property_vs_structure_sort_discriminant() {
     // Two instances on the same head → OverlappingInstances.
     // Manually register a first one:
     use ken_kernel::GlobalId;
-    env_str.class_env.instances.insert(
-        ("Count2".to_string(), "Int".to_string()),
-        ken_elaborator::classes::InstanceInfo {
+    let count_id = env_str.class_env.class("Count2").unwrap().projection.type_id;
+    let int_id = env_str.globals["Int"];
+    let prior = ken_elaborator::classes::InstanceInfo {
             instance_id: GlobalId(888),
             class_name: "Count2".to_string(),
+            class_id: count_id,
             field_effect_rows: vec![],
             module_id: 0,
             head_param_count: 0,
@@ -241,8 +244,9 @@ fn ac4_property_vs_structure_sort_discriminant() {
             constraints: vec![],
             defining_package: "<local>".to_string(),
             declaration_span: Default::default(),
-        },
-    );
+        };
+    env_str.class_env.instances.insert(("Count2".to_string(), "Int".to_string()), prior.clone());
+    env_str.class_env.instances_by_id.insert((count_id, ken_elaborator::classes::InstanceHeadKey::Global(int_id)), prior);
     let r4 = env_str.elaborate_decl("instance Count2 Int { n = n }");
     assert!(
         matches!(r4, Err(ElabError::OverlappingInstances { .. })),

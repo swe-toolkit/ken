@@ -120,6 +120,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         bytes_env,    // GlobalId type / op ids — types live in global_env
         foreign_env,  // FFI postulate GlobalIds — types live in global_env
         effect_rows,  // effect-row algebra — carries no Term
+        effect_rows_by_id, // checked GlobalId -> effect row — carries no Term
         space_metadata: _, // private GlobalId index — types live in global_env
         prelude_env,  // GlobalIds for prelude decls — types live in global_env
         module_state, // surface-name -> canonical-name aliases into global_env
@@ -141,6 +142,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         bytes_env,
         foreign_env,
         effect_rows,
+        effect_rows_by_id,
         prelude_env,
         module_state,
         resolution_provenance,

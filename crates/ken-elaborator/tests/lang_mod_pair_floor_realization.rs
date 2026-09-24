@@ -114,10 +114,70 @@ fn strict_one(source: &str) -> Result<ElabEnv, ElabError> {
 fn strict_one_with_proof_terminal(source: &str) -> Result<ElabEnv, ElabError> {
     let root = FixtureRoot::new("strict-proof-terminal");
     root.write("Entry", &format!("import ProofTerms (Proved)\n{source}"));
+    root.write("ProofTerms", "export Proved");
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_file("module ProofTerms { export Proved }")?;
     env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")?;
     Ok(env)
+}
+
+/// Promise class: durable invariant (spec 16 §1.4; 33 §§3.2–3.3).
+///
+/// MEASURED: the strict Entry's selective import from a real ProofTerms.ken
+/// yields a checked theorem body pointing to the exact fixed tt_id. CLAIMED:
+/// file-backed facade re-export preserves the Top-introduction identity and
+/// permits conversion without adding an assumption. THE GAP: the missing-file
+/// negative below proves an in-memory export alone cannot supply the import.
+#[test]
+fn strict_file_backed_proof_terminal_facade_keeps_kernel_intro_identity() {
+    let env = strict_one_with_proof_terminal("theorem selected_intro : Eq Bool True True = Proved")
+        .expect("file-backed proof facade must elaborate by conversion");
+    let tt = env.env.tt_id();
+    assert_eq!(env.globals["Proved"], tt);
+    assert!(!env.env.trusted_base().contains(&tt));
+    let (_, body) = env
+        .env
+        .transparent_body(env.globals["Entry.selected_intro"])
+        .expect("selected intro has a checked transparent body");
+    match body {
+        Term::Const { id, .. } => assert_eq!(id, tt),
+        other => panic!("selectively imported Proved must be fixed tt: {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant (spec 33 §§3.2–3.3).
+///
+/// MEASURED: a strict file import of nonexistent ProofTerms.ken rejects at
+/// that import, both cold and after a distinct in-memory module with the
+/// same public spelling has been checked. CLAIMED: a globally preloaded
+/// export is not file-loader authority. THE GAP: the checked positive above
+/// shows that a real file-backed provider is importable instead.
+#[test]
+fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
+    let root = FixtureRoot::new("missing-proof-terms");
+    root.write(
+        "Entry",
+        "import ProofTerms (Proved)\n\
+         theorem selected_intro : Eq Bool True True = Proved",
+    );
+    for preload in [false, true] {
+        let mut env = ElabEnv::new().expect("base environment");
+        if preload {
+            env.elaborate_file("module ProofTerms { export Proved }")
+                .expect("separate legacy in-memory module");
+        }
+        match env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry") {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "ProofTerms");
+                assert_eq!(
+                    (span.start, span.end),
+                    (0, "import ProofTerms (Proved)".len())
+                );
+            }
+            Err(other) => panic!("missing file must reject at import, got {other:?}"),
+            Ok(_) => panic!("missing ProofTerms file was admitted, preload={preload}"),
+        }
+        assert!(!env.globals.contains_key("Entry.selected_intro"));
+    }
 }
 
 /// Promise class: normative compatibility vector.
@@ -413,17 +473,34 @@ fn pair_floor_beta_eta_are_definitional() {
     )
     .expect("Pair beta and eta equations must hold by conversion");
 
-    for source in [
+    for (index, source) in [
         "theorem bad : Eq Bool (pair_fst Bool Bool (mk_pair Bool Bool True False)) True = Refl",
         "theorem bad : Eq Bool (pair_snd Bool Bool (mk_pair Bool Bool True False)) False = Refl",
         "theorem bad (p : Pair Bool Bool) : Eq (Pair Bool Bool) (mk_pair Bool Bool (pair_fst Bool Bool p) (pair_snd Bool Bool p)) p = Proved",
         "theorem bad : Eq Bool (pair_fst Bool Bool (mk_pair Bool Bool True False)) False = Proved",
         "theorem bad : Eq Bool (pair_snd Bool Bool (mk_pair Bool Bool True False)) True = Proved",
-    ] {
-        assert!(
-            strict_one_with_proof_terminal(source).is_err(),
-            "wrong Pair equation/terminal must reject"
-        );
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let error = match strict_one_with_proof_terminal(source) {
+            Ok(_) => panic!("wrong Pair equation/terminal must reject: {source}"),
+            Err(error) => error,
+        };
+        match (index, error) {
+            (0 | 1, ElabError::TypeMismatch { reason, span }) => {
+                assert_eq!(reason, "Refl expects an `Eq`-shaped goal");
+                assert!(span.start > "import ProofTerms (Proved)".len());
+            }
+            (
+                2..=4,
+                ElabError::KernelRejected {
+                    error: ken_kernel::KernelError::TypeMismatch { .. },
+                    span,
+                },
+            ) => assert!(span.start >= "import ProofTerms (Proved)".len()),
+            (_, other) => panic!("wrong proof must reject at its obligation: {other:?}"),
+        }
     }
 }
 

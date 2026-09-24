@@ -70,6 +70,9 @@ pub(crate) enum RPatKind {
     /// declaration-order projection columns need not become lexical binders.
     Var(String, Option<usize>),
     Ctor(String, Vec<RPattern>),
+    /// Imported constructor selected at a checked provider; its name is
+    /// diagnostic only and must never be re-looked-up in mutable globals.
+    CheckedCtor(String, GlobalId, Vec<RPattern>),
     Tuple(Vec<RPattern>),
     Record(Vec<RRecordPatField>),
     As(Box<RPattern>, String, usize),
@@ -154,6 +157,8 @@ pub(crate) struct RRecordField {
 #[derive(Clone, Debug)]
 pub(crate) struct RInstanceConstraint {
     pub class_name: String,
+    /// Selected imported class identity; local classes defer to admission.
+    pub class_id: Option<ken_kernel::GlobalId>,
     pub head_type: RType,
     pub binder: String,
 }
@@ -227,6 +232,8 @@ pub(crate) enum RDeclKind {
     },
     /// `instance C HeadType [where …] { field = expr ; … }` (`39 §6`).
     InstanceDecl {
+        /// Selected imported class identity; local classes defer to admission.
+        class_id: Option<ken_kernel::GlobalId>,
         /// Free lowercase type variables generalized from the instance head.
         /// Each is implicitly bound at `Type0`.
         head_params: Vec<String>,
@@ -237,7 +244,11 @@ pub(crate) enum RDeclKind {
         fields: Vec<(String, RExpr)>,
     },
     /// `derive ClassName for DataName` (`33 §5.6`, `39 §6.6`).
-    DeriveDecl { data_name: String },
+    DeriveDecl {
+        class_id: Option<ken_kernel::GlobalId>,
+        data_name: String,
+        data_id: Option<ken_kernel::GlobalId>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -253,12 +264,14 @@ pub(crate) struct RPropIntro {
 pub(crate) enum RInfixOperator {
     Builtin(BinOp, Span),
     User(String, Span),
+    /// Imported operator whose checked provider has already been selected.
+    CheckedUser(String, GlobalId, Span),
 }
 
 impl RInfixOperator {
     pub fn span(&self) -> &Span {
         match self {
-            Self::Builtin(_, span) | Self::User(_, span) => span,
+            Self::Builtin(_, span) | Self::User(_, span) | Self::CheckedUser(_, _, span) => span,
         }
     }
 }
@@ -272,6 +285,9 @@ pub(crate) enum RExpr {
     /// landed per-position occurrence.
     RPatternAlias(usize, String, Span),
     RCon(String, Span),
+    /// Checked identity selected by a module import; unlike RCon this must
+    /// never be re-looked-up through the mutable process-global name table.
+    RCheckedGlobal { name: String, id: GlobalId, span: Span },
     RUniv(Option<u32>, Span),
     RApp(Box<RExpr>, Box<RExpr>, Span),
     RLam(String, Box<RExpr>, Span),
@@ -424,7 +440,9 @@ impl RExpr {
             | RExpr::RBinOp(_, _, _, s)
             | RExpr::RStandardOp { span: s, .. }
             | RExpr::RInfixSpine { span: s, .. } => s,
-            RExpr::RMatch { span, .. } | RExpr::RIf { span, .. } => span,
+            RExpr::RMatch { span, .. }
+            | RExpr::RIf { span, .. }
+            | RExpr::RCheckedGlobal { span, .. } => span,
         }
     }
 }
@@ -440,6 +458,9 @@ pub(crate) enum RType {
     REffectArr(Box<RType>, EffectRowSyntax, Box<RType>, Span),
     RUniv(Option<u32>, Span),
     RCon(String, Span),
+    /// Checked provider identity captured at import resolution, not a name
+    /// to recover later from the mutable globals table.
+    RCheckedGlobal { name: String, id: GlobalId, span: Span },
     RVarTy(usize, String, Span),
     /// A record-pattern binding used in a type annotation in its arm body.
     RPatternAliasTy(usize, String, Span),
@@ -480,6 +501,7 @@ impl RType {
             | RType::RApp(_, _, s)
             | RType::RTrunc(_, s)
             | RType::RProj(_, _, s) => s,
+            RType::RCheckedGlobal { span, .. } => span,
         }
     }
 }
@@ -656,6 +678,7 @@ fn resolve_instance_constraints(
         }
         resolved.push(RInstanceConstraint {
             class_name: constraint.class_name.clone(),
+            class_id: None,
             head_type: rty,
             binder,
         });
@@ -1729,6 +1752,7 @@ pub(crate) fn resolve_decl_in_unit(
                 span: span.clone(),
                 contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::InstanceDecl {
+                    class_id: None,
                     head_params,
                     head_type: rhead,
                     constraints: rconstraints,
@@ -1750,7 +1774,9 @@ pub(crate) fn resolve_decl_in_unit(
             span: span.clone(),
             contains_infix_spine: false,
             kind: RDeclKind::DeriveDecl {
+                class_id: None,
                 data_name: data_name.clone(),
+                data_id: None,
             },
         }),
     }
@@ -2466,7 +2492,10 @@ fn remap_pattern_occurrence_slots(pattern: &mut RPattern, remap: &HashMap<usize,
         RPatKind::Var(_, Some(slot)) => {
             *slot = remap[slot];
         }
-        RPatKind::Ctor(_, fields) | RPatKind::Tuple(fields) | RPatKind::Or(fields) => {
+        RPatKind::Ctor(_, fields)
+        | RPatKind::CheckedCtor(_, _, fields)
+        | RPatKind::Tuple(fields)
+        | RPatKind::Or(fields) => {
             for field in fields {
                 remap_pattern_occurrence_slots(field, remap);
             }

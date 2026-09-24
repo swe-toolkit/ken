@@ -26,7 +26,7 @@ use ken_kernel::{
 use crate::ast::{
     BinOp, DefKeyword, Fixity, FixityAssoc, LiteralPat, NumLit, RecursiveResultSelector,
 };
-use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceInfo};
+use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceHeadKey, InstanceInfo};
 use crate::data;
 use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
@@ -797,6 +797,16 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         }
         RType::RUniv(Some(n), _) => Ok(Term::ty(level_from_nat(*n))),
 
+        RType::RCheckedGlobal { id, .. } => {
+            let id = *id;
+            if cx.env.constructor(id).is_some() {
+                Ok(Term::Constructor { id, level_args: vec![] })
+            } else if cx.env.inductive(id).is_some() {
+                Ok(Term::IndFormer { id, level_args: vec![] })
+            } else {
+                Ok(Term::const_(id, vec![]))
+            }
+        }
         RType::RCon(name, span) => {
             if name == "Omega" {
                 return Ok(Term::omega(Level::Zero));
@@ -1617,7 +1627,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             // existing general `infer_match`/`compile_match_matrix`
             // nested-pattern compiler unchanged.
             let flat = arms.iter().all(|a| match &a.pat.kind {
-                RPatKind::Ctor(_, subs) => subs
+                RPatKind::Ctor(_, subs) | RPatKind::CheckedCtor(_, _, subs) => subs
                     .iter()
                     .all(|s| matches!(s.kind, RPatKind::Var(_, _) | RPatKind::Wild)),
                 _ => false,
@@ -4296,7 +4306,7 @@ fn check_match_with_lift(
                     span: span.clone(),
                 })?;
         let sub_pats = match &arm.pat.kind {
-            RPatKind::Ctor(_, fields) => fields,
+            RPatKind::Ctor(_, fields) | RPatKind::CheckedCtor(_, _, fields) => fields,
             _ => unreachable!("arm selected by constructor guard"),
         };
         if sub_pats.len() != host_ctor.args.len()
@@ -4569,7 +4579,7 @@ fn check_structured_constructor_method(
         expected_bindings.push((source_position, installed));
     }
     let field_spans = match &arm.pat.kind {
-        RPatKind::Ctor(_, fields) => fields
+        RPatKind::Ctor(_, fields) | RPatKind::CheckedCtor(_, _, fields) => fields
             .iter()
             .enumerate()
             .map(|(source_field, pattern)| (base + source_field, pattern.span.clone()))
@@ -6271,7 +6281,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         let n = ctor.args.len();
         if let Some(arm) = arm {
             let sub_pats = match &arm.pat.kind {
-                RPatKind::Ctor(_, subs) => subs.clone(),
+                RPatKind::Ctor(_, subs) | RPatKind::CheckedCtor(_, _, subs) => subs.clone(),
                 _ => unreachable!("guarded by the constructor-arm selection above"),
             };
             if sub_pats.len() != n {
@@ -8254,6 +8264,14 @@ fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId) -> MissingPatternWitness 
 /// the first unguarded arm is the covering fallback and alone subsumes later
 /// arms. If no unguarded arm exists, return `None`: the caller must treat the
 /// constructor as omitted, proving it index-impossible or reporting it missing.
+fn pattern_ctor_id(cx: &ElabCtx<'_>, kind: &RPatKind) -> Option<GlobalId> {
+    match kind {
+        RPatKind::Ctor(name, _) => cx.globals.get(name).copied(),
+        RPatKind::CheckedCtor(_, id, _) => Some(*id),
+        _ => None,
+    }
+}
+
 #[inline(never)]
 fn guarded_constructor_arm(
     cx: &ElabCtx,
@@ -8266,7 +8284,7 @@ fn guarded_constructor_arm(
         .iter()
         .enumerate()
         .filter(|(_, arm)| {
-            matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(ctor_id))
+            pattern_ctor_id(cx, &arm.pat.kind) == Some(ctor_id)
         })
         .collect::<Vec<_>>();
     let fallback = candidates.iter().position(|(_, arm)| arm.guard.is_none())?;
@@ -8311,6 +8329,55 @@ fn unassociated_infix_error(span: &Span) -> Result<(Term, Term), ElabError> {
         "unassociated infix spine reached type-directed elaboration at {}-{}",
         span.start, span.end
     )))
+}
+
+// A spelling-routed global is a leaf, but its constructor, inductive, and
+// dictionary cases carry temporaries. Keep those out of `infer`'s recursive
+// dispatch frame: every nested application pays that frame before reaching
+// this leaf, even when no spelling lookup is performed at that depth.
+#[inline(never)]
+fn infer_spelling_global(
+    cx: &mut ElabCtx,
+    name: &str,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if let Some((term, ty, install_depth)) = cx.local_dicts.get(name) {
+        let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+            ElabError::Internal(format!("dictionary '{name}' used outside its declaration context"))
+        })? as i64;
+        return Ok((weaken(term, growth), weaken(ty, growth)));
+    }
+    let id = cx
+        .globals
+        .get(name)
+        .copied()
+        .ok_or_else(|| ElabError::UnresolvedCon {
+            name: name.to_string(),
+            span: span.clone(),
+        })?;
+    if let Some((ind, k)) = cx.env.constructor(id) {
+        return Ok((
+            Term::Constructor {
+                id,
+                level_args: vec![],
+            },
+            ind.constructors[k].type_.clone(),
+        ));
+    }
+    if let Some(ind) = cx.env.inductive(id) {
+        return Ok((
+            Term::IndFormer {
+                id,
+                level_args: vec![],
+            },
+            ind.former_type.clone(),
+        ));
+    }
+    let (_, decl_ty) = cx
+        .env
+        .const_type(id)
+        .ok_or_else(|| ElabError::Internal(format!("no type for global '{name}'")))?;
+    Ok((Term::const_(id, vec![]), decl_ty.clone()))
 }
 
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
@@ -8411,55 +8478,21 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             span: span.clone(),
         }),
 
-        RExpr::RCon(name, span) => {
-            if let Some((term, ty, install_depth)) = cx.local_dicts.get(name) {
-                let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
-                    ElabError::Internal(format!(
-                        "dictionary '{name}' used outside its declaration context"
-                    ))
-                })? as i64;
-                return Ok((weaken(term, growth), weaken(ty, growth)));
+        RExpr::RCheckedGlobal { name, id, .. } => {
+            let id = *id;
+            if let Some((ind, k)) = cx.env.constructor(id) {
+                let ty = ind.constructors[k].type_.clone();
+                return Ok((Term::Constructor { id, level_args: vec![] }, ty));
             }
-            let id = cx
-                .globals
-                .get(name)
-                .copied()
-                .ok_or_else(|| ElabError::UnresolvedCon {
-                    name: name.clone(),
-                    span: span.clone(),
-                })?;
-            // Constructor: Term::Constructor with the ctor's declared type.
-            let ctor_ty = cx
-                .env
-                .constructor(id)
-                .map(|(ind, k)| ind.constructors[k].type_.clone());
-            if let Some(ty) = ctor_ty {
-                return Ok((
-                    Term::Constructor {
-                        id,
-                        level_args: vec![],
-                    },
-                    ty,
-                ));
+            if let Some(ind) = cx.env.inductive(id) {
+                return Ok((Term::IndFormer { id, level_args: vec![] }, ind.former_type.clone()));
             }
-            // Inductive type former: Term::IndFormer.
-            let ind_ty = cx.env.inductive(id).map(|ind| ind.former_type.clone());
-            if let Some(ty) = ind_ty {
-                return Ok((
-                    Term::IndFormer {
-                        id,
-                        level_args: vec![],
-                    },
-                    ty,
-                ));
-            }
-            // Regular constant (postulate/def/primitive).
-            let (_, decl_ty) = cx
-                .env
-                .const_type(id)
-                .ok_or_else(|| ElabError::Internal(format!("no type for global '{}'", name)))?;
-            Ok((Term::const_(id, vec![]), decl_ty.clone()))
+            let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
+                ElabError::Internal(format!("no checked type for imported global '{name}' {id:?}"))
+            })?;
+            Ok((Term::const_(id, vec![]), ty.clone()))
         }
+        RExpr::RCon(name, span) => infer_spelling_global(cx, name, span),
 
         RExpr::RUniv(None, _) => {
             let l = cx.metas.fresh();
@@ -9595,7 +9628,7 @@ fn peel_named_rtype_app<'a>(ty: &'a RType, name: &str, arity: usize) -> Option<V
 /// `instance_search` key lookup (`37 §6`, L3b).
 fn rtype_head_name(ty: &RType) -> String {
     match ty {
-        RType::RCon(name, _) => name.clone(),
+        RType::RCon(name, _) | RType::RCheckedGlobal { name, .. } => name.clone(),
         RType::RApp(f, _, _) => rtype_head_name(f),
         RType::RVarTy(_, name, _) => name.clone(),
         // A truncation head, consistent with head_type_name.
@@ -9651,22 +9684,29 @@ fn instantiate_instance_rtype(ty: &RType, args: &[RType], param_count: usize) ->
     }
 }
 
-fn rtypes_match(left: &RType, right: &RType) -> bool {
+fn rtypes_match(left: &RType, right: &RType, globals: &HashMap<String, GlobalId>) -> bool {
     match (left, right) {
-        (RType::RCon(left, _), RType::RCon(right, _)) => left == right,
-        (RType::RVarTy(left, _, _), RType::RVarTy(right, _, _)) => left == right,
+        (RType::RCon(left, _), RType::RCon(right, _)) =>
+            globals.get(left).zip(globals.get(right)).is_some_and(|(a, b)| a == b),
+        (RType::RCheckedGlobal { id: left, .. }, RType::RCheckedGlobal { id: right, .. }) => left == right,
+        (RType::RCon(left, _), RType::RCheckedGlobal { id, .. })
+        | (RType::RCheckedGlobal { id, .. }, RType::RCon(left, _)) =>
+            globals.get(left) == Some(id),
+        (RType::RVarTy(left, left_name, _), RType::RVarTy(right, right_name, _)) =>
+            left == right && left_name == right_name,
         (RType::RUniv(left, _), RType::RUniv(right, _)) => left == right,
         (RType::RApp(left_f, left_a, _), RType::RApp(right_f, right_a, _)) => {
-            rtypes_match(left_f, right_f) && rtypes_match(left_a, right_a)
+            rtypes_match(left_f, right_f, globals) && rtypes_match(left_a, right_a, globals)
         }
         (RType::RArr(left_a, left_b, _), RType::RArr(right_a, right_b, _)) => {
-            rtypes_match(left_a, right_a) && rtypes_match(left_b, right_b)
+            rtypes_match(left_a, right_a, globals) && rtypes_match(left_b, right_b, globals)
         }
         (
             RType::REffectArr(left_a, left_row, left_b, _),
             RType::REffectArr(right_a, right_row, right_b, _),
         ) => {
-            left_row == right_row && rtypes_match(left_a, right_a) && rtypes_match(left_b, right_b)
+            left_row == right_row && rtypes_match(left_a, right_a, globals)
+                && rtypes_match(left_b, right_b, globals)
         }
         _ => false,
     }
@@ -9675,6 +9715,7 @@ fn rtypes_match(left: &RType, right: &RType) -> bool {
 fn match_instance_head(
     pattern: &RType,
     requested: &RType,
+    globals: &HashMap<String, GlobalId>,
     param_count: usize,
     args: &mut [Option<RType>],
 ) -> bool {
@@ -9682,18 +9723,27 @@ fn match_instance_head(
         RType::RVarTy(index, _, _) if *index < param_count => {
             let slot = param_count - 1 - index;
             match &args[slot] {
-                Some(previous) => rtypes_match(previous, requested),
+                Some(previous) => rtypes_match(previous, requested, globals),
                 None => {
                     args[slot] = Some(requested.clone());
                     true
                 }
             }
         }
-        RType::RCon(name, _) => matches!(requested, RType::RCon(other, _) if name == other),
+        RType::RCon(name, _) => match requested {
+            RType::RCon(other, _) => globals.get(name).zip(globals.get(other)).is_some_and(|(a, b)| a == b),
+            RType::RCheckedGlobal { id, .. } => globals.get(name) == Some(id),
+            _ => false,
+        },
+        RType::RCheckedGlobal { id, .. } => match requested {
+            RType::RCheckedGlobal { id: other, .. } => id == other,
+            RType::RCon(name, _) => globals.get(name) == Some(id),
+            _ => false,
+        },
         RType::RApp(pattern_f, pattern_a, _) => match requested {
             RType::RApp(requested_f, requested_a, _) => {
-                match_instance_head(pattern_f, requested_f, param_count, args)
-                    && match_instance_head(pattern_a, requested_a, param_count, args)
+                match_instance_head(pattern_f, requested_f, globals, param_count, args)
+                    && match_instance_head(pattern_a, requested_a, globals, param_count, args)
             }
             _ => false,
         },
@@ -9733,8 +9783,11 @@ fn match_instance_head_core(
                 }
             }
         }
-        RType::RCon(name, _) => {
-            let Some(pattern_id) = globals.get(name).copied() else {
+        RType::RCon(name, _) | RType::RCheckedGlobal { name, .. } => {
+            let Some(pattern_id) = (match pattern {
+                RType::RCheckedGlobal { id, .. } => Some(*id),
+                _ => globals.get(name).copied(),
+            }) else {
                 return false;
             };
             matches!(
@@ -9799,16 +9852,25 @@ fn confirm_instance_dictionary_carrier(
     class_env: &ClassEnv,
     ctx: &Context,
     class_name: &str,
+    class_id: GlobalId,
     spelling: &str,
     candidate_type: &Term,
     expected_carrier: Option<&Term>,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let class = class_env.class(class_name).ok_or_else(|| {
+    let class = class_env.class_by_id(class_id).ok_or_else(|| {
         ElabError::Internal(format!(
             "instance resolution selected an unregistered class `{class_name}`"
         ))
     })?;
+    let actual_class = core_type_head_id(candidate_type);
+    if actual_class != Some(class_id) {
+        return Err(ElabError::InstanceCarrierIdentityMismatch {
+            class: class_name.to_string(),
+            spelling: spelling.to_string(),
+            span: span.clone(),
+        });
+    }
     if class.projection.head_param.is_none() {
         return Ok(());
     }
@@ -9852,24 +9914,26 @@ fn resolve_instance_dictionary(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
+    selected_class_id: Option<GlobalId>,
     requested: &RType,
     span: &Span,
     owner_label: &str,
 ) -> Result<(Term, Term), ElabError> {
-    let expected_carrier = if class_env
-        .class(class_name)
-        .map(|class| class.projection.head_param.is_some())
-        .unwrap_or(false)
-    {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
-        for ty in &ctx.types {
-            cx.ctx.push(ty.clone());
-        }
-        let carrier = elab_type(&mut cx, requested)?;
-        Some(cx.metas.zonk_term(&carrier))
-    } else {
-        None
-    };
+    let class_id = checked_class_id(class_env, class_name, selected_class_id, span)
+        .map_err(|_| ElabError::NoInstance {
+            class: class_name.to_string(),
+            ty: rtype_head_name(requested),
+            span: span.clone(),
+        })?;
+    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
+    for ty in &ctx.types {
+        cx.ctx.push(ty.clone());
+    }
+    let carrier = elab_type(&mut cx, requested)?;
+    let carrier = cx.metas.zonk_term(&carrier);
+    let expected_carrier = class_env.class_by_id(class_id)
+        .is_some_and(|class| class.projection.head_param.is_some())
+        .then_some(carrier.clone());
     resolve_instance_dictionary_inner(
         env,
         globals,
@@ -9879,6 +9943,8 @@ fn resolve_instance_dictionary(
         provenance,
         ctx,
         class_name,
+        class_id,
+        instance_head_key(requested, &carrier),
         &rtype_head_name(requested),
         InstanceHeadRequest::Surface {
             requested,
@@ -9890,25 +9956,34 @@ fn resolve_instance_dictionary(
     )
 }
 
-/// Resolve a dictionary when the caller holds the carrier's IDENTITY and no
-/// surface type -- the expression side of the seam.
-///
-/// **It finds the registry key without ever inverting `globals`.** The
-/// registry is keyed on a surface type name and `globals` maps name -> id,
-/// which nothing makes injective; running it backwards would pick among
-/// candidates, and a wrong pick keying a registry entry is not provably a
-/// miss. So this scans the registered names FORWARD -- `globals.get(name)`,
-/// the same direction `elab_type` itself uses -- and asks which resolve to the
-/// identity in hand. No injectivity is assumed anywhere.
-///
-/// Three outcomes, all decided:
-///
-/// ```text
-/// zero matches   NoInstance, fail closed, semantics unchanged
-/// one match      that is the key; delegate with no surface pattern
-/// two matches    REFUSE -- the name-keyed registry cannot express which
-///                instance was meant, and iteration order must not decide it
-/// ```
+/// Read the dictionary class from a certified standard binding's checked
+/// second parameter. A later class with the same spelling cannot redirect
+/// completion for an operator whose telescope was already admitted.
+fn standard_operator_class_id(
+    env: &GlobalEnv,
+    operator: GlobalId,
+    class_env: &ClassEnv,
+    name: &str,
+) -> Result<GlobalId, ElabError> {
+    let (_, ty) = env.const_type(operator).ok_or_else(|| {
+        ElabError::Internal(format!("certified operator {operator:?} has no checked telescope"))
+    })?;
+    let id = match ty {
+        Term::Pi(_, tail) => match tail.as_ref() {
+            Term::Pi(domain, _) => core_type_head_id(domain),
+            _ => None,
+        },
+        _ => None,
+    };
+    id.filter(|id| class_env.class_by_id(*id).is_some()).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "certified operator {operator:?} has no checked {name} dictionary parameter"
+        ))
+    })
+}
+
+/// Resolve a dictionary when the caller holds the carrier's ID and no surface
+/// type. The exact `(class_id, head_id)` selects; mutable names do not.
 #[allow(clippy::too_many_arguments)]
 fn resolve_instance_dictionary_by_head_id(
     env: &mut GlobalEnv,
@@ -9919,32 +9994,14 @@ fn resolve_instance_dictionary_by_head_id(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
+    class_id: GlobalId,
     carrier: &Term,
     head_id: GlobalId,
     span: &Span,
     owner_label: &str,
     enforce_direct_use: bool,
 ) -> Result<(Term, Term), ElabError> {
-    let mut hit: Option<&str> = None;
-    for (registered_class, registered_head) in class_env.instances.keys() {
-        if registered_class != class_name {
-            continue;
-        }
-        if globals.get(registered_head).copied() != Some(head_id) {
-            continue;
-        }
-        if let Some(earlier) = hit.replace(registered_head.as_str()) {
-            let mut spellings = [earlier.to_string(), registered_head.clone()];
-            spellings.sort();
-            let [first, second] = spellings;
-            return Err(ElabError::InstanceHeadSpellingsShareAnIdentity {
-                class: class_name.to_string(),
-                spellings: (first, second),
-                span: span.clone(),
-            });
-        }
-    }
-    let Some(head_name) = hit.map(str::to_owned) else {
+    let Some(info) = class_env.instances_by_id.get(&(class_id, InstanceHeadKey::Global(head_id))) else {
         return Err(ElabError::NoInstance {
             class: class_name.to_string(),
             // No registered spelling resolves to this identity, so there is no
@@ -9954,10 +10011,12 @@ fn resolve_instance_dictionary_by_head_id(
         });
     };
 
-    // STEP 2 -- the class must be CARRIER-PARAMETERISED, or there is nothing
-    // in its type to confirm the scan against and step 3 would be vacuous.
+    let head_name = info.head_type.as_ref().map(rtype_head_name)
+        .unwrap_or_else(|| format!("{head_id:?}"));
+    // A carrier-parameterized class gives the expected-carrier check a real
+    // parameter. A nullary class cannot use this expression-side adapter.
     if !class_env
-        .class(class_name)
+        .class_by_id(class_id)
         .map(|view| view.projection.head_param.is_some())
         .unwrap_or(false)
     {
@@ -9968,9 +10027,8 @@ fn resolve_instance_dictionary_by_head_id(
         });
     }
 
-    // STEP 3 is enforced by the common resolver after kernel inference and
-    // before provenance or return. The scan and its ambiguity refusal remain
-    // the identity adapter's independent steps 1 and 2.
+    // The common resolver confirms both class ID and carrier after inference
+    // and before recording successful provenance.
     resolve_instance_dictionary_inner(
         env,
         globals,
@@ -9980,6 +10038,8 @@ fn resolve_instance_dictionary_by_head_id(
         provenance,
         ctx,
         class_name,
+        class_id,
+        InstanceHeadKey::Global(head_id),
         &head_name,
         InstanceHeadRequest::Core {
             expected_carrier: carrier,
@@ -10000,9 +10060,10 @@ fn resolve_instance_dictionary_inner(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
-    // `head_name` is the registry KEY, supplied rather than derived: the
-    // registry is keyed on a surface type NAME (`classes.rs:202`) and an
-    // expression site does not hold one -- it holds the carrier's identity.
+    class_id: GlobalId,
+    head_key: InstanceHeadKey,
+    // `head_name` is retained for diagnostics only; `head_key` selects the
+    // checked constructor or an explicitly non-global head shape.
     //
     // `requested` preserves the caller's real representation: the declaration
     // path supplies surface syntax, while an inferred expression carrier
@@ -10016,13 +10077,27 @@ fn resolve_instance_dictionary_inner(
 ) -> Result<(Term, Term), ElabError> {
     let head_name = head_name.to_string();
     let info = class_env
-        .instances
-        .get(&(class_name.to_string(), head_name.clone()))
+        .instances_by_id
+        .get(&(class_id, head_key))
         .cloned()
-        .ok_or_else(|| ElabError::NoInstance {
-            class: class_name.to_string(),
-            ty: head_name.clone(),
-            span: span.clone(),
+        .ok_or_else(|| {
+            // The name view is diagnostic only. It can explain a stale
+            // same-class, same-spelling head without selecting its dictionary.
+            if class_env.instances.get(&(class_name.to_string(), head_name.clone()))
+                .is_some_and(|old| old.class_id == class_id)
+            {
+                ElabError::InstanceCarrierIdentityMismatch {
+                    class: class_name.to_string(),
+                    spelling: head_name.clone(),
+                    span: span.clone(),
+                }
+            } else {
+                ElabError::NoInstance {
+                    class: class_name.to_string(),
+                    ty: head_name.clone(),
+                    span: span.clone(),
+                }
+            }
         })?;
     if enforce_direct_use {
         if let Some(admitted) = &class_env.direct_use_packages {
@@ -10055,7 +10130,7 @@ fn resolve_instance_dictionary_inner(
         match requested {
             InstanceHeadRequest::Surface { requested, .. } => {
                 let mut matched = vec![None; info.head_param_count];
-                if !match_instance_head(pattern, requested, info.head_param_count, &mut matched) {
+                if !match_instance_head(pattern, requested, globals, info.head_param_count, &mut matched) {
                     return Err(ElabError::NoInstance {
                         class: class_name.to_string(),
                         ty: head_name.clone(),
@@ -10126,7 +10201,7 @@ fn resolve_instance_dictionary_inner(
     for constraint in &info.constraints {
         let required_type = ken_kernel::subst::subst_tel(&constraint.core_type, &core_args);
         let constraint_is_parameterized = class_env
-            .class(&constraint.class_name)
+            .class_by_id(constraint.class_id)
             .map(|class| class.projection.head_param.is_some())
             .unwrap_or(false);
         let required_carrier = if constraint_is_parameterized {
@@ -10156,6 +10231,8 @@ fn resolve_instance_dictionary_inner(
                 provenance,
                 ctx,
                 &constraint.class_name,
+                constraint.class_id,
+                instance_head_key(&required_head, required_carrier.as_ref().unwrap_or(&required_type)),
                 &rtype_head_name(&required_head),
                 InstanceHeadRequest::Surface {
                     requested: &required_head,
@@ -10189,6 +10266,7 @@ fn resolve_instance_dictionary_inner(
                 provenance,
                 ctx,
                 &constraint.class_name,
+                constraint.class_id,
                 &required_carrier,
                 required_head_id,
                 span,
@@ -10207,6 +10285,7 @@ fn resolve_instance_dictionary_inner(
         class_env,
         ctx,
         class_name,
+        class_id,
         &head_name,
         &ty,
         expected_carrier,
@@ -10330,6 +10409,7 @@ fn type_contains_effect_row(ty: &RType) -> bool {
         RType::RProj(_, _, _) => false,
         RType::RUniv(_, _)
         | RType::RCon(_, _)
+        | RType::RCheckedGlobal { .. }
         | RType::RVarTy(_, _, _)
         | RType::RPatternAliasTy(_, _, _) => false,
     }
@@ -10337,24 +10417,27 @@ fn type_contains_effect_row(ty: &RType) -> bool {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum RTypeHead {
-    Con(String),
+    Con(String, Option<GlobalId>),
     Var(usize, String),
 }
 
 fn rtype_heads_match(a: &RTypeHead, b: &RTypeHead) -> bool {
     match (a, b) {
-        (RTypeHead::Con(a), RTypeHead::Con(b)) => a == b,
+        (RTypeHead::Con(_, Some(a)), RTypeHead::Con(_, Some(b))) => a == b,
+        (RTypeHead::Con(a, _), RTypeHead::Con(b, _)) => a == b,
         (RTypeHead::Var(_, a), RTypeHead::Var(_, b)) => a == b,
-        (RTypeHead::Con(a), RTypeHead::Var(_, b)) | (RTypeHead::Var(_, a), RTypeHead::Con(b)) => {
-            a == b
-        }
+        (RTypeHead::Con(a, _), RTypeHead::Var(_, b))
+        | (RTypeHead::Var(_, a), RTypeHead::Con(b, _)) => a == b,
     }
 }
 
 fn rtype_app_head(ty: &RType) -> Option<RTypeHead> {
     match ty {
         RType::RApp(f, _, _) => rtype_app_head(f),
-        RType::RCon(name, _) => Some(RTypeHead::Con(name.clone())),
+        RType::RCon(name, _) => Some(RTypeHead::Con(name.clone(), None)),
+        RType::RCheckedGlobal { name, id, .. } => {
+            Some(RTypeHead::Con(name.clone(), Some(*id)))
+        }
         RType::RVarTy(index, name, _) => Some(RTypeHead::Var(*index, name.clone())),
         _ => None,
     }
@@ -10370,7 +10453,10 @@ fn rtype_is_app_headed_by(ty: &RType, head: &RTypeHead) -> bool {
 fn type_is_applicative_dict_for_head(ty: &RType, head: &RTypeHead) -> bool {
     match ty {
         RType::RApp(f, arg, _) => {
-            matches!(&**f, RType::RCon(name, _) if name == "Applicative")
+            matches!(&**f,
+                RType::RCon(name, _) | RType::RCheckedGlobal { name, .. }
+                    if name == "Applicative"
+            )
                 && rtype_app_head(arg)
                     .as_ref()
                     .is_some_and(|candidate| rtype_heads_match(candidate, head))
@@ -10508,18 +10594,33 @@ struct ProjectionPurityCtx<'a> {
     globals: &'a HashMap<String, GlobalId>,
     class_env: &'a ClassEnv,
     local_constraints: &'a [RInstanceConstraint],
-    bound_dict_classes: &'a [(String, String)],
+    bound_dict_classes: &'a [(String, GlobalId)],
 }
 
-fn instance_class_for_global<'a>(
-    class_env: &'a ClassEnv,
+fn instance_class_for_global(
+    class_env: &ClassEnv,
     instance_id: GlobalId,
-) -> Option<&'a str> {
-    class_env
-        .instances
-        .values()
-        .find(|inst| inst.instance_id == instance_id)
-        .map(|inst| inst.class_name.as_str())
+) -> Option<&InstanceInfo> {
+    class_env.instances_by_id.values().find(|inst| inst.instance_id == instance_id)
+}
+
+fn constraint_instance_id(
+    constraint: &RInstanceConstraint,
+    ctx: &ProjectionPurityCtx<'_>,
+) -> Option<GlobalId> {
+    let class_id = constraint.class_id.or_else(|| {
+        ctx.class_env.class(&constraint.class_name).map(|info| info.projection.type_id)
+    })?;
+    let head_key = match &constraint.head_type {
+        RType::RVarTy(_, name, _) => InstanceHeadKey::Parameter(name.clone()),
+        RType::RCheckedGlobal { id, .. } => InstanceHeadKey::Global(*id),
+        RType::RCon(name, _) => InstanceHeadKey::Global(*ctx.globals.get(name)?),
+        RType::RApp(..) => InstanceHeadKey::Global(
+            named_head_id(&constraint.head_type, ctx.globals)?
+        ),
+        _ => return None, // no inferred core type in this purity-only view
+    };
+    ctx.class_env.instances_by_id.get(&(class_id, head_key)).map(|info| info.instance_id)
 }
 
 fn projected_instance_id(base: &RExpr, ctx: &ProjectionPurityCtx<'_>) -> Option<GlobalId> {
@@ -10529,10 +10630,7 @@ fn projected_instance_id(base: &RExpr, ctx: &ProjectionPurityCtx<'_>) -> Option<
                 && (name == "d" || name == &ctx.local_constraints[0].binder) =>
         {
             let constraint = &ctx.local_constraints[0];
-            ctx.class_env.instance_search(
-                &constraint.class_name,
-                &rtype_head_name(&constraint.head_type),
-            )
+            constraint_instance_id(constraint, ctx)
         }
         RExpr::RCon(name, _) => {
             if let Some(constraint) = ctx
@@ -10540,14 +10638,12 @@ fn projected_instance_id(base: &RExpr, ctx: &ProjectionPurityCtx<'_>) -> Option<
                 .iter()
                 .find(|constraint| constraint.binder == *name)
             {
-                ctx.class_env.instance_search(
-                    &constraint.class_name,
-                    &rtype_head_name(&constraint.head_type),
-                )
+                constraint_instance_id(constraint, ctx)
             } else {
                 ctx.globals.get(name).copied()
             }
         }
+        RExpr::RCheckedGlobal { id, .. } => Some(*id),
         _ => None,
     }
 }
@@ -10561,18 +10657,19 @@ fn projected_field_row_type(
         return crate::effects::RowType::empty();
     };
     if let RExpr::RVar(_, name, _) = base {
-        if let Some((_, class_name)) = ctx.bound_dict_classes.iter().find(|(n, _)| n == name) {
-            return projected_class_field_row_type(ctx.class_env, class_name, field);
+        if let Some((_, class_id)) = ctx.bound_dict_classes.iter().find(|(n, _)| n == name) {
+            return projected_class_field_row_type(ctx.class_env, *class_id, field);
         }
     }
     let Some(instance_id) = projected_instance_id(base, ctx) else {
         return crate::effects::RowType::empty();
     };
-    let Some(class_name) = instance_class_for_global(ctx.class_env, instance_id) else {
+    let Some(instance) = instance_class_for_global(ctx.class_env, instance_id) else {
         return crate::effects::RowType::empty();
     };
-    let Some(class_info) = ctx.class_env.class(class_name) else {
-        return crate::effects::RowType::empty();
+    let class_name = &instance.class_name;
+    let Some(class_info) = ctx.class_env.class_by_id(instance.class_id) else {
+        return crate::effects::RowType::singleton("unknown checked class owner");
     };
     let Some(idx) = class_info
         .projection
@@ -10584,7 +10681,7 @@ fn projected_field_row_type(
     };
     if let Some(row) = ctx
         .class_env
-        .instances
+        .instances_by_id
         .values()
         .find(|inst| inst.instance_id == instance_id)
         .and_then(|inst| inst.field_effect_rows.get(idx))
@@ -10603,11 +10700,11 @@ fn projected_field_row_type(
 
 fn projected_class_field_row_type(
     class_env: &ClassEnv,
-    class_name: &str,
+    class_id: GlobalId,
     field: &str,
 ) -> crate::effects::RowType {
-    let Some(class_info) = class_env.class(class_name) else {
-        return crate::effects::RowType::empty();
+    let Some(class_info) = class_env.class_by_id(class_id) else {
+        return crate::effects::RowType::singleton("unknown checked class owner");
     };
     let Some(idx) = class_info
         .projection
@@ -10620,40 +10717,72 @@ fn projected_class_field_row_type(
     match class_info.field_purities.get(idx).copied().flatten() {
         Some(DefKeyword::Proc) => crate::effects::RowType::singleton(format!(
             "projected proc class field `{}.{}`",
-            class_name, field
+            class_info.projection.owner_name, field
         )),
         _ => crate::effects::RowType::empty(),
     }
 }
 
-fn class_name_for_dictionary_type(class_env: &ClassEnv, ty: &RType) -> Option<String> {
-    let head = rtype_head_name(ty);
-    class_env.class(&head).is_some().then_some(head)
+fn class_id_for_dictionary_type(class_env: &ClassEnv, ty: &RType) -> Option<GlobalId> {
+    let head = match ty { RType::RApp(f, _, _) => f.as_ref(), _ => ty };
+    match head {
+        RType::RCheckedGlobal { id, .. } => {
+            // A known record is not a class. An unknown selected owner must
+            // not disappear from a purity check as an empty effect row.
+            (class_env.class_by_id(*id).is_some()
+                || class_env.projection_by_type_id(*id).is_none()).then_some(*id)
+        }
+        RType::RCon(name, _) => class_env.class(name).map(|info| info.projection.type_id),
+        _ => None,
+    }
 }
 
 fn collect_bound_dictionary_params(
     ty: Option<&RType>,
     class_env: &ClassEnv,
-) -> Vec<(String, String)> {
+) -> Vec<(String, GlobalId)> {
     let mut dicts = Vec::new();
     let mut cur = ty;
     while let Some(RType::RPi(name, domain, codomain, _)) = cur {
-        if let Some(class_name) = class_name_for_dictionary_type(class_env, domain) {
-            dicts.push((name.clone(), class_name));
+        if let Some(class_id) = class_id_for_dictionary_type(class_env, domain) {
+            dicts.push((name.clone(), class_id));
         }
         cur = Some(codomain);
     }
     dicts
 }
 
+/// Two indices for one effect assertion: mutable spellings support local
+/// forward declarations; checked imported IDs preserve their owner's row
+/// after a different provider overwrites the same canonical spelling.
+pub(crate) struct CheckedEffectRows<'a> {
+    names: &'a HashMap<String, crate::effects::RowType>,
+    ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+}
+
+impl<'a> CheckedEffectRows<'a> {
+    pub(crate) fn new(
+        names: &'a HashMap<String, crate::effects::RowType>,
+        ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+    ) -> Self {
+        Self { names, ids }
+    }
+}
+
 fn infer_expr_row_type(
     expr: &RExpr,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     projection_ctx: Option<&ProjectionPurityCtx<'_>>,
 ) -> crate::effects::RowType {
     match expr {
         RExpr::RCon(name, _) => effect_rows
+            .names
             .get(name)
+            .cloned()
+            .unwrap_or_else(crate::effects::RowType::empty),
+        RExpr::RCheckedGlobal { id, .. } => effect_rows
+            .ids
+            .get(id)
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(_, _, _)
@@ -10676,6 +10805,7 @@ fn infer_expr_row_type(
             proof_name,
             ..
         } => effect_rows
+            .names
             .get(&format!("{subject}::{proof_name}"))
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
@@ -10722,13 +10852,13 @@ fn infer_expr_row_type(
                     row.join(infer_expr_row_type(operand, effect_rows, projection_ctx))
                 });
             for operator in operators {
-                if let RInfixOperator::User(name, _) = operator {
-                    row = row.join(
-                        effect_rows
-                            .get(name)
-                            .cloned()
-                            .unwrap_or_else(crate::effects::RowType::empty),
-                    );
+                let operator_row = match operator {
+                    RInfixOperator::User(name, _) => effect_rows.names.get(name),
+                    RInfixOperator::CheckedUser(_, id, _) => effect_rows.ids.get(id),
+                    RInfixOperator::Builtin(_, _) => None,
+                };
+                if let Some(operator_row) = operator_row {
+                    row = row.join(operator_row.clone());
                 }
             }
             row
@@ -10764,6 +10894,7 @@ fn infer_expr_row_type(
 pub(crate) fn check_surface_purity(
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows_by_id: &HashMap<GlobalId, crate::effects::RowType>,
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
 ) -> Result<(), ElabError> {
@@ -10787,7 +10918,7 @@ pub(crate) fn check_surface_purity(
     };
     let inferred = infer_expr_row_type(
         decl_eval_body(&rdecl.body),
-        effect_rows,
+        &CheckedEffectRows::new(effect_rows, effect_rows_by_id),
         Some(&projection_ctx),
     );
     let decl =
@@ -10896,14 +11027,16 @@ fn resolved_operator_fixity(
         RInfixOperator::Builtin(operator, _) => {
             Ok((builtin_fixity(*operator), format!("{operator:?}")))
         }
-        RInfixOperator::User(name, span) => {
-            let id = globals
-                .get(name)
-                .copied()
-                .ok_or_else(|| ElabError::UnboundName {
-                    name: name.clone(),
-                    span: span.clone(),
-                })?;
+        RInfixOperator::User(name, span)
+        | RInfixOperator::CheckedUser(name, _, span) => {
+            let id = match operator {
+                RInfixOperator::CheckedUser(_, id, _) => Some(*id),
+                _ => globals.get(name).copied(),
+            }
+            .ok_or_else(|| ElabError::UnboundName {
+                name: name.clone(),
+                span: span.clone(),
+            })?;
             Ok((
                 fixities.get(&id).copied().unwrap_or(Fixity::DEFAULT),
                 name.clone(),
@@ -11041,6 +11174,7 @@ fn elab_standard_operator(
                     provenance,
                     ctx,
                     "Ord",
+                    standard_operator_class_id(env, op, class_env, "Ord")?,
                     &carrier,
                     head_id,
                     span,
@@ -11119,6 +11253,7 @@ fn elab_standard_operator(
                     provenance,
                     ctx,
                     "Membership",
+                    standard_operator_class_id(env, op, class_env, "Membership")?,
                     &carrier,
                     head_id,
                     span,
@@ -11159,11 +11294,17 @@ fn reduce_resolved_operator(
     let rhs = values.pop().expect("an infix operator has a right operand");
     let lhs = values.pop().expect("an infix operator has a left operand");
     let span = Span::merge(lhs.span(), rhs.span());
+    let imported_id = match &operator {
+        RInfixOperator::CheckedUser(_, id, _) => Some(*id),
+        _ => None,
+    };
     let combined = match operator {
         RInfixOperator::Builtin(operator, _) => {
             RExpr::RBinOp(operator, Box::new(lhs), Box::new(rhs), span)
         }
-        RInfixOperator::User(name, operator_span) => {
+        RInfixOperator::User(name, operator_span)
+        | RInfixOperator::CheckedUser(name, _, operator_span) => {
+            let selected_id = imported_id.or_else(|| globals.get(&name).copied());
             // KEYED ON THE RESOLVED IDENTITY, NOT ON `name`. `39 §6.9` binds
             // completion to the defining `GlobalId` "never to the occurrence's
             // glyph text", so this resolves the surface name first and then
@@ -11172,7 +11313,7 @@ fn reduce_resolved_operator(
             // same node; an unrelated local `≤` resolves elsewhere and does
             // not (AC-2(b)).
             let certified = standard_operators.and_then(|roles| {
-                let id = *globals.get(&name)?;
+                let id = selected_id?;
                 roles.values().any(|&certified| certified == id).then_some(id)
             });
             match certified {
@@ -11210,7 +11351,12 @@ fn reduce_resolved_operator(
                 // claim of non-constructibility, which is what this said
                 // before and what the paragraph above refutes.
                 None => {
-                    let head = RExpr::RCon(name, operator_span.clone());
+                    let head = match selected_id {
+                        Some(id) if imported_id.is_some() => {
+                            RExpr::RCheckedGlobal { name, id, span: operator_span.clone() }
+                        }
+                        _ => RExpr::RCon(name, operator_span.clone()),
+                    };
                     let first_span = Span::merge(head.span(), lhs.span());
                     let applied = RExpr::RApp(Box::new(head), Box::new(lhs), first_span);
                     RExpr::RApp(Box::new(applied), Box::new(rhs), span)
@@ -11749,6 +11895,8 @@ pub(crate) fn elaborate_rdecl_v1(
     // only within this single declaration. The persistent cross-declaration
     // registry travels through the module path via `ElabEnv::ctor_decl_spans`.
     let mut ctor_decl_spans = HashMap::new();
+    let no_names = HashMap::new();
+    let no_checked_ids = HashMap::new();
     elaborate_rdecl_v1_with_effect_rows(
         env,
         globals,
@@ -11757,7 +11905,7 @@ pub(crate) fn elaborate_rdecl_v1(
         class_env,
         provenance,
         standard_operators,
-        &HashMap::new(),
+        &CheckedEffectRows::new(&no_names, &no_checked_ids),
         &mut fixities,
         &mut fixity_spans,
         &mut ctor_decl_spans,
@@ -11803,7 +11951,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     class_env: &mut ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
@@ -11858,7 +12006,7 @@ fn elaborate_associated_rdecl(
     class_env: &mut ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
@@ -11916,6 +12064,7 @@ fn elaborate_associated_rdecl(
                     provenance,
                     &dictionary_ctx,
                     &constraint.class_name,
+                    constraint.class_id,
                     &constraint.head_type,
                     &rdecl.span,
                     &rdecl.name,
@@ -12126,6 +12275,7 @@ fn elaborate_associated_rdecl(
             fields,
         ),
         RDeclKind::InstanceDecl {
+            class_id,
             head_params,
             head_type,
             constraints,
@@ -12140,21 +12290,24 @@ fn elaborate_associated_rdecl(
             standard_operators,
             rdecl,
             effect_rows,
-            &rdecl.name.clone(),
+            &rdecl.name,
+            *class_id,
             head_params,
             head_type,
             constraints,
             fields,
         ),
-        RDeclKind::DeriveDecl { data_name } => elab_derive(
+        RDeclKind::DeriveDecl { class_id, data_name, data_id } => elab_derive(
             env,
             globals,
             num_values,
             numeric_env,
             class_env,
             rdecl,
-            &rdecl.name.clone(),
+            &rdecl.name,
+            *class_id,
             data_name,
+            *data_id,
         ),
     }
 }
@@ -12276,7 +12429,10 @@ fn elab_record_decl(
 /// Extract the outermost type constructor name from a resolved type.
 fn head_type_name(ty: &RType) -> String {
     match ty {
-        RType::RCon(s, _) | RType::RVarTy(_, s, _) | RType::RPatternAliasTy(_, s, _) => s.clone(),
+        RType::RCon(s, _)
+        | RType::RCheckedGlobal { name: s, .. }
+        | RType::RVarTy(_, s, _)
+        | RType::RPatternAliasTy(_, s, _) => s.clone(),
         RType::RApp(f, _, _) => head_type_name(f),
         RType::RUniv(_, _) => "Type".to_string(),
         RType::RArr(_, _, _) | RType::REffectArr(_, _, _, _) | RType::RPi(_, _, _, _) => {
@@ -12430,15 +12586,17 @@ fn compute_ordered_field_values(
     cx: &mut ElabCtx,
     class_env: &ClassEnv,
     class_name: &str,
+    class_id: GlobalId,
     head_name: &str,
     head_core: &Term,
     fields: &[(String, RExpr)],
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    constraints: &[RInstanceConstraint],
+    effect_rows: &CheckedEffectRows<'_>,
     span: &Span,
 ) -> Result<(Vec<Term>, Vec<crate::effects::RowType>), ElabError> {
     let (field_names, field_types, field_purities, has_param) = {
         let ci = class_env
-            .class(class_name)
+            .class_by_id(class_id)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
                 span: span.clone(),
@@ -12450,6 +12608,14 @@ fn compute_ordered_field_values(
             ci.projection.head_param.is_some(),
         )
     };
+    let mut bound_dict_classes: Vec<(String, GlobalId)> = constraints.iter().map(|constraint| {
+        let id = checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+            .expect("prerequisite checked before instance fields");
+        (constraint.binder.clone(), id)
+    }).collect();
+    if constraints.len() == 1 && constraints[0].binder != "d" {
+        bound_dict_classes.push(("d".to_string(), bound_dict_classes[0].1));
+    }
     let mut values: Vec<Term> = Vec::new();
     let mut field_rows: Vec<crate::effects::RowType> = Vec::new();
     for (i, fname) in field_names.iter().enumerate() {
@@ -12467,8 +12633,8 @@ fn compute_ordered_field_values(
         let projection_ctx = ProjectionPurityCtx {
             globals: cx.globals,
             class_env,
-            local_constraints: &[],
-            bound_dict_classes: &[],
+            local_constraints: constraints,
+            bound_dict_classes: &bound_dict_classes,
         };
         let field_row = infer_expr_row_type(&fields[pos].1, effect_rows, Some(&projection_ctx));
         if let Some(keyword) = field_purities[i] {
@@ -12480,6 +12646,8 @@ fn compute_ordered_field_values(
                 effect_rows,
                 cx.globals,
                 class_env,
+                constraints,
+                &bound_dict_classes,
                 span,
             )?;
         }
@@ -12495,16 +12663,18 @@ fn check_instance_field_purity(
     class_name: &str,
     field_name: &str,
     expr: &RExpr,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
+    constraints: &[RInstanceConstraint],
+    bound_dict_classes: &[(String, GlobalId)],
     span: &Span,
 ) -> Result<(), ElabError> {
     let projection_ctx = ProjectionPurityCtx {
         globals,
         class_env,
-        local_constraints: &[],
-        bound_dict_classes: &[],
+        local_constraints: constraints,
+        bound_dict_classes,
     };
     let inferred = infer_expr_row_type(expr, effect_rows, Some(&projection_ctx));
     let impure = !is_empty_closed_row(&inferred);
@@ -12558,6 +12728,77 @@ fn close_type0_lams(mut body: Term, count: usize) -> Term {
     body
 }
 
+/// Class references selected by imports are never resolved through the
+/// mutable current-name index. A local/legacy reference without a selected ID
+/// uses that index only after its declaration has been checked.
+fn checked_class_id(
+    class_env: &ClassEnv,
+    name: &str,
+    selected: Option<GlobalId>,
+    span: &Span,
+) -> Result<GlobalId, ElabError> {
+    let id = selected.or_else(|| class_env.class(name).map(|view| view.projection.type_id));
+    id.filter(|id| class_env.class_by_id(*id).is_some())
+        .ok_or_else(|| ElabError::UnresolvedCon {
+            name: name.to_string(),
+            span: span.clone(),
+        })
+}
+
+/// Store a checked identity for every fixed constructor in a saved instance
+/// pattern; a later unit may reuse its spelling before a search occurs.
+fn freeze_instance_pattern(
+    ty: &RType,
+    globals: &HashMap<String, GlobalId>,
+) -> RType {
+    match ty {
+        RType::RCon(name, span) => match globals.get(name) {
+            Some(id) => RType::RCheckedGlobal {
+                name: name.clone(), id: *id, span: span.clone(),
+            },
+            None => ty.clone(),
+        },
+        RType::RApp(f, a, span) => RType::RApp(
+            Box::new(freeze_instance_pattern(f, globals)),
+            Box::new(freeze_instance_pattern(a, globals)), span.clone(),
+        ),
+        RType::RArr(a, b, span) => RType::RArr(
+            Box::new(freeze_instance_pattern(a, globals)),
+            Box::new(freeze_instance_pattern(b, globals)), span.clone(),
+        ),
+        RType::REffectArr(a, row, b, span) => RType::REffectArr(
+            Box::new(freeze_instance_pattern(a, globals)), row.clone(),
+            Box::new(freeze_instance_pattern(b, globals)), span.clone(),
+        ),
+        RType::RTrunc(inner, span) => RType::RTrunc(
+            Box::new(freeze_instance_pattern(inner, globals)), span.clone(),
+        ),
+        _ => ty.clone(),
+    }
+}
+
+fn named_head_id(ty: &RType, globals: &HashMap<String, GlobalId>) -> Option<GlobalId> {
+    match ty {
+        RType::RCheckedGlobal { id, .. } => Some(*id),
+        RType::RCon(name, _) => globals.get(name).copied(),
+        RType::RApp(f, _, _) | RType::RRefine(_, f, _, _) => named_head_id(f, globals),
+        _ => None,
+    }
+}
+
+fn instance_head_key(ty: &RType, core: &Term) -> InstanceHeadKey {
+    match ty {
+        RType::RVarTy(_, name, _) => InstanceHeadKey::Parameter(name.clone()),
+        RType::RCheckedGlobal { id, .. } => InstanceHeadKey::Global(*id),
+        RType::RApp(f, _, _) if matches!(instance_head_key(f, core), InstanceHeadKey::Global(_)) =>
+            instance_head_key(f, core),
+        _ => match core_type_head_id(core) {
+            Some(id) => InstanceHeadKey::Global(id),
+            None => InstanceHeadKey::Structural(core.clone()),
+        },
+    }
+}
+
 /// Elaborate `instance C HeadType [where C1 T1 ; …] { f1 = e1 ; … }`.
 ///
 /// Enforces the orphan check (`33 §5.3`) and overlap check (`39 §6.1`),
@@ -12574,36 +12815,27 @@ fn elab_instance_decl(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     class_name: &str,
+    selected_class_id: Option<GlobalId>,
     head_params: &[String],
     head_type: &RType,
     constraints: &[RInstanceConstraint],
     fields: &[(String, RExpr)],
 ) -> Result<ElabResult, ElabError> {
     let span = &rdecl.span;
-
-    // ---- look up class ---------------------------------------------------
-    let (class_module, class_type_id, class_kind) = {
-        let ci = class_env
-            .class(class_name)
-            .ok_or_else(|| ElabError::UnresolvedCon {
-                name: class_name.to_string(),
-                span: span.clone(),
-            })?;
-        (ci.module_id, ci.projection.type_id, ci.kind.clone())
+    let class_type_id = checked_class_id(class_env, class_name, selected_class_id, span)?;
+    let (class_module, class_kind) = {
+        let ci = class_env.class_by_id(class_type_id).expect("selected class was checked");
+        (ci.module_id, ci.kind.clone())
     };
-
     let head_name = head_type_name(head_type);
-    let instance_key = (class_name.to_string(), head_name.clone());
-
-    // ---- orphan check (`33 §5.3`) ----------------------------------------
+    // Orphan ownership is checked at the declaration, even for an unbound
+    // head; imported heads carry their selected ID independently of globals.
     let in_class_module = class_module == class_env.current_module;
-    let in_head_module = globals
-        .get(&head_name)
-        .and_then(|id| class_env.global_modules.get(id))
-        .map(|m| *m == class_env.current_module)
-        .unwrap_or(false);
+    let in_head_module = named_head_id(head_type, globals)
+        .and_then(|id| class_env.global_modules.get(&id))
+        .is_some_and(|module| *module == class_env.current_module);
     if !in_class_module && !in_head_module {
         return Err(ElabError::OrphanInstance {
             class: class_name.to_string(),
@@ -12612,18 +12844,7 @@ fn elab_instance_decl(
         });
     }
 
-    // ---- overlap check (`39 §6.1`) — skip for property classes (Ω-PI) ---
-    if class_kind == ClassKind::Structure && class_env.instances.contains_key(&instance_key) {
-        let first_span = class_env.instances[&instance_key].declaration_span.clone();
-        return Err(ElabError::OverlappingInstances {
-            class: class_name.to_string(),
-            head_type: head_name.clone(),
-            first_span,
-            second_span: span.clone(),
-        });
-    }
-
-    // ---- elaborate head type --------------------------------------------
+    // ---- elaborate head type before identity-keyed overlap test ----------
     let head_core = {
         let mut cx = ElabCtx::new(
             env,
@@ -12636,13 +12857,23 @@ fn elab_instance_decl(
         let h = elab_type(&mut cx, head_type)?;
         cx.metas.zonk_term(&h)
     };
+    let instance_key = (class_type_id, instance_head_key(head_type, &head_core));
+    if class_kind == ClassKind::Structure {
+        if let Some(existing) = class_env.instances_by_id.get(&instance_key) {
+            return Err(ElabError::OverlappingInstances {
+                class: class_name.to_string(),
+                head_type: head_name.clone(),
+                first_span: existing.declaration_span.clone(),
+                second_span: span.clone(),
+            });
+        }
+    }
 
     // ---- build instance type --------------------------------------------
     // App(class_type, head) if parameterized, else class_type directly.
     let instance_ty = if class_env
-        .class(class_name)
-        .map(|ci| ci.projection.head_param.is_some())
-        .unwrap_or(false)
+        .class_by_id(class_type_id)
+        .is_some_and(|ci| ci.projection.head_param.is_some())
     {
         Term::app(Term::const_(class_type_id, vec![]), head_core.clone())
     } else {
@@ -12660,12 +12891,8 @@ fn elab_instance_decl(
         constraints
             .iter()
             .map(|constraint| {
-                let class = class_env.class(&constraint.class_name).ok_or_else(|| {
-                    ElabError::UnresolvedCon {
-                        name: constraint.class_name.clone(),
-                        span: span.clone(),
-                    }
-                    })?;
+                let id = checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)?;
+                let class = class_env.class_by_id(id).expect("selected constraint was checked");
                 let head = elab_type(&mut cx, &constraint.head_type)?;
                 Ok(if class.projection.head_param.is_some() {
                     Term::app(Term::const_(class.projection.type_id, vec![]), head)
@@ -12697,8 +12924,9 @@ fn elab_instance_decl(
     // There is NO search-side backstop (no resolution-depth bound or occurs-check);
     // faithful reification is the sole net for mutual-cycle termination.
     let has_self_ref = constraints.iter().any(|constraint| {
-        let chead = head_type_name(&constraint.head_type);
-        (constraint.class_name.as_str(), chead.as_str()) == (class_name, head_name.as_str())
+        checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+            .is_ok_and(|id| id == class_type_id)
+            && rtypes_match(&constraint.head_type, head_type, globals)
     });
 
     // ---- admit the instance ----------------------------------------------
@@ -12745,9 +12973,11 @@ fn elab_instance_decl(
                 &mut cx,
                 class_env,
                 class_name,
+                class_type_id,
                 &head_name,
                 &head_core,
                 fields,
+                constraints,
                 effect_rows,
                 span,
             )?
@@ -12782,9 +13012,11 @@ fn elab_instance_decl(
                 &mut cx,
                 class_env,
                 class_name,
+                class_type_id,
                 &head_name,
                 &head_core,
                 fields,
+                constraints,
                 effect_rows,
                 span,
             )?
@@ -12810,31 +13042,33 @@ fn elab_instance_decl(
         .insert(instance_id, class_env.current_module);
     // For property classes, allow multiple registrations (Ω-PI means they're
     // all definitionally equal; the key is occupied but we don't error).
-    class_env.instances.insert(
-        instance_key,
-        InstanceInfo {
-            instance_id,
-            class_name: class_name.to_string(),
-            field_effect_rows,
-            module_id: class_env.current_module,
-            head_param_count: head_params.len(),
-            head_type: Some(head_type.clone()),
-            constraints: constraints
-                .iter()
-                .zip(&constraint_core_types)
-                .map(|(constraint, core_type)| InstanceConstraintInfo {
-                    class_name: constraint.class_name.clone(),
-                    head_type: constraint.head_type.clone(),
-                    core_type: core_type.clone(),
-                })
-                .collect(),
-            defining_package: class_env
-                .current_package
-                .clone()
-                .unwrap_or_else(|| "<local>".to_string()),
-            declaration_span: span.clone(),
-        },
-    );
+    let info = InstanceInfo {
+        instance_id,
+        class_name: class_name.to_string(),
+        class_id: class_type_id,
+        field_effect_rows,
+        module_id: class_env.current_module,
+        head_param_count: head_params.len(),
+        head_type: Some(freeze_instance_pattern(head_type, globals)),
+        constraints: constraints
+            .iter()
+            .zip(&constraint_core_types)
+            .map(|(constraint, core_type)| InstanceConstraintInfo {
+                class_name: constraint.class_name.clone(),
+                class_id: checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+                    .expect("constraint checked before instance admission"),
+                head_type: freeze_instance_pattern(&constraint.head_type, globals),
+                core_type: core_type.clone(),
+            })
+            .collect(),
+        defining_package: class_env
+            .current_package
+            .clone()
+            .unwrap_or_else(|| "<local>".to_string()),
+        declaration_span: span.clone(),
+    };
+    class_env.instances.insert((class_name.to_string(), head_name), info.clone());
+    class_env.instances_by_id.insert(instance_key, info);
     if let Some(package) = &class_env.current_package {
         class_env.source_instance_packages.insert(package.clone());
     }
@@ -12863,23 +13097,17 @@ fn elab_derive(
     class_env: &mut ClassEnv,
     rdecl: &RDecl,
     class_name: &str,
+    selected_class_id: Option<GlobalId>,
     data_name: &str,
+    selected_data_id: Option<GlobalId>,
 ) -> Result<ElabResult, ElabError> {
     let span = &rdecl.span;
 
-    let (class_type_id, has_param) = {
-        let ci = class_env
-            .class(class_name)
-            .ok_or_else(|| ElabError::UnresolvedCon {
-                name: class_name.to_string(),
-                span: span.clone(),
-            })?;
-        (ci.projection.type_id, ci.projection.head_param.is_some())
-    };
+    let class_type_id = checked_class_id(class_env, class_name, selected_class_id, span)?;
+    let has_param = class_env.class_by_id(class_type_id)
+        .expect("selected class was checked").projection.head_param.is_some();
 
-    let data_id = globals
-        .get(data_name)
-        .copied()
+    let data_id = selected_data_id.or_else(|| globals.get(data_name).copied())
         .ok_or_else(|| ElabError::UnresolvedCon {
             name: data_name.to_string(),
             span: span.clone(),
@@ -12914,22 +13142,21 @@ fn elab_derive(
     class_env
         .global_modules
         .insert(instance_id, class_env.current_module);
-    class_env.instances.insert(
-        (class_name.to_string(), head_name),
-        InstanceInfo {
-            instance_id,
-            class_name: class_name.to_string(),
-            field_effect_rows: vec![],
-            module_id: class_env.current_module,
-            head_param_count: 0,
-            head_type: None,
-            constraints: vec![],
-            defining_package: class_env
-                .current_package
-                .clone()
-                .unwrap_or_else(|| "<local>".to_string()),
-            declaration_span: span.clone(),
-        },
+    let info = InstanceInfo {
+        instance_id,
+        class_name: class_name.to_string(),
+        class_id: class_type_id,
+        field_effect_rows: vec![],
+        module_id: class_env.current_module,
+        head_param_count: 0,
+        head_type: None,
+        constraints: vec![],
+        defining_package: class_env.current_package.clone().unwrap_or_else(|| "<local>".to_string()),
+        declaration_span: span.clone(),
+    };
+    class_env.instances.insert((class_name.to_string(), head_name), info.clone());
+    class_env.instances_by_id.insert(
+        (class_type_id, InstanceHeadKey::Global(data_id)), info,
     );
     if let Some(package) = &class_env.current_package {
         class_env.source_instance_packages.insert(package.clone());
@@ -13257,7 +13484,11 @@ pub(crate) fn elaborate_space_decl(
         }
 
         let qualified_name = format!("{}.{}", space.name, operation.name);
-        let inferred_row = infer_expr_row_type(&operation.body, &elab.effect_rows, None)
+        let inferred_row = infer_expr_row_type(
+            &operation.body,
+            &CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+            None,
+        )
             .join(crate::effects::RowType::singleton(space.name.clone()));
         let effect_decl = crate::effects::EffectDecl::new(&qualified_name)
             .with_declared_row_type(declared_row.clone());
@@ -14033,6 +14264,7 @@ pub(crate) fn elaborate_mutual_group(
 pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
     match expr {
         RExpr::RCon(n, _) => n == name,
+        RExpr::RCheckedGlobal { .. } => false,
         RExpr::RVar(_, _, _)
         | RExpr::RPatternAlias(_, _, _)
         | RExpr::RCell(_, _, _)
@@ -14113,6 +14345,7 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
 pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
     match ty {
         RType::RCon(n, _) => n == name,
+        RType::RCheckedGlobal { .. } => false,
         RType::RPi(_, domain, codomain, _)
         | RType::RSigma(_, domain, codomain, _)
         | RType::RArr(domain, codomain, _)
@@ -15550,7 +15783,9 @@ fn collect_or_pattern_slots(pattern: &RPattern, inside_or: bool, slots: &mut Has
                 collect_or_pattern_slots(alternative, true, slots);
             }
         }
-        RPatKind::Ctor(_, fields) | RPatKind::Tuple(fields) => {
+        RPatKind::Ctor(_, fields)
+        | RPatKind::CheckedCtor(_, _, fields)
+        | RPatKind::Tuple(fields) => {
             for field in fields {
                 collect_or_pattern_slots(field, inside_or, slots);
             }
@@ -15746,7 +15981,7 @@ fn pattern_without_aliases(mut pattern: &RPattern) -> &RPattern {
 
 fn guarded_leaf_missing_witness(pattern: &RPattern) -> MissingPatternWitness {
     match &pattern.kind {
-        RPatKind::Ctor(name, fields) => MissingPatternWitness {
+        RPatKind::Ctor(name, fields) | RPatKind::CheckedCtor(name, _, fields) => MissingPatternWitness {
             constructor: name.clone(),
             arity: fields.len(),
         },
@@ -16353,7 +16588,10 @@ fn compile_literal_column(
                     Some(value)
                 }
                 RPatKind::Wild | RPatKind::Var(_, _) => None,
-                RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {
+                RPatKind::Ctor(_, _)
+                | RPatKind::CheckedCtor(_, _, _)
+                | RPatKind::Tuple(_)
+                | RPatKind::Record(_) => {
                     return Err(ElabError::TypeMismatch {
                         span: row.real_pats[0].span.clone(),
                         reason: "literal column cannot mix value literals with structural patterns"
@@ -16528,7 +16766,10 @@ fn compile_tuple_column(
                         .specialize_current_column(vec![wild(), wild()], false),
                 );
             }
-            RPatKind::Ctor(_, _) | RPatKind::Record(_) | RPatKind::Literal(_, _) => {
+            RPatKind::Ctor(_, _)
+            | RPatKind::CheckedCtor(_, _, _)
+            | RPatKind::Record(_)
+            | RPatKind::Literal(_, _) => {
                 return Err(ElabError::TypeMismatch {
                     span: row.real_pats[0].span.clone(),
                     reason: "non-tuple pattern cannot match a pair component".into(),
@@ -16749,7 +16990,10 @@ fn compile_record_column(
                         .specialize_projected_record_column(patterns, source_bindings),
                 );
             }
-            RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Literal(_, _) => {
+            RPatKind::Ctor(_, _)
+            | RPatKind::CheckedCtor(_, _, _)
+            | RPatKind::Tuple(_)
+            | RPatKind::Literal(_, _) => {
                 return Err(ElabError::TypeMismatch {
                     span: row.real_pats[0].span.clone(),
                     reason: "non-record pattern cannot match a named record component".into(),
@@ -17303,8 +17547,8 @@ fn build_ctor_buckets(
                 "a constructor split must receive the current column's live occurrence"
             );
             match &r.real_pats[0].kind {
-                RPatKind::Ctor(name, subs) => {
-                    if cx.globals.get(name).copied() == Some(c0.id) {
+                RPatKind::Ctor(_, subs) | RPatKind::CheckedCtor(_, _, subs) => {
+                    if pattern_ctor_id(cx, &r.real_pats[0].kind) == Some(c0.id) {
                         bucket.push(r.clone().specialize_current_column(subs.clone(), true));
                     }
                 }
@@ -17572,6 +17816,7 @@ fn top_pattern_is_catchall(pattern: &RPattern) -> bool {
         RPatKind::As(inner, _, _) => top_pattern_is_catchall(inner),
         RPatKind::Or(alternatives) => alternatives.iter().any(top_pattern_is_catchall),
         RPatKind::Ctor(_, _)
+        | RPatKind::CheckedCtor(_, _, _)
         | RPatKind::Tuple(_)
         | RPatKind::Record(_)
         | RPatKind::Literal(_, _) => false,
@@ -17585,10 +17830,8 @@ fn ensure_top_pattern_ctors_belong_to_family(
     d_id: GlobalId,
 ) -> Result<(), ElabError> {
     match &pattern.kind {
-        RPatKind::Ctor(name, _) => {
-            let ctor_id = *cx
-                .globals
-                .get(name)
+        RPatKind::Ctor(name, _) | RPatKind::CheckedCtor(name, _, _) => {
+            let ctor_id = pattern_ctor_id(cx, &pattern.kind)
                 .expect("constructor resolution precedes family validation");
             if !ind
                 .constructors
@@ -17714,6 +17957,7 @@ fn top_pattern_contains_literal(pattern: &RPattern) -> bool {
         RPatKind::Wild
         | RPatKind::Var(_, _)
         | RPatKind::Ctor(_, _)
+        | RPatKind::CheckedCtor(_, _, _)
         | RPatKind::Tuple(_)
         | RPatKind::Record(_) => false,
     }
@@ -17732,9 +17976,11 @@ fn top_pattern_is_literal_form(pattern: &RPattern) -> bool {
             top_pattern_contains_literal(alternative)
                 && top_pattern_is_literal_form(alternative)
         }),
-        RPatKind::Var(_, _) | RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {
-            false
-        }
+        RPatKind::Var(_, _)
+        | RPatKind::Ctor(_, _)
+        | RPatKind::CheckedCtor(_, _, _)
+        | RPatKind::Tuple(_)
+        | RPatKind::Record(_) => false,
     }
 }
 
@@ -17973,8 +18219,8 @@ fn ensure_pattern_constructors_resolve(
     pattern: &RPattern,
 ) -> Result<(), ElabError> {
     match &pattern.kind {
-        RPatKind::Ctor(name, fields) => {
-            if !cx.globals.contains_key(name) {
+        RPatKind::Ctor(name, fields) | RPatKind::CheckedCtor(name, _, fields) => {
+            if matches!(&pattern.kind, RPatKind::Ctor(_, _)) && !cx.globals.contains_key(name) {
                 return Err(ElabError::UnresolvedCon {
                     name: name.clone(),
                     span: pattern.span.clone(),
@@ -18025,10 +18271,11 @@ fn ensure_arm_ctors_belong_to_family(
     d_id: GlobalId,
 ) -> Result<(), ElabError> {
     for arm in arms {
-        if let RPatKind::Ctor(name, _) = &pattern_without_aliases(&arm.pat).kind {
-            let ctor_id = *cx.globals.get(name).expect(
+        let head = &pattern_without_aliases(&arm.pat).kind;
+        if let RPatKind::Ctor(name, _) | RPatKind::CheckedCtor(name, _, _) = head {
+            let ctor_id = pattern_ctor_id(cx, head).expect(
                 "ensure_pattern_constructors_resolve already validated every top-level \
-                 arm pattern name resolves in cx.globals before this function runs",
+                 arm pattern before this function runs",
             );
             if !ind.constructors.iter().any(|c| c.id == ctor_id) {
                 return Err(ElabError::TypeMismatch {
