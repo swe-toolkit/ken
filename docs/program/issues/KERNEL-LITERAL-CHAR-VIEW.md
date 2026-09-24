@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LITERAL-CHAR-VIEW
 title: "K3: the kernel reduces string_to_list_char on a checked String literal to its List Char and charToInt on a checked Char literal to its IntLit codepoint, so a generic client can build a checked ASCII witness for a fresh literal; no other primitive gains reduction"
-status: ready
+status: active
 owner: kernel
 size: M
 gate: architect
