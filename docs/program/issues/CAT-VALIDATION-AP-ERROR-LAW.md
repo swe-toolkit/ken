@@ -1,7 +1,7 @@
 ---
 id: CAT-VALIDATION-AP-ERROR-LAW
 title: "Proof-backfill for Data/Sums/Validation.ken.md: prove privately that validation_ap accumulates two errors by the supplied semigroup in order -- for every e, a, b, sg and errors left, right, applying Invalid left to Invalid right gives Invalid (sg.op left right) -- instead of only the concrete NonEmpty String example"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect

@@ -1,12 +1,12 @@
 ---
 id: CAT-ARGPARSE-LAWS
 title: "Proof-backfill for Application/CommandLine/ArgParse.ken.md: prove, for arbitrary specifications and argument lists, that argparse_run preserves raw argument Bytes, accumulates every located diagnostic in token order, and drives help from the same spec, over the existing representation with no new trust"
-status: active
+status: draft
 owner: foundation
 size: L
 gate: none
 tier: T1
-depends_on: [CAT-SCHEMA-LAWS, CAT-PARSING-CURSOR-LAWS, CAT-PARSING-DECODER-LAWS]
+depends_on: [CAT-SCHEMA-LAWS, CAT-PARSING-CURSOR-LAWS, CAT-PARSING-DECODER-LAWS, KERNEL-LITERAL-CHAR-VIEW]
 blocks: []
 github: null
 origin: "Proof-backfill follow-on CAT-ARGPARSE-LAWS named by docs/program/CATALOG-PROOF-COMPLETENESS-SURVEY.md, under operator ruling 2026-09-13 ('schedule the proof backfill before extending the catalog'). Chosen next because every package it imports now carries laws. Steward-filed per COORDINATION section 2."
@@ -68,29 +68,26 @@ laws landed (`6e235b746`, `3120a845c`). Deliverables 1 and 2 stopped on
 bounded attempts (`evt_3jdh6yptdct5m`, `evt_4ts4acq2t3jxf`). The cause is
 per-occurrence literal identity: `elab_str_lit` mints a fresh identity for
 each `"--"`, so the parser's prefix literal and the proof's never convert
-(Architect `evt_5sy6b16r05r48`; not an established K3 dependency). The
-kept extraction `71776ddd8` stays unlanded. Resume only on an operator
-ruling.
+(Architect `evt_5sy6b16r05r48`). The kept extraction `71776ddd8` stays
+unlanded. **Operator 2026-09-24:** resume laws 1 and 2 after
+`KERNEL-LITERAL-CHAR-VIEW` lands. Every `"--"` here is
+`string_to_list_char "--"`, which that node reduces to one `List Char`
+across occurrences (its AC-4). No parser or elaborator change.
 
 ## Acceptance criteria
 
 - **AC-1.** No new trust: the added lines contain no `Axiom`, postulate,
   primitive, `Omega` carrier, or kernel/TCB change. The production
   representation and shipped declarations are unchanged apart from added
-  proofs and exports, with one exception (Steward, 2026-09-23, after the
-  measured stop `evt_6s7xaffe0nz4`). The implementer first makes a bounded, checked
-  exact-goal J-transport attempt against the actual unfolded parser match,
-  and the Architect reviews it. If that attempt stays stuck, one shared
-  private step may be factored out, used by both the production parser and
-  the proof, preserving every old arm and the callback, index and effect
-  semantics. Exported types are unchanged and `cc7_*` stays green. AC-2
-  keeps a natural-site mutation for each law, including after factoring.
-  The Architect confirms meaning on the actual candidate.
+  proofs and exports. For the laws 1-2 resumption after K3 there is **no
+  parser or elaborator change**: the 2026-09-23 shared-step factorization
+  fallback is withdrawn (2026-09-24). A distinct post-K3 structural blocker
+  is a STOP for its own ruling. Exported types are unchanged and `cc7_*`
+  stays green. The Architect confirms meaning on the actual candidate.
 - **AC-2 (falsifier).** For each deliverable, the handback names one
   one-line natural-site mutation that makes that law's proof fail to check
   for its own property. For laws 1 and 2 the site is
-  `argparse_parse_tokens`, or the single shared production step it calls if
-  AC-1's factorization is used. For law 3 it is `command_schema` or
+  `argparse_parse_tokens`. For law 3 it is `command_schema` or
   `command_help`. For example, `Suc index` instead of `Suc (Suc index)` after
   a value option, at whichever site owns that branch, must break law 2. No
   law may be vacuous: its hypotheses must be satisfiable, and removing any
