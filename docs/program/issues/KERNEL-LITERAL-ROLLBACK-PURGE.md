@@ -70,14 +70,15 @@ The K3 acceptance tests stay green without changed expectations.
 ## Acceptance
 
 - **AC-1 (parent/base matrix, red first).** Commit the Adversary's sequence
-  (`ElabEnv::elaborate_decl` in order) as a regression. Record three rows
-  separately, at parent `88124a613` and at base `bfdbb9789`:
-  - kernel false `Refl` over the reused-id foreign String (expected
-    K3-specific: rejected at parent, accepted at base);
-  - runtime stale side table: the reused-id `Int` const evaluates to
+  (`ElabEnv::elaborate_decl` in order) as a regression. Record:
+  - at parent `88124a613` and base `bfdbb9789`: the false `Refl` over the
+    reused-id foreign String (expected rejected at parent, accepted at base);
+  - at parent and base, using only facilities the parent has: the runtime
+    stale side table, where the reused-id `Int` const evaluates to
     `Str("zz")` (possibly older than K3; measure it, do not impute it);
-  - positive: a genuine literal declared after the rollback gets its own
-    view.
+  - at base only: the positive, a genuine literal declared after the
+    rollback gets its own checked `string_to_list_char` view. The parent
+    predates K3 and has no such view.
   Every negative is paired with a reaching positive; no bare `expect_err`.
 - **AC-2 (candidate).** The false theorem rejects at its `Refl` obligation,
   and so do the adjacent controls. Each popped-id reuse evaluates to its own
