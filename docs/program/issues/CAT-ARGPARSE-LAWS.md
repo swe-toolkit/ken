@@ -63,7 +63,7 @@ list:
 The ring chooses the exact statements. Each must quantify over arbitrary
 input and must fail if the implementation changes the behavior it names.
 
-**Parked for the operator (2026-09-23).** Deliverable 3 and its provider
+**History (2026-09-23 park, resolved).** Deliverable 3 and its provider
 laws landed (`6e235b746`, `3120a845c`). Deliverables 1 and 2 stopped on
 bounded attempts (`evt_3jdh6yptdct5m`, `evt_4ts4acq2t3jxf`). The cause is
 per-occurrence literal identity: `elab_str_lit` mints a fresh identity for
@@ -72,7 +72,20 @@ each `"--"`, so the parser's prefix literal and the proof's never convert
 unlanded. **Operator 2026-09-24:** resume laws 1 and 2 after
 `KERNEL-LITERAL-CHAR-VIEW` lands. Every `"--"` here is
 `string_to_list_char "--"`, which that node reduces to one `List Char`
-across occurrences (its AC-4). No parser or elaborator change.
+across occurrences (its AC-4). No parser or elaborator change. K3 landed
+(`bfdbb9789`) and resolved literal identity. The **current** blocker is
+neutral-selector access; see the symptom inventory.
+
+## Symptom inventory
+
+1. Before K3: the computed prefix `Bool` stayed opaque inside the selected
+   helper when the theorem split a separate result. The obstacle is access
+   through a computed nested selector.
+2. After K3: the theorem's own match on a neutral `argparse_find_option`
+   did not refine the parser's own eliminator. This is the same
+   proof-access predicate.
+
+The chain is at HS2. A third advancing hard stop invokes Research.
 
 ## Acceptance criteria
 
@@ -84,11 +97,15 @@ across occurrences (its AC-4). No parser or elaborator change.
   fallback is withdrawn (2026-09-24). A distinct post-K3 structural blocker
   is a STOP for its own ruling. Exported types are unchanged and `cc7_*`
   stays green. The Architect confirms meaning on the actual candidate.
-- **AC-1a (proof-only adapter; Architect `evt_7fzgaaqe3x855`).** The one
-  permitted auxiliary declaration is a private, transparent, proof-only
-  single-token adapter, parameterized by the outcomes the proof splits on
-  (for example the selected `Option OptionSpec`, and the prefix `Bool` in the
-  `None` branch).
+- **AC-1a (proof-local helpers; Architect `evt_7fzgaaqe3x855`,
+  `evt_5bjtwy4ymq99s`).** Private proof-local observation and projection
+  helpers that the laws need may stay (for example the WIP's
+  `argparse_input_value_bytes` and `argparse_observed_bytes`). None of them
+  may compute a full parser outcome. In addition, **exactly one** private,
+  transparent, proof-only single-token **full-parser-outcome head adapter**
+  may be added, parameterized by the outcomes the proof splits on (for
+  example the selected `Option OptionSpec`, and the prefix `Bool` in the
+  `None` branch). Calling a second parser an observer does not exempt it.
   - It calls the existing `argparse_parse_tokens` for recursive tails and
     the existing `argparse_cons_validations` and `argparse_error` for
     assembly. It never recurses as an independent parser.
@@ -126,10 +143,8 @@ across occurrences (its AC-4). No parser or elaborator change.
 
 - If the generic full-`Validation` bridge does not check with `Refl` or
   existing transport, STOP. Do not add a second adapter or edit the parser or
-  elaborator. Hard-stop inventory (Architect `evt_7fzgaaqe3x855`): this
-  computed-selector chain is at HS2. The theorem's own match on a neutral
-  nested selector does not refine the parser's eliminator. A third stop
-  triggers Research.
+  elaborator. The chain is at HS2 (symptom inventory above); a third
+  advancing hard stop invokes Research.
 
 - If a law needs a fact about primitive `Bytes` or `String` that no existing
   TCB contract states, prove everything else and STOP on that fact. Do not
