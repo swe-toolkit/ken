@@ -51,6 +51,25 @@ output for a declaration that already round-trips.
   from `84c88e4a0` used as a fixture, fail the round trip at base. On the
   candidate, both round-trip: the formatted output parses to the same
   declarations, and a second format is byte-identical.
+- **AC-1a (sibling).** The type alias `def Wrapped = List (Option Nat)`
+  loses its final `)` under `ken fmt` at base, like the axiom (Architect
+  measurement). It is red first and round-trips on the candidate. The
+  handback states which repair shape was taken (see Design) and, for the
+  declaration-level shape only, names every parser production whose span
+  end is taken from a sub-term's span, with its disposition.
+- **Design (Architect).** The cause is the parser: the `TypeAtomForm::Paren`
+  arm of `parse_atom_type` returns the inner type with the inner span, and
+  unlike `ExprAtomForm::Paren` it never re-spans over the parens. Preferred
+  repair: re-span that arm from `(` through `)`, which closes every
+  consumer (axiom, alias, constructor arguments, prop intros) in one place.
+  Fallback, if and only if the preferred repair changes the formatted output
+  of an already-round-tripping declaration (the frame's STOP): end
+  `AxiomDecl` and `TypeAlias` at the last consumed token, as `PropDecl`
+  already does. Do not add a printer-side patch, and leave `print_sum`'s
+  adjacent-`)` extension in place. It becomes redundant under the preferred
+  repair; say so in the handback. A diagnostic-span test that moves because
+  a type span now covers its parens is not a STOP, but list every such pin
+  in the handback.
 - **AC-2 (mutation).** Reverting only the repair reddens AC-1.
 - **AC-3 (no collateral).** The whole-catalog kenfmt gate and the
   frozen-corpus canonical check stay green, with no catalog file reformatted.
