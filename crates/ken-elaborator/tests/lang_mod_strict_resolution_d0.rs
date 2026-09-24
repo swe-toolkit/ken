@@ -1059,6 +1059,31 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // AC-5: Derived's closure set plus charToInt, this package's own
+            // use of a provider-less builtin in AllAscii and F2.
+            "Data.Binary.BytesPrimitiveContracts".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "charToInt",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Data.Collections.Deque".to_string(),
             [
                 "And",
