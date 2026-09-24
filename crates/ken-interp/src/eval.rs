@@ -1788,7 +1788,13 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
 
         // --- Const: δ-unfold transparent; postulate → Unknown; prim → pending ---
         Term::Const { id, .. } => {
-            // Numeric literal side table: opaque postulates representing literal values.
+            // The checked String payload is authoritative even if an
+            // independent evaluation-side table disagrees. Char literals
+            // are already core IntLit values, not Const-backed side entries.
+            if let Some(literal) = globals.checked_literal(*id) {
+                return EvalVal::Str(ken_elaborator::NfcString::new(literal.as_str()));
+            }
+            // Other numeric literals retain their original side table.
             if let Some(v) = store.num_values.get(id) {
                 return v.clone();
             }

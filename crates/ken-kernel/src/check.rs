@@ -12,13 +12,17 @@
 //! gates inductives on strict positivity (`14 §8`).
 
 use crate::conv::{convert, convert_type, level_eq, whnf};
-use crate::env::{telescope_to_pi, AllSupportSort, Context, Decl, GlobalEnv, InductiveDecl};
+use crate::env::{
+    telescope_to_pi, AllSupportSort, CheckedStringLiteral, Context, Decl, GlobalEnv, InductiveDecl,
+    PrimReduction,
+};
 use crate::error::{KernelError, KernelResult};
 use crate::inductive::{
     build_all_support_decl, check_positivity, check_support_positivity, method_type,
 };
 use crate::subst::{apply_args, subst0, subst_levels, subst_outer, subst_tel, weaken};
 use crate::term::{GlobalId, Level, LevelVar, Term};
+use unicode_normalization::UnicodeNormalization;
 
 // --- raw well-formedness (`11 §6`) -----------------------------------------
 
@@ -380,10 +384,48 @@ fn check_level_arity(params: &[LevelVar], args: &[Level]) -> KernelResult<()> {
 
 // --- check (`18 §3`) -------------------------------------------------------
 
+/// Eliminate recursive `check(App(f, a)) -> infer(App) -> check(a)` frames on
+/// constructor spines. The argument check must precede conversion of the
+/// inferred application type; otherwise an unchecked operand could influence
+/// the type's normalization. Deferred comparisons preserve that order.
+fn check_app_spine(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResult<()> {
+    let mut argument = t;
+    let mut expected = ty.clone();
+    let mut pending = Vec::new();
+    while let Term::App(f, a) = argument {
+        let tf = infer(env, ctx, f)?;
+        let (dom, cod) = match whnf(env, ctx, &tf) {
+            Term::Pi(dom, cod) => (dom, cod),
+            other => return Err(KernelError::NotAFunction { head: Box::new(other) }),
+        };
+        pending.push((expected, subst0(&cod, a)));
+        expected = *dom;
+        argument = a;
+    }
+    check(env, ctx, argument, &expected)?;
+    for (expected, inferred) in pending.into_iter().rev() {
+        if !convert_type(env, ctx, &expected, &inferred) {
+            return Err(KernelError::TypeMismatch {
+                expected: Box::new(expected),
+                found: Box::new(inferred),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// `Γ ⊢ t ⇐ A` — check `t` against a known type (`18 §3`). Type-driven rules
 /// for λ (Π) and pair (Σ) insert η-relevant structure; everything else falls
 /// to the mode switch (infer + conversion).
 pub fn check(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResult<()> {
+    // Application arguments can themselves be constructor applications: a
+    // List spine nests three Apps per Cons. Check its argument chain with an
+    // explicit worklist rather than retaining one infer/check stack per cell.
+    // Each deferred type comparison runs only after its argument was checked,
+    // in exactly the same inner-to-outer order as infer(App)'s mode switch.
+    if matches!(t, Term::App(..)) {
+        return check_app_spine(env, ctx, t, ty);
+    }
     match t {
         Term::Lam(a, body) => match whnf(env, ctx, ty) {
             Term::Pi(dom, cod) => {
@@ -1229,6 +1271,155 @@ pub fn declare_primitive(
         reduction,
     });
     Ok(id)
+}
+
+/// Register a literal carrier when its type is admitted. Prelude declarations
+/// may contain checked String literals before the List Char view is installed.
+pub fn register_checked_string_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
+    if env.checked_string_type().is_some()
+        || !matches!(
+            env.lookup(id),
+            Some(Decl::Primitive {
+                reduction: PrimReduction::OpaqueType,
+                ..
+            })
+        )
+    {
+        return Err(KernelError::Msg(
+            "invalid or duplicate String literal carrier".into(),
+        ));
+    }
+    env.install_checked_string_carrier(id);
+    Ok(())
+}
+
+/// Char's current core carrier is a checked transparent alias convertible to
+/// Int. The source refinement predicate is erased at this boundary; each
+/// literal payload is independently validated as a Unicode scalar below.
+pub fn register_checked_char_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
+    let int_type = env
+        .int_lit_type()
+        .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
+    if env.checked_char_type().is_some()
+        || !matches!(env.lookup(id), Some(Decl::Transparent { .. }))
+        || !convert_type(
+            env,
+            &Context::new(),
+            &Term::const_(id, vec![]),
+            &Term::const_(int_type, vec![]),
+        )
+    {
+        return Err(KernelError::Msg(
+            "invalid or duplicate Char literal carrier".into(),
+        ));
+    }
+    env.install_checked_char_carrier(id);
+    Ok(())
+}
+
+/// Authorize precisely one String-literal view, after checking all carrier,
+/// operation and constructor types inside the kernel. The operation's name is
+/// irrelevant: only the registered declaration identity may reduce.
+pub fn register_literal_char_view(
+    env: &mut GlobalEnv,
+    string_type: GlobalId,
+    char_type: GlobalId,
+    operation: GlobalId,
+    list_type: GlobalId,
+    nil: GlobalId,
+    cons: GlobalId,
+) -> KernelResult<()> {
+    if env.has_literal_char_view()
+        || env.checked_string_type() != Some(string_type)
+        || env.checked_char_type() != Some(char_type)
+    {
+        return Err(KernelError::Msg(
+            "literal view registration does not match checked carriers or is duplicate".into(),
+        ));
+    }
+    if !matches!(
+        env.lookup(string_type),
+        Some(Decl::Primitive {
+            reduction: PrimReduction::OpaqueType,
+            ..
+        })
+    ) {
+        return Err(KernelError::Msg(
+            "literal String carrier must be an opaque primitive type".into(),
+        ));
+    }
+    let int_type = env
+        .int_lit_type()
+        .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
+    let char_ty = Term::const_(char_type, vec![]);
+    // Char's checked core alias converts to Int; scalar validity is separately
+    // enforced at every checked literal admission (Rust `char::from_u32`).
+    if !matches!(env.lookup(char_type), Some(Decl::Transparent { .. }))
+        || !convert_type(
+            env,
+            &Context::new(),
+            &char_ty,
+            &Term::const_(int_type, vec![]),
+        )
+    {
+        return Err(KernelError::Msg(
+            "literal Char carrier must be a checked Int-compatible alias".into(),
+        ));
+    }
+    let list_ty = Term::app(Term::indformer(list_type, vec![]), char_ty.clone());
+    let expected_op = Term::pi(Term::const_(string_type, vec![]), list_ty.clone());
+    if !matches!(
+        env.lookup(operation),
+        Some(Decl::Primitive {
+            reduction: PrimReduction::Op { .. },
+            ..
+        })
+    ) || !convert_type(
+        env,
+        &Context::new(),
+        &infer(env, &Context::new(), &Term::const_(operation, vec![]))?,
+        &expected_op,
+    ) {
+        return Err(KernelError::Msg(
+            "literal view operation must have String -> List Char type".into(),
+        ));
+    }
+    let nil_term = Term::app(Term::constructor(nil, vec![]), char_ty.clone());
+    let sample = apply_args(
+        Term::constructor(cons, vec![]),
+        &[char_ty, Term::IntLit(65u32.into()), nil_term],
+    );
+    check(env, &Context::new(), &sample, &list_ty)?;
+    env.install_literal_char_view(char_type, operation, nil, cons);
+    Ok(())
+}
+
+/// Register an immutable NFC payload and its kernel-checked String carrier.
+/// The same payload is exposed to the interpreter and native compiler.
+pub fn declare_checked_string_literal(env: &mut GlobalEnv, raw: &str) -> KernelResult<GlobalId> {
+    let ty_id = env
+        .checked_string_type()
+        .ok_or_else(|| KernelError::Msg("literal String carrier is not registered".into()))?;
+    let ty = Term::const_(ty_id, vec![]);
+    let normalized: String = raw.nfc().collect();
+    let id = declare_primitive(env, vec![], ty, PrimReduction::Literal)?;
+    env.install_checked_literal(id, CheckedStringLiteral(normalized));
+    Ok(id)
+}
+
+/// A surface Char literal is an IntLit in the current core, but only a valid
+/// Unicode scalar at the checked, Int-compatible Char carrier may be emitted.
+/// The value lives in the Term itself, so derived `charToInt := λc.c` and
+/// direct use share one normal form without an extra reduction rule.
+pub fn checked_char_literal(env: &GlobalEnv, scalar: u32) -> KernelResult<Term> {
+    let c = char::from_u32(scalar)
+        .ok_or_else(|| KernelError::Msg(format!("invalid Unicode scalar U+{scalar:X}")))?;
+    let char_type = env
+        .checked_char_type()
+        .ok_or_else(|| KernelError::Msg("literal Char carrier is not registered".into()))?;
+    let term = Term::IntLit((c as u32).into());
+    check(env, &Context::new(), &term, &Term::const_(char_type, vec![]))?;
+    Ok(term)
 }
 
 /// `declare_deceq_certificate` — register a decidable-equality certificate

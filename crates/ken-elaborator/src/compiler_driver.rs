@@ -4068,13 +4068,7 @@ fn stable_symbols_for_env(
             if let Decl::Primitive { id, reduction, .. } = decl {
                 let registry_symbol = match reduction {
                     ken_kernel::PrimReduction::Op { symbol } => Some((*symbol).to_string()),
-                    ken_kernel::PrimReduction::Literal => match env.num_values.get(id) {
-                        Some(crate::NumericLitVal::Int(value)) => Some(format!("lit_int_{value}")),
-                        Some(crate::NumericLitVal::Str(value)) => {
-                            Some(format!("lit_string_{value}"))
-                        }
-                        _ => None,
-                    },
+                    ken_kernel::PrimReduction::Literal => literal_native_symbol(env, *id),
                     ken_kernel::PrimReduction::OpaqueType => None,
                 };
                 if let Some(registry_symbol) = registry_symbol {
@@ -4112,6 +4106,20 @@ fn stable_symbols_for_env(
     (symbols, table)
 }
 
+// Kernel-checked String payload is the single authority for native lowering;
+// Char literals are core IntLit values, and unrelated numeric literals retain
+// the elaborator's original side table.
+fn literal_native_symbol(env: &ElabEnv, id: GlobalId) -> Option<String> {
+    match env.env.checked_literal(id) {
+        Some(value) => Some(format!("lit_string_{}", value.as_str())),
+        None => match env.num_values.get(&id) {
+            Some(crate::NumericLitVal::Int(value)) => Some(format!("lit_int_{value}")),
+            Some(crate::NumericLitVal::Str(value)) => Some(format!("lit_string_{value}")),
+            _ => None,
+        },
+    }
+}
+
 fn add_native_primitive_metadata(
     env: &ElabEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
@@ -4125,16 +4133,9 @@ fn add_native_primitive_metadata(
             ken_kernel::PrimReduction::Op { symbol } => {
                 ((*symbol).to_string(), PrimitiveReductionMetadata::Op)
             }
-            ken_kernel::PrimReduction::Literal => match env.num_values.get(id) {
-                Some(crate::NumericLitVal::Int(value)) => (
-                    format!("lit_int_{value}"),
-                    PrimitiveReductionMetadata::Literal,
-                ),
-                Some(crate::NumericLitVal::Str(value)) => (
-                    format!("lit_string_{value}"),
-                    PrimitiveReductionMetadata::Literal,
-                ),
-                _ => continue,
+            ken_kernel::PrimReduction::Literal => match literal_native_symbol(env, *id) {
+                Some(symbol) => (symbol, PrimitiveReductionMetadata::Literal),
+                None => continue,
             },
             ken_kernel::PrimReduction::OpaqueType => continue,
         };

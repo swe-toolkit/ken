@@ -98,6 +98,26 @@ pub enum PrimReduction {
     },
 }
 
+/// Immutable, kernel-validated NFC String literal payload. Char literals
+/// instead use the type-preserving core `Term::IntLit` representation (after
+/// scalar validation at registration), with no fresh global to look up.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CheckedStringLiteral(pub(crate) String);
+
+impl CheckedStringLiteral {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LiteralCharView {
+    char_type: GlobalId,
+    operation: GlobalId,
+    nil: GlobalId,
+    cons: GlobalId,
+}
+
 /// A registered decidable-equality certificate for an opaque primitive type
 /// (`docs/adr/0013-int-decidable-equality-kernel-posture.md` Layer 1) — the
 /// kernel-audited assumption that `eq_op`
@@ -284,6 +304,13 @@ pub struct GlobalEnv {
     /// registered — bookkeeping metadata (like `deceq_certs`), never a
     /// `trusted_base()` member.
     int_lit_ty: Option<GlobalId>,
+    /// K3 literal views: source syntax is validated against declared carriers
+    /// before its immutable value is installed; never sourced from side tables
+    /// supplied at conversion time.
+    literal_char_view: Option<LiteralCharView>,
+    checked_string_carrier: Option<GlobalId>,
+    checked_char_carrier: Option<GlobalId>,
+    checked_literals: HashMap<GlobalId, CheckedStringLiteral>,
 }
 
 impl GlobalEnv {
@@ -558,6 +585,61 @@ impl GlobalEnv {
     /// rather than assume a default.
     pub fn int_lit_type(&self) -> Option<GlobalId> {
         self.int_lit_ty
+    }
+
+    /// Checked literal payload for interpreter/native lowering and conversion.
+    /// No payload exists for any other primitive or unregistered declaration.
+    pub fn checked_literal(&self, id: GlobalId) -> Option<&CheckedStringLiteral> {
+        self.checked_literals.get(&id)
+    }
+
+    /// The only registered String-to-List-Char operation and its typed
+    /// constructors. Unregistered ops have no conversion arm.
+    pub(crate) fn literal_char_view(
+        &self,
+        operation: GlobalId,
+    ) -> Option<(GlobalId, GlobalId, GlobalId)> {
+        let view = self.literal_char_view.as_ref()?;
+        (view.operation == operation).then_some((view.char_type, view.nil, view.cons))
+    }
+
+    pub(crate) fn has_literal_char_view(&self) -> bool {
+        self.literal_char_view.is_some()
+    }
+
+    pub(crate) fn checked_string_type(&self) -> Option<GlobalId> {
+        self.checked_string_carrier
+    }
+
+    pub(crate) fn checked_char_type(&self) -> Option<GlobalId> {
+        self.checked_char_carrier
+    }
+
+    pub(crate) fn install_checked_string_carrier(&mut self, id: GlobalId) {
+        self.checked_string_carrier = Some(id);
+    }
+
+    pub(crate) fn install_checked_char_carrier(&mut self, id: GlobalId) {
+        self.checked_char_carrier = Some(id);
+    }
+
+    pub(crate) fn install_literal_char_view(
+        &mut self,
+        char_type: GlobalId,
+        operation: GlobalId,
+        nil: GlobalId,
+        cons: GlobalId,
+    ) {
+        self.literal_char_view = Some(LiteralCharView {
+            char_type,
+            operation,
+            nil,
+            cons,
+        });
+    }
+
+    pub(crate) fn install_checked_literal(&mut self, id: GlobalId, value: CheckedStringLiteral) {
+        self.checked_literals.insert(id, value);
     }
 
     /// The postulates and real primitives in `Σ` — the unchecked assumptions a

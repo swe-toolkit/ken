@@ -60,6 +60,8 @@ pub fn register_bytes_env(
     let string_id = declare_primitive(env, vec![], type0.clone(), PrimReduction::OpaqueType)
         .map_err(|e| ElabError::Internal(format!("prim String failed: {}", e)))?;
     globals.insert("String".to_string(), string_id);
+    ken_kernel::check::register_checked_string_carrier(env, string_id)
+        .map_err(|e| ElabError::Internal(format!("literal String carrier failed: {e}")))?;
 
     // Int is registered by the numeric tower before us.
     let int_id = globals

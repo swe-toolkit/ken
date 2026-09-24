@@ -9303,22 +9303,24 @@ fn elab_str_lit(
     }
     // Checked string literals are accounting-neutral values; see
     // `elab_num_lit_infer`.
-    let lit_id = declare_primitive(cx.env, vec![], str_ty.clone(), PrimReduction::Literal)
-        .map_err(|e| ElabError::KernelRejected {
-            error: e,
+    let lit_id = ken_kernel::check::declare_checked_string_literal(cx.env, s).map_err(|error| {
+        ElabError::KernelRejected {
+            error,
             span: span.clone(),
-        })?;
+        }
+    })?;
+    let checked = cx.env.checked_literal(lit_id)
+        .expect("kernel just registered checked String payload");
     cx.num_values
-        .insert(lit_id, NumericLitVal::Str(crate::NfcString::new(s)));
+        .insert(lit_id, NumericLitVal::Str(crate::NfcString::new(checked.as_str())));
     Ok((Term::const_(lit_id, vec![]), str_ty))
 }
 
 /// Elaborate a character literal (`31 §3`) -- one decoded Unicode scalar,
 /// already validated by the lexer's cardinality check. `Char` is `{c : Int |
-/// isScalar c}` (`decimal_char.rs`), so the literal's value is its codepoint
-/// stored as an ordinary `NumericLitVal::Int` -- every existing Int-consuming
-/// bridge (evaluation, native codegen) sees it unchanged; only the surface
-/// type is `Char`.
+/// isScalar c}` (`decimal_char.rs`). The kernel validates the scalar and
+/// emits an ordinary, type-checked IntLit at the Int-compatible Char carrier;
+/// the immutable core value itself drives conversion, interpreter and native.
 fn elab_char_lit(cx: &mut ElabCtx, c: char, span: &Span) -> Result<(Term, Term), ElabError> {
     let char_id = cx
         .globals
@@ -9329,16 +9331,12 @@ fn elab_char_lit(cx: &mut ElabCtx, c: char, span: &Span) -> Result<(Term, Term),
             span: span.clone(),
         })?;
     let char_ty = Term::const_(char_id, vec![]);
-    let lit_id = declare_primitive(cx.env, vec![], char_ty.clone(), PrimReduction::Literal)
-        .map_err(|e| ElabError::KernelRejected {
-            error: e,
+    let literal = ken_kernel::check::checked_char_literal(cx.env, c as u32)
+        .map_err(|error| ElabError::KernelRejected {
+            error,
             span: span.clone(),
         })?;
-    cx.num_values.insert(
-        lit_id,
-        NumericLitVal::Int(num_bigint::BigInt::from(c as u32)),
-    );
-    Ok((Term::const_(lit_id, vec![]), char_ty))
+    Ok((literal, char_ty))
 }
 
 /// Elaborate a byte-string literal (`31 §3`), mirroring `elab_str_lit`

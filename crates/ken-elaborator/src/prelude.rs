@@ -1267,6 +1267,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // `elab.globals`).
     let decimal_char_env = crate::decimal_char::register_decimal_char(elab)
         .map_err(|e| ElabError::Internal(format!("Decimal/Char demote failed: {}", e)))?;
+    ken_kernel::check::register_checked_char_carrier(&mut elab.env, decimal_char_env.char_id)
+        .map_err(|e| ElabError::Internal(format!("literal Char carrier failed: {e}")))?;
 
     // `IntN<->Int` conversion floor + `checked_*`/`saturating_*` DEMOTE
     // (`18a §5.7`, Phase-2 tranche #4). Needs the 8 `IntN`/`UIntN` type ids
@@ -1607,6 +1609,19 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // NLL cannot end the reg_prim borrow while print_line = reg_prim(...) appears
     // after the IO declaration; an explicit drop lets IO borrow elab cleanly.
     drop(reg_prim);
+
+    // The two K3 literal conversions are enabled only after the kernel
+    // checks the exact carrier, operation, and List-constructor identities.
+    ken_kernel::check::register_literal_char_view(
+        &mut elab.env,
+        string_id,
+        char_id,
+        string_to_list_char_id,
+        list_id,
+        nil_id,
+        cons_id,
+    )
+    .map_err(|e| ElabError::Internal(format!("literal Char view registration failed: {e}")))?;
 
     // Console's response family is a genuine non-constant large elimination,
     // kernel-checked as ordinary Ken. Host failures remain total values.

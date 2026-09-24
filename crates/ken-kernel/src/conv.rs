@@ -81,6 +81,50 @@ fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgres
             Term::App(f, a) => {
                 let (f_w, fp) = whnf_progress(env, ctx, f);
                 iota |= fp.iota;
+                // K3: only the registered String -> List Char operation on
+                // an immutable checked String literal. No other primitive
+                // call, nor a neutral String argument, gains reduction.
+                if let Term::Const { id: op, level_args } = &f_w {
+                    if level_args.is_empty() {
+                        if let Some((char_type, nil, cons)) = env.literal_char_view(*op)
+                        {
+                            let (argument, progress) = whnf_progress(env, ctx, a);
+                            // The original argument remains in the stuck App.
+                            // Its reductions count toward the δ-origin ledger
+                            // only when the checked-literal result consumes it.
+                            if let Term::Const {
+                                id: literal,
+                                level_args: literal_levels,
+                            } = argument
+                            {
+                                if literal_levels.is_empty() {
+                                    if let Some(value) = env.checked_literal(literal) {
+                                        iota |= progress.iota;
+                                        let char_ty = Term::const_(char_type, vec![]);
+                                        let mut result = Term::app(
+                                            Term::constructor(nil, vec![]),
+                                            char_ty.clone(),
+                                        );
+                                        for scalar in value.as_str().chars().rev() {
+                                            result = Term::app(
+                                                Term::app(
+                                                    Term::app(
+                                                        Term::constructor(cons, vec![]),
+                                                        char_ty.clone(),
+                                                    ),
+                                                    Term::IntLit((scalar as u32).into()),
+                                                ),
+                                                result,
+                                            );
+                                        }
+                                        cur = result;
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 match &f_w {
                     Term::Lam(_, body) => {
                         cur = subst0(body, a);
@@ -1898,6 +1942,154 @@ mod tests {
             1,
             "the recurring no-progress pair refuses exactly once"
         );
+    }
+
+    /// The K3 view is neutral when a closed ι-redex produces a runtime-only
+    /// String operation, even though reducing that *discarded* argument did
+    /// perform ι. The no-progress δ-origin ledger must not inherit that event.
+    #[test]
+    fn k3_closed_iota_to_neutral_argument_does_not_report_iota_progress() {
+        use crate::check::{
+            declare_checked_string_literal, declare_primitive, register_checked_char_carrier,
+            register_checked_string_carrier, register_literal_char_view,
+        };
+        use crate::env::PrimReduction;
+        let mut env = GlobalEnv::new();
+        let int = declare_primitive(&mut env, vec![], type0(), PrimReduction::OpaqueType).unwrap();
+        env.register_int_lit_type(int);
+        let char_id = declare_def(&mut env, vec![], type0(), cref0(int)).unwrap();
+        register_checked_char_carrier(&mut env, char_id).unwrap();
+        let string_id = declare_primitive(&mut env, vec![], type0(), PrimReduction::OpaqueType).unwrap();
+        register_checked_string_carrier(&mut env, string_id).unwrap();
+        let str_ty = cref0(string_id);
+        let char_ty = cref0(char_id);
+        let list = declare_inductive(&mut env, |list| InductiveSpec {
+            level_params: vec![],
+            params: vec![type0()],
+            indices: vec![],
+            level: zero(),
+            constructors: vec![
+                CtorSpec { args: vec![], target_indices: vec![] },
+                CtorSpec {
+                    args: vec![Term::var(0), Term::app(Term::indformer(list, vec![]), Term::var(1))],
+                    target_indices: vec![],
+                },
+            ],
+        }).unwrap();
+        let nil = env.inductive(list).unwrap().constructors[0].id;
+        let cons = env.inductive(list).unwrap().constructors[1].id;
+        let list_char = Term::app(Term::indformer(list, vec![]), char_ty.clone());
+        let view = declare_primitive(&mut env, vec![], Term::pi(str_ty.clone(), list_char.clone()),
+            PrimReduction::Op { symbol: "string_to_list_char" }).unwrap();
+        let inverse = declare_primitive(&mut env, vec![], Term::pi(list_char.clone(), str_ty.clone()),
+            PrimReduction::Op { symbol: "list_char_to_string" }).unwrap();
+        register_literal_char_view(&mut env, string_id, char_id, view, list, nil, cons).unwrap();
+        let (bool_id, _, true_id) = declare_bool(&mut env);
+        let bool_type = bool_ty(bool_id);
+        let neutral_string = Term::app(cref0(inverse), Term::app(Term::constructor(nil, vec![]), char_ty.clone()));
+        let motive = Term::Ascript(
+            Box::new(Term::lam(bool_type.clone(), str_ty)),
+            Box::new(Term::pi(bool_type, type0())),
+        );
+        let iota_to_neutral = Term::Elim {
+            fam: bool_id,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(motive),
+            methods: vec![neutral_string.clone(), neutral_string],
+            indices: vec![],
+            scrut: Box::new(bool_ctor(true_id)),
+        };
+        let stuck_view = Term::app(cref0(view), iota_to_neutral);
+        assert_typed(&env, &Context::new(), &stuck_view);
+        let (reduct, progress) = whnf_progress(&env, &Context::new(), &stuck_view);
+        assert_eq!(reduct, stuck_view, "the closed ι argument is discarded on a neutral result");
+        assert!(!progress.iota, "discarded argument ι cannot discharge a δ-origin");
+
+        // A positive through the *same* ι construction: when the selected
+        // method returns an admitted literal, the K3 operation consumes it.
+        // That ι event legitimately propagates and the result is checked.
+        let literal = declare_checked_string_literal(&mut env, "Az").unwrap();
+        let checked_iota = Term::Elim {
+            fam: bool_id,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(Term::Ascript(
+                Box::new(Term::lam(bool_ty(bool_id), cref0(string_id))),
+                Box::new(Term::pi(bool_ty(bool_id), type0())),
+            )),
+            methods: vec![cref0(literal), cref0(literal)],
+            indices: vec![],
+            scrut: Box::new(bool_ctor(true_id)),
+        };
+        let positive = Term::app(cref0(view), checked_iota);
+        assert_typed(&env, &Context::new(), &positive);
+        let (list_result, positive_progress) = whnf_progress(&env, &Context::new(), &positive);
+        assert!(positive_progress.iota, "consumed argument ι must propagate");
+        crate::check::check(&env, &Context::new(), &list_result, &list_char).unwrap();
+        let expected = Term::app(
+            Term::app(
+                Term::app(Term::constructor(cons, vec![]), char_ty.clone()),
+                Term::IntLit(65u32.into()),
+            ),
+            Term::app(
+                Term::app(
+                    Term::app(Term::constructor(cons, vec![]), char_ty.clone()),
+                    Term::IntLit(122u32.into()),
+                ),
+                Term::app(Term::constructor(nil, vec![]), char_ty.clone()),
+            ),
+        );
+        assert_eq!(list_result, expected, "NFC view keeps source scalar order");
+
+        // Two distinct SCT-admitted recursive definitions on the same List
+        // return a recurring δ-origin pair when the scrutinee is neutral.
+        // Unlike a synthetic primed ledger, both sides here are closed and
+        // independently kernel-typed before conversion.
+        let declare_self_map = |env: &mut GlobalEnv| {
+            let list_char = list_char.clone();
+            let char_ty = char_ty.clone();
+            declare_recursive_group(env, vec![(vec![], Term::pi(list_char.clone(), list_char.clone()))], |ids| {
+                let recur = Term::app(cref0(ids[0]), Term::var(1));
+                let cons_result = Term::app(
+                    Term::app(
+                        Term::app(Term::constructor(cons, vec![]), char_ty.clone()),
+                        Term::var(2),
+                    ),
+                    recur,
+                );
+                let method = Term::lam(
+                    char_ty.clone(),
+                    Term::lam(list_char.clone(), Term::lam(list_char.clone(), cons_result)),
+                );
+                let motive = Term::Ascript(
+                    Box::new(Term::lam(list_char.clone(), list_char.clone())),
+                    Box::new(Term::pi(list_char.clone(), type0())),
+                );
+                vec![Term::lam(list_char.clone(), Term::Elim {
+                    fam: list,
+                    level_args: vec![],
+                    params: vec![char_ty.clone()],
+                    motive: Box::new(motive),
+                    methods: vec![Term::app(Term::constructor(nil, vec![]), char_ty), method],
+                    indices: vec![],
+                    scrut: Box::new(Term::var(0)),
+                })]
+            }).expect("self-map must pass SCT")[0]
+        };
+        let f = declare_self_map(&mut env);
+        let g = declare_self_map(&mut env);
+        assert_ne!(f, g);
+        let lhs = Term::app(cref0(f), stuck_view.clone());
+        let rhs = Term::app(cref0(g), stuck_view);
+        assert_typed(&env, &Context::new(), &lhs);
+        assert_typed(&env, &Context::new(), &rhs);
+        delta_probe::reset();
+        assert!(!convert_type(&env, &Context::new(), &lhs, &rhs));
+        assert!(delta_probe::captures() >= 1, "distinct recursive δ origins must be reached");
+        assert!(delta_probe::iotas() >= 1, "the discarded String argument really performs ι");
+        assert_eq!(delta_probe::refusals(), 1,
+            "a discarded argument ι must not erase the recurring no-progress pair");
     }
 
     /// Closed positive (Nil): `map_f Nil ≡ map_g Nil` — both ι-reduce to the
