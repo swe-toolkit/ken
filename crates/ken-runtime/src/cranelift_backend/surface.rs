@@ -176,6 +176,7 @@ pub enum CraneliftBackendError {
     Unsupported(UnsupportedLowering),
     Backend(BackendFailure),
     CapacityExhausted(ken_host::CapacityExhaustedV1),
+    ProfileMismatch(crate::boundary_activation::InvocationEpochProfileMismatchV2),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -226,6 +227,9 @@ impl fmt::Display for CraneliftBackendError {
             CraneliftBackendError::Backend(err) => write!(f, "Cranelift backend failure: {err}"),
             CraneliftBackendError::CapacityExhausted(fault) => {
                 write!(f, "runtime capacity exhausted: {fault:?}")
+            }
+            CraneliftBackendError::ProfileMismatch(mismatch) => {
+                write!(f, "process epoch profile mismatch: {mismatch:?}")
             }
         }
     }

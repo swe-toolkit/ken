@@ -1069,6 +1069,10 @@ fn differential_error_report(
         CraneliftBackendError::CapacityExhausted(fault) => {
             NativeDifferentialVerdict::CapacityExhausted(fault)
         }
+        CraneliftBackendError::ProfileMismatch(mismatch) => NativeDifferentialVerdict::BackendFailure {
+            stage: NativeDifferentialStage::BoundaryPreflight,
+            reason: format!("process epoch profile mismatch: {mismatch:?}"),
+        },
         CraneliftBackendError::Unsupported(err) => NativeDifferentialVerdict::Unsupported {
             stage: if preflight {
                 NativeDifferentialStage::BoundaryPreflight
@@ -1101,6 +1105,12 @@ fn runtime_ir_comparison_error_report(
     let verdict = match err {
         CraneliftBackendError::CapacityExhausted(fault) => {
             NativeRuntimeIrComparisonVerdict::CapacityExhausted(fault)
+        }
+        CraneliftBackendError::ProfileMismatch(mismatch) => {
+            NativeRuntimeIrComparisonVerdict::BackendFailure {
+                stage: NativeDifferentialStage::BoundaryPreflight,
+                reason: format!("process epoch profile mismatch: {mismatch:?}"),
+            }
         }
         CraneliftBackendError::Unsupported(err) => NativeRuntimeIrComparisonVerdict::Unsupported {
             stage,

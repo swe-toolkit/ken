@@ -58,16 +58,42 @@
 //! have caught the alternative.
 
 use std::ffi::c_void;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-// Process-wide, not store-local or address-derived: a destroyed activation
-// never frees an epoch for reuse while a copied pending value can still exist.
+// The deployment's first admitted epoch ceiling wins, including zero. This
+// authority is distinct from the no-wrap counter and never resets with a store.
+static INVOCATION_EPOCH_CEILING: OnceLock<u64> = OnceLock::new();
 static LAST_INVOCATION_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+/// An attempted store would change the process-wide epoch budget. This is a
+/// profile disagreement, not a request for an exhausted activation epoch.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct InvocationEpochProfileMismatchV2 {
+    pub authorized: u64,
+    pub attempted: u64,
+}
+
+fn admit_epoch_ceiling(limit: u64) -> Result<(), InvocationEpochProfileMismatchV2> {
+    let authorized = *INVOCATION_EPOCH_CEILING.get_or_init(|| limit);
+    if authorized == limit {
+        Ok(())
+    } else {
+        Err(InvocationEpochProfileMismatchV2 {
+            authorized,
+            attempted: limit,
+        })
+    }
+}
+
+fn requested_epoch_after(last: u64) -> u128 {
+    u128::from(last) + 1
+}
 
 fn mint_invocation_epoch(limit: u64) -> Result<u64, ken_host::CapacityExhaustedV1> {
     loop {
         let last = LAST_INVOCATION_EPOCH.load(Ordering::Acquire);
-        let requested = u128::from(last) + 1;
+        let requested = requested_epoch_after(last);
         if requested > u128::from(limit) || requested > u128::from(u64::MAX) {
             return Err(ken_host::CapacityExhaustedV1 {
                 scope: ken_host::CapacityScopeV1::Runtime,
@@ -150,16 +176,21 @@ pub struct BoundaryStoreBindingV1 {
 impl BoundaryStoreBindingV1 {
     /// Reserve and publish the store's persistent image from the authorized
     /// persistent limits. ⛔ Once per store.
-    pub fn open(store: &mut BoundaryValueStore, profile: BoundaryResourceProfileV2) -> Self {
+    pub fn open(
+        store: &mut BoundaryValueStore,
+        profile: BoundaryResourceProfileV2,
+    ) -> Result<Self, InvocationEpochProfileMismatchV2> {
+        // Admit before publication: a refused profile must not alter the store.
+        admit_epoch_ceiling(profile.runtime.invocation_epochs)?;
         // Routed through `as_reserve_arguments` so the named->positional
         // mapping is spelled once in the whole crate.
         let (nodes, words, data, limbs) = profile.persistent.as_reserve_arguments();
         store.reserve_persistent(nodes, words, data, limbs);
         let published_persistent_base = store.publish_persistent();
-        BoundaryStoreBindingV1 {
+        Ok(BoundaryStoreBindingV1 {
             profile,
             published_persistent_base,
-        }
+        })
     }
 
     /// The authorized profile. ⛔ Read-only.
@@ -591,6 +622,11 @@ mod tests {
         }
     }
 
+    #[test]
+    fn one_past_max_epoch_has_an_exact_nonwrapping_request() {
+        assert_eq!(requested_epoch_after(u64::MAX), u128::from(u64::MAX) + 1);
+    }
+
     /// Promise: durable resource invariant. The parent launches a fresh test
     /// process so the process-wide counter really begins at zero; resetting a
     /// shared atomic in this test would permit epoch reuse during other tests.
@@ -619,14 +655,14 @@ mod tests {
         let mut profile = distinct_profile();
         profile.runtime.invocation_epochs = 2;
         let mut first_store = BoundaryValueStore::new();
-        let first_binding = BoundaryStoreBindingV1::open(&mut first_store, profile);
+        let first_binding = BoundaryStoreBindingV1::open(&mut first_store, profile).expect("matching process epoch ceiling");
         let first = BoundaryActivationV1::begin(&first_binding).expect("epoch 1");
         assert_eq!(first.epoch(), 1);
         drop(first);
         drop(first_binding);
         drop(first_store);
         let mut next_store = BoundaryValueStore::new();
-        let next_binding = BoundaryStoreBindingV1::open(&mut next_store, profile);
+        let next_binding = BoundaryStoreBindingV1::open(&mut next_store, profile).expect("matching process epoch ceiling");
         let second = BoundaryActivationV1::begin(&next_binding).expect("epoch 2");
         assert_eq!(second.epoch(), 2);
         drop(second);
@@ -655,17 +691,119 @@ mod tests {
         };
         let encoded = ken_host::encode_linked_effect_trace(&linked).expect("real fault encodes");
         assert_eq!(ken_host::decode_linked_effect_trace(&encoded), Ok(linked));
-        profile.runtime.invocation_epochs = 0;
-        let mut zero_store = BoundaryValueStore::new();
-        let zero_binding = BoundaryStoreBindingV1::open(&mut zero_store, profile);
+    }
+
+    fn run_epoch_child(test_name: &str) {
+        let result = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .arg("--exact")
+            .arg(format!("boundary_activation::tests::{test_name}"))
+            .env("KEN_EPOCH_ISOLATED_CHILD", "1")
+            .output()
+            .expect("spawn isolated epoch process");
+        assert!(result.status.success(), "isolated child: {result:?}");
+        let output = String::from_utf8_lossy(&result.stdout);
+        assert!(output.contains("1 passed; 0 failed"), "test did not run: {output}");
+    }
+
+    #[test]
+    fn later_stores_may_change_only_their_own_region_limits() {
+        let first = distinct_profile();
+        let mut next = first;
+        next.persistent.nodes += 1;
+        next.invocation.words += 1;
+        let mut store_a = BoundaryValueStore::new();
+        let mut store_b = BoundaryValueStore::new();
+        let binding_a = BoundaryStoreBindingV1::open(&mut store_a, first).unwrap();
+        let binding_b = BoundaryStoreBindingV1::open(&mut store_b, next).unwrap();
+        assert_eq!(binding_a.profile(), first);
+        assert_eq!(binding_b.profile(), next);
+        assert_eq!(store_b.image().0.node_capacity(), next.persistent.nodes);
+    }
+
+    #[test]
+    fn a_first_cap_of_one_cannot_be_raised_to_two_after_use() {
+        run_epoch_child("cap_one_cannot_be_raised_child");
+    }
+
+    #[test]
+    fn cap_one_cannot_be_raised_child() {
+        if std::env::var_os("KEN_EPOCH_ISOLATED_CHILD").is_none() {
+            return;
+        }
+        let mut profile = distinct_profile();
+        profile.runtime.invocation_epochs = 1;
+        let mut first_store = BoundaryValueStore::new();
+        let binding = BoundaryStoreBindingV1::open(&mut first_store, profile).unwrap();
+        assert_eq!(BoundaryActivationV1::begin(&binding).unwrap().epoch(), 1);
+        profile.runtime.invocation_epochs = 2;
+        let mut next_store = BoundaryValueStore::new();
         assert_eq!(
-            BoundaryActivationV1::begin(&zero_binding).err(),
-            Some(ken_host::CapacityExhaustedV1 {
-                limit: 0,
-                requested: 3,
-                ..err
-            })
+            BoundaryStoreBindingV1::open(&mut next_store, profile).err(),
+            Some(InvocationEpochProfileMismatchV2 { authorized: 1, attempted: 2 })
         );
+        assert_eq!(next_store.image().0.node_capacity(), 0, "mismatch published storage");
+        assert_eq!(BoundaryActivationV1::begin(&binding).err().unwrap().requested, 2);
+    }
+
+    #[test]
+    fn a_first_cap_of_zero_cannot_be_raised_before_any_activation() {
+        run_epoch_child("cap_zero_cannot_be_raised_child");
+    }
+
+    #[test]
+    fn cap_zero_cannot_be_raised_child() {
+        if std::env::var_os("KEN_EPOCH_ISOLATED_CHILD").is_none() {
+            return;
+        }
+        let mut profile = distinct_profile();
+        profile.runtime.invocation_epochs = 0;
+        let mut store = BoundaryValueStore::new();
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile).unwrap();
+        assert_eq!(BoundaryActivationV1::begin(&binding).err().unwrap(),
+            ken_host::CapacityExhaustedV1 {
+                scope: ken_host::CapacityScopeV1::Runtime,
+                resource: ken_host::CapacityResourceV1::InvocationEpochs,
+                limit: 0, requested: 1,
+            });
+        profile.runtime.invocation_epochs = 5;
+        let mut later = BoundaryValueStore::new();
+        assert_eq!(BoundaryStoreBindingV1::open(&mut later, profile).err(),
+            Some(InvocationEpochProfileMismatchV2 { authorized: 0, attempted: 5 }));
+    }
+
+    #[test]
+    fn concurrent_begins_issue_unique_epochs_without_overrunning_one_cap() {
+        run_epoch_child("concurrent_epoch_child");
+    }
+
+    #[test]
+    fn concurrent_epoch_child() {
+        if std::env::var_os("KEN_EPOCH_ISOLATED_CHILD").is_none() {
+            return;
+        }
+        let mut profile = distinct_profile();
+        profile.runtime.invocation_epochs = 12;
+        let handles = (0..20).map(|_| std::thread::spawn(move || {
+            let mut store = BoundaryValueStore::new();
+            let binding = BoundaryStoreBindingV1::open(&mut store, profile).unwrap();
+            BoundaryActivationV1::begin(&binding).map(|activation| activation.epoch())
+        })).collect::<Vec<_>>();
+        let mut epochs = Vec::new();
+        let mut refused = Vec::new();
+        for handle in handles {
+            match handle.join().expect("worker must not panic") {
+                Ok(epoch) => epochs.push(epoch),
+                Err(fault) => refused.push(fault),
+            }
+        }
+        epochs.sort_unstable();
+        assert_eq!(epochs, (1..=12).collect::<Vec<_>>());
+        assert_eq!(refused.len(), 8);
+        assert!(refused.iter().all(|fault| *fault == ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Runtime,
+            resource: ken_host::CapacityResourceV1::InvocationEpochs,
+            limit: 12, requested: 13,
+        }));
     }
 
     /// ⭐⭐ **`AC-3`(c) — Finding 8's exact defect, caught by pointer identity
@@ -688,7 +826,7 @@ mod tests {
     #[test]
     fn the_services_record_carries_the_boundary_base_and_not_the_native_one() {
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile());
+        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile()).expect("matching process epoch ceiling");
         let activation = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
 
         let services = activation.services_ptr().expect("live activation");
@@ -735,7 +873,7 @@ mod tests {
     #[test]
     fn two_activations_do_not_share_mutable_arena_state() {
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile());
+        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile()).expect("matching process epoch ceiling");
         let first = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
         let second = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
 
@@ -792,7 +930,7 @@ mod tests {
     #[test]
     fn moving_the_activation_does_not_move_what_generated_code_was_given() {
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile());
+        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile()).expect("matching process epoch ceiling");
         let activation = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
         let (services, native, boundary) = (
             activation.services_ptr().expect("live"),
@@ -830,7 +968,7 @@ mod tests {
     fn the_eight_authorized_limits_reach_their_own_published_ceilings() {
         let profile = distinct_profile();
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, profile);
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("matching process epoch ceiling");
         let activation = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
 
         let (nodes, words, data, limbs) = activation
@@ -881,7 +1019,7 @@ mod tests {
     #[test]
     fn the_generated_root_ingress_excludes_the_native_arena() {
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile());
+        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile()).expect("matching process epoch ceiling");
         let mut first = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
         let mut second = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
 
@@ -920,7 +1058,7 @@ mod tests {
     #[test]
     fn finishing_withdraws_the_services_pointer_and_seals_the_image() {
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile());
+        let binding = BoundaryStoreBindingV1::open(&mut store, distinct_profile()).expect("matching process epoch ceiling");
         let mut activation =
             BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
         assert!(activation.services_ptr().is_some());

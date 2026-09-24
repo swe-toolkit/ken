@@ -8967,7 +8967,7 @@ pub(crate) mod tests {
             let limit = 2usize;
             let profile = ac4_profile_with(scope, resource, limit);
             let mut store = BoundaryValueStore::new();
-            let binding = BoundaryStoreBindingV1::open(&mut store, profile);
+            let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("matching process epoch ceiling");
             let activation =
                 BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
             let base = match scope {
@@ -9142,7 +9142,7 @@ pub(crate) mod tests {
             0,
         );
         let mut store = BoundaryValueStore::new();
-        let binding = BoundaryStoreBindingV1::open(&mut store, profile);
+        let binding = BoundaryStoreBindingV1::open(&mut store, profile).expect("matching process epoch ceiling");
         let activation = BoundaryActivationV1::begin(&binding).expect("explicit test epoch budget");
         let (_m, code) = compile_producer(4, emit_ac4_bytes_len_probe);
         let f: extern "C" fn(*mut u64, i64, i64, i64) -> i64 = unsafe { std::mem::transmute(code) };

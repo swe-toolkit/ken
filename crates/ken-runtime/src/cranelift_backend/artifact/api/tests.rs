@@ -14,25 +14,33 @@ use std::collections::BTreeSet;
 #[test]
 fn jit_epoch_policy_is_explicit_and_prelaunch_refusal_is_typed() {
     let expr = RuntimeExpr::Value(RuntimeValue::Bool(true));
+    let zero = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args(["--exact", "cranelift_backend::artifact::api::tests::jit_zero_epoch_child"])
+        .env("KEN_JIT_EPOCH_ZERO_CHILD", "1")
+        .output()
+        .expect("isolated JIT zero-epoch test");
+    assert!(zero.status.success(), "zero-epoch child: {zero:?}");
+    assert!(String::from_utf8_lossy(&zero.stdout).contains("1 passed; 0 failed"));
+    let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let compiled = super::super::compile_expr(&expr, &env).expect("same body compiles");
+    let (result, _) = compiled.run_with_profile(None, env.profile()).expect("roomy JIT epoch");
+    assert_eq!(result, RuntimeObservation::Returned(RuntimeGroundValue::Bool(true)));
+}
+
+#[test]
+fn jit_zero_epoch_child() {
+    if std::env::var_os("KEN_JIT_EPOCH_ZERO_CHILD").is_none() { return; }
+    let expr = RuntimeExpr::Value(RuntimeValue::Bool(true));
     let mut profile = crate::boundary_resource_profile::starter_smoke_profile();
     profile.runtime.invocation_epochs = 0;
     let env = NativeSeedEnvironment::empty(profile);
     let compiled = super::super::compile_expr(&expr, &env).expect("compile unaffected by policy");
     let fault = compiled.run_with_profile(None, env.profile()).unwrap_err();
-    match fault {
-        CraneliftBackendError::CapacityExhausted(capacity) => {
-            assert_eq!(capacity.scope, ken_host::CapacityScopeV1::Runtime);
-            assert_eq!(capacity.resource, ken_host::CapacityResourceV1::InvocationEpochs);
-            assert_eq!(capacity.limit, 0);
-            assert!(capacity.requested > capacity.limit);
-        }
-        other => panic!("epoch exhaustion took a non-capacity path: {other:?}"),
-    }
-    profile.runtime.invocation_epochs = u64::MAX;
-    let env = NativeSeedEnvironment::empty(profile);
-    let compiled = super::super::compile_expr(&expr, &env).expect("same body compiles");
-    let (result, _) = compiled.run_with_profile(None, env.profile()).expect("roomy JIT epoch");
-    assert_eq!(result, RuntimeObservation::Returned(RuntimeGroundValue::Bool(true)));
+    assert_eq!(fault, CraneliftBackendError::CapacityExhausted(ken_host::CapacityExhaustedV1 {
+        scope: ken_host::CapacityScopeV1::Runtime,
+        resource: ken_host::CapacityResourceV1::InvocationEpochs,
+        limit: 0, requested: 1,
+    }));
 }
 
 // RT-SPLIT slice 7, rule 8: `total_primitive` moved from facade file scope to

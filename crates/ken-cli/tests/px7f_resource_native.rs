@@ -372,6 +372,13 @@ fn bounded_epoch_refuses_before_the_checked_program_issues_an_effect() {
                         ..exact_failure
                     }),
                 ),
+                (
+                    -7,
+                    Some(ken_runtime::CapacityExhaustedV1 {
+                        requested: 2,
+                        ..exact_failure
+                    }),
+                ),
                 (-7, None),
             ] {
                 let trace = ken_runtime::LinkedEffectTrace {

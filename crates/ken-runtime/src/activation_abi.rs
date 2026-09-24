@@ -37,6 +37,7 @@
 //! in the one language with no help against it.
 
 use std::ffi::c_void;
+use std::io::Write;
 
 use crate::boundary_activation::{BoundaryActivationV1, BoundaryStoreBindingV1};
 use crate::boundary_resource_profile::{
@@ -67,6 +68,9 @@ pub const KEN_ACTIVATION_ERR_BUFFER: i64 = -6;
 /// The runtime's process-wide epoch authority refused the declared limit.
 /// A typed opaque failure handle is returned alongside this status.
 pub const KEN_ACTIVATION_ERR_CAPACITY: i64 = -7;
+/// A later store supplied a different process-wide epoch ceiling. No store
+/// handle was published and no capacity fault was minted.
+pub const KEN_ACTIVATION_ERR_PROFILE_MISMATCH: i64 = -8;
 
 /// **The deployment-authorized profile, as it crosses into C.**
 ///
@@ -163,11 +167,15 @@ pub unsafe extern "C" fn ken_boundary_store_v1_open(
     if profile.is_null() || out_store.is_null() {
         return KEN_ACTIVATION_ERR_NULL;
     }
+    unsafe { *out_store = std::ptr::null_mut() };
     let Some(profile) = (unsafe { *profile }).to_rust() else {
         return KEN_ACTIVATION_ERR_PROFILE;
     };
     let mut store = BoundaryValueStore::new();
-    let binding = BoundaryStoreBindingV1::open(&mut store, profile);
+    let binding = match BoundaryStoreBindingV1::open(&mut store, profile) {
+        Ok(binding) => binding,
+        Err(_) => return KEN_ACTIVATION_ERR_PROFILE_MISMATCH,
+    };
     let handle = Box::into_raw(Box::new(KenBoundaryStoreV1 { store, binding }));
     unsafe { *out_store = handle };
     KEN_ACTIVATION_OK
@@ -238,18 +246,36 @@ pub unsafe extern "C" fn ken_activation_v1_finish_capacity_failure(
     unsafe { ken_host::ken_host_invocation_v1_finish_with_capacity(context, failure.fault) }
 }
 
-/// Discard an error from a non-process starter, which has no host observation.
+/// Consume a nonprocess starter's real failed-begin handle into the same
+/// typed linked terminal codec as the checked process path. Standard error is
+/// the starter's binary terminal/result boundary; plan hash zero marks its
+/// lack of a process plan, and no generated entry has executed.
 ///
 /// # Safety
 /// The handle must come from a failed begin and be consumed exactly once.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn ken_activation_v1_discard_capacity_failure(
+pub unsafe extern "C" fn ken_activation_v1_write_starter_capacity_failure(
     failure: *mut KenCapacityFailureV1,
 ) -> i64 {
     if failure.is_null() {
         return KEN_ACTIVATION_ERR_NULL;
     }
-    drop(unsafe { Box::from_raw(failure) });
+    let fault = unsafe { Box::from_raw(failure) }.fault;
+    let trace = ken_host::LinkedEffectTrace {
+        plan_hash: 0,
+        target_abi_hash: ken_host::TARGET_ABI_MANIFEST_HASH,
+        host_effect_abi_hash: ken_host::HOST_EFFECT_ABI_V1_HASH,
+        terminal_value: ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+        terminal_error: Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)),
+        effect_trace: Vec::new(),
+        terminal_exit: ken_host::TerminalExitClass::ControlledTrap,
+    };
+    let Ok(bytes) = ken_host::encode_linked_effect_trace(&trace) else {
+        return KEN_ACTIVATION_ERR_EXPORT;
+    };
+    if std::io::stderr().write_all(&bytes).is_err() {
+        return KEN_ACTIVATION_ERR_EXPORT;
+    }
     KEN_ACTIVATION_OK
 }
 
@@ -459,7 +485,7 @@ pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 11] = [
     "ken_boundary_store_v1_destroy",
     "ken_activation_v1_begin",
     "ken_activation_v1_finish_capacity_failure",
-    "ken_activation_v1_discard_capacity_failure",
+    "ken_activation_v1_write_starter_capacity_failure",
     "ken_activation_v1_services",
     "ken_activation_v1_bind_process_frame",
     "ken_activation_v1_native_frame",
@@ -617,6 +643,18 @@ mod tests {
     /// a Rust-only synthetic constructor for a terminal fault.
     #[test]
     fn zero_epoch_profile_refuses_before_publishing_an_activation_handle() {
+        let result = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args(["--exact", "activation_abi::tests::zero_epoch_profile_child"])
+            .env("KEN_ABI_EPOCH_ZERO_CHILD", "1")
+            .output()
+            .expect("isolated C ABI test");
+        assert!(result.status.success(), "isolated C ABI: {result:?}");
+        assert!(String::from_utf8_lossy(&result.stdout).contains("1 passed; 0 failed"));
+    }
+
+    #[test]
+    fn zero_epoch_profile_child() {
+        if std::env::var_os("KEN_ABI_EPOCH_ZERO_CHILD").is_none() { return; }
         let mut profile = c_profile();
         profile.runtime_invocation_epochs = 0;
         let mut store = std::ptr::null_mut();
@@ -633,8 +671,8 @@ mod tests {
         assert_eq!(fault.scope, ken_host::CapacityScopeV1::Runtime);
         assert_eq!(fault.resource, ken_host::CapacityResourceV1::InvocationEpochs);
         assert_eq!(fault.limit, 0);
-        assert!(fault.requested > fault.limit, "refusal must name a real request");
-        assert_eq!(unsafe { ken_activation_v1_discard_capacity_failure(failure) }, KEN_ACTIVATION_OK);
+        assert_eq!(fault.requested, 1, "zero ceiling has exactly one impossible request");
+        assert_eq!(unsafe { ken_activation_v1_write_starter_capacity_failure(failure) }, KEN_ACTIVATION_OK);
         assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
     }
 
@@ -667,6 +705,20 @@ mod tests {
             KEN_ACTIVATION_ERR_PROFILE
         );
         assert!(store.is_null());
+    }
+
+    #[test]
+    fn c_abi_refuses_epoch_ceiling_mismatch_before_publishing_a_store() {
+        let profile = c_profile();
+        let mut store = std::ptr::null_mut();
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&profile, &mut store) }, KEN_ACTIVATION_OK);
+        let mut mismatch = profile;
+        mismatch.runtime_invocation_epochs = u64::MAX - 1;
+        let mut second = 1usize as *mut KenBoundaryStoreV1;
+        assert_eq!(unsafe { ken_boundary_store_v1_open(&mismatch, &mut second) },
+            KEN_ACTIVATION_ERR_PROFILE_MISMATCH);
+        assert!(second.is_null(), "refused profile returned a store handle");
+        assert_eq!(unsafe { ken_boundary_store_v1_destroy(store) }, KEN_ACTIVATION_OK);
     }
 
     /// ⛔ Every entry point refuses a null handle or out-slot rather than
@@ -717,7 +769,9 @@ mod tests {
         );
     }
 
-    /// ⛔ **The six statuses are six** — a caller must be able to tell a null
+    /// ⛔ Each status is distinct — a caller can tell a process-profile
+    /// disagreement from an exhausted activation epoch.
+    /// A null
     /// argument from a rejected profile from a finished activation.
     #[test]
     fn the_abi_statuses_are_distinct() {
@@ -730,6 +784,7 @@ mod tests {
             KEN_ACTIVATION_ERR_EXPORT,
             KEN_ACTIVATION_ERR_BUFFER,
             KEN_ACTIVATION_ERR_CAPACITY,
+            KEN_ACTIVATION_ERR_PROFILE_MISMATCH,
         ];
         let distinct = statuses.iter().collect::<std::collections::BTreeSet<_>>();
         assert_eq!(distinct.len(), statuses.len());

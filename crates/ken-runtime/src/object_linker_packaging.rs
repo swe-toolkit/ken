@@ -355,7 +355,7 @@ pub fn run_bound_process_effect_observation_with_stdin(
             || failure.resource != ken_host::CapacityResourceV1::InvocationEpochs
             || failure.limit
                 != u128::from(artifact.boundary_resource_profile.runtime.invocation_epochs)
-            || failure.requested > u128::from(u64::MAX) + 1
+            || failure.requested != failure.limit + 1
             || exit_status != 1
         {
             return Err(NativeEffectRunErrorV1::MalformedTrace);
@@ -542,6 +542,10 @@ pub struct ObjectLinkerPackagingError {
     pub stage: ObjectLinkerPackagingStage,
     pub field: &'static str,
     pub reason: String,
+    /// Real linked nonprocess starter capacity refusal, decoded from the
+    /// opaque failed-begin handle's typed terminal wire (never inferred from
+    /// exit status or a smoke mismatch string).
+    pub capacity_failure: Option<ken_host::CapacityExhaustedV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -826,6 +830,7 @@ fn package_starter_executable_artifact_with_authority(
         &executable_path,
         &options.executable_relative_path,
         &expected_stdout,
+        profile,
     )?;
 
     let mut package = ObjectLinkerExecutablePackage {
@@ -1463,6 +1468,7 @@ fn smoke_executable(
     executable_path: &Path,
     executable_relative_path: &str,
     expected_stdout: &str,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<ObjectLinkerSmokeReport, ObjectLinkerPackagingError> {
     let output = Command::new(executable_path).output().map_err(|err| {
         packaging_error(
@@ -1473,6 +1479,37 @@ fn smoke_executable(
     })?;
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let status = output.status.code().unwrap_or(-1);
+    // Only the actual linked starter's own failed-begin handle can write this
+    // terminal in the ordinary packaging path. A forged/replaced executable is
+    // outside this evidence boundary: the decoder checks the stated artifact
+    // and policy, not executable authenticity.
+    if status == 1 && output.stdout.is_empty() {
+        if let Ok(trace) = ken_host::decode_linked_effect_trace(&output.stderr) {
+            if trace.plan_hash == 0
+                && trace.target_abi_hash == ken_host::TARGET_ABI_MANIFEST_HASH
+                && trace.host_effect_abi_hash == ken_host::HOST_EFFECT_ABI_V1_HASH
+                && trace.terminal_value == ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+                && trace.terminal_exit == ken_host::TerminalExitClass::ControlledTrap
+                && trace.effect_trace.is_empty()
+            {
+                if let Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)) = trace.terminal_error {
+                    let limit = u128::from(profile.runtime.invocation_epochs);
+                    if fault.scope == ken_host::CapacityScopeV1::Runtime
+                        && fault.resource == ken_host::CapacityResourceV1::InvocationEpochs
+                        && fault.limit == limit
+                        && fault.requested == limit + 1
+                    {
+                        return Err(ObjectLinkerPackagingError {
+                            stage: ObjectLinkerPackagingStage::SmokeExecution,
+                            field: "runtime.invocation_epochs",
+                            reason: format!("linked starter refused actual epoch begin: {fault:?}"),
+                            capacity_failure: Some(fault),
+                        });
+                    }
+                }
+            }
+        }
+    }
     if !output.status.success() || stdout != expected_stdout {
         return Err(packaging_error(
             ObjectLinkerPackagingStage::SmokeExecution,
@@ -2017,7 +2054,7 @@ struct KenBoundaryResourceProfileV2 {{
 extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store);
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
-extern long long ken_activation_v1_discard_capacity_failure(void *failure);
+extern long long ken_activation_v1_write_starter_capacity_failure(void *failure);
 extern long long ken_activation_v1_native_frame(const void *activation, const void **out_frame);
 extern long long ken_activation_v1_services(const void *activation, const void **out_services);
 extern long long ken_activation_v1_write_final_export(const void *activation, long long fallback, unsigned char *buffer, size_t capacity, size_t *out_len);
@@ -2042,10 +2079,13 @@ int main(void) {{
     if (ken_boundary_store_v1_open(&profile, &store) != 0) return 1;
     long long begin_status = ken_activation_v1_begin(store, &activation, &capacity_failure);
     if (begin_status != 0) {{
-        if (begin_status == -7 && capacity_failure != NULL)
-            ken_activation_v1_discard_capacity_failure(capacity_failure);
+        if (begin_status == -7 && capacity_failure != NULL) {{
+            long long terminal_status = ken_activation_v1_write_starter_capacity_failure(capacity_failure);
+            ken_boundary_store_v1_destroy(store);
+            return terminal_status == 0 ? 1 : 2;
+        }}
         ken_boundary_store_v1_destroy(store);
-        return 1;
+        return 2;
     }}
     if (ken_activation_v1_native_frame(activation, &frame) != 0) {{
         ken_activation_v1_destroy(activation);
@@ -2438,6 +2478,7 @@ fn packaging_error(
         stage,
         field,
         reason: reason.into(),
+        capacity_failure: None,
     }
 }
 
@@ -2746,6 +2787,56 @@ mod tests {
             package.toolchain.whole_compiler_proof,
             ObjectLinkerEvidenceFact::Unavailable { .. }
         ));
+    }
+
+    /// Promise: durable real-starter epoch resource boundary. Both runs use
+    /// the same checked entry object and the ordinary C stub/linked smoke
+    /// route. The zero-budget case must be typed, not a bare nonzero exit.
+    #[test]
+    fn nonprocess_starter_preserves_actual_one_past_epoch_fault() {
+        let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int(42.into()));
+        let program = starter_program(int_body(42), observation);
+        let (_report, entrypoint) = packaged_entrypoint(&program);
+        let run_report = runtime_ir_run_report(&program);
+        let support = platform_support(&program, &entrypoint, &run_report);
+        let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+        let mut profile = env.profile();
+        profile.runtime.invocation_epochs = 1;
+        let good = temp_output_dir("epoch-starter-room");
+        let package = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &good,
+            "real-starter epoch positive", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect("epoch 1 under cap 1 must run the linked entry");
+        assert_eq!(package.smoke.stdout, "42\n");
+        assert_eq!(package.smoke.exit_status, 0);
+
+        profile.runtime.invocation_epochs = 0;
+        let bad = temp_output_dir("epoch-starter-exhausted");
+        let refusal = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &bad,
+            "real-starter epoch refusal", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect_err("epoch 1 over cap 0 must be a typed packaging result");
+        let expected = ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Runtime,
+            resource: ken_host::CapacityResourceV1::InvocationEpochs,
+            limit: 0,
+            requested: 1,
+        };
+        assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        assert_eq!(refusal.field, "runtime.invocation_epochs");
+        assert_eq!(refusal.capacity_failure, Some(expected));
+        // Independently read the artifact that packaging just ran, rather
+        // than deriving the terminal payload from the returned error.
+        let linked_path = bad.join(ObjectLinkerPackagingOptions::starter_host_with_profile(profile).executable_relative_path);
+        let linked = Command::new(linked_path)
+            .output().expect("starter artifact survived typed refusal");
+        assert_eq!(linked.status.code(), Some(1));
+        assert!(linked.stdout.is_empty());
+        let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("typed starter wire");
+        assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::CapacityExhausted(expected)));
+        assert!(trace.effect_trace.is_empty());
     }
 
     fn generic_big_int_program() -> RuntimeProgram {

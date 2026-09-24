@@ -123,7 +123,8 @@ impl CompiledModule<JITModule> {
                 ));
             }
         }
-        let binding = crate::boundary_activation::BoundaryStoreBindingV1::open(&mut store, profile);
+        let binding = crate::boundary_activation::BoundaryStoreBindingV1::open(&mut store, profile)
+            .map_err(CraneliftBackendError::ProfileMismatch)?;
         let mut activation = crate::boundary_activation::BoundaryActivationV1::begin(&binding)
             .map_err(CraneliftBackendError::CapacityExhausted)?;
         let process_root = process_root
