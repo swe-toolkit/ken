@@ -101,7 +101,17 @@ All three share one predicate: the proof case-splits on a computed scrutinee
 that is not a bound variable, and the goal mentions it only through
 δ-unfolding or a different spelling. The chain is at **HS3** (Architect
 `evt_8dr2qm391x53`). Research advises in-thread before the Architect's
-mechanism ruling; the WIP stays parked. The next re-trigger is the 6th.
+mechanism ruling. The next re-trigger is the 6th.
+
+**HS3 ruling (Architect `evt_4xhp1k4y4w8sq`, adopting Research
+`evt_579nbhknhvcnn`).** Resume from `acbebbfa9`. In
+`argparse_cons_view_bytes`, split on the variable `spec`
+(`MkOptionSpec name short mode description`) and then on `mode`, never on
+`option_mode spec`. The count stays at 3. **Closure rule, binding laws 1
+and 2:** every scrutinee a law case-splits on is, at the split, either an
+adapter parameter or a pattern variable (including a field exposed by
+destructuring a single-constructor value). Anything else is a STOP for a
+ruling, never another adapter.
 
 ## Acceptance criteria
 
@@ -175,6 +185,13 @@ mechanism ruling; the WIP stays parked. The next re-trigger is the 6th.
   a value option, at whichever site owns that branch, must break law 2. No
   law may be vacuous: its hypotheses must be satisfiable, and removing any
   one must make it false.
+  - **A process abort is not a redden** (Architect `evt_4xhp1k4y4w8sq`).
+    The `Suc index` example aborts `ken check` with a stack overflow
+    (`rc=134`). Each law's mutation must give `KernelRejected` at that law's
+    own obligation; for law 1, for example, `ParsedOption name value` to
+    `ParsedOption name argument` in the parser. If no law-2 mutation reddens
+    without aborting, STOP and report the rc and mutation. The abort is
+    `KERNEL-CHECK-ABORT-ON-NONCONVERTIBLE-RECURSIVE-REFL`, not this WP.
 - **AC-3.** Under `crates/`, only consumer-view harnesses change, such as
   `src/r_layer_tests/cat_tier_e_argparse_import.rs`. Use Cursor's `AC-3c`
   rule: bring a MIRRORING assertion into agreement; for a DIRECTIONAL one
