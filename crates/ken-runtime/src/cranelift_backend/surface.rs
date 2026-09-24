@@ -113,6 +113,7 @@ pub struct NativeArtifactIdentity {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NativeDifferentialVerdict {
+    CapacityExhausted(ken_host::CapacityExhaustedV1),
     F1InterpreterAgreement {
         stage: NativeDifferentialStage,
     },
@@ -134,6 +135,7 @@ pub enum NativeDifferentialVerdict {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NativeRuntimeIrComparisonVerdict {
+    CapacityExhausted(ken_host::CapacityExhaustedV1),
     RuntimeIrNativeAgreement {
         stage: NativeDifferentialStage,
     },
@@ -173,6 +175,8 @@ pub enum NativeFidelity {
 pub enum CraneliftBackendError {
     Unsupported(UnsupportedLowering),
     Backend(BackendFailure),
+    CapacityExhausted(ken_host::CapacityExhaustedV1),
+    ProfileMismatch(crate::boundary_activation::InvocationEpochProfileMismatchV2),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -209,7 +213,9 @@ pub enum BackendFailure {
     /// the fault; a reader must observe which decoder was selected. Saying less
     /// is the correction — the previous wording localized it **wrongly**, which
     /// is worse than not localizing it at all.
-    NativeResultDecode { token: i64 },
+    NativeResultDecode {
+        token: i64,
+    },
 }
 
 impl fmt::Display for CraneliftBackendError {
@@ -219,6 +225,12 @@ impl fmt::Display for CraneliftBackendError {
                 write!(f, "unsupported runtime-IR lowering: {err}")
             }
             CraneliftBackendError::Backend(err) => write!(f, "Cranelift backend failure: {err}"),
+            CraneliftBackendError::CapacityExhausted(fault) => {
+                write!(f, "runtime capacity exhausted: {fault:?}")
+            }
+            CraneliftBackendError::ProfileMismatch(mismatch) => {
+                write!(f, "process epoch profile mismatch: {mismatch:?}")
+            }
         }
     }
 }
@@ -434,9 +446,11 @@ mod surface_diagnostics_tests {
 
         let boxed: Box<dyn std::error::Error> =
             Box::new(ValidatedNativeRunError::Validation(validation_error()));
-        assert!(boxed
+        assert!(
+            boxed
             .to_string()
-            .starts_with("runtime artifact validation failed: "));
+                .starts_with("runtime artifact validation failed: ")
+        );
     }
 
     #[test]
@@ -459,23 +473,31 @@ mod surface_diagnostics_tests {
         );
     }
 }
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NativeSeedEnvironment {
     pub(super) values: BTreeMap<String, RuntimeGroundValue>,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 }
 
 impl NativeSeedEnvironment {
-    pub fn empty() -> Self {
-        Self::default()
+    pub fn empty(profile: crate::boundary_resource_profile::BoundaryResourceProfileV2) -> Self {
+        Self {
+            values: BTreeMap::new(),
+            profile,
+        }
     }
 
-    pub fn nc5_seed() -> Self {
+    pub fn profile(&self) -> crate::boundary_resource_profile::BoundaryResourceProfileV2 {
+        self.profile
+    }
+
+    pub fn nc5_seed(profile: crate::boundary_resource_profile::BoundaryResourceProfileV2) -> Self {
         let mut values = BTreeMap::new();
         values.insert(
             "decl:fixture::Local::y".to_string(),
             RuntimeGroundValue::Int((2).into()),
         );
-        Self { values }
+        Self { values, profile }
     }
 
     pub fn insert(&mut self, symbol: impl Into<String>, value: RuntimeGroundValue) {

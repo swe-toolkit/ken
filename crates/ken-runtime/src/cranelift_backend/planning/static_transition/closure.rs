@@ -7205,7 +7205,7 @@ mod tests {
             observation: crate::RuntimeObservation::Returned(crate::RuntimeGroundValue::Bool(true)),
         };
         let compile = || {
-            crate::run_example_with_seed_observation(&example, &crate::NativeSeedEnvironment::empty())
+            crate::run_example_with_seed_observation(&example, &crate::NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()))
                 .err()
         };
         let member_law = |error: &CraneliftBackendError| {

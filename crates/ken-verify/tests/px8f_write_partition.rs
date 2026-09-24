@@ -503,6 +503,7 @@ fn run_write_partition() {
         ken_cli::SourceFormat::Ken,
         "px8f_write_partition",
         dir.join("build"),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("the real checked writeAll program builds to a linked native artifact");
 

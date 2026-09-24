@@ -161,7 +161,7 @@ fn interpreter_backed_f1_report_uses_real_oracle_not_seed_observation() {
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
         &example,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         oracle_observation(artifact.clone()),
     );
 
@@ -230,7 +230,7 @@ fn mismatch_report_names_compare_stage_after_both_sides_run() {
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
         &example,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         oracle_observation(artifact),
     );
 
@@ -280,7 +280,7 @@ fn unsupported_preflight_report_emits_no_differential_claim() {
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
         &example,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         oracle_observation(artifact),
     );
 
@@ -312,7 +312,7 @@ fn oracle_identity_mismatch_emits_no_f1_and_does_not_run_native() {
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
         &example,
-        &ken_runtime::NativeSeedEnvironment::empty(),
+        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
         oracle_observation(wrong_artifact.clone()),
     );
 

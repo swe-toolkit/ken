@@ -23,6 +23,7 @@ pub fn build_native_program(
     format: SourceFormat,
     package_name: &str,
     output_dir: impl AsRef<std::path::Path>,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<
     ken_elaborator::compiler_driver::NativeProgramBuildOutput,
     ken_elaborator::compiler_driver::NativeProgramBuildError,
@@ -37,6 +38,7 @@ pub fn build_native_program(
             name, source,
         )],
         output_dir,
+        profile,
     )
 }
 

@@ -154,6 +154,7 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1_body(
             ken_cli::SourceFormat::Ken,
             "rt_branched_scrutinee_unit_body",
             root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
 
@@ -211,6 +212,7 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
                 ken_cli::SourceFormat::Ken,
                 "rt_branched_scrutinee_unit_body_mutation",
                 root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         })
     });

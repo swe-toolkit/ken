@@ -91,8 +91,13 @@ fn linked_home_root_uses_only_production_account_database_boundary() {
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode = host_exit APartial Success
 "#;
-    let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, "px16-home-root", &dir)
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px16-home-root",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect("checked ~/ root reaches a linked artifact");
     let observation = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
@@ -120,8 +125,13 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 #[test]
 fn real_source_builds_one_identity_bound_linked_process_artifact() {
     let dir = output_dir("pure");
-    let output =
-        ken_cli::build_native_program(PURE_PROGRAM, ken_cli::SourceFormat::Ken, "px4b-pure", &dir)
+    let output = ken_cli::build_native_program(
+        PURE_PROGRAM,
+        ken_cli::SourceFormat::Ken,
+        "px4b-pure",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect("checked source reaches native artifact");
 
     assert_eq!(
@@ -166,9 +176,11 @@ fn real_source_builds_one_identity_bound_linked_process_artifact() {
     assert_eq!(reported, executable);
     assert_eq!(&reported_runtime, metadata);
     assert_eq!(reported_runtime, declarations);
-    assert!(reported
+    assert!(
+        reported
         .iter()
-        .all(|symbol| !symbol.to_string().contains("unused_sibling")));
+            .all(|symbol| !symbol.to_string().contains("unused_sibling"))
+    );
 
     let mut stale_plan = output.package.clone();
     let plan_bytes = stale_plan
@@ -233,6 +245,7 @@ fn public_source_observes_raw_argv_environment_cwd_bytes_in_field_order() {
         ken_cli::SourceFormat::Ken,
         "px4b-process-bytes",
         &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("checked byte discriminator reaches native artifact");
     let observation_dir = output_dir("process-observation");
@@ -269,8 +282,13 @@ fn public_source_observes_raw_argv_environment_cwd_bytes_in_field_order() {
 fn authority_mismatch_fails_before_any_artifact_is_written() {
     let dir = output_dir("mismatch");
     let source = PURE_PROGRAM.replace("ProgramCaps APartial", "ProgramCaps AFull");
-    let error =
-        ken_cli::build_native_program(&source, ken_cli::SourceFormat::Ken, "px4b-mismatch", &dir)
+    let error = ken_cli::build_native_program(
+        &source,
+        ken_cli::SourceFormat::Ken,
+        "px4b-mismatch",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect_err("declared/type authority mismatch must reject");
     assert!(matches!(
         error,
@@ -289,7 +307,13 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program APartial (print_line "px5")
 "#;
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, "px5-vis", &dir)
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px5-vis",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
         .expect("checked Vis reaches the PX5 artifact lane");
     let ran = Command::new(&output.artifact.executable_path)
         .output()
@@ -310,8 +334,13 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
       (\_. print_line "two"))
     Success
 "#;
-    let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, "px5-two-vis", &dir)
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px5-two-vis",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect("two checked Vis nodes reach one artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
@@ -414,6 +443,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         ken_cli::SourceFormat::Ken,
         "px5-reply-dependent",
         &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("checked response-dependent continuation reaches the artifact");
     let ran = Command::new(&output.artifact.executable_path)
@@ -473,8 +503,13 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
     }
   }
 "#;
-    let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, "px5-broken-pipe", &dir)
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px5-broken-pipe",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect("checked BrokenPipe observer reaches the linked artifact");
 
     let mut child = Command::new(&output.artifact.executable_path)
@@ -566,8 +601,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     }
   }
 "#;
-    let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, "px5-fs-roundtrip", &dir)
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px5-fs-roundtrip",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect("FS Vis nodes reach the native capability lane");
     let observation = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
@@ -659,8 +699,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   }
 "#;
 
-    let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, "px5c-fs-identity", &dir)
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px5c-fs-identity",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect("same checked source reaches the native producer");
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
@@ -715,7 +760,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
             .0 = drift.to_string();
         assert_ne!(interpreted, native_drift, "native seed drift must fail");
     }
-
 }
 
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
@@ -773,8 +817,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     }
   }
 "#;
-    let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, "px5-fs-denial", &dir)
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px5-fs-denial",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
             .expect("checked FS denial program reaches the artifact");
     let ran = Command::new(&output.artifact.executable_path)
         .arg("../escape")
@@ -790,11 +839,16 @@ fn native_build_subcommand_reaches_the_same_public_producer() {
     let dir = output_dir("cli");
     let source_path = dir.join("main.ken");
     let artifact_dir = dir.join("artifact");
+    let profile_path = dir.join("resource-profile.json");
     std::fs::write(&source_path, PURE_PROGRAM).unwrap();
+    std::fs::write(&profile_path,
+        r#"{"runtime":{"invocation_epochs":18446744073709551615},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#,
+    ).unwrap();
     let built = Command::new(env!("CARGO_BIN_EXE_ken"))
         .arg("native-build")
         .arg(&source_path)
         .arg(&artifact_dir)
+        .arg(&profile_path)
         .output()
         .expect("native-build command runs");
     assert_eq!(built.status.code(), Some(0), "stderr: {:?}", built.stderr);

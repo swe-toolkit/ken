@@ -1363,7 +1363,9 @@ mod tests {
         let expr = b2r_seed_closure(&["c"], RuntimeExpr::Var(0));
         let mut shapes = Vec::new();
         for (label, value) in &family {
-            let mut seed_env = NativeSeedEnvironment::default();
+            let mut seed_env = NativeSeedEnvironment::empty(
+                crate::boundary_resource_profile::starter_smoke_profile(),
+            );
             seed_env.insert("c", value.clone());
             // ⚠ The environment is constructed and bound, and is deliberately
             // NOT threaded into planning -- because planning has no parameter to

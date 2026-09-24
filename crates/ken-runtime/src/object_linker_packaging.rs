@@ -18,13 +18,14 @@ use crate::cranelift_backend::{
 };
 use crate::platform_runtime_support::validate_entrypoint_metadata_payload;
 use crate::{
-    fnv1a_64, platform_runtime_support_report_hash, runtime_executable_entrypoint_package_hash,
-    CraneliftObjectArtifact, NativeDifferentialStage, NativeRuntimeIrComparisonVerdict,
-    NativeSeedEnvironment, PlatformRuntimeEvidenceFact, PlatformRuntimeEvidenceLane,
+    CraneliftObjectArtifact, EXECUTABLE_ENTRYPOINT_PACKAGE_KIND,
+    EXECUTABLE_ENTRYPOINT_PACKAGE_VERSION, NativeDifferentialStage,
+    NativeRuntimeIrComparisonVerdict, NativeSeedEnvironment, PLATFORM_RUNTIME_SUPPORT_KIND,
+    PLATFORM_RUNTIME_SUPPORT_VERSION, PlatformRuntimeEvidenceFact, PlatformRuntimeEvidenceLane,
     PlatformRuntimeSupportReport, RuntimeArtifactIdentity, RuntimeExecutableEntrypointPackage,
     RuntimeExpr, RuntimeGroundValue, RuntimeIrRunReport, RuntimeObservation, RuntimeProgram,
-    RuntimeSymbol, EXECUTABLE_ENTRYPOINT_PACKAGE_KIND, EXECUTABLE_ENTRYPOINT_PACKAGE_VERSION,
-    PLATFORM_RUNTIME_SUPPORT_KIND, PLATFORM_RUNTIME_SUPPORT_VERSION,
+    RuntimeSymbol, fnv1a_64, platform_runtime_support_report_hash,
+    runtime_executable_entrypoint_package_hash,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -74,6 +75,7 @@ pub struct BoundProcessExecutableArtifact {
     pub target_symbol: RuntimeSymbol,
     pub executable_path: PathBuf,
     pub executable_hash: u64,
+    boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
     trap_catalog: BoundPlannerTrapCatalog,
 }
 
@@ -344,6 +346,21 @@ pub fn run_bound_process_effect_observation_with_stdin(
         return Err(NativeEffectRunErrorV1::BindingMismatch);
     }
     let exit_status = output.status.code().unwrap_or(1);
+    // A typed capacity terminal is valid only when its reserved root status
+    // and exact bound profile agree. Neither a bare -7 nor an arbitrary
+    // negative paired with a forged terminal variant grants fault authority.
+    if let Some(ken_host::TerminalErrorV1::CapacityExhausted(failure)) = &trace.terminal_error {
+        if trace.terminal_value != ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+            || failure.scope != ken_host::CapacityScopeV1::Runtime
+            || failure.resource != ken_host::CapacityResourceV1::InvocationEpochs
+            || failure.limit
+                != u128::from(artifact.boundary_resource_profile.runtime.invocation_epochs)
+            || failure.requested != failure.limit + 1
+            || exit_status != 1
+        {
+            return Err(NativeEffectRunErrorV1::MalformedTrace);
+        }
+    }
     let terminal_error = if trace.terminal_error.is_some() {
         trace.terminal_error
     } else if output.status.code().is_none() {
@@ -376,7 +393,7 @@ pub fn run_bound_process_effect_observation_with_stdin(
 }
 
 pub const OBJECT_LINKER_PACKAGE_KIND: &str = "KenObjectLinkerExecutablePackage";
-pub const OBJECT_LINKER_PACKAGE_VERSION: u32 = 0;
+pub const OBJECT_LINKER_PACKAGE_VERSION: u32 = 1;
 pub const OBJECT_LINKER_PACKAGE_SPEC_REF: &str = "docs/program/wp/NC23-object-linker-packaging.md";
 pub const STARTER_ENTRY_SYMBOL: &str = "ken_nc23_entrypoint";
 
@@ -402,7 +419,7 @@ pub struct ObjectLinkerExecutablePackage {
     /// authorized resource policy** share one identity, and a consumer checking
     /// identity would not be able to tell them apart. ⇒ Two profiles, two
     /// packages.
-    pub boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    pub boundary_resource_profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -517,7 +534,7 @@ pub struct ObjectLinkerPackagingOptions {
     /// linked** — which is `AC-7`'s whole point, and is a different observation
     /// from a starter that links, runs, and then declines to execute.
     pub boundary_resource_profile:
-        Option<crate::boundary_resource_profile::BoundaryResourceProfileV1>,
+        Option<crate::boundary_resource_profile::BoundaryResourceProfileV2>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -525,6 +542,10 @@ pub struct ObjectLinkerPackagingError {
     pub stage: ObjectLinkerPackagingStage,
     pub field: &'static str,
     pub reason: String,
+    /// Real linked nonprocess starter capacity refusal, decoded from the
+    /// opaque failed-begin handle's typed terminal wire (never inferred from
+    /// exit status or a smoke mismatch string).
+    pub capacity_failure: Option<ken_host::CapacityExhaustedV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -560,7 +581,7 @@ impl ObjectLinkerPackagingOptions {
 
     /// The same options, with a deployment-authorized profile named.
     pub fn starter_host_with_profile(
-        profile: crate::boundary_resource_profile::BoundaryResourceProfileV1,
+        profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
     ) -> Self {
         Self {
             boundary_resource_profile: Some(profile),
@@ -585,7 +606,7 @@ pub fn package_starter_executable_artifact(
     env: &NativeSeedEnvironment,
     output_dir: impl AsRef<Path>,
     producer: impl Into<String>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     package_starter_executable_artifact_with_options(
         program,
@@ -653,7 +674,7 @@ pub(crate) fn package_synthetic_starter_executable_artifact_with_profile(
     env: &NativeSeedEnvironment,
     output_dir: impl AsRef<Path>,
     producer: impl Into<String>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
     authority: &crate::NativeProcessSymbols,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     package_starter_executable_artifact_with_authority(
@@ -809,6 +830,7 @@ fn package_starter_executable_artifact_with_authority(
         &executable_path,
         &options.executable_relative_path,
         &expected_stdout,
+        profile,
     )?;
 
     let mut package = ObjectLinkerExecutablePackage {
@@ -854,7 +876,7 @@ fn package_starter_executable_artifact_with_authority(
 fn link_process_starter_object_artifact(
     object: crate::CraneliftObjectArtifact,
     output_dir: impl AsRef<Path>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<PathBuf, ObjectLinkerPackagingError> {
     let options = ObjectLinkerPackagingOptions::starter_host_with_profile(profile);
     let output_dir = output_dir.as_ref();
@@ -956,7 +978,7 @@ pub fn build_bound_process_starter_executable_artifact(
     program: &RuntimeProgram,
     entrypoint: &BoundProcessEntrypoint,
     output_dir: impl AsRef<Path>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<BoundProcessExecutableArtifact, ObjectLinkerPackagingError> {
     if !entrypoint.root_execution_binding_is_valid() {
         return Err(packaging_error(
@@ -1082,6 +1104,7 @@ pub fn build_bound_process_starter_executable_artifact(
         target_symbol: entrypoint.target_symbol.clone(),
         executable_path,
         executable_hash: fnv1a_64(&executable_bytes),
+        boundary_resource_profile: profile,
         trap_catalog,
     })
 }
@@ -1445,6 +1468,7 @@ fn smoke_executable(
     executable_path: &Path,
     executable_relative_path: &str,
     expected_stdout: &str,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> Result<ObjectLinkerSmokeReport, ObjectLinkerPackagingError> {
     let output = Command::new(executable_path).output().map_err(|err| {
         packaging_error(
@@ -1455,6 +1479,37 @@ fn smoke_executable(
     })?;
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let status = output.status.code().unwrap_or(-1);
+    // Only the actual linked starter's own failed-begin handle can write this
+    // terminal in the ordinary packaging path. A forged/replaced executable is
+    // outside this evidence boundary: the decoder checks the stated artifact
+    // and policy, not executable authenticity.
+    if status == 1 && output.stdout.is_empty() {
+        if let Ok(trace) = ken_host::decode_linked_effect_trace(&output.stderr) {
+            if trace.plan_hash == 0
+                && trace.target_abi_hash == ken_host::TARGET_ABI_MANIFEST_HASH
+                && trace.host_effect_abi_hash == ken_host::HOST_EFFECT_ABI_V1_HASH
+                && trace.terminal_value == ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+                && trace.terminal_exit == ken_host::TerminalExitClass::ControlledTrap
+                && trace.effect_trace.is_empty()
+            {
+                if let Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)) = trace.terminal_error {
+                    let limit = u128::from(profile.runtime.invocation_epochs);
+                    if fault.scope == ken_host::CapacityScopeV1::Runtime
+                        && fault.resource == ken_host::CapacityResourceV1::InvocationEpochs
+                        && fault.limit == limit
+                        && fault.requested == limit + 1
+                    {
+                        return Err(ObjectLinkerPackagingError {
+                            stage: ObjectLinkerPackagingStage::SmokeExecution,
+                            field: "runtime.invocation_epochs",
+                            reason: format!("linked starter refused actual epoch begin: {fault:?}"),
+                            capacity_failure: Some(fault),
+                        });
+                    }
+                }
+            }
+        }
+    }
     if !output.status.success() || stdout != expected_stdout {
         return Err(packaging_error(
             ObjectLinkerPackagingStage::SmokeExecution,
@@ -1674,6 +1729,15 @@ fn canonical_object_linker_package_bytes(package: &ObjectLinkerExecutablePackage
     // listing eight fields here: a resource added to `BoundaryResource::ALL`
     // joins the identity automatically, and ⛔ cannot be forgotten in this
     // function.
+    push_field(
+        &mut out,
+        "runtime_invocation_epochs",
+        &package
+            .boundary_resource_profile
+            .runtime
+            .invocation_epochs
+            .to_string(),
+    );
     for scope in crate::boundary_resource_profile::BoundaryResourceScope::ALL {
         for resource in crate::boundary_resource_profile::BoundaryResource::ALL {
             push_field(
@@ -1973,22 +2037,24 @@ fn runtime_trap_code_tag(code: &crate::RuntimeTrapCode) -> &'static str {
 /// deployment-authorized profile. ⭐ The stub *carries* already-authorized
 /// numbers; ⛔ it is not their authority, and a package with no profile is
 /// refused before this text is ever written.
-fn starter_c_stub(profile: &crate::boundary_resource_profile::BoundaryResourceProfileV1) -> String {
+fn starter_c_stub(profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2) -> String {
     format!(
         r#"#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-struct KenBoundaryResourceProfileV1 {{
+struct KenBoundaryResourceProfileV2 {{
     uint64_t version, size;
+    uint64_t runtime_invocation_epochs;
     uint64_t invocation_nodes, invocation_words, invocation_data_bytes, invocation_native_int_limbs;
     uint64_t persistent_nodes, persistent_words, persistent_data_bytes, persistent_native_int_limbs;
 }};
 
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV1 *profile, void **out_store);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store);
 extern long long ken_boundary_store_v1_destroy(void *store);
-extern long long ken_activation_v1_begin(void *store, void **out_activation);
+extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
+extern long long ken_activation_v1_write_starter_capacity_failure(void *failure);
 extern long long ken_activation_v1_native_frame(const void *activation, const void **out_frame);
 extern long long ken_activation_v1_services(const void *activation, const void **out_services);
 extern long long ken_activation_v1_write_final_export(const void *activation, long long fallback, unsigned char *buffer, size_t capacity, size_t *out_len);
@@ -1997,8 +2063,9 @@ extern long long ken_activation_v1_destroy(void *activation);
 extern long long ken_nc23_entrypoint(const void *frame, const void *services);
 
 int main(void) {{
-    struct KenBoundaryResourceProfileV1 profile = {{
-        .version = {version}, .size = sizeof(struct KenBoundaryResourceProfileV1),
+    struct KenBoundaryResourceProfileV2 profile = {{
+        .version = {version}, .size = sizeof(struct KenBoundaryResourceProfileV2),
+        .runtime_invocation_epochs = {runtime_epochs},
         .invocation_nodes = {inv_nodes}, .invocation_words = {inv_words},
         .invocation_data_bytes = {inv_data}, .invocation_native_int_limbs = {inv_limbs},
         .persistent_nodes = {per_nodes}, .persistent_words = {per_words},
@@ -2006,12 +2073,19 @@ int main(void) {{
     }};
     void *store = NULL;
     void *activation = NULL;
+    void *capacity_failure = NULL;
     const void *frame = NULL;
     const void *services = NULL;
     if (ken_boundary_store_v1_open(&profile, &store) != 0) return 1;
-    if (ken_activation_v1_begin(store, &activation) != 0) {{
+    long long begin_status = ken_activation_v1_begin(store, &activation, &capacity_failure);
+    if (begin_status != 0) {{
+        if (begin_status == -7 && capacity_failure != NULL) {{
+            long long terminal_status = ken_activation_v1_write_starter_capacity_failure(capacity_failure);
+            ken_boundary_store_v1_destroy(store);
+            return terminal_status == 0 ? 1 : 2;
+        }}
         ken_boundary_store_v1_destroy(store);
-        return 1;
+        return 2;
     }}
     if (ken_activation_v1_native_frame(activation, &frame) != 0) {{
         ken_activation_v1_destroy(activation);
@@ -2040,6 +2114,7 @@ int main(void) {{
 }}
 "#,
         version = crate::boundary_resource_profile::BOUNDARY_RESOURCE_PROFILE_VERSION,
+        runtime_epochs = profile.runtime.invocation_epochs,
         inv_nodes = profile.invocation.nodes,
         inv_words = profile.invocation.words,
         inv_data = profile.invocation.data_bytes,
@@ -2053,7 +2128,7 @@ int main(void) {{
 
 #[cfg(test)]
 pub(crate) fn process_starter_c_stub(
-    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> String {
     process_starter_c_stub_for_authority(1, 1, false, 1, &ken_host::FsRootSpec::default(), profile)
 }
@@ -2064,7 +2139,7 @@ fn process_starter_c_stub_for_authority(
     allow_root_execution: bool,
     root_denied_exit_status: i32,
     fs_root_spec: &ken_host::FsRootSpec,
-    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    profile: &crate::boundary_resource_profile::BoundaryResourceProfileV2,
 ) -> String {
     r#"#include <stdint.h>
 #include <stdio.h>
@@ -2097,8 +2172,9 @@ struct KenArena {
    dead -- nothing referenced it -- but a dead private copy of native-Int layout
    is still a private copy of native-Int layout, and neither the build nor the
    link discriminates it. */
-struct KenBoundaryResourceProfileV1 {
+struct KenBoundaryResourceProfileV2 {
     uint64_t version, size;
+    uint64_t runtime_invocation_epochs;
     uint64_t invocation_nodes, invocation_words, invocation_data_bytes, invocation_native_int_limbs;
     uint64_t persistent_nodes, persistent_words, persistent_data_bytes, persistent_native_int_limbs;
 };
@@ -2110,9 +2186,10 @@ struct KenHostInitResultV1 {
 };
 
 extern long long ken_nc23_entrypoint(const void *frame, const void *services);
-extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV1 *profile, void **out_store);
+extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProfileV2 *profile, void **out_store);
 extern long long ken_boundary_store_v1_destroy(void *store);
-extern long long ken_activation_v1_begin(void *store, void **out_activation);
+extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
+extern long long ken_activation_v1_finish_capacity_failure(void *context, void *failure);
 extern long long ken_activation_v1_services(const void *activation, const void **out_services);
 extern long long ken_activation_v1_bind_process_frame(void *activation, const void *process_input, void *host_context, uint64_t capability, const void **out_frame);
 extern long long ken_activation_v1_finish(void *activation, void *store, uint64_t escaping, uint64_t *out_word);
@@ -2268,8 +2345,9 @@ int main(int argc, char **argv, char **envp) {
         host_init.plan_hash != KEN_ENTRYPOINT_PLAN_HASH) {
         free(pool); free(cwd); return 1;
     }
-    struct KenBoundaryResourceProfileV1 profile = {
-        .version = __KEN_PROFILE_VERSION__, .size = sizeof(struct KenBoundaryResourceProfileV1),
+    struct KenBoundaryResourceProfileV2 profile = {
+        .version = __KEN_PROFILE_VERSION__, .size = sizeof(struct KenBoundaryResourceProfileV2),
+        .runtime_invocation_epochs = __KEN_PROFILE_RUNTIME_EPOCHS__,
         .invocation_nodes = __KEN_PROFILE_INV_NODES__, .invocation_words = __KEN_PROFILE_INV_WORDS__,
         .invocation_data_bytes = __KEN_PROFILE_INV_DATA__, .invocation_native_int_limbs = __KEN_PROFILE_INV_LIMBS__,
         .persistent_nodes = __KEN_PROFILE_PER_NODES__, .persistent_words = __KEN_PROFILE_PER_WORDS__,
@@ -2277,10 +2355,18 @@ int main(int argc, char **argv, char **envp) {
     };
     void *store = NULL;
     void *activation = NULL;
+    void *capacity_failure = NULL;
     const void *frame = NULL;
     const void *services = NULL;
-    if (ken_boundary_store_v1_open(&profile, &store) != 0) { free(pool); free(cwd); return 1; }
-    if (ken_activation_v1_begin(store, &activation) != 0) {
+    if (ken_boundary_store_v1_open(&profile, &store) != 0) {
+        ken_host_invocation_v1_destroy(host_init.context);
+        free(pool); free(cwd); return 1;
+    }
+    long long begin_status = ken_activation_v1_begin(store, &activation, &capacity_failure);
+    if (begin_status != 0) {
+        if (begin_status == -7 && capacity_failure != NULL)
+            ken_activation_v1_finish_capacity_failure(host_init.context, capacity_failure);
+        else ken_host_invocation_v1_destroy(host_init.context);
         ken_boundary_store_v1_destroy(store); free(pool); free(cwd); return 1;
     }
     if (ken_activation_v1_bind_process_frame(activation, root, host_init.context, host_init.capability, &frame) != 0) {
@@ -2315,6 +2401,7 @@ int main(int argc, char **argv, char **envp) {
         "__KEN_PROFILE_VERSION__",
         &crate::boundary_resource_profile::BOUNDARY_RESOURCE_PROFILE_VERSION.to_string(),
     )
+    .replace("__KEN_PROFILE_RUNTIME_EPOCHS__", &profile.runtime.invocation_epochs.to_string())
     .replace("__KEN_PROFILE_INV_NODES__", &profile.invocation.nodes.to_string())
     .replace("__KEN_PROFILE_INV_WORDS__", &profile.invocation.words.to_string())
     .replace("__KEN_PROFILE_INV_DATA__", &profile.invocation.data_bytes.to_string())
@@ -2391,6 +2478,7 @@ fn packaging_error(
         stage,
         field,
         reason: reason.into(),
+        capacity_failure: None,
     }
 }
 
@@ -2399,9 +2487,6 @@ mod tests {
     use super::*;
 
     use crate::{
-        evaluate_runtime_ir_example, executable_artifact_contract_for_runtime_report,
-        executable_entrypoint_metadata_hash, executable_entrypoint_package_for_runtime_contract,
-        platform_runtime_support_for_entrypoint, summarize_runtime_ir_program,
         ErasedExecutableCore, ExecutableArgumentPackaging, ExecutableArgumentShape,
         ExecutableDependencyClosure, ExecutableEntrypointPackageMetadata,
         ExecutableEntrypointTargetKind, ExecutableEntrypointVerdict, ExecutableReportContract,
@@ -2409,12 +2494,14 @@ mod tests {
         ExecutableTrapContract, ExecutableTrapShape, RuntimeDeclaration, RuntimeDeclarationKind,
         RuntimeExpr, RuntimeIrProgramReport, RuntimeIrSeedEnvironment, RuntimeLowerabilityStatus,
         RuntimeMetadata, RuntimePartiality, RuntimePrimitive, RuntimeSymbolMetadata, RuntimeTrap,
-        RuntimeTrapCode, RuntimeValue,
+        RuntimeTrapCode, RuntimeValue, evaluate_runtime_ir_example,
+        executable_artifact_contract_for_runtime_report, executable_entrypoint_metadata_hash,
+        executable_entrypoint_package_for_runtime_contract,
+        platform_runtime_support_for_entrypoint, summarize_runtime_ir_program,
     };
 
     fn signed_root_token(identity: u64) -> i64 {
-        let magnitude = (identity
-            << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+        let magnitude = (identity << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
             | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG as u64;
         -i64::try_from(magnitude).expect("test trap token fits the process ABI")
     }
@@ -2663,12 +2750,15 @@ mod tests {
         .expect("platform support materializes");
         let output_dir = temp_output_dir("nc23-smoke");
 
-        let package = package_synthetic_starter_executable_artifact_with_profile(
+        let package =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             &output_dir,
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -2688,13 +2778,65 @@ mod tests {
         assert!(package.smoke.passed);
         assert!(package.object_artifact.byte_len > 0);
         assert!(package.executable_artifact.byte_len > 0);
-        assert!(package
+        assert!(
+            package
             .unavailable_lanes
-            .contains(&ObjectLinkerUnavailableLane::WholeCompilerProof));
+                .contains(&ObjectLinkerUnavailableLane::WholeCompilerProof)
+        );
         assert!(matches!(
             package.toolchain.whole_compiler_proof,
             ObjectLinkerEvidenceFact::Unavailable { .. }
         ));
+    }
+
+    /// Promise: durable real-starter epoch resource boundary. Both runs use
+    /// the same checked entry object and the ordinary C stub/linked smoke
+    /// route. The zero-budget case must be typed, not a bare nonzero exit.
+    #[test]
+    fn nonprocess_starter_preserves_actual_one_past_epoch_fault() {
+        let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int(42.into()));
+        let program = starter_program(int_body(42), observation);
+        let (_report, entrypoint) = packaged_entrypoint(&program);
+        let run_report = runtime_ir_run_report(&program);
+        let support = platform_support(&program, &entrypoint, &run_report);
+        let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+        let mut profile = env.profile();
+        profile.runtime.invocation_epochs = 1;
+        let good = temp_output_dir("epoch-starter-room");
+        let package = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &good,
+            "real-starter epoch positive", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect("epoch 1 under cap 1 must run the linked entry");
+        assert_eq!(package.smoke.stdout, "42\n");
+        assert_eq!(package.smoke.exit_status, 0);
+
+        profile.runtime.invocation_epochs = 0;
+        let bad = temp_output_dir("epoch-starter-exhausted");
+        let refusal = package_synthetic_starter_executable_artifact_with_profile(
+            &program, &entrypoint, &support, &run_report, &env, &bad,
+            "real-starter epoch refusal", profile,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        ).expect_err("epoch 1 over cap 0 must be a typed packaging result");
+        let expected = ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Runtime,
+            resource: ken_host::CapacityResourceV1::InvocationEpochs,
+            limit: 0,
+            requested: 1,
+        };
+        assert_eq!(refusal.stage, ObjectLinkerPackagingStage::SmokeExecution);
+        assert_eq!(refusal.field, "runtime.invocation_epochs");
+        assert_eq!(refusal.capacity_failure, Some(expected));
+        // Independently read the artifact that packaging just ran, rather
+        // than deriving the terminal payload from the returned error.
+        let linked_path = bad.join(ObjectLinkerPackagingOptions::starter_host_with_profile(profile).executable_relative_path);
+        let linked = Command::new(linked_path)
+            .output().expect("starter artifact survived typed refusal");
+        assert_eq!(linked.status.code(), Some(1));
+        assert!(linked.stdout.is_empty());
+        let trace = ken_host::decode_linked_effect_trace(&linked.stderr).expect("typed starter wire");
+        assert_eq!(trace.terminal_error, Some(ken_host::TerminalErrorV1::CapacityExhausted(expected)));
+        assert!(trace.effect_trace.is_empty());
     }
 
     fn generic_big_int_program() -> RuntimeProgram {
@@ -2734,12 +2876,15 @@ mod tests {
         let run_report = runtime_ir_run_report(&program);
         let support = platform_support(&program, &entrypoint, &run_report);
         let output_dir = temp_output_dir("px8i-generic-big-int");
-        let package = package_synthetic_starter_executable_artifact_with_profile(
+        let package =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             &output_dir,
             "PX8-I generic object Big discriminator",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -2773,12 +2918,15 @@ mod tests {
         let run_report = runtime_ir_run_report(&program);
         let support = platform_support(&program, &entrypoint, &run_report);
         let output_dir = temp_output_dir("px8i-generic-terminal-big-int");
-        let package = package_synthetic_starter_executable_artifact_with_profile(
+        let package =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             &output_dir,
             "PX8-I generic terminal Big discriminator",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -2804,7 +2952,7 @@ mod tests {
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             &output_dir,
             "PX8-I shared-helper mutation",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -3114,7 +3262,6 @@ mod tests {
         assert_eq!(wrong_cwd.status.code(), Some(1));
         assert_eq!(wrong_argument.status.code(), Some(1));
         assert_eq!(wrong_key.status.code(), Some(1));
-
     }
 
     #[cfg(target_os = "linux")]
@@ -3164,16 +3311,20 @@ mod tests {
             RuntimeExpr::Value(RuntimeValue::Int((0).into())),
         );
         assert_eq!(malformed.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&malformed.stderr)
-            .contains("entrypoint returned a malformed ExitCode"));
+        assert!(
+            String::from_utf8_lossy(&malformed.stderr)
+                .contains("entrypoint returned a malformed ExitCode")
+        );
 
         let malformed_failure = run(
             "px4-malformed-failure",
             failure(RuntimeExpr::Value(RuntimeValue::Bool(true))),
         );
         assert_eq!(malformed_failure.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&malformed_failure.stderr)
-            .contains("malformed ExitCode::Failure payload"));
+        assert!(
+            String::from_utf8_lossy(&malformed_failure.stderr)
+                .contains("malformed ExitCode::Failure payload")
+        );
 
         let trapped = run(
             "px4-explicit-trap",
@@ -3183,8 +3334,7 @@ mod tests {
             }),
         );
         assert_eq!(trapped.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&trapped.stderr)
-            .contains("planned runtime trap token"));
+        assert!(String::from_utf8_lossy(&trapped.stderr).contains("planned runtime trap token"));
 
         // This producer Match is the retired monolithic-lane sibling. Its
         // runtime-reached default crosses the generated-unit TrapWord route and
@@ -3211,8 +3361,10 @@ mod tests {
             },
         );
         assert_eq!(retained_root_trap.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&retained_root_trap.stderr)
-            .contains("planned runtime trap token"));
+        assert!(
+            String::from_utf8_lossy(&retained_root_trap.stderr)
+                .contains("planned runtime trap token")
+        );
     }
 
     #[cfg(target_os = "linux")]
@@ -3271,7 +3423,8 @@ mod tests {
         // review closes a future raw jump that bypasses the private emitter.
         let header_edges = success_provenance
             .iter()
-            .filter_map(|event| match event {
+            .filter_map(|event| {
+                match event {
                 crate::cranelift_backend::Px8trTrapProvenanceEvent::CarriedLoopHeaderEdgeEmitted {
                     checked_frame_id,
                     edge,
@@ -3284,6 +3437,7 @@ mod tests {
                     *emitted_control_word,
                 )),
                 _ => None,
+            }
             })
             .collect::<Vec<_>>();
         assert_eq!(
@@ -3317,8 +3471,7 @@ mod tests {
             "the enabled checked route must return successfully while disabling that exact \
              route must select the planned checked-ITree default"
         );
-        assert!(String::from_utf8_lossy(&trapped.stderr)
-            .contains("planned runtime trap token"));
+        assert!(String::from_utf8_lossy(&trapped.stderr).contains("planned runtime trap token"));
 
         // ── ⭐⭐ `RT-DECL-CLOSURE-PORT` `D6a` — EXACT TRAP PROVENANCE ──
         //
@@ -3927,12 +4080,15 @@ mod tests {
         .expect("platform support materializes");
         support.header.support_hash ^= 1;
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-stale-support"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -3953,12 +4109,15 @@ mod tests {
         let support = platform_support(&program, &entrypoint, &run_report);
         entrypoint.entrypoint.target_kind = ExecutableEntrypointTargetKind::Library;
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-stale-payload"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -3986,12 +4145,15 @@ mod tests {
         support.entrypoint_metadata_identity = entrypoint.entrypoint.metadata_identity;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-forged-support"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4017,12 +4179,15 @@ mod tests {
         support.entrypoint_package_hash = entrypoint.header.package_hash;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-forged-entrypoint-header"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4047,12 +4212,15 @@ mod tests {
         support.entrypoint_package_hash = entrypoint.header.package_hash;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-forged-entrypoint-version"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4076,12 +4244,15 @@ mod tests {
         support.header.version = PLATFORM_RUNTIME_SUPPORT_VERSION + 1;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-forged-support-header"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4107,12 +4278,15 @@ mod tests {
         support.header.version = PLATFORM_RUNTIME_SUPPORT_VERSION + 1;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-forged-support-version"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4149,12 +4323,15 @@ mod tests {
         };
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-platform"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4166,27 +4343,25 @@ mod tests {
         assert_eq!(err.field, "platform_target");
     }
 
-    #[test]
-    /// ⭐⭐ **`D5` — the authorized profile is IN the package identity, and each
-    /// of the eight limits is in it separately.**
+    /// The authorized profile is in the package identity: all eight existing
+    /// boundary limits and the process-wide epoch limit are separate inputs.
     ///
     /// ⚠ **Recording it as metadata alone would not do**, and that is the whole
     /// point: two packages built with **different authorized resource policy**
     /// would then share one identity, and a consumer checking identity could not
     /// tell them apart. ⇒ Two profiles, two packages.
     ///
-    /// ⛔ Each limit is perturbed **separately**, so the test cannot pass on an
-    /// identity that happens to include only one of them — the failure mode a
-    /// single "change the profile" assertion would miss.
+    /// Each limit is perturbed separately, including the epoch limit, so the
+    /// identity cannot pass by encoding only the boundary limits. A single
+    /// "change the profile" assertion would miss an omitted field.
     ///
-    /// **MEASURED:** perturbing any one of the eight limits changes
-    /// `object_linker_executable_package_hash`, and the eight perturbations give
-    /// eight distinct identities.
+    /// **MEASURED:** independently perturbing the epoch or any boundary limit
+    /// changes `object_linker_executable_package_hash` to a distinct identity.
     /// **CLAIMED:** the profile is part of the package identity.
     /// **THE GAP:** ⛔ that a consumer *checks* identity before trusting a
     /// package. That is the consumer's obligation and is not this node's.
     #[test]
-    fn each_of_the_eight_authorized_limits_is_part_of_the_package_identity() {
+    fn each_authorized_boundary_and_epoch_limit_is_part_of_the_package_identity() {
         use crate::boundary_resource_profile::{BoundaryResource, BoundaryResourceScope};
 
         let observation = RuntimeObservation::Returned(RuntimeGroundValue::Bool(true));
@@ -4201,12 +4376,15 @@ mod tests {
             "object linker unit test",
         )
         .expect("platform support materializes");
-        let package = package_synthetic_starter_executable_artifact_with_profile(
+        let package =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("c3-d5-identity"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4223,6 +4401,17 @@ mod tests {
 
         let mut identities = BTreeSet::new();
         identities.insert(baseline);
+        let mut epoch_changed = package.clone();
+        epoch_changed
+            .boundary_resource_profile
+            .runtime
+            .invocation_epochs -= 1;
+        let epoch_hash = object_linker_executable_package_hash(&epoch_changed);
+        assert_ne!(
+            epoch_hash, baseline,
+            "the runtime epoch bound is not in package identity"
+        );
+        assert!(identities.insert(epoch_hash));
         for scope in BoundaryResourceScope::ALL {
             for resource in BoundaryResource::ALL {
                 let mut perturbed = package.clone();
@@ -4254,7 +4443,11 @@ mod tests {
                 );
             }
         }
-        assert_eq!(identities.len(), 9, "one baseline plus eight perturbations");
+        assert_eq!(
+            identities.len(),
+            2 + BoundaryResourceScope::ALL.len() * BoundaryResource::ALL.len(),
+            "baseline, epoch, and every existing boundary region limit differ"
+        );
     }
 
     /// ⭐⭐ **`AC-7` — absence of a profile is a refusal BEFORE packaging, and
@@ -4296,12 +4489,15 @@ mod tests {
             "non-vacuity: `starter_host` must carry no profile, or this test \
              measures nothing"
         );
-        let err = package_synthetic_starter_executable_artifact(
+        let err =
+            package_synthetic_starter_executable_artifact(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             &output_dir,
             "object linker unit test",
             &options,
@@ -4322,12 +4518,15 @@ mod tests {
 
         // And the same inputs DO package once a profile is named — otherwise the
         // refusal above could be about anything.
-        let package = package_synthetic_starter_executable_artifact(
+        let package =
+            package_synthetic_starter_executable_artifact(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("c3-ac7-named-profile"),
             "object linker unit test",
             &ObjectLinkerPackagingOptions::starter_host_with_profile(
@@ -4363,12 +4562,15 @@ mod tests {
         );
         options.linker_command = "definitely-missing-ken-linker".to_string();
 
-        let err = package_synthetic_starter_executable_artifact(
+        let err =
+            package_synthetic_starter_executable_artifact(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-missing-linker"),
             "object linker unit test",
             &options,
@@ -4405,12 +4607,15 @@ mod tests {
         )
         .expect("platform support materializes");
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-aggregate"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
@@ -4441,12 +4646,15 @@ mod tests {
         )
         .expect("platform support materializes");
 
-        let err = package_synthetic_starter_executable_artifact_with_profile(
+        let err =
+            package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
             &run_report,
-            &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(
+                    crate::boundary_resource_profile::starter_smoke_profile(),
+                ),
             temp_output_dir("nc23-trap"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),

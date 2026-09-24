@@ -4831,7 +4831,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
             "ken_d3_direct_store_loop_child",
             Linkage::Local,
             &expression,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             BTreeMap::new(),
             None,
             true,
@@ -5055,7 +5055,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
             }],
         };
         let (plan, _) = planned_root_occurrence(&source);
-        let seed_env = NativeSeedEnvironment::empty();
+        let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
         // Found by SHAPE rather than by position, so the agreeing row below cannot
         // fail at the planner's own shape cross-check and be misread as the class
@@ -5593,7 +5593,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
             "ken_d7_aggregate_ownership",
             Linkage::Export,
             program,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             declarations,
             None,
             true,
@@ -5682,7 +5682,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
         let compile = || {
             crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
                 &program,
-                &NativeSeedEnvironment::empty(),
+                &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             )
             .map(|_| ())
         };
@@ -5775,7 +5775,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     /// resolve ownership at wherever the value happens to be transferred.
     #[test]
     fn an_aggregate_with_no_producer_certificate_cannot_reach_the_carrier() {
-        let seed_env = NativeSeedEnvironment::empty();
+        let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         let mut module = new_jit_module().expect("JIT module constructs");
         let mut signature = module.make_signature();
         signature.returns.push(AbiParam::new(types::I64));
@@ -6143,7 +6143,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     /// allocator through a container the walk declined to enter.
     #[test]
     fn a_mismatch_below_every_recursive_container_is_refused_before_any_allocation() {
-        let seed_env = NativeSeedEnvironment::empty();
+        let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         let construct = RuntimeExpr::Construct {
             constructor: "ctor:fixture::C1::Wrap".to_string(),
             args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
@@ -6287,7 +6287,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     /// not merely recorded.
     #[test]
     fn a_child_owner_set_outside_the_planned_meet_is_refused_before_any_allocation() {
-        let seed_env = NativeSeedEnvironment::empty();
+        let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         // ⭐ The `Call` child is what makes position 0's planned owner set the
         // singleton `[NoReferent]`: its join result is a native scalar pair, so the
         // planner records that nothing can own it. Measured on this exact fixture.

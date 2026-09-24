@@ -153,6 +153,7 @@ fn the_conditional_join_grows_the_projection_and_records_every_deferral_body() {
             ken_cli::SourceFormat::Ken,
             "rt_capture_projection_grow",
             root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
     eprintln!("RT_CAPTURE_PROJECTION_GROW_DEFERRALS {deferrals:?}");

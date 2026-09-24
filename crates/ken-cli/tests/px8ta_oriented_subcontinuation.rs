@@ -204,6 +204,7 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
         ken_cli::SourceFormat::Ken,
         &format!("px8ta-depth-{depth}"),
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .unwrap_or_else(|error| {
         panic!("depth {depth} checked nested bracket reaches native lowering: {error:?}")
@@ -387,6 +388,7 @@ fn run_px8ds_retired_flat_control() {
             ken_cli::SourceFormat::Ken,
             "px8ds-retired-flat",
             retired_dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     })
     .expect_err("the retired flat-order plan must retain the closure refusal");
@@ -453,6 +455,7 @@ fn observe_px8ds_real_same_depth_path() -> ken_runtime::EffectObservation {
         ken_cli::SourceFormat::Ken,
         "px8ds-exact-edges",
         exact_dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("exact dynamic edges compile the same checked source");
     ken_runtime::run_bound_process_effect_observation(

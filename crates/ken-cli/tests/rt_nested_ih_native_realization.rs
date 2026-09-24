@@ -77,6 +77,7 @@ fn nested_checked_ih_native_result_is_exactly_interpreter_nat_three() {
         ken_cli::SourceFormat::Ken,
         "rt-nested-ih-native-realization",
         root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("nested checked IH reaches a linked native artifact");
     let mut host = ken_interp::CaptureHost::new(Vec::new());

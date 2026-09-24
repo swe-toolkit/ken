@@ -567,10 +567,10 @@ fn d5a_an_unmarked_static_worker_call_is_untouched_by_the_marker_seam() {
     reset_d5a_marker_events();
     let compiled = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
         &super::constructors::static_worker_witness(true),
-        &NativeSeedEnvironment::empty(),
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
     )
     .expect("the ordinary static-worker witness compiles, exactly as it did before");
-    compiled.run(None).expect("and runs");
+    compiled.run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile()).expect("and runs");
     let events = d5a_marker_events();
     assert!(
         events

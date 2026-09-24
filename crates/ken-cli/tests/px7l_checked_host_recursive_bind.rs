@@ -168,6 +168,7 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
         ken_cli::SourceFormat::Ken,
         "px7l-recursive-bind",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("generic checked HostIO bind reaches the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -246,6 +247,7 @@ fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
         ken_cli::SourceFormat::Ken,
         "px7l-consumed-runtime-response",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("runtime-selected Result response reaches the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -294,6 +296,7 @@ fn static_direct_vis_retains_the_existing_lowering_path() {
         ken_cli::SourceFormat::Ken,
         "px7l-static-direct-vis",
         dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("static direct Vis remains supported");
     let main = output

@@ -94,6 +94,7 @@ fn run_case(case: &str, chain: &str, repeats: usize) {
         ken_cli::SourceFormat::Ken,
         &format!("rt_multiop_{}", case.replace('-', "_")),
         root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .expect("the repeated-metadata program builds natively");
     let native = ken_runtime::run_bound_process_effect_observation(

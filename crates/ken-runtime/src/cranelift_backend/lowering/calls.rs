@@ -2492,7 +2492,7 @@ mod tests {
             "ken_px8l_recursive_shape",
             Linkage::Export,
             &entry,
-            &NativeSeedEnvironment::empty(),
+            &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
             declarations,
             None,
             true,

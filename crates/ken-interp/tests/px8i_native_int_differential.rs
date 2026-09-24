@@ -52,7 +52,7 @@ fn interpreter_and_native_agree_beyond_i128_and_on_canonical_image() {
         },
         observation: RuntimeObservation::Returned(RuntimeGroundValue::Int(expected)),
     };
-    let native = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty())
+    let native = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()))
         .expect("native exact-Int execution succeeds");
     assert_eq!(native.observation, example.observation);
 }

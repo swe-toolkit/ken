@@ -96,7 +96,7 @@ fn output_dir() -> tempfile::TempDir {
 fn native_exit(source: &str, name: &str) -> i32 {
     let root = output_dir();
     let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, root.path())
+        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, root.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
             .unwrap_or_else(|e| panic!("{name}: nested-former fold must reach a native artifact: {e}"));
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,

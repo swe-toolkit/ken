@@ -429,6 +429,7 @@ fn try_differential(case: &str, entry: &str, matrix_body: &str) -> Result<Differ
         ken_cli::SourceFormat::Ken,
         &format!("abi_s6_surface_{}", case.replace('-', "_")),
         root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .map_err(|error| format!("{case}: native lowering: {error:?}"))?;
     let native = ken_runtime::run_bound_process_effect_observation(
