@@ -6197,6 +6197,47 @@ mod namespace_effect_tests {
         assert_ne!(file_id, env.globals["A.leak"]);
     }
 
+    /// Promise class: durable invariant (spec 33 §4.3).
+    ///
+    /// MEASURED: F republishes file A.leak, then an in-memory A checks a
+    /// distinct A.leak and republishes F's selected leaf under the same
+    /// surface. Both providers have the SAME canonical spelling but distinct
+    /// GlobalIds, and the export site raises ReExportCollision. CLAIMED: an
+    /// interface cannot identify two checked declarations by one public name
+    /// merely because their canonical spellings agree. THE GAP: the L4
+    /// distinct-spelling collision cannot detect removal of the checked-ID
+    /// guard, so this case must preserve both same-spelling IDs.
+    #[test]
+    fn facade_selected_equal_canonical_distinct_ids_collide_at_export() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        fs::write(root.path().join("F.ken"), "export A (leak)\n")
+            .expect("write file facade F");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "F")
+            .expect("file F must republish A's checked leaf");
+        let file_id = env.globals["A.leak"];
+        assert_eq!(env.module_state.file_export_ids["F"]["F"]["leak"], file_id);
+
+        let source = "module A { pub const leak : Nat = Suc Zero\n\
+                      import F (leak as selected)\n\
+                      export selected as leak }";
+        match env.elaborate_file(source) {
+            Err(ElabError::ReExportCollision {
+                surface_name,
+                existing,
+                incoming,
+                span,
+            }) => {
+                assert_eq!(surface_name, "leak");
+                assert_eq!(existing, "A.leak");
+                assert_eq!(incoming, "A.leak");
+                assert_eq!(span.start, source.find("export selected as leak").unwrap());
+            }
+            other => panic!("same-canonical distinct checked IDs must clash: {other:?}"),
+        }
+        assert_ne!(file_id, env.globals["A.leak"]);
+    }
+
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
     /// MEASURED: an explicit local export BEFORE its declaration selects the
