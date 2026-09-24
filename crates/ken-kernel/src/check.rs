@@ -384,10 +384,48 @@ fn check_level_arity(params: &[LevelVar], args: &[Level]) -> KernelResult<()> {
 
 // --- check (`18 §3`) -------------------------------------------------------
 
+/// Eliminate recursive `check(App(f, a)) -> infer(App) -> check(a)` frames on
+/// constructor spines. The argument check must precede conversion of the
+/// inferred application type; otherwise an unchecked operand could influence
+/// the type's normalization. Deferred comparisons preserve that order.
+fn check_app_spine(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResult<()> {
+    let mut argument = t;
+    let mut expected = ty.clone();
+    let mut pending = Vec::new();
+    while let Term::App(f, a) = argument {
+        let tf = infer(env, ctx, f)?;
+        let (dom, cod) = match whnf(env, ctx, &tf) {
+            Term::Pi(dom, cod) => (dom, cod),
+            other => return Err(KernelError::NotAFunction { head: Box::new(other) }),
+        };
+        pending.push((expected, subst0(&cod, a)));
+        expected = *dom;
+        argument = a;
+    }
+    check(env, ctx, argument, &expected)?;
+    for (expected, inferred) in pending.into_iter().rev() {
+        if !convert_type(env, ctx, &expected, &inferred) {
+            return Err(KernelError::TypeMismatch {
+                expected: Box::new(expected),
+                found: Box::new(inferred),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// `Γ ⊢ t ⇐ A` — check `t` against a known type (`18 §3`). Type-driven rules
 /// for λ (Π) and pair (Σ) insert η-relevant structure; everything else falls
 /// to the mode switch (infer + conversion).
 pub fn check(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResult<()> {
+    // Application arguments can themselves be constructor applications: a
+    // List spine nests three Apps per Cons. Check its argument chain with an
+    // explicit worklist rather than retaining one infer/check stack per cell.
+    // Each deferred type comparison runs only after its argument was checked,
+    // in exactly the same inner-to-outer order as infer(App)'s mode switch.
+    if matches!(t, Term::App(..)) {
+        return check_app_spine(env, ctx, t, ty);
+    }
     match t {
         Term::Lam(a, body) => match whnf(env, ctx, ty) {
             Term::Pi(dom, cod) => {

@@ -65,6 +65,82 @@ fn fresh_ascii_literal_closes_generic_checked_finite_code_witness() {
     assert_eq!(list_int_heads(&env, reduced), Some(vec![120; 256]));
 }
 
+#[test]
+fn deep_checked_literal_view_admits_a_list_on_the_default_sized_stack() {
+    // 2 MiB is the Linux libtest default, stated here to make depth a
+    // deterministic code property rather than a machine/environment setting.
+    // Before the checker-spine repair, depth 80 checked on this stack, while
+    // depth 88 overflowed; after it, depth 256 checks without more stack.
+    const CHECKER_STACK_BYTES: usize = 2 * 1024 * 1024;
+    std::thread::Builder::new()
+        .name("k3-list-check-2mib".into())
+        .stack_size(CHECKER_STACK_BYTES)
+        .spawn(|| {
+            let mut env = ElabEnv::new().expect("prelude");
+            for length in [96, 256] {
+                let source = format!("const deep_{length} : String = \"{}\"", "x".repeat(length));
+                env.elaborate_decl(&source).expect("ordinary checked source literal");
+                let body = env.env.transparent_body(env.globals[&format!("deep_{length}")])
+                    .unwrap().1.clone();
+                let view = string_view(&env, body);
+                let reduced = normalize(&env.env, &Context::new(), &view);
+                let list_char = Term::app(
+                    Term::indformer(env.prelude_env.list_id, vec![]),
+                    Term::const_(env.globals["Char"], vec![]),
+                );
+                let checked = ken_kernel::declare_def(&mut env.env, vec![], list_char.clone(), reduced.clone())
+                    .expect("ordinary kernel definition must independently check every Cons tail");
+                assert_eq!(list_int_heads(&env, reduced), Some(vec![120; length]));
+                assert!(env.env.transparent_body(checked).is_some());
+            }
+            for name in ["left", "right"] {
+                env.elaborate_decl(&format!("const {name} : String = \"{}\"", "x".repeat(96)))
+                    .expect("independent 96-scalar literal");
+            }
+            env.elaborate_decl("theorem same_deep_view : Equal (List Char) (string_to_list_char left) (string_to_list_char right) = Refl")
+                .expect("ordinary checked Ken client uses both long literal views");
+            let char_ty = Term::const_(env.globals["Char"], vec![]);
+            let invalid_tail = Term::app(
+                Term::app(
+                    Term::app(Term::constructor(env.prelude_env.cons_id, vec![]), char_ty.clone()),
+                    Term::IntLit(65u32.into()),
+                ),
+                Term::IntLit(7u32.into()),
+            );
+            let list_char = Term::app(Term::indformer(env.prelude_env.list_id, vec![]), char_ty);
+            assert!(matches!(check(&env.env, &Context::new(), &invalid_tail, &list_char),
+                Err(KernelError::TypeMismatch { .. })),
+                "iterative application checking must still reject an ill-typed tail");
+            let type0 = Term::ty(ken_kernel::Level::Zero);
+            let dependent_id = ken_kernel::declare_def(
+                &mut env.env,
+                vec![],
+                Term::pi(type0.clone(), Term::app(
+                    Term::indformer(env.prelude_env.list_id, vec![]), Term::var(0),
+                )),
+                Term::lam(type0, Term::app(
+                    Term::constructor(env.prelude_env.nil_id, vec![]), Term::var(0),
+                )),
+            ).expect("kernel-checked dependent constructor fixture");
+            let dependent = Term::app(
+                Term::const_(dependent_id, vec![]),
+                Term::const_(env.globals["String"], vec![]),
+            );
+            let list_string = Term::app(
+                Term::indformer(env.prelude_env.list_id, vec![]),
+                Term::const_(env.globals["String"], vec![]),
+            );
+            check(&env.env, &Context::new(), &dependent, &list_string)
+                .expect("dependent codomain is substituted after its operand checks");
+            assert!(matches!(check(&env.env, &Context::new(), &dependent, &list_char),
+                Err(KernelError::TypeMismatch { .. })),
+                "a different dependent codomain must not be accepted");
+        })
+        .expect("spawn fixed 2 MiB checker worker")
+        .join()
+        .expect("checker worker must return normally");
+}
+
 fn string_view(env: &ElabEnv, literal: Term) -> Term {
     Term::app(
         Term::const_(env.prelude_env.string_to_list_char_id, vec![]),
