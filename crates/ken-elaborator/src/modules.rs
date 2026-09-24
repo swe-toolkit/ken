@@ -460,55 +460,40 @@ fn resolve_attached_ref(
     Ok(format!("{subject}::{proof_name}"))
 }
 
-/// Find an inline module by walking outward from the current lexical module.
-/// Each component must follow a recorded declaration edge; a similarly named
-/// file-backed export is never evidence that the path is owned by this scope.
+/// A bare import in a unit is either its own declared child (already
+/// expanded or still unavailable) or an absolute module name. Global export
+/// tables and edges owned by another unit do not classify the import.
+enum InlineImport {
+    Available(String),
+    Unavailable,
+    Absolute,
+}
+
 fn lexical_inline_import(
     prefix: &str,
     file_root: Option<&str>,
-    unit_inline_modules: Option<&HashSet<String>>,
+    unit_inline_modules: &HashSet<String>,
+    ordered_inline_modules: &HashSet<String>,
     module: &str,
     inline_children: &HashMap<String, HashSet<String>>,
-) -> Option<String> {
-    // Dotted imports retain the absolute file-path identity from §3.2.
-    // Only a bare child name can be resolved relative to an inline owner.
-    if module.contains('.') {
-        return None;
-    }
-    let mut owner = prefix;
-    while !owner.is_empty() {
-        let mut canonical = owner.to_string();
-        let mut fully_declared = true;
-        for part in module.split('.') {
-            let child = qualify(&canonical, part);
-            if !inline_children
-                .get(&canonical)
-                .is_some_and(|children| children.contains(&child))
-            {
-                fully_declared = false;
-                break;
-            }
-            canonical = child;
-        }
-        // An edge at the file root can predate this file: a separately
-        // elaborated inline module may share the file unit's dotted name.
-        // The current unit must have declared the child itself, and the edge
-        // must also have been installed by the ordered expansion above.
-        if fully_declared
-            && (file_root.is_none()
-                || unit_inline_modules.is_some_and(|declared| declared.contains(&canonical)))
+) -> InlineImport {
+    if let Some(canonical) = declared_inline_import(prefix, file_root, module, unit_inline_modules)
+    {
+        let (parent, _) = canonical
+            .rsplit_once('.')
+            .expect("relative inline child must have a parent");
+        if ordered_inline_modules.contains(&canonical)
+            && inline_children
+                .get(parent)
+                .is_some_and(|children| children.contains(&canonical))
         {
-            return Some(canonical);
+            InlineImport::Available(canonical)
+        } else {
+            InlineImport::Unavailable
         }
-        // The dots in a loaded unit's path are directories, not lexical
-        // ancestors. Stop at the actual file unit before a bare import can
-        // capture a separately elaborated inline child of its path prefix.
-        if file_root == Some(owner) {
-            break;
-        }
-        owner = owner.rsplit_once('.').map_or("", |(parent, _)| parent);
+    } else {
+        InlineImport::Absolute
     }
-    None
 }
 
 /// Grant only descendants whose edges were produced by actual inline module
@@ -544,19 +529,29 @@ fn apply_import(
     prelude_binding_names: &HashSet<String>,
     owner: &str,
     file_root: Option<&str>,
-    unit_inline_modules: Option<&HashSet<String>>,
+    unit_inline_modules: &HashSet<String>,
+    ordered_inline_modules: &HashSet<String>,
     module: &str,
     kind: &ImportKind,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let canonical = lexical_inline_import(
+    let canonical = match lexical_inline_import(
         owner,
         file_root,
         unit_inline_modules,
+        ordered_inline_modules,
         module,
         inline_children,
-    )
-    .unwrap_or_else(|| module.to_string());
+    ) {
+        InlineImport::Available(path) => path,
+        InlineImport::Unavailable => {
+            return Err(ElabError::UnboundName {
+                name: module.to_string(),
+                span: span.clone(),
+            });
+        }
+        InlineImport::Absolute => module.to_string(),
+    };
     let pubmap = exports
         .get(&canonical)
         .ok_or_else(|| ElabError::UnboundName {
@@ -788,18 +783,27 @@ fn imported_module_paths(decls: &[Decl], owner: &str, out: &mut Vec<(String, Str
     }
 }
 
-fn declared_inline_import(owner: &str, module: &str, declared: &HashSet<String>) -> bool {
+fn declared_inline_import(
+    owner: &str,
+    file_root: Option<&str>,
+    module: &str,
+    declared: &HashSet<String>,
+) -> Option<String> {
     if module.contains('.') {
-        return false;
+        return None;
     }
     let mut current = owner;
     while !current.is_empty() {
-        if declared.contains(&qualify(current, module)) {
-            return true;
+        let canonical = qualify(current, module);
+        if declared.contains(&canonical) {
+            return Some(canonical);
+        }
+        if file_root == Some(current) {
+            break;
         }
         current = current.rsplit_once('.').map_or("", |(parent, _)| parent);
     }
-    false
+    None
 }
 
 fn admission_boundary(decls: &[Decl]) -> Result<Option<(BoundaryHeader, Span)>, ElabError> {
@@ -1044,12 +1048,12 @@ fn load_unit(
         let mut imports = Vec::new();
         imported_module_paths(&decls, module, &mut imports);
         for (dependency, owner, import_span) in imports {
-            if declared_inline_import(&owner, &dependency, &local_modules)
-                || elab.module_state.exports.contains_key(&dependency)
-            {
-                continue;
+            // A same-unit child is never an absolute file dependency, even if
+            // declared later: the ordered pass will reject its premature use
+            // at the import. An unrelated global export is not a file load.
+            if declared_inline_import(&owner, Some(module), &dependency, &local_modules).is_none() {
+                load_unit(elab, &dependency, &import_span, mode)?;
             }
-            load_unit(elab, &dependency, &import_span, mode)?;
         }
         refresh_carried_instance_admission(elab);
 
@@ -1060,11 +1064,13 @@ fn load_unit(
 
         let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
         let mut unit_definitions = HashSet::new();
+        let mut ordered_inline_modules = HashSet::new();
         let (results, exports) = expand_scope(
             elab,
             &decls,
             module,
-            Some(&local_modules),
+            &local_modules,
+            &mut ordered_inline_modules,
             &mut scope,
             &mut unit_definitions,
             true,
@@ -2437,7 +2443,8 @@ fn prebind_scope_declarations(
     decls: &[Decl],
     prefix: &str,
     file_root: Option<&str>,
-    unit_inline_modules: Option<&HashSet<String>>,
+    unit_inline_modules: &HashSet<String>,
+    ordered_inline_modules: &HashSet<String>,
     exports: &HashMap<String, HashMap<String, String>>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     prelude_binding_names: &HashSet<String>,
@@ -2523,6 +2530,7 @@ fn prebind_scope_declarations(
                     prefix,
                     file_root,
                     unit_inline_modules,
+                    ordered_inline_modules,
                     module,
                     kind,
                     span,
@@ -2789,7 +2797,8 @@ fn expand_scope(
     elab: &mut ElabEnv,
     decls: &[Decl],
     prefix: &str,
-    unit_inline_modules: Option<&HashSet<String>>,
+    unit_inline_modules: &HashSet<String>,
+    ordered_inline_modules: &mut HashSet<String>,
     scope: &mut Scope,
     unit_definitions: &mut HashSet<String>,
     allow_boundary: bool,
@@ -2823,6 +2832,7 @@ fn expand_scope(
         prefix,
         elab.module_state.active_imports.last().map(String::as_str),
         unit_inline_modules,
+        ordered_inline_modules,
         &elab.module_state.exports,
         &elab.globals,
         &elab.module_state.prelude_binding_names,
@@ -2866,6 +2876,7 @@ fn expand_scope(
                     prefix,
                     elab.module_state.active_imports.last().map(String::as_str),
                     unit_inline_modules,
+                    ordered_inline_modules,
                     module,
                     kind,
                     span,
@@ -2896,6 +2907,7 @@ fn expand_scope(
                     inner,
                     &child_prefix,
                     unit_inline_modules,
+                    ordered_inline_modules,
                     &mut child_scope,
                     unit_definitions,
                     false,
@@ -2937,6 +2949,9 @@ fn expand_scope(
                         .or_default()
                         .insert(child_prefix.clone());
                 }
+                // Record availability only after this unit has completed the
+                // child's ordered expansion, never from another unit's edge.
+                ordered_inline_modules.insert(child_prefix.clone());
                 // The defining scope owns its declared child without an
                 // import. Its grandchildren are authorized by the same
                 // declaration edges, never by similarly spelled file paths.
@@ -3428,11 +3443,15 @@ pub fn expand_and_elaborate(
     }
     let mut scope = elab.module_state.root_scope.clone();
     let mut unit_definitions = HashSet::new();
+    let mut local_modules = HashSet::new();
+    declared_module_paths(decls, "", &mut local_modules);
+    let mut ordered_inline_modules = HashSet::new();
     let expanded = expand_scope(
         elab,
         decls,
         "",
-        None,
+        &local_modules,
+        &mut ordered_inline_modules,
         &mut scope,
         &mut unit_definitions,
         true,
@@ -4212,7 +4231,9 @@ mod namespace_effect_tests {
             match result {
                 Err(ElabError::UnboundName { name, span }) => {
                     assert_eq!(name, "N", "entry {entry} must reject at import N");
-                    assert_eq!(span.start, A.find("import N").unwrap());
+                    let import_start = A.find("import N").unwrap();
+                    assert_eq!(span.start, import_start);
+                    assert_eq!(span.end, import_start + "import N".len());
                 }
                 other => panic!("entry {entry} must reject later A.N at import: {other:?}"),
             }
@@ -4231,16 +4252,22 @@ mod namespace_effect_tests {
     fn external_inline_edge_cannot_predeclare_later_same_unit_sibling() {
         const A: &str = "module P { import N\npub const bound : Nat = N.decoy }\n\
                          module N { pub const x : Nat = Zero }\n";
+        const A_WITH_REPLAY: &str = "module P { class Marker a {}\n\
+                         import N\ninstance Marker Nat {}\n\
+                         pub const bound : Nat = N.decoy }\n\
+                         module N { pub const x : Nat = Zero }\n";
         let root = inline_owner_root(A);
         let roots = [root.path().to_path_buf()];
         let mut results = Vec::new();
-        for preload_inline in [false, true] {
+        for (preload_inline, with_replay) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let source = if with_replay { A_WITH_REPLAY } else { A };
+            fs::write(root.path().join("A.ken"), source).expect("write A unit for replay arm");
             let mut env = ElabEnv::new().expect("base environment");
             if preload_inline {
-                env.elaborate_file(
-                    "module A { module N { pub const decoy : Nat = Suc Zero } }",
-                )
-                .expect("independent inline A.N.decoy");
+                env.elaborate_file("module A { module N { pub const decoy : Nat = Suc Zero } }")
+                    .expect("independent inline A.N.decoy");
             }
             let external_id = env.globals.get("A.N.decoy").copied();
             let result = env.elaborate_module_from_roots(&roots, "A");
@@ -4252,22 +4279,112 @@ mod namespace_effect_tests {
                 }
             });
             eprintln!(
-                "external-edge probe: preload={preload_inline} \
+                "external-edge probe: preload={preload_inline} replay={with_replay} \
                  result={result:?} external={external_id:?} body={body_id:?}"
             );
-            results.push((preload_inline, result, external_id, body_id));
+            results.push((
+                preload_inline,
+                with_replay,
+                source,
+                result,
+                external_id,
+                body_id,
+            ));
         }
-        for (preload_inline, result, external_id, body_id) in results {
+        for (preload_inline, with_replay, source, result, external_id, body_id) in results {
             if preload_inline && result.is_ok() {
                 assert_eq!(body_id, external_id, "base must bind the external decoy");
             }
             match result {
                 Err(ElabError::UnboundName { name, span }) => {
-                    assert_eq!(name, "N", "preload {preload_inline} must reject at import");
-                    assert_eq!(span.start, A.find("import N").unwrap());
+                    assert_eq!(
+                        name, "N",
+                        "preload {preload_inline} replay {with_replay} must reject at import"
+                    );
+                    let import_start = source.find("import N").unwrap();
+                    assert_eq!(span.start, import_start);
+                    assert_eq!(span.end, import_start + "import N".len());
                 }
-                other => panic!("preload {preload_inline} must reject later A.N: {other:?}"),
+                other => panic!(
+                    "preload {preload_inline} replay {with_replay} must reject later A.N: {other:?}"
+                ),
             }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: an earlier A.N's ordered edge is selected over an actual
+    /// N.ken, regardless of whether the file was preloaded; the transparent
+    /// body contains the exact checked inline GlobalId. CLAIMED: rejecting
+    /// later children does not disable legitimate prior sibling imports.
+    /// THE GAP: the two failing-order fixtures above supply the opposite arm.
+    #[test]
+    fn earlier_same_unit_sibling_wins_over_file_import_in_both_orders() {
+        let root = inline_owner_root(
+            "module N { pub const x : Nat = Zero }\n\
+             module P { import N\npub const selected : Nat = N.x }\n",
+        );
+        fs::write(
+            root.path().join("N.ken"),
+            "pub const x : Nat = Suc (Suc Zero)\n",
+        )
+        .expect("write file-backed decoy N");
+        let roots = [root.path().to_path_buf()];
+        for preload_file_n in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if preload_file_n {
+                env.elaborate_module_from_roots(&roots, "N")
+                    .expect("preload independent N.ken");
+            }
+            env.elaborate_module_from_roots(&roots, "A")
+                .expect("prior same-unit inline A.N is available");
+            let inline_id = env.globals["A.N.x"];
+            if preload_file_n {
+                assert_ne!(inline_id, env.globals["N.x"]);
+            } else {
+                assert!(!env.module_state.loaded_units.contains_key("N"));
+            }
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals["A.P.selected"])
+                .expect("selected is transparent");
+            match body {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, inline_id),
+                other => panic!("selected must use inline A.N.x: {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.2–3.3).
+    ///
+    /// MEASURED: an unrelated inline N provides only decoy; A's `import N`
+    /// still loads catalog N.ken and its checked N.x. CLAIMED: an ambient
+    /// export-table hit is not file-import authority. THE GAP: the earlier
+    /// same-unit case above proves this is not a ban on inline modules.
+    #[test]
+    fn file_import_uses_catalog_source_despite_unrelated_inline_name() {
+        let root = inline_owner_root("import N\npub const selected : Nat = N.x\n");
+        fs::write(root.path().join("N.ken"), "pub const x : Nat = Suc Zero\n")
+            .expect("write catalog source for N");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_file("module N { pub const decoy : Nat = Zero }")
+            .expect("independent inline N is checked");
+        let unrelated_id = env.globals["N.decoy"];
+        let roots = [root.path().to_path_buf()];
+        let result = env.elaborate_module_from_roots(&roots, "A");
+        eprintln!("absolute file-import probe: result={result:?} unrelated={unrelated_id:?}");
+        result.expect("A must import the actual N.ken even with ambient inline N");
+        let file_id = env.globals["N.x"];
+        assert_ne!(unrelated_id, file_id);
+        assert!(env.module_state.loaded_units.contains_key("N"));
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals["A.selected"])
+            .expect("selected is transparent");
+        match body {
+            ken_kernel::Term::Const { id, .. } => assert_eq!(id, file_id),
+            other => panic!("selected must use catalog N.x: {other:?}"),
         }
     }
 
@@ -4334,34 +4451,30 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: A.N is independently loaded from A/N.ken and A has an
-    /// unrelated inline root declaration, but importing A still refuses
-    /// A.N.x. CLAIMED: a dotted export and a loaded unit do not supply an
-    /// inline declaration edge. THE GAP: the positive B import of A's own
-    /// `top` proves that the root import is not simply broken.
+    /// MEASURED: an in-memory import of inline A can reach A.top, but not
+    /// the independently file-loaded A.N.x. CLAIMED: a file-backed child
+    /// never becomes an inline descendant through shared dotted spelling.
+    /// THE GAP: the positive A.top import proves A's owner path works.
     #[test]
     fn file_backed_child_never_counts_as_inline_descendant_of_imported_owner() {
         let root = tempfile::tempdir().expect("temporary module root");
         fs::create_dir(root.path().join("A")).expect("write A directory");
         fs::write(root.path().join("A/N.ken"), "pub const x : Nat = Zero\n")
             .expect("write independent file-backed A.N");
-        fs::write(
-            root.path().join("B.ken"),
-            "import A\nconst public_control : Nat = A.top\n\
-             const denied : Nat = A.N.x\n",
-        )
-        .expect("write imported owner B client");
         let roots = [root.path().to_path_buf()];
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_file("module A { pub const top : Nat = Zero }")
-            .expect("create an unrelated importable owner");
+            .expect("create unrelated inline owner");
         env.elaborate_module_from_roots(&roots, "A.N")
             .expect("load the real file-backed child");
-        match env.elaborate_module_from_roots(&roots, "B") {
+        env.elaborate_file("import A\nconst public_control : Nat = A.top\n")
+            .expect("A.top is accessible through the imported owner");
+        match env.elaborate_file("const denied : Nat = A.N.x\n") {
             Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.N.x"),
             other => panic!("a file-backed A.N must not become inline: {other:?}"),
         }
         assert!(env.globals.contains_key("A.top"));
+        assert!(env.globals.contains_key("public_control"));
         assert!(env.globals.contains_key("A.N.x"));
     }
 
