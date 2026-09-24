@@ -211,10 +211,13 @@ display_name = "architect"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
 # are not used because a bad model string fails the launch.
-model = "openai-codex/gpt-6-sol"
-harness = "pi"
+# 2026-09-24 reseat (operator directive "reset architect to anthropic/claude-code
+# opus-5.5."; Steward-executed): pi openai-codex/gpt-6-sol (high) -> Claude Code
+# Anthropic claude-opus-5-5[1m] (high), T1 tier-preserving. Checked before edit:
+# live pane gpt-6-sol high matched this block. Claude Code shape: NO harness key,
+# `effort`, NO env.
+model = "claude-opus-5-5[1m]"
 effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
@@ -296,10 +299,13 @@ display_name = "research"
 # TIER-PRESERVING). Claude Code seat: NO harness key, uses `effort`, NO env.
 # Model strings are the PROVEN ones this repo has run (opus[1m]); unverified ids
 # are not used because a bad model string fails the launch.
-model = "openai-codex/gpt-6-sol"
-harness = "pi"
+# 2026-09-24 reseat (operator directive "and research too.", with the architect;
+# Steward-executed): pi openai-codex/gpt-6-sol (high) -> Claude Code Anthropic
+# claude-opus-5-5[1m] (high), T1 tier-preserving. Checked before edit: live pane
+# gpt-6-sol high matched this block. Claude Code shape: NO harness key, `effort`,
+# NO env.
+model = "claude-opus-5-5[1m]"
 effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Research agent (ad hoc external-knowledge dispatch; research is not a standing team — see the Steward playbook §5). Read agent/COORDINATION.md (federation law) and MODELS.md first. Set your status and await the Steward's research dispatch, then gather sources and synthesize a cited report back to the Steward. Do not poll."
 
 [agents.adversary]
