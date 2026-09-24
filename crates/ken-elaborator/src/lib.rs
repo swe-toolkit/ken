@@ -181,6 +181,10 @@ pub struct ElabEnv {
     /// Surface effect rows for already-elaborated definitions. SURF-1 D2 uses
     /// this to release a callee's declared row at a resolved call site.
     pub effect_rows: HashMap<String, effects::RowType>,
+    /// Immutable row evidence for checked imported identities. The spelling
+    /// table above may later be overwritten by another provider with the
+    /// same canonical name; purity inference must use the selected ID.
+    pub(crate) effect_rows_by_id: HashMap<ken_kernel::GlobalId, effects::RowType>,
     /// Generated initial-state definitions for surface `space` blocks.
     ///
     /// These are elaboration metadata, not source-visible `Space.initial`
@@ -239,6 +243,7 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
         bytes_env: _,
         foreign_env: _,
         effect_rows: _,
+        effect_rows_by_id: _,
         space_metadata: _,
         prelude_env: _,
         class_env: _,
@@ -300,6 +305,7 @@ impl ElabEnv {
             bytes_env,
             foreign_env: foreign::ForeignEnv::empty(),
             effect_rows,
+            effect_rows_by_id: HashMap::new(),
             space_metadata: SpaceElaborationMetadata::default(),
             // placeholder; `register_prelude` fills it (and needs `&mut self`).
             prelude_env: prelude::empty_prelude_env(),

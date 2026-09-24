@@ -70,6 +70,9 @@ pub(crate) enum RPatKind {
     /// declaration-order projection columns need not become lexical binders.
     Var(String, Option<usize>),
     Ctor(String, Vec<RPattern>),
+    /// Imported constructor selected at a checked provider; its name is
+    /// diagnostic only and must never be re-looked-up in mutable globals.
+    CheckedCtor(String, GlobalId, Vec<RPattern>),
     Tuple(Vec<RPattern>),
     Record(Vec<RRecordPatField>),
     As(Box<RPattern>, String, usize),
@@ -253,12 +256,14 @@ pub(crate) struct RPropIntro {
 pub(crate) enum RInfixOperator {
     Builtin(BinOp, Span),
     User(String, Span),
+    /// Imported operator whose checked provider has already been selected.
+    CheckedUser(String, GlobalId, Span),
 }
 
 impl RInfixOperator {
     pub fn span(&self) -> &Span {
         match self {
-            Self::Builtin(_, span) | Self::User(_, span) => span,
+            Self::Builtin(_, span) | Self::User(_, span) | Self::CheckedUser(_, _, span) => span,
         }
     }
 }
@@ -2475,7 +2480,10 @@ fn remap_pattern_occurrence_slots(pattern: &mut RPattern, remap: &HashMap<usize,
         RPatKind::Var(_, Some(slot)) => {
             *slot = remap[slot];
         }
-        RPatKind::Ctor(_, fields) | RPatKind::Tuple(fields) | RPatKind::Or(fields) => {
+        RPatKind::Ctor(_, fields)
+        | RPatKind::CheckedCtor(_, _, fields)
+        | RPatKind::Tuple(fields)
+        | RPatKind::Or(fields) => {
             for field in fields {
                 remap_pattern_occurrence_slots(field, remap);
             }

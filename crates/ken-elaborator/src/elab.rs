@@ -1627,7 +1627,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             // existing general `infer_match`/`compile_match_matrix`
             // nested-pattern compiler unchanged.
             let flat = arms.iter().all(|a| match &a.pat.kind {
-                RPatKind::Ctor(_, subs) => subs
+                RPatKind::Ctor(_, subs) | RPatKind::CheckedCtor(_, _, subs) => subs
                     .iter()
                     .all(|s| matches!(s.kind, RPatKind::Var(_, _) | RPatKind::Wild)),
                 _ => false,
@@ -4306,7 +4306,7 @@ fn check_match_with_lift(
                     span: span.clone(),
                 })?;
         let sub_pats = match &arm.pat.kind {
-            RPatKind::Ctor(_, fields) => fields,
+            RPatKind::Ctor(_, fields) | RPatKind::CheckedCtor(_, _, fields) => fields,
             _ => unreachable!("arm selected by constructor guard"),
         };
         if sub_pats.len() != host_ctor.args.len()
@@ -4579,7 +4579,7 @@ fn check_structured_constructor_method(
         expected_bindings.push((source_position, installed));
     }
     let field_spans = match &arm.pat.kind {
-        RPatKind::Ctor(_, fields) => fields
+        RPatKind::Ctor(_, fields) | RPatKind::CheckedCtor(_, _, fields) => fields
             .iter()
             .enumerate()
             .map(|(source_field, pattern)| (base + source_field, pattern.span.clone()))
@@ -6281,7 +6281,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         let n = ctor.args.len();
         if let Some(arm) = arm {
             let sub_pats = match &arm.pat.kind {
-                RPatKind::Ctor(_, subs) => subs.clone(),
+                RPatKind::Ctor(_, subs) | RPatKind::CheckedCtor(_, _, subs) => subs.clone(),
                 _ => unreachable!("guarded by the constructor-arm selection above"),
             };
             if sub_pats.len() != n {
@@ -8264,6 +8264,14 @@ fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId) -> MissingPatternWitness 
 /// the first unguarded arm is the covering fallback and alone subsumes later
 /// arms. If no unguarded arm exists, return `None`: the caller must treat the
 /// constructor as omitted, proving it index-impossible or reporting it missing.
+fn pattern_ctor_id(cx: &ElabCtx<'_>, kind: &RPatKind) -> Option<GlobalId> {
+    match kind {
+        RPatKind::Ctor(name, _) => cx.globals.get(name).copied(),
+        RPatKind::CheckedCtor(_, id, _) => Some(*id),
+        _ => None,
+    }
+}
+
 #[inline(never)]
 fn guarded_constructor_arm(
     cx: &ElabCtx,
@@ -8276,7 +8284,7 @@ fn guarded_constructor_arm(
         .iter()
         .enumerate()
         .filter(|(_, arm)| {
-            matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(ctor_id))
+            pattern_ctor_id(cx, &arm.pat.kind) == Some(ctor_id)
         })
         .collect::<Vec<_>>();
     let fallback = candidates.iter().position(|(_, arm)| arm.guard.is_none())?;
@@ -9765,8 +9773,11 @@ fn match_instance_head_core(
                 }
             }
         }
-        RType::RCon(name, _) => {
-            let Some(pattern_id) = globals.get(name).copied() else {
+        RType::RCon(name, _) | RType::RCheckedGlobal { name, .. } => {
+            let Some(pattern_id) = (match pattern {
+                RType::RCheckedGlobal { id, .. } => Some(*id),
+                _ => globals.get(name).copied(),
+            }) else {
                 return false;
             };
             matches!(
@@ -10370,24 +10381,27 @@ fn type_contains_effect_row(ty: &RType) -> bool {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum RTypeHead {
-    Con(String),
+    Con(String, Option<GlobalId>),
     Var(usize, String),
 }
 
 fn rtype_heads_match(a: &RTypeHead, b: &RTypeHead) -> bool {
     match (a, b) {
-        (RTypeHead::Con(a), RTypeHead::Con(b)) => a == b,
+        (RTypeHead::Con(_, Some(a)), RTypeHead::Con(_, Some(b))) => a == b,
+        (RTypeHead::Con(a, _), RTypeHead::Con(b, _)) => a == b,
         (RTypeHead::Var(_, a), RTypeHead::Var(_, b)) => a == b,
-        (RTypeHead::Con(a), RTypeHead::Var(_, b)) | (RTypeHead::Var(_, a), RTypeHead::Con(b)) => {
-            a == b
-        }
+        (RTypeHead::Con(a, _), RTypeHead::Var(_, b))
+        | (RTypeHead::Var(_, a), RTypeHead::Con(b, _)) => a == b,
     }
 }
 
 fn rtype_app_head(ty: &RType) -> Option<RTypeHead> {
     match ty {
         RType::RApp(f, _, _) => rtype_app_head(f),
-        RType::RCon(name, _) => Some(RTypeHead::Con(name.clone())),
+        RType::RCon(name, _) => Some(RTypeHead::Con(name.clone(), None)),
+        RType::RCheckedGlobal { name, id, .. } => {
+            Some(RTypeHead::Con(name.clone(), Some(*id)))
+        }
         RType::RVarTy(index, name, _) => Some(RTypeHead::Var(*index, name.clone())),
         _ => None,
     }
@@ -10403,7 +10417,10 @@ fn rtype_is_app_headed_by(ty: &RType, head: &RTypeHead) -> bool {
 fn type_is_applicative_dict_for_head(ty: &RType, head: &RTypeHead) -> bool {
     match ty {
         RType::RApp(f, arg, _) => {
-            matches!(&**f, RType::RCon(name, _) if name == "Applicative")
+            matches!(&**f,
+                RType::RCon(name, _) | RType::RCheckedGlobal { name, .. }
+                    if name == "Applicative"
+            )
                 && rtype_app_head(arg)
                     .as_ref()
                     .is_some_and(|candidate| rtype_heads_match(candidate, head))
@@ -10679,14 +10696,37 @@ fn collect_bound_dictionary_params(
     dicts
 }
 
+/// Two indices for one effect assertion: mutable spellings support local
+/// forward declarations; checked imported IDs preserve their owner's row
+/// after a different provider overwrites the same canonical spelling.
+pub(crate) struct CheckedEffectRows<'a> {
+    names: &'a HashMap<String, crate::effects::RowType>,
+    ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+}
+
+impl<'a> CheckedEffectRows<'a> {
+    pub(crate) fn new(
+        names: &'a HashMap<String, crate::effects::RowType>,
+        ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+    ) -> Self {
+        Self { names, ids }
+    }
+}
+
 fn infer_expr_row_type(
     expr: &RExpr,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     projection_ctx: Option<&ProjectionPurityCtx<'_>>,
 ) -> crate::effects::RowType {
     match expr {
-        RExpr::RCon(name, _) | RExpr::RCheckedGlobal { name, .. } => effect_rows
+        RExpr::RCon(name, _) => effect_rows
+            .names
             .get(name)
+            .cloned()
+            .unwrap_or_else(crate::effects::RowType::empty),
+        RExpr::RCheckedGlobal { id, .. } => effect_rows
+            .ids
+            .get(id)
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(_, _, _)
@@ -10709,6 +10749,7 @@ fn infer_expr_row_type(
             proof_name,
             ..
         } => effect_rows
+            .names
             .get(&format!("{subject}::{proof_name}"))
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
@@ -10755,13 +10796,13 @@ fn infer_expr_row_type(
                     row.join(infer_expr_row_type(operand, effect_rows, projection_ctx))
                 });
             for operator in operators {
-                if let RInfixOperator::User(name, _) = operator {
-                    row = row.join(
-                        effect_rows
-                            .get(name)
-                            .cloned()
-                            .unwrap_or_else(crate::effects::RowType::empty),
-                    );
+                let operator_row = match operator {
+                    RInfixOperator::User(name, _) => effect_rows.names.get(name),
+                    RInfixOperator::CheckedUser(_, id, _) => effect_rows.ids.get(id),
+                    RInfixOperator::Builtin(_, _) => None,
+                };
+                if let Some(operator_row) = operator_row {
+                    row = row.join(operator_row.clone());
                 }
             }
             row
@@ -10797,6 +10838,7 @@ fn infer_expr_row_type(
 pub(crate) fn check_surface_purity(
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows_by_id: &HashMap<GlobalId, crate::effects::RowType>,
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
 ) -> Result<(), ElabError> {
@@ -10820,7 +10862,7 @@ pub(crate) fn check_surface_purity(
     };
     let inferred = infer_expr_row_type(
         decl_eval_body(&rdecl.body),
-        effect_rows,
+        &CheckedEffectRows::new(effect_rows, effect_rows_by_id),
         Some(&projection_ctx),
     );
     let decl =
@@ -10929,14 +10971,16 @@ fn resolved_operator_fixity(
         RInfixOperator::Builtin(operator, _) => {
             Ok((builtin_fixity(*operator), format!("{operator:?}")))
         }
-        RInfixOperator::User(name, span) => {
-            let id = globals
-                .get(name)
-                .copied()
-                .ok_or_else(|| ElabError::UnboundName {
-                    name: name.clone(),
-                    span: span.clone(),
-                })?;
+        RInfixOperator::User(name, span)
+        | RInfixOperator::CheckedUser(name, _, span) => {
+            let id = match operator {
+                RInfixOperator::CheckedUser(_, id, _) => Some(*id),
+                _ => globals.get(name).copied(),
+            }
+            .ok_or_else(|| ElabError::UnboundName {
+                name: name.clone(),
+                span: span.clone(),
+            })?;
             Ok((
                 fixities.get(&id).copied().unwrap_or(Fixity::DEFAULT),
                 name.clone(),
@@ -11192,11 +11236,17 @@ fn reduce_resolved_operator(
     let rhs = values.pop().expect("an infix operator has a right operand");
     let lhs = values.pop().expect("an infix operator has a left operand");
     let span = Span::merge(lhs.span(), rhs.span());
+    let imported_id = match &operator {
+        RInfixOperator::CheckedUser(_, id, _) => Some(*id),
+        _ => None,
+    };
     let combined = match operator {
         RInfixOperator::Builtin(operator, _) => {
             RExpr::RBinOp(operator, Box::new(lhs), Box::new(rhs), span)
         }
-        RInfixOperator::User(name, operator_span) => {
+        RInfixOperator::User(name, operator_span)
+        | RInfixOperator::CheckedUser(name, _, operator_span) => {
+            let selected_id = imported_id.or_else(|| globals.get(&name).copied());
             // KEYED ON THE RESOLVED IDENTITY, NOT ON `name`. `39 §6.9` binds
             // completion to the defining `GlobalId` "never to the occurrence's
             // glyph text", so this resolves the surface name first and then
@@ -11205,7 +11255,7 @@ fn reduce_resolved_operator(
             // same node; an unrelated local `≤` resolves elsewhere and does
             // not (AC-2(b)).
             let certified = standard_operators.and_then(|roles| {
-                let id = *globals.get(&name)?;
+                let id = selected_id?;
                 roles.values().any(|&certified| certified == id).then_some(id)
             });
             match certified {
@@ -11243,7 +11293,12 @@ fn reduce_resolved_operator(
                 // claim of non-constructibility, which is what this said
                 // before and what the paragraph above refutes.
                 None => {
-                    let head = RExpr::RCon(name, operator_span.clone());
+                    let head = match selected_id {
+                        Some(id) if imported_id.is_some() => {
+                            RExpr::RCheckedGlobal { name, id, span: operator_span.clone() }
+                        }
+                        _ => RExpr::RCon(name, operator_span.clone()),
+                    };
                     let first_span = Span::merge(head.span(), lhs.span());
                     let applied = RExpr::RApp(Box::new(head), Box::new(lhs), first_span);
                     RExpr::RApp(Box::new(applied), Box::new(rhs), span)
@@ -11782,6 +11837,8 @@ pub(crate) fn elaborate_rdecl_v1(
     // only within this single declaration. The persistent cross-declaration
     // registry travels through the module path via `ElabEnv::ctor_decl_spans`.
     let mut ctor_decl_spans = HashMap::new();
+    let no_names = HashMap::new();
+    let no_checked_ids = HashMap::new();
     elaborate_rdecl_v1_with_effect_rows(
         env,
         globals,
@@ -11790,7 +11847,7 @@ pub(crate) fn elaborate_rdecl_v1(
         class_env,
         provenance,
         standard_operators,
-        &HashMap::new(),
+        &CheckedEffectRows::new(&no_names, &no_checked_ids),
         &mut fixities,
         &mut fixity_spans,
         &mut ctor_decl_spans,
@@ -11836,7 +11893,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     class_env: &mut ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
@@ -11891,7 +11948,7 @@ fn elaborate_associated_rdecl(
     class_env: &mut ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
@@ -12469,7 +12526,7 @@ fn compute_ordered_field_values(
     head_name: &str,
     head_core: &Term,
     fields: &[(String, RExpr)],
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     span: &Span,
 ) -> Result<(Vec<Term>, Vec<crate::effects::RowType>), ElabError> {
     let (field_names, field_types, field_purities, has_param) = {
@@ -12531,7 +12588,7 @@ fn check_instance_field_purity(
     class_name: &str,
     field_name: &str,
     expr: &RExpr,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
     span: &Span,
@@ -12610,7 +12667,7 @@ fn elab_instance_decl(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
-    effect_rows: &HashMap<String, crate::effects::RowType>,
+    effect_rows: &CheckedEffectRows<'_>,
     class_name: &str,
     head_params: &[String],
     head_type: &RType,
@@ -13293,7 +13350,11 @@ pub(crate) fn elaborate_space_decl(
         }
 
         let qualified_name = format!("{}.{}", space.name, operation.name);
-        let inferred_row = infer_expr_row_type(&operation.body, &elab.effect_rows, None)
+        let inferred_row = infer_expr_row_type(
+            &operation.body,
+            &CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+            None,
+        )
             .join(crate::effects::RowType::singleton(space.name.clone()));
         let effect_decl = crate::effects::EffectDecl::new(&qualified_name)
             .with_declared_row_type(declared_row.clone());
@@ -15577,7 +15638,9 @@ fn collect_or_pattern_slots(pattern: &RPattern, inside_or: bool, slots: &mut Has
                 collect_or_pattern_slots(alternative, true, slots);
             }
         }
-        RPatKind::Ctor(_, fields) | RPatKind::Tuple(fields) => {
+        RPatKind::Ctor(_, fields)
+        | RPatKind::CheckedCtor(_, _, fields)
+        | RPatKind::Tuple(fields) => {
             for field in fields {
                 collect_or_pattern_slots(field, inside_or, slots);
             }
@@ -15773,7 +15836,7 @@ fn pattern_without_aliases(mut pattern: &RPattern) -> &RPattern {
 
 fn guarded_leaf_missing_witness(pattern: &RPattern) -> MissingPatternWitness {
     match &pattern.kind {
-        RPatKind::Ctor(name, fields) => MissingPatternWitness {
+        RPatKind::Ctor(name, fields) | RPatKind::CheckedCtor(name, _, fields) => MissingPatternWitness {
             constructor: name.clone(),
             arity: fields.len(),
         },
@@ -16380,7 +16443,10 @@ fn compile_literal_column(
                     Some(value)
                 }
                 RPatKind::Wild | RPatKind::Var(_, _) => None,
-                RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {
+                RPatKind::Ctor(_, _)
+                | RPatKind::CheckedCtor(_, _, _)
+                | RPatKind::Tuple(_)
+                | RPatKind::Record(_) => {
                     return Err(ElabError::TypeMismatch {
                         span: row.real_pats[0].span.clone(),
                         reason: "literal column cannot mix value literals with structural patterns"
@@ -16555,7 +16621,10 @@ fn compile_tuple_column(
                         .specialize_current_column(vec![wild(), wild()], false),
                 );
             }
-            RPatKind::Ctor(_, _) | RPatKind::Record(_) | RPatKind::Literal(_, _) => {
+            RPatKind::Ctor(_, _)
+            | RPatKind::CheckedCtor(_, _, _)
+            | RPatKind::Record(_)
+            | RPatKind::Literal(_, _) => {
                 return Err(ElabError::TypeMismatch {
                     span: row.real_pats[0].span.clone(),
                     reason: "non-tuple pattern cannot match a pair component".into(),
@@ -16776,7 +16845,10 @@ fn compile_record_column(
                         .specialize_projected_record_column(patterns, source_bindings),
                 );
             }
-            RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Literal(_, _) => {
+            RPatKind::Ctor(_, _)
+            | RPatKind::CheckedCtor(_, _, _)
+            | RPatKind::Tuple(_)
+            | RPatKind::Literal(_, _) => {
                 return Err(ElabError::TypeMismatch {
                     span: row.real_pats[0].span.clone(),
                     reason: "non-record pattern cannot match a named record component".into(),
@@ -17330,8 +17402,8 @@ fn build_ctor_buckets(
                 "a constructor split must receive the current column's live occurrence"
             );
             match &r.real_pats[0].kind {
-                RPatKind::Ctor(name, subs) => {
-                    if cx.globals.get(name).copied() == Some(c0.id) {
+                RPatKind::Ctor(_, subs) | RPatKind::CheckedCtor(_, _, subs) => {
+                    if pattern_ctor_id(cx, &r.real_pats[0].kind) == Some(c0.id) {
                         bucket.push(r.clone().specialize_current_column(subs.clone(), true));
                     }
                 }
@@ -17599,6 +17671,7 @@ fn top_pattern_is_catchall(pattern: &RPattern) -> bool {
         RPatKind::As(inner, _, _) => top_pattern_is_catchall(inner),
         RPatKind::Or(alternatives) => alternatives.iter().any(top_pattern_is_catchall),
         RPatKind::Ctor(_, _)
+        | RPatKind::CheckedCtor(_, _, _)
         | RPatKind::Tuple(_)
         | RPatKind::Record(_)
         | RPatKind::Literal(_, _) => false,
@@ -17612,10 +17685,8 @@ fn ensure_top_pattern_ctors_belong_to_family(
     d_id: GlobalId,
 ) -> Result<(), ElabError> {
     match &pattern.kind {
-        RPatKind::Ctor(name, _) => {
-            let ctor_id = *cx
-                .globals
-                .get(name)
+        RPatKind::Ctor(name, _) | RPatKind::CheckedCtor(name, _, _) => {
+            let ctor_id = pattern_ctor_id(cx, &pattern.kind)
                 .expect("constructor resolution precedes family validation");
             if !ind
                 .constructors
@@ -17741,6 +17812,7 @@ fn top_pattern_contains_literal(pattern: &RPattern) -> bool {
         RPatKind::Wild
         | RPatKind::Var(_, _)
         | RPatKind::Ctor(_, _)
+        | RPatKind::CheckedCtor(_, _, _)
         | RPatKind::Tuple(_)
         | RPatKind::Record(_) => false,
     }
@@ -17759,9 +17831,11 @@ fn top_pattern_is_literal_form(pattern: &RPattern) -> bool {
             top_pattern_contains_literal(alternative)
                 && top_pattern_is_literal_form(alternative)
         }),
-        RPatKind::Var(_, _) | RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {
-            false
-        }
+        RPatKind::Var(_, _)
+        | RPatKind::Ctor(_, _)
+        | RPatKind::CheckedCtor(_, _, _)
+        | RPatKind::Tuple(_)
+        | RPatKind::Record(_) => false,
     }
 }
 
@@ -18000,8 +18074,8 @@ fn ensure_pattern_constructors_resolve(
     pattern: &RPattern,
 ) -> Result<(), ElabError> {
     match &pattern.kind {
-        RPatKind::Ctor(name, fields) => {
-            if !cx.globals.contains_key(name) {
+        RPatKind::Ctor(name, fields) | RPatKind::CheckedCtor(name, _, fields) => {
+            if matches!(&pattern.kind, RPatKind::Ctor(_, _)) && !cx.globals.contains_key(name) {
                 return Err(ElabError::UnresolvedCon {
                     name: name.clone(),
                     span: pattern.span.clone(),
@@ -18052,10 +18126,11 @@ fn ensure_arm_ctors_belong_to_family(
     d_id: GlobalId,
 ) -> Result<(), ElabError> {
     for arm in arms {
-        if let RPatKind::Ctor(name, _) = &pattern_without_aliases(&arm.pat).kind {
-            let ctor_id = *cx.globals.get(name).expect(
+        let head = &pattern_without_aliases(&arm.pat).kind;
+        if let RPatKind::Ctor(name, _) | RPatKind::CheckedCtor(name, _, _) = head {
+            let ctor_id = pattern_ctor_id(cx, head).expect(
                 "ensure_pattern_constructors_resolve already validated every top-level \
-                 arm pattern name resolves in cx.globals before this function runs",
+                 arm pattern before this function runs",
             );
             if !ind.constructors.iter().any(|c| c.id == ctor_id) {
                 return Err(ElabError::TypeMismatch {

@@ -301,6 +301,16 @@ struct Scope {
     /// Export-name ID overrides for facade/in-scope republishing. A canonical
     /// spelling alone can no longer recover the imported provider's ID.
     exported_ids: HashMap<String, ken_kernel::GlobalId>,
+    /// Locals declared by the current expansion, even if a previous unit
+    /// already minted this canonical spelling. Cleared after the ordered pass.
+    current_local_names: HashSet<String>,
+    /// An `export Local` may precede Local's checked declaration. Delay its
+    /// ID until that declaration finishes, then check any competing facade.
+    pending_local_exports: HashMap<String, (String, Span)>,
+    /// A proof declared in THIS scope may be attached to an imported subject.
+    /// Its own declaration, not the subject's provider, grants the local
+    /// `proof p for subject` selector (including same-unit SCC references).
+    local_attached_proofs: HashSet<String>,
     /// Names mentioned by a facade export remain deliberately unavailable to
     /// the body unless a separate import/local binding supplies them. Keeping
     /// this negative fact makes the normative facade-vs-binding failure an
@@ -322,7 +332,7 @@ impl Scope {
         globals: &HashMap<String, ken_kernel::GlobalId>,
         bare: &str,
         qualified: &str,
-        selected_id: Option<ken_kernel::GlobalId>,
+        selected_id: ken_kernel::GlobalId,
         span: &Span,
     ) -> Result<(), ElabError> {
         if self.locals.contains(bare) {
@@ -331,11 +341,7 @@ impl Scope {
                 Some(local) => globals.get(local),
                 None => globals.get(bare),
             };
-            let imported_id = selected_id.as_ref().or_else(|| globals.get(qualified));
-            if local_id
-                .zip(imported_id)
-                .is_some_and(|(local, imported)| local == imported)
-            {
+            if local_id.is_some_and(|local| *local == selected_id) {
                 return Ok(());
             }
             let local_source = local_binding
@@ -358,11 +364,11 @@ impl Scope {
                     .insert(bare.to_string(), qualified.to_string());
             }
             Some(existing) if existing == qualified => {
-                if let Some((old, new)) = self.binding_ids.get(bare).zip(selected_id.as_ref()) {
-                    if old != new {
+                if let Some(old) = self.binding_ids.get(bare) {
+                    if *old != selected_id {
                         return Err(ElabError::AmbiguousReference {
                             name: bare.to_string(),
-                            sources: vec![format!("{existing} {old:?}"), format!("{qualified} {new:?}")],
+                            sources: vec![format!("{existing} {old:?}"), format!("{qualified} {selected_id:?}")],
                             span: span.clone(),
                         });
                     }
@@ -376,9 +382,7 @@ impl Scope {
                 });
             }
         }
-        if let Some(id) = selected_id {
-            self.binding_ids.insert(bare.to_string(), id);
-        }
+        self.binding_ids.insert(bare.to_string(), selected_id);
         Ok(())
     }
 
@@ -434,7 +438,17 @@ fn resolve_ref(
     if let Some(dot) = name.rfind('.') {
         let (prefix_part, leaf) = (&name[..dot], &name[dot + 1..]);
         if let Some(q) = scope.bindings.get(prefix_part) {
-            return Ok(format!("{q}.{leaf}"));
+            // Selective imports of a family grant only checked public
+            // selectors. A canonical spelling formed by appending an
+            // arbitrary leaf could otherwise borrow an ambient provider's
+            // private member after that provider overwrote `globals`.
+            if scope.locals.contains(prefix_part) || scope.qualified_ids.contains_key(name) {
+                return Ok(format!("{q}.{leaf}"));
+            }
+            return Err(ElabError::UnboundName {
+                name: name.to_string(),
+                span: span.clone(),
+            });
         }
         if let Some(canonical_module) = scope.prefixes.get(prefix_part) {
             return scope
@@ -532,25 +546,28 @@ fn resolve_attached_ref(
     subject: &str,
     proof_name: &str,
     span: &Span,
-) -> Result<String, ElabError> {
+) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
     let subject_is_local = !subject.contains('.') && scope.locals.contains(subject);
-    let subject = resolve_ref(scope, exports, subject, span)?;
-    if !subject_is_local {
-        if let Some(dot) = subject.rfind('.') {
-            let (module, leaf) = (&subject[..dot], &subject[dot + 1..]);
-            if let Some(pubmap) = exports.get(module) {
-                let attached_key = format!("{leaf}::{proof_name}");
-                return pubmap
-                    .get(&attached_key)
-                    .cloned()
-                    .ok_or_else(|| ElabError::UnboundName {
-                        name: format!("{subject}::{proof_name}"),
-                        span: span.clone(),
-                    });
-            }
-        }
+    let canonical_subject = resolve_ref(scope, exports, subject, span)?;
+    let selected = format!("{subject}::{proof_name}");
+    if let Some(id) = scope.qualified_ids.get(&selected) {
+        // Only an actually exported attached proof is entered under this
+        // subject selector. Its ID is selected by the subject's provider,
+        // never by the process-global canonical spelling.
+        let canonical = if selected.contains('.') {
+            resolve_ref(scope, exports, &selected, span)?
+        } else {
+            format!("{canonical_subject}::{proof_name}")
+        };
+        return Ok((canonical, Some(*id)));
     }
-    Ok(format!("{subject}::{proof_name}"))
+    if subject_is_local || scope.local_attached_proofs.contains(&selected) {
+        return Ok((format!("{canonical_subject}::{proof_name}"), None));
+    }
+    Err(ElabError::UnboundName {
+        name: selected,
+        span: span.clone(),
+    })
 }
 
 /// A bare import in a unit is either its own declared child (already
@@ -697,10 +714,6 @@ fn apply_import(
         }
     };
     let file_tables = provider_file.and_then(|root| file_export_tables.get(root));
-    let selected_ids = match provider_file {
-        Some(file) => file_export_ids.get(file),
-        None => export_provenance.get(&canonical).map(|owner| &owner.member_ids),
-    };
     let pubmap = match provider_file {
         Some(_) => file_tables.and_then(|tables| tables.get(&canonical)),
         None => exports.get(&canonical),
@@ -709,6 +722,23 @@ fn apply_import(
         name: module.to_string(),
         span: span.clone(),
     })?;
+    let selected_ids = match provider_file {
+        Some(file) => file_export_ids.get(file),
+        None => export_provenance.get(&canonical).map(|owner| &owner.member_ids),
+    }
+    .ok_or_else(|| ElabError::Internal(format!(
+        "selected import provider '{canonical}' has no checked export identities"
+    )))?;
+    let provider_members = selected_ids.get(&canonical).ok_or_else(|| {
+        ElabError::Internal(format!("selected provider '{canonical}' has no checked member IDs"))
+    })?;
+    for leaf in pubmap.keys() {
+        if !provider_members.contains_key(leaf) {
+            return Err(ElabError::Internal(format!(
+                "public member '{canonical}.{leaf}' has no checked ID in its selected provider"
+            )));
+        }
+    }
     match kind {
         ImportKind::Qualified | ImportKind::Aliased(_) => {
             let surface = match kind {
@@ -732,9 +762,7 @@ fn apply_import(
             scope
                 .prefixes
                 .insert(surface.to_string(), canonical.clone());
-            if let Some(ids) = selected_ids {
-                bind_provider_members(scope, surface, &canonical, ids);
-            }
+            bind_provider_members(scope, surface, &canonical, selected_ids);
             if let Some(tables) = file_tables {
                 scope
                     .file_prefix_exports
@@ -745,7 +773,7 @@ fn apply_import(
                         inline_children,
                         paths,
                         Some(tables),
-                        selected_ids,
+                        Some(selected_ids),
                         &canonical,
                         surface,
                     );
@@ -756,7 +784,7 @@ fn apply_import(
                     inline_children,
                     paths,
                     None,
-                    selected_ids,
+                    Some(selected_ids),
                     &canonical,
                     surface,
                 );
@@ -771,16 +799,11 @@ fn apply_import(
                         span: span.clone(),
                     })?;
                 let bare = item.rename.as_deref().unwrap_or(&item.name);
-                let selected_id = selected_ids
-                    .and_then(|ids| ids.get(&canonical))
-                    .and_then(|members| members.get(&item.name))
-                    .copied()
-                    .or_else(|| globals.get(q).copied());
+                let selected_id = provider_members[&item.name];
                 if prelude_binding_names.contains(bare) {
                     let same_canonical_identity = globals
                         .get(bare)
-                        .zip(selected_id.as_ref())
-                        .is_some_and(|(installed, incoming)| installed == incoming);
+                        .is_some_and(|installed| *installed == selected_id);
                     if !same_canonical_identity {
                         return Err(ElabError::AmbiguousReference {
                             name: bare.to_string(),
@@ -790,6 +813,18 @@ fn apply_import(
                     }
                 }
                 scope.bind_import(globals, bare, q, selected_id, span)?;
+                let selector_prefix = format!("{}.", item.name);
+                let proof_prefix = format!("{}::", item.name);
+                for (member, id) in provider_members {
+                    if pubmap.contains_key(member) {
+                        if let Some(selector) = member.strip_prefix(&selector_prefix) {
+                            scope.qualified_ids.insert(format!("{bare}.{selector}"), *id);
+                        }
+                        if let Some(proof) = member.strip_prefix(&proof_prefix) {
+                            scope.qualified_ids.insert(format!("{bare}::{proof}"), *id);
+                        }
+                    }
+                }
             }
         }
     }
@@ -852,19 +887,39 @@ fn certify_standard_operator_home(
 }
 
 fn checked_export_ids(
-    scope: &Scope,
+    scope: &mut Scope,
     exports: &HashMap<String, String>,
     globals: &HashMap<String, ken_kernel::GlobalId>,
-) -> HashMap<String, ken_kernel::GlobalId> {
+) -> Result<HashMap<String, ken_kernel::GlobalId>, ElabError> {
+    for (surface, (canonical, span)) in std::mem::take(&mut scope.pending_local_exports) {
+        let id = globals.get(&canonical).copied().ok_or_else(|| ElabError::UnboundName {
+            name: canonical.clone(),
+            span: span.clone(),
+        })?;
+        if let Some(existing_id) = scope.exported_ids.get(&surface) {
+            if *existing_id != id {
+                return Err(ElabError::ReExportCollision {
+                    surface_name: surface.clone(),
+                    existing: exports[&surface].clone(),
+                    incoming: canonical,
+                    span,
+                });
+            }
+        }
+        scope.exported_ids.insert(surface, id);
+    }
     exports
         .iter()
-        .filter_map(|(surface, canonical)| {
+        .map(|(surface, canonical)| {
             scope
                 .exported_ids
                 .get(surface)
                 .copied()
                 .or_else(|| globals.get(canonical).copied())
                 .map(|id| (surface.clone(), id))
+                .ok_or_else(|| ElabError::Internal(format!(
+                    "published member '{surface}' at '{canonical}' has no checked ID"
+                )))
         })
         .collect()
 }
@@ -917,8 +972,8 @@ fn publish_checked_identity(
         if *existing_id != id {
             return Err(ElabError::ReExportCollision {
                 surface_name: surface.to_string(),
-                existing: format!("{} {existing_id:?}", exports_here[surface]),
-                incoming: format!("{canonical} {id:?}"),
+                existing: exports_here[surface].clone(),
+                incoming: canonical.to_string(),
                 span: span.clone(),
             });
         }
@@ -929,20 +984,29 @@ fn publish_checked_identity(
 }
 
 fn publish_family_intros(
+    scope: &mut Scope,
     exports_here: &mut HashMap<String, String>,
     prop_intros: &HashMap<String, Vec<String>>,
     surface_family: &str,
     canonical_family: &str,
+    source_family: &str,
+    source_members: Option<&HashMap<String, ken_kernel::GlobalId>>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
     span: &Span,
 ) -> Result<(), ElabError> {
     if let Some(intros) = prop_intros.get(canonical_family) {
         for intro in intros {
-            publish_identity(
-                exports_here,
-                &format!("{surface_family}.{intro}"),
-                &format!("{canonical_family}.{intro}"),
-                span,
-            )?;
+            let surface = format!("{surface_family}.{intro}");
+            let canonical = format!("{canonical_family}.{intro}");
+            let id = match source_members {
+                Some(members) => members.get(&format!("{source_family}.{intro}")).copied(),
+                None => globals.get(&canonical).copied(),
+            }
+            .ok_or_else(|| ElabError::UnboundName {
+                name: surface.clone(),
+                span: span.clone(),
+            })?;
+            publish_checked_identity(scope, exports_here, &surface, &canonical, id, span)?;
         }
     }
     Ok(())
@@ -977,6 +1041,14 @@ fn apply_export(
                 name: module.clone(),
                 span: span.clone(),
             })?;
+            let source_members = match selected_file {
+                Some(file) => file_export_ids.get(file),
+                None => export_provenance.get(module).map(|owner| &owner.member_ids),
+            }
+            .and_then(|ids| ids.get(module))
+            .ok_or_else(|| ElabError::Internal(format!(
+                "facade provider '{module}' has no checked export identities"
+            )))?;
             for item in items {
                 let canonical = pubmap
                     .get(&item.name)
@@ -985,19 +1057,17 @@ fn apply_export(
                         span: span.clone(),
                     })?;
                 let surface = published_name(item);
-                let selected_id = selected_file
-                    .and_then(|file| file_export_ids.get(file))
-                    .or_else(|| export_provenance.get(module).map(|owner| &owner.member_ids))
-                    .and_then(|ids| ids.get(module))
-                    .and_then(|members| members.get(&item.name))
-                    .copied()
-                    .or_else(|| globals.get(canonical).copied())
-                    .ok_or_else(|| ElabError::UnboundName {
-                        name: format!("{module}.{}", item.name),
-                        span: span.clone(),
-                    })?;
+                let selected_id = source_members.get(&item.name).copied().ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "facade member '{module}.{}' has no checked provider ID",
+                        item.name
+                    ))
+                })?;
                 publish_checked_identity(scope, exports_here, surface, canonical, selected_id, span)?;
-                publish_family_intros(exports_here, prop_intros, surface, canonical, span)?;
+                publish_family_intros(
+                    scope, exports_here, prop_intros, surface, canonical,
+                    &item.name, Some(source_members), globals, span,
+                )?;
                 for name in [item.name.as_str(), surface] {
                     if !scope.bindings.contains_key(name) && !globals.contains_key(name) {
                         scope.facade_only.insert(name.to_string());
@@ -1016,12 +1086,30 @@ fn apply_export(
                     });
                 }
                 let surface = published_name(item);
+                if scope.current_local_names.contains(&item.name) {
+                    // The same unit can export a local before it is checked.
+                    // Even if another unit already owns this canonical name,
+                    // that ambient ID is not the forward local's identity.
+                    publish_identity(exports_here, surface, &canonical, span)?;
+                    scope.pending_local_exports.insert(
+                        surface.to_string(), (canonical, span.clone()),
+                    );
+                    continue;
+                }
                 let selected_id = scope
                     .qualified_ids
                     .get(&item.name)
                     .or_else(|| scope.binding_ids.get(&item.name))
                     .copied()
-                    .or_else(|| globals.get(&canonical).copied())
+                    .or_else(|| {
+                        // Locals checked earlier in this unit have their ID
+                        // in `globals`. An imported binding must already have
+                        // its selected ID; the mutable table is not evidence.
+                        (scope.locals.contains(&item.name)
+                            || (!had_scope_binding && !item.name.contains('.')))
+                            .then(|| globals.get(&canonical).copied())
+                            .flatten()
+                    })
                     .ok_or_else(|| ElabError::UnboundName {
                         name: item.name.clone(),
                         span: span.clone(),
@@ -1029,7 +1117,14 @@ fn apply_export(
                 publish_checked_identity(
                     scope, exports_here, surface, &canonical, selected_id, span,
                 )?;
-                publish_family_intros(exports_here, prop_intros, surface, &canonical, span)?;
+                let selected_members = (scope.qualified_ids.contains_key(&item.name)
+                    || scope.binding_ids.contains_key(&item.name))
+                    .then(|| scope.qualified_ids.clone());
+                let source_members = selected_members.as_ref();
+                publish_family_intros(
+                    scope, exports_here, prop_intros, surface, &canonical,
+                    &item.name, source_members, globals, span,
+                )?;
             }
         }
     }
@@ -1396,7 +1491,7 @@ fn load_unit(
             .collect();
         member_ids.insert(
             module.to_string(),
-            checked_export_ids(&scope, &exports, &elab.globals),
+            checked_export_ids(&mut scope, &exports, &elab.globals)?,
         );
         elab.module_state
             .file_export_tables
@@ -1953,10 +2048,16 @@ fn rewrite_rexpr_inner(
                     .into_iter()
                     .map(|operator| match operator {
                         RInfixOperator::Builtin(op, span) => Ok(RInfixOperator::Builtin(op, span)),
-                        RInfixOperator::User(name, span) => Ok(RInfixOperator::User(
-                            resolve_ref(scope, exports, &name, &span)?,
-                            span,
-                        )),
+                        RInfixOperator::User(name, span) => {
+                            let (name, selected) = resolve_checked_ref(scope, exports, &name, &span)?;
+                            Ok(match selected {
+                                Some(id) => RInfixOperator::CheckedUser(name, id, span),
+                                None => RInfixOperator::User(name, span),
+                            })
+                        }
+                        RInfixOperator::CheckedUser(name, id, span) => {
+                            Ok(RInfixOperator::CheckedUser(name, id, span))
+                        }
                     })
                     .collect::<Result<Vec<_>, ElabError>>()?,
                 span,
@@ -2063,10 +2164,12 @@ fn rewrite_rexpr_inner(
             proof_name,
             span,
         } => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RCon(
-                resolve_attached_ref(scope, exports, &subject, &proof_name, &span)?,
-                span,
-            ))
+            let (name, selected) =
+                resolve_attached_ref(scope, exports, &subject, &proof_name, &span)?;
+            Ok(match selected {
+                Some(id) => RExpr::RCheckedGlobal { name, id, span },
+                None => RExpr::RCon(name, span),
+            })
         })?,
         RExpr::RTrunc(e, s) => rewrite_rexpr_arm(|| {
             Ok(RExpr::RTrunc(
@@ -2086,13 +2189,17 @@ fn rewrite_rpattern(
         RPatKind::Wild => RPatKind::Wild,
         RPatKind::Var(n, slot) => RPatKind::Var(n, slot),
         RPatKind::Ctor(name, subs) => {
-            let n = resolve_ref(scope, exports, &name, &p.span)?;
+            let (name, selected) = resolve_checked_ref(scope, exports, &name, &p.span)?;
             let subs = subs
                 .into_iter()
                 .map(|s| rewrite_rpattern(scope, exports, s))
                 .collect::<Result<Vec<_>, ElabError>>()?;
-            RPatKind::Ctor(n, subs)
+            match selected {
+                Some(id) => RPatKind::CheckedCtor(name, id, subs),
+                None => RPatKind::Ctor(name, subs),
+            }
         }
+        RPatKind::CheckedCtor(name, id, subs) => RPatKind::CheckedCtor(name, id, subs),
         RPatKind::Tuple(components) => RPatKind::Tuple(
             components
                 .into_iter()
@@ -2406,14 +2513,14 @@ fn is_recursive_candidate(decl: &Decl) -> bool {
 fn register_effect_row(elab: &mut ElabEnv, result: &crate::elab::ElabResult) {
     if let Some(row) = &result.effect_row_type {
         elab.effect_rows.insert(result.name.clone(), row.clone());
+        elab.effect_rows_by_id.insert(result.def_id, row.clone());
     }
     if let Some(fb) = &result.foreign_binding {
         elab.foreign_env.register(result.name.clone(), fb.clone());
         if !fb.effect_row.is_empty() {
-            elab.effect_rows.insert(
-                result.name.clone(),
-                crate::effects::RowType::Concrete(fb.effect_row.clone()),
-            );
+            let row = crate::effects::RowType::Concrete(fb.effect_row.clone());
+            elab.effect_rows.insert(result.name.clone(), row.clone());
+            elab.effect_rows_by_id.insert(result.def_id, row);
         }
     }
 }
@@ -2445,7 +2552,9 @@ fn elaborate_checked_spine_free(
     elab: &mut ElabEnv,
     rdecl: &crate::resolve::RDecl,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    crate::elab::check_surface_purity(rdecl, &elab.effect_rows, &elab.globals, &elab.class_env)?;
+    crate::elab::check_surface_purity(
+        rdecl, &elab.effect_rows, &elab.effect_rows_by_id, &elab.globals, &elab.class_env,
+    )?;
     let standard_operators_here = elab.standard_operators.clone();
     let result = crate::elab::elaborate_rdecl_v1_with_effect_rows(
         &mut elab.env,
@@ -2455,7 +2564,7 @@ fn elaborate_checked_spine_free(
         &mut elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_here,
-        &elab.effect_rows,
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
@@ -2472,7 +2581,9 @@ fn elaborate_checked_with_fixity(
     rdecl: &crate::resolve::RDecl,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    crate::elab::check_surface_purity(rdecl, &elab.effect_rows, &elab.globals, &elab.class_env)?;
+    crate::elab::check_surface_purity(
+        rdecl, &elab.effect_rows, &elab.effect_rows_by_id, &elab.globals, &elab.class_env,
+    )?;
     let standard_operators_here = elab.standard_operators.clone();
     let result = crate::elab::elaborate_rdecl_v1_with_effect_rows(
         &mut elab.env,
@@ -2482,7 +2593,7 @@ fn elaborate_checked_with_fixity(
         &mut elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_here,
-        &elab.effect_rows,
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
@@ -2824,10 +2935,12 @@ fn prebind_scope_declarations(
         if !is_qualifiable(inner) && !unqualified_local {
             continue;
         }
-        if matches!(inner, Decl::AttachedProofDecl { .. }) {
+        if let Decl::AttachedProofDecl { subject, proof_name, .. } = inner {
+            scope.local_attached_proofs.insert(format!("{subject}::{proof_name}"));
             continue;
         }
         let bare = inner.name().to_string();
+        scope.current_local_names.insert(bare.clone());
         let qualified = if unqualified_local {
             bare.clone()
         } else {
@@ -2837,6 +2950,7 @@ fn prebind_scope_declarations(
         match inner {
             Decl::DataDecl { ctors, .. } => {
                 for ctor in ctors {
+                    scope.current_local_names.insert(ctor.name.clone());
                     let qualified = qualify(prefix, &ctor.name);
                     scope.bind_local(&ctor.name, &qualified, &ctor.span)?;
                 }
@@ -2847,6 +2961,7 @@ fn prebind_scope_declarations(
                         ExplicitDataCtor::Simple(ctor) => (&ctor.name, &ctor.span),
                         ExplicitDataCtor::Signature { name, span, .. } => (name, span),
                     };
+                    scope.current_local_names.insert(name.clone());
                     let qualified = qualify(prefix, name);
                     scope.bind_local(name, &qualified, span)?;
                 }
@@ -3106,9 +3221,23 @@ fn collect_scope_fixities(
         pending.push(candidate);
     }
 
-    // Validate every already-admitted target before mutating the program table,
-    // so one later conflict cannot leave earlier declarations installed.
+    // A local operator declared by THIS unit has not received its ID yet.
+    // Another already-loaded unit can have the same canonical spelling:
+    // installing this unit's fixity onto that ambient ID would both mutate
+    // the unrelated provider and turn a legal collision into a conflict.
+    let new_operators: HashSet<&str> = decls
+        .iter()
+        .filter_map(|decl| match decl.unwrap_pub() {
+            Decl::ViewDecl { name, .. } => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    // Validate already-admitted local targets (a fixity-only later source
+    // call) before mutating the program table. New targets wait for admission.
     for candidate in &pending {
+        if new_operators.contains(candidate.source_operator.as_str()) {
+            continue;
+        }
         let Some(id) = elab.globals.get(&candidate.canonical_name).copied() else {
             continue;
         };
@@ -3127,6 +3256,9 @@ fn collect_scope_fixities(
         }
     }
     for candidate in &pending {
+        if new_operators.contains(candidate.source_operator.as_str()) {
+            continue;
+        }
         if let Some(id) = elab.globals.get(&candidate.canonical_name).copied() {
             install_declared_fixity(elab, &candidate.source_operator, id, candidate)?;
         }
@@ -3399,7 +3531,7 @@ fn expand_scope(
                     .collect();
                 member_ids.insert(
                     child_prefix.clone(),
-                    checked_export_ids(&child_scope, &child_exports, &elab.globals),
+                    checked_export_ids(&mut child_scope, &child_exports, &elab.globals)?,
                 );
                 elab.module_state.export_provenance.insert(
                     child_prefix.clone(),
@@ -3642,6 +3774,7 @@ fn expand_scope(
                             crate::elab::check_surface_purity(
                                 rdecl,
                                 &group_effect_rows,
+                                &elab.effect_rows_by_id,
                                 &elab.globals,
                                 &elab.class_env,
                             )?;
@@ -3692,17 +3825,33 @@ fn expand_scope(
                                 span: inner.span().clone(),
                             });
                         }
-                        publish_identity(
+                        let checked_id = elab.globals.get(&rdecl.name).copied().ok_or_else(|| {
+                            ElabError::Internal(format!(
+                                "recursive public proof '{}' has no checked ID",
+                                rdecl.name
+                            ))
+                        })?;
+                        publish_checked_identity(
+                            scope,
                             &mut exports_here,
                             &format!("{subject}::{proof_name}"),
                             &rdecl.name,
+                            checked_id,
                             inner.span(),
                         )?;
                     } else {
-                        publish_identity(
+                        let checked_id = elab.globals.get(&rdecl.name).copied().ok_or_else(|| {
+                            ElabError::Internal(format!(
+                                "recursive public declaration '{}' has no checked ID",
+                                rdecl.name
+                            ))
+                        })?;
+                        publish_checked_identity(
+                            scope,
                             &mut exports_here,
                             inner.name(),
                             &rdecl.name,
+                            checked_id,
                             inner.span(),
                         )?;
                     }
@@ -3772,10 +3921,12 @@ fn expand_scope(
                             ..
                         } = inner
                         {
-                            publish_identity(
+                            publish_checked_identity(
+                                scope,
                                 &mut exports_here,
                                 &format!("{subject}::{proof_name}"),
                                 &result.name,
+                                result.def_id,
                                 inner.span(),
                             )?;
                         } else {
@@ -3784,12 +3935,19 @@ fn expand_scope(
                             // abstract export: ctors are simply never entered
                             // into any export table, so a client can't bring
                             // them into scope by any import form).
-                            publish_identity(&mut exports_here, &bare, &result.name, inner.span())?;
+                            publish_checked_identity(
+                                scope, &mut exports_here, &bare, &result.name,
+                                result.def_id, inner.span(),
+                            )?;
                             publish_family_intros(
+                                scope,
                                 &mut exports_here,
                                 &elab.module_state.prop_intros,
                                 &bare,
                                 &result.name,
+                                &bare,
+                                None,
+                                &elab.globals,
                                 inner.span(),
                             )?;
                         }
@@ -3810,11 +3968,9 @@ fn expand_scope(
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
                     if is_pub && matches!(inner, Decl::ClassDecl { .. }) {
-                        publish_identity(
-                            &mut exports_here,
-                            inner.name(),
-                            &result.name,
-                            inner.span(),
+                        publish_checked_identity(
+                            scope, &mut exports_here, inner.name(),
+                            &result.name, result.def_id, inner.span(),
                         )?;
                     }
                     ids.push(result);
@@ -3824,6 +3980,24 @@ fn expand_scope(
         }
     }
 
+    // Forward in-scope exports are emitted only after their local family is
+    // checked, so prop selectors cannot be lost merely because `export P`
+    // preceded the declaration of `P` in this source unit.
+    let forward_exports = scope.pending_local_exports.clone();
+    for (surface, (canonical, span)) in forward_exports {
+        publish_family_intros(
+            scope,
+            &mut exports_here,
+            &elab.module_state.prop_intros,
+            &surface,
+            &canonical,
+            &surface,
+            None,
+            &elab.globals,
+            &span,
+        )?;
+    }
+    scope.current_local_names.clear();
     Ok((ids, exports_here))
 }
 
@@ -3948,7 +4122,14 @@ pub fn expand_and_elaborate(
         elab.class_env.direct_use_instances = previous_direct_instances;
         elab.class_env.implicit_single_provider = previous_implicit_single_provider;
     }
-    let (results, _root_exports) = expanded?;
+    let (results, root_exports) = expanded?;
+    // In-memory root exports are not a named module interface, but any
+    // forward local selected for export still owes checked-ID reconciliation
+    // before this persistent scope is reused by the next source call.
+    checked_export_ids(&mut scope, &root_exports, &elab.globals)?;
+    // Root exports are not a named public interface. Keep imported scope
+    // bindings across calls, but not this call's export-ID collision ledger.
+    scope.exported_ids.clear();
     if direct_call {
         if let Some((header, header_span)) = &boundary {
             let main_span = decls
@@ -4271,7 +4452,7 @@ mod namespace_effect_tests {
         assert_eq!(before.get("item").map(String::as_str), Some("Owner.item"));
 
         scope
-            .bind_import(&globals, "item", "Provider.item", None, &Span::new(10, 20))
+            .bind_import(&globals, "item", "Provider.item", shared, &Span::new(10, 20))
             .expect("two routes to one resolved identity must be idempotent");
 
         assert_eq!(
@@ -4303,7 +4484,7 @@ mod namespace_effect_tests {
             .bind_local("item", "Owner.item", &Span::new(0, 4))
             .expect("the local producer installs both local and canonical binding state");
 
-        match scope.bind_import(&globals, "item", "Provider.item", None, &Span::new(10, 20)) {
+        match scope.bind_import(&globals, "item", "Provider.item", imported_id, &Span::new(10, 20)) {
             Err(ElabError::AmbiguousReference { name, sources, .. }) => {
                 assert_eq!(name, "item");
                 assert_eq!(
@@ -5592,6 +5773,119 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
+    /// MEASURED: a local public `A.leak` and a facade-selected file
+    /// `A.leak` share their canonical spelling but not their checked ID, and
+    /// compete for the SAME public surface in one interface. CLAIMED: facade
+    /// collision compares checked IDs, not only strings. THE GAP: the file
+    /// identity is recorded before the competing local is elaborated.
+    #[test]
+    fn facade_reexport_refuses_two_ids_under_one_identical_canonical_name() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let file_id = env.globals["A.leak"];
+        match env.elaborate_file("module A { pub const leak : Nat = Suc Zero export A (leak) }") {
+            Err(ElabError::ReExportCollision { surface_name, existing, incoming, .. }) => {
+                assert_eq!(surface_name, "leak");
+                assert_eq!(existing, "A.leak");
+                assert_eq!(incoming, "A.leak");
+            }
+            other => panic!("two IDs under one public spelling must clash: {other:?}"),
+        }
+        assert_ne!(file_id, env.globals["A.leak"]);
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: an explicit local export BEFORE its declaration selects the
+    /// new local's ID rather than the old file declaration's ID at the same
+    /// canonical spelling. CLAIMED: prebound locals are paired only once
+    /// checked. THE GAP: an earlier file ID exists and differs, so an eager
+    /// ambient lookup would select the wrong provider and fail this assertion.
+    #[test]
+    fn forward_local_export_waits_for_its_checked_id() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let old = env.globals["A.leak"];
+        env.elaborate_file("module A { export leak\nconst leak : Nat = Suc Zero }")
+            .expect("forward in-scope export resolves after local check");
+        let local = env.globals["A.leak"];
+        assert_ne!(old, local);
+        env.elaborate_file("import A as M\nconst selected : Nat = M.leak")
+            .expect("memory client selects the forward-published local");
+        let (_, body) = env.env.transparent_body(env.globals["selected"])
+            .expect("selected local has a checked body");
+        match body {
+            ken_kernel::Term::Const { id, .. } => assert_eq!(id, local),
+            other => panic!("forward export selected non-local body: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: exporting a prop family before its declaration still
+    /// publishes exactly its checked intro selector to a later strict file
+    /// import. CLAIMED: delayed ID reconciliation carries intros as well as
+    /// the family. THE GAP: an intro omitted by the early table would fail
+    /// at the import site, before the checked proof can be constructed.
+    #[test]
+    fn forward_prop_export_publishes_its_checked_intro() {
+        let root = inline_owner_root(
+            "export HasProof\nprop HasProof (a : Type) : Omega where { intro : HasProof a }\n",
+        );
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\ntheorem selected (a : Type) : K.HasProof a = K.HasProof.intro a\n",
+        )
+        .expect("write forward-prop client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+            .expect("forward family export carries the checked intro");
+        let file_intro = env.globals["A.HasProof.intro"];
+        let (_, body) = env.env.transparent_body(env.globals["B.selected"])
+            .expect("checked intro proof has a body");
+        let ken_kernel::Term::Lam(_, body) = body else {
+            panic!("selected is not a parameterized proof: {body:?}");
+        };
+        let ken_kernel::Term::App(head, _) = *body else {
+            panic!("selected did not apply its intro: {body:?}");
+        };
+        assert!(matches!(head.as_ref(),
+            ken_kernel::Term::Const { id, .. }
+            | ken_kernel::Term::Constructor { id, .. } if *id == file_intro));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: a forward local and a facade to the file owner publish one
+    /// surface/canonical spelling but two IDs. CLAIMED: delayed local-ID
+    /// reconciliation cannot let a later facade conceal a real collision.
+    /// THE GAP: an earlier `pub` would exercise eager collision only.
+    #[test]
+    fn forward_local_and_file_facade_collide_when_ids_differ() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let old = env.globals["A.leak"];
+        match env.elaborate_file(
+            "module A { export leak\nexport A (leak)\nconst leak : Nat = Suc Zero }",
+        ) {
+            Err(ElabError::ReExportCollision { surface_name, existing, incoming, .. }) => {
+                assert_eq!(surface_name, "leak");
+                assert_eq!(existing, "A.leak");
+                assert_eq!(incoming, "A.leak");
+            }
+            other => panic!("forward export and facade must clash by ID: {other:?}"),
+        }
+        assert_ne!(old, env.globals["A.leak"]);
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
     /// MEASURED: a file owner and a later or earlier in-memory owner mint
     /// distinct checked declarations at the SAME canonical leaf. File B's
     /// imported alias must select the file's GlobalId even if the mutable
@@ -5654,6 +5948,389 @@ mod namespace_effect_tests {
                 }
             }
         }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: a file-owned inductive former and an in-memory former share
+    /// one canonical name but not one checked ID. A strict imported annotation
+    /// in both the domain and result type retains the selected file ID.
+    /// CLAIMED: type elaboration consumes the same provider identity as term
+    /// elaboration. THE GAP: asserting both Pi branches prevents a body-only
+    /// repair from being mistaken for a type-position repair.
+    #[test]
+    fn file_import_retains_checked_type_identity_across_same_name_memory_owner() {
+        let root = inline_owner_root("pub data T = MkT\n");
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\nfn selected (x : K.T) : K.T = x\n",
+        )
+        .expect("write file-backed type-position client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file A declares an inductive former");
+        let file = env.globals["A.T"];
+        env.elaborate_file("module A { pub data T = Other }")
+            .expect("in-memory A declares a distinct same-spelling former");
+        let memory = env.globals["A.T"];
+        assert_ne!(file, memory);
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+            .expect("checked type positions select file A");
+        let (_, checked_type) = env.env.const_type(env.globals["B.selected"])
+            .expect("selected declaration has a checked type");
+        match checked_type {
+            ken_kernel::Term::Pi(domain, codomain) => {
+                assert_eq!(*domain, ken_kernel::Term::IndFormer { id: file, level_args: vec![] });
+                assert_eq!(*codomain, ken_kernel::Term::IndFormer { id: file, level_args: vec![] });
+            }
+            other => panic!("expected selected file Pi, got {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: explicit constructor export at a file owner stays distinct
+    /// from a later same-spelling non-constructor declaration in memory.
+    /// CLAIMED: an imported constructor pattern uses its selected checked ID.
+    /// THE GAP: the matching term and type both select the same file family.
+    #[test]
+    fn file_import_constructor_pattern_keeps_provider_checked_identity() {
+        let root = inline_owner_root("pub data T = MkT\nexport MkT\n");
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\nfn matched (x : K.T) : Nat = match x { K.MkT ↦ Zero }\n",
+        )
+        .expect("write constructor-pattern client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file A explicitly exports its constructor");
+        let file_ctor = env.globals["A.MkT"];
+        let file_former = env.globals["A.T"];
+        env.elaborate_file("module A { pub const MkT : Nat = Zero }")
+            .expect("memory A owns distinct same-spelling non-constructor");
+        assert_ne!(file_ctor, env.globals["A.MkT"]);
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+            .expect("imported file pattern selects the checked constructor");
+        assert!(env.env.constructor(file_ctor).is_some());
+        let (_, checked_type) = env.env.const_type(env.globals["B.matched"])
+            .expect("matched has a checked function type");
+        match checked_type {
+            ken_kernel::Term::Pi(domain, _) => {
+                assert_eq!(*domain, ken_kernel::Term::IndFormer { id: file_former, level_args: vec![] });
+            }
+            other => panic!("matched was not a function: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: a selective file binding and a later in-memory binding
+    /// contest the SAME bare name, despite identical canonical strings.
+    /// CLAIMED: ID inequality rejects true selective clashes, while a repeated
+    /// import of the SAME selected ID remains idempotent. THE GAP: a qualified
+    /// file-only use would not exercise this unqualified binding collision.
+    #[test]
+    fn selective_import_distinguishes_same_spelling_providers_and_same_idempotence() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let file_id = env.globals["A.leak"];
+        env.elaborate_file("import A (leak)\nconst same : Nat = leak")
+            .expect("selective file binding checked");
+        env.elaborate_file("import A (leak)\nconst again : Nat = leak")
+            .expect("repeat of one checked ID is idempotent");
+        for name in ["same", "again"] {
+            let (_, body) = env.env.transparent_body(env.globals[name]).expect("checked body");
+            match body {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, file_id),
+                other => panic!("{name} did not select file ID: {other:?}"),
+            }
+        }
+        env.elaborate_file("module A { pub const leak : Nat = Suc Zero }")
+            .expect("second in-memory provider checked");
+        assert_ne!(env.globals["A.leak"], file_id);
+        match env.elaborate_file("import A (leak)\nconst wrong : Nat = leak") {
+            Err(ElabError::AmbiguousReference { name, .. }) => assert_eq!(name, "leak"),
+            other => panic!("distinct IDs on one bare selective name must clash: {other:?}"),
+        }
+        assert!(!env.globals.contains_key("wrong"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: both the facade and in-scope re-export of file A's leaf
+    /// preserve the file's checked ID after memory A owns the same name.
+    /// CLAIMED: a second module interface republishes the provider identity,
+    /// not its canonical spelling's current mutable lookup. THE GAP: both
+    /// facade and in-scope paths are independently read in checked bodies.
+    #[test]
+    fn file_reexports_preserve_provider_id_through_facade_and_in_scope() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        for (name, source) in [
+            ("P.ken", "export A (leak as facade)\n"),
+            ("Q.ken", "import A (leak)\nexport leak as facade\n"),
+            ("B.ken", "import P as PF\nimport Q as QS\nconst from_facade : Nat = PF.facade\nconst from_in_scope : Nat = QS.facade\n"),
+        ] {
+            fs::write(root.path().join(name), source).expect("write provider-ID relay");
+        }
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file A checked");
+        let file_id = env.globals["A.leak"];
+        env.elaborate_file("module A { pub const leak : Nat = Suc Zero }")
+            .expect("memory A checked");
+        assert_ne!(file_id, env.globals["A.leak"]);
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+            .expect("file re-exports carry the original checked provider");
+        for name in ["B.from_facade", "B.from_in_scope"] {
+            let (_, body) = env.env.transparent_body(env.globals[name]).expect("checked body");
+            match body {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, file_id, "{name}"),
+                other => panic!("{name} did not select file leaf: {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: file prop intro helpers are used through direct alias,
+    /// facade, and in-scope selective family paths after a memory declaration
+    /// overwrites the same canonical intro spelling. CLAIMED: selectors carry
+    /// their owning file family's checked helper ID. THE GAP: both checked
+    /// body and type must originate from the file, not the memory impostor.
+    #[test]
+    fn file_prop_intro_reexports_retain_checked_helper_identity() {
+        let root = inline_owner_root(
+            "pub prop HasProof (a : Type) : Omega where { intro : HasProof a }\n",
+        );
+        for (name, source) in [
+            ("P.ken", "export A (HasProof as Proof)\n"),
+            ("Q.ken", "import A (HasProof)\nexport HasProof as Claim\n"),
+            ("B.ken", "import A as K\nimport P as F\nimport Q as I\ntheorem direct (a : Type) : K.HasProof a = K.HasProof.intro a\ntheorem facade (a : Type) : F.Proof a = F.Proof.intro a\ntheorem in_scope (a : Type) : I.Claim a = I.Claim.intro a\n"),
+        ] {
+            fs::write(root.path().join(name), source).expect("write prop selector relay");
+        }
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file prop family checked");
+        let file_intro = env.globals["A.HasProof.intro"];
+        env.elaborate_file("module A { module HasProof { pub const intro : Nat = Zero } }")
+            .expect("distinct memory owner checks a same-spelling intro");
+        assert_ne!(file_intro, env.globals["A.HasProof.intro"]);
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+            .expect("file family selectors keep their owning intro");
+        for name in ["B.direct", "B.facade", "B.in_scope"] {
+            let (_, body) = env.env.transparent_body(env.globals[name]).expect("checked proof");
+            match body {
+                ken_kernel::Term::Lam(_, body) => match *body {
+                    ken_kernel::Term::App(head, _) => match *head {
+                        ken_kernel::Term::Const { id, .. }
+                        | ken_kernel::Term::Constructor { id, .. } => assert_eq!(id, file_intro, "{name}"),
+                        other => panic!("{name}: wrong prop intro head {other:?}"),
+                    },
+                    other => panic!("{name}: wrong prop intro body {other:?}"),
+                },
+                other => panic!("{name}: expected one-parameter proof, got {other:?}"),
+            }
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: file A's effectful checked `proc` and memory A's pure
+    /// same-spelling `const` differ in declared row. A pure strict file
+    /// importer must fail purity while an FS-qualified importer succeeds.
+    /// CLAIMED: imported checked identity selects both the body and its row.
+    /// THE GAP: memory A's ambient spelling is pure, so name-keyed row lookup
+    /// would admit the wrong source; the positive rules out blanket rejection.
+    #[test]
+    fn file_import_uses_checked_provider_effect_row_under_name_collision() {
+        let root = inline_owner_root("pub proc f : Nat visits [FS] = Zero\n");
+        for (name, source) in [
+            ("Bad.ken", "import A as K\nconst bad : Nat = K.f\n"),
+            ("Good.ken", "import A as K\nproc good : Nat visits [FS] = K.f\n"),
+        ] {
+            fs::write(root.path().join(name), source).expect("write effect-row client");
+        }
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("effectful file provider checked");
+        let file_id = env.globals["A.f"];
+        env.elaborate_file("module A { pub const f : Nat = Zero }")
+            .expect("pure memory provider checked");
+        assert_ne!(file_id, env.globals["A.f"]);
+        match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Bad") {
+            Err(ElabError::TypeMismatch { reason, .. }) => {
+                assert!(reason.contains("false purity"), "wrong refusal: {reason}");
+            }
+            other => panic!("pure file client must reject file FS row: {other:?}"),
+        }
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Good")
+            .expect("declaring file FS row permits the same selected binding");
+        let (_, body) = env.env.transparent_body(env.globals["Good.good"])
+            .expect("effect-compatible client has checked body");
+        match body {
+            ken_kernel::Term::Const { id, .. } => assert_eq!(id, file_id),
+            other => panic!("effectful client selected the wrong body: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    ///
+    /// MEASURED: selective import of a real exported prop family does not
+    /// grant an arbitrary same-spelling private selector from another unit;
+    /// the authorized `.intro` positive is exercised by the preceding test.
+    /// CLAIMED: a family selector is checked against its provider's public
+    /// member table. THE GAP: the error and span prove this is name refusal,
+    /// not a later type mismatch or failed import.
+    #[test]
+    fn selective_file_family_refuses_an_external_private_selector() {
+        let root = inline_owner_root(
+            "pub prop HasProof (a : Type) : Omega where { intro : HasProof a }\n",
+        );
+        let bad = "import A (HasProof)\nconst denied : Nat = HasProof.private\n";
+        fs::write(root.path().join("B.ken"), bad).expect("write private selector client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file family and intro checked");
+        env.elaborate_file("module A { module HasProof { pub const private : Nat = Zero } }")
+            .expect("unrelated memory owner checks its leaf");
+        assert!(env.globals.contains_key("A.HasProof.private"));
+        let at = bad.find("HasProof.private").expect("single private selector");
+        match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B") {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "HasProof.private");
+                assert_eq!((span.start, span.end), (at, at + "HasProof.private".len()));
+            }
+            other => panic!("private family selector must not resolve: {other:?}"),
+        }
+        assert!(!env.globals.contains_key("B.denied"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3, §8.2).
+    ///
+    /// MEASURED: `proof same for K.id` selects the file owner's checked
+    /// attached proof even when the mutable global-name map is pointed to an
+    /// independently checked proof ID at that canonical spelling. A second
+    /// source proof of the SAME subject and proof name is refused as a duplicate,
+    /// so this map perturbation exercises the downstream consumer seam directly.
+    /// CLAIMED: attached selectors carry a checked provider ID. THE GAP:
+    /// memory's extra proof is checked, not an invented/unknown ID.
+    #[test]
+    fn file_attached_proof_selector_retains_checked_provider_id() {
+        let root = inline_owner_root(
+            "pub fn id (x : Nat) : Nat = x\n\
+             pub proof same for id (x : Nat) : Eq Nat (id x) x = Refl\n",
+        );
+        fs::write(
+            root.path().join("B.ken"),
+            "import A as K\ntheorem selected (x : Nat) : Eq Nat (K.id x) x = (proof same for K.id) x\n",
+        )
+        .expect("write file-backed attached-proof client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file attached proof checked");
+        let file_proof = env.globals["A.id::same"];
+        env.elaborate_file(
+            "module A { pub fn id (x : Nat) : Nat = x\n\
+             pub proof extra for id (x : Nat) : Eq Nat (id x) x = Refl }",
+        )
+        .expect("memory owner checks a different attached proof");
+        let memory_proof = env.globals["A.id::extra"];
+        assert_ne!(file_proof, memory_proof);
+        assert_eq!(env.globals.insert("A.id::same".to_string(), memory_proof), Some(file_proof));
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+            .expect("file attached proof selector uses file's checked ID");
+        let (_, body) = env.env.transparent_body(env.globals["B.selected"])
+            .expect("proof client has checked body");
+        let ken_kernel::Term::Lam(_, body) = body else {
+            panic!("selected should bind one argument: {body:?}");
+        };
+        let ken_kernel::Term::App(head, _) = *body else {
+            panic!("selected should apply file proof: {body:?}");
+        };
+        assert!(matches!(head.as_ref(), ken_kernel::Term::Const { id, .. } if *id == file_proof));
+
+        fs::write(
+            root.path().join("Bad.ken"),
+            "import A as K\ntheorem denied (x : Nat) : Eq Nat (K.id x) x = (proof extra for K.id) x\n",
+        )
+        .expect("write memory-only attached-proof negative");
+        match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Bad") {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "K.id::extra"),
+            other => panic!("file import cannot borrow memory-only proof: {other:?}"),
+        }
+        env.elaborate_file(
+            "import A as M\ntheorem memory_selected (x : Nat) : Eq Nat (M.id x) x = (proof extra for M.id) x",
+        )
+        .expect("independent memory importer selects its own attached proof");
+        let (_, body) = env.env.transparent_body(env.globals["memory_selected"])
+            .expect("memory proof has a checked body");
+        let ken_kernel::Term::Lam(_, body) = body else {
+            panic!("memory proof should bind one argument: {body:?}");
+        };
+        let ken_kernel::Term::App(head, _) = *body else {
+            panic!("memory proof should apply selected helper: {body:?}");
+        };
+        assert!(matches!(head.as_ref(), ken_kernel::Term::Const { id, .. } if *id == memory_proof));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3, §6).
+    ///
+    /// MEASURED: a selectively imported symbolic operator keeps the file
+    /// provider's checked ID and right fixity when the memory provider has
+    /// the same canonical name and left fixity. CLAIMED: both reassociation
+    /// and operator elaboration consume the selected ID. THE GAP: the exact
+    /// right-nested checked term distinguishes either wrong fixity or ID.
+    #[test]
+    fn file_operator_import_retains_checked_id_and_fixity() {
+        let root = inline_owner_root(
+            "pub fn <+> (a : Nat) (b : Nat) : Nat = a\ninfixr 5 <+>\n",
+        );
+        fs::write(
+            root.path().join("B.ken"),
+            "import A (<+>)\nfn selected (a : Nat) (b : Nat) (c : Nat) : Nat = a <+> b <+> c\n",
+        )
+        .expect("write operator client");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file operator and fixity checked");
+        let file_op = env.globals["A.<+>"];
+        env.elaborate_file(
+            "module A { pub fn <+> (a : Nat) (b : Nat) : Nat = b\ninfixl 5 <+> }",
+        )
+        .expect("memory operator with left fixity checked");
+        let memory_op = env.globals["A.<+>"];
+        assert_ne!(file_op, memory_op);
+        assert_eq!(env.fixities[&file_op].associativity, crate::ast::FixityAssoc::Right);
+        assert_eq!(env.fixities[&memory_op].associativity, crate::ast::FixityAssoc::Left);
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+            .expect("file operator wins over the unrelated memory identity");
+        let (_, body) = env.env.transparent_body(env.globals["B.selected"])
+            .expect("operator client has checked body");
+        let mut expr = &body;
+        for _ in 0..3 {
+            let ken_kernel::Term::Lam(_, next) = expr else {
+                panic!("expected three parameters, got {expr:?}");
+            };
+            expr = next;
+        }
+        fn applied(term: &ken_kernel::Term, file_op: GlobalId) -> (&ken_kernel::Term, &ken_kernel::Term) {
+            let ken_kernel::Term::App(first, rhs) = term else {
+                panic!("expected saturated infix application: {term:?}");
+            };
+            let ken_kernel::Term::App(op, lhs) = first.as_ref() else {
+                panic!("expected operator application: {first:?}");
+            };
+            assert!(matches!(op.as_ref(), ken_kernel::Term::Const { id, .. } if *id == file_op));
+            (lhs.as_ref(), rhs.as_ref())
+        }
+        let (a, rest) = applied(expr, file_op);
+        assert_eq!(*a, ken_kernel::Term::Var(2));
+        let (b, c) = applied(rest, file_op);
+        assert_eq!(*b, ken_kernel::Term::Var(1));
+        assert_eq!(*c, ken_kernel::Term::Var(0));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
