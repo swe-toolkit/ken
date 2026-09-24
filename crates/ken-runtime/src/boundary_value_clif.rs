@@ -4377,9 +4377,9 @@ pub(crate) mod tests {
 
     /// A profile that is generous everywhere, so a single tightened limit is
     /// unambiguously the one that fired.
-    fn ac4_roomy() -> crate::boundary_resource_profile::BoundaryResourceProfileV2 {
+    fn ac4_roomy() -> crate::boundary_resource_profile::BoundaryResourceProfileV3 {
         use crate::boundary_resource_profile::{
-            BoundaryRegionLimitsV1, BoundaryResourceProfileV2, RuntimeResourceLimitsV2,
+            BoundaryRegionLimitsV1, BoundaryResourceProfileV3, RuntimeResourceLimitsV2,
         };
         let roomy = BoundaryRegionLimitsV1 {
             nodes: 64,
@@ -4387,9 +4387,13 @@ pub(crate) mod tests {
             data_bytes: 512,
             native_int_limbs: 64,
         };
-        BoundaryResourceProfileV2 {
+        BoundaryResourceProfileV3 {
             runtime: RuntimeResourceLimitsV2 {
                 invocation_epochs: u64::MAX,
+            },
+            call_events: crate::boundary_resource_profile::InvocationCallLimitsV3 {
+                event_generations: u64::MAX,
+                live_pending_slots: 64,
             },
             invocation: roomy,
             persistent: roomy,
@@ -4401,7 +4405,7 @@ pub(crate) mod tests {
         scope: crate::boundary_resource_profile::BoundaryResourceScope,
         resource: crate::boundary_resource_profile::BoundaryResource,
         limit: usize,
-    ) -> crate::boundary_resource_profile::BoundaryResourceProfileV2 {
+    ) -> crate::boundary_resource_profile::BoundaryResourceProfileV3 {
         use crate::boundary_resource_profile::{BoundaryResource, BoundaryResourceScope};
         let mut profile = ac4_roomy();
         let limits = match scope {

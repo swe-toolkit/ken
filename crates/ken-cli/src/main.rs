@@ -82,15 +82,16 @@ fn dispatch() -> i32 {
 /// envelope is written while this result is still a value. See `main`.
 fn parse_native_resource_profile(
     bytes: &[u8],
-) -> Result<ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2, String> {
+) -> Result<ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3, String> {
     use ken_runtime::boundary_resource_profile::{
-        BoundaryRegionLimitsV1, BoundaryResourceProfileV2, RuntimeResourceLimitsV2,
+        BoundaryRegionLimitsV1, BoundaryResourceProfileV3, InvocationCallLimitsV3,
+        RuntimeResourceLimitsV2,
     };
     let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     let object = value.as_object().ok_or("profile must be a JSON object")?;
-    let keys = ["runtime", "invocation", "persistent"];
+    let keys = ["runtime", "call_events", "invocation", "persistent"];
     if object.len() != keys.len() || keys.iter().any(|key| !object.contains_key(*key)) {
-        return Err("profile must name exactly runtime, invocation, persistent".into());
+        return Err("profile must name exactly runtime, call_events, invocation, persistent".into());
     }
     let region = |name: &str| -> Result<BoundaryRegionLimitsV1, String> {
         let fields = object[name]
@@ -124,8 +125,19 @@ fn parse_native_resource_profile(
     let invocation_epochs = runtime["invocation_epochs"]
         .as_u64()
         .ok_or("runtime.invocation_epochs must be a nonnegative integer")?;
-    Ok(BoundaryResourceProfileV2 {
+    let calls = object["call_events"].as_object().ok_or("call_events must be an object")?;
+    if calls.len() != 2 || !calls.contains_key("event_generations") || !calls.contains_key("live_pending_slots") {
+        return Err("call_events must name exactly event_generations, live_pending_slots".into());
+    }
+    let event_generations = calls["event_generations"].as_u64()
+        .ok_or("call_events.event_generations must be a nonnegative integer")?;
+    let live_pending_slots = calls["live_pending_slots"].as_u64()
+        .ok_or("call_events.live_pending_slots must be a nonnegative integer")?;
+    let live_pending_slots = usize::try_from(live_pending_slots)
+        .map_err(|_| "call_events.live_pending_slots exceeds the host address space")?;
+    Ok(BoundaryResourceProfileV3 {
         runtime: RuntimeResourceLimitsV2 { invocation_epochs },
+        call_events: InvocationCallLimitsV3 { event_generations, live_pending_slots },
         invocation: region("invocation")?,
         persistent: region("persistent")?,
     })
@@ -136,15 +148,19 @@ mod capacity_profile_tests {
     use super::*;
 
     #[test]
-    fn native_profile_requires_all_nine_explicit_numbers_and_admits_zero() {
-        let valid = br#"{"runtime":{"invocation_epochs":0},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+    fn native_profile_requires_all_eleven_explicit_numbers_and_admits_zero() {
+        let valid = br#"{"runtime":{"invocation_epochs":0},"call_events":{"event_generations":0,"live_pending_slots":0},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
         let profile = parse_native_resource_profile(valid).expect("zero is explicit, not absent");
         assert_eq!(profile.runtime.invocation_epochs, 0);
+        assert_eq!(profile.call_events.event_generations, 0);
+        assert_eq!(profile.call_events.live_pending_slots, 0);
         assert_eq!(profile.invocation.nodes, 1);
         assert_eq!(profile.persistent.native_int_limbs, 8);
-        let missing = br#"{"runtime":{},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+        let missing = br#"{"runtime":{},"call_events":{"event_generations":0,"live_pending_slots":0},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
         assert!(parse_native_resource_profile(missing).unwrap_err().contains("invocation_epochs"));
-        let extra = br#"{"runtime":{"invocation_epochs":0,"pending_slots":1},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+        let extra = br#"{"runtime":{"invocation_epochs":0,"pending_slots":1},"call_events":{"event_generations":0,"live_pending_slots":0},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+        let missing_calls = br#"{"runtime":{"invocation_epochs":0},"call_events":{"live_pending_slots":0},"invocation":{"nodes":1,"words":2,"data_bytes":3,"native_int_limbs":4},"persistent":{"nodes":5,"words":6,"data_bytes":7,"native_int_limbs":8}}"#;
+        assert!(parse_native_resource_profile(missing_calls).unwrap_err().contains("event_generations"));
         assert!(parse_native_resource_profile(extra).unwrap_err().contains("runtime"));
     }
 }

@@ -58,7 +58,7 @@ pub struct CheckedProgramEntry {
 pub struct Scenario {
     /// Deployment resource policy for the native lane. Named by each fixture;
     /// never inferred from the program or silently supplied by this runner.
-    pub boundary_resource_profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV2,
+    pub boundary_resource_profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
     pub process_input: RawProcessInput,
     pub ambient: AmbientScript,
     pub program_caps: ProgramCapsShape,

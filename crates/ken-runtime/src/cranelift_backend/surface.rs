@@ -476,22 +476,22 @@ mod surface_diagnostics_tests {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NativeSeedEnvironment {
     pub(super) values: BTreeMap<String, RuntimeGroundValue>,
-    profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
 }
 
 impl NativeSeedEnvironment {
-    pub fn empty(profile: crate::boundary_resource_profile::BoundaryResourceProfileV2) -> Self {
+    pub fn empty(profile: crate::boundary_resource_profile::BoundaryResourceProfileV3) -> Self {
         Self {
             values: BTreeMap::new(),
             profile,
         }
     }
 
-    pub fn profile(&self) -> crate::boundary_resource_profile::BoundaryResourceProfileV2 {
+    pub fn profile(&self) -> crate::boundary_resource_profile::BoundaryResourceProfileV3 {
         self.profile
     }
 
-    pub fn nc5_seed(profile: crate::boundary_resource_profile::BoundaryResourceProfileV2) -> Self {
+    pub fn nc5_seed(profile: crate::boundary_resource_profile::BoundaryResourceProfileV3) -> Self {
         let mut values = BTreeMap::new();
         values.insert(
             "decl:fixture::Local::y".to_string(),

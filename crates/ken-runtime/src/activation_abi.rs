@@ -27,7 +27,7 @@
 //! `§4` bans a second copy of the **arena, services, native-`Int` or
 //! activation** layouts in generated C. ⚠ The profile is not among them, and
 //! `D5` explicitly contemplates the stub *"embedding those already-authorized
-//! numbers"*. ⇒ [`KenBoundaryResourceProfileV2`] is deliberately the only
+//! numbers"*. ⇒ [`KenBoundaryResourceProfileV3`] is deliberately the only
 //! `#[repr(C)]` struct that crosses.
 //!
 //! ⭐ And it carries its own `version` and `size` so a C/Rust disagreement
@@ -43,8 +43,8 @@ use crate::boundary_activation::{
     BoundaryActivationV1, BoundaryStoreBindingV1, BoundaryStoreOpenErrorV2,
 };
 use crate::boundary_resource_profile::{
-    BOUNDARY_RESOURCE_PROFILE_VERSION, BoundaryRegionLimitsV1, BoundaryResourceProfileV2,
-    RuntimeResourceLimitsV2,
+    BOUNDARY_RESOURCE_PROFILE_VERSION, BoundaryRegionLimitsV1, BoundaryResourceProfileV3,
+    InvocationCallLimitsV3, RuntimeResourceLimitsV2,
 };
 use crate::boundary_value::{BoundaryValueStore, BoundaryWord};
 
@@ -81,13 +81,16 @@ pub const KEN_ACTIVATION_ERR_PROFILE_MISMATCH: i64 = -8;
 /// **checked refusal** instead of a silent misread.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct KenBoundaryResourceProfileV2 {
+pub struct KenBoundaryResourceProfileV3 {
     /// Must equal [`BOUNDARY_RESOURCE_PROFILE_VERSION`].
     pub version: u64,
-    /// Must equal `size_of::<KenBoundaryResourceProfileV2>()`.
+    /// Must equal `size_of::<KenBoundaryResourceProfileV3>()`.
     pub size: u64,
     /// Process-wide activation-epoch ceiling.
     pub runtime_invocation_epochs: u64,
+    /// Per-activation generation and simultaneous live-ticket ceilings.
+    pub call_event_generations: u64,
+    pub call_live_pending_slots: u64,
     /// Invocation-arena node ceiling.
     pub invocation_nodes: u64,
     /// Invocation-arena child-word ceiling.
@@ -106,21 +109,25 @@ pub struct KenBoundaryResourceProfileV2 {
     pub persistent_native_int_limbs: u64,
 }
 
-impl KenBoundaryResourceProfileV2 {
+impl KenBoundaryResourceProfileV3 {
     /// Convert to the Rust profile, refusing a layout this runtime does not
     /// implement.
     ///
     /// ⛔ No default and no widening: a wrong `version` or `size` is
     /// [`KEN_ACTIVATION_ERR_PROFILE`], ⛔ never a fallback profile.
-    fn to_rust(self) -> Option<BoundaryResourceProfileV2> {
+    fn to_rust(self) -> Option<BoundaryResourceProfileV3> {
         if self.version != u64::from(BOUNDARY_RESOURCE_PROFILE_VERSION)
-            || self.size != std::mem::size_of::<KenBoundaryResourceProfileV2>() as u64
+            || self.size != std::mem::size_of::<KenBoundaryResourceProfileV3>() as u64
         {
             return None;
         }
-        Some(BoundaryResourceProfileV2 {
+        Some(BoundaryResourceProfileV3 {
             runtime: RuntimeResourceLimitsV2 {
                 invocation_epochs: self.runtime_invocation_epochs,
+            },
+            call_events: InvocationCallLimitsV3 {
+                event_generations: self.call_event_generations,
+                live_pending_slots: usize::try_from(self.call_live_pending_slots).ok()?,
             },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: self.invocation_nodes as usize,
@@ -159,11 +166,11 @@ pub struct KenCapacityFailureV1 {
 ///
 /// # Safety
 ///
-/// `profile` must point to a readable [`KenBoundaryResourceProfileV2`] and
+/// `profile` must point to a readable [`KenBoundaryResourceProfileV3`] and
 /// `out_store` to a writable pointer slot.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ken_boundary_store_v1_open(
-    profile: *const KenBoundaryResourceProfileV2,
+    profile: *const KenBoundaryResourceProfileV3,
     out_store: *mut *mut KenBoundaryStoreV1,
     out_failure: *mut *mut KenCapacityFailureV1,
 ) -> i64 {
@@ -509,11 +516,13 @@ pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 11] = [
 mod tests {
     use super::*;
 
-    fn c_profile() -> KenBoundaryResourceProfileV2 {
-        KenBoundaryResourceProfileV2 {
+    fn c_profile() -> KenBoundaryResourceProfileV3 {
+        KenBoundaryResourceProfileV3 {
             version: u64::from(BOUNDARY_RESOURCE_PROFILE_VERSION),
-            size: std::mem::size_of::<KenBoundaryResourceProfileV2>() as u64,
+            size: std::mem::size_of::<KenBoundaryResourceProfileV3>() as u64,
             runtime_invocation_epochs: u64::MAX,
+            call_event_generations: 29,
+            call_live_pending_slots: 13,
             invocation_nodes: 12,
             invocation_words: 24,
             invocation_data_bytes: 36,

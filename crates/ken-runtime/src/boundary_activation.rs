@@ -114,7 +114,7 @@ fn mint_invocation_epoch(limit: u64) -> Result<u64, ken_host::CapacityExhaustedV
 
 use crate::activation_services::GeneratedActivationServicesV1;
 use crate::boundary_resource_profile::{
-    BoundaryCapacityExhaustedV1, BoundaryResource, BoundaryResourceProfileV2, BoundaryResourceScope,
+    BoundaryCapacityExhaustedV1, BoundaryResource, BoundaryResourceProfileV3, BoundaryResourceScope,
 };
 use crate::boundary_value::{
     ARENA_DATA_CAPACITY, ARENA_LIMB_CAPACITY, ARENA_NATIVE_INT, ARENA_NODE_CAPACITY,
@@ -155,7 +155,7 @@ use crate::native_int::NativeIntArenaV1;
 /// as any adopted result may live"* a property of the caller's scope rather
 /// than of this struct's drop order.
 pub struct BoundaryActivationV1 {
-    profile: BoundaryResourceProfileV2,
+    profile: BoundaryResourceProfileV3,
     epoch: u64,
     /// ⛔ Boxed for address stability — see the module doc.
     native_int_arena: Box<NativeIntArenaV1>,
@@ -192,7 +192,7 @@ pub struct BoundaryActivationV1 {
 /// the profile lives here, and [`BoundaryActivationV1::begin`] takes it from
 /// this binding rather than accepting one from its caller.
 pub struct BoundaryStoreBindingV1 {
-    profile: BoundaryResourceProfileV2,
+    profile: BoundaryResourceProfileV3,
     published_persistent_base: *mut u64,
 }
 
@@ -201,7 +201,7 @@ impl BoundaryStoreBindingV1 {
     /// persistent limits. ⛔ Once per store.
     pub fn open(
         store: &mut BoundaryValueStore,
-        profile: BoundaryResourceProfileV2,
+        profile: BoundaryResourceProfileV3,
     ) -> Result<Self, BoundaryStoreOpenErrorV2> {
         // Admit before publication: a refused profile must not alter the store.
         admit_epoch_ceiling(profile.runtime.invocation_epochs)
@@ -220,7 +220,7 @@ impl BoundaryStoreBindingV1 {
     }
 
     /// The authorized profile. ⛔ Read-only.
-    pub fn profile(&self) -> BoundaryResourceProfileV2 {
+    pub fn profile(&self) -> BoundaryResourceProfileV3 {
         self.profile
     }
 
@@ -355,7 +355,7 @@ impl BoundaryActivationV1 {
 
     /// The profile this activation was authorized with. ⛔ Read-only: an
     /// activation cannot widen its own limits.
-    pub fn profile(&self) -> BoundaryResourceProfileV2 {
+    pub fn profile(&self) -> BoundaryResourceProfileV3 {
         self.profile
     }
 
@@ -630,10 +630,14 @@ mod tests {
     /// Eight **distinct** limits, so a transposition anywhere in `begin` is
     /// visible. ⛔ Equal limits would let every assertion below pass on a
     /// crossed wiring.
-    fn distinct_profile() -> BoundaryResourceProfileV2 {
-        BoundaryResourceProfileV2 {
+    fn distinct_profile() -> BoundaryResourceProfileV3 {
+        BoundaryResourceProfileV3 {
             runtime: RuntimeResourceLimitsV2 {
                 invocation_epochs: u64::MAX,
+            },
+            call_events: crate::boundary_resource_profile::InvocationCallLimitsV3 {
+                event_generations: 29,
+                live_pending_slots: 13,
             },
             invocation: BoundaryRegionLimitsV1 {
                 nodes: 12,

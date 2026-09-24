@@ -103,7 +103,7 @@ impl CompiledModule<JITModule> {
     pub(super) fn run_with_profile(
         mut self,
         process_root: Option<*const std::ffi::c_void>,
-        profile: crate::boundary_resource_profile::BoundaryResourceProfileV2,
+        profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     ) -> Result<(RuntimeObservation, Option<i64>), CraneliftBackendError> {
         if let Some(trap) = self.trap {
             return Ok((RuntimeObservation::Trapped(trap), None));
