@@ -6221,8 +6221,8 @@ mod namespace_effect_tests {
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
     /// MEASURED: a forward local and a facade to the file owner publish one
-    /// surface/canonical spelling but two IDs. CLAIMED: delayed local-ID
-    /// reconciliation cannot let a later facade conceal a real collision.
+    /// spelling at both surface and canonical levels but two IDs. CLAIMED:
+    /// delayed local-ID reconciliation cannot conceal a real collision.
     /// THE GAP: an earlier `pub` would exercise eager collision only.
     #[test]
     fn forward_local_and_file_facade_collide_when_ids_differ() {
