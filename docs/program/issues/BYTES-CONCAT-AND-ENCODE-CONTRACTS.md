@@ -76,6 +76,30 @@ stop and report the mismatch; do not build around it.
   facts. Removing any one fact makes a proof that uses it fail to check.
 - **AC-4.** Targeted builds only, through `scripts/ken-cargo`. No-regression
   means green in CI.
+- **AC-5 (admitted census row; Architect `evt_6x38xqk62w4n7`).** D2
+  `7a40bc553` fails the directional
+  `catalog_ambient_passthrough_migration_census` with one new row. It is
+  admitted on these conditions:
+  - Exactly one new row, `Data.Binary.BytesPrimitiveContracts`, at the
+    census position the test's leaf-iteration order gives it. Its set is
+    `Data.Collections.Derived`'s row in the re-cut's base plus
+    `charToInt`, and nothing else. No existing row changes. `discovered`,
+    `clean` and the residual set change only by this package entering
+    `discovered`.
+  - `charToInt` is the package's own use of a provider-less elaborator
+    builtin (`AllAscii`, `bytes_encode_ascii_octets`). A one-line comment
+    at the row says so and names this AC.
+  - The re-cut is one test-only commit directly on `7a40bc553`, touching
+    only `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs`.
+    The package, `bytes_primitive_contracts.rs` and both spec-file blobs
+    stay byte-identical. It needs a targeted census re-run through
+    `scripts/ken-cargo`, and a fresh Decision with the CV and Architect
+    votes.
+  - **Ordering with `CAT-DERIVED-FILTER-MEMBERSHIP-LAW` AC-4.** Both
+    re-cuts edit the same census, so whichever lands second rebases onto
+    the first and re-measures. If FILTER lands first, this row also gains
+    `filter`. If BYTES lands first, FILTER's closure rows include this one.
+    Any other difference is a STOP.
 
 ## Stop conditions
 

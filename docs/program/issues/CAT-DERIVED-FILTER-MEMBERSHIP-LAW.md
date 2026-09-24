@@ -129,6 +129,23 @@ statement. No change to `filter`, `mem` or any other definition.
   (`cat3_collections_package.rs:252`).
 - **AC-3.** Targeted builds only, through `scripts/ken-cargo`. No-regression
   means green in CI.
+- **AC-4 (admitted census growth; Architect `evt_4grsne5p7yyc1`).** Full CI
+  on `3cc16e8d1` reddened the directional
+  `catalog_ambient_passthrough_migration_census`: the laws name the prelude
+  combinator `filter` ambiently, and no catalog provider or import form for
+  it exists. This one delta is admitted as prelude-convenience migration
+  debt, the first admitted growth of that census.
+  - Exactly one name, `filter`, is added, only to
+    `Data.Collections.Derived` and to the rows whose closure roots-loads it
+    (19 in the CI reading). No other row changes, no name is removed, and
+    `discovered`, `clean` and the residual set are unchanged.
+  - A one-line comment at the Derived row says `filter` is admitted
+    prelude-convenience debt under this ruling and names this AC. The other
+    rows need no comment.
+  - The re-cut is one new commit on top of `3cc16e8d1` touching only
+    `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs`. The
+    `Derived.ken.md` and filter-test blobs stay byte-identical. Foundation
+    QA re-runs the census targeted. A fresh Decision binds the new SHA.
 
 ## Stop conditions
 
