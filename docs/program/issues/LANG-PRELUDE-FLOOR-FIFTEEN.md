@@ -44,7 +44,9 @@ stop and report the mismatch.
 
 `PRELUDE_FLOOR_NAMES` becomes the fifteen, admitted at their exact
 pre-source identities, with no second identity and no fallback route. The
-census `expected` shrinks by deletion only.
+census `expected` shrinks by deletion only. `space` desugaring uses an `Empty`
+identity captured before source elaboration and compared by exact ID, not a
+by-spelling read of the live globals map.
 
 ## Acceptance
 
@@ -65,9 +67,27 @@ census `expected` shrinks by deletion only.
   to its exact registered `GlobalId`. A source declaration of the same name
   and shape is still rejected. A strict unit naming a non-floor prelude global
   (for example `And`) still fails `UnboundName`.
+- **AC-1a (`Empty` capture, Architect `evt_2esx3xsv7sm4g`).** At
+  `ae5cce97f`, `elaborate_space_decl` reads `globals.get("Empty")` by spelling
+  at each `space` (`elab.rs:13450`), so a same-program `data Empty` rebinds it.
+  Capture the prelude `Empty` in a `PreludeEnv` field before source
+  elaboration, as `Proved`'s fixed identity is (`modules.rs:258-261`), and use
+  it there. Controls (Architect `evt_6drg78c0zz7dz`), each red on base:
+  - `data Empty (a : Type) : Type where {}` followed by a `space` checks
+    instead of failing `TypeMismatch`;
+  - with `data Empty : Type where { Oops : Empty }` before a `space`, the
+    `GlobalId` in the residual position of the elaborated `Counter.get` type
+    equals the `PreludeEnv` capture and differs from the source `Empty`'s;
+  - with `"Empty"` removed from the globals map after `ElabEnv::new()` (as
+    `modules.rs:4534` removes `"Proved"`), a `space` still elaborates, with
+    the captured identity in the residual position; on base it fails
+    `Internal("space desugaring requires the prelude Empty type")`;
+  - reverting the capture reddens all three.
 - **AC-2.** The census diff is deletion-only. The deleted (row, name) pairs are
   predicted before the build and measured after it; an unpredicted deletion is
-  a finding. No `trusted_base()` change. Targeted builds only, through
+  a finding. If `CAT-LOGIC-PRELUDE-MOVE` lands first, its row
+  `(Core.Logic.Not, [Bottom])` moves to the clean set here and is predicted.
+  No `trusted_base()` change. Targeted builds only, through
   `scripts/ken-cargo`; no-regression means green in CI.
 
 ## Stop conditions
