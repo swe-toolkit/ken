@@ -28,10 +28,12 @@ the *source contract needs that exact identity* (`30 §4`'s conjunction).
 Both proven → reserved, always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
-full unit reach is measured. The pre-source `Empty` is a confirmed instance
-of the keyed-but-internal case; the separate catalog `Empty` remains a lawful
-source/package identity. A copied source declaration **cannot** replace a
-machinery-keyed `GlobalId`; there is **no intrinsic import module**. The
+full unit reach is measured. `Empty` has a measured native reader and no
+independent source-name need: its required disposition is internal-only, but
+its fixed-ID capture has not landed. A distinct checked catalog `Empty` is a
+lawful source/package identity once declared. A copied source declaration
+**cannot** replace a machinery-keyed `GlobalId`; there is **no intrinsic
+import module**. The
 unkeyed laws/helpers below are not candidates for floor membership.
 
 Apart from the internal-only `Empty`, the candidate names in this table are
@@ -81,10 +83,11 @@ possible native reader, **not** additional bare names to add to B.
 Each table entry is one named identity. Except for the constructor-private
 `PrivateBufferSpan` and `PrivateTransferCount` (not exported through `globals`
 but recorded on their types), these spellings occur in the 503-name global
-inventory. `Empty` is recorded here as a **measured internal-only exception**,
-not a proposed reservation: its native reader is keyed but its independent
-source-name clause is false. Rows sharing a reader still require individual D0
-reads; a family label is not a keying proof for every member. Reservation is
+inventory. `Empty` is recorded here as an **internal-only target with a
+measured mutable reader**, not a proposed reservation: the native site uses
+its name without a fixed-ID capture, and the independent source-name clause
+is false. Rows sharing a reader still require individual D0 reads; a family
+label is not a keying proof for every member. Reservation is
 per **type and whole constructor family**, never a subset chosen by catalog
 use. For a scoped type, only the type is reserved. Its constructor IDs remain
 exact, and its public constructor paths are qualified. D0 traces each native
@@ -94,7 +97,7 @@ above. No row alone reserves a name today.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
-| `Empty` (internal-only, not a current floor candidate) | **Keyed exact-ID:** `elaborate_space_decl` reads `elab.globals.get("Empty")` and embeds that pre-source identity in `space` effect/state-fold terms (`elab.rs:13449–13456`, `36 §4.1–4.2`). **No independent source-name need:** the identity is desugarer output; the source-level `Core.Logic.EmptyDec.Empty` is a distinct, lawful package identity. |
+| `Empty` (internal-only target, not a current floor candidate) | **Current at `ae5cce97f`:** `elaborate_space_decl` looks up `elab.globals.get("Empty")` by spelling at each `space` (`elab.rs:13450`), then embeds the returned ID in effect/state-fold terms. Same-program `data Empty` replaces that live map entry (`data.rs:99`); this is not a fixed pre-source ID. **Required, not landed:** capture the compiler's `Empty` before source elaboration and use/compare its exact ID, as `Proved`'s fixed-identity check illustrates (`modules.rs:258–261`). **Source need:** none for that exact identity under `36 §4.1–4.2`; `Core.Logic.EmptyDec.Empty` can be a separate lawful package identity once its illustrative declaration becomes checked. |
 | `Unit` | Effect-response result type used by the reifier (`38 §1.7`, `prelude.rs`); verify the exact type ID and source need. |
 | `MkUnit` | `CanonicalRuntimeRoles::unit`, effect-response constructor; verify exact parent `Unit`. |
 | `ProcessInput` | `program_admission.rs` checks the `main` parameter against its registered type (`33 §3.2.1`). |
@@ -173,9 +176,10 @@ above. No row alone reserves a name today.
 | `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 
 These rows remain **outside** the current B. Capturing an ID proves
-keying, not independent source need. `Empty` is already known to be keyed but
-internal-only: a future `36` contract requiring source to name that exact
-space identity needs separate Spec gates. If adopted, existing Q-B admits it
+keying, not independent source need. `Empty` has a native reader but its
+fixed-ID capture is owed; its intended disposition is internal-only. A future
+`36` contract requiring source to name that exact space identity needs separate
+Spec gates. If adopted, existing Q-B admits it
 to the floor without per-name operator approval, with atomic roster/count
 change and retirement of the catalog `Empty`; it adds nothing to today's floor.
 Both witnesses admit a type to B; its whole constructor family follows the
