@@ -67,7 +67,9 @@ census `expected` shrinks by deletion only.
   (for example `And`) still fails `UnboundName`.
 - **AC-2.** The census diff is deletion-only. The deleted (row, name) pairs are
   predicted before the build and measured after it; an unpredicted deletion is
-  a finding. No `trusted_base()` change. Targeted builds only, through
+  a finding. If `CAT-LOGIC-PRELUDE-MOVE` lands first, its row
+  `(Core.Logic.Not, [Bottom])` moves to the clean set here and is predicted.
+  No `trusted_base()` change. Targeted builds only, through
   `scripts/ken-cargo`; no-regression means green in CI.
 
 ## Stop conditions

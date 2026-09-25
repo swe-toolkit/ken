@@ -76,18 +76,26 @@ stop and report the mismatch.
   EmptyDec's consumers, removing that name's import while keeping `Dec`
   imported reddens with a kernel `TypeMismatch`. A consumer that checks green
   without its import proves nothing.
-- **AC-3.** The census diff is deletion-only. The deleted (row, name) pairs
-  are predicted before the build and measured after; OrderedSearch's names are
-  predicted separately by source reading. If OrderedSearch leaves the residual
-  set, that sentinel change is predicted. Coordinate overlapping rows with L2.
-  No `trusted_base()` change. Targeted builds only, through
-  `scripts/ken-cargo`; no-regression means green in CI.
+- **AC-3 (census, Architect `evt_5mqbentknbf4c`).** The census diff deletes
+  (row, name) pairs from existing rows, plus exactly one added row
+  `(Core.Logic.Not, [Bottom])`: the leaf's statement `a -> Bottom` forces it
+  until the L2 floor admits `Bottom`. Every name in it must already be ambient
+  in an existing row. Any other addition is a STOP.
+  - Predicted before the build and measured after: `Map` loses only `Not`;
+    `EmptyDec` loses `Dec`, `Empty`, `No`, `Yes`, and whether its `Bottom`
+    survives is predicted by source reading; no importer row moves.
+  - OrderedSearch's names are predicted separately by source reading. If it
+    leaves the residual set, that sentinel change is predicted.
+  - Whichever of this slice and `LANG-PRELUDE-FLOOR-FIFTEEN` lands second
+    re-predicts the `Core.Logic.Not` row.
+  - No `trusted_base()` change. Targeted builds only, through
+    `scripts/ken-cargo`; no-regression means green in CI.
 
 ## Stop conditions
 
 - AC-0a fails, or an AC-2 control stays green.
 - A consumer's statement changes, or a proof needs the prelude identity.
-- Any `trusted_base()` growth, or any new ambient name in the census.
+- Any `trusted_base()` growth, or any census addition beyond AC-3's one row.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
