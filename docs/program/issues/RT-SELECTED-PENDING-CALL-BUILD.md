@@ -24,8 +24,8 @@ origin: "RT-SELECTED-PENDING-CALL-PACKAGE AC-3: Architect D1 disposition 'REPRES
   and exactly one call. This frame does not restate it.
 - **D1 amendment 1** (Architect `evt_54vq22cwfnp9k`), recorded verbatim in
   the same file, governs this build: backing class (f), the F4 gate at every
-  carried-residual consumer, nested arms, C0 and the dominance test, and
-  AC-0(e) below.
+  carried-residual consumer, nested arms, C0 and the dominance test. D1
+  amendment 2 (Architect `evt_6yjef2cy4nv1e`) replaces its AC-0(e).
 - **D0 census** `evt_3ywcecyzbyqkh`. Body 322's six members [S0, S1, S2,
   C0, C1, C2] are planner declarations only on main. The first refusal is
   `reject_carried_residual_arguments`, and it is not a D2 typed fault.
@@ -58,9 +58,10 @@ natively. Any row that stays ignored gets a measured reason in its
     whether it is in the AC-1 admission population. A row outside the
     population stays ignored with that measured reason; it is not a new
     admission.
-  - (e) the C1/C2 operand order, per D1 amendment 1: measured before AC-1.
-    The alias reading continues into AC-1 with a pinning test; the
-    coordinate reading is a STOP.
+  - (e) the C1/C2 operand order: the static three-way check of D1
+    amendment 2 (source truth, planner, emitter, source-to-ABI mapping),
+    before AC-1. All agree continues into AC-1 with a static pin against the
+    source declaration; planner ≠ emitter or source ≠ planner is a STOP.
 - **AC-1 (admission, D1 item 0).**
   - A package is planned only for a pending producer `Match` whose arms
     declare different recursive body units: the population

@@ -417,22 +417,82 @@ for, so it is non-advancing, and there is no inventory row.
   block (block10 for 322). A mutation that hoists the issue above the `brif`
   must turn the test red.
 
-### AC-0(e): measure this before AC-1. The C1/C2 order is unresolved.
+### AC-0(e)
 
-- The two readings disagree:
-  - The context coordinates say C1 = EntryAbi position 0 (`_input`, v10) and
-    C2 = position 1 (`_caps`, v11).
-  - The direct-emission aliases, and 343's actual frame, say C1 = v11
-    (`_caps`) and C2 = v10 (`_input`).
-- Both are admitted classes, so classification is unaffected. But an
-  operand-order swap is a silent wrong call that **the gate cannot catch**:
-  the gate authenticates the target, not operand order.
-- **Measure, scratch-only,** which source variable 322's body, and 343's,
-  actually **reads** from Capture ordinals 1 and 2 inside the callee. Then:
-  - **If it matches the alias reading, the one 343's landed route uses,**
-    build with the same resolution `assemble_continuation_call_operands`
-    performs, and continue into AC-1 without another review. Add a test
-    pinning 322's C1/C2 to the callee's consumption.
-  - **If it matches the coordinate reading,** STOP. 343's landed
-    constructed-frame route then carries a pre-existing operand-order defect,
-    and that belongs in its own node, not in this build.
+Replaced by D1 amendment 2 (AC-0(e) ruling) below.
+
+## D1 amendment 2 (AC-0(e) ruling, Architect `evt_6yjef2cy4nv1e`, at `5a3f3dad0`)
+
+Recorded verbatim from the Architect's ruling on the AC-0(e) measurement
+`evt_7aq38g6trgka1`. It replaces amendment 1's AC-0(e).
+
+**AC-0(e) ruling: the measurement is accepted as a null result. My
+discriminator could not fire, and that error is mine. AC-0(e) is replaced by
+the static three-way check below. AC-1 stays unauthorized until it returns.**
+
+**Why the read test was empty.** The two captures are the parameters `_input`
+and `_caps`. The underscore names mark them as unused. On this fixture a swap
+is therefore semantically invisible. On any program that does read them, the
+callee would receive a wrong-typed value: a heap pointer where it expects a
+`ProgramCaps` handle. I should have checked that the world could produce my
+terminating observation before asking for it. The implementer was right not to
+manufacture a read, and the traversal controls make the zero a real
+measurement.
+
+**The coordinate reading and the alias reading are one reading, not two.** At
+`5a3f3dad0`, `continuations.rs::nearest_exact_alias` (`:4401`) computes the
+alias index **from** the coordinate. It searches the planner's seat
+environment, which `continuation_owner_entry_sources` seeds in ascending
+entry-ABI-position order (`:3094` sort) and then walks forward
+(`current_lexical_availability`, `:4468`). So "C1 is at ABI position 0" and
+"C1 is at lexical index 1" are the planner's single claim that position 0 sits
+at index 1. The real disagreement in AC-0 is between the **planner's** seat
+environment and the **emitter's** actual environment. The emitter applies the
+`converts` reversal: `units.rs::source_body_binding_order` (`:7748`) returns
+true for `CallableDeclaration` and `ClosureBody`, and
+`generated_context_source_environment` then reverses the parameter run.
+
+### Revised AC-0(e): a static three-way check on base `5a3f3dad0`, scratch-only.
+
+Do it for C1 and C2 of body 322, and separately for body 343.
+
+- **(e1) Source truth.** Take the continuation's (origin 11) capture ordinals
+  1 and 2. Report which source parameter each one captures, **by name**, and
+  that name's declaration position in the owner's source signature. Read this
+  from the retained source or elaborated term, not from any planner record.
+- **(e2) Planner.** Report the requested coordinate's `source_abi_position`,
+  the index `nearest_exact_alias` returned, and the planner seat-environment
+  entry at that index.
+- **(e3) Emitter.** At the emission seat (the Match355 arm environment),
+  report the Cranelift value at that lexical index and **the ABI slot it was
+  loaded from**. Read the slot from the load's frame offset against the unit's
+  `AbiSlot` run, **not** from the value's number. That is exactly where the
+  AC-0 labels "v10 = ordinal 0, v11 = ordinal 1" could be wrong.
+- **(e4)** Report the mapping from source parameter declaration position to
+  ABI slot position for the owner (`Predeclared(3)`).
+
+### Outcomes
+
+- **All agree for k = 1, 2** (e1's name → e4's slot = e2's position = e3's
+  loaded slot): proceed into AC-1 with no further review. Build with
+  `assemble_continuation_call_operands` and do not write a second resolution.
+  The pinning test is static. It asserts that 322's C1/C2 operands load from
+  the ABI slot of the **source-named** parameter. It must compare against the
+  source declaration, not against the planner coordinate, because a pin
+  compared with its own source cannot fail.
+- **e2 ≠ e3:** the planner seat environment and the emitter environment
+  disagree for a converting body. That is a pre-existing defect in the landed
+  direct-emission route, including 343's. **STOP**, and it gets its own node.
+- **e1 ≠ e2:** the planner coordinate names the wrong parameter. **STOP**, and
+  it gets its own node.
+
+**Prediction, stated so the check can refute it:** taken at face value, the
+AC-0 numbers already give e2 ≠ e3. C1's coordinate is position 0 and its alias
+index is 1, while the emitter's index 1 holds v11, loaded from ordinal 1.
+**The likely outcome is therefore STOP**, unless e3 shows that the value labels
+were wrong. I have not read `continuation_emission_seat_environment` far enough
+to know whether it applies the reversal. That is part of what e2 reports.
+
+**§1a for the build chain stays at 0.** This is a measurement my ruling asked
+for, returned and re-specified. It does not advance the chain, and there is no
+inventory row.
