@@ -1,7 +1,7 @@
 ---
 id: CAT-CAPABILITY-LAWS-PRELUDE-MOVE
 title: "Move the prelude's unkeyed capability laws into their single catalog consumers: transfer_count_request_budget with its bounded proof into Capability.System.Buffer (retargeted over Nat add), and write_all_complete, write_all_call_bound, write_all_first_error and write_all_all_success with their attached proofs into Capability.System.IO; second L3 slice of the minimal-prelude program"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: architect
@@ -68,7 +68,15 @@ stop and report the mismatch.
     (`proof bounded for ...`, `proof success_complete for ...`, and the rest)
     still resolves. Attached-proof globals need no removal: a local selector
     resolves to the module-qualified key (Architect `evt_6y1zf4fje6rgt`).
-  - On base, the same removal makes Buffer and IO fail `UnboundName`.
+  - **Base half (Architect `evt_7eenk75kws3r9`).** On base, with the same
+    seven names removed, roots-load Buffer and IO in separate loads:
+    - Buffer fails `UnresolvedCon { name: "transfer_count_request_budget" }`
+      (a type-position head), and the span's source slice equals that name;
+    - IO is predicted to fail `UnresolvedCon { name: "write_all_call_bound" }`
+      the same way. A different removed name, or `UnboundName` naming a
+      removed name, is recorded as a measurement and pinned.
+    - Any variant outside `{UnboundName, UnresolvedCon}`, or any name outside
+      the removed set, is a STOP.
 - **AC-2 (statements).** Every consumer theorem statement is byte-identical
   except the sanctioned `bounded` retarget. Attached proofs keep their
   statements.
