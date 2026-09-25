@@ -44,26 +44,33 @@ stop and report the mismatch.
 ## Deliverable
 
 Amend `39 §2.0` step 4 to the fifteen-name roster, and the reuse paragraph to
-say the loader reuses all fifteen exact checked identities. The Spec author
-owns the wording. The wording must be true of all five kernel-keyed members,
-including `Proved`, a proof term rather than a type former.
+say the loader reuses all fifteen exact checked identities. Bring every other
+stale floor statement in `spec/` into line with `30 §4` in the same candidate
+(scope widened at the AC-1 stop, spec-leader `evt_52cvnqb0d6zhz`). The Spec
+author owns the wording. The wording must be true of all five kernel-keyed
+members, including `Proved`, a proof term rather than a type former.
 
 ## Acceptance
 
 - **AC-1.** No normative statement in `spec/` presents a floor type set
-  other than the fifteen as current. Sweep `spec/` for `Utf8Error}`, the
-  word `ten` near "floor" or "prelude", and each roster spelling. Post the
-  hit list with each hit classified as current-fifteen, historical (for
-  example `30 §4`'s "the former ten"), or stale. A stale hit outside `39` is
-  a STOP.
-- **AC-2.** The diff touches only `spec/30-surface/39-elaboration.md`, with
-  no constructor or companion inventory change. Any other needed edit is a
-  STOP.
+  other than the fifteen as current, or says `Equal` is not a floor member.
+  Sweep `spec/` for `Utf8Error}`, the word `ten` near "floor" or "prelude",
+  `Equal` near "delete", and each roster spelling. Post the hit list with each
+  hit classified as current-fifteen, historical or stale.
+- **AC-2.** The diff touches only the stale sites the sweep finds. Known at
+  `6bdd75394`: `39 §2.0`, `50-stdlib/README.md:34-45` (the ten-type floor and
+  "`Equal` is deleted"), and `30 §6`'s "`Equal` → delete" ruling, which
+  `30 §4` supersedes: `Equal` is now the floor name whose body is the kernel's
+  `Eq`, not a postulate. Spec decides whether `30 §6` is corrected in place or
+  marked as the historical ruling that produced `30 §4`. There is no
+  constructor, companion or floor inventory change.
 
 ## Stop conditions
 
 - Reconciling needs a floor change, a new inventory entry, or an
   implementation change.
+- A stale site whose correction would change what a program may name, rather
+  than restate the settled `30 §4` floor.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
