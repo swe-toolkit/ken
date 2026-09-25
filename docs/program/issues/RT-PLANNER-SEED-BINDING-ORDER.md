@@ -97,9 +97,22 @@ handles the raw-capture and context-capture suffix.
   through direct emission and through a context-capture (entry-frame) route.
   It is red on base in every coordinate-keyed route and green after the fix.
   A single-parameter fixture is not a witness.
-  - A coordinate-keyed consumer that AC-0(ii) finds unreachable from source
-    is named as such and is covered by a planner-level control instead. For
-    a two-parameter converting owner, the control asserts that the
+  - A coordinate-keyed consumer that no checked-source row reaches, in a
+    published trace-selected population with a live positive sensor, is
+    named as **unreached in that population** (Architect `evt_6nq0hrfx576fs`).
+    That is not unreachable: a shape outside the population is not excluded.
+    It is covered by a planner-level control instead, and its source witness
+    stays owed (see After landing).
+    - **At base `50966beb2`:** the context-capture gather (`calls.rs`
+      `call_declared_context`) is unreached. It is reachable only from five
+      `Some(coordinates)` arms: `source.rs:4991`, `:5085`, and
+      `core.rs:6097`, `:16204`, `:16288`.
+    - **Population:** ten targeted rows across `rt_planner_seed_binding_order`,
+      px8ta, px7p, px7l and px7m. One resolves a context, px8ta public, and it
+      takes the constructed frame. There are zero counted gather reads.
+    - **Positive sensor:** synthetic px8tr, at `source.rs:4991` to the gather.
+
+    For a two-parameter converting owner, the control asserts that the
     `EntryAbi` label at each seat index names the ABI slot the emitter loads
     at that index. It compares against the emitter's load offset, not
     against another planner record.
@@ -128,6 +141,11 @@ amended. The Architect expects e1 = e2 = e3 (C1 = `_caps`, C2 = `_input`),
 after which its AC-1 proceeds without review. C1 and C2's backing classes
 swap labels (C1 the invocation-arena handle, C2 the ingress-borrowed
 pointee); both are admitted classes, so no D1 amendment is needed.
+
+`RT-SELECTED-PENDING-CALL-BUILD` AC-1 owes the checked-source witness for the
+context-capture gather on a two-parameter converting owner. It reddens under a
+seed-only rollback of this node's fix. Until then the gather is covered only by
+this node's planner-level control.
 
 ## Symptom inventory
 
