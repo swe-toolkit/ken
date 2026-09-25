@@ -16,10 +16,7 @@ These rulings remain operative and are retained verbatim.
   2) was unblocking rt on priority, and when that was done should have unblocked
   foundation (lane 3) with module/import."
 - **2026-09-23/24:** L3 reinstated, L2 reactivated. Roster is L1 + L2 + L3.
-
-## Review of doc-only merges
-
-- **2026-09-23:** "doc only merges may have reviewers. However, if it is a
+- **2026-09-23, doc-only review:** "doc only merges may have reviewers. However, if it is a
   doc change that I directed you to make a review is not necessary."
 
 ## Catalog direction
@@ -30,7 +27,9 @@ These rulings remain operative and are retained verbatim.
   considered "built-in" and therefore a fixed part of the language surface."
   Then: "Because the built-in and prelude definitions can't be overriden,
   then -- out of kindness to the authors of ken code -- they should be the
-  minimal set required." (the prelude is 30 §4's closed set)
+  minimal set required." Then: "any convenience names that are not required
+  by the prelude rules above (or the kernel built-ins) should be considered
+  technical debt and moved to packages."
 - **2026-09-13:** "The proofs are not done. A catalog package is not finished
   until its proofs are complete. Declaring that they are tested computation is
   less valuable than proven correct behavior."
@@ -70,8 +69,8 @@ pending-call. it has to be addressed."). Spec serves BYTES D2.
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-SEED-BINDING-ORDER` -- `active`, M, T1 (anchor `evt_5ajc3arrq3ghz`): planner seed ignores source-body binding order | `RT-SELECTED-PENDING-CALL-BUILD` -- parked at AC-0 on it; resume re-runs AC-0(e) | Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed. Hard stop 0 |
-| L2 | language | One resolution mode: strict admits the whole prelude, legacy passthrough deleted, binding a prelude name anywhere (incl. local binders) is an error (operator 2026-09-25) | None | Elaborator slice(s) of the built-in program | Architect redesign (`evt_4nqhpet9va5w0`), then Spec S0, then frame |
-| L3 | foundation | Move definable prelude conveniences into packages and remove collisions (minimal fixed prelude, operator 2026-09-25), then resume proof backfill | `CAT-DERIVED-SORT-LAWS` -- `active`, S, T1 (anchor `evt_3fannpxh75c55`) | Built-in program: Architect redesign (`evt_4nqhpet9va5w0`); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
+| L2 | language | One resolution mode: strict admits the whole prelude, legacy passthrough deleted, binding a prelude name anywhere (incl. local binders) is an error (operator 2026-09-25) | None | Elaborator slice(s) of the built-in program | Architect slice plan (`evt_6pdw65xspcn3k`), then Spec S0, then frame |
+| L3 | foundation | Move definable prelude conveniences into packages and remove collisions (minimal fixed prelude, operator 2026-09-25), then resume proof backfill | `CAT-DERIVED-SORT-LAWS` -- `active`, S, T1 (anchor `evt_3fannpxh75c55`) | Built-in program: Architect slice plan (`evt_6pdw65xspcn3k`); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
 
 ## Update rule
 
