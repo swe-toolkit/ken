@@ -614,6 +614,34 @@ pub fn static_response_owner_body_mutation_is_exact() -> bool {
     STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
 }
 
+// Test-only E4 observation: the response capture value is loaded by the
+// declared owner-frame slot. Its source coordinate is metadata, not the key
+// selecting the value. Record only pairs that reach a two-parameter source.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static RT_SEED_RESPONSE_OBSERVING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static RT_SEED_RESPONSE_PAIRS: std::cell::RefCell<Vec<(u32, u32, i32)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_rt_seed_response_metadata_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<(u32, u32, i32)>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RT_SEED_RESPONSE_OBSERVING.with(|enabled| enabled.set(false));
+        }
+    }
+    RT_SEED_RESPONSE_OBSERVING.with(|enabled| assert!(!enabled.replace(true)));
+    RT_SEED_RESPONSE_PAIRS.with(|pairs| pairs.borrow_mut().clear());
+    let _restore = Restore;
+    let result = operation();
+    let pairs = RT_SEED_RESPONSE_PAIRS.with(|pairs| std::mem::take(&mut *pairs.borrow_mut()));
+    (result, pairs)
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 fn claim_static_response_owner_body_mutation(
     predicate: impl FnOnce(StaticResponseOwnerBodyMutation) -> bool,
@@ -3220,6 +3248,54 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                             )
                         })?,
                 );
+                #[cfg(feature = "px8-ds-test-support")]
+                if RT_SEED_RESPONSE_OBSERVING.with(std::cell::Cell::get) {
+                    if let ContinuationSourceCoordinate::EntryAbi {
+                        source_owner, source_abi_position, ..
+                    } = capture.source() {
+                        let source = compiler.static_transition_plan.emittable_units()?
+                            .into_iter()
+                            .find(|unit| unit.function() == source_owner)
+                            .expect("response EntryAbi source has an emittable owner");
+                        if source.header().parameters >= 2
+                            && source_abi_position < source.header().parameters {
+                            let source_slot = source.slots().get(source_abi_position as usize)
+                                .expect("source parameter has a descriptor slot");
+                            assert_eq!(source_slot.kind, AbiSlotKind::Parameter);
+                            let word = match context_suffix.last().expect("just appended capture") {
+                                LoweringOperand::Carried(word) => word.word,
+                                _ => panic!("response K capture was not an emitted word"),
+                            };
+                            let cranelift_codegen::ir::ValueDef::Result(inst, _) =
+                                builder.func.dfg.value_def(word) else {
+                                    panic!("response capture word has no emitted Load");
+                                };
+                            let cranelift_codegen::ir::InstructionData::Load { offset, .. } =
+                                builder.func.dfg.insts[inst] else {
+                                    panic!("response capture word was not loaded from its frame");
+                                };
+                            let emitted_offset = i32::from(offset);
+                            let response_slot = slots.iter().zip(offsets)
+                                .find(|(_, offset)| i32::try_from(**offset).ok() == Some(emitted_offset))
+                                .map(|(slot, _)| slot)
+                                .expect("emitted response Load offset names a descriptor slot");
+                            assert_eq!(response_slot.kind, AbiSlotKind::Parameter);
+                            assert_eq!(response_slot.ordinal, capture.producer_abi_slot(),
+                                "response capture must read by producer's index-keyed frame slot");
+                            assert_eq!(response_slot.carrier, source_slot.carrier,
+                                "response M: emitter-loaded slot and source descriptor carrier disagree");
+                            assert_eq!(response_slot.ownership, source_slot.ownership,
+                                "response M: emitter-loaded slot and source descriptor ownership disagree");
+                            assert_eq!(response_slot.storage_owner, source_slot.storage_owner,
+                                "response M: emitter-loaded slot and source descriptor storage owner disagree");
+                            assert_eq!(response_slot.carrier, AbiCarrier::ValueWord,
+                                "response M: ValueWord referent affinity must be revisited with a new parameter carrier");
+                            RT_SEED_RESPONSE_PAIRS.with(|pairs| pairs.borrow_mut().push((
+                                source_abi_position, response_slot.ordinal, emitted_offset,
+                            )));
+                        }
+                    }
+                }
             }
             for (ordinal, _, _) in emission.row.continuation_inputs() {
                 context_suffix.push(

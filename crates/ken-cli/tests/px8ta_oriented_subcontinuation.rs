@@ -258,7 +258,20 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
 // finalize-all path, and a bracket that releases explicitly never reaches it.
 #[test]
 fn public_one_level_bracket_finishes_and_releases() {
-    assert_depth_finishes_and_releases_lifo(1);
+    // RT-PLANNER-SEED-BINDING-ORDER E4: this is the source-reachable response
+    // route. At the response emitter, compare each source descriptor's metadata
+    // with the actual Load-selected response slot. Values themselves are read
+    // by the frame slot issued from the producer's lexical index, not by the
+    // coordinate. Promise class: durable relation over both source parameters.
+    let ((), pairs) = ken_runtime::with_rt_seed_response_metadata_observations(|| {
+        assert_depth_finishes_and_releases_lifo(1);
+    });
+    assert_eq!(pairs.len(), 2, "both source parameter captures must reach the response emitter");
+    let source_positions = pairs.iter().map(|(source, _, _)| *source)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(source_positions, std::collections::BTreeSet::from([0, 1]));
+    assert_ne!(pairs[0].1, pairs[1].1, "the capture values occupy distinct response slots");
+    assert_ne!(pairs[0].2, pairs[1].2, "the capture values load from distinct frame offsets");
 }
 
 #[cfg(target_os = "linux")]
