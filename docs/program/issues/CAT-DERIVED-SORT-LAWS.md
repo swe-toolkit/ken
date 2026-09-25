@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-SORT-LAWS
 title: "Proof-backfill slice for Data/Collections/Derived.ken.md: prove that the generic insertion sort preserves every element count for every comparator, and returns a sorted list under a stated totality hypothesis on the comparator, over the existing insert and sort with no new trust"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: architect

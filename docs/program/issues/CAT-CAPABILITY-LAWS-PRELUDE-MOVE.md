@@ -1,7 +1,7 @@
 ---
 id: CAT-CAPABILITY-LAWS-PRELUDE-MOVE
 title: "Move the prelude's unkeyed capability laws into their single catalog consumers: transfer_count_request_budget with its bounded proof into Capability.System.Buffer (retargeted over Nat add), and write_all_complete, write_all_call_bound, write_all_first_error and write_all_all_success with their attached proofs into Capability.System.IO; second L3 slice of the minimal-prelude program"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: architect
@@ -68,22 +68,40 @@ stop and report the mismatch.
     (`proof bounded for ...`, `proof success_complete for ...`, and the rest)
     still resolves. Attached-proof globals need no removal: a local selector
     resolves to the module-qualified key (Architect `evt_6y1zf4fje6rgt`).
-  - On base, the same removal makes Buffer and IO fail `UnboundName`.
+  - **Base half (Architect `evt_7eenk75kws3r9`).** On base, with the same
+    seven names removed, roots-load Buffer and IO in separate loads:
+    - Buffer fails `UnresolvedCon { name: "transfer_count_request_budget" }`
+      (a type-position head), and the span's source slice equals that name;
+    - IO is predicted to fail `UnresolvedCon { name: "write_all_call_bound" }`
+      the same way. A different removed name, or `UnboundName` naming a
+      removed name, is recorded as a measurement and pinned.
+    - Any variant outside `{UnboundName, UnresolvedCon}`, or any name outside
+      the removed set, is a STOP.
 - **AC-2 (statements).** Every consumer theorem statement is byte-identical
   except the sanctioned `bounded` retarget. Attached proofs keep their
   statements.
-- **AC-3 (census).** Deletion-only, exact sets:
-  - Buffer loses 3, going from 15 to 12: `buffer_nat_add`,
+- **AC-3 (census, Architect `evt_24084xfdemttg`).** A row is the ambient set
+  of the entry's whole load closure, imports and moved proof bodies included.
+  Exact sets:
+  - Buffer goes from 15 to 13: it loses `buffer_nat_add`,
     `transfer_count_request_budget` and
-    `transfer_count_request_budget::bounded`.
-  - IO loses 8, going from 15 to 7: the four `write_all_*` functions and their
-    four `::` proofs. It keeps `BufferSpan`, `Equal`, `ResourceError`,
-    `TransferCount`, `Unit`, `write_all_exact_prefix_prop` and
+    `transfer_count_request_budget::bounded`, and gains `Proved` through the
+    new `Data.Numeric.Nat.Arithmetic` import (Arithmetic's row is `[Equal,
+    Proved]`). Row: `BufferSpan`, `BufferWindow`, `Equal`, `MkBufferWindow`,
+    `Proved`, `TransferCount`, `buffer_span_budget`, `buffer_span_length`,
+    `transfer_count_int`, `transfer_count_nat`, `transfer_count_positive`,
+    `transfer_count_positive_prop`, `transfer_count_remaining`.
+  - IO goes from 15 to 8: it loses the four `write_all_*` functions and their
+    four `::` proofs, and gains `Proved` from the moved proof bodies
+    (`termination`, `all_success`, `success_complete`). Row: `BufferSpan`,
+    `Equal`, `Proved`, `ResourceError`, `TransferCount`, `Unit`,
+    `write_all_exact_prefix_prop`,
     `write_all_exact_prefix_prop::exact_prefix`.
-  - There are no new leaves. If `Suc` or `False` appears as one, stop before
-    rebaselining. Names that the new `Data.Numeric.Nat.Arithmetic` and
-    `Core.Logic.Transport` imports bring in must already be ambient in an
-    existing row.
+  - `Proved` is a floor type already ambient in 37 rows. Any other addition,
+    any change to another row, or `Suc` or `False` as a leaf is a stop.
+  - If `LANG-PRELUDE-FLOOR-FIFTEEN` lands first, both rows also lose `Equal`
+    and `Proved` (Buffer 11, IO 6); whichever lands second re-predicts before
+    rebaselining.
   - No `trusted_base()` change. Targeted builds only, through
     `scripts/ken-cargo`; no-regression means green in CI.
 
