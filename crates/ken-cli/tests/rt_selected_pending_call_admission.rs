@@ -73,13 +73,15 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
                 candidates,
                 width,
                 defining_function,
-                allowed_families,
+                visited,
+                traversed_families,
                 gates,
             } => Some((
                 candidates,
                 width,
                 defining_function,
-                allowed_families,
+                visited,
+                traversed_families,
                 gates,
             )),
             _ => None,
@@ -90,7 +92,7 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
         1,
         "one differing-unit Match must be planned: {rows:#?}"
     );
-    let (candidates, width, owner, allowed_families, gates) = planned[0];
+    let (candidates, width, owner, visited, traversed_families, gates) = planned[0];
     assert_eq!((*width, *owner), (6, 3));
     assert_eq!(
         candidates
@@ -106,7 +108,17 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
             .collect::<Vec<_>>(),
         vec![3, 3]
     );
-    assert_eq!(allowed_families, &["F1", "F2", "F3", "F4"]);
+    assert!(
+        !visited.is_empty(),
+        "the planner must publish visited route origins"
+    );
+    let derived_families = visited
+        .iter()
+        .filter_map(|(_, kind)| (*kind != "Local").then_some(*kind))
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    assert_eq!(traversed_families, &derived_families);
     assert!(
         !gates.is_empty(),
         "the planner must locate the carried-call path"

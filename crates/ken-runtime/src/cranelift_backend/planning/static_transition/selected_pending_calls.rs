@@ -8,20 +8,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    occurrences::occurrence_authority, planner_error, ContinuationSourceCoordinate,
-    CraneliftBackendError, PredeclaredFunctionId, RuntimeExpr, StaticOriginId,
-    StaticTransitionPlan,
+    occurrences::occurrence_authority, planner_error, CheckedCaseBinderLayout,
+    CheckedCaseBinderRole, ContinuationSourceCoordinate, CraneliftBackendError,
+    PredeclaredFunctionId, RuntimeExpr, StaticOriginId, StaticTransitionPlan,
 };
 use crate::cranelift_backend::lowering::core::agreeing_recursive_body_unit;
 use crate::{CheckedComputationalIHBinderMorphism, CheckedComputationalIHInvocationKind};
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum PendingRouteFamily {
-    SelectedArm,
-    Join,
-    Binding,
-    CarriedResidual,
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum PendingMember {
@@ -42,51 +34,48 @@ pub(super) struct PendingCandidate {
     pub(super) members: Vec<PendingMember>,
 }
 
-// One set of counters per execution path, never a total over the whole match.
-// Two *marked* pending reads can reach only one consuming gate. A plain
-// source `Var` is not a pending-read identity without its checked binder map.
+/// A transport decision for one visited static origin. Local means evaluating
+/// within the same function without moving a companion across a binding/edge.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PendingRouteKind {
+    Local,
+    SelectedArm,
+    Join,
+    Binding,
+    CarriedResidual,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct PendingRouteVisit {
+    pub(super) origin: StaticOriginId,
+    pub(super) kind: PendingRouteKind,
+}
+
+// One gate count per execution path, never a sum over the whole match. Every
+// marked pending call is its consuming gate; an unmarked occurrence of its IH
+// binder is refused separately, at the raw Var leaf.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PendingPathCounts {
-    pending_reads: u8,
     consuming_gates: u8,
 }
 
 impl PendingPathCounts {
-    const START: Self = Self {
-        pending_reads: 0,
-        consuming_gates: 0,
-    };
-
-    fn read_pending(self, enforce_linearity: bool) -> Result<Self, PendingRefusal> {
-        if enforce_linearity && self.pending_reads != 0 {
-            return Err(PendingRefusal::NotLinearOrMustReach);
-        }
-        Ok(Self {
-            pending_reads: self
-                .pending_reads
-                .checked_add(1)
-                .ok_or(PendingRefusal::NotLinearOrMustReach)?,
-            ..self
-        })
-    }
+    const START: Self = Self { consuming_gates: 0 };
 
     fn consume(self) -> Result<Self, PendingRefusal> {
-        if self.consuming_gates != 0 || self.pending_reads == 0 {
+        if self.consuming_gates != 0 {
             return Err(PendingRefusal::NotLinearOrMustReach);
         }
-        Ok(Self {
-            consuming_gates: 1,
-            ..self
-        })
+        Ok(Self { consuming_gates: 1 })
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct PendingCallRoute {
     pub(super) defining_function: PredeclaredFunctionId,
-    /// Allowed F1-F4 transport families, not a traversal census. Increment 2
-    /// must prove which edges the selected package actually takes in emission.
-    pub(super) allowed_families: Vec<PendingRouteFamily>,
+    /// The set of static origins the checked route walker actually visited.
+    /// The emitter must assert membership before carrying a companion there.
+    pub(super) visited: Vec<PendingRouteVisit>,
     /// Alternative static call sites are permitted only where each reachable
     /// execution path selects exactly one of them.
     pub(super) gates: Vec<StaticOriginId>,
@@ -256,6 +245,23 @@ pub(super) fn plan_selected_pending_calls(
             );
             continue;
         }
+        // The checked case layout is the authority for the IH's initial
+        // runtime de Bruijn slot. The single recursive position has slot 0;
+        // nested Let/Match binders shift it as the walker descends.
+        let pending_ih_index = match CheckedCaseBinderLayout::for_case(selected_case)?.role_at(0) {
+            CheckedCaseBinderRole::InductionHypothesis { recursive_position }
+                if recursive_position as usize == position =>
+            {
+                0_u32
+            }
+            _ => {
+                by_producer.insert(
+                    producer,
+                    PendingCallAdmission::Refused(PendingRefusal::UnsupportedRouteEdge),
+                );
+                continue;
+            }
+        };
         // The consumer proof below is deliberately conservative. Any edge we
         // cannot identify as a same-function F1-F4 route refuses before the
         // emitter can ever consume this plan.
@@ -266,21 +272,16 @@ pub(super) fn plan_selected_pending_calls(
                 .position(|case| std::ptr::eq(case, selected_case))
                 .ok_or_else(|| planner_error("selected recursive case disappeared"))?,
         )?;
-        let result = prove_route(plan, producer, case_origin, owner);
+        let result = prove_route(plan, producer, case_origin, owner, pending_ih_index);
         let admission = match result {
-            Ok((paths, gates)) => admit_routed_package(
+            Ok((paths, gates, visited)) => admit_routed_package(
                 PendingCallPackagePlan {
                     producer,
                     candidates,
                     width,
                     route: PendingCallRoute {
                         defining_function: owner,
-                        allowed_families: vec![
-                            PendingRouteFamily::SelectedArm,
-                            PendingRouteFamily::Join,
-                            PendingRouteFamily::Binding,
-                            PendingRouteFamily::CarriedResidual,
-                        ],
+                        visited,
                         gates,
                     },
                 },
@@ -309,22 +310,23 @@ fn marked_pending_read(
     kind: CheckedComputationalIHInvocationKind,
     binder_morphism: CheckedComputationalIHBinderMorphism,
     body: &RuntimeExpr,
+    pending_ih_index: u32,
 ) -> bool {
     kind == CheckedComputationalIHInvocationKind::CheckedHostVisContinuation
         && matches!(body, RuntimeExpr::Call { callee, args }
             if args.len() == 1
                 && matches!(callee.as_ref(), RuntimeExpr::Var(index)
-                    if binder_morphism.runtime_index(0) == Some(u64::from(*index))))
+                    if *index == pending_ih_index
+                        && binder_morphism.runtime_index(0) == Some(u64::from(*index))))
 }
 
 fn admit_routed_package(
     package: PendingCallPackagePlan,
     paths: Vec<PendingPathCounts>,
 ) -> PendingCallAdmission {
-    // The marked pending-read guard rejects at a second marked read; the
-    // checked-source direct double-bind is shadowed by response planning at
-    // this base. This final check establishes must-reach and
-    // one consuming gate, independently of that read count.
+    // Marked pending calls consume at their own gate; a second gate is
+    // refused at that call. A raw IH occurrence is refused by the walker.
+    // This final check establishes must-reach on every ordinary exit.
     if paths.is_empty()
         || package.route.gates.is_empty()
         || paths.iter().any(|path| path.consuming_gates != 1)
@@ -346,8 +348,34 @@ fn require_defining_function(
     }
 }
 
-fn refuse_generated_unit_crossing() -> PendingRefusal {
-    PendingRefusal::RouteLeavesDefiningFunction
+/// The single exhaustive mapping from a walked runtime expression to the
+/// transport required at that origin. A new expression variant cannot silently
+/// receive a `Local` default; an unsupported route refuses before publication.
+fn route_kind(expr: &RuntimeExpr) -> Result<PendingRouteKind, PendingRefusal> {
+    use PendingRouteKind as Kind;
+    match expr {
+        RuntimeExpr::CheckedJoinSite { .. } => Ok(Kind::Join),
+        RuntimeExpr::If { .. } | RuntimeExpr::Match { .. } => Ok(Kind::SelectedArm),
+        RuntimeExpr::Var(_) | RuntimeExpr::Let { .. } | RuntimeExpr::Project { .. } => {
+            Ok(Kind::Binding)
+        }
+        RuntimeExpr::CheckedComputationalIHInvocation { .. } => Ok(Kind::CarriedResidual),
+        RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. }
+        | RuntimeExpr::Value(_)
+        | RuntimeExpr::PrimitiveCall { .. }
+        | RuntimeExpr::Construct { .. }
+        | RuntimeExpr::Record { .. }
+        | RuntimeExpr::Effect { .. }
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Trap(_) => Ok(Kind::Local),
+        RuntimeExpr::Call { .. }
+        | RuntimeExpr::Closure { .. }
+        | RuntimeExpr::LexicalClosure { .. } => Err(PendingRefusal::RouteLeavesDefiningFunction),
+        RuntimeExpr::ComputationalMatch { .. } => Err(PendingRefusal::UnsupportedRouteEdge),
+    }
 }
 
 fn prove_route(
@@ -355,7 +383,15 @@ fn prove_route(
     producer: StaticOriginId,
     consumer: StaticOriginId,
     owner: PredeclaredFunctionId,
-) -> Result<(Vec<PendingPathCounts>, Vec<StaticOriginId>), PendingRefusal> {
+    pending_ih_index: u32,
+) -> Result<
+    (
+        Vec<PendingPathCounts>,
+        Vec<StaticOriginId>,
+        Vec<PendingRouteVisit>,
+    ),
+    PendingRefusal,
+> {
     let root = plan
         .root_static_origin()
         .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
@@ -371,25 +407,51 @@ fn prove_route(
         return Err(PendingRefusal::RouteLeavesDefiningFunction);
     }
     let mut gates = BTreeSet::new();
+    let mut visited = BTreeMap::new();
     // Counts are carried separately on each branch; a sum over the whole
     // case would accept two gates in one arm and none in the sibling arm.
-    let exits = walk_to_gate(plan, consumer, owner, PendingPathCounts::START, &mut gates)?;
-    Ok((exits, gates.into_iter().collect()))
+    let exits = walk_to_gate(
+        plan,
+        consumer,
+        owner,
+        pending_ih_index,
+        true,
+        PendingPathCounts::START,
+        &mut gates,
+        &mut visited,
+    )?;
+    Ok((
+        exits,
+        gates.into_iter().collect(),
+        visited
+            .into_iter()
+            .map(|(origin, kind)| PendingRouteVisit { origin, kind })
+            .collect(),
+    ))
 }
 
 /// Follow the checked case body, not a guessed arm-order-to-CLIF mapping.
-/// `None` of the returned paths is the compiler's explicit trap/termination;
-/// any ordinary exit with zero or two marked gate reads refuses. The checked
-/// binder morphism, not a bare `Var` spelling, identifies a marked read.
-/// All unrecognized calls,
-/// closure boundaries and owner changes refuse rather than inventing an F5/F6
-/// transport. This traversal is bounded by the acyclic source occurrence tree.
+/// An empty set of returned paths is an explicit trap/termination; any
+/// ordinary exit without a gate refuses. The checked case binder layout gives
+/// the pending IH's index, shifted through every binder this walk enters.
+/// Calls, closure boundaries and owner changes refuse rather than inventing
+/// an F5/F6 transport. The source occurrence tree bounds traversal.
+fn shifted_pending_ih(index: u32, binders: usize) -> Result<u32, PendingRefusal> {
+    let shift = u32::try_from(binders).map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
+    index
+        .checked_add(shift)
+        .ok_or(PendingRefusal::UnsupportedRouteEdge)
+}
+
 fn walk_to_gate(
     plan: &StaticTransitionPlan<'_>,
     origin: StaticOriginId,
     owner: PredeclaredFunctionId,
+    pending_ih_index: u32,
+    deny_raw_ih: bool,
     path: PendingPathCounts,
     gates: &mut BTreeSet<StaticOriginId>,
+    visited: &mut BTreeMap<StaticOriginId, PendingRouteKind>,
 ) -> Result<Vec<PendingPathCounts>, PendingRefusal> {
     require_defining_function(
         owner,
@@ -400,6 +462,10 @@ fn walk_to_gate(
     let expr = plan
         .planned_occurrence_expr(origin)
         .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
+    let kind = route_kind(expr)?;
+    if visited.insert(origin, kind).is_some_and(|old| old != kind) {
+        return Err(PendingRefusal::UnsupportedRouteEdge);
+    }
     let child = |position| {
         plan.semantic
             .child_origin(origin, position)
@@ -408,51 +474,157 @@ fn walk_to_gate(
     match expr {
         RuntimeExpr::Trap(_) => Ok(Vec::new()),
         RuntimeExpr::Value(_)
-        | RuntimeExpr::Var(_)
         | RuntimeExpr::DeclarationRef { .. }
         | RuntimeExpr::ImportedDeclarationRef { .. } => Ok(vec![path]),
+        RuntimeExpr::Var(index) => {
+            if deny_raw_ih && *index == pending_ih_index {
+                Err(PendingRefusal::NotLinearOrMustReach)
+            } else {
+                Ok(vec![path])
+            }
+        }
         RuntimeExpr::CheckedComputationalIHInvocation {
             kind,
             binder_morphism,
             body,
             ..
         } => {
-            if !marked_pending_read(*kind, *binder_morphism, body) {
+            if !marked_pending_read(*kind, *binder_morphism, body, pending_ih_index) {
                 return Err(PendingRefusal::UnsupportedRouteEdge);
             }
-            let path = path.read_pending(true)?.consume()?;
-            gates.insert(child(0)?);
-            Ok(vec![path])
+            let RuntimeExpr::Call { args, .. } = body.as_ref() else {
+                return Err(PendingRefusal::UnsupportedRouteEdge);
+            };
+            let gate = child(0)?;
+            require_defining_function(
+                owner,
+                occurrence_authority(plan, gate)
+                    .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?
+                    .owner,
+            )?;
+            // The marked callee is this authorized pending IH; ordinary call
+            // lowering is not visited. Its arguments are ordinary occurrences
+            // and must not smuggle a second, unmarked IH read through the gate.
+            let arguments = walk_sequence(
+                plan,
+                gate,
+                owner,
+                pending_ih_index,
+                deny_raw_ih,
+                path,
+                args.len() + 1,
+                1,
+                gates,
+                visited,
+            )?;
+            let mut exits = Vec::new();
+            for argument_path in arguments {
+                exits.push(argument_path.consume()?);
+                gates.insert(gate);
+            }
+            Ok(exits)
         }
         RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
-        | RuntimeExpr::CheckedComputationalIHSlots { .. } => {
-            walk_to_gate(plan, child(0)?, owner, path, gates)
-        }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. } => walk_to_gate(
+            plan,
+            child(0)?,
+            owner,
+            pending_ih_index,
+            deny_raw_ih,
+            path,
+            gates,
+            visited,
+        ),
         RuntimeExpr::Let { .. } => {
-            let prefix = walk_to_gate(plan, child(0)?, owner, path, gates)?;
+            let prefix = walk_to_gate(
+                plan,
+                child(0)?,
+                owner,
+                pending_ih_index,
+                deny_raw_ih,
+                path,
+                gates,
+                visited,
+            )?;
+            let body_ih = shifted_pending_ih(pending_ih_index, 1)?;
             let mut exits = Vec::new();
             for step in prefix {
-                exits.extend(walk_to_gate(plan, child(1)?, owner, step, gates)?);
+                exits.extend(walk_to_gate(
+                    plan,
+                    child(1)?,
+                    owner,
+                    body_ih,
+                    deny_raw_ih,
+                    step,
+                    gates,
+                    visited,
+                )?);
             }
             Ok(exits)
         }
         RuntimeExpr::If { .. } => {
-            let prefix = walk_to_gate(plan, child(0)?, owner, path, gates)?;
+            let prefix = walk_to_gate(
+                plan,
+                child(0)?,
+                owner,
+                pending_ih_index,
+                deny_raw_ih,
+                path,
+                gates,
+                visited,
+            )?;
             let mut exits = Vec::new();
             for step in prefix {
-                exits.extend(walk_to_gate(plan, child(1)?, owner, step, gates)?);
-                exits.extend(walk_to_gate(plan, child(2)?, owner, step, gates)?);
+                exits.extend(walk_to_gate(
+                    plan,
+                    child(1)?,
+                    owner,
+                    pending_ih_index,
+                    deny_raw_ih,
+                    step,
+                    gates,
+                    visited,
+                )?);
+                exits.extend(walk_to_gate(
+                    plan,
+                    child(2)?,
+                    owner,
+                    pending_ih_index,
+                    deny_raw_ih,
+                    step,
+                    gates,
+                    visited,
+                )?);
             }
             Ok(exits)
         }
         RuntimeExpr::Match { cases, .. } => {
-            let prefix = walk_to_gate(plan, child(0)?, owner, path, gates)?;
+            let prefix = walk_to_gate(
+                plan,
+                child(0)?,
+                owner,
+                pending_ih_index,
+                deny_raw_ih,
+                path,
+                gates,
+                visited,
+            )?;
             let mut exits = Vec::new();
             for step in prefix {
-                for index in 0..cases.len() {
-                    exits.extend(walk_to_gate(plan, child(1 + index)?, owner, step, gates)?);
+                for (index, case) in cases.iter().enumerate() {
+                    let case_ih = shifted_pending_ih(pending_ih_index, case.binders)?;
+                    exits.extend(walk_to_gate(
+                        plan,
+                        child(1 + index)?,
+                        owner,
+                        case_ih,
+                        deny_raw_ih,
+                        step,
+                        gates,
+                        visited,
+                    )?);
                 }
                 // Its default is a RuntimeTrap, so it terminates rather than
                 // dropping an open package on an ordinary return.
@@ -460,29 +632,61 @@ fn walk_to_gate(
             Ok(exits)
         }
         RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
-            walk_sequence(plan, origin, owner, path, args.len(), 0, gates)
+            walk_sequence(
+                plan,
+                origin,
+                owner,
+                pending_ih_index,
+                deny_raw_ih,
+                path,
+                args.len(),
+                0,
+                gates,
+                visited,
+            )
         }
-        RuntimeExpr::Record { fields } => {
-            walk_sequence(plan, origin, owner, path, fields.len(), 0, gates)
-        }
-        RuntimeExpr::Project { .. } => walk_to_gate(plan, child(0)?, owner, path, gates),
+        RuntimeExpr::Record { fields } => walk_sequence(
+            plan,
+            origin,
+            owner,
+            pending_ih_index,
+            deny_raw_ih,
+            path,
+            fields.len(),
+            0,
+            gates,
+            visited,
+        ),
+        RuntimeExpr::Project { .. } => walk_to_gate(
+            plan,
+            child(0)?,
+            owner,
+            pending_ih_index,
+            deny_raw_ih,
+            path,
+            gates,
+            visited,
+        ),
         RuntimeExpr::Effect {
             capability, args, ..
         } => walk_sequence(
             plan,
             origin,
             owner,
+            pending_ih_index,
+            deny_raw_ih,
             path,
             args.len() + usize::from(capability.is_some()),
             0,
             gates,
+            visited,
         ),
         // An arbitrary call or closure crosses a unit boundary, or can copy
         // the pending value before the consuming call. The F5/F6 increment
         // needs its own typed/provenance authority before either is admitted.
         RuntimeExpr::Call { .. }
         | RuntimeExpr::Closure { .. }
-        | RuntimeExpr::LexicalClosure { .. } => Err(refuse_generated_unit_crossing()),
+        | RuntimeExpr::LexicalClosure { .. } => Err(PendingRefusal::RouteLeavesDefiningFunction),
         RuntimeExpr::ComputationalMatch { .. } => Err(PendingRefusal::UnsupportedRouteEdge),
     }
 }
@@ -510,7 +714,8 @@ pub enum SelectedPendingCallOutcomeObservation {
         candidates: Vec<SelectedPendingCallCandidateObservation>,
         width: usize,
         defining_function: u32,
-        allowed_families: Vec<&'static str>,
+        visited: Vec<(u32, &'static str)>,
+        traversed_families: Vec<&'static str>,
         gates: Vec<u32>,
     },
     Refused(PendingRefusal),
@@ -578,12 +783,22 @@ pub(super) fn record_selected_pending_call_admissions(plan: &StaticTransitionPla
                     }).collect(),
                     width: package.width,
                     defining_function: package.route.defining_function.observation_ordinal(),
-                    allowed_families: package.route.allowed_families.iter().map(|family| match family {
-                        PendingRouteFamily::SelectedArm => "F1",
-                        PendingRouteFamily::Join => "F2",
-                        PendingRouteFamily::Binding => "F3",
-                        PendingRouteFamily::CarriedResidual => "F4",
+                    visited: package.route.visited.iter().map(|visit| {
+                        (visit.origin.observation_ordinal(), match visit.kind {
+                            PendingRouteKind::Local => "Local",
+                            PendingRouteKind::SelectedArm => "F1",
+                            PendingRouteKind::Join => "F2",
+                            PendingRouteKind::Binding => "F3",
+                            PendingRouteKind::CarriedResidual => "F4",
+                        })
                     }).collect(),
+                    traversed_families: package.route.visited.iter().filter_map(|visit| match visit.kind {
+                        PendingRouteKind::Local => None,
+                        PendingRouteKind::SelectedArm => Some("F1"),
+                        PendingRouteKind::Join => Some("F2"),
+                        PendingRouteKind::Binding => Some("F3"),
+                        PendingRouteKind::CarriedResidual => Some("F4"),
+                    }).collect::<BTreeSet<_>>().into_iter().collect(),
                     gates: package.route.gates.iter().map(|gate| gate.observation_ordinal()).collect(),
                 },
             };
@@ -596,10 +811,13 @@ fn walk_sequence(
     plan: &StaticTransitionPlan<'_>,
     parent: StaticOriginId,
     owner: PredeclaredFunctionId,
+    pending_ih_index: u32,
+    deny_raw_ih: bool,
     path: PendingPathCounts,
     len: usize,
     index: usize,
     gates: &mut BTreeSet<StaticOriginId>,
+    visited: &mut BTreeMap<StaticOriginId, PendingRouteKind>,
 ) -> Result<Vec<PendingPathCounts>, PendingRefusal> {
     if index == len {
         return Ok(vec![path]);
@@ -608,17 +826,29 @@ fn walk_sequence(
         .semantic
         .child_origin(parent, index)
         .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
-    let prefix = walk_to_gate(plan, child, owner, path, gates)?;
+    let prefix = walk_to_gate(
+        plan,
+        child,
+        owner,
+        pending_ih_index,
+        deny_raw_ih,
+        path,
+        gates,
+        visited,
+    )?;
     let mut exits = Vec::new();
     for step in prefix {
         exits.extend(walk_sequence(
             plan,
             parent,
             owner,
+            pending_ih_index,
+            deny_raw_ih,
             step,
             len,
             index + 1,
             gates,
+            visited,
         )?);
     }
     Ok(exits)
@@ -649,33 +879,12 @@ mod tests {
             width: 1,
             route: PendingCallRoute {
                 defining_function: owner,
-                allowed_families: vec![
-                    PendingRouteFamily::SelectedArm,
-                    PendingRouteFamily::CarriedResidual,
-                ],
+                visited: vec![PendingRouteVisit {
+                    origin: StaticOriginId::for_test(19),
+                    kind: PendingRouteKind::CarriedResidual,
+                }],
                 gates: vec![StaticOriginId::for_test(19)],
             },
-        }
-    }
-
-    // From checked source on base 6bdd75394, a direct double bind fails first
-    // in response planning; a pure pair's unused second read is erased before
-    // runtime IR. This is a *defensive route-input* fixture, not a claim that
-    // the source mutation reaches the admission guard. Both routes use the
-    // same two-candidate package; only the second pending-binding read varies.
-    fn one_route(second_read: bool, enforce_linearity: bool) -> PendingCallAdmission {
-        let routed = (|| {
-            let path = PendingPathCounts::START.read_pending(enforce_linearity)?;
-            let path = if second_read {
-                path.read_pending(enforce_linearity)?
-            } else {
-                path
-            };
-            path.consume()
-        })();
-        match routed {
-            Ok(path) => admit_routed_package(route_package(), vec![path]),
-            Err(reason) => PendingCallAdmission::Refused(reason),
         }
     }
 
@@ -732,6 +941,76 @@ mod tests {
         );
     }
 
+    // From checked source on base 6bdd75394, the direct double bind fails
+    // first in response planning and a pure pair's second read is erased.
+    // This planner-route input deliberately places the *same* marked IH call
+    // before a Let body: Var(0) names the local result; Var(1) additionally
+    // reads the still-bound IH. It is not a checked-source second-read claim.
+    fn pending_route_input(body_var: u32, deny_raw_ih: bool) -> PendingCallAdmission {
+        let expr = RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
+                call_template_id: 171,
+                checked_occurrence_path: vec![20],
+                kind: CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
+                binder_morphism: CheckedComputationalIHBinderMorphism::identity_for_test(0),
+                body: Box::new(RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(0)),
+                    args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))],
+                }),
+            }),
+            body: Box::new(RuntimeExpr::Var(body_var)),
+        };
+        let plan = super::super::plan_static_transition_graph(&expr, &BTreeMap::new())
+            .expect("a marked route input plans");
+        let root = plan.root_static_origin().expect("route root exists");
+        let owner = occurrence_authority(&plan, root)
+            .expect("root has an owner")
+            .owner;
+        let mut gates = BTreeSet::new();
+        let mut visited = BTreeMap::new();
+        match walk_to_gate(
+            &plan,
+            root,
+            owner,
+            0,
+            deny_raw_ih,
+            PendingPathCounts::START,
+            &mut gates,
+            &mut visited,
+        ) {
+            Ok(paths) => {
+                let mut package = route_package();
+                package.route.defining_function = owner;
+                package.route.gates = gates.into_iter().collect();
+                package.route.visited = visited
+                    .into_iter()
+                    .map(|(origin, kind)| PendingRouteVisit { origin, kind })
+                    .collect();
+                admit_routed_package(package, paths)
+            }
+            Err(reason) => PendingCallAdmission::Refused(reason),
+        }
+    }
+
+    #[test]
+    fn pending_route_input_second_raw_ih_read_is_refused_at_the_walker() {
+        assert!(matches!(
+            pending_route_input(0, true),
+            PendingCallAdmission::Planned(_)
+        ));
+        assert_eq!(
+            pending_route_input(1, true),
+            PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach)
+        );
+        // Disable only the raw occurrence check. The same negative then
+        // reaches one marked gate and becomes Planned, proving the refusal's
+        // provenance rather than relying on the independent gate counter.
+        assert!(matches!(
+            pending_route_input(1, false),
+            PendingCallAdmission::Planned(_)
+        ));
+    }
+
     #[test]
     fn marked_pending_read_is_the_bound_ih_not_just_any_var_call() {
         let morphism = CheckedComputationalIHBinderMorphism::identity_for_test(4);
@@ -744,16 +1023,19 @@ mod tests {
             CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
             morphism,
             &call(4, one_arg.clone()),
+            4,
         ));
         assert!(!marked_pending_read(
             CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
             morphism,
             &call(5, one_arg),
+            4,
         ));
         assert!(!marked_pending_read(
             CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
             morphism,
             &call(4, vec![]),
+            4,
         ));
     }
 
@@ -772,24 +1054,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn pending_route_input_second_read_is_a_distinct_linearity_refusal() {
-        assert!(matches!(
-            one_route(false, true),
-            PendingCallAdmission::Planned(_)
-        ));
-        assert_eq!(
-            one_route(true, true),
-            PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach),
-        );
-        // Disable only the read-linearity guard; the negative must now plan.
-        // The gate count, owner, members and both candidates are unchanged.
-        assert!(matches!(
-            one_route(true, false),
-            PendingCallAdmission::Planned(_)
-        ));
-    }
-
     // The only single-edit checked-source attempt that returns the pending
     // ITree from main is rejected by checking (Unit versus ExitCode). A
     // generated-root edge is therefore measured as a route-input fixture;
@@ -799,11 +1063,7 @@ mod tests {
         let package = route_package();
         let local = package.route.defining_function;
         let generated_root = PredeclaredFunctionId::for_test(0);
-        let gated = PendingPathCounts::START
-            .read_pending(true)
-            .unwrap()
-            .consume()
-            .unwrap();
+        let gated = PendingPathCounts::START.consume().unwrap();
         assert!(require_defining_function(local, local).is_ok());
         assert!(matches!(
             admit_routed_package(package.clone(), vec![gated]),
@@ -832,8 +1092,11 @@ mod tests {
                 &plan,
                 root,
                 local,
+                0,
+                true,
                 PendingPathCounts::START,
-                &mut BTreeSet::new()
+                &mut BTreeSet::new(),
+                &mut BTreeMap::new(),
             )
             .expect_err("the generated root cannot consume another owner's package"),
             PendingRefusal::RouteLeavesDefiningFunction,
@@ -866,20 +1129,22 @@ mod tests {
                 &plan,
                 call,
                 owner,
+                0,
+                true,
                 PendingPathCounts::START,
-                &mut BTreeSet::new()
+                &mut BTreeSet::new(),
+                &mut BTreeMap::new(),
             )
             .expect_err("F6 call cannot carry the pending package"),
             PendingRefusal::RouteLeavesDefiningFunction,
         );
     }
 
-    /// A planned runtime-IR `ITree::Ret` constructor returns an open pending
-    /// route with no gate. This is a route-input F5 representative, not a
-    /// checked-source strict `return_body` witness: the bounded one-edit
-    /// source variant is rejected by typing (Unit versus ExitCode). The gate
-    /// in `route_package` represents the other path, so must-reach (rather
-    /// than an empty gate inventory) is the discriminating refusal here.
+    /// A planned runtime-IR `ITree::Ret` constructor exits with zero gates.
+    /// This is a route-input F5 representative, not a checked-source strict
+    /// `return_body` witness: the one-edit source variant fails typing (Unit
+    /// versus ExitCode). The other path's gate in `route_package` keeps the
+    /// inventory nonempty, so must-reach alone distinguishes the refusal.
     #[test]
     fn f5_open_return_reaches_production_walker_and_must_reach_guard() {
         let ret = RuntimeExpr::Construct {
@@ -890,39 +1155,30 @@ mod tests {
             .expect("a strict return is a planned runtime-IR occurrence");
         let root = plan.root_static_origin().expect("return root exists");
         let owner = occurrence_authority(&plan, root).unwrap().owner;
-        let pending = PendingPathCounts::START.read_pending(true).unwrap();
         let mut gates = BTreeSet::new();
-        let exits = walk_to_gate(&plan, root, owner, pending, &mut gates)
-            .expect("the local return itself does not cross a function");
-        assert_eq!(exits, vec![pending]);
+        let exits = walk_to_gate(
+            &plan,
+            root,
+            owner,
+            0,
+            true,
+            PendingPathCounts::START,
+            &mut gates,
+            &mut BTreeMap::new(),
+        )
+        .expect("the local return itself does not cross a function");
+        assert_eq!(exits, vec![PendingPathCounts::START]);
         assert!(gates.is_empty(), "the return is not a consuming gate");
         assert!(matches!(
-            admit_routed_package(route_package(), vec![pending.consume().unwrap()]),
+            admit_routed_package(
+                route_package(),
+                vec![PendingPathCounts::START.consume().unwrap()]
+            ),
             PendingCallAdmission::Planned(_)
         ));
         assert_eq!(
             admit_routed_package(route_package(), exits),
             PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach),
-        );
-    }
-
-    #[test]
-    fn strict_return_and_generated_call_routes_refuse_before_consumption() {
-        let package = route_package();
-        let selected = PendingPathCounts::START.read_pending(true).unwrap();
-        assert!(matches!(
-            admit_routed_package(package.clone(), vec![selected.consume().unwrap()]),
-            PendingCallAdmission::Planned(_)
-        ));
-        assert_eq!(
-            admit_routed_package(package, vec![selected]),
-            PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach),
-            "F5 must not return an open pending binding without its gate"
-        );
-        assert_eq!(
-            PendingCallAdmission::Refused(refuse_generated_unit_crossing()),
-            PendingCallAdmission::Refused(PendingRefusal::RouteLeavesDefiningFunction),
-            "F6 may not carry the package into a generated unit"
         );
     }
 }
