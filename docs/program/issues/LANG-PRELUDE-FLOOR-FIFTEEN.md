@@ -90,7 +90,11 @@ by-spelling read of the live globals map.
     `modules.rs:4534` removes `"Proved"`), a `space` still elaborates, with
     the captured identity in the residual position; on base it fails
     `Internal("space desugaring requires the prelude Empty type")`;
-  - reverting the capture reddens all three.
+  - a flat `data Box = Empty | Full` followed by a `space` checks, with the
+    captured identity in the residual position; on base a constructor named
+    `Empty` captures the key and it fails `KernelRejected` ("unknown type
+    former"), spanned on the space (Steward `evt_5w11t5mqpt64a`);
+  - reverting the capture reddens all four.
 - **AC-2.** The census diff is deletion-only. The deleted (row, name) pairs are
   predicted before the build and measured after it; an unpredicted deletion is
   a finding. If `CAT-LOGIC-PRELUDE-MOVE` lands first, its row
