@@ -27,10 +27,10 @@ These rulings remain operative and are retained verbatim.
 
 ## Catalog direction
 
-- **2026-09-25, census debt:** "like the ignored tests that L1 is working on,
-  this is technical debt and should be paid down now. This seems like
-  foundation work since it concerns ken source, so it should be L3's
-  priority."
+- **2026-09-25, built-ins:** "it is a language design weakness to allow
+  built-ins to be overriden. It makes for confusing code, allows obfuscation
+  and is therefore a security risk. Anything in the prelude should be
+  considered "built-in" and therefore a fixed part of the language surface."
 - **2026-09-13:** "The proofs are not done. A catalog package is not finished
   until its proofs are complete. Declaring that they are tested computation is
   less valuable than proven correct behavior."
@@ -71,7 +71,7 @@ pending-call. it has to be addressed."). Spec serves BYTES D2.
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-SEED-BINDING-ORDER` -- `active`, M, T1 (anchor `evt_5ajc3arrq3ghz`): planner seed ignores source-body binding order | `RT-SELECTED-PENDING-CALL-BUILD` -- parked at AC-0 on it; resume re-runs AC-0(e) | Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed. Hard stop 0 |
 | L2 | language | Parked: no operator objective after the load-order fix | None (`LANG-FACADE-EXPORT-LOAD-ORDER` landed `2c6f8b204`) | None | Operator names L2's next objective |
-| L3 | foundation | Retire the catalog's ambient convenience names (census to zero), then resume proof backfill (operator 2026-09-25) | `CAT-DERIVED-SORT-LAWS` -- `active`, S, T1 (anchor `evt_3fannpxh75c55`), filler while the retirement program is held | Ambient-name retirement program ON HOLD by operator (design `evt_mz1dtg4nsqnb`); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
+| L3 | foundation | Prelude is fixed built-in surface; overriding a built-in is an error (operator 2026-09-25), then resume proof backfill | `CAT-DERIVED-SORT-LAWS` -- `active`, S, T1 (anchor `evt_3fannpxh75c55`) | Built-in program: Architect redesign under the ruling (`evt_2fatgkrh53r0v`); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
 
 ## Update rule
 
