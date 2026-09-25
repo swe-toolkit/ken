@@ -43,10 +43,11 @@ named a primitive type; opaque constant, trusted/audited — `18 §5`; checked
 `bytes_length` are `PrimReduction::Op` and compute in `ken-interp`, not kernel
 conversion, pending K3); `41 §3a` (`Bytes` has durable kind tag `0x05` and
 private runtime representation; **`String` is NFC-normalized UTF-8 at
-construction time** — the fact the round-trip law and its one-directionality
-both rest on); `36 §1.4` (the escape check `ρ_inf ⊆ ρ_decl` accept / `ρ_inf ⊄
-ρ_decl` EFFECT-ESCAPE — the **single soundness-relevant gate**, pinned in
-L5); `31 §3` (`b"…"`/`0x[deadbeef]` ⇒ `Bytes`; bare `0xFF` ⇒ `Int`); `14 §8.4`
+construction time**, relevant to the reverse-round-trip counterexample);
+`38 §1.4` supplies the trusted F3 forward equality; `36 §1.4` (the escape
+check `ρ_inf ⊆ ρ_decl` accept / `ρ_inf ⊄ ρ_decl` EFFECT-ESCAPE — the
+**single soundness-relevant gate**, pinned in L5); `31 §3` (`b"…"`/`0x[deadbeef]` ⇒
+`Bytes`; bare `0xFF` ⇒ `Int`); `14 §8.4`
 (W-style `ITree.Vis` admitted in K1.5 — so L6 adds **no** kernel rule and
 carries no kernel-staging block). Cross-ref fidelity verified at each target; no
 dangling forward-ref.
@@ -76,16 +77,17 @@ cross-reference the L5 home rather than copy it.
   flip`): AC2/AC3 each pair accept (rowed) vs reject (untracked) on the real
   `[FS]`/`[Console]` producers, so the verdict flips on a dropped/absent row;
   AC1's hex-vs-int and AC4's no-coercion flip on type.
-- **The round-trip law is asserted as a dischargeable obligation over *all*
-  strings** (`(property)`), not a single sampled round-trip (the untrusted-layer
-  lesson) — AC5.
-- **The reverse round-trip is pinned as a NON-law at the source** (`§1.5`): a
-  `Bytes → String → Bytes` case asserting
-  `bytes_decode b = Ok s ⇒ encode s = b` would be a **wrong case that rejects
-  conforming implementations**, so the boundary is pinned with a **non-NFC
-  distinguishing witness** (a witness off the degenerate already-NFC point —
-  the `taint-axis`/off-grid-witness discipline) to show the asymmetry is real,
-  not to require the reverse.
+- **AC5 is asserted through the quantified F3 equality inhabitant**, not by
+  discharging the opaque `BytesRoundTripLaw` marker and not by deriving the
+  decoder from Ken source. F3 is a trusted contract of the primitive
+  implementation; it is not a sampled round-trip.
+- **The reverse round-trip is pinned as a NON-law at the source** (`38 §1.5`):
+  a `Bytes → String → Bytes` case asserting
+  `bytes_decode b = Ok s ⇒ bytes_encode s = b` would be a **wrong case that
+  rejects conforming implementations**, so the boundary is pinned with a
+  **non-NFC distinguishing witness** (a witness off the degenerate already-NFC
+  point — the `taint-axis`/off-grid-witness discipline) to show the asymmetry
+  is real, not to require the reverse.
 - **Safe partiality is exact, not an oracle.** CP0 closes the former
   `Option`-vs-refinement seam: `bytes_at` and `bytes_slice` return `Option`, and
   invalid indices/spans return `None`. The cases assert the result constructors
@@ -288,32 +290,34 @@ gate (this case does not re-pin the gate — see the subsume note).
 
 ---
 
-## AC5 — the round-trip law (one-directional, dischargeable)
+## AC5 — the one-directional round-trip equality (F3 contract)
 
-### surface/bytes-io/bytes-decode-encode-roundtrip-provable (property)
-- spec: `38 §1.5`, `41 §3a` (NFC idempotent at construction), `20-verification/`
-- given: the named `BytesRoundTripLaw` obligation
-  `∀ (s : String). bytes_decode (encode s) = Ok s`.
-- expect: the obligation is **dischargeable** (provable) against
-  `20-verification/` — `encode s` is valid UTF-8 (so `bytes_decode` succeeds,
-  `Ok`), `bytes_decode` rebuilds a `String` **NFC-normalizing at construction**
-  (`41 §3a`), and `s` is **already** NFC with NFC **idempotent**, so the
-  reconstruction **equals** `s`. Assert the **obligation is provable over all `s`**
-  (`(property)`), **not** that one sampled string round-trips.
-- why: AC5 — the serialization contract as a **verified-component** target. The
-  structural assertion is "the obligation discharges", per the untrusted-layer
-  lesson; a single-sample case would pass even if the law fails for some `s`.
-  The proof rests on NFC-idempotence (`41 §3a`), re-derived here, not assumed.
-  (property/obligation.)
+### surface/bytes-io/bytes-decode-encode-f3-contract-inhabitant (property)
+- spec: `38 §1.4` (F3), `38 §1.5` (marker distinction and direction).
+- given: the `bytes_decode_encode` contract
+  `(s : String) → Equal (Result Utf8Error String)
+  (bytes_decode (bytes_encode s)) (Ok Utf8Error String s)`.
+- expect: for arbitrary `s`, applying F3 supplies a checked term of the exact
+  decode-after-encode equality. This is a **trusted property of the primitive
+  implementation**, not an unassisted Ken-source proof of the decoder or a
+  derivation from NFC idempotence. `BytesRoundTripLaw : Ω₀` remains an opaque
+  marker, not definitionally this equality and not itself its inhabitant; a
+  separate marker-discharge test checks only the obligation mechanism. The
+  conformance assertion is the quantified F3 inhabitant, **not** one sampled
+  round-trip or a claim that the marker proves the semantics.
+- why: landed `38 §1.4–1.5` makes F3 the explicit law witness relative to the
+  trusted primitive contract. The marker's L8 proof target is separate, and
+  proving the decoder from Ken source is not claimed here. (property/contract.)
 
 ### surface/bytes-io/reverse-roundtrip-is-not-a-law
 - spec: `38 §1.5` (the silence pinned at source), `41 §3a` (renormalization)
 - given: the **non-NFC but valid** UTF-8 witness `b = 0x[65 cc 81]` — the NFD
   spelling of `"é"` (`U+0065` `e` + `U+0301` combining acute). Consider the
-  successful `Ok s` arm of `bytes_decode b`, followed by `encode s`.
+  successful `Ok s` arm of `bytes_decode b`, followed by `bytes_encode s`.
 - expect: `bytes_decode b = Ok "é"`, but the reconstructed `String`
-  **NFC-normalizes** at construction (`41 §3a`) to `U+00E9`, so encoding the
-  successful result yields `0x[c3 a9]` (the NFC bytes) **≠**
+  **NFC-normalizes** at construction (`41 §3a`) to `U+00E9`, so
+  `bytes_encode` on the successful result yields `0x[c3 a9]` (the NFC bytes)
+  **≠**
   `b = 0x[65 cc 81]`. Therefore the successful
   `Bytes → String → Bytes` reverse trip does **NOT** preserve every valid input
   byte sequence, and **conformance must NOT assert it as a law** — doing so
@@ -344,7 +348,7 @@ gate (this case does not re-pin the gate — see the subsume note).
   `text-from-bytes-requires-named-bytes-decode`,
   `bytes-decode-valid-ok-invalid-utf8-err`.
 - **AC5** (round-trip law, one-directional):
-  `bytes-decode-encode-roundtrip-provable`
+  `bytes-decode-encode-f3-contract-inhabitant`
   (property), `reverse-roundtrip-is-not-a-law`.
 
 ## Cross-case consistency sweep
@@ -366,16 +370,17 @@ gate (this case does not re-pin the gate — see the subsume note).
   `text-from-bytes-requires-named-bytes-decode` rejects the absent named step;
   `bytes-decode-valid-ok-invalid-utf8-err` then holds that step fixed and flips
   `Ok`/`Err` only on UTF-8 validity. The round-trip case quantifies over
-  `encode` outputs, not arbitrary `Bytes`, so it cannot contradict the invalid
-  witness.
+  `bytes_encode` outputs, not arbitrary `Bytes`, so it cannot contradict the
+  invalid witness.
 - **Round-trip directionality class.**
-  `bytes-decode-encode-roundtrip-provable`
-  (forward, **provable**) and `reverse-roundtrip-is-not-a-law` (reverse, **not a
-  law**) must not contradict: the forward law holds for all `s : String`; the
-  reverse fails on a non-NFC witness. Both rest on the **same** fact (`String`
-  NFC-normalizes at construction, `41 §3a`) — NFC-idempotence makes the forward
-  hold and renormalization makes the reverse fail. A case asserting the reverse
-  as a law would contradict this class.
+  `bytes-decode-encode-f3-contract-inhabitant`
+  (forward, **trusted F3 contract**) and `reverse-roundtrip-is-not-a-law`
+  (reverse, **not a law**) must not contradict: F3 states the forward equality
+  for all `s : String`, while the reverse fails on a non-NFC witness. The
+  forward equality is a trusted primitive contract, not derived from NFC
+  idempotence; normalization at String construction (`41 §3a`) grounds the
+  reverse counterexample. A case asserting the reverse as a law would
+  contradict this class.
 - **`Bytes`-from-text introduction is singular.** AC1's `b"…"`-is-not-via-
   `String` and AC4's only-`bytes_decode`-yields-`String` are duals:
   introduction of a `Bytes` literal never routes through `String`, and
@@ -410,8 +415,9 @@ machinery (`36 §1.4` gate, `ITree` denotation) is **L5, on `main`**. So every
 case here drives **real** values/signatures through **landed** mechanisms: AC2/
 AC3 route a real I/O signature through the real `36 §1.4` escape check (a real
 untracked call → a real reject, per the QA gate — not a synthetic flag); AC5's
-obligation discharges against the real `20-verification/` pipeline. The
-Language's landed CP0 build half supplies the safe **operations**
+forward equality is supplied by the trusted F3 primitive contract; a separate
+marker-discharge path does not establish decoder semantics. The Language's
+landed CP0 build half supplies the safe **operations**
 (`bytes_decode`/`bytes_at`/`bytes_slice`) and their lowering over the landed
 substrate. The pre-existing `read_bytes` operation-row case stays live;
 the retired `send`/`[Net]` case is replaced by the real landed
