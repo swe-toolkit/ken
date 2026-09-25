@@ -1,7 +1,7 @@
 ---
 id: SPEC-39-LOADER-FLOOR-FIFTEEN
 title: "Reconcile spec 39 §2.0's source loader with the closed fifteen-member prelude floor of 30 §4 and 33 §3.3: replace its stale ten-name type set and 'reuses all ten' with the fifteen-name roster and the loader's reuse of all fifteen exact checked identities; spec-only, and it gates Language QA on LANG-PRELUDE-FLOOR-FIFTEEN"
-status: ready
+status: merged
 owner: spec
 size: S
 gate: architect
