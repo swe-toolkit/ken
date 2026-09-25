@@ -142,6 +142,20 @@ fn native_string_scalar_above_u8_is_not_refused() {
 #[test]
 fn native_string_decomposed_char_list_normalizes() {
     assert_char_list_row("decomposed-two-scalars", &[0x65, 0x301], "é");
+    // A later boundary serializer can normalize the returned text. Read its
+    // byte length inside each evaluator, before any outbound observation.
+    let string = primitive(
+        "list_char_to_string",
+        vec![char_list(&[0x65, 0x301])],
+        RuntimePartiality::Total,
+    );
+    assert_both_native_engines(
+        "decomposed-two-scalars-before-export",
+        primitive("byte_length", vec![string], RuntimePartiality::Total),
+        RuntimeGroundValue::Int(2.into()),
+        &empty_native_seed(),
+        &RuntimeIrSeedEnvironment::empty(),
+    );
 }
 
 fn decode_result_partiality() -> RuntimePartiality {
