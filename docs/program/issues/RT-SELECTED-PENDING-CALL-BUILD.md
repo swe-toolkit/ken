@@ -1,7 +1,7 @@
 ---
 id: RT-SELECTED-PENDING-CALL-BUILD
 title: "Build the selected pending-call package designed in RT-SELECTED-PENDING-CALL-PACKAGE D1: a companion package beside the pending ITree word, built in the executed arm from its own ordered S/C members, carried through the six transport families to D2's one-event consuming gate, so the px7l/px7m rows can lower natively; first checkpoint measures backing classes, arm-edge dominance and traversed families before the build proceeds"
-status: draft
+status: active
 owner: runtime
 size: L
 gate: architect
@@ -13,10 +13,6 @@ origin: "RT-SELECTED-PENDING-CALL-PACKAGE AC-3: Architect D1 disposition 'REPRES
 ---
 
 # Build the selected pending-call package
-
-**Status: parked at AC-0 on `RT-PLANNER-SEED-BINDING-ORDER`**, under
-`evt_6yjef2cy4nv1e`'s e2 ≠ e3 outcome (Architect `evt_2eqe033bxff6f`). On
-resume, rebase onto it and re-run AC-0(e).
 
 ## Settled inputs -- at `1303e5cd4`
 
@@ -118,6 +114,12 @@ natively. Any row that stays ignored gets a measured reason in its
   amendment reviewed by the Architect.
 - A member whose measured backing is outside classes (a) to (e) is a STOP
   for a ruling, not a new class.
+- The build gives a converting owner (`CallableDeclaration`, `ClosureBody`)
+  with two or more parameters non-uniform per-slot result phases while
+  `joins_traps.rs::result_phase_environment_for_owner` is still seeded in ABI
+  order: STOP. Its de Bruijn reads would then take the mirror parameter's
+  phase. Seed it through `source_body_binding_order` first (latent at
+  `6bdd75394`, because every entry there is `ResultPhaseSummary::carrier()`).
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 

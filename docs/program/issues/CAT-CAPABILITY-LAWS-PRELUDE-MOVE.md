@@ -104,6 +104,15 @@ stop and report the mismatch.
     rebaselining.
   - No `trusted_base()` change. Targeted builds only, through
     `scripts/ken-cargo`; no-regression means green in CI.
+- **AC-4 (non-catalog consumers, Architect `evt_1kkygg9f7psn8`).** Enumerate
+  every non-catalog source (`crates/*/tests`, `r_layer_tests`, `ken-cli`
+  fixtures, `examples/`, `conformance/`) that loads or exposes
+  `Capability.System.Buffer` or `Capability.System.IO`, transitive importers
+  included. Classify each loose source that names a moved or retired name
+  bare as (a) consumes the moved law, so it exposes the consumer module;
+  (b) independent; or (c) a labelled transition sentinel. Post the list with
+  the candidate. The moved names are transparent, so a missed site stays
+  kernel-green, and this sweep is its only guard.
 
 ## Stop conditions
 
