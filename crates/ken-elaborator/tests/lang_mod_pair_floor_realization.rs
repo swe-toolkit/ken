@@ -205,15 +205,17 @@ fn prelude_signature_inventory_is_executable_and_closed() {
     let env = ElabEnv::new().expect("base environment");
     let signature_expected = TYPE_FLOOR
         .into_iter()
-        .filter(|name| !matches!(*name,
-            "Nat" | "Pair" | "Bottom" | "Equal" | "Prop" | "Proved" | "Top"))
+        .filter(|name| {
+            !matches!(
+                *name,
+                "Nat" | "Pair" | "Bottom" | "Equal" | "Prop" | "Proved" | "Top"
+            )
+        })
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
     assert_eq!(primitive_signature_type_ids(&env), signature_expected);
 
-    let internal = [
-        "Nat", "Pair", "Bottom", "Equal", "Prop", "Proved", "Top",
-    ]
+    let internal = ["Nat", "Pair", "Bottom", "Equal", "Prop", "Proved", "Top"]
         .map(|name| env.globals[name])
         .into_iter()
         .collect::<BTreeSet<_>>();

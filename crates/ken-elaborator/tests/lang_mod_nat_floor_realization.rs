@@ -347,9 +347,8 @@ fn primitive_signature_inventory_is_executable_and_closed() {
     let mut observed_plus_internal_provision = observed.clone();
     assert!(observed_plus_internal_provision.insert(env.globals["Nat"]));
     assert!(observed_plus_internal_provision.insert(env.globals["Pair"]));
-    observed_plus_internal_provision.extend(
-        ["Bottom", "Equal", "Prop", "Proved", "Top"].map(|name| env.globals[name]),
-    );
+    observed_plus_internal_provision
+        .extend(["Bottom", "Equal", "Prop", "Proved", "Top"].map(|name| env.globals[name]));
     assert_eq!(configured, observed_plus_internal_provision);
     assert!(!configured.contains(&env.globals["Prod"]));
 
