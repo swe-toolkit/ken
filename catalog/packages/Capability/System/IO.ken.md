@@ -18,6 +18,30 @@ exposing a `BufferSpan` producer to source code.
 ```ken
 import Core.Logic.Transport (cong)
 
+theorem write_all_terminates (fuel : Nat) : Equal Nat (write_all_call_bound fuel) fuel =
+  proof termination for write_all_call_bound fuel
+
+theorem write_all_preserves_exact_prefix
+      (span : BufferSpan) (count : TransferCount)
+    : write_all_exact_prefix_prop span count =
+  proof exact_prefix for write_all_exact_prefix_prop span count
+
+theorem write_all_success_is_complete : Equal Bool (write_all_complete Zero) True =
+  proof success_complete for write_all_complete
+
+theorem write_all_preserves_first_error
+      (error : ResourceError)
+    : Equal
+        (Result ResourceError Unit)
+        (write_all_first_error error)
+        (Err ResourceError Unit error) =
+  proof first_error for write_all_first_error error
+
+theorem write_all_all_success_holds
+      (fuel : Nat)
+    : Equal Bool (write_all_all_success fuel) True =
+  proof all_success for write_all_all_success fuel
+
 fn write_all_call_bound (fuel : Nat) : Nat =
   match fuel {
     Zero ↦ Zero;
@@ -72,28 +96,4 @@ proof all_success for write_all_all_success
     Zero ↦ Proved;
     Suc rest ↦ (proof all_success for write_all_all_success) rest
   }
-
-theorem write_all_terminates (fuel : Nat) : Equal Nat (write_all_call_bound fuel) fuel =
-  proof termination for write_all_call_bound fuel
-
-theorem write_all_preserves_exact_prefix
-      (span : BufferSpan) (count : TransferCount)
-    : write_all_exact_prefix_prop span count =
-  proof exact_prefix for write_all_exact_prefix_prop span count
-
-theorem write_all_success_is_complete : Equal Bool (write_all_complete Zero) True =
-  proof success_complete for write_all_complete
-
-theorem write_all_preserves_first_error
-      (error : ResourceError)
-    : Equal
-        (Result ResourceError Unit)
-        (write_all_first_error error)
-        (Err ResourceError Unit error) =
-  proof first_error for write_all_first_error error
-
-theorem write_all_all_success_holds
-      (fuel : Nat)
-    : Equal Bool (write_all_all_success fuel) True =
-  proof all_success for write_all_all_success fuel
 ```

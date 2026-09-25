@@ -16,16 +16,6 @@ by `writeAll`, however, are ordinary Ken data and their laws are kernel-checked.
 ```ken
 import Data.Numeric.Nat.Arithmetic (add)
 
-fn transfer_count_request_budget (count : TransferCount) : Nat =
-  add (transfer_count_nat count) (transfer_count_remaining count)
-
-proof bounded for transfer_count_request_budget
-      (count : TransferCount)
-    : Equal Nat
-        (transfer_count_request_budget count)
-        (add (transfer_count_nat count) (transfer_count_remaining count)) =
-  Refl
-
 fn buffer_window (start : Int) (length : Int) : BufferWindow = MkBufferWindow start length
 
 fn span_length (span : BufferSpan) : Int = buffer_span_length span
@@ -43,4 +33,14 @@ theorem transfer_is_bounded
         (transfer_count_request_budget count)
         (add (transfer_count_nat count) (transfer_count_remaining count)) =
   proof bounded for transfer_count_request_budget count
+
+fn transfer_count_request_budget (count : TransferCount) : Nat =
+  add (transfer_count_nat count) (transfer_count_remaining count)
+
+proof bounded for transfer_count_request_budget
+      (count : TransferCount)
+    : Equal Nat
+        (transfer_count_request_budget count)
+        (add (transfer_count_nat count) (transfer_count_remaining count)) =
+  Refl
 ```
