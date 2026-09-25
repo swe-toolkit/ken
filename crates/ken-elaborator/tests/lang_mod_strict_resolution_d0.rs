@@ -1074,6 +1074,7 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_snd",
                 "charToInt",
                 "eqChar",
+                "filter",
                 "is_sorted",
                 "leqChar",
                 "map",
