@@ -91,6 +91,8 @@ import Core.Classes.LawfulClasses (Ord)
 
 import Core.Classes.Membership (Membership)
 
+import Core.Logic.Not (Not)
+
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.Transport (cong, trans, sym)
@@ -3963,11 +3965,10 @@ evaluation, escalated and resolved as a spec restatement) with `lookup key
 (the list-first match).
 
 The mechanism: `order_equiv`/`NoDup`/`Distinct` are `Ω`-valued,
-comparison-free structural predicates (`54 §4`). `Not` (a new prelude
-registration, `¬A := A -> Bottom`) is needed here because the surface has
-no expression-position `->` — only a `view`'s type-annotation position
-parses the Pi-sugar (confirmed empirically); `NoDup`'s per-entry negation
-predicate is a `Prop`-returning value, not a type annotation.
+comparison-free structural predicates (`54 §4`). `Not` comes from
+`Core.Logic.Not`, where `Not A` reduces to `A → Bottom`. `NoDup` uses this
+propositional negation for each entry rather than deciding equality by
+computing a Boolean.
 `assoc_step`/`assoc_step_inner` mirror `assoc`'s own two-level stuck match
 (the same technique as `lookup_step`/`insert_step`), with the usual
 stop-one-step-short bridges. `assoc_skip_prefix` shows that if no entry in

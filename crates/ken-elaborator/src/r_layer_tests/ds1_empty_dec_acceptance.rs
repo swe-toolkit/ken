@@ -210,6 +210,8 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
     );
 }
 
+// Transition sentinel for L2-4: this deliberately inspects the still-
+// registered prelude family, not Core.Logic.EmptyDec's catalog identities.
 // AC2 — `Empty`/`absurdEmpty` elaborate through the real prelude+surface
 // path (not the bare-kernel harness above).
 #[test]
@@ -226,6 +228,8 @@ fn ac2_empty_and_absurd_empty_elaborate() {
         .expect("absurdEmpty must elaborate (large elim via ordinary surface match)");
 }
 
+// Transition sentinel for L2-4: this measures the prelude's still-
+// registered identities, not Core.Logic.EmptyDec's catalog identities.
 // AC3 — ground the `trusted_base()` delta on the Rust EMISSION, not a
 // `.ken` view: `Empty`/`Dec` are ordinary `declare_inductive` admissions,
 // never `declare_primitive`/`declare_postulate`.

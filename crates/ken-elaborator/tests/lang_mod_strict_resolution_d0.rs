@@ -432,6 +432,26 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // With its own Dec-family imports, this package now reaches the
+            // strict-floor census. Its conjunction names remain prelude-bound
+            // until the separate collections slice moves And and is_sorted.
+            "Algorithm.Searching.OrderedSearch".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Algorithm.Sorting.InsertionSort".to_string(),
             [
                 "And",
@@ -1005,13 +1025,9 @@ fn catalog_ambient_passthrough_migration_census() {
             [
                 "And",
                 "Bottom",
-                "Dec",
-                "Empty",
                 "Equal",
-                "No",
                 "Prop",
                 "Proved",
-                "Yes",
                 "and_fst",
                 "and_intro",
                 "and_snd",
@@ -1019,6 +1035,12 @@ fn catalog_ambient_passthrough_migration_census() {
             .into_iter()
             .map(str::to_string)
             .collect(),
+        ),
+        (
+            // This new proposition provider still uses the existing ambient
+            // Bottom name until the later floor change admits it.
+            "Core.Logic.Not".to_string(),
+            ["Bottom"].into_iter().map(str::to_string).collect(),
         ),
         (
             // The operator facade this WP adds. It declares the standard
@@ -1137,7 +1159,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "Bottom",
                 "Equal",
                 "MkUnit",
-                "Not",
                 "Prop",
                 "Proved",
                 "Top",
@@ -1386,14 +1407,11 @@ fn catalog_ambient_passthrough_migration_census() {
     .into_iter()
     .map(str::to_string)
     .collect::<BTreeSet<_>>();
-    let expected_residuals = ["Algorithm.Searching.OrderedSearch"]
-        .into_iter()
-        .map(str::to_string)
-        .collect::<BTreeSet<_>>();
+    let expected_residuals = BTreeSet::<String>::new();
     assert_eq!(clean, expected_clean, "WP-4 strict-floor-clean sentinel");
     assert_eq!(
         residual_names, expected_residuals,
-        "WP-4 baseline-red residual sentinel"
+        "WP-4 strict-floor residual sentinel"
     );
     assert!(ambient.is_disjoint(&clean));
     assert!(ambient.is_disjoint(&residual_names));

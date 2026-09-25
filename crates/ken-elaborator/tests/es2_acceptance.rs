@@ -44,6 +44,12 @@ fn mk_env_with_map() -> ElabEnv {
     .expect("Map's canonical Nat addition provider must roots-load");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.Membership")
         .expect("Map's canonical Membership provider must roots-load");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Logic.Not")
+        .expect("Map's canonical negation provider must roots-load");
+    assert!(
+        env.globals.remove("Not").is_some(),
+        "Map must take Not from its selective import, not the prelude alias"
+    );
     assert!(
         env.globals.remove("Membership").is_some(),
         "the legacy Map fixture must withhold an unqualified Membership alias"
