@@ -76,6 +76,9 @@ not give it one here.
 - If a pane is working, leave it alone.
 - If the gate refuses a dirty worktree, the owner resolves it; the Steward does
   not reset another seat by hand.
+- The gate resets only home branches (`<seat>/work`). A seat on another branch
+  is switched home and that branch is left in place; if the switch fails, the
+  seat is compacted without a reset. Tell the seat its WP branch in the kickoff.
 - If context did not drop, retry only that idle pane and verify again.
 - If a kickoff was sent before the drop, reuse the original WP thread anchor
   when re-delivering; never create a second thread.

@@ -103,7 +103,11 @@ Before marking the frame ready, verify:
 4. there are at most three normal acceptance criteria;
 5. every criterion can fail on a plausible wrong implementation;
 6. current-code facts name the measured SHA;
-7. stale or superseded prose was deleted rather than annotated.
+7. stale or superseded prose was deleted rather than annotated;
+8. every `agent/memory/CHECKS.md` check the frame's settled inputs trigger was
+   run, and its result is in the frame (a consumer list is grepped across
+   every root, an assumed enabler is written once, an exempted axis is
+   measured).
 
 Then release. Do not request a separate review of the frame unless an existing
 rule requires it.

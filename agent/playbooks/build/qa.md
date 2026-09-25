@@ -212,6 +212,9 @@ load and follow it after this generic archetype.
 
 ## What you verify
 
+0. **Decision checks:** run each `agent/memory/CHECKS.md` check the candidate
+   triggers (two agreeing derivations, a cited guard's fan-in, a proxy used as
+   a gate) and put the result in your verdict.
 1. **Conformance:** the change passes the relevant `/conformance` tests.
 2. **Spec compliance:** behavior matches `/spec` and the component design — diff
    it, don't eyeball it.

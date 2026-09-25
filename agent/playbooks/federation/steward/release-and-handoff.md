@@ -41,8 +41,11 @@ Use the Spec enclave's three roles when it is the receiving unit. Verify each
 pane shows a context drop, active compaction, or queued compaction. If the unit
 is mid-turn, wait for its clean seam; never compact away live work.
 
-The script refreshes worktrees. If a worktree is dirty or carries unmerged work,
-stop and ask its owner to resolve it. Do not reset another seat by hand.
+The script refreshes worktrees. It resets only a seat's home branch
+(`<seat>/work`): a seat on a `wp/` branch or detached is switched home first,
+and the branch it was on is never moved. If a worktree is dirty, the script
+refuses; stop and ask its owner to resolve it. Do not reset another seat by
+hand.
 
 ## 3. Kick with a pointer, not a second frame
 
