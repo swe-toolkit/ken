@@ -16,8 +16,7 @@ These rulings remain operative and are retained verbatim.
 - **2026-08-25:** "there are three lanes authorized right now. language (lane
   2) was unblocking rt on priority, and when that was done should have unblocked
   foundation (lane 3) with module/import."
-- **2026-09-23:** L3 reinstated beside L1. **2026-09-24:** L2 reactivated
-  for the load-order fix. Roster is L1 + L2 + L3.
+- **2026-09-23/24:** L3 reinstated, L2 reactivated. Roster is L1 + L2 + L3.
 
 ## Review of doc-only merges
 
@@ -26,8 +25,12 @@ These rulings remain operative and are retained verbatim.
   Narrows `evt_12a47d49frwjd`: a route cites the operator direction it
   carries out; other doc-only changes get their domain's reviewer.
 
-## Catalog proof direction -- SUSPENDED WITH L3, NOT WITHDRAWN
+## Catalog direction
 
+- **2026-09-25, census debt:** "like the ignored tests that L1 is working on,
+  this is technical debt and should be paid down now. This seems like
+  foundation work since it concerns ken source, so it should be L3's
+  priority."
 - **2026-09-13:** "The proofs are not done. A catalog package is not finished
   until its proofs are complete. Declaring that they are tested computation is
   less valuable than proven correct behavior."
@@ -53,17 +56,14 @@ These rulings remain operative and are retained verbatim.
 restate the objective.** Zero rows cleared plus N structural findings is not
 zero progress. But "could be indicative" is a prior: a minimal correct repair
 still wins when the structure says so, and restructuring returns to me to size
-as its own node. SUPERSEDES escalation `evt_5vkyp3sekgq0h`. Frames stay short;
-investigation opens a repair, never a separate report node.
+as its own node. Investigation opens a repair, never a separate report node.
 
 ## Authorized roster
 
 **L1 Runtime, L2 Language, L3 Foundation.** **2026-09-24:** operator ruled
 BYTES K3/F4'/four postulates ("concur with rec."), the L1 bracket redesign
-("option (a)."), the L1 pending-call precursor ("authorize option (a) for
-pending-call. it has to be addressed."), ArgParse laws 1-2 resume after K3
-("concur with rec."), and the L2 load-order fix ("concur with rec on load
-order bug. fix it."). K3 landed `bfdbb9789`; Spec serves BYTES D2.
+("option (a)."), and the L1 pending-call precursor ("authorize option (a) for
+pending-call. it has to be addressed."). Spec serves BYTES D2.
 
 ## Current state
 
@@ -71,7 +71,7 @@ order bug. fix it."). K3 landed `bfdbb9789`; Spec serves BYTES D2.
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-SEED-BINDING-ORDER` -- `ready`, M, T1 (Architect `evt_2eqe033bxff6f`): planner seed ignores source-body binding order | `RT-SELECTED-PENDING-CALL-BUILD` -- parked at AC-0 on it; resume re-runs AC-0(e) | Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed. Hard stop 0 |
 | L2 | language | Parked: no operator objective after the load-order fix | None (`LANG-FACADE-EXPORT-LOAD-ORDER` landed `2c6f8b204`) | None | Operator names L2's next objective |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-DERIVED-FILTER-MEMBERSHIP-LAW` -- AC-4 re-cut `a2753a8ed` routed for Full CI (`dec_5qdct2bgyb56r`) | `CAT-DERIVED-SORT-LAWS` (`ready`, S, T1); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands (D2 re-cut per AC-5) | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
+| L3 | foundation | Retire the catalog's ambient convenience names (census to zero), then resume proof backfill (operator 2026-09-25) | `CAT-DERIVED-FILTER-MEMBERSHIP-LAW` -- AC-4 re-cut `a2753a8ed` routed for Full CI (`dec_5qdct2bgyb56r`) | Ambient-name retirement program: Architect design requested; `CAT-DERIVED-SORT-LAWS` (`ready`) waits behind it; `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
 
 ## Update rule
 
