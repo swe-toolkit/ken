@@ -152,6 +152,7 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
     let mut env = roots_env();
     catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
     catalog_or::expose_module(&mut env, MODULE);
+    catalog_or::expose_module(&mut env, "Core.Logic.EmptyDec");
     env.elaborate_file(
         "fn cat_bsearch_decision \
              (a : Type) (d : Ord a) (x : a) (xs : List a) \
