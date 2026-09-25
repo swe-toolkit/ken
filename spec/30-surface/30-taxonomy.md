@@ -200,9 +200,13 @@ Ken-defined **type floor** is the closed fifteen-member set
 ResourceKind, Result, Top, Utf8Error}`**.
 
 The type count is fifteen — the former ten plus the five kernel-machinery-keyed
-proposition/equality members — not ten; the definable `And`/`Dec`/`Yes`/`No`/
-`Empty` stay **out** (source-constructible, with a `Core/Logic` package home,
-failing the machinery-keying witness). `Pair`'s floor-binding closure
+proposition/equality members — not ten. The definable `And`/`Dec`/`Yes`/`No`
+stay **out** (source-constructible, with a `Core/Logic` package home, and no
+internal-provision witness). The compiler's `Empty` identity is different: it
+is keyed by `space` desugaring, but no surface contract independently requires
+source to name that exact identity. It stays compiler-internal under the
+conjunction above, not in the floor; the catalog's `Core.Logic.EmptyDec.Empty`
+is a separate, lawful package identity. `Pair`'s floor-binding closure
 also contains the exact three companions `{mk_pair, pair_fst, pair_snd}`. They
 are operations, not type members. Their checked types reference the canonical
 `Pair` identity, and their bodies use the kernel pair-introduction and
@@ -236,8 +240,16 @@ also holds. `Unit` and the Program-I input/exit families are candidates, not
 an automatic extension merely because the compiler registers them. A source
 wrapper over an ABI (for example `Capability/Process/Exit`'s
 `exit_with`/`exit_from_result`) does not become an intrinsic identity by using
-one. `Empty`, installed for `Dec` but not forced by a native identity reader,
-fails the keying clause and remains an import-required package.
+one. The pre-source `Empty` identity is keyed by `elaborate_space_decl` when it
+builds the `space` effect and state fold (`36 §4.1–4.2`), but this is desugarer
+output: no current source contract requires programs to name that exact
+identity. It is internal-only, while source-level `Empty` is an
+import-required package identity. A future `36` contract requiring source to
+name the desugarer's exact `Empty` would be a separately gated source-contract
+change. Once keying and that independent source need both hold, the existing
+rule admits `Empty` to the floor without per-name operator approval; the
+catalog `Empty` then retires, with the roster/count changed atomically. This
+contingency adds no present floor member.
 
 The [open per-name intrinsic ledger](30-intrinsic-ledger.md) records candidate
 names, possible keying mechanisms, missing witness arms, and the separate
@@ -286,7 +298,9 @@ path from the built-ins stated in-spec**. `Nat` and `Pair` are therefore not
 package carriers: they are the kernel-origin and compiler-bootstrap members of
 the internal-provision arm. `Option` and `Result` are likewise not packages:
 public primitive signatures name their canonical compiler-installed
-identities. `Empty` and `Either` remain packages; `Unit` is a candidate for the
+identities. The source-level `Empty` in `Core.Logic.EmptyDec` and `Either`
+remain packages; the separately keyed `Empty` used by `space` desugaring is
+compiler-internal, not a package export. `Unit` is a candidate for the
 internal-provision arm, **not** a sixteenth floor member until both witness
 clauses are proven and §4's roster changes atomically. A same-shaped source
 definition of `Pair` allocates a distinct identity; it neither replaces the
