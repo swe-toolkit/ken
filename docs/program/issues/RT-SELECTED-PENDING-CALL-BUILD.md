@@ -123,6 +123,10 @@ natively. Any row that stays ignored gets a measured reason in its
   order: STOP. Its de Bruijn reads would then take the mirror parameter's
   phase. Seed it through `source_body_binding_order` first (latent at
   `6bdd75394`, because every entry there is `ResultPhaseSummary::carrier()`).
+- **Increment 2 is held until the binder attribution lands** (Architect
+  `evt_3yce3vzbddvk0`): it emits raw `Var` reads on the px7l route, where
+  one `Match` binder is missing from erasure's remap. Increment 1 gates by
+  checked call template and records the (walker, morphism) index pair.
 - **The F5/F6 increment starts with a design ruling.** Carrying a package
   across a return or a generated unit call needs a per-member backing
   authority, which the names-only plane (`abi.rs:55-60`) cannot supply. That
@@ -138,3 +142,9 @@ natively. Any row that stays ignored gets a measured reason in its
    names-only (`abi.rs:55-60`) -- keyed on the per-value pointee type the
    plane deliberately does not carry. Discharged by route confinement (no
    F5/F6 crossing) for increments 1-2 (Architect `evt_327ykvk4cv8bq`).
+2. The pending IH's runtime position has two derivations that disagree at
+   px7l origin 47 (IR binding structure 4, erasure-minted morphism and
+   callee `Var` 3): one `Match` case binder on the host-response dispatch
+   path has no group in erasure's `BranchBinderRemap` -- keyed on a runtime
+   binder that erasure's coordinate map does not record (Architect
+   `evt_3yce3vzbddvk0`).
