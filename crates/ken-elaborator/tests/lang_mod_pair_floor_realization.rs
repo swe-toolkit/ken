@@ -11,16 +11,21 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 10] = [
+const TYPE_FLOOR: [&str; 15] = [
     "Auth",
     "Bool",
+    "Bottom",
     "Char",
+    "Equal",
     "List",
     "Nat",
     "Option",
     "Pair",
+    "Prop",
+    "Proved",
     "ResourceKind",
     "Result",
+    "Top",
     "Utf8Error",
 ];
 
@@ -182,9 +187,9 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the primitive producer traversal yields exactly the eight
-/// signature identities, the two explicit internal-provision identities close
-/// the type inventory to ten, and the separately configured companion
+/// MEASURED: the primitive producer traversal yields exactly eight signature
+/// identities, and Nat, Pair and five kernel-keyed proposition/equality members
+/// close the type inventory to fifteen. The separately configured companion
 /// inventory has three checked-transparent constants keyed to the exact Pair
 /// identity. CLAIMED: type and binding membership are independent closed
 /// inventories rather than one compiler-global allow-list. THE GAP: source
@@ -200,12 +205,16 @@ fn prelude_signature_inventory_is_executable_and_closed() {
     let env = ElabEnv::new().expect("base environment");
     let signature_expected = TYPE_FLOOR
         .into_iter()
-        .filter(|name| !matches!(*name, "Nat" | "Pair"))
+        .filter(|name| !matches!(*name,
+            "Nat" | "Pair" | "Bottom" | "Equal" | "Prop" | "Proved" | "Top"))
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
     assert_eq!(primitive_signature_type_ids(&env), signature_expected);
 
-    let internal = [env.globals["Nat"], env.globals["Pair"]]
+    let internal = [
+        "Nat", "Pair", "Bottom", "Equal", "Prop", "Proved", "Top",
+    ]
+        .map(|name| env.globals[name])
         .into_iter()
         .collect::<BTreeSet<_>>();
     let configured = PRELUDE_FLOOR_NAMES
@@ -504,8 +513,9 @@ fn pair_floor_beta_eta_are_definitional() {
     }
 }
 
-/// Fresh Strict execution re-derives the post-realization frontier without
-/// projecting Legacy evidence or declaring every catalog subject closed.
+/// Fresh Strict execution re-derives the frontier after the five additional
+/// proposition/equality floor members, without projecting Legacy evidence or
+/// declaring every catalog subject closed.
 #[test]
 fn pair_floor_closure_is_rederived_after_realization() {
     let root = catalog_root();
@@ -535,14 +545,14 @@ fn pair_floor_closure_is_rederived_after_realization() {
             );
         }
         match result {
-            Err(ElabError::UnboundName { name, .. }) if name == "Equal" => {
+            Err(ElabError::UnboundName { name, .. }) if name == "And" => {
                 observed_failures.insert(*module);
             }
             Ok(_) => {
                 observed_successes.insert(*module);
             }
             other => panic!(
-                "{module} must stop at the exact post-Pair UnboundName(Equal) frontier, got {other:?}"
+                "{module} must stop at the exact post-fifteen UnboundName(And) frontier, got {other:?}"
             ),
         }
     }

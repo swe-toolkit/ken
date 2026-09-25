@@ -91,6 +91,10 @@ pub struct ModuleState {
     active_imports: Vec<String>,
     /// Parent names in the closed prelude floor (`30-taxonomy §4`).
     prelude_names: HashSet<String>,
+    /// Exact pre-source IDs for those parents, independently of the mutable
+    /// source-visible globals map. Strict entry validates this roster before
+    /// loading or reusing a unit.
+    prelude_floor_ids: HashMap<String, ken_kernel::GlobalId>,
     /// Unshadowable bindings derived from the exact floor parents: those
     /// parent names plus only their kernel-recorded constructor names.
     prelude_binding_names: HashSet<String>,
@@ -120,21 +124,26 @@ struct ExportProvenance {
 /// inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// `Nat` and `Pair` have separate internal-provision witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 10] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 15] = [
     "Auth",
     "Bool",
+    "Bottom",
     "Char",
+    "Equal",
     "List",
     "Nat",
     "Option",
     "Pair",
+    "Prop",
+    "Proved",
     "ResourceKind",
     "Result",
+    "Top",
     "Utf8Error",
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
-/// These are not type-floor members and do not increase its ten-member count.
+/// These are not type-floor members and do not increase its fifteen-member count.
 pub const PRELUDE_COMPANION_BINDING_NAMES: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
 
 pub fn is_prelude_floor_name(name: &str) -> bool {
@@ -183,16 +192,21 @@ impl ModuleState {
         globals: &HashMap<String, ken_kernel::GlobalId>,
         native_trusted_base: &std::collections::BTreeSet<ken_kernel::GlobalId>,
     ) -> Result<(), ElabError> {
-        let floor_formers: HashSet<_> = PRELUDE_FLOOR_NAMES
+        let floor_ids: HashMap<_, _> = PRELUDE_FLOOR_NAMES
             .iter()
             .map(|name| {
-                globals.get(*name).copied().ok_or_else(|| {
-                    ElabError::Internal(format!(
-                        "prelude type-floor member `{name}` has no pre-source identity"
-                    ))
-                })
+                globals
+                    .get(*name)
+                    .copied()
+                    .map(|id| (name.to_string(), id))
+                    .ok_or_else(|| {
+                        ElabError::Internal(format!(
+                            "prelude type-floor member `{name}` has no pre-source identity"
+                        ))
+                    })
             })
             .collect::<Result<_, _>>()?;
+        let floor_formers: HashSet<_> = floor_ids.values().copied().collect();
         let pair_id = globals.get("Pair").copied().ok_or_else(|| {
             ElabError::Internal(
                 "prelude type-floor member `Pair` has no pre-source identity".to_string(),
@@ -230,6 +244,7 @@ impl ModuleState {
         // postulate. Validate its kernel identity before reserving its name.
         require_fixed_proved_identity(env, globals)?;
 
+        self.prelude_floor_ids = floor_ids;
         self.prelude_binding_names = self.prelude_names.clone();
         self.strict_builtin_names = globals
             .iter()
@@ -251,6 +266,26 @@ impl ModuleState {
         self.strict_builtin_names.insert("Proved".to_string());
         Ok(())
     }
+}
+
+fn require_pre_source_floor_identities(
+    state: &ModuleState,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+) -> Result<(), ElabError> {
+    for name in PRELUDE_FLOOR_NAMES {
+        let expected = state.prelude_floor_ids.get(name).ok_or_else(|| {
+            ElabError::Internal(format!(
+                "pre-source floor identity `{name}` was not captured"
+            ))
+        })?;
+        if globals.get(name) != Some(expected) {
+            return Err(ElabError::Internal(format!(
+                "prelude floor identity mismatch for `{name}`: expected {expected:?}, found {:?}",
+                globals.get(name)
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn require_fixed_proved_identity(
@@ -1741,6 +1776,7 @@ fn elaborate_module_from_roots_with_mode(
     // before loading or reusing any strict unit; do not heal a forged map.
     if mode == ResolutionMode::Strict {
         require_fixed_proved_identity(&elab.env, &elab.globals)?;
+        require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
     }
     if roots.len() != 1 {
         return Err(ElabError::ParseError {

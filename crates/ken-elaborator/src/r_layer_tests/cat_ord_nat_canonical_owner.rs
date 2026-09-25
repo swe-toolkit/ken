@@ -255,8 +255,8 @@ fn pair_floor_advances_the_structural_compare_boundary() {
         .expect_err("Compare retains later non-floor dependencies");
     assert_eq!(strict.globals["Pair"], canonical_pair);
     assert!(
-        matches!(error, ElabError::UnboundName { ref name, .. } if name == "Equal"),
-        "Pair must no longer be the first Strict boundary, got {error:?}"
+        matches!(error, ElabError::UnboundName { ref name, .. } if name == "And"),
+        "the fifteen-member floor must reach the later And boundary, got {error:?}"
     );
 }
 
