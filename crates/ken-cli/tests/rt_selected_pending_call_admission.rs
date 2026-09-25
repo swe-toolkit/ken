@@ -73,9 +73,15 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
                 candidates,
                 width,
                 defining_function,
-                families,
+                allowed_families,
                 gates,
-            } => Some((candidates, width, defining_function, families, gates)),
+            } => Some((
+                candidates,
+                width,
+                defining_function,
+                allowed_families,
+                gates,
+            )),
             _ => None,
         })
         .collect();
@@ -84,7 +90,7 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
         1,
         "one differing-unit Match must be planned: {rows:#?}"
     );
-    let (candidates, width, owner, families, gates) = planned[0];
+    let (candidates, width, owner, allowed_families, gates) = planned[0];
     assert_eq!((*width, *owner), (6, 3));
     assert_eq!(
         candidates
@@ -100,7 +106,7 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
             .collect::<Vec<_>>(),
         vec![3, 3]
     );
-    assert_eq!(families, &["F1", "F2", "F3", "F4"]);
+    assert_eq!(allowed_families, &["F1", "F2", "F3", "F4"]);
     assert!(
         !gates.is_empty(),
         "the planner must locate the carried-call path"
@@ -133,4 +139,38 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
             );
         }
     }
+}
+
+/// Refused upstream by the response planner at 6bdd75394; not an admission
+/// witness. This checked double-bind source cannot reach the linearity guard:
+/// the response planner rejects its duplicate host response case first. No
+/// native artifact is executed in this test. The planner-level unit fixture in
+/// ken-runtime observes the shadowed admission guard separately.
+#[test]
+fn checked_double_bind_is_refused_upstream_not_admitted() {
+    const ORIGINAL: &str = "  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    (body MkUnit)\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      (Result IOError Unit) ExitCode\n      (host_console APartial (Result IOError Unit) (flush Stdout))\n      (\\_. host_exit APartial Success))";
+    const DOUBLE_BIND: &str = "  let p : HostIO APartial Unit = body MkUnit in\n  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    p\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      Unit ExitCode\n      p\n      (\\_. host_exit APartial Success))";
+    assert_eq!(PX7L.matches(ORIGINAL).count(), 1);
+    let source = PX7L.replacen(ORIGINAL, DOUBLE_BIND, 1);
+    let dir = tempfile::tempdir().unwrap();
+    let (outcome, rows) = ken_runtime::with_selected_pending_call_admissions(|| {
+        ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            "rt-pending-duplicate",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    assert!(
+        rows.is_empty(),
+        "response planning must refuse before admission: {rows:#?}"
+    );
+    let error = outcome.expect_err("double bind cannot produce a native artifact");
+    assert!(
+        format!("{error:?}").contains(
+            "native static transition planner invariant failed; please report this compiler bug: two host response cases claim one operation constructor"
+        ),
+        "the direct double bind must remain an upstream refusal, not a surrogate admission witness: {error:?}"
+    );
 }
