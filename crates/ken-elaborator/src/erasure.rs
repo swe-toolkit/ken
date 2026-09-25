@@ -3999,10 +3999,14 @@ fn lower_runtime_selected_host_operation(
         })
     };
 
-    let fs = leaf_dispatch(&spine.fs_family, RuntimeExpr::Var(0), 1)?;
-    let console = leaf_dispatch(&spine.console_family, RuntimeExpr::Var(0), 2)?;
-    let clock = leaf_dispatch(&spine.clock_family, RuntimeExpr::Var(0), 2)?;
-    let entropy = leaf_dispatch(&spine.entropy_family, RuntimeExpr::Var(0), 2)?;
+    // Each nested coproduct Match adds one case binder before its leaf.
+    let hostio_leaf_depth = 1;
+    let fs = leaf_dispatch(&spine.fs_family, RuntimeExpr::Var(0), hostio_leaf_depth)?;
+    let ambient_leaf_depth = hostio_leaf_depth + 1;
+    let console = leaf_dispatch(&spine.console_family, RuntimeExpr::Var(0), ambient_leaf_depth)?;
+    let tail_leaf_depth = ambient_leaf_depth + 1;
+    let clock = leaf_dispatch(&spine.clock_family, RuntimeExpr::Var(0), tail_leaf_depth)?;
+    let entropy = leaf_dispatch(&spine.entropy_family, RuntimeExpr::Var(0), tail_leaf_depth)?;
     // The ambient algebra is the closed three-way sum Console + Clock +
     // Entropy, represented as Coproduct ConsoleOp (Coproduct ClockOp
     // EntropyOp). The elimination mirrors that nesting exactly, and lives
@@ -7133,6 +7137,10 @@ fn effects_for_targets(package: &CheckedCorePackage, targets: &[StableSymbol]) -
         .flat_map(|(_, meta)| meta.declared_effects.iter().cloned())
         .collect()
 }
+
+#[cfg(test)]
+#[path = "erasure/selected_host_binder_depth_tests.rs"]
+mod selected_host_binder_depth_tests;
 
 #[cfg(test)]
 mod px7l_tests {
