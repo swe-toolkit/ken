@@ -72,12 +72,17 @@ by-spelling read of the live globals map.
   at each `space` (`elab.rs:13450`), so a same-program `data Empty` rebinds it.
   Capture the prelude `Empty` in a `PreludeEnv` field before source
   elaboration, as `Proved`'s fixed identity is (`modules.rs:258-261`), and use
-  it there. Controls, each red on base:
-  - `data Empty (a : Type) : Type where {}` followed by a `space` no longer
-    fails `TypeMismatch`: the space uses the prelude identity;
-  - `data Empty : Type where { Oops : Empty }` followed by a `space` cannot
-    make that space's residual op type inhabited;
-  - reverting the capture reddens both.
+  it there. Controls (Architect `evt_6drg78c0zz7dz`), each red on base:
+  - `data Empty (a : Type) : Type where {}` followed by a `space` checks
+    instead of failing `TypeMismatch`;
+  - with `data Empty : Type where { Oops : Empty }` before a `space`, the
+    `GlobalId` in the residual position of the elaborated `Counter.get` type
+    equals the `PreludeEnv` capture and differs from the source `Empty`'s;
+  - with `"Empty"` removed from the globals map after `ElabEnv::new()` (as
+    `modules.rs:4534` removes `"Proved"`), a `space` still elaborates, with
+    the captured identity in the residual position; on base it fails
+    `Internal("space desugaring requires the prelude Empty type")`;
+  - reverting the capture reddens all three.
 - **AC-2.** The census diff is deletion-only. The deleted (row, name) pairs are
   predicted before the build and measured after it; an unpredicted deletion is
   a finding. If `CAT-LOGIC-PRELUDE-MOVE` lands first, its row
