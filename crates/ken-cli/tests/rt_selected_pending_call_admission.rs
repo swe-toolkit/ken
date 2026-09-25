@@ -76,6 +76,7 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
                 visited,
                 traversed_families,
                 gates,
+                gate_binder_pairs,
             } => Some((
                 candidates,
                 width,
@@ -83,6 +84,7 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
                 visited,
                 traversed_families,
                 gates,
+                gate_binder_pairs,
             )),
             _ => None,
         })
@@ -92,7 +94,8 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
         1,
         "one differing-unit Match must be planned: {rows:#?}"
     );
-    let (candidates, width, owner, visited, traversed_families, gates) = planned[0];
+    let (candidates, width, owner, visited, traversed_families, gates, gate_binder_pairs) =
+        planned[0];
     assert_eq!((*width, *owner), (6, 3));
     assert_eq!(
         candidates
@@ -108,10 +111,14 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
             .collect::<Vec<_>>(),
         vec![3, 3]
     );
-    assert!(
-        !visited.is_empty(),
-        "the planner must publish visited route origins"
-    );
+    // Transition sentinel for this checked source and planner base: each
+    // origin below is an actual route step, not an allowed-family inventory.
+    for expected in [(311, "F1"), (96, "F1"), (55, "F1"), (49, "F3"), (47, "F4")] {
+        assert!(
+            visited.contains(&expected),
+            "missing route visit {expected:?}: {visited:?}"
+        );
+    }
     let derived_families = visited
         .iter()
         .filter_map(|(_, kind)| (*kind != "Local").then_some(*kind))
@@ -123,6 +130,16 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
         !gates.is_empty(),
         "the planner must locate the carried-call path"
     );
+    assert!(
+        gate_binder_pairs.contains(&(47, 4, 3)),
+        "the raw runtime IH Var index and erasure's binder morphism disagree at marker 47; the checked template, not either index, authorizes the gate: {gate_binder_pairs:?}"
+    );
+    for &(origin, ..) in gate_binder_pairs {
+        assert!(
+            visited.contains(&(origin, "F4")),
+            "a binder pair must be attributed to a visited marker: {origin}"
+        );
+    }
     let source_main = source_main_parameters(PX7L);
     assert_eq!(source_main, ["_input", "_caps"]);
     for candidate in candidates {

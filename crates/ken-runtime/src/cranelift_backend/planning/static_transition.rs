@@ -971,8 +971,6 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
     planner.connect_declaration_calls(&declaration_entries)?;
     let plan = planner.finish(symbols, root_ingress, functionized_units)?;
     #[cfg(feature = "px8-ds-test-support")]
-    selected_pending_calls::record_selected_pending_call_admissions(&plan);
-    #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     Ok(plan)
 }
