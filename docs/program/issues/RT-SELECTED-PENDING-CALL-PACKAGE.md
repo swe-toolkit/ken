@@ -341,3 +341,98 @@ reports each of the six members' class as measured.
   static frame slots. The only runtime resources are one live slot and one
   generation per selection, both already profiled. **There is no new
   unprofiled resource, hence no STOP.**
+
+## D1 amendment 1 (AC-0 ruling, Architect `evt_54vq22cwfnp9k`, at `5a3f3dad0`)
+
+Recorded verbatim from the Architect's ruling on the
+`RT-SELECTED-PENDING-CALL-BUILD` AC-0 checkpoint `evt_2dkb9zeymy5g0`.
+A1-A4 and AC-0(e) are D1 amendments.
+
+**RT-SELECTED-PENDING-CALL-BUILD AC-0 ruling on base `5a3f3dad0`: no §5 STOP.
+The build proceeds after one measurement, AC-0(e) below, under D1 amendments
+A1-A4.** The measurement is the AC-0 checkpoint `evt_2dkb9zeymy5g0`, and it is
+good work: the S2 finding and the source-machine F4 site are both real.
+
+**§1a for the build chain stays at 0.** AC-0 is a measurement my ruling asked
+for, so it is non-advancing, and there is no inventory row.
+
+### A1. S2 is admitted as a new class (f): an ingress-borrowed pointee.
+
+- **What it is:** host-owned process-input storage that the native harness
+  allocates **before** `ken_activation_v1_begin` and frees only **after**
+  `ken_activation_v1_destroy`.
+- **Measured order** at `object_linker_packaging.rs:2436-2495`: `calloc` of
+  `pool`, then store open, then activation begin, then
+  `bind_process_frame(root)`, then `ken_nc23_entrypoint`. After that come
+  `take_selected_call_failure`, activation finish and destroy, store destroy,
+  and **`free(pool)` last**.
+- **Why this is safe:** every package lives strictly inside the entrypoint's
+  execution, because D1 item 0 refuses the generated root. So the pointee
+  outlives every ticket and every call.
+- **It is not a new resource.** It is existing caller-owned backing, and no
+  D1 allocation is involved.
+- **Condition:** (f) applies only to harness templates whose ingress release
+  follows activation destroy. The build verifies this for **each**
+  generated-root template in `object_linker_packaging.rs` (there are at least
+  two C templates, near `:2121` and `:2270`). A program built for any
+  template that does not satisfy it is refused.
+- **Borrowed loads:** the pointer word is copied, the pointee is never
+  touched before the consume, and the callee alone dereferences it.
+
+### A2. The F4 gate goes at every carried-residual consumer, not only `core.rs::lower_recursor_residual_call`.
+
+- My D1 named one site. The fixture's operative site is
+  `source.rs::source_call_state`'s carried branch (`:4990-5016`), which your
+  backtrace shows is where all four rows refuse.
+- The gate is **one shared helper**. It is called first inside each
+  carried-residual branch whenever a companion is present, before the
+  `recursive_unit_body` check, at every consumer of
+  `reject_carried_residual_arguments`. The doc at `core.rs:3095` names four.
+- Companion-less behavior stays byte-for-byte the same.
+- The source machine carries values as `RoutedAnswer` and in env bindings,
+  which are D1's placements, so the companion rides there. The gate emits
+  into the same function as the arm, `Predeclared(3)`, so the fixture's route
+  has no F5 or F6 crossing.
+
+### A3. Nested arms (px7m dynamic-ok).
+
+- The candidate set is the leaf `ITree::Vis` units across nested producer
+  Matches: worker 369 and nested worker 332.
+- The package is built in the **innermost** selected arm, after every
+  enclosing `brif` edge. It reaches the outer join through each intervening
+  F2 join, with zero-ticket padding on arms that construct no package.
+
+### A4. C0 and the emission-site evidence.
+
+- **C0 is class (a).** Both arms receive the same environment `[Bool, v11,
+  v10]`, as you measured. The claim `CurrentLexical` alias 0 at emission 339
+  therefore resolves to lexical index 0 at the arm, which is `terminal`, the
+  immediate Bool. Resolution works the same way for sibling 343's C0 (D0).
+- **Source-to-environment association is the accepted AC-0 standard** for
+  S0-S2 and C0-C2 on this base. The 322 arm cannot be emitted before the
+  build exists, so materialization belongs to AC-2's positive witness.
+- **The arm-edge dominance in AC-0(b) becomes a build obligation.** A
+  lowering test runs cranelift's dominator tree over the emitted function.
+  It asserts the issue call's block is dominated by the selected arm's entry
+  block (block10 for 322). A mutation that hoists the issue above the `brif`
+  must turn the test red.
+
+### AC-0(e): measure this before AC-1. The C1/C2 order is unresolved.
+
+- The two readings disagree:
+  - The context coordinates say C1 = EntryAbi position 0 (`_input`, v10) and
+    C2 = position 1 (`_caps`, v11).
+  - The direct-emission aliases, and 343's actual frame, say C1 = v11
+    (`_caps`) and C2 = v10 (`_input`).
+- Both are admitted classes, so classification is unaffected. But an
+  operand-order swap is a silent wrong call that **the gate cannot catch**:
+  the gate authenticates the target, not operand order.
+- **Measure, scratch-only,** which source variable 322's body, and 343's,
+  actually **reads** from Capture ordinals 1 and 2 inside the callee. Then:
+  - **If it matches the alias reading, the one 343's landed route uses,**
+    build with the same resolution `assemble_continuation_call_operands`
+    performs, and continue into AC-1 without another review. Add a test
+    pinning 322's C1/C2 to the callee's consumption.
+  - **If it matches the coordinate reading,** STOP. 343's landed
+    constructed-frame route then carries a pre-existing operand-order defect,
+    and that belongs in its own node, not in this build.

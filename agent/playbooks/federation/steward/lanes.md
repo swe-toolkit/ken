@@ -69,9 +69,9 @@ order bug. fix it."). K3 landed `bfdbb9789`; Spec serves BYTES D2.
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-SELECTED-PENDING-CALL-BUILD` -- `ready`, L, T1; AC-0 checkpoint first (D1 Architect `evt_3y5xkyf1v02dj`) | Follows from the rows the build leaves ignored | Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed. Hard stop 0 |
-| L2 | language | Make module import resolution load-order independent (spec 33 §3.3) | `LANG-FACADE-EXPORT-LOAD-ORDER` -- `active`, S, T1 (anchor `evt_42y7m4ftm872c`; Adversary `evt_5n8nhxesrbwz4`) | None | After the facade repair, L2 needs a new operator objective |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-DERIVED-FILTER-MEMBERSHIP-LAW` -- `3cc16e8d1` Full-CI red on the ambient census; re-cut per AC-4 (Architect `evt_4grsne5p7yyc1`) | `CAT-DERIVED-SORT-LAWS` (`ready`, S, T1); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands (D2 re-cut per AC-5) | Editing the census sentinel is NOT authorized except FILTER AC-4 and BYTES AC-5 (Architect `evt_6x38xqk62w4n7`) |
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-SELECTED-PENDING-CALL-BUILD` -- `active`, L, T1 (anchor `evt_7p5g7eechwjy6`); AC-0 ruled, D1 amendment 1 (`evt_54vq22cwfnp9k`): AC-0(e) operand order, then AC-1 | Follows from the rows the build leaves ignored | Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed. Hard stop 0 |
+| L2 | language | Parked: no operator objective after the load-order fix | None (`LANG-FACADE-EXPORT-LOAD-ORDER` landed `2c6f8b204`) | None | Operator names L2's next objective |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-DERIVED-FILTER-MEMBERSHIP-LAW` -- AC-4 re-cut `a2753a8ed` routed for Full CI (`dec_5qdct2bgyb56r`) | `CAT-DERIVED-SORT-LAWS` (`ready`, S, T1); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands (D2 re-cut per AC-5) | Editing the census sentinel is NOT authorized except FILTER AC-4 and BYTES AC-5 (Architect `evt_6x38xqk62w4n7`) |
 
 ## Update rule
 
