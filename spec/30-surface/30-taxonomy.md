@@ -292,15 +292,18 @@ identity or fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib
 
-Everything Ken-definable that **neither** prelude arm admits is a **standard
-package**: optional, explicitly imported, ordinary Ken with its **derivation
-path from the built-ins stated in-spec**. `Nat` and `Pair` are therefore not
-package carriers: they are the kernel-origin and compiler-bootstrap members of
-the internal-provision arm. `Option` and `Result` are likewise not packages:
-public primitive signatures name their canonical compiler-installed
-identities. The source-level `Empty` in `Core.Logic.EmptyDec` and `Either`
-remain packages; the separately keyed `Empty` used by `space` desugaring is
-compiler-internal, not a package export. `Unit` is a candidate for the
+Every Ken-definable identity that the specified surface makes available to
+source and that **neither** prelude arm admits is a **standard package**:
+optional, explicitly imported, ordinary Ken with its **derivation path from
+the built-ins stated in-spec**. A keyed identity needed only by compiler
+machinery is not a source-facing package entry; under §4 it stays internal.
+`Nat` and `Pair` are therefore not package carriers: they are the kernel-origin
+and compiler-bootstrap members of the internal-provision arm. `Option` and
+`Result` are likewise not packages: public primitive signatures name their
+canonical compiler-installed identities. The source-level `Empty` in
+`Core.Logic.EmptyDec` and `Either` remain packages; the separately keyed
+`Empty` used by `space` desugaring is compiler-internal, not a package export.
+`Unit` is a candidate for the
 internal-provision arm, **not** a sixteenth floor member until both witness
 clauses are proven and §4's roster changes atomically. A same-shaped source
 definition of `Pair` allocates a distinct identity; it neither replaces the
