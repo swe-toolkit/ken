@@ -29,6 +29,29 @@ const IO_KEN_MD: &str = include_str!("../../../../catalog/packages/Capability/Sy
 
 fn landed_surface() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("SEAL-2 prelude");
+    let root = catalog_packages_dir();
+    for module in ["Core.Logic.Transport", "Data.Numeric.Nat.Arithmetic"] {
+        env.elaborate_module_from_roots(&[root.clone()], module)
+            .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
+    }
+    // These flat fences have no module-qualified proof namespace. Withhold
+    // prelude copies and selectors before checking their catalog declarations.
+    for name in [
+        "buffer_nat_add",
+        "buffer_suc_cong",
+        "transfer_count_request_budget",
+        "transfer_count_request_budget::bounded",
+        "write_all_call_bound",
+        "write_all_call_bound::termination",
+        "write_all_complete",
+        "write_all_complete::success_complete",
+        "write_all_first_error",
+        "write_all_first_error::first_error",
+        "write_all_all_success",
+        "write_all_all_success::all_success",
+    ] {
+        env.globals.remove(name);
+    }
     env.elaborate_ken_md_file(BUFFER_KEN_MD)
         .expect("System.Buffer checked fences");
     env.elaborate_ken_md_file(IO_KEN_MD)
