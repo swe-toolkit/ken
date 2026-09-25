@@ -139,9 +139,9 @@ before this file.
 Ordinary transparent recursive definitions over `List`/`Nat`; no primitive
 or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `length_take_min` are the three original proof-returning laws. The private
-`mem_filter` theorem characterizes membership through the installed prelude
-`filter`: given `compat`, a matching head has the same predicate result as
-`x`. The private `mem_filter_sound` theorem needs no compatibility premise:
+`mem_filter` theorem characterizes membership through this module's `filter`:
+given `compat`, a matching head has the same predicate result as `x`.
+The private `mem_filter_sound` theorem needs no compatibility premise:
 membership after filtering implies membership before filtering. Both laws
 range over any element type, comparator, predicate, query and list; neither
 adds a wrapper or a new trust assumption. The two attached `nth` laws connect
@@ -161,6 +161,22 @@ constructor `Nil a`, which observationally collapses to `Top` and closes by
 `Proved`; step is `cong` under `Cons a h` on the tail IH.
 
 ```ken
+pub fn map (a : Type) (b : Type) (f : a → b) (xs : List a) : List b =
+  match xs {
+    Nil ↦ Nil b;
+    Cons h t ↦ Cons b (f h) (map a b f t)
+  }
+
+pub fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
+  match xs {
+    Nil ↦ Nil a;
+    Cons h t ↦
+      match p h {
+        True ↦ Cons a h (filter a p t);
+        False ↦ filter a p t
+      }
+  }
+
 fn mem (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Bool =
   match xs {
     Nil ↦ False;
@@ -1798,8 +1814,8 @@ trust level; this package ships the functions only, honestly.
 - **Kernel-reduction defect:** none.
 - **Abstraction candidate:** `§4.1` now proves private `mem_filter` with an
   explicit comparator/predicate compatibility premise, and proves private
-  `mem_filter_sound` without that premise. Both address the installed prelude
-  `filter`; neither publishes a new wrapper.
+  `mem_filter_sound` without that premise. Both address this module's `filter`;
+  neither publishes a new wrapper.
 - **Runtime-performance characteristic (non-blocking, forward-tracked).**
   `crates/ken-elaborator/tests/l3_strings_surface_acceptance.rs`'s
   `derived_string_ops_reduce_over_real_roundtrip` test exercises the pinned
@@ -1872,7 +1888,7 @@ reference implementation.
 6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
    lifting the tail IH under the head constructor; private `mem_filter`
    and `mem_filter_sound` split named predicate/comparator outcomes and use
-   `cong` over the prelude `filter` branch, with compatibility needed only
+   `cong` over this module's `filter` branch, with compatibility needed only
    for the first law. Private `concat_map_append` lifts the IH under
    `list_append` and uses
    `list_append::assoc` in reverse. The `nth` bounds proofs split the list
@@ -1886,8 +1902,13 @@ reference implementation.
    `trans`/`sym`. `§4.4`: every law field closes by
    `Refl` (each concrete operation reduces definitionally once applied, no
    case-split needed).
-7. **Consumers.** `catalog/packages/Data/Collections/Map.ken` (the proved
-   `Map`/`Set` BST) depends on this package's `list_append`.
+7. **Consumers.** `Application.CommandLine.ArgParse`,
+   `Capability.Filesystem.Path.Posix`, `Data.Binary.BytesPrimitiveContracts`,
+   `Data.Collections.NonEmpty`, and `Tooling.Testing.Property` import the
+   checked `map`; the module's `map_length` and filter-membership laws use
+   its structural operations locally. `Application.Configuration.Decoder`
+   imports this module wholesale. `catalog/packages/Data/Collections/Map.ken`
+   (the proved `Map`/`Set` BST) depends on its `list_append`.
    `crates/ken-elaborator/tests/cat1_lawful_functors_package.rs`,
    `ds3_sum_combinators_acceptance.rs`, `ds4_list_combinators_acceptance.rs`,
    `ds7_applicative_monad_acceptance.rs`, `ds8_traversable_acceptance.rs`,
@@ -1899,7 +1920,7 @@ reference implementation.
    several rosetta examples that reuse it per the DRY rule.
 8. **Validation evidence.**
    `crates/ken-elaborator/tests/cat_derived_filter_membership_law.rs` —
-   pins both private checked contracts to the installed prelude `filter`
+   pins both private checked contracts to this module's `filter`
    and distinguishes incompatible from compatible concrete equations.
    `crates/ken-elaborator/tests/cat_derived_sort_laws.rs` — pins four
    attached private raw contracts to Derived's own `insert`/`sort`, checks

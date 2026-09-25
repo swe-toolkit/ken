@@ -1,11 +1,23 @@
 //! K3: a fresh literal closes a generic checked ASCII-code witness.
 //! The finite table is checked Ken source; its bounds are 0..127.
 
+use std::path::PathBuf;
+
 use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{check, convert, normalize, whnf, Context, KernelError, Term};
 
 fn checked_ascii_client(env: &mut ElabEnv) -> Result<(), (String, ken_elaborator::ElabError)> {
+    assert!(!env.globals.contains_key("map"), "map is not prelude-owned");
+    let catalog_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[catalog_root], "Data.Collections.Derived")
+        .map_err(|error| ("load Data.Collections.Derived.map".to_owned(), error))?;
+    let derived_map = env.globals["Data.Collections.Derived.map"];
+    assert!(env.env.transparent_body(derived_map).is_some());
+    env.globals.insert("map".to_owned(), derived_map);
+
     let tags = (0..=127)
         .map(|n| format!("Ascii{n}"))
         .collect::<Vec<_>>()

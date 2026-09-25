@@ -443,10 +443,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -466,10 +464,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_snd",
                 "charToInt",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -493,10 +489,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -515,10 +509,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -551,10 +543,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -611,10 +601,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -632,10 +620,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -654,10 +640,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -675,10 +659,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -707,10 +689,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -731,10 +711,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -832,10 +810,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -861,10 +837,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -924,10 +898,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_snd",
                 "charToInt",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -942,17 +914,15 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
             .collect(),
         ),
         (
-            // FILTER AC-4: filter is admitted prelude-convenience debt.
+            // Derived now owns both structural list operations directly.
             "Data.Collections.Derived".to_string(),
             [
                 "And",
@@ -961,10 +931,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -980,10 +948,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -1001,10 +967,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -1023,10 +987,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -1051,10 +1013,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -1072,10 +1032,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)
@@ -1101,10 +1059,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_intro",
                 "and_snd",
                 "eqChar",
-                "filter",
                 "is_sorted",
                 "leqChar",
-                "map",
             ]
             .into_iter()
             .map(str::to_string)

@@ -30,7 +30,7 @@ use the ordinary error-biased `Result`: an error is the first counterexample,
 while success carries `Unit`.
 
 ```ken
-import Data.Collections.Derived (length, nth)
+import Data.Collections.Derived (length, map, nth)
 
 data Gen a = MkGen (List a)
 

@@ -254,10 +254,26 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
             "Vector must retain the compiler's canonical `{name}` identity"
         );
     }
+    assert!(
+        !base.globals.contains_key("map"),
+        "map is not a prelude name"
+    );
+    let mut alongside_derived = ElabEnv::new().expect("base environment");
+    alongside_derived
+        .elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+        .expect("Derived.map must roots-load");
+    let derived_map = alongside_derived.globals["Data.Collections.Derived.map"];
+    alongside_derived
+        .elaborate_module_from_roots(&[catalog_root()], VECTOR)
+        .expect("Vector's local map must load beside Derived.map");
     assert_ne!(
-        via_vector.globals["map"],
-        via_vector.globals[&format!("{VECTOR}.map")],
-        "the compiler `map` and Vector's private `map` must remain distinct identities"
+        derived_map,
+        alongside_derived.globals[&format!("{VECTOR}.map")],
+        "Derived.map and Vector's local map must remain distinct identities"
+    );
+    assert_eq!(
+        alongside_derived.globals["Data.Collections.Derived.map"], derived_map,
+        "Vector's local map must not overwrite the checked Derived provider"
     );
 
     let shape = package_shape();

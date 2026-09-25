@@ -1,25 +1,49 @@
-//! LANG-PRELUDE-COLLECTIONS -- `map`/`fold`/`zip`/`filter` are reachable
-//! from a bare prelude environment (`37 §9`, WS-L), with no test-local
-//! redeclaration. `spec/30-surface/37-strings-collections.md §9` requires
-//! these "in the surface/elaborator + prelude"; before this WP they were
-//! declared only inside `tests/l3a_acceptance.rs`'s `setup_combinators`, so
-//! a program that merely imports the prelude had a `List` type and no
-//! operation over it.
+//! List combinator acceptance: `fold`/`zip` live in the prelude; structural
+//! `map`/`filter` are checked exports of `Data.Collections.Derived`.
+//! The four compose over the same List identities (`37 §4.1`, §9).
+
+use std::path::PathBuf;
 
 use ken_elaborator::ElabEnv;
 use ken_kernel::{whnf, Context, GlobalId, Term};
 
-/// AC-1 -- the combinators are reachable from a bare prelude env. `env` gets
-/// no `elaborate_decl` of `map`/`fold`/`zip`/`filter` themselves; the single
-/// declaration below both applies all four and composes their outputs into
-/// each other (zip's `Prod` output feeds map's projection, map's `List Nat`
-/// feeds filter, filter's result feeds fold), so a well-typed elaboration is
-/// only possible if every one of the four already exists in the bare
-/// prelude. This fails today for all four -- before this WP, `ElabEnv::new()`
-/// has no `map`/`fold`/`zip`/`filter` global at all.
-#[test]
-fn ac1_prelude_combinators_reachable_from_bare_env() {
+fn with_derived_combinators() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
+    for name in ["map", "filter"] {
+        assert!(
+            !env.globals.contains_key(name),
+            "{name} must not be prelude-owned"
+        );
+    }
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[root], "Data.Collections.Derived")
+        .expect("Derived must roots-load with real provider imports");
+    for name in ["map", "filter"] {
+        let id = env.globals[&format!("Data.Collections.Derived.{name}")];
+        assert!(
+            env.env.transparent_body(id).is_some(),
+            "{name} must be checked"
+        );
+        assert!(
+            !env.env.trusted_base().contains(&id),
+            "{name} adds no trust"
+        );
+        env.globals.insert(name.to_owned(), id);
+    }
+    env
+}
+
+/// Promise class: durable checked integration.
+/// MEASURED: the bare prelude provides fold/zip, Derived provides map/filter,
+/// and the one declaration composes all four with the exact checked identities.
+/// CLAIMED: clients can compose these structural List combinators after
+/// loading Derived. THE GAP: the fixture exposes exact qualified identities
+/// as flat aliases; real catalog client selective imports have separate gates.
+#[test]
+fn list_combinators_compose_with_checked_derived_providers() {
+    let mut env = with_derived_combinators();
     env.elaborate_decl(
         "const uses_all_four_combinators : Nat = \
          fold Nat Nat (\\h acc. Suc acc) Zero \
@@ -27,10 +51,7 @@ fn ac1_prelude_combinators_reachable_from_bare_env() {
              (map (Prod Nat Nat) Nat (\\p. match p { MkProd x y |-> x }) \
                (zip Nat Nat (Cons Nat Zero (Nil Nat)) (Cons Nat Zero (Nil Nat)))))",
     )
-    .expect(
-        "a declaration applying map/fold/zip/filter must elaborate against \
-         a bare prelude env with no test-local combinator declaration",
-    );
+    .expect("map/filter from Derived and fold/zip from the prelude must compose");
 }
 
 /// Peel a fully-applied `App` spine to its head `GlobalId` (constructor or
@@ -89,14 +110,14 @@ fn whnf_list_elements(
     }
 }
 
-/// AC-2 -- `filter` computes, not merely elaborates. `is_zero` rejects two of
+/// AC-2 -- Derived's `filter` computes, not merely elaborates. `is_zero` rejects two of
 /// the three elements of `[Zero, Suc Zero, Suc (Suc Zero)]`, so a `filter`
 /// that type-checked but silently returned its input unchanged (the failure
 /// this AC exists to catch) would produce a 3-element list here, not the
 /// 1-element `[Zero]` this test asserts.
 #[test]
 fn ac2_filter_computes_and_rejects_at_least_one_element() {
-    let mut env = ElabEnv::new().expect("base env");
+    let mut env = with_derived_combinators();
     let nil_id = env.globals["Nil"];
     let cons_id = env.globals["Cons"];
     let zero_id = env.globals["Zero"];
@@ -127,34 +148,22 @@ fn ac2_filter_computes_and_rejects_at_least_one_element() {
     );
 }
 
-/// AC-5 -- each of the four new combinators is a transparent definition,
-/// not a trusted-base postulate, by name. (Narrowed by
-/// LANG-PRELUDE-ELABORATION-DEPTH D5a: this is a per-name claim about these
-/// four identifiers, not the wider claim that the trusted base does not
-/// grow under any addition -- an entry can be registered under a name
-/// other than the declaration that raised it, `prover.rs:493-501`'s
-/// `emit_unknown_hole` registering under the literal `"prover unknown
-/// goal"` being the existing example. `d5b_trusted_base_full_enumeration_
-/// from_bare_env` below is the full-enumeration control for that wider
-/// property.) `sort`'s `is_sorted ∧ Perm` obligation is deliberately
-/// excluded from the prelude (it would enter as an undischarged postulate,
-/// `elab.rs:53-57`); this asserts the per-name mechanism directly rather
-/// than a raw before/after count (a frozen size is a snapshot that a later,
-/// unrelated prelude addition would have to keep updating, and a
-/// coincidental +1/-1 elsewhere could mask a real regression here).
-/// `map`/`fold`/`zip`/`filter` are ordinary `fn` declarations with real
-/// bodies -- the only way any of them could grow `trusted_base()` is if
-/// elaboration left one of them as an undischarged postulate/obligation
-/// instead of a transparent definition, which is exactly what this checks
-/// per name, mirroring the existing
-/// `!env.env.trusted_base().contains(&unfold_id)` idiom
-/// `fuel_bounded_unfold_produces_finite_prefix` already uses for
-/// `unfoldUpTo`.
+/// Promise class: durable trust invariant.
+/// MEASURED: the exact fold/zip and qualified Derived.map/filter identities
+/// are transparent and absent from `trusted_base()`. CLAIMED: moving map and
+/// filter adds no assumptions. THE GAP: this per-name check cannot detect a
+/// separately named assumption; the full bare-env trust enumeration below
+/// guards inherited membership, and the Derived package gate checks its delta.
 #[test]
 fn ac5_new_combinators_add_zero_trusted_base_entries() {
-    let env = ElabEnv::new().expect("base env");
+    let env = with_derived_combinators();
     let trusted = env.env.trusted_base();
-    for name in ["map", "fold", "zip", "filter"] {
+    for name in [
+        "fold",
+        "zip",
+        "Data.Collections.Derived.map",
+        "Data.Collections.Derived.filter",
+    ] {
         let id = env.globals[name];
         assert!(
             !trusted.contains(&id),
@@ -238,7 +247,7 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 /// because `ElabEnv::new()` has no "before" env to diff against. A
 /// *block-level* bracket over a sub-range of registration is a different
 /// and available instrument -- `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D2`
-/// brackets exactly the four `List` combinator `elaborate_decl` calls in
+/// brackets exactly the two prelude `List` combinator `elaborate_decl` calls in
 /// `prelude.rs`, following the established `conversions.rs:303/364` idiom,
 /// and asserts their contribution to the trusted base is empty.
 /// 107 entries: large enough to be a finding about the shape of the
@@ -267,7 +276,7 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 ///
 /// `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D3` -- this enumeration and the
 /// block delta above are not redundant, and neither retires the other: the
-/// block delta is `GlobalId`-keyed and covers only the four combinators'
+/// block delta is `GlobalId`-keyed and covers only fold/zip's
 /// contribution, while this enumeration is label-keyed and covers the
 /// *whole* 107-entry trusted base, carrying census value the block delta
 /// does not (the shape-of-the-trusted-base finding two paragraphs up is a

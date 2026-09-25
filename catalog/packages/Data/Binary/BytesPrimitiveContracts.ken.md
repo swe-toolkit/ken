@@ -13,7 +13,7 @@ K3's checked literal view makes the witness for a concrete ASCII `String`
 reducible without an encoder assumption.
 
 ```ken
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, map)
 
 pub data AsciiTag : Type where {
   Ascii0;

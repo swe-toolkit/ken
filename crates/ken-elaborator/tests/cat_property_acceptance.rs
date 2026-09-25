@@ -14,8 +14,8 @@ const PROPERTY_KEN_MD: &str =
 
 fn property_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["length", "reverse"]);
-    for name in ["length", "reverse"] {
+    catalog_or::load_derived_importing_fixture_many(&mut env, &["length", "map", "reverse"]);
+    for name in ["length", "map", "reverse"] {
         assert!(
             !env.globals.contains_key(name),
             "the fixture must withhold flat {name} so Property's selector is observable"
@@ -141,33 +141,23 @@ fn boolean_list(env: &ElabEnv, value: EvalVal) -> Vec<bool> {
 
 /// Promise class: durable invariant.
 ///
-/// AC-RECURSIVE-UNSHADOW-MIGRATION's durable candidate-side guard.
-///
-/// MEASURED: roots-loading the real Property module leaves the installed
-/// prelude `map` identity selected, defines no qualified `gen_map_list`, and
-/// gives `gen_map` one saturated application headed directly by that installed
-/// identity. The real source maps Nil and a recursive Cons sample list with a
-/// nonidentity function to the expected lists. CLAIMED: Property removes its
-/// named recursive reimplementation and routes `gen_map` directly through
-/// installed P.map with no package-global intermediary. THE GAP / EXPLICIT
-/// RESIDUAL: the candidate diff and complete inventory separately own the
-/// no-import/no-new-declaration claim. This candidate-side guard does not
-/// mechanically prohibit a future differently named, behaviorally isomorphic
-/// recursive helper. Separately declared recursive globals are distinct rigid
-/// heads, so that residual remains review- and census-enforced rather than
-/// kernel-definitional-equality-backed.
+/// MEASURED: real roots loading selects checked `Derived.map` for Property's
+/// `gen_map` body, and the flat import fixture withholds `map` until Property's
+/// selective import restores that exact provider identity. Nil and nonidentity
+/// Cons examples compute the expected lists. CLAIMED: Property uses the one
+/// canonical derived List operation, not a private recursive replacement.
+/// THE GAP: a differently named, behaviorally equivalent unused helper is not
+/// ruled out by this identity check; catalog inventory review owns that case.
 #[test]
-fn property_unshadows_installed_prelude_map_for_gen_map() {
+fn property_uses_derived_map_identity_for_gen_map() {
     let mut roots_env = ElabEnv::new().expect("base env");
-    let installed_map = roots_env.globals["map"];
+    assert!(!roots_env.globals.contains_key("map"));
     roots_env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Tooling.Testing.Property")
         .expect("Property must roots-load through its real dependency closure");
-
-    assert_eq!(
-        roots_env.globals["map"], installed_map,
-        "Property must leave unqualified map bound directly to installed P.map"
-    );
+    let derived_map = roots_env.globals["Data.Collections.Derived.map"];
+    assert!(roots_env.env.transparent_body(derived_map).is_some());
+    assert!(!roots_env.env.trusted_base().contains(&derived_map));
     assert!(!roots_env
         .globals
         .contains_key("Tooling.Testing.Property.gen_map_list"));
@@ -175,9 +165,9 @@ fn property_unshadows_installed_prelude_map_for_gen_map() {
         .globals
         .contains_key("Tooling.Testing.Property.map"));
 
-    let provider_type = match roots_env.env.lookup(installed_map) {
+    let provider_type = match roots_env.env.lookup(derived_map) {
         Some(Decl::Transparent { ty, .. }) => ty,
-        other => panic!("installed P.map must be transparent, got {other:?}"),
+        other => panic!("Derived.map must be transparent, got {other:?}"),
     };
     let provider_arity = leading_pi_count(provider_type);
     let gen_map = roots_env.globals["Tooling.Testing.Property.gen_map"];
@@ -186,26 +176,40 @@ fn property_unshadows_installed_prelude_map_for_gen_map() {
         other => panic!("Property.gen_map must remain transparent, got {other:?}"),
     };
     assert_eq!(
-        saturated_provider_occurrences(gen_map_body, installed_map, provider_arity),
+        saturated_provider_occurrences(gen_map_body, derived_map, provider_arity),
         1,
-        "Property.gen_map must contain one saturated installed P.map application"
+        "Property.gen_map must contain one saturated Derived.map application"
     );
 
     let mut env = property_dependency_env();
-    let flat_installed_map = env.globals["map"];
+    assert!(!env.globals.contains_key("map"));
+    let flat_derived_map = env.globals["Data.Collections.Derived.map"];
     env.elaborate_ken_md_file(PROPERTY_KEN_MD)
-        .expect("Property must elaborate through installed P.map");
-    assert_eq!(env.globals["map"], flat_installed_map);
+        .expect("Property must elaborate through its selective Derived.map import");
+    assert!(
+        !env.globals.contains_key("map"),
+        "Property's selective import must stay module-local in the flat fixture"
+    );
+    let flat_gen_map = env.globals["gen_map"];
+    let flat_body = match env.env.lookup(flat_gen_map) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("flat Property.gen_map must be transparent, got {other:?}"),
+    };
+    assert_eq!(
+        saturated_provider_occurrences(flat_body, flat_derived_map, provider_arity),
+        1,
+        "flat Property.gen_map must use the same exact Derived.map identity"
+    );
     env.elaborate_file(
-        "fn cat_prelude_property_flip (x : Bool) : Bool = \
+        "fn cat_derived_property_flip (x : Bool) : Bool = \
            match x { False ↦ True; True ↦ False }\n\
-         const cat_prelude_property_map_nil : List Bool = \
+         const cat_derived_property_map_nil : List Bool = \
            gen_samples Bool \
-             (gen_map Bool Bool cat_prelude_property_flip \
+             (gen_map Bool Bool cat_derived_property_flip \
                (gen_from_list Bool (Nil Bool)))\n\
-         const cat_prelude_property_map_recursive_cons : List Bool = \
+         const cat_derived_property_map_recursive_cons : List Bool = \
            gen_samples Bool \
-             (gen_map Bool Bool cat_prelude_property_flip \
+             (gen_map Bool Bool cat_derived_property_flip \
                (gen_from_list Bool \
                  (Cons Bool True (Cons Bool False (Nil Bool)))))",
     )
@@ -213,14 +217,14 @@ fn property_unshadows_installed_prelude_map_for_gen_map() {
 
     let mut store = make_store(&env);
     for (name, expected) in [
-        ("cat_prelude_property_map_nil", vec![]),
-        ("cat_prelude_property_map_recursive_cons", vec![false, true]),
+        ("cat_derived_property_map_nil", vec![]),
+        ("cat_derived_property_map_recursive_cons", vec![false, true]),
     ] {
         let value = eval_global(&env, &mut store, name);
         assert_eq!(
             boolean_list(&env, value),
             expected,
-            "{name} must preserve installed P.map's recursive behavior"
+            "{name} must preserve Derived.map's recursive behavior"
         );
     }
 }
