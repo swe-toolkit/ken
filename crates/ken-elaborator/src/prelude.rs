@@ -168,7 +168,7 @@ canonical_runtime_roles! {
     resource_invalid_offset => "InvalidOffset",
     resource_invalid_bounds => "InvalidBounds",
     resource_no_progress => "NoProgress",
-    resource_kind_buffer => "Buffer",
+    resource_kind_buffer => "ResourceKind.Buffer",
     // Progress constructors.
     read_some => "ReadSome",
     read_eof => "ReadEof",
@@ -209,7 +209,7 @@ canonical_runtime_roles! {
     // ABI-S6 D4 appends the mapping-governor refusal without moving roles.
     resource_mapping_limit => "MappingLimit",
     // ABI-S6 D5a appends the now-native resource-kind reification role.
-    resource_kind_mapping => "Mapping",
+    resource_kind_mapping => "ResourceKind.Mapping",
 }
 
 /// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction. `GlobalId(0)`
@@ -1828,11 +1828,21 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // can preserve all 64 bits without narrowing through signed Ken `Int`.
     elab.elaborate_decl("data ResourceKind = FsHandle | Buffer | Mapping")
         .map_err(|e| ElabError::Internal(format!("prelude ResourceKind failed: {e}")))?;
+    let resource_kind_id = *elab
+        .globals
+        .get("ResourceKind")
+        .ok_or_else(|| ElabError::Internal("prelude: ResourceKind missing".into()))?;
+    elab.module_state.scope_constructor_family(
+        &elab.env,
+        &mut elab.globals,
+        resource_kind_id,
+        "ResourceKind",
+    )?;
     let fs_handle_id = elab
         .globals
-        .get("FsHandle")
+        .get("ResourceKind.FsHandle")
         .copied()
-        .ok_or_else(|| ElabError::Internal("prelude: FsHandle missing".into()))?;
+        .ok_or_else(|| ElabError::Internal("prelude: ResourceKind.FsHandle missing".into()))?;
     elab.elaborate_decl("data ResourceTraceIdentity = PrivateResourceTraceIdentity Int Int")
         .map_err(|e| ElabError::Internal(format!("prelude ResourceTraceIdentity failed: {e}")))?;
     let private_resource_trace_identity_id = elab
@@ -1842,11 +1852,6 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         .ok_or_else(|| {
             ElabError::Internal("prelude: PrivateResourceTraceIdentity missing".into())
         })?;
-    let resource_kind_id = elab
-        .globals
-        .get("ResourceKind")
-        .copied()
-        .ok_or_else(|| ElabError::Internal("prelude: ResourceKind missing".into()))?;
     let resource_id = declare_primitive(
         &mut elab.env,
         vec![],
@@ -1901,12 +1906,18 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // remainder, making positivity and request-boundedness constructor facts.
     elab.elaborate_decl("data BufferWindow = MkBufferWindow Int Int")
         .map_err(|e| ElabError::Internal(format!("prelude BufferWindow failed: {e}")))?;
-    elab.elaborate_decl("data BufferHandle = PrivateBufferHandle (Resource Buffer) Int")
-        .map_err(|e| ElabError::Internal(format!("prelude BufferHandle failed: {e}")))?;
-    elab.elaborate_decl("data BufferSpan = PrivateBufferSpan (Resource Buffer) Int Nat")
-        .map_err(|e| ElabError::Internal(format!("prelude BufferSpan failed: {e}")))?;
-    elab.elaborate_decl("data MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int")
-        .map_err(|e| ElabError::Internal(format!("prelude MappingSource failed: {e}")))?;
+    elab.elaborate_decl(
+        "data BufferHandle = PrivateBufferHandle (Resource ResourceKind.Buffer) Int",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude BufferHandle failed: {e}")))?;
+    elab.elaborate_decl(
+        "data BufferSpan = PrivateBufferSpan (Resource ResourceKind.Buffer) Int Nat",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude BufferSpan failed: {e}")))?;
+    elab.elaborate_decl(
+        "data MappingSource = Anonymous Int | FileBacked (Resource ResourceKind.FsHandle) Int",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude MappingSource failed: {e}")))?;
     elab.elaborate_decl("data MappingProt = ReadOnly | ReadWrite")
         .map_err(|e| ElabError::Internal(format!("prelude MappingProt failed: {e}")))?;
     elab.elaborate_decl("data MappingExtent = MkMappingExtent Int")
@@ -1914,7 +1925,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.elaborate_decl("data MappingWindow = MkMappingWindow Int Int")
         .map_err(|e| ElabError::Internal(format!("prelude MappingWindow failed: {e}")))?;
     elab.elaborate_decl(
-        "data MappingHandle = PrivateMappingHandle (Resource Mapping) MappingExtent",
+        "data MappingHandle = PrivateMappingHandle (Resource ResourceKind.Mapping) MappingExtent",
     )
     .map_err(|e| ElabError::Internal(format!("prelude MappingHandle failed: {e}")))?;
     elab.elaborate_decl("data TransferCount = PrivateTransferCount Nat Nat")
@@ -1926,7 +1937,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let private_buffer_span_id = elab.globals["PrivateBufferSpan"];
     let private_transfer_count_id = elab.globals["PrivateTransferCount"];
     elab.elaborate_decl(
-        "fn buffer_handle_resource (buffer : BufferHandle) : Resource Buffer = match buffer { PrivateBufferHandle resource capacity |-> resource }",
+        "fn buffer_handle_resource (buffer : BufferHandle) : Resource ResourceKind.Buffer = match buffer { PrivateBufferHandle resource capacity |-> resource }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude buffer_handle_resource failed: {e}")))?;
     elab.elaborate_decl(
@@ -1941,7 +1952,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude mapping_extent_length failed: {e}")))?;
     elab.elaborate_decl(
-        "fn mapping_handle_resource (mapping : MappingHandle) : Resource Mapping = match mapping { PrivateMappingHandle resource extent |-> resource }",
+        "fn mapping_handle_resource (mapping : MappingHandle) : Resource ResourceKind.Mapping = match mapping { PrivateMappingHandle resource extent |-> resource }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude mapping_handle_resource failed: {e}")))?;
     elab.elaborate_decl(
@@ -1989,7 +2000,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // `write_all_advance_span` internals below and removed from the public name
     // map, so a span's origin is never publicly projectable (AC-5).
     elab.elaborate_decl(
-        "fn buffer_span_origin (span : BufferSpan) : Resource Buffer = match span { PrivateBufferSpan origin start budget |-> origin }",
+        "fn buffer_span_origin (span : BufferSpan) : Resource ResourceKind.Buffer = match span { PrivateBufferSpan origin start budget |-> origin }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude buffer_span_origin failed: {e}")))?;
     elab.elaborate_decl(
@@ -2032,18 +2043,18 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     );
     let buffer_id = elab
         .globals
-        .get("Buffer")
+        .get("ResourceKind.Buffer")
         .copied()
-        .ok_or_else(|| ElabError::Internal("prelude: Buffer missing".into()))?;
+        .ok_or_else(|| ElabError::Internal("prelude: ResourceKind.Buffer missing".into()))?;
     let resource_buffer_t = Term::app(
         Term::const_(resource_id, vec![]),
         Term::constructor(buffer_id, vec![]),
     );
     let mapping_id = elab
         .globals
-        .get("Mapping")
+        .get("ResourceKind.Mapping")
         .copied()
-        .ok_or_else(|| ElabError::Internal("prelude: Mapping missing".into()))?;
+        .ok_or_else(|| ElabError::Internal("prelude: ResourceKind.Mapping missing".into()))?;
     let resource_mapping_t = Term::app(
         Term::const_(resource_id, vec![]),
         Term::constructor(mapping_id, vec![]),
@@ -2198,17 +2209,17 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
            RemoveDirectory cap recursive path |-> Result FileError Unit; \
            Rename cap from to |-> Result FileError Unit; \
            ChangeMode cap path mode |-> Result FileError Unit; \
-           PrivateFsOpen cap path mode |-> Result FileError (Resource FsHandle); \
+           PrivateFsOpen cap path mode |-> Result FileError (Resource ResourceKind.FsHandle); \
            PrivateFsHandleMetadata resource |-> Result ResourceError FileMetadata; \
            PrivateResourceRelease kind resource |-> Result ResourceError Unit; \
-           PrivateBufferAllocate capacity |-> Result ResourceError (Resource Buffer); \
+           PrivateBufferAllocate capacity |-> Result ResourceError (Resource ResourceKind.Buffer); \
            PrivateFsReadAt file file_offset buffer buffer_start length |-> Result ResourceError ReadProgress; \
            PrivateFsWriteAt file file_offset buffer buffer_start length span_origin |-> Result ResourceError WriteProgress; \
            PrivateBufferFreeze buffer start length span_origin |-> Result ResourceError Bytes; \
-           PrivateMappingAllocate length protection |-> Result ResourceError (Resource Mapping); \
+           PrivateMappingAllocate length protection |-> Result ResourceError (Resource ResourceKind.Mapping); \
            PrivateMappingReadView mapping start length span_origin |-> Result ResourceError Bytes; \
            PrivateMappingWriteView mapping start bytes span_origin |-> Result ResourceError Unit; \
-           PrivateMappingAcquireFile file length protection |-> Result ResourceError (Resource Mapping) \
+           PrivateMappingAcquireFile file length protection |-> Result ResourceError (Resource ResourceKind.Mapping) \
          }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude fs_resp failed: {}", e)))?;
@@ -2361,18 +2372,18 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // acquisition producers; all private constructor spellings and raw
     // acquisition helpers are removed from the public global-name map afterward.
     elab.elaborate_decl(
-        "proc private_resource_acquire (a : Auth) (cap : Cap a) (path : Bytes) (mode : ResourceOpenMode) : HostIO a (Result FileError (Resource FsHandle)) visits [FS] = \
+        "proc private_resource_acquire (a : Auth) (cap : Cap a) (path : Bytes) (mode : ResourceOpenMode) : HostIO a (Result FileError (Resource ResourceKind.FsHandle)) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-           (Result FileError (Resource FsHandle)) \
+           (Result FileError (Resource ResourceKind.FsHandle)) \
            (InL (FSOp a) AmbientOp (PrivateFsOpen a cap path mode)) \
            (\\r. Ret (Coproduct (FSOp a) AmbientOp) \
              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-             (Result FileError (Resource FsHandle)) r)",
+             (Result FileError (Resource ResourceKind.FsHandle)) r)",
     )
     .map_err(|e| ElabError::Internal(format!("prelude resource acquire failed: {e}")))?;
     elab.elaborate_decl(
-        "proc resourceMetadata (a : Auth) (resource : Resource FsHandle) : HostIO a (Result ResourceError FileMetadata) visits [FS] = \
+        "proc resourceMetadata (a : Auth) (resource : Resource ResourceKind.FsHandle) : HostIO a (Result ResourceError FileMetadata) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
            (Result ResourceError FileMetadata) \
@@ -2383,11 +2394,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude resourceMetadata failed: {e}")))?;
     elab.elaborate_decl(
-        "proc release (a : Auth) (resource : Resource FsHandle) : HostIO a (Result ResourceError Unit) visits [FS] = \
+        "proc release (a : Auth) (resource : Resource ResourceKind.FsHandle) : HostIO a (Result ResourceError Unit) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
            (Result ResourceError Unit) \
-           (InL (FSOp a) AmbientOp (PrivateResourceRelease a FsHandle resource)) \
+           (InL (FSOp a) AmbientOp (PrivateResourceRelease a ResourceKind.FsHandle resource)) \
            (\\r. Ret (Coproduct (FSOp a) AmbientOp) \
              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
              (Result ResourceError Unit) r)",
@@ -2521,8 +2532,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     .map_err(|e| ElabError::Internal(format!("prelude release_if_live failed: {e}")))?;
     elab.elaborate_decl(
         "proc private_with_resource_after_open (a : Auth) (e : Type) (r : Type) \
-           (body : Resource FsHandle -> HostIO a (ResourceBodyResult e r)) \
-           (acquired : Result FileError (Resource FsHandle)) \
+           (body : Resource ResourceKind.FsHandle -> HostIO a (ResourceBodyResult e r)) \
+           (acquired : Result FileError (Resource ResourceKind.FsHandle)) \
            : HostIO a (Result FileError (ResourceBracketResult e r)) visits [FS] = \
          match acquired { \
            Err open_error |-> Ret (Coproduct (FSOp a) AmbientOp) \
@@ -2534,7 +2545,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
              (ResourceBodyResult e r) \
              (Result FileError (ResourceBracketResult e r)) \
              (body resource) \
-             (\\body_result. release_if_live a FileError e r FsHandle resource body_result) \
+             (\\body_result. release_if_live a FileError e r ResourceKind.FsHandle resource body_result) \
          }",
     )
     .map_err(|e| {
@@ -2545,7 +2556,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.elaborate_decl(
         "proc withResource (a : Auth) (e : Type) (r : Type) \
            (cap : Cap a) (path : Bytes) (mode : ResourceOpenMode) \
-           (body : Resource FsHandle -> HostIO a (ResourceBodyResult e r)) \
+           (body : Resource ResourceKind.FsHandle -> HostIO a (ResourceBodyResult e r)) \
            : HostIO a (Result FileError (ResourceBracketResult e r)) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
@@ -2558,7 +2569,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "proc private_with_buffer_after_allocate (a : Auth) (e : Type) (r : Type) \
            (capacity : Int) \
            (body : BufferHandle -> HostIO a (ResourceBodyResult e r)) \
-           (acquired : Result ResourceError (Resource Buffer)) \
+           (acquired : Result ResourceError (Resource ResourceKind.Buffer)) \
            : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [FS] = \
          match acquired { \
            Err allocate_error |-> Ret (Coproduct (FSOp a) AmbientOp) \
@@ -2570,7 +2581,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
              (ResourceBodyResult e r) \
              (Result ResourceError (ResourceBracketResult e r)) \
              (body (PrivateBufferHandle resource capacity)) \
-             (\\body_result. release_if_live a ResourceError e r Buffer resource body_result) \
+             (\\body_result. release_if_live a ResourceError e r ResourceKind.Buffer resource body_result) \
          }",
     )
     .map_err(|e| {
@@ -2590,13 +2601,13 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude withBuffer failed: {e}")))?;
 
-    // ABI-S6 Mapping uses the same checked bracket and opaque-resource lifetime
-    // as Buffer while keeping its mapping token private. Each access passes its
+    // ABI-S6 ResourceKind.Mapping uses the same checked bracket and opaque-resource lifetime
+    // as ResourceKind.Buffer while keeping its mapping token private. Each access passes its
     // immutable window directly to the frozen read/write operation.
     elab.elaborate_decl(
         "proc private_with_mapping_after_allocate (a : Auth) (e : Type) (r : Type) \
            (length : Int) (body : MappingHandle -> HostIO a (ResourceBodyResult e r)) \
-           (acquired : Result ResourceError (Resource Mapping)) \
+           (acquired : Result ResourceError (Resource ResourceKind.Mapping)) \
            : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [FS] = \
          match acquired { \
            Err allocate_error |-> Ret (Coproduct (FSOp a) AmbientOp) \
@@ -2607,7 +2618,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
              (ResourceBodyResult e r) (Result ResourceError (ResourceBracketResult e r)) \
              (body (PrivateMappingHandle resource (MkMappingExtent length))) \
-             (\\body_result. release_if_live a ResourceError e r Mapping resource body_result) \
+             (\\body_result. release_if_live a ResourceError e r ResourceKind.Mapping resource body_result) \
          }",
     )
     .map_err(|e| {
@@ -2670,8 +2681,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // budget. Every successful count carries both its positive predecessor and
     // exact remainder, so the recursive call consumes one structural fuel step.
     elab.elaborate_decl(
-        "proc private_read_at_positive (a : Auth) (file : Resource FsHandle) \
-           (file_offset : Int) (buffer : Resource Buffer) (start : Int) \
+        "proc private_read_at_positive (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           (file_offset : Int) (buffer : Resource ResourceKind.Buffer) (start : Int) \
            (effective : Int) \
            : HostIO a (Result ResourceError ReadProgress) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
@@ -2699,7 +2710,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude buffer_min_int failed: {e}")))?;
     elab.elaborate_decl(
-        "proc private_read_at_admit_window (a : Auth) (file : Resource FsHandle) \
+        "proc private_read_at_admit_window (a : Auth) (file : Resource ResourceKind.FsHandle) \
            (file_offset : Int) (buffer : BufferHandle) (window : BufferWindow) \
            : HostIO a (Result ResourceError ReadProgress) visits [FS] = \
          match leq_int (0 : Int) (buffer_window_start window) { \
@@ -2736,7 +2747,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         ElabError::Internal(format!("prelude private_read_at_admit_window failed: {e}"))
     })?;
     elab.elaborate_decl(
-        "proc readAt (a : Auth) (file : Resource FsHandle) (file_offset : Int) \
+        "proc readAt (a : Auth) (file : Resource ResourceKind.FsHandle) (file_offset : Int) \
            (buffer : BufferHandle) (window : BufferWindow) \
            : HostIO a (Result ResourceError ReadProgress) visits [FS] = \
          match intToUInt64 file_offset { \
@@ -2748,7 +2759,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude readAt failed: {e}")))?;
     elab.elaborate_decl(
-        "proc writeAt (a : Auth) (file : Resource FsHandle) (file_offset : Int) \
+        "proc writeAt (a : Auth) (file : Resource ResourceKind.FsHandle) (file_offset : Int) \
            (buffer : BufferHandle) (span : BufferSpan) \
            : HostIO a (Result ResourceError WriteProgress) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
@@ -2788,7 +2799,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude write_all_advance_span failed: {e}")))?;
     elab.elaborate_decl(
-        "proc private_write_all_fuel (a : Auth) (file : Resource FsHandle) \
+        "proc private_write_all_fuel (a : Auth) (file : Resource ResourceKind.FsHandle) \
            (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) \
            (fuel : Nat) : HostIO a (Result ResourceError Unit) visits [FS] = \
          match fuel { \
@@ -2818,7 +2829,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude private_write_all_fuel failed: {e}")))?;
     elab.elaborate_decl(
-        "proc writeAll (a : Auth) (file : Resource FsHandle) (file_offset : Int) \
+        "proc writeAll (a : Auth) (file : Resource ResourceKind.FsHandle) (file_offset : Int) \
            (buffer : BufferHandle) (span : BufferSpan) \
            : HostIO a (Result ResourceError Unit) visits [FS] = \
          private_write_all_fuel a file file_offset buffer span (buffer_span_budget span)",

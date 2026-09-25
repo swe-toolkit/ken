@@ -98,6 +98,12 @@ pub struct ModuleState {
     /// Unshadowable bindings derived from the exact floor parents: those
     /// parent names plus only their kernel-recorded constructor names.
     prelude_binding_names: HashSet<String>,
+    /// Source leaf → checked constructor identity, keyed by the exact parent
+    /// inductive ID. A flat `globals` spelling is never constructor authority.
+    constructor_members: HashMap<ken_kernel::GlobalId, HashMap<String, ken_kernel::GlobalId>>,
+    /// Whole families with qualified-only constructor bindings, selected by
+    /// checked parent identity rather than individual constructor spellings.
+    scoped_constructor_types: HashSet<ken_kernel::GlobalId>,
     /// Compiler vocabulary captured before package source can add aliases.
     /// Includes native trusted names and constructors of the closed floor.
     strict_builtin_names: HashSet<String>,
@@ -186,6 +192,60 @@ impl ModuleState {
             .collect();
     }
 
+    /// Move one entire checked family's constructor bindings to `T.C`.
+    /// Membership is keyed on the parent ID recorded at declaration time;
+    /// a later same-spelling source constructor cannot be moved or selected.
+    pub(crate) fn scope_constructor_family(
+        &mut self,
+        env: &ken_kernel::GlobalEnv,
+        globals: &mut HashMap<String, ken_kernel::GlobalId>,
+        parent_id: ken_kernel::GlobalId,
+        parent_name: &str,
+    ) -> Result<(), ElabError> {
+        let members = self.constructor_members.get(&parent_id).ok_or_else(|| {
+            ElabError::Internal(format!(
+                "scoped family `{parent_name}` has no checked members"
+            ))
+        })?;
+        let family = env.inductive(parent_id).ok_or_else(|| {
+            ElabError::Internal(format!("scoped family `{parent_name}` is not inductive"))
+        })?;
+        let checked: HashSet<_> = family.constructors.iter().map(|c| c.id).collect();
+        if members.len() != checked.len()
+            || members.values().copied().collect::<HashSet<_>>() != checked
+            || globals.get(parent_name) != Some(&parent_id)
+        {
+            return Err(ElabError::Internal(format!(
+                "scoped family `{parent_name}` is not its complete checked constructor family"
+            )));
+        }
+        for (leaf, id) in members {
+            if globals.get(leaf) != Some(id)
+                || globals.contains_key(&format!("{parent_name}.{leaf}"))
+                || self.root_scope.bindings.get(leaf).map(String::as_str) != Some(leaf)
+                || self.root_scope.checked_local_ids.get(leaf) != Some(id)
+            {
+                return Err(ElabError::Internal(format!(
+                    "scoped family `{parent_name}` member `{leaf}` has an inconsistent binding"
+                )));
+            }
+        }
+        for (leaf, id) in members {
+            globals.remove(leaf);
+            globals.insert(format!("{parent_name}.{leaf}"), *id);
+            // The prelude's initial `data` admission also installed each
+            // constructor as a root-scope local. Its removal is necessary:
+            // otherwise a later selective import of bare `Buffer` would
+            // collide with a phantom prelude local despite no bare B entry.
+            self.root_scope.bindings.remove(leaf);
+            self.root_scope.checked_local_ids.remove(leaf);
+            self.root_scope.current_local_names.remove(leaf);
+            self.root_scope.locals.remove(leaf);
+        }
+        self.scoped_constructor_types.insert(parent_id);
+        Ok(())
+    }
+
     pub(crate) fn capture_strict_builtin_names(
         &mut self,
         env: &ken_kernel::GlobalEnv,
@@ -249,15 +309,48 @@ impl ModuleState {
         self.strict_builtin_names = globals
             .iter()
             .filter_map(|(name, id)| {
-                let floor_constructor = env
+                let floor_parent = env
                     .constructor(*id)
-                    .is_some_and(|(parent, _)| floor_formers.contains(&parent.id));
-                if floor_constructor {
-                    self.prelude_binding_names.insert(name.clone());
+                    .map(|(parent, _)| parent.id)
+                    .filter(|parent| floor_formers.contains(parent));
+                if let Some(parent) = floor_parent {
+                    if self.scoped_constructor_types.contains(&parent) {
+                        let family_name = self
+                            .prelude_floor_ids
+                            .iter()
+                            .find_map(|(name, id)| (*id == parent).then_some(name.as_str()))?;
+                        let leaf = name.strip_prefix(&format!("{family_name}."))?;
+                        self.constructor_members
+                            .entry(parent)
+                            .or_default()
+                            .insert(leaf.to_string(), *id);
+                    } else {
+                        self.constructor_members
+                            .entry(parent)
+                            .or_default()
+                            .insert(name.clone(), *id);
+                        self.prelude_binding_names.insert(name.clone());
+                    }
                 }
-                (native_trusted_base.contains(id) || floor_constructor).then_some(name.clone())
+                (native_trusted_base.contains(id) || floor_parent.is_some()).then_some(name.clone())
             })
             .collect();
+        for (name, parent) in &self.prelude_floor_ids {
+            if let Some(ind) = env.inductive(*parent) {
+                let actual: HashSet<_> = ind.constructors.iter().map(|c| c.id).collect();
+                let selected: HashSet<_> = self
+                    .constructor_members
+                    .get(parent)
+                    .into_iter()
+                    .flat_map(|members| members.values().copied())
+                    .collect();
+                if actual != selected {
+                    return Err(ElabError::Internal(format!(
+                        "floor family `{name}` has incomplete checked constructor bindings"
+                    )));
+                }
+            }
+        }
         for (name, _) in companion_bindings {
             self.prelude_binding_names.insert(name.clone());
             self.strict_builtin_names.insert(name);
@@ -343,6 +436,12 @@ struct Scope {
     /// remove a former occupant during prebinding; a stale ambient
     /// `globals[canonical]` must never stand in for the current local.
     checked_local_ids: HashMap<String, ken_kernel::GlobalId>,
+    /// Immutable pre-source floor type IDs; a later flat globals entry cannot
+    /// substitute another family's constructor when resolving `T.C`.
+    floor_type_ids: HashMap<String, ken_kernel::GlobalId>,
+    /// The parent-keyed checked constructor registry in this scope. Loaded
+    /// providers still need an authorized public constructor export below.
+    constructor_members: HashMap<ken_kernel::GlobalId, HashMap<String, ken_kernel::GlobalId>>,
     /// An `export Local` may precede Local's checked declaration. Delay its
     /// ID until that declaration finishes, then check any competing facade.
     pending_local_exports: HashMap<String, (String, Span)>,
@@ -598,6 +697,65 @@ fn resolve_ref(
     }
 }
 
+/// Select `T.C` by the exact checked type identity and its recorded
+/// constructor family. A mutable `globals["C"]` (or `globals["T.C"]`)
+/// cannot establish parentage or visibility. Imported types also require a
+/// public constructor selected from that same provider, whereas the owner
+/// and the captured prelude floor may use their own complete checked family.
+fn resolve_constructor_path(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    name: &str,
+    span: &Span,
+) -> Result<Option<ken_kernel::GlobalId>, ElabError> {
+    let Some((type_path, leaf)) = name.rsplit_once('.') else {
+        return Ok(None);
+    };
+    let type_id = scope
+        .checked_local_ids
+        .get(type_path)
+        .or_else(|| scope.binding_ids.get(type_path))
+        .or_else(|| scope.qualified_ids.get(type_path))
+        .or_else(|| scope.floor_type_ids.get(type_path));
+    let Some(type_id) = type_id else {
+        return Ok(None);
+    };
+    let Some(member) = scope
+        .constructor_members
+        .get(type_id)
+        .and_then(|family| family.get(leaf))
+    else {
+        return Ok(None);
+    };
+    let owner_member = scope.checked_local_ids.get(type_path) == Some(type_id)
+        || scope.floor_type_ids.get(type_path) == Some(type_id);
+    let selected_member = scope.qualified_ids.get(name) == Some(member)
+        || type_path.rsplit_once('.').is_some_and(|(module, _)| {
+            scope.prefixes.contains_key(module)
+                && scope.qualified_ids.get(&format!("{module}.{leaf}")) == Some(member)
+        });
+    if !owner_member && !selected_member {
+        return Ok(None);
+    }
+    // An authorized module export and an authorized type member are two
+    // meanings even when both eventually denote the same GlobalId.
+    let module_member = scope.prefixes.get(type_path).is_some_and(|module| {
+        scope
+            .file_prefix_exports
+            .get(type_path)
+            .or_else(|| exports.get(module))
+            .is_some_and(|pubmap| pubmap.contains_key(leaf))
+    });
+    if module_member {
+        return Err(ElabError::AmbiguousReference {
+            name: name.to_string(),
+            sources: vec![format!("module {name}"), format!("type {name}")],
+            span: span.clone(),
+        });
+    }
+    Ok(Some(*member))
+}
+
 /// Resolve a class-environment reference through the unit's class namespace.
 /// Class-bearing declarations do not carry an RCon, so this is their single
 /// strict choke, parallel to [`resolve_ref`] for globals-routed forms.
@@ -610,6 +768,9 @@ fn resolve_checked_ref(
     name: &str,
     span: &Span,
 ) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
+    if let Some(id) = resolve_constructor_path(scope, exports, name, span)? {
+        return Ok((name.to_string(), Some(id)));
+    }
     let canonical = resolve_ref(scope, exports, name, span)?;
     let selected = scope
         .qualified_ids
@@ -980,6 +1141,16 @@ fn apply_import(
                     }
                 }
                 scope.bind_import(globals, bare, q, selected_id, span)?;
+                // Importing a public type grants its qualified public
+                // constructors, but not their bare spellings. The provider's
+                // export must select the exact member of this checked type.
+                if let Some(constructors) = scope.constructor_members.get(&selected_id) {
+                    for (leaf, id) in constructors {
+                        if pubmap.contains_key(leaf) && provider_members.get(leaf) == Some(id) {
+                            scope.qualified_ids.insert(format!("{bare}.{leaf}"), *id);
+                        }
+                    }
+                }
                 let selector_prefix = format!("{}.", item.name);
                 let proof_prefix = format!("{}::", item.name);
                 for (member, id) in provider_members {
@@ -3564,6 +3735,10 @@ fn expand_scope(
 
     let mut exports_here: HashMap<String, String> = HashMap::new();
     scope.exported_ids.clear();
+    scope.floor_type_ids = elab.module_state.prelude_floor_ids.clone();
+    scope
+        .constructor_members
+        .extend(elab.module_state.constructor_members.clone());
     prebind_scope_declarations(
         scope,
         decls,
@@ -3668,6 +3843,12 @@ fn expand_scope(
                     false,
                 )?;
                 ids.extend(child_ids);
+                // The child may have declared a new checked family. Its
+                // constructor registry is keyed by parent ID and must be
+                // available to this scope's later explicit imports.
+                scope
+                    .constructor_members
+                    .extend(elab.module_state.constructor_members.clone());
                 // Keep the decl's span and an unnecessary `child_prefix`
                 // clone out of the recursive expansion frame. The stated-stack
                 // Map sentinel measures the whole elaboration path, not this
@@ -4090,26 +4271,57 @@ fn expand_scope(
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
                     record_checked_local(scope, &bare, &result.name, result.def_id);
-                    match inner {
+                    let constructor_names: Option<Vec<&str>> = match inner {
                         Decl::DataDecl { ctors, .. } => {
-                            for ctor in ctors {
-                                let canonical = qualify(prefix, &ctor.name);
-                                let id = elab.globals[&canonical];
-                                record_checked_local(scope, &ctor.name, &canonical, id);
-                            }
+                            Some(ctors.iter().map(|ctor| ctor.name.as_str()).collect())
                         }
-                        Decl::ExplicitDataDecl { ctors, .. } => {
-                            for ctor in ctors {
-                                let name = match ctor {
-                                    ExplicitDataCtor::Simple(ctor) => &ctor.name,
-                                    ExplicitDataCtor::Signature { name, .. } => name,
-                                };
-                                let canonical = qualify(prefix, name);
-                                let id = elab.globals[&canonical];
-                                record_checked_local(scope, name, &canonical, id);
+                        Decl::ExplicitDataDecl { ctors, .. } => Some(
+                            ctors
+                                .iter()
+                                .map(|ctor| match ctor {
+                                    ExplicitDataCtor::Simple(ctor) => ctor.name.as_str(),
+                                    ExplicitDataCtor::Signature { name, .. } => name.as_str(),
+                                })
+                                .collect(),
+                        ),
+                        _ => None,
+                    };
+                    if let Some(names) = constructor_names {
+                        let mut members = HashMap::new();
+                        for name in names {
+                            let canonical = qualify(prefix, name);
+                            let id = *elab.globals.get(&canonical).ok_or_else(|| {
+                                ElabError::Internal(format!(
+                                    "checked constructor `{canonical}` has no binding"
+                                ))
+                            })?;
+                            if elab
+                                .env
+                                .constructor(id)
+                                .is_none_or(|(parent, _)| parent.id != result.def_id)
+                            {
+                                return Err(ElabError::Internal(format!(
+                                    "checked constructor `{canonical}` has a foreign parent"
+                                )));
                             }
+                            members.insert(name.to_string(), id);
+                            record_checked_local(scope, name, &canonical, id);
                         }
-                        _ => {}
+                        if elab
+                            .env
+                            .inductive(result.def_id)
+                            .is_none_or(|family| family.constructors.len() != members.len())
+                        {
+                            return Err(ElabError::Internal(format!(
+                                "checked family `{bare}` has incomplete constructor names"
+                            )));
+                        }
+                        scope
+                            .constructor_members
+                            .insert(result.def_id, members.clone());
+                        elab.module_state
+                            .constructor_members
+                            .insert(result.def_id, members);
                     }
                     if let Decl::PropDecl { intros, .. } = inner {
                         let mut checked_intros = Vec::with_capacity(intros.len());

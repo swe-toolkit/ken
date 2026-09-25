@@ -70,8 +70,12 @@ const FLOOR_CASES: [FloorCase; 10] = [
     },
     FloorCase {
         name: "ResourceKind",
-        constructors: &["FsHandle", "Buffer", "Mapping"],
-        source: "fn witness (x : ResourceKind) : ResourceKind = match x { FsHandle |-> Buffer ; Buffer |-> Mapping ; Mapping |-> FsHandle }",
+        constructors: &[
+            "ResourceKind.FsHandle",
+            "ResourceKind.Buffer",
+            "ResourceKind.Mapping",
+        ],
+        source: "fn witness (x : ResourceKind) : ResourceKind = match x { ResourceKind.FsHandle |-> ResourceKind.Buffer ; ResourceKind.Buffer |-> ResourceKind.Mapping ; ResourceKind.Mapping |-> ResourceKind.FsHandle }",
     },
     FloorCase {
         name: "Result",
@@ -163,13 +167,9 @@ const COLLISION_CASES: [CollisionCase; 8] = [
     CollisionCase {
         parent: "ResourceKind",
         parent_collision_source: "data ResourceKind = LocalFsHandle | LocalBuffer",
-        constructor_collisions: &[
-            (
-                "FsHandle",
-                "data LocalResourceKind = FsHandle | LocalBuffer",
-            ),
-            ("Buffer", "data LocalResourceKind = LocalFsHandle | Buffer"),
-        ],
+        // ResourceKind is scoped: only its parent belongs to bare B. The
+        // three generic constructor spellings are available to user code.
+        constructor_collisions: &[],
         renamed_source: "data LocalResourceKind = LocalFsHandle | LocalBuffer",
         renamed_parent: "LocalResourceKind",
         renamed_constructors: &["LocalFsHandle", "LocalBuffer"],
@@ -592,9 +592,10 @@ fn assert_renamed_family_accepts(case: &CollisionCase) {
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
-/// Promise class: durable invariant. Every parent and exact-parent constructor
-/// in the closed floor is unshadowable before allocation under a non-empty
-/// module prefix, while equal-shaped all-renamed declarations remain ordinary
+/// Promise class: durable invariant. Every parent and every bare constructor
+/// of an unscoped floor family is unshadowable before allocation under a
+/// non-empty module prefix; scoped ResourceKind reserves only its parent.
+/// Equal-shaped all-renamed declarations remain ordinary
 /// checked local identities.
 ///
 /// **MEASURED:** one-axis parent and constructor rows reject at the retained
@@ -602,7 +603,7 @@ fn assert_renamed_family_accepts(case: &CollisionCase) {
 /// positive per family plus an explicit-data spelling control allocates only
 /// distinct local families and constructors with kernel-recorded local parentage.
 /// **CLAIMED:** prelude immutability covers
-/// the complete exact-parent-derived floor binding set, not shape or an
+/// the exact-parent-derived bare floor binding set, not shape or an
 /// arbitrary compiler-name inventory. **THE GAP:** selective-import collisions
 /// use the same set through a separate production entry, pinned below.
 #[test]

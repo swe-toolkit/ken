@@ -20,7 +20,7 @@ fn px7f_after_metadata (outcome : Result ResourceError FileMetadata)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
   }
 
-proc px7f_export_body (resource : Resource FsHandle)
+proc px7f_export_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit)
     visits [FS, FsHandleMetadata] =
   bind (Coproduct (FSOp AFull) AmbientOp)

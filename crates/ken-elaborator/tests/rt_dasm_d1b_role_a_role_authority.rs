@@ -61,9 +61,10 @@
 //! roster into an already-canonical `PreludeEnv` field is sound (captured at
 //! registration) but invisible here. Roles whose ids were already canonical
 //! (`Zero`/`Suc`, the private operations, the resource ids) never passed through
-//! name lookup. Closed-floor bindings (`Nil`/`Cons`, `Some`, `Ok`/`Err`,
-//! `True`/`False`, `Buffer`) are outside the fixture: module prebinding rejects
-//! those spellings before package allocation.
+//! name lookup. Bare closed-floor bindings (`Nil`/`Cons`, `Some`, `Ok`/`Err`,
+//! `True`/`False`) are outside the fixture: module prebinding rejects them
+//! before package allocation. Scoped `ResourceKind.Buffer` is separately
+//! witnessed by exact parentage and its absence as a bare binding.
 
 use std::collections::BTreeSet;
 
@@ -201,10 +202,7 @@ fn compile_shadowing_package() -> Result<(), CompilerDriverError> {
         &CompilerManifest::new(PACKAGE, Vec::new()),
         vec![CompilerSource::new("src/main.ken", SHADOWING_SOURCE)],
         TargetSelector::StableSymbol {
-            package_identity: StableSymbol::new(
-                SymbolNamespace::Module,
-                vec![PACKAGE.to_string()],
-            ),
+            package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PACKAGE.to_string()]),
             symbol: StableSymbol::new(
                 SymbolNamespace::Declaration,
                 vec![PACKAGE.to_string(), "two".to_string()],
@@ -331,21 +329,47 @@ fn d1b_role_a_every_canonical_role_is_covered_by_shadowing_or_floor_immutability
         .iter()
         .copied()
         .filter(|spelling| {
-            env.globals.get(*spelling).is_some_and(|id| {
-                env.env
-                    .constructor(*id)
-                    .is_some_and(|(parent, _)| floor_parents.contains(&parent.id))
-            })
+            !spelling.contains('.')
+                && env.globals.get(*spelling).is_some_and(|id| {
+                    env.env
+                        .constructor(*id)
+                        .is_some_and(|(parent, _)| floor_parents.contains(&parent.id))
+                })
         })
         .collect::<Vec<_>>();
     assert!(
         !floor_protected.is_empty(),
-        "the roster must exercise the exact-parent floor-protection arm"
+        "the roster must exercise the bare exact-parent floor-protection arm"
+    );
+    let scoped_selected = roster
+        .iter()
+        .copied()
+        .filter(|spelling| {
+            spelling.split_once('.').is_some_and(|(type_name, leaf)| {
+                env.globals.get(type_name).is_some_and(|parent_id| {
+                    floor_parents.contains(parent_id)
+                        && env.globals.get(*spelling).is_some_and(|ctor_id| {
+                            env.env
+                                .constructor(*ctor_id)
+                                .is_some_and(|(parent, _)| parent.id == *parent_id)
+                        })
+                        && !env.globals.contains_key(leaf)
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        scoped_selected,
+        ["ResourceKind.Buffer", "ResourceKind.Mapping"]
     );
 
     let uncovered: Vec<&(&str, &str)> = CanonicalRuntimeRoles::spellings()
         .iter()
-        .filter(|(_, spelling)| !shadowed.contains(spelling) && !floor_protected.contains(spelling))
+        .filter(|(_, spelling)| {
+            !shadowed.contains(spelling)
+                && !floor_protected.contains(spelling)
+                && !scoped_selected.contains(spelling)
+        })
         .collect();
     assert!(
         uncovered.is_empty(),

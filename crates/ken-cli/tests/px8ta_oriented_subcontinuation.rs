@@ -6,7 +6,7 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 }
 
 const NESTED_BRACKET_PROGRAM: &str = r#"program capabilities FS AFull
-fn leaf_body (_resource : Resource FsHandle)
+fn leaf_body (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -35,7 +35,7 @@ fn body_result
   }
 
 proc level_one_body
-  (cap : Cap AFull) (_resource : Resource FsHandle)
+  (cap : Cap AFull) (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -46,7 +46,7 @@ proc level_one_body
     (\outcome. body_result outcome)
 
 proc level_two_body
-  (cap : Cap AFull) (_resource : Resource FsHandle)
+  (cap : Cap AFull) (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

@@ -27,7 +27,7 @@ fn read_eof_body (_unit : Unit)
     (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
 
 proc after_read
-  (output : Resource FsHandle) (buffer : BufferHandle)
+  (output : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
@@ -44,7 +44,7 @@ proc after_read
   }
 
 proc buffer_body
-  (input : Resource FsHandle) (output : Resource FsHandle)
+  (input : Resource ResourceKind.FsHandle) (output : Resource ResourceKind.FsHandle)
   (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
@@ -75,7 +75,7 @@ fn after_buffer
     (ResourceBodyResult Unit Unit) (buffer_bracket_body outcome)
 
 proc output_body
-  (input : Resource FsHandle) (output : Resource FsHandle)
+  (input : Resource ResourceKind.FsHandle) (output : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -105,7 +105,7 @@ fn after_output
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (file_bracket_body outcome)
 
-proc input_body (cap : Cap AFull) (input : Resource FsHandle)
+proc input_body (cap : Cap AFull) (input : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

@@ -216,7 +216,11 @@ operation:
 | `ResourceRelease` | `[(Target, released)]` |
 
 Here `file`, `buffer`, and `released` stand for runtime-bound
-`ResourceTraceIdentityV1` values, not target-level serialized witnesses. The
+`ResourceTraceIdentityV1` values, not target-level serialized witnesses. In Ken
+source the two kind constructors are `ResourceKind.FsHandle` and
+`ResourceKind.Buffer`. The `FsHandle` and `Buffer` tags below are the frozen
+`ResourceKindV1` export discriminators, not alternate Ken source bindings;
+the `Buffer` resource-binding role is independent of the kind tag. The
 following record is the exact full-inventory specialization for a target whose
 reachable `Σ` contains both acquisitions and every listed use:
 

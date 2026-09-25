@@ -23,7 +23,7 @@ fn rt_branched_body (_buffer : BufferHandle)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 proc rt_branched_endpoint_buffer
-  (file : Resource FsHandle) (buffer : BufferHandle)
+  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -51,7 +51,7 @@ proc rt_branched_after_buffer
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
 
-proc rt_branched_file (file : Resource FsHandle)
+proc rt_branched_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

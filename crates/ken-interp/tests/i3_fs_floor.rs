@@ -357,3 +357,46 @@ fn named_errors_and_write_gate_are_total_and_discriminating() {
     );
     assert!(!host.fs_nodes().contains_key(b"root/denied".as_slice()));
 }
+
+/// Promise class: durable invariant. MEASURED: adding three user data
+/// families with the erstwhile ResourceKind constructor spellings does not
+/// change the checked FS role IDs, and those IDs still denote the original
+/// ResourceKind parent. CLAIMED: Runtime selects the pre-source constructor
+/// identities rather than reading a mutable bare global after elaboration.
+/// THE GAP: the comparison must use newly allocated, distinct source IDs.
+#[test]
+fn scoped_resource_kinds_keep_runtime_roles_after_user_bare_rebindings() {
+    let mut elab = ken_elaborator::ElabEnv::new().expect("checked prelude");
+    let before = FSIds::from_elab(&elab).expect("FS ABI before source");
+    let resource_kind = elab.globals["ResourceKind"];
+    elab.elaborate_file(
+        "data Buffer = MkMyBuffer\n\
+         data Mapping = MkMyMapping\n\
+         data FsHandle = MkMyFsHandle",
+    )
+    .expect("generic scoped-constructor spellings are available to source");
+    let after = FSIds::from_elab(&elab).expect("FS ABI after source");
+    for (role, original, source) in [
+        ("Buffer", before.buffer_id, elab.globals["Buffer"]),
+        ("Mapping", before.mapping_id, elab.globals["Mapping"]),
+        ("FsHandle", before.fs_handle_id, elab.globals["FsHandle"]),
+    ] {
+        assert_ne!(original, source, "{role} must be a distinct source ID");
+        assert_eq!(
+            elab.env
+                .constructor(original)
+                .expect("original kind constructor")
+                .0
+                .id,
+            resource_kind,
+            "{role} must retain its exact floor parent"
+        );
+        let actual = match role {
+            "Buffer" => after.buffer_id,
+            "Mapping" => after.mapping_id,
+            "FsHandle" => after.fs_handle_id,
+            _ => unreachable!("the fixture enumerates exactly three roles"),
+        };
+        assert_eq!(actual, original, "{role} runtime role changed after source");
+    }
+}

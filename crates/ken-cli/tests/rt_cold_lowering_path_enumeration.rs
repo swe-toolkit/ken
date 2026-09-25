@@ -161,7 +161,7 @@ proc rt_allocate_stage (cap : Cap AFull)
 (withBuffer AFull Unit Unit (sub_int 0 1) rt_body_ok)
 (\outcome. rt_allocate_done outcome)
 
-proc rt_read_offset_body (file : Resource FsHandle) (buffer : BufferHandle)
+proc rt_read_offset_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -169,7 +169,7 @@ proc rt_read_offset_body (file : Resource FsHandle) (buffer : BufferHandle)
 (readAt AFull file (sub_int 0 1) buffer (MkBufferWindow (0 : Int) (1 : Int)))
 (\outcome. rt_expect_invalid_offset outcome)
 
-proc rt_read_offset_file (file : Resource FsHandle)
+proc rt_read_offset_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -187,7 +187,7 @@ proc rt_read_offset_stage (cap : Cap AFull)
   ResourceRead rt_read_offset_file)
 (\outcome. rt_bracket_done outcome)
 
-proc rt_read_window_body (file : Resource FsHandle) (buffer : BufferHandle)
+proc rt_read_window_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -196,7 +196,7 @@ proc rt_read_window_body (file : Resource FsHandle) (buffer : BufferHandle)
   (MkBufferWindow (sub_int 0 1) (1 : Int)))
 (\outcome. rt_expect_invalid_bounds outcome)
 
-proc rt_read_window_file (file : Resource FsHandle)
+proc rt_read_window_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -224,7 +224,7 @@ proc rt_read_norights_stage (cap : Cap AFull)
 (\outcome. rt_bracket_done outcome)
 
 proc rt_write_after_read
-  (file : Resource FsHandle) (buffer : BufferHandle)
+  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
@@ -241,7 +241,7 @@ Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
 
-proc rt_write_body (file : Resource FsHandle) (buffer : BufferHandle)
+proc rt_write_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -249,7 +249,7 @@ proc rt_write_body (file : Resource FsHandle) (buffer : BufferHandle)
 (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (1 : Int)))
 (\outcome. rt_write_after_read file buffer outcome)
 
-proc rt_write_file (file : Resource FsHandle)
+proc rt_write_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -283,7 +283,7 @@ Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
   }
 
 proc rt_write_pair_after
-  (sink : Resource FsHandle) (buffer : BufferHandle)
+  (sink : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
@@ -301,7 +301,7 @@ Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
   }
 
 proc rt_write_pair_buffer
-  (source : Resource FsHandle) (sink : Resource FsHandle)
+  (source : Resource ResourceKind.FsHandle) (sink : Resource ResourceKind.FsHandle)
   (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
@@ -311,7 +311,7 @@ proc rt_write_pair_buffer
 (\outcome. rt_write_pair_after sink buffer outcome)
 
 proc rt_write_pair_sink
-  (source : Resource FsHandle) (sink : Resource FsHandle)
+  (source : Resource ResourceKind.FsHandle) (sink : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -320,7 +320,7 @@ proc rt_write_pair_sink
 (withBuffer AFull Unit Unit (1 : Int) (rt_write_pair_buffer source sink))
 (\outcome. rt_inner_bracket_result outcome)
 
-proc rt_write_pair_source (cap : Cap AFull) (source : Resource FsHandle)
+proc rt_write_pair_source (cap : Cap AFull) (source : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -354,7 +354,7 @@ fn rt_cap41_expect_eof (outcome : Result ResourceError ReadProgress)
   }
 
 proc rt_cap41_endpoint_buffer
-  (file : Resource FsHandle) (buffer : BufferHandle)
+  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -364,7 +364,7 @@ proc rt_cap41_endpoint_buffer
     (\outcome. rt_cap41_expect_eof outcome)
 
 proc rt_cap41_out_of_range_buffer
-  (file : Resource FsHandle) (buffer : BufferHandle)
+  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -374,7 +374,7 @@ proc rt_cap41_out_of_range_buffer
     (\outcome. rt_expect_invalid_bounds outcome)
 
 proc rt_cap41_offset_endpoint_buffer
-  (file : Resource FsHandle) (buffer : BufferHandle)
+  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -384,7 +384,7 @@ proc rt_cap41_offset_endpoint_buffer
     (\outcome. rt_expect_invalid_offset outcome)
 
 proc rt_cap41_offset_out_of_range_buffer
-  (file : Resource FsHandle) (buffer : BufferHandle)
+  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -393,7 +393,7 @@ proc rt_cap41_offset_out_of_range_buffer
       (MkBufferWindow (9 : Int) (4 : Int)))
     (\outcome. rt_expect_invalid_offset outcome)
 
-proc rt_cap41_endpoint_file (file : Resource FsHandle)
+proc rt_cap41_endpoint_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -402,7 +402,7 @@ proc rt_cap41_endpoint_file (file : Resource FsHandle)
     (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_endpoint_buffer file))
     (\outcome. rt_inner_bracket_result outcome)
 
-proc rt_cap41_out_of_range_file (file : Resource FsHandle)
+proc rt_cap41_out_of_range_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -411,7 +411,7 @@ proc rt_cap41_out_of_range_file (file : Resource FsHandle)
     (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_out_of_range_buffer file))
     (\outcome. rt_inner_bracket_result outcome)
 
-proc rt_cap41_offset_endpoint_file (file : Resource FsHandle)
+proc rt_cap41_offset_endpoint_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -420,7 +420,7 @@ proc rt_cap41_offset_endpoint_file (file : Resource FsHandle)
     (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_offset_endpoint_buffer file))
     (\outcome. rt_inner_bracket_result outcome)
 
-proc rt_cap41_offset_out_of_range_file (file : Resource FsHandle)
+proc rt_cap41_offset_out_of_range_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
