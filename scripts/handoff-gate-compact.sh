@@ -9,6 +9,11 @@ Usage:
 Resets each named agent worktree to origin/main, sends the Codex compaction
 sequence to that agent's moot tmux session, then waits five minutes by default.
 
+Only the agent's home branch (<agent>/work) is ever reset. A worktree on any
+other branch, or detached, is first switched to its home branch (created at
+origin/main if missing); the branch it was on is left exactly where it was. If
+the switch fails, that worktree is not reset, and the agent is still compacted.
+
 Agent names may be passed as either "language-leader" or "moot-language-leader".
 The script fails before making changes if any named agent worktree or tmux
 session cannot be resolved, or if any named worktree has uncommitted changes --
@@ -103,7 +108,34 @@ worktree_for_agent() {
 reset_agent() {
   local agent="$1"
   local worktree="$2"
-  local cur_branch ahead preserve_ref
+  local home="$agent/work"
+  local cur_branch cur_sha ahead preserve_ref switch_err
+
+  # SAFETY: reset only the seat's home branch. `reset --hard` moves whatever
+  # branch is checked out, so on a seat holding a `wp/` branch (a QA seat
+  # reviewing a candidate, an implementer mid-WP) it moved that WP branch to
+  # origin/main. Move the worktree to its home branch first and leave the other
+  # ref untouched. The tree is clean here: the dirty
+  # check above refused the run otherwise.
+  cur_branch="$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || printf 'HEAD')"
+  if [ "$cur_branch" != "$home" ]; then
+    cur_sha="$(git -C "$worktree" rev-parse --short HEAD 2>/dev/null || printf '?')"
+    if git -C "$worktree" show-ref --verify --quiet "refs/heads/$home"; then
+      switch_err="$(git -C "$worktree" switch --quiet "$home" 2>&1)" || {
+        printf '[%s] WARNING: on %s at %s and could not switch to %s (%s); not resetting this worktree, %s left untouched\n' \
+          "$agent" "$cur_branch" "$cur_sha" "$home" "$switch_err" "$cur_branch"
+        return 0
+      }
+    else
+      switch_err="$(git -C "$worktree" switch --quiet -c "$home" "$origin_main" 2>&1)" || {
+        printf '[%s] WARNING: on %s at %s and could not create %s (%s); not resetting this worktree, %s left untouched\n' \
+          "$agent" "$cur_branch" "$cur_sha" "$home" "$switch_err" "$cur_branch"
+        return 0
+      }
+    fi
+    printf '[%s] was on %s at %s; left that ref untouched and switched to %s\n' \
+      "$agent" "$cur_branch" "$cur_sha" "$home"
+  fi
 
   # SAFETY: `reset --hard origin/main` moves the current branch ref, which
   # orphans any commits it holds ahead of origin/main (completed-but-unmerged

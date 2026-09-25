@@ -22,6 +22,9 @@ Build teams route **component-design questions** to you (§9). You:
   design thread) over a one-off answer, so the next team finds it written — the
   same artifact-improving instinct that keeps the query rate decaying.
 - Route a genuine fork to a **Decision**; route scope questions to the Steward.
+- **Before posting any ruling, run `agent/memory/CHECKS.md` against it.** For
+  each check whose trigger the ruling hits, do the check and write its result
+  into the ruling. Most recent hard stops traced to a ruling that skipped one.
 
 **Deliver a technique ruling SELF-CONTAINED — paste the verbatim artifact
 in-thread; never make the recipient fetch a prior event by ID.** Your

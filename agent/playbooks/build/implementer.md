@@ -273,6 +273,9 @@ The two steps most often skipped, both of which have blocked candidates here:
   property with a deferred feature behind it; the gate must fail closed.
 ## Discipline: verifying what you inherit
 
+- **Before building on a ruling's premise, run the `agent/memory/CHECKS.md`
+  check it triggers.** A premise that fails its check is a hard stop to report
+  before the build, not after it.
 - **A shared-structure field another crate "populates" is a claim to verify —
   grep its init sites before you rely on it (promoted X1).** A field that exists
   and is read elsewhere may be **always-empty** at every construction site. Before

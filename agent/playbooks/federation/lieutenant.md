@@ -30,9 +30,9 @@ any context reset, in order:
    - `agent/playbooks/federation/steward/merge-policy.md` — the two standing
      merge policies (accepted base belongs on main; accepted partials merge as
      soon as done). You apply these; you do not re-decide them.
-4. Read your memory scopes: `agent/memory/fleet/` (every lesson there binds you;
-   note especially the merge-split / one-owner-per-merge lesson), plus any
-   lieutenant-scoped directory once one exists.
+4. Read `agent/memory/CHECKS.md`. The scopes `fleet/` and `build/` are
+   reference you search on demand; for a merge-split or ownership question,
+   start with the one-owner-per-merge lesson in `fleet/`.
 
 Optional deeper background (gitignored, not operative law): `local/`'s
 lieutenant-restructure-plan, for why the role exists and the full agreed

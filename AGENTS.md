@@ -57,51 +57,48 @@ it; it is the identical playbook. A fresh session start registers every skill
 for the `Skill` tool. This makes playbook updates self-heal on rebase without a
 forced restart.
 
-## Load your memory scopes (every agent, every session)
+## Read the decision checks (every agent, every session)
 
-The federation's hard-won operational lessons live in **`agent/memory/`** — a
-curated, scoped corpus (see `agent/memory/README.md`). After loading your
-playbook, **read the memory scopes for your role**: your `fleet` scope plus the
-narrower scopes on your path (its path + ancestors).
+After loading your playbook, **read `agent/memory/CHECKS.md`**: at most twelve
+checks, one per recurring cause of hard stops. That is the whole startup read.
+**Do not bulk-read the scope directories**, at startup or after compaction.
 
-| Your role | Memory scopes to read (the dir's files + its `README.md`) |
+**Apply a check when its trigger fires**: before you post a ruling, release a
+frame, approve a candidate, or build on a premise. Recalling a lesson is not
+applying it. The 2026-09-25 audit found that ten of the last twenty hard stops
+had a lesson naming their cause in the responsible seat's required reading,
+and none of the ten was prevented.
+
+**The rest of `agent/memory/` is reference, searched on demand.** When a
+decision touches an area where the fleet has been burned before, grep your
+scopes (the table below) for the mechanism term, not only the subject name,
+and read the hits. Nothing requires you to read a lesson you did not search
+for.
+
+| Your role | Scopes to search (under `agent/memory/`) |
 |---|---|
-| _any role_ | `agent/memory/fleet/` |
-| `steward` | `fleet` + `agent/memory/enclave/` + `agent/memory/roles/steward/` |
-| `lieutenant` | `fleet` + `agent/memory/build/` (it releases build WPs) |
-| `architect` | `fleet` + `enclave` + `agent/memory/roles/architect/` |
-| `spec-leader` / `spec-author` / `conformance-validator` | `fleet` + `enclave` + `agent/memory/roles/<role>/` |
-| `librarian` | `fleet` + `agent/memory/roles/librarian/` + `agent/memory/teams/doc/` (it is the doc team's QA) |
-| `research` | `fleet` + `agent/memory/enclave/` + `agent/memory/roles/research/` |
-| `adversary` | `fleet` + `agent/memory/enclave/` + `agent/memory/roles/adversary/` |
-| `<team>-leader` | `fleet` + `agent/memory/build/` + `agent/memory/build/leaders/` + `agent/memory/teams/<team>/` |
+| _any role_ | `fleet/` |
+| `steward` | `fleet` + `enclave/` + `roles/steward/` |
+| `lieutenant` | `fleet` + `build/` |
+| `architect` | `fleet` + `enclave` + `roles/architect/` |
+| `spec-leader` / `spec-author` / `conformance-validator` | `fleet` + `enclave` + `roles/<role>/` |
+| `librarian` | `fleet` + `roles/librarian/` + `teams/doc/` |
+| `research` | `fleet` + `enclave` + `roles/research/` |
+| `adversary` | `fleet` + `enclave` + `roles/adversary/` |
+| `<team>-leader` | `fleet` + `build/` + `build/leaders/` + `teams/<team>/` |
 | `<team>-implementer` | `fleet` + `build/` + `build/implementers/` + `teams/<team>/` |
 | `<team>-qa` | `fleet` + `build/` + `build/qa/` + `teams/<team>/` |
 
-These are **lessons, not law** — recall aids that reflect what was true when
-written; verify a named file/flag/function still exists before acting on one.
-Record a new lesson at the broadest scope where every reader must apply it.
-This corpus is the source of truth — Codex's generated `~/.codex/memories/` (if
-ever enabled) is supplemental only, never canonical.
+These are **lessons, not law**: recall aids that reflect what was true when
+written. Verify that a named file, flag or function still exists before
+acting on one. This corpus is the source of truth. Codex's generated
+`~/.codex/memories/` and any harness's private memory are supplemental only.
 
-> ### DIRECTORY PLACEMENT IS AUTHORITATIVE. Read your scopes and STOP.
->
-> **A lesson's audience is exactly the directory it sits in.** ⇒ Reading your
-> scopes (your path + ancestors) is **complete** — nothing applicable to you is
-> filed anywhere else. **Do not scan the rest of the corpus**, and do not read
-> frontmatter hunting for lessons that opt into your scope.
->
-> **A `scope:` frontmatter key is redundant metadata, not routing.** It sits on
-> most files and every occurrence merely restates its own directory. It
-> confers nothing and is not consulted. To reach a wider audience, **move the
-> file to the wider scope** — that is the only mechanism.
->
-> **Why this is stated so flatly:** the previous wording let a cross-cutting
-> lesson stay put and carry a `scope:` tag instead. That made directory placement
-> non-authoritative, so the only *sound* way to honour it was to read all 260
-> files' frontmatter at every startup — ~109 KB beyond a role's actual scope,
-> paid again at every compaction. **The mechanism was never once used**, so
-> that cost bought nothing.
+**Adding to the corpus** (rules in `agent/memory/README.md`): search first and
+extend an existing lesson rather than adding a near-duplicate. A cause that
+has recurred across hard stops belongs in `CHECKS.md` as a merged or replaced
+check, not as one more file. Directory placement is the only routing, and a
+`scope:` frontmatter key confers nothing.
 
 ## Reference material is off-limits to code authors
 
