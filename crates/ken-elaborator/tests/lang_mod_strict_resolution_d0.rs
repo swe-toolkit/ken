@@ -430,9 +430,9 @@ fn catalog_ambient_passthrough_migration_census() {
             // until the separate collections slice moves And and is_sorted.
             "Algorithm.Searching.OrderedSearch".to_string(),
             ["And", "and_fst", "and_intro", "and_snd"]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Algorithm.Sorting.InsertionSort".to_string(),
@@ -900,9 +900,9 @@ fn catalog_ambient_passthrough_migration_census() {
         (
             "Core.Logic.EmptyDec".to_string(),
             ["And", "and_fst", "and_intro", "and_snd"]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // The operator facade this WP adds. It declares the standard

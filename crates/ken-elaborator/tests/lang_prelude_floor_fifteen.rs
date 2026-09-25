@@ -65,6 +65,38 @@ fn checked_residual_id(env: &ElabEnv) -> GlobalId {
 }
 
 /// Promise class: durable invariant (30-taxonomy §4; 36 §4.2).
+/// MEASURED: without a shadowing declaration the checked residual of a space
+/// operation is the pre-source Empty identity. CLAIMED: the space fixture
+/// reaches the same checked operation type as the constructor-shadow control.
+/// THE GAP: this positive control cannot detect a shadowed spelling by itself.
+#[test]
+fn space_alone_uses_pre_source_empty_residual() {
+    let mut env = ElabEnv::new().expect("compiler prelude");
+    let pre_source = env.prelude_env.empty_id;
+    env.elaborate_file(COUNTER)
+        .expect("a standalone space must check");
+    assert_eq!(checked_residual_id(&env), pre_source);
+}
+
+/// Promise class: durable invariant (30-taxonomy §4; 36 §4.2).
+/// MEASURED: a flat source constructor called Empty can precede a checked
+/// space, whose residual-position ID remains the pre-source Empty former.
+/// CLAIMED: a source constructor must not replace a compiler type identity.
+/// THE GAP: the separate controls test type-family shadows and a missing
+/// globals entry; the constructor path would be absent without this case.
+#[test]
+fn flat_empty_constructor_cannot_replace_checked_residual_identity() {
+    let mut env = ElabEnv::new().expect("compiler prelude");
+    let pre_source = env.prelude_env.empty_id;
+    env.elaborate_file(&format!("data Box = Empty | Full\n{COUNTER}"))
+        .expect("a source Empty constructor and space must coexist");
+    let source_empty = env.globals["Empty"];
+    assert_ne!(pre_source, source_empty, "constructor must shadow Empty");
+    assert_eq!(checked_residual_id(&env), pre_source);
+    assert_ne!(checked_residual_id(&env), source_empty);
+}
+
+/// Promise class: durable invariant (30-taxonomy §4; 36 §4.2).
 /// MEASURED: after a same-unit ill-kinded Empty declaration, the real space
 /// operation checks. CLAIMED: desugaring uses the pre-source Empty identity.
 /// THE GAP: the next two controls inspect the residual identity and absence
