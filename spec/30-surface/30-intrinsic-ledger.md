@@ -1,12 +1,12 @@
 # Open intrinsic and package-surface ledger
 
-> Status: **open inventory, not a floor-membership decision**. The normative
-> fifteen-member prelude and its exact constructor/companion closure are
-> `30-taxonomy §4`; resolution and protected names are `33 §3.3`. This ledger
-> cannot admit a sixteenth member or change `trusted_base()`. Every addition to
-> the closed floor needs a per-name operator decision and an atomic roster
-> change. Its job is to keep candidate identities and outstanding evidence
-> visible while L2 measures them and L3 moves derivable conveniences.
+> Status: **open evidence ledger, not a floor-membership witness**. The
+> normative fifteen-member prelude and its exact constructor/companion closure
+> are `30-taxonomy §4`; resolution and protected names are `33 §3.3`. This
+> ledger cannot admit a sixteenth member or change `trusted_base()`. Once D0
+> proves both §4 witness clauses per name, a keyed, source-required identity
+> joins the reserved floor with an atomic roster/count change. The final list
+> is informational for the operator, not a per-name approval gate.
 
 ## Reading the inventory without over-claiming
 
@@ -21,25 +21,43 @@ producer-to-reader proof of keying: a reader of an ID captured during prelude
 registration need never repeat the name literal. Neither an absent literal nor
 an unused catalog census name proves a global is safe to remove.
 
-For each name below, the keying column names a **mechanism to check**, not a
-finding that its identity reader is complete. L2's D0 must trace registration
-through every reader; check whether the *source contract independently needs*
-that exact identity (`30 §4`'s conjunctive internal-provision arm). The possible
-outcomes are: witnessed and proposed to the operator for B; keyed but not
-floor-witnessed and exposed only through an operator-approved,
-identity-preserving explicit import; compiler-internal only, without source
-resolution; or unkeyed, promised ordinary Ken in a package. An unkeyed,
-unpromised registration may be removed only after D0 checks all unit classes.
-A copied source declaration **cannot** replace a machinery-keyed `GlobalId`.
-The proposed compiler-provided intrinsic module is still an operator question,
-not an authorized delivery mechanism.
+For each possible reserved name below, the keying column names a **native
+reader to check**, not proof that the reader set is complete. L2's D0 must
+trace registration through every reader and independently establish whether
+the *source contract needs that exact identity* (`30 §4`'s conjunction).
+Both proven → reserved, always-present floor. Keyed but no independent source
+need → compiler-internal, not source-resolvable. Unkeyed but promised →
+explicit-import Ken package. Unkeyed and unpromised → remove only after the
+full unit reach is measured. A copied source declaration **cannot** replace a
+machinery-keyed `GlobalId`; there is **no intrinsic import module**. The
+unkeyed laws/helpers below are not candidates for floor membership.
 
-## Per-name candidates requiring a keying and reachability decision
+The candidate names in this table are **observed spellings**, not names
+approved for permanent reservation. Before L2-3 admits any newly witnessed
+name, Spec checks that its spelling closely encloses its meaning (`30 §4`);
+`NotFound`, `Other`, `Unsupported`, `Success`, `Failure`, `write`, `Stdout`, and
+`Instant` are operator-named specificity probes, not an exhaustive list or
+preselected renames. Spec owns the public naming fold in `35`/`38` and this
+ledger. Any necessary rename lands atomically with floor admission and
+catalog/fixture clients. Type-qualified constructor use such as
+`IOError.NotFound` is an open Architect/operator fork, **not** an assumed
+escape from the currently specified constructor-family rule. This S0 assigns
+no replacement spelling.
 
-Each table entry is one registered spelling (an attached `::` proof is a
-separate identity). Rows sharing a mechanism still require individual D0
-reads; a family label is not a witness for every member. `prelude.rs` and
-`program_admission.rs` citations below refer to the exact base above.
+## Possible reserved names: proposed reader per name
+
+Each table entry is one named identity. Except for the constructor-private
+`PrivateBufferSpan` and `PrivateTransferCount` (not exported through `globals`
+but recorded on their types), these spellings occur in the 503-name global
+inventory. Rows sharing a reader still require individual D0 reads; a family
+label is not a keying proof for every member. **Reservation is decided per
+type, not one constructor at a time.** An admitted inductive type brings its
+entire exact registered constructor
+family into B by `30 §4`; never expose a partial family selected by catalog
+use. D0 traces which native mechanism produces each exact constructor ID,
+not just a sibling's identity, and checks the parent type's independent
+source requirement. `prelude.rs` and `program_admission.rs` citations refer
+to the exact base above. No row alone reserves a name today.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
@@ -53,15 +71,17 @@ reads; a family label is not a witness for every member. `prelude.rs` and
 | `ProgramCaps` | The `main` capability parameter's exact type in `program_admission.rs`, **source-named in `33 §3.2.1` despite catalog-census absence**. |
 | `MkProgramCaps` | Runner-minted constructor in `program_admission.rs`; check if only internal, with exact `ProgramCaps` parent. |
 | `HostIO` | `main` result's exact wrapper in `program_admission.rs`, **source-named in `33 §3.2.1`**; verify whether this identity must be imported. |
-| `Prod` | Product carrier in `ProcessInput`'s environment field; check host-runner ABI identity, not just its structural shape. |
-| `MkProd` | `program_admission.rs` captures this constructor when building an input; verify its `Prod` parent and whether a source-visible product is required. |
+| `Prod` | `ProcessInput` environment carrier: D0 decides whether its exact identity is source-required, or the ABI can be retargeted to canonical floor `Pair`. Reserve-or-retarget, not assumed floor. |
+| `MkProd` | `program_admission.rs` captures this constructor; D0 pairs its `Prod` parent with the same reserve-or-retarget choice. No partial constructor admission. |
 | `eqChar` | `decimal_char.rs::set_eq_entry` captures the checked definition's ID for literal/comparator selection (`33 §6.2`); confirm every reader. |
 | `leqChar` | Checked projection/comparison definition (`decimal_char.rs`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `charToInt` | Checked `Char → Int` projection (`18a §5.9.1`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `IO` | Checked Console-ITree alias (`prelude.rs`); confirm whether the effect reifier selects the alias ID or only the underlying constructors. |
 | `FS` | Checked Auth-indexed ITree alias (`prelude.rs`); confirm whether the reifier/runner selects its ID. |
-| `Stdout` | Console `Stream` constructor used by source `write`/`print_line`; trace runtime stream selection and the public Console contract. |
-| `Stderr` | Console `Stream` constructor; same reader/contract check independently. |
+| `Stream` | Console stream carrier; trace `ConsoleOp` response/reifier identity and source use before reserving its complete constructor family. |
+| `Stdin` | `Stream` constructor; trace the native stream selector and source requirement. |
+| `Stdout` | `Stream` constructor used by source `write`/`print_line`; trace native stream selection. |
+| `Stderr` | `Stream` constructor; trace the native selector independently. |
 | `read_bytes` | Checked FS call wrapper (`prelude.rs`); test whether the compiler keys on its ID or only on its emitted `Vis`/`ReadFile`. |
 | `write` | Checked Console call wrapper (`prelude.rs`); same independent test. |
 | `write_file` | Checked FS call wrapper (`prelude.rs`); same independent test. |
@@ -84,31 +104,28 @@ reads; a family label is not a witness for every member. `prelude.rs` and
 | `Instant` | Clock response carrier (`prelude.rs::clock_resp`); trace native clock response's type ID. |
 | `MkInstant` | `CanonicalRuntimeRoles::mk_instant` for clock response; verify exact `Instant` parent. |
 | `CreatePolicy` | FS `WriteFile` request parameter (`prelude.rs::fs_resp`); test whether native operation needs this type's ID. |
+| `CreateNew` | `CreatePolicy` constructor; trace native create-policy discriminator. |
+| `CreateOrTruncate` | `CreatePolicy` constructor; trace native create-policy discriminator. |
+| `CreateOrKeep` | `CreatePolicy` constructor; trace native create-policy discriminator. |
 | `BufferSpan` | Constructor-private minted transfer span (`38 §1.7.1–2`); trace response-type and runtime span ID. |
+| `PrivateBufferSpan` | Exact `BufferSpan` constructor: trace host minting; parent admission never widens constructor-private visibility. |
 | `BufferWindow` | Public immutable request descriptor (`38 §1.7.1`); check identity reader separately from bounds checking. |
 | `MkBufferWindow` | `BufferWindow` constructor in request creation; check whether the runtime selects this exact ID. |
-| `buffer_nat_add` | Checked span/count helper; trace prelude reverse dependencies and host-read identity, if any. |
-| `buffer_span_budget` | Checked span budget proof helper (`38 §1.7.3`); test whether runtime reads its ID. |
-| `buffer_span_length` | Checked span projection; test whether runtime reads its ID. |
 | `TransferCount` | Positioned-transfer count carrier (`38 §1.7.2`); trace driver result identity. |
-| `transfer_count_int` | Checked projection used by transfer laws; trace source and native readers. |
-| `transfer_count_nat` | Checked projection; trace source and native readers. |
-| `transfer_count_positive` | Checked positivity witness; trace source and native readers. |
-| `transfer_count_positive_prop` | Checked positivity proposition; trace source and native readers. |
-| `transfer_count_remaining` | Checked remaining-count helper; trace source and native readers. |
-| `transfer_count_request_budget` | Checked request-budget helper; trace source and native readers. |
-| `transfer_count_request_budget::bounded` | Attached proof; trace dependent proof clients and exact subject ID. |
-| `write_all_all_success` | Checked all-success law (`38 §1.7.3`); test public proof need vs internal-only helper. |
-| `write_all_all_success::all_success` | Attached proof of preceding law; test public proof need independently. |
-| `write_all_call_bound` | Checked call-bound law; test public proof need. |
-| `write_all_call_bound::termination` | Attached proof of preceding law; test public proof need independently. |
-| `write_all_complete` | Checked complete-success law; test public proof need. |
-| `write_all_complete::success_complete` | Attached proof of preceding law; test public proof need independently. |
-| `write_all_exact_prefix_prop` | Checked exact-prefix proposition; test public proof need. |
-| `write_all_exact_prefix_prop::exact_prefix` | Attached proof of preceding proposition; test public proof need independently. |
-| `write_all_first_error` | Checked first-error law; test public proof need. |
-| `write_all_first_error::first_error` | Attached proof of preceding law; test public proof need independently. |
+| `PrivateTransferCount` | Exact `TransferCount` constructor: trace native minting; retain constructor-private visibility. |
 | `ResourceError` | Runtime resource refusal family (`38 §1.7–1.9`); trace host/reifier identity and public error carrier. |
+| `ResourceHostIO` | `ResourceError` constructor: trace native host-error wrapper ID. |
+| `Closed` | `ResourceError` constructor: trace native closed-token refusal ID. |
+| `MalformedResource` | `ResourceError` constructor: trace native malformed-token refusal ID. |
+| `RightNotHeld` | `ResourceError` constructor: trace native right-refusal ID. |
+| `ReleaseFailed` | `ResourceError` constructor: trace native release-error ID. |
+| `ResourceKindMismatch` | `CanonicalRuntimeRoles::resource_kind_mismatch`; exact parent `ResourceError`. |
+| `BufferLimit` | `CanonicalRuntimeRoles::resource_buffer_limit`; exact parent `ResourceError`. |
+| `AllocationFailed` | `CanonicalRuntimeRoles::resource_allocation_failed`; exact parent `ResourceError`. |
+| `InvalidOffset` | `CanonicalRuntimeRoles::resource_invalid_offset`; exact parent `ResourceError`. |
+| `InvalidBounds` | `CanonicalRuntimeRoles::resource_invalid_bounds`; exact parent `ResourceError`. |
+| `NoProgress` | `CanonicalRuntimeRoles::resource_no_progress`; exact parent `ResourceError`. |
+| `MappingLimit` | `CanonicalRuntimeRoles::resource_mapping_limit`; exact parent `ResourceError`. |
 | `ResourceBodyResult` | Bracket body result carrier (`38 §1.7.1`); trace bracket host and source identity. |
 | `ResourceBodyOk` | `ResourceBodyResult` constructor; trace host result discriminator. |
 | `ResourceBodyErr` | `ResourceBodyResult` constructor; trace host result discriminator. |
@@ -118,13 +135,48 @@ reads; a family label is not a witness for every member. `prelude.rs` and
 | `ResourceBracketReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 | `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 
-These names remain **outside** the current B. Capturing a name's ID proves
-keying, not the separate clause that source must name it without an import.
-A keyed public name not admitted to B cannot be recreated by copying a
-catalog definition: an explicit, identity-preserving import needs an operator
-ruling before implementation. An unkeyed checked helper can be imported from
-an ordinary package. Compiler-only IDs need no source spelling. Each case is
-per-name; in particular `leqChar` does not inherit `eqChar`'s registry key.
+These names remain **outside** the current B. Capturing an ID proves keying,
+not the independent source-name requirement. Both witnesses admit the type
+and its exact constructor family to the reserved floor; without source need
+it is internal-only, and without keying it is package material if promised.
+For checked definitions the test remains per-name: `leqChar` does not inherit
+`eqChar`'s registry key. The thirteen `IOError` causes are one closed family
+**if** its parent type qualifies; D0 still names the native producer of each
+exact cause ID, never accepting a partial family or inferring all producers
+from one constructor. `Prod`/`MkProd` remains an explicit D0 decision:
+reserve the exact family on both witnesses or retarget the Program-I field to
+already-floor `Pair`, without asserting either outcome here.
+
+## Checked laws and helpers are not intrinsic candidates
+
+No `write_all_*`, `transfer_count_*`, or `buffer_*` lemma/helper is keyed by
+native machinery just because it reasons about a keyed carrier. The behavior
+or proof that the spec promises moves to a checked package; an unneeded pure
+helper's prelude registration is deleted. D0 still measures actual uses and
+reverse dependencies before any such move or deletion.
+
+| Name | Package or removal disposition |
+|---|---|
+| `buffer_nat_add` | Pure internal helper: package-private only if its proof needs it; otherwise delete. |
+| `buffer_span_budget` | Checked span-budget lemma: place with the buffer laws if used (`38 §1.7.3`). |
+| `buffer_span_length` | Public span-length projection: export from the buffer package (`38 §1.7.1`). |
+| `transfer_count_int` | Checked transfer projection in the package (`38 §1.7.2`). |
+| `transfer_count_nat` | Checked transfer projection in the package (`38 §1.7.2`). |
+| `transfer_count_positive` | Checked positivity witness in the package (`38 §1.7.2–3`). |
+| `transfer_count_positive_prop` | Checked positivity proposition in the package (`38 §1.7.2–3`). |
+| `transfer_count_remaining` | Checked remaining-count helper: package-private if needed; otherwise delete. |
+| `transfer_count_request_budget` | Checked budget helper: package-private if needed; otherwise delete. |
+| `transfer_count_request_budget::bounded` | Attached boundedness proof: publish with its package subject if required. |
+| `write_all_all_success` | Checked law in the capability package (`38 §1.7.3`). |
+| `write_all_all_success::all_success` | Attached proof in that package. |
+| `write_all_call_bound` | Checked law in the capability package. |
+| `write_all_call_bound::termination` | Attached proof in that package. |
+| `write_all_complete` | Checked law in the capability package. |
+| `write_all_complete::success_complete` | Attached proof in that package. |
+| `write_all_exact_prefix_prop` | Checked proposition in the capability package. |
+| `write_all_exact_prefix_prop::exact_prefix` | Attached proof in that package. |
+| `write_all_first_error` | Checked law in the capability package. |
+| `write_all_first_error::first_error` | Attached proof in that package. |
 
 ## Unused-by-catalog does not mean unpromised
 
@@ -133,9 +185,9 @@ family is unkeyed. L2's D0 must still check producer-to-reader keying,
 source-use outside the catalog census, and exact spelling. The normative
 behavior remains required even for a name no current catalog root references.
 Under `30 §4`, none of these ordinary convenience families acquires ambient
-availability merely by being registered. The applicable disposition for a
-**verified unkeyed** member is an explicit-import standard package; for a
-member with a native identity reader, use the keyed route above instead.
+availability merely by being registered. A **verified unkeyed** promised name
+is an explicit-import package definition; a keyed identity joins the floor
+only if source must name that exact identity, otherwise it remains internal.
 
 | Family | Existing normative promise | Disposition once unkeyed is confirmed |
 |---|---|---|
@@ -156,8 +208,10 @@ without the §4 witness. These are explicit documentation seams, not silent
 exceptions to strict resolution.
 
 No removal or move is authorized by this ledger alone. L2 D0 measures the
-full unit reach and ID keying, and each L3 move checks reverse dependencies
-and exact identity before replacement. The operator decides each new floor
-member and the outstanding compiler-provided intrinsic-module question;
-package conveniences and compiler-internal names are not floor members by
-word association.
+full unit reach, each native ID reader, and independent source need; each L3
+move checks reverse dependencies and identity before replacement. L2-3 then
+adds every fully witnessed name to the floor, with the roster/count updated
+atomically; its final list is shown to the operator for information. There is
+no intrinsic module and no extra per-name operator approval gate. Package
+conveniences and compiler-internal identities are not floor members by word
+association.

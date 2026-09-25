@@ -147,6 +147,20 @@ the prelude bridges to the surface. This is the surface analog of the kernel's
 > companion's exact pre-source `GlobalId`. This is a closed companion inventory,
 > not authority to expose arbitrary compiler helpers.
 
+**Reserved-name specificity (normative for every internal-provision
+admission).** Because authors cannot bind a name in B anywhere, a new
+reserved spelling must closely enclose the identity's meaning, not consume a
+generic name for a narrow intrinsic. A proposed generic name is renamed before
+admission; Spec owns the public spelling in `35`/`38` and the
+[ledger](30-intrinsic-ledger.md), and the rename lands atomically with the
+floor identity, roster/count, catalog callers, and fixtures. The current
+candidate spellings `NotFound`, `Other`, `Unsupported`, `Success`, `Failure`,
+`write`, `Stdout`, and `Instant` trigger that review, but this section chooses
+no replacement names. Whether a type-qualified constructor path (for example
+`IOError.NotFound`) can or should avoid reserving the bare constructor is an
+open design question for the Architect and operator; it does not silently
+change the current whole-family rule or the fifteen-member floor.
+
 The prelude is a **second minimality target** — the same TB-Sound discipline
 (`is_prelude` is exactly `{Top, Bottom, tt}`, no catch-all) applied at the
 surface. The signature inventory is obtained by traversing the type of every
@@ -197,10 +211,12 @@ adds no `trusted_base()` entry. Kernel `Sigma`/`Pair`/`Proj1`/`Proj2` remain
 representation and computation authority, not provider declarations or another
 identity family.
 
-For an inductive floor member, a constructor enters only when its
-kernel-recorded parent is that exact member; `Char` and transparent `Pair` are
-constructor-free. A same-shaped source family or definition has a different
-identity and is not the floor member. Every floor type, constructor, and
+For an inductive floor member, its entire kernel-recorded constructor family
+enters name protection together, with every constructor's parent the exact
+floor identity; private constructors remain unavailable to source under
+`33 §4.2`. `Char` and transparent `Pair` are constructor-free. A same-shaped
+source family or definition has a different identity and is not the floor
+member. Every floor type, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
 
 **Effect-surface and Program-I candidates are not yet floor members.** The
@@ -215,14 +231,23 @@ fails the keying clause and remains an import-required package.
 
 The [open per-name intrinsic ledger](30-intrinsic-ledger.md) records candidate
 names, possible keying mechanisms, missing witness arms, and the separate
-spec-promised package surface. A proposed name joins the **closed** floor only
-by an operator-owned, per-name membership change that names its exact
-pre-source identity and updates this roster and its count atomically. No
-ledger row is a floor admission. Re-checked additions would not themselves
-add a `trusted_base()` entry. Until a candidate is admitted, it has no
-ambient-prelude privilege: a source-facing need must be met by an explicit
-package import or a separately authorized identity-preserving intrinsic route.
-Merely being present in the compiler's global table is neither route.
+spec-promised package surface. The membership rule above is the complete
+criterion: **once the exact pre-source identity is proven keyed by a native
+mechanism and independently required by the surface contract, that name joins
+the always-present, reserved floor**. The witnessed roster and its count change
+atomically with realization. The final list is reported to the operator for
+information, not submitted for per-name permission. No compiler-provided
+intrinsic import module exists as an alternative route: a keyed identity that
+source must name cannot be made optional without surprising shadowing.
+
+Until D0 proves both witness clauses for a candidate, the floor remains the
+fifteen-member set above and the candidate has no new ambient availability.
+A keyed identity without an independent source-name requirement stays
+compiler-internal; an unkeyed, promised definition belongs in an explicit
+package; an unkeyed, unpromised registration may be removed after its uses
+are measured. A ledger row alone does not admit a name, and registering it in
+`globals` proves neither clause. Each added checked floor member remains out
+of `trusted_base()`.
 
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
@@ -233,12 +258,14 @@ The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
 **Implementation staging.** The specification fixes the fifteen-type and
-three-companion target as the current floor; the effect-surface and
-entrypoint-ABI extension above grows it further only under the operator-gated
-floor-membership change. Until the floor-realization build captures and admits
-the four existing Pair-family identities, current Strict loading may still
-reject their bare names. That implementation gap is not a package boundary and
-does not authorize a second identity or fallback route.
+three-companion target as the current floor; further effect-surface and
+entrypoint-ABI names join only after D0 supplies both witness clauses per
+name. L2's floor-addition slice lands each warranted addition with the
+roster/count change before the one-mode strict flip. Until the
+floor-realization build captures and admits the four existing Pair-family
+identities, current Strict loading may still reject their bare names. That
+implementation gap is not a package boundary and does not authorize a second
+identity or fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib
 
@@ -249,9 +276,10 @@ package carriers: they are the kernel-origin and compiler-bootstrap members of
 the internal-provision arm. `Option` and `Result` are likewise not packages:
 public primitive signatures name their canonical compiler-installed
 identities. `Empty` and `Either` remain packages; `Unit` is a candidate for the
-internal-provision arm, **not** a sixteenth floor member without the per-name
-witness and operator-gated change of §4. A same-shaped source definition of
-`Pair` allocates a distinct identity; it neither replaces the floor family nor
+internal-provision arm, **not** a sixteenth floor member until both witness
+clauses are proven and §4's roster changes atomically. A same-shaped source
+definition of `Pair` allocates a distinct identity; it neither replaces the
+floor family nor
 converts structural equality into floor provenance.
 
 The reframed catalog is
@@ -264,12 +292,12 @@ postulated**" discipline carries to the package builds (ES4). Pair's admission
 under the general internal-provision rule is part of the prelude boundary above,
 not a package exception.
 
-A compiler-owned identity keyed by native machinery but not admitted to the
-closed prelude cannot be replaced by a same-shaped ordinary package
-*declaration*. Its possible explicit-import route must preserve the exact
-registered identity; whether a compiler-provided intrinsic module supplies
-that route is an open operator question, not a fourth ambient tier. A checked
-helper with no such identity reader remains ordinary package material.
+A compiler-owned identity keyed by native machinery cannot be replaced by a
+same-shaped ordinary package declaration. If the surface independently needs
+to name that exact identity, it joins the protected prelude by §4; otherwise
+it remains internal and unresolvable from source. There is no optional
+intrinsic-import module. A checked helper with no identity reader remains
+ordinary package material when its behavior is promised.
 
 **The derivation-path discipline (normative).** Every catalog entry states a
 real Ken definition path from the built-ins. A catalog entry with **no** path is

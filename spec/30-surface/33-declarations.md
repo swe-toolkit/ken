@@ -252,8 +252,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom, Char,
   Equal, List, Nat,
   Option, Pair, Prop, Proved, ResourceKind, Result, Top, Utf8Error}`. The latter
-  is a fifteen-member floor, not the superseded ten-member inventory. A floor
-  constructor enters B only with its exact registered parent identity:
+  is a fifteen-member floor, not the superseded ten-member inventory. An
+  admitted inductive member reserves its whole exact registered constructor
+  family, not an arbitrary subset of constructors a particular corpus used.
+  Constructor-private names stay inaccessible to source under §4.2; they do
+  not become public merely by being protected. The current floor parents are:
   `ANone`/`APartial`/`AFull` under `Auth`, `True`/`False` under `Bool`,
   `Nil`/`Cons` under `List`, `Zero`/`Suc` under `Nat`, `None`/`Some` under
   `Option`, `FsHandle`/`Buffer`/`Mapping` under `ResourceKind`, `Err`/`Ok` under
@@ -263,7 +266,8 @@ is a **surface error** (`24`) — it never reaches the kernel:
   with their checked types keyed to that `Pair` identity. Kernel native names
   and reserved formers/sugar remain kernel vocabulary, not extra prelude
   identities. Neither the closed roster nor B includes arbitrary compiler
-  globals; future floor membership is operator-gated (`30-taxonomy §4`).
+  globals; future floor membership requires §4's two witnesses and an atomic
+  roster change.
 - **No binding of a built-in name.** No declaration or binder may introduce a
   name in the built-in set B. This is a hard surface error at introduction,
   even if the proposed target has the same canonical identity as the built-in
@@ -278,6 +282,14 @@ is a **surface error** (`24`) — it never reaches the kernel:
   it does not create a second floor identity. Qualified use of an existing
   floor name is not a new binding. Lexical shadowing applies only to names
   outside B; an inner binder cannot override B.
+- **`Eq`/`J` staging.** The former MRES-8 lower-arity coexistence exception
+  is superseded for both protected kernel names. The existing conformance
+  case `arity-gated-eq-j-sugar-coexists-with-lower-arity-definitions` and
+  `n1_duplicate_definition.rs` still test the pre-enforcement behavior;
+  their inversion is owed by L2-4, **not** by this specification change.
+  L3 first renames the catalog's `class Eq` and its users, with Spec and
+  Foundation choosing a non-colliding name. L2-4 may enforce the ban only
+  after that rename lands; S0 chooses no replacement name.
 - **Non-B top-level identity clash.** A top-level local, a selective or
   renamed import, and a re-exported name may supply the same unqualified
   name outside B. If two bindings name **distinct canonical declarations**,
