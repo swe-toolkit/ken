@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-STRING-CONSTRUCTION
 title: "Native String construction disagrees with the interpreter: Cranelift list_char_to_string treats each Char as a UTF-8 byte (a silent wrong value for scalars 128-255, refusals above), and native and runtime-IR bytes_decode skip NFC; fix every native String ingress together so the trusted byte contracts stay true on every engine"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: architect
