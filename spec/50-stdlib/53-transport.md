@@ -24,9 +24,8 @@ reduce. The prelude's `Equal` is a **transparent `declare_def` alias**
 and is equally transportable** — a Map order-hypothesis `Equal Bool (leq …)
 True` (`52 §5`) reduces to the computing `Eq` and needs no `Equal → Eq`
 migration to be rewritten by `J`. Only a genuinely *postulated*, non-computing
-equality would be untransportable; Ken has none on this path. (`30 §6`'s
-"`Equal` → delete, postulated" prose predates that alias and reads stale — a
-cross-ref tidy for a future `30-taxonomy` pass, out of this WP.)
+equality would be untransportable; Ken has none on this path. `30 §4`/`§6`
+retain the checked `Equal` alias while retiring the duplicate postulate.
 
 ## 2. The five combinators
 

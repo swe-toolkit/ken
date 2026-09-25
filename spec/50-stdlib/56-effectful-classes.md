@@ -355,10 +355,11 @@ by induction on the carrier (`55 §3.1`).
 ## 6. Derivation paths and `trusted_base()` delta (AC1/AC4)
 
 - **The classes** are `class` declarations = record types (`33 §5.2`,
-  right-nested Σ), built from the kernel's `Equal`/`Ω` vocabulary + the wired
-  superclass fields (themselves `55` records). **No new kernel former, zero
-  delta.** The wiring + explicit dicts + attested bridge all ride **CAT-1's
-  `55 §6` extension + existing record/projection machinery** (`elab_class_decl`,
+  right-nested Σ), built from the checked prelude `Equal` alias of kernel `Eq`,
+  kernel `Ω`, and the wired superclass fields (themselves `55` records).
+  **No new kernel former, zero delta.** The wiring, explicit dicts, and
+  attested bridge ride **CAT-1's `55 §6` extension + existing
+  record/projection machinery** (`elab_class_decl`,
   `infer_proj`, `compute_ordered_field_values`) — **zero new elaborator
   capability** (`§2`; AC1). If the build finds one genuinely required, it
   re-forks to Steward, not smuggled.

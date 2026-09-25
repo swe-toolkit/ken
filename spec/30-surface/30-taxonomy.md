@@ -348,14 +348,16 @@ corrections; ES2 implements the `prelude.rs` demotion. Each is a
 `trusted_base()`-shrinking move that makes the built-in set and the trusted base
 coincide.
 
-- **`Equal` → delete; use the kernel's native `Eq`.** The prelude postulates
-  `Equal : Π(A). A → A → Ω`, which **shadows the kernel's computing `Eq`**
-  (`../10-kernel/16 §2` — a real former with `refl`/`J`, reduced by recursion).
-  An assumed equality over the real one is not merely a phantom `trusted_base()`
-  entry — it **forfeits `Eq`'s computational and `J`-elimination behavior**. The
-  ruling is **delete and reference `Eq`**, not re-define. (A postulate
-  duplicating a real kernel construct is the surface form of the
-  name-shadows-the-mechanism trap.)
+- **`Equal` → checked prelude alias of the kernel's native `Eq`, not a
+  postulate.** The former prelude postulate `Equal : Π(A). A → A → Ω` shadowed
+  the kernel's computing `Eq` (`../10-kernel/16 §2` — a real former with
+  `refl`/`J`, reduced by recursion). An assumed equality over the real one
+  forfeits `Eq`'s computational and `J`-elimination behavior and adds an
+  unnecessary `trusted_base()` entry. Retire that duplicate postulate, **not**
+  the source spelling: §4 admits `Equal` as the exact checked, transparent floor
+  definition whose body is native `Eq`. It is re-checked and adds no trust
+  entry. A postulate duplicating a real kernel construct is the surface form
+  of the name-shadows-the-mechanism trap.
 - **`And` → the derived connective, not a postulate.** Ω-conjunction is already
   a **derived operation** from the K1 formers (`16 §1.3`). The prelude postulate
   is redundant; reference the derived connective (or
@@ -435,11 +437,11 @@ built-in type (§3), computed, so it belongs **out** of `trusted_base()` entirel
 (the base lists the `Int`/`String` *primitive type* once, item-2, never each
 literal value). Whatever the table rules, ES2 lands it.
 
-**Net.** Of the surface soundness entries,
-`Equal`/`And`/`is_sorted`/`Perm`/`Bool`/`OrdResult` and the `reg_novf`
-**predicate** become re-checked definitions or are removed (**out** of
-`trusted_base()`), literals become primitive-constant terms (out), and
-`Map`/`Set` — under OQ-A — become **proved package inductives, retired from
+**Net.** Of the surface soundness entries, `Equal` remains as the checked
+prelude floor alias, while `And`/`is_sorted`/`Perm`/`Bool`/`OrdResult` and the
+`reg_novf` **predicate** become re-checked definitions or are removed (all
+**out** of `trusted_base()`); literals become primitive-constant terms (out);
+and `Map`/`Set` — under OQ-A — become **proved package inductives, retired from
 `trusted_base()`** (out; `../50-stdlib/52-map.md`), the opaque primitive gone.
 The **assumed-axiom** surface trusted base shrinks toward **zero** — leaving
 only the genuinely-audited primitives (`Array`/`String`/`Bytes`) **and the live
