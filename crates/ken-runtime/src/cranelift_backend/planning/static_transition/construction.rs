@@ -265,6 +265,7 @@ impl<'src> Planner<'src> {
         };
         let mut planner = Self {
             plan: StaticTransitionPlan {
+                selected_pending_calls: BTreeMap::new(),
                 checked_ih_post_call_consumers: Vec::new(),
                 entries: Vec::new(),
                 planned_entry_bodies: Vec::new(),
@@ -1549,6 +1550,10 @@ impl<'src> Planner<'src> {
         #[cfg(test)]
         apply_static_worker_member_mutation(&mut self.plan);
         self.plan.validate()?;
+        // The selected pending-call plane observes validated declarations only.
+        // No emission or ticket is changed by publishing this decision.
+        self.plan.selected_pending_calls =
+            super::selected_pending_calls::plan_selected_pending_calls(&self.plan)?;
         #[cfg(feature = "px8-ds-test-support")]
         run_checked_ih_intervening_binder_population_control(&self.plan)?;
         Ok(self.plan)

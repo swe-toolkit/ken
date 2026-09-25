@@ -1,0 +1,136 @@
+// AC-1 increment 1: checked-source planner admission only. Nothing in this
+// test expects a package to have been emitted or a ticket to have been issued.
+
+const PX7L: &str = r#"program capabilities FS APartial
+proc selected_body (terminal : Bool) (message : String)
+  : Unit -> HostIO APartial Unit visits [Console] =
+  \_. match terminal {
+    False |-> host_console APartial Unit (print_line message) ;
+    True |-> bind (Coproduct (FSOp APartial) AmbientOp)
+      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      (Result IOError Unit) Unit
+      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+        Unit MkUnit)
+  }
+
+proc delayed (body : Unit -> HostIO APartial Unit)
+  : HostIO APartial ExitCode visits [Console] =
+  bind (Coproduct (FSOp APartial) AmbientOp)
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+    Unit ExitCode
+    (body MkUnit)
+    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
+      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      (Result IOError Unit) ExitCode
+      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (\_. host_exit APartial Success))
+
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  bind (Coproduct (FSOp APartial) AmbientOp)
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+    Bool ExitCode
+    (host_console APartial Bool (is_terminal Stdout))
+    (\terminal. delayed (selected_body terminal "captured"))
+"#;
+
+// Source declaration, not the planner coordinate, names the expected slot.
+// Parsing the fixture's Ken declaration keeps `_caps`; erasure canonicalizes
+// the runtime binder name to `program_caps`.
+fn source_main_parameters(source: &str) -> Vec<String> {
+    ken_elaborator::parser::parse_decls(source)
+        .expect("checked source parses")
+        .into_iter()
+        .find_map(|decl| match decl {
+            ken_elaborator::Decl::ViewDecl { name, params, .. } if name == "main" => {
+                Some(params.into_iter().flat_map(|binder| binder.names).collect())
+            }
+            _ => None,
+        })
+        .expect("source declares main")
+}
+
+#[test]
+fn selected_pending_call_planner_checked_source_baseline_probe() {
+    let dir = tempfile::tempdir().unwrap();
+    let (outcome, rows) = ken_runtime::with_selected_pending_call_admissions(|| {
+        ken_cli::build_native_program(
+            PX7L,
+            ken_cli::SourceFormat::Ken,
+            "rt-pending-admission",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    let error = outcome.expect_err("increment 1 does not change emission's first refusal");
+    assert!(format!("{error:?}").contains("BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1"), "{error:?}");
+    let planned: Vec<_> = rows
+        .iter()
+        .filter_map(|row| match &row.outcome {
+            ken_runtime::SelectedPendingCallOutcomeObservation::Planned {
+                candidates,
+                width,
+                defining_function,
+                families,
+                gates,
+            } => Some((candidates, width, defining_function, families, gates)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        planned.len(),
+        1,
+        "one differing-unit Match must be planned: {rows:#?}"
+    );
+    let (candidates, width, owner, families, gates) = planned[0];
+    assert_eq!((*width, *owner), (6, 3));
+    assert_eq!(
+        candidates
+            .iter()
+            .map(|candidate| (candidate.arm, candidate.body))
+            .collect::<Vec<_>>(),
+        vec![(0, 343), (1, 322)]
+    );
+    assert_eq!(
+        candidates
+            .iter()
+            .map(|candidate| candidate.worker_captures)
+            .collect::<Vec<_>>(),
+        vec![3, 3]
+    );
+    assert_eq!(families, &["F1", "F2", "F3", "F4"]);
+    assert!(
+        !gates.is_empty(),
+        "the planner must locate the carried-call path"
+    );
+    let source_main = source_main_parameters(PX7L);
+    assert_eq!(source_main, ["_input", "_caps"]);
+    for candidate in candidates {
+        use ken_runtime::SelectedPendingCallCaptureObservation as Capture;
+        assert!(matches!(
+            candidate.context_sources.as_slice(),
+            [
+                Capture::ProducerLocal { ordinal: 0 },
+                Capture::EntryAbi {
+                    ordinal: 1,
+                    slot: 1
+                },
+                Capture::EntryAbi {
+                    ordinal: 2,
+                    slot: 0
+                }
+            ]
+        ));
+        for (index, expected) in [(1, "_caps"), (2, "_input")] {
+            let Capture::EntryAbi { slot, .. } = candidate.context_sources[index] else {
+                panic!("a named source parameter must back context member {index}")
+            };
+            assert_eq!(
+                &source_main[slot as usize], expected,
+                "C{index} source name must load from its own declaration's ABI slot"
+            );
+        }
+    }
+}

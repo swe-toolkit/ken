@@ -20,6 +20,13 @@ mod immediate_bridge;
 mod joins_traps;
 mod occurrences;
 mod responses;
+mod selected_pending_calls;
+#[cfg(feature = "px8-ds-test-support")]
+pub use selected_pending_calls::{
+    with_selected_pending_call_admissions, PendingRefusal,
+    SelectedPendingCallAdmissionObservation, SelectedPendingCallCandidateObservation,
+    SelectedPendingCallCaptureObservation, SelectedPendingCallOutcomeObservation,
+};
 mod semantic_ir;
 mod units;
 
@@ -482,6 +489,8 @@ fn dense_slice<T>(arena: &[T], range: semantic_ir::DenseRange) -> Option<&[T]> {
 
 #[derive(Clone)]
 pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
+    /// Read-only selected pending-call admission; no emitter reads it yet.
+    selected_pending_calls: BTreeMap<StaticOriginId, selected_pending_calls::PendingCallAdmission>,
     entries: Vec<StaticNodeId>,
     /// The exact `entry -> body_occurrence` pairing, one row per `entries` row
     /// and in the same order.
@@ -961,6 +970,8 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
     }
     planner.connect_declaration_calls(&declaration_entries)?;
     let plan = planner.finish(symbols, root_ingress, functionized_units)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    selected_pending_calls::record_selected_pending_call_admissions(&plan);
     #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     Ok(plan)

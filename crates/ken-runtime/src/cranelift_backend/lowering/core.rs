@@ -1247,7 +1247,7 @@ mod branched_scrutinee_unit_body_observer_tests {
     }
 }
 
-fn agreeing_recursive_body_unit<Unit>(
+pub(in crate::cranelift_backend) fn agreeing_recursive_body_unit<Unit>(
     declared_units: impl IntoIterator<Item = Unit>,
 ) -> Result<Option<Unit>, CraneliftBackendError>
 where
