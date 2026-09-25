@@ -118,6 +118,12 @@ natively. Any row that stays ignored gets a measured reason in its
   amendment reviewed by the Architect.
 - A member whose measured backing is outside classes (a) to (e) is a STOP
   for a ruling, not a new class.
+- The build gives a converting owner (`CallableDeclaration`, `ClosureBody`)
+  with two or more parameters non-uniform per-slot result phases while
+  `joins_traps.rs::result_phase_environment_for_owner` is still seeded in ABI
+  order: STOP. Its de Bruijn reads would then take the mirror parameter's
+  phase. Seed it through `source_body_binding_order` first (latent at
+  `6bdd75394`, because every entry there is `ResultPhaseSummary::carrier()`).
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
