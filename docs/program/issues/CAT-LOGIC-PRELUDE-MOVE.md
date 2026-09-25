@@ -1,7 +1,7 @@
 ---
 id: CAT-LOGIC-PRELUDE-MOVE
 title: "Move the prelude's logic conveniences into catalog packages: And, and_intro, and_fst, and_snd and Not into a Core/Logic home, and Dec/Yes/No/Empty onto Core.Logic.EmptyDec's own definitions, with every consumer importing them; opened by the identity guard that proves no compiler code or other prelude definition holds each moved identity; first L3 slice of the minimal-prelude program"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: architect
