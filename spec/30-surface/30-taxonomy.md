@@ -156,10 +156,12 @@ admission; Spec owns the public spelling in `35`/`38` and the
 floor identity, roster/count, catalog callers, and fixtures. The current
 candidate spellings `NotFound`, `Other`, `Unsupported`, `Success`, `Failure`,
 `write`, `Stdout`, and `Instant` trigger that review, but this section chooses
-no replacement names. Whether a type-qualified constructor path (for example
-`IOError.NotFound`) can or should avoid reserving the bare constructor is an
-open design question for the Architect and operator; it does not silently
-change the current whole-family rule or the fifteen-member floor.
+no replacement names. A per-type scoped-constructors choice supplies
+specificity structurally: `IOError.NotFound` is unambiguous without reserving
+bare `NotFound`. Type qualification is supported in expressions and patterns
+for every data type (`34 §1`), even when its constructors remain bare. The property changes only
+source visibility and the B inventory, never a constructor's checked identity
+or the fifteen-member type count.
 
 The prelude is a **second minimality target** — the same TB-Sound discipline
 (`is_prelude` is exactly `{Top, Bottom, tt}`, no catch-all) applied at the
@@ -211,10 +213,18 @@ adds no `trusted_base()` entry. Kernel `Sigma`/`Pair`/`Proj1`/`Proj2` remain
 representation and computation authority, not provider declarations or another
 identity family.
 
-For an inductive floor member, its entire kernel-recorded constructor family
-enters name protection together, with every constructor's parent the exact
-floor identity; private constructors remain unavailable to source under
-`33 §4.2`. `Char` and transparent `Pair` are constructor-free. A same-shaped
+For an inductive floor member, constructor names are governed **per type** by
+the scoped-constructors property (`33 §3.3`, `34 §1`). An unscoped floor type
+reserves its whole kernel-recorded constructor family as bare names in B; a
+scoped floor type reserves **only the type name**, and its constructors are
+reachable solely as `T.C`, not reserved as bare spellings. Neither mode admits
+a partial constructor family, and each constructor's parent remains the exact
+floor identity. Abstract or constructor-private visibility still applies
+(`33 §4.2`); qualification cannot expose a hidden constructor. The existing
+`ResourceKind` floor is scoped: `ResourceKind.FsHandle`,
+`ResourceKind.Buffer`, and `ResourceKind.Mapping` are the public constructor
+paths, not three additional bare names in B. `Char` and transparent `Pair`
+are constructor-free. A same-shaped
 source family or definition has a different identity and is not the floor
 member. Every floor type, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
@@ -260,8 +270,9 @@ closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 **Implementation staging.** The specification fixes the fifteen-type and
 three-companion target as the current floor; further effect-surface and
 entrypoint-ABI names join only after D0 supplies both witness clauses per
-name. L2's floor-addition slice lands each warranted addition with the
-roster/count change before the one-mode strict flip. Until the
+name. After the dedicated L2 qualified-constructor-resolution and scoped-property
+slice, L2's floor-addition slice lands each warranted addition with the
+roster/count and per-type property before the one-mode strict flip. Until the
 floor-realization build captures and admits the four existing Pair-family
 identities, current Strict loading may still reject their bare names. That
 implementation gap is not a package boundary and does not authorize a second

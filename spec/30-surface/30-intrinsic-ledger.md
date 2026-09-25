@@ -38,11 +38,40 @@ name, Spec checks that its spelling closely encloses its meaning (`30 §4`);
 `NotFound`, `Other`, `Unsupported`, `Success`, `Failure`, `write`, `Stdout`, and
 `Instant` are operator-named specificity probes, not an exhaustive list or
 preselected renames. Spec owns the public naming fold in `35`/`38` and this
-ledger. Any necessary rename lands atomically with floor admission and
-catalog/fixture clients. Type-qualified constructor use such as
-`IOError.NotFound` is an open Architect/operator fork, **not** an assumed
-escape from the currently specified constructor-family rule. This S0 assigns
-no replacement spelling.
+ledger. Any necessary type/function rename lands atomically with floor
+admission and catalog/fixture clients. Qualification `T.C` is now normative
+in expressions and patterns for every data type (`32 §4`, `33 §3.3`, `34 §1`).
+It can make a generic constructor specific without reserving its bare name;
+this S0 assigns no replacement spelling to any type or function.
+
+## Per-type constructor scope choices
+
+The operator permits a **per-type** scoped-constructors property, not a
+per-constructor switch. These choices govern B if a candidate type later
+satisfies both §4 witnesses; a table entry is not floor membership. An
+unscoped floor type brings its entire constructor family into bare B; a scoped
+one contributes only its type name and uses qualified `T.C` paths. Every
+constructor still has the same checked parent and `GlobalId`.
+
+| Type | Scoped? | Specificity judgment |
+|---|---|---|
+| `ResourceKind` (current floor) | Yes | `Buffer`, `Mapping`, `FsHandle` are generic bare names; their `ResourceKind.C` paths state their role. |
+| `Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, `Utf8Error` (current floor) | No | The settled bare constructor vocabulary remains available; in particular `True`/`False`, `Zero`/`Suc`, `Nil`/`Cons`, `None`/`Some`, `Ok`/`Err` stay bare. |
+| `IOError` | Yes if admitted | Error causes such as `NotFound`, `Other`, and `Unsupported` need their type qualifier. |
+| `ExitCode` | Yes if admitted | `Success`/`Failure` need their exit-code meaning at the use site. |
+| `ResourceError`, `ResourceBodyResult`, `ResourceBracketResult` | Yes if admitted | A result/error qualifier prevents generic error and status names becoming bare reservations. |
+| `Stream`, `Instant`, `CreatePolicy` | Yes if admitted | `Stdout`, `Stderr`, `MkInstant`, and create-policy cases are specific only under their carrier; a generic type name may still need a rename. |
+| `Unit`, `ProcessInput`, `FileError`, `BufferWindow` | No if admitted | `MkUnit`, `MkProcessInput`, `MkFileError`, and `MkBufferWindow` name their carriers closely. |
+| `ProgramCaps`, `BufferSpan`, `TransferCount` | Yes if admitted | Their minted constructor identities need no additional bare source spelling; private visibility stays intact. |
+| `Coproduct` | Yes if admitted | `InL`/`InR` are generic; the effect-signature role is explicit as `Coproduct.C`. |
+| `Prod` | No if admitted | `MkProd` names its carrier; admission versus retargeting the ABI to floor `Pair` remains D0's question. |
+
+The dedicated L2 qualified-constructor/scoped-property slice precedes L2-3
+floor additions. It also migrates uses of the existing `ResourceKind` family
+from bare to qualified form; the change must not strand catalog or fixture
+clients. L2-3 then admits only D0-witnessed types with the property selected
+above. A scoped type's constructor rows below identify exact parent and
+possible native reader, **not** additional bare names to add to B.
 
 ## Possible reserved names: proposed reader per name
 
@@ -50,14 +79,13 @@ Each table entry is one named identity. Except for the constructor-private
 `PrivateBufferSpan` and `PrivateTransferCount` (not exported through `globals`
 but recorded on their types), these spellings occur in the 503-name global
 inventory. Rows sharing a reader still require individual D0 reads; a family
-label is not a keying proof for every member. **Reservation is decided per
-type, not one constructor at a time.** An admitted inductive type brings its
-entire exact registered constructor
-family into B by `30 §4`; never expose a partial family selected by catalog
-use. D0 traces which native mechanism produces each exact constructor ID,
-not just a sibling's identity, and checks the parent type's independent
-source requirement. `prelude.rs` and `program_admission.rs` citations refer
-to the exact base above. No row alone reserves a name today.
+label is not a keying proof for every member. Reservation is per **type and
+whole constructor family**, never a subset chosen by catalog use. For a scoped
+type, only the type is reserved; its constructor IDs remain exact and its
+public constructor paths are qualified. D0 traces each native constructor
+producer and checks the parent type's independent source requirement.
+`prelude.rs` and `program_admission.rs` citations refer to the exact base
+above. No row alone reserves a name today.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
@@ -78,6 +106,9 @@ to the exact base above. No row alone reserves a name today.
 | `charToInt` | Checked `Char → Int` projection (`18a §5.9.1`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `IO` | Checked Console-ITree alias (`prelude.rs`); confirm whether the effect reifier selects the alias ID or only the underlying constructors. |
 | `FS` | Checked Auth-indexed ITree alias (`prelude.rs`); confirm whether the reifier/runner selects its ID. |
+| `Coproduct` | Checked effect-signature sum (`effects/state.rs`, `34 §1`); native composition roles are possible ID readers, independent source need unproven. |
+| `InL` | `CanonicalRuntimeRoles::in_l` captures constructor for effect composition; verify parent `Coproduct`. |
+| `InR` | `CanonicalRuntimeRoles::in_r` captures constructor for effect composition; verify parent `Coproduct`. |
 | `Stream` | Console stream carrier; trace `ConsoleOp` response/reifier identity and source use before reserving its complete constructor family. |
 | `Stdin` | `Stream` constructor; trace the native stream selector and source requirement. |
 | `Stdout` | `Stream` constructor used by source `write`/`print_line`; trace native stream selection. |
@@ -135,17 +166,17 @@ to the exact base above. No row alone reserves a name today.
 | `ResourceBracketReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 | `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 
-These names remain **outside** the current B. Capturing an ID proves keying,
-not the independent source-name requirement. Both witnesses admit the type
-and its exact constructor family to the reserved floor; without source need
+These candidates remain **outside** the current B. Capturing an ID proves
+keying, not independent source need. Both witnesses admit a type to B; its
+whole constructor family follows the scoped choice above. Without source need
 it is internal-only, and without keying it is package material if promised.
 For checked definitions the test remains per-name: `leqChar` does not inherit
-`eqChar`'s registry key. The thirteen `IOError` causes are one closed family
-**if** its parent type qualifies; D0 still names the native producer of each
-exact cause ID, never accepting a partial family or inferring all producers
-from one constructor. `Prod`/`MkProd` remains an explicit D0 decision:
-reserve the exact family on both witnesses or retarget the Program-I field to
-already-floor `Pair`, without asserting either outcome here.
+`eqChar`'s registry key. If `IOError` qualifies, its thirteen causes are one
+**scoped** family, not thirteen bare B names. D0 still names the native
+producer of each exact cause ID, never inferring all readers from one cause.
+`Prod`/`MkProd` remains an explicit D0 decision: reserve the exact type and
+its unscoped constructor, or retarget the Program-I field to already-floor
+`Pair`, without asserting either outcome here.
 
 ## Checked laws and helpers are not intrinsic candidates
 

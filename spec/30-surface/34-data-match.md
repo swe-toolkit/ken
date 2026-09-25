@@ -91,9 +91,10 @@ interchangeable.
 
 Each public name has one canonical compiler-bootstrap origin and one canonical
 `GlobalId`. Floor installation reuses those identities and allocates no
-replacement declaration. An explicit re-export may republish a floor binding,
-but it preserves the same identity and does not manufacture a source
-`defined-at` owner. A separately authored definition with the same name, type,
+replacement declaration. An explicit public alias named outside B may
+republish a floor identity without manufacturing a source `defined-at` owner.
+Rebinding its protected spelling, even to the same identity, is forbidden by
+`33 §3.3`. A separately authored definition with the same name, type,
 and transparent body has a different identity; definitional equality does not
 turn it into the floor declaration or rewrite an existing identity-keyed
 reference. All four definitions are ordinary kernel-rechecked Ken and add
@@ -119,6 +120,43 @@ data Color = Red | Green | Blue
 data Tree a = Leaf | Node (Tree a) a (Tree a)
 data Expr = Lit Int | Add Expr Expr | Neg Expr
 ```
+
+### 1.1 Qualified constructors and scoped families
+
+For **every** data type `T`, `T.C` denotes the constructor `C` whose
+kernel-recorded parent is the exact resolved identity of `T`. It is admitted
+in expressions and in constructor patterns (`32 §3–4`); both uses resolve to
+the same canonical constructor `GlobalId` as an eligible bare use. The type
+path may come from a local declaration, a prelude identity, or an explicit
+import; a different same-shaped type cannot donate its constructor. A
+qualified constructor is still subject to visibility: `T.C` cannot expose a
+private constructor hidden by abstract export (`33 §4.2`).
+
+The per-type **scoped constructors** property selects whether that family's
+constructors have bare source bindings. If it is enabled, only `T` is a
+reserved built-in name when `T` is in B; its constructors are reached solely
+as `T.C`, and their bare spellings are neither reserved nor ambiently bound by
+that family. If disabled, an admitted prelude family's complete constructor
+set remains bare and reserved. There is no constructor-by-constructor setting.
+Qualification `T.C` also remains available for an unscoped family; it never
+changes the kernel constructor, telescope, reduction, or pattern coverage.
+`ResourceKind` is the current scoped floor member (`30 §4`); the other
+current floor constructor families stay bare as recorded in `33 §3.3`.
+Candidate types are selected individually by the specificity rule in `30 §4`
+and remain outside B until both floor witnesses are established.
+
+A written path that could identify both a module export `T.C` and a type
+constructor `T.C` raises **`AmbiguousReference`** at surface resolution
+(`33 §3.3`), even if the two paths eventually name the same `GlobalId`.
+Neither parser order nor expression-versus-pattern context selects a winner.
+A scoped constructor written bare is not a wildcard or variable pattern: if
+no independently in-scope constructor has that spelling, the pattern rejects
+as unresolved. The checker still covers the scrutinee's entire constructor
+set, keyed by identities rather than the path spellings chosen in arms.
+Qualified constructor resolution and the scoped-property implementation are
+an L2 slice preceding L2-3's floor additions; this specification does not
+claim that today's elaborator resolves `T.C` yet. No kernel or trusted-base
+rule changes.
 
 A `data` declaration elaborates to an **inductive family** (`../10-kernel/14
 §1`): the kernel admits the **type former** `D`, its **constructors** `cₖ` (real
@@ -154,21 +192,18 @@ be built **and** taken apart, and the eliminator reduces.
   non-error-biased sibling — the two coexist, neither subsumes the other
   (judgment call L5, 2026-07-10; an earlier erratum subsumed `Either` into
   `Result` while `Either` had no declaration or user — that condition no
-  longer holds now that `Either` is landed). **A third, structurally
-  isomorphic neutral sum is also prelude-declared and user-reachable:**
-  `Coproduct a b = InL a | InR b` (`crates/ken-elaborator/src/effects/
-  state.rs`'s `declare_coproduct`, hand-built rather than a surface `data`
-  decl, `elab.globals.insert`-registered like any other prelude type — an
-  ordinary surface reference such as `InL a b x` elaborates). It is the
-  effect-signature composition coproduct (`ITree`'s `resp_coproduct`/
-  `inject_l`/`inject_r`, effect-composition `D2`) — kept hand-built as a
-  deliberate risk-reduction for effect-row plumbing, not deprecated or
-  hidden. `Either` is the catalog-level neutral sum for ordinary user
-  code; `Coproduct` is internal effect-signature plumbing most code never
-  names directly. The two are not reconciled into one declaration here —
-  that is a reflect-don't-extend opportunity the implementation's own
-  comment leaves explicitly open for the Architect to take up, not a
-  decision this WP makes.
+  longer holds now that `Either` is landed). A third, structurally
+  isomorphic neutral sum is compiler-registered for effect-signature
+  composition: `Coproduct a b = InL a | InR b`
+  (`crates/ken-elaborator/src/effects/state.rs`). Registration in `globals`
+  did once let bare `InL a b x` resolve, but it is **not** in `30 §4`'s closed
+  prelude and gains no ambient source authority under `33 §3.3`'s one mode.
+  D0 must establish whether effect machinery keys its exact identity and
+  whether the source contract independently requires naming it; absent both
+  witnesses it is internal-only or an explicitly imported package, not a
+  hidden floor member. `Either` remains the ordinary catalog-level neutral
+  sum for user code. No new constructor identity or merger between these two
+  families is chosen here.
 
 **What the elaborator builds vs. what the kernel admits (the staged line).**
 The elaborator lowers a `data` decl to a kernel `InductiveDecl` and relies on
@@ -350,8 +385,9 @@ constructor's freshly-bound fields. The result is a tree of nested `elim_D`
 applications — one eliminator per scrutinized inductive, nested for nested
 patterns. Specifically:
 
-- **Constructor patterns** drive the `elim_D` split: arm `Cₖ p̄ => e` becomes the
-  `cₖ` method, with `p̄` matched against `cₖ`'s fields in the residual matrix.
+- **Constructor patterns** drive the `elim_D` split: arm `Cₖ p̄ => e` or
+  `T.Cₖ p̄ => e` becomes the same `cₖ` method after resolution, with `p̄`
+  matched against `cₖ`'s fields in the residual matrix.
 - **Variable / wildcard** patterns bind (or discard) the scrutinee in a method
   that does not split further; a column of all-variables needs no eliminator.
 - **Literal** patterns are checked against the scrutinee type (`31 §3`, `35

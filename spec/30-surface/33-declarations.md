@@ -233,10 +233,15 @@ this section defines no entry syntax (MRES-4a/4e).
 Resolution is a **surface / elaboration** pass; a name still unresolved after it
 is a **surface error** (`24`) — it never reaches the kernel:
 
-- **Qualified / aliased / selective import targets** each identify exactly one
-  declaration before collision checking: `M.foo`, `N.foo`, and a selectively
-  imported or renamed name retain the imported declaration's canonical
-  identity.
+- **Qualified paths** may name a module export (`M.C`) or a data
+  constructor (`T.C`, `34 §1`) in an expression or pattern. `T` must resolve
+  to a visible data type and `C` to one of its exact registered constructors;
+  qualification preserves that constructor's canonical `GlobalId` and checks
+  its ordinary visibility. If the same written path could denote both a module
+  export and a type constructor, reject **`AmbiguousReference`**; neither
+  lookup order, capitalization, nor an identical target ID breaks the tie.
+  Qualified and aliased module imports otherwise preserve the imported
+  declaration's identity. Selectively imported or renamed names do too.
 - **One strict mode, for every source unit.** Resolve a source name through its
   lexical locals (including declarations already admitted to the same
   incremental session), explicit imports, the kernel/built-in vocabulary, or
@@ -250,24 +255,30 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom, Char,
-  Equal, List, Nat,
-  Option, Pair, Prop, Proved, ResourceKind, Result, Top, Utf8Error}`. The latter
-  is a fifteen-member floor, not the superseded ten-member inventory. An
-  admitted inductive member reserves its whole exact registered constructor
-  family, not an arbitrary subset of constructors a particular corpus used.
-  Constructor-private names stay inaccessible to source under §4.2; they do
-  not become public merely by being protected. The current floor parents are:
-  `ANone`/`APartial`/`AFull` under `Auth`, `True`/`False` under `Bool`,
-  `Nil`/`Cons` under `List`, `Zero`/`Suc` under `Nat`, `None`/`Some` under
-  `Option`, `FsHandle`/`Buffer`/`Mapping` under `ResourceKind`, `Err`/`Ok` under
-  `Result`, and `InvalidUtf8` under `Utf8Error`. `Char`, transparent `Pair`,
-  and the added proposition/equality members introduce no constructors.
-  `Pair`'s exact three companions `{mk_pair, pair_fst, pair_snd}` also enter B
-  with their checked types keyed to that `Pair` identity. Kernel native names
-  and reserved formers/sugar remain kernel vocabulary, not extra prelude
-  identities. Neither the closed roster nor B includes arbitrary compiler
-  globals; future floor membership requires §4's two witnesses and an atomic
-  roster change.
+  Equal, List, Nat, Option, Pair, Prop, Proved, ResourceKind, Result, Top,
+  Utf8Error}`. The latter is a fifteen-member type floor, not the superseded
+  ten-member inventory. For an inductive floor type, its per-type
+  **scoped constructors** property determines whether its whole exact
+  constructor family also occupies bare B names. When enabled, only `T`
+  enters B and public constructors resolve as `T.C`; no bare `C` is reserved
+  by that family. When disabled, its entire constructor family stays bare and
+  reserved. There is no per-constructor subset choice. `ResourceKind` is scoped:
+  `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and
+  `ResourceKind.Mapping` replace its former three bare reserved names.
+  `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s `True`/`False`,
+  `List`'s `Nil`/`Cons`, `Nat`'s `Zero`/`Suc`, `Option`'s `None`/`Some`,
+  `Result`'s `Err`/`Ok`, and `Utf8Error`'s `InvalidUtf8`
+  remain bare. `Char`, transparent `Pair`, and the proposition/equality
+  members have no constructors. Constructor-private names remain inaccessible
+  under §4.2 in either mode. `Pair`'s three checked companions
+  `{mk_pair, pair_fst, pair_snd}` still enter B at its exact identity. Kernel
+  native names and reserved formers/sugar remain kernel vocabulary, not extra
+  prelude identities. Neither the closed roster nor B includes arbitrary
+  compiler globals; future floor membership requires §4's two witnesses and
+  an atomic roster and per-type property change. The dedicated L2 qualified-
+  constructor/scoped-property slice precedes L2-3's floor additions and
+  reconciles existing `ResourceKind` users; until then the implementation's
+  older bare behavior is a staged gap, not a second normative mode.
 - **No binding of a built-in name.** No declaration or binder may introduce a
   name in the built-in set B. This is a hard surface error at introduction,
   even if the proposed target has the same canonical identity as the built-in
@@ -277,8 +288,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
   proof identities and synthesized instance dictionaries; selective, renamed,
   or re-export import aliases (including a module alias named in B); and
   `λ`, `let`, function/constructor/record parameters, Π, match-pattern,
-  `eqn`, and `where` dictionary binders. Exporting or importing a floor
-  identity by a *different* name outside B preserves its canonical identity;
+  `eqn`, and `where` dictionary binders. A scoped constructor's bare spelling
+  is not in B merely because its type is reserved; it can be introduced by
+  other source declarations subject to ordinary non-B clashes. Exporting or
+  importing a floor identity by a *different* name outside B preserves its
+  canonical identity;
   it does not create a second floor identity. Qualified use of an existing
   floor name is not a new binding. Lexical shadowing applies only to names
   outside B; an inner binder cannot override B.

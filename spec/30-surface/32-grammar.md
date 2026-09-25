@@ -340,6 +340,11 @@ induction_hypothesis ::= "induction" "hypothesis" "for" ident
 field_assign ::= ident "=" expr | ident  -- punning allowed
 ```
 
+The existing dotted `qualified_global_ref` primary admits `T.C` in an
+expression; §33 §3.3 resolves it as a type constructor or module export and
+rejects a dual reading. The pattern addition in §4 admits the same spelling
+without changing expression grammar or the constructor's identity.
+
 `let_expr` contains one or more bindings. A semicolon occurs only between two
 bindings: a trailing semicolon before `in` and a comma in place of a semicolon
 are syntax errors. Newlines are whitespace, so the same production admits both
@@ -523,7 +528,7 @@ restriction is V0-local and is lifted here for the full surface.
 
 ```
 pattern ::=
-    ConId pattern*           -- constructor (uppercase ⇒ constructor, 31 §2)
+    constructor_head pattern* -- bare or qualified constructor (33 §3.3; 34 §1)
   | ident                    -- variable binder (lowercase)
   | "_"                      -- wildcard
   | literal                  -- literal pattern
@@ -532,11 +537,14 @@ pattern ::=
   | "{" field_pat ("," field_pat)* "}"  -- open record pattern
   | pattern "as" ident       -- as-pattern
   | pattern "|" pattern       -- or-pattern (same binders)
+constructor_head ::= ConId | ModPath "." ConId  -- T.C or module-qualified C
 field_pat ::= ident "=" pattern | ident  -- explicit or punned
 ```
 
-Pattern matching compiles to nested `elim_D` with exhaustiveness and
-reachability checking (`34`, `39`).
+`ModPath "." ConId` admits `T.C` as a constructor pattern (and
+module-qualified constructor paths); §33 §3.3 resolves a type-versus-module
+collision without choosing by parse order. Pattern matching compiles to
+nested `elim_D` with exhaustiveness and reachability checking (`34`, `39`).
 
 Pattern operators have their own fixed precedence. Constructor application
 binds tighter than `as`, and `as` binds tighter than `|`. Thus `C p as x` is
