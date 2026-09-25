@@ -205,12 +205,11 @@ stay **out** (source-constructible, with a `Core/Logic` package home, and no
 internal-provision witness). The `Empty` needed by `space` desugaring is
 different: its identity must be fixed before source elaboration, but no surface
 contract independently requires source to name it. It belongs internally,
-not in the floor; the catalog's `Core.Logic.EmptyDec.Empty` can be a separate,
-lawful package identity once declared in checked source. At the present base,
-that catalog declaration is illustrative (`ken ignore`), not yet a distinct
-checked identity. `Pair`'s floor-binding closure also contains the exact
-three companions `{mk_pair, pair_fst, pair_snd}`. They
-are operations, not type members. Their checked types reference the canonical
+not in the floor. The source name `Empty` is provided by the explicit-import
+catalog package `Core.Logic.EmptyDec`, not by the prelude; its checked identity
+is distinct from the compiler's. `Pair`'s floor-binding closure contains the
+exact three companions `{mk_pair, pair_fst, pair_snd}`. They are operations,
+not type members. Their checked types reference the canonical
 `Pair` identity, and their bodies use the kernel pair-introduction and
 projection formers. The four-name surface
 `{Pair, mk_pair, pair_fst, pair_snd}` reuses the compiler-installed transparent
@@ -245,17 +244,18 @@ wrapper over an ABI (for example `Capability/Process/Exit`'s
 one. `elaborate_space_decl` uses `Empty` when it builds the `space` effect
 and state fold (`36 §4.1–4.2`). **Required:** this must be the identity fixed
 before source elaboration, retained for the desugarer by exact ID, not supplied
-by a source declaration. **Current at `ae5cce97f`:** the reader instead looks
+by a source declaration. **Current implementation:** the reader instead looks
 up `elab.globals.get("Empty")` by spelling at each `space`; a same-program
 `data Empty` rebinds that map entry (`elab.rs:13450`, `data.rs:99`). The
 pre-source exact-ID capture is owed, not landed. The desugarer's use is internal
 output: no current source contract requires programs to name that exact
-identity. The intended source-level `Empty` is an import-required package
-identity, not this compiler identity. A future `36` contract requiring source
-to name the desugarer's exact `Empty` would be a separately gated source-contract
-change. Once keying and that independent source need both hold, the existing
-rule admits `Empty` to the floor without per-name operator approval; the
-catalog `Empty` then retires, with the roster/count changed atomically. This
+identity. Source-level `Empty` is provided by the explicit-import
+`Core.Logic.EmptyDec` package with a distinct identity, not by this compiler
+identity. A future `36` contract requiring source to name the desugarer's exact
+`Empty` would be a separately gated source-contract change. Once keying and
+that independent source need both hold, the existing rule admits `Empty` to
+the floor without per-name operator approval; the catalog `Empty` then retires,
+with the roster/count changed atomically. This
 contingency adds no present floor member.
 
 The [open per-name intrinsic ledger](30-intrinsic-ledger.md) records candidate
@@ -307,19 +307,14 @@ machinery is not a source-facing package entry; under §4 it stays internal.
 `Nat` and `Pair` are therefore not package carriers: they are the kernel-origin
 and compiler-bootstrap members of the internal-provision arm. `Option` and
 `Result` are likewise not packages: public primitive signatures name their
-canonical compiler-installed identities. The source-level `Empty` in
-`Core.Logic.EmptyDec` and `Either` belong in packages; the `Empty` required by
-`space` desugaring is compiler-internal, not a package export. At `ae5cce97f`,
-`Core.Logic.EmptyDec` has only an illustrative `data Empty` in a `ken ignore`
-fence; its checked consumers still use the ambient name. That incidental
-ambient resolution is not an independent source requirement for the compiler's
-identity. The distinct checked package declaration and imports are a catalog
-move, not already landed. `Unit` is a candidate for the internal-provision arm,
-**not** a sixteenth floor member until both witness
-clauses are proven and §4's roster changes atomically. A same-shaped source
-definition of `Pair` allocates a distinct identity; it neither replaces the
-floor family nor
-converts structural equality into floor provenance.
+canonical compiler-installed identities. The source-level `Empty` is provided
+by the `Core.Logic.EmptyDec` package with an identity distinct from the
+compiler's; `Either` is also a package. The `Empty` required by `space`
+desugaring is compiler-internal, not a package export. `Unit` is a candidate
+for the internal-provision arm, **not** a sixteenth floor member until both
+witness clauses are proven and §4's roster changes atomically. A same-shaped
+source definition of `Pair` allocates a distinct identity; it neither replaces
+the floor family nor converts structural equality into floor provenance.
 
 The reframed catalog is
 `../50-stdlib/README.md` — the lawful classes (`Num`/`Ord`/`Eq`/`Monoid`/

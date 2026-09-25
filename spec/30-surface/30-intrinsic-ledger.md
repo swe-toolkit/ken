@@ -30,11 +30,11 @@ need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
 full unit reach is measured. `Empty` has a measured native reader and no
 independent source-name need: its required disposition is internal-only, but
-its fixed-ID capture has not landed. A distinct checked catalog `Empty` is a
-lawful source/package identity once declared. A copied source declaration
-**cannot** replace a machinery-keyed `GlobalId`; there is **no intrinsic
-import module**. The
-unkeyed laws/helpers below are not candidates for floor membership.
+its fixed-ID capture has not landed. The source name is supplied by a catalog
+package, not the prelude, with an identity distinct from the compiler's. A
+copied source declaration **cannot** replace a machinery-keyed `GlobalId`;
+there is **no intrinsic import module**. The unkeyed laws/helpers below are
+not candidates for floor membership.
 
 Apart from the internal-only `Empty`, the candidate names in this table are
 **observed spellings**, not names approved for permanent reservation. Before
@@ -97,7 +97,7 @@ above. No row alone reserves a name today.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
-| `Empty` (internal-only target, not a current floor candidate) | **Current at `ae5cce97f`:** `elaborate_space_decl` looks up `elab.globals.get("Empty")` by spelling at each `space` (`elab.rs:13450`), then embeds the returned ID in effect/state-fold terms. Same-program `data Empty` replaces that live map entry (`data.rs:99`); this is not a fixed pre-source ID. **Required, not landed:** capture the compiler's `Empty` before source elaboration and use/compare its exact ID, as `Proved`'s fixed-identity check illustrates (`modules.rs:258–261`). **Source need:** none for that exact identity under `36 §4.1–4.2`; `Core.Logic.EmptyDec.Empty` can be a separate lawful package identity once its illustrative declaration becomes checked. |
+| `Empty` (internal-only target, not a current floor candidate) | **Current implementation:** `elaborate_space_decl` looks up `elab.globals.get("Empty")` by spelling at each `space` (`elab.rs:13450`), then embeds the returned ID in effect/state-fold terms. Same-program `data Empty` replaces that live map entry (`data.rs:99`); this is not a fixed pre-source ID. **Required, not landed:** capture the compiler's `Empty` before source elaboration and use/compare its exact ID, as `Proved`'s fixed-identity check illustrates (`modules.rs:258–261`). **Source need:** none for that exact identity under `36 §4.1–4.2`; the source name belongs to the catalog package `Core.Logic.EmptyDec` with a distinct checked identity, not to the prelude. |
 | `Unit` | Effect-response result type used by the reifier (`38 §1.7`, `prelude.rs`); verify the exact type ID and source need. |
 | `MkUnit` | `CanonicalRuntimeRoles::unit`, effect-response constructor; verify exact parent `Unit`. |
 | `ProcessInput` | `program_admission.rs` checks the `main` parameter against its registered type (`33 §3.2.1`). |
