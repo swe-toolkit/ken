@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-FLOOR-FIFTEEN
 title: "Realize the spec's fifteen-member prelude floor in strict resolution (add Bottom, Equal, Prop, Proved, Top to PRELUDE_FLOOR_NAMES), opened by the D0 that measures what the legacy fall-through and local binders reach outside the minimal built-in set B across every unit class; first slice of the single-mode, minimal-prelude program"
-status: ready
+status: active
 owner: language
 size: M
 gate: architect
