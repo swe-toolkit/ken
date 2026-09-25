@@ -1,6 +1,7 @@
 //! PX8-F checked positioned-buffer surface and real structural proof terms.
 
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{whnf, Context, Decl, GlobalId, Term};
@@ -8,6 +9,35 @@ use ken_kernel::{whnf, Context, Decl, GlobalId, Term};
 const BUFFER_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/System/Buffer.ken.md");
 const IO_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/System/IO.ken.md");
+
+fn load_checked_dependencies(env: &mut ElabEnv) {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    for module in ["Core.Logic.Transport", "Data.Numeric.Nat.Arithmetic"] {
+        env.elaborate_module_from_roots(&[root.clone()], module)
+            .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
+    }
+    // This older flat-fence fixture has no module-qualified proof namespace.
+    // Withhold the old prelude names, including their flat proof selectors,
+    // before checking the catalog's now-local declarations.
+    for name in [
+        "buffer_nat_add",
+        "buffer_suc_cong",
+        "transfer_count_request_budget",
+        "transfer_count_request_budget::bounded",
+        "write_all_call_bound",
+        "write_all_call_bound::termination",
+        "write_all_complete",
+        "write_all_complete::success_complete",
+        "write_all_first_error",
+        "write_all_first_error::first_error",
+        "write_all_all_success",
+        "write_all_all_success::all_success",
+    ] {
+        env.globals.remove(name);
+    }
+}
 
 fn result_head(env: &ken_kernel::GlobalEnv, ty: &Term) -> Term {
     let mut context = Context::new();
@@ -55,6 +85,7 @@ fn public_buffer_span_producers(env: &ElabEnv) -> BTreeSet<String> {
 fn checked_surface_is_public_but_proof_carrying_constructors_stay_private() {
     let mut env = ElabEnv::empty().expect("PX8-F prelude");
     let base_trusted = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    load_checked_dependencies(&mut env);
     env.elaborate_ken_md_file(BUFFER_KEN_MD)
         .expect("System.Buffer checked fences");
     env.elaborate_ken_md_file(IO_KEN_MD)
@@ -289,6 +320,7 @@ fn checked_source_cannot_forge_or_project_mapping_handles() {
 #[test]
 fn buffer_span_producer_closure_is_derived_from_public_globals() {
     let mut env = ElabEnv::empty().expect("SPAN-SEAL prelude");
+    load_checked_dependencies(&mut env);
     env.elaborate_ken_md_file(BUFFER_KEN_MD)
         .expect("System.Buffer checked fences");
     env.elaborate_ken_md_file(IO_KEN_MD)

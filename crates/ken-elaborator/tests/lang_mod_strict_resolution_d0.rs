@@ -768,7 +768,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "BufferWindow",
                 "MkBufferWindow",
                 "TransferCount",
-                "buffer_nat_add",
                 "buffer_span_budget",
                 "buffer_span_length",
                 "transfer_count_int",
@@ -776,8 +775,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "transfer_count_positive",
                 "transfer_count_positive_prop",
                 "transfer_count_remaining",
-                "transfer_count_request_budget",
-                "transfer_count_request_budget::bounded",
             ]
             .into_iter()
             .map(str::to_string)
@@ -793,16 +790,8 @@ fn catalog_ambient_passthrough_migration_census() {
                 "ResourceError",
                 "TransferCount",
                 "Unit",
-                "write_all_all_success",
-                "write_all_all_success::all_success",
-                "write_all_call_bound",
-                "write_all_call_bound::termination",
-                "write_all_complete",
-                "write_all_complete::success_complete",
                 "write_all_exact_prefix_prop",
                 "write_all_exact_prefix_prop::exact_prefix",
-                "write_all_first_error",
-                "write_all_first_error::first_error",
             ]
             .into_iter()
             .map(str::to_string)
