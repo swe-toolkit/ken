@@ -20,11 +20,19 @@ fn base_env() -> ElabEnv {
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
-    // The current sequential package harness has no module namespace. Hide the
-    // earlier generic operations so this package can own its public `insert`
-    // and `sort` names, as a real module import would.
-    env.globals.remove("insert");
-    env.globals.remove("sort");
+    // The sequential harness has no module namespace. Hide Derived's private
+    // operations and attached proofs so this package's names are inventoried
+    // independently, as they are under the real module loader.
+    for name in [
+        "insert",
+        "sort",
+        "insert::count",
+        "insert::sorted",
+        "sort::perm",
+        "sort::sorted",
+    ] {
+        env.globals.remove(name);
+    }
     env
 }
 

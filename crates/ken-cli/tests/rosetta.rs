@@ -151,13 +151,18 @@ fn collections_prelude() -> String {
     );
     let canonical_lawful_ops = std::iter::once(&lawful_classes[is_true])
         .chain(
-            ["pub fn bool_leq", "pub fn bool_and", "pub fn leq_nat"]
-                .into_iter()
-                .map(|start| {
-                    let declaration =
-                        flattened_braced_declaration(&lawful_classes, "LawfulClasses", start);
-                    &lawful_classes[declaration]
-                }),
+            [
+                "pub fn bool_leq",
+                "pub fn bool_and",
+                "pub fn bool_or",
+                "pub fn leq_nat",
+            ]
+            .into_iter()
+            .map(|start| {
+                let declaration =
+                    flattened_braced_declaration(&lawful_classes, "LawfulClasses", start);
+                &lawful_classes[declaration]
+            }),
         )
         .collect::<Vec<_>>()
         .join("\n");
@@ -185,7 +190,7 @@ fn collections_prelude() -> String {
         remove_flattened_import(&mut compare, "Compare", import);
     }
     for import in [
-        "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_leq, leq_nat)",
+        "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)",
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
