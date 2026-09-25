@@ -96,6 +96,19 @@ scoped property, and `ResourceKind` scoped. No kernel change and no
   ResourceKind.Buffer` elaborates to the same term as the pre-scoping bare
   spelling. A same-named constructor under another parent type is refused.
   The ambiguity case fails closed in type position too.
+- **AC-3b (conformance, conformance-validator block `evt_73xcxjheqx3ap`).**
+  The conformance validator adds black-box cases to `/conformance` on this
+  branch, as its own commit on top of the implementation:
+  - a qualified constructor in a type argument (`Resource
+    ResourceKind.Buffer`) resolves to the canonical constructor;
+  - a same-named constructor under another parent type is refused;
+  - module-versus-type ambiguity in type position is `AmbiguousReference`.
+
+  The same commit brings `conformance/surface/modules/seed-modules.md` and
+  `conformance/surface/taxonomy/minimality.md` up to the landed
+  fifteen-name floor and the `ResourceKind.C` spelling. That replaces the
+  separate currency correction (`evt_6e58ajsz20rty`). The Spec leader
+  reviews the conformance delta as the Spec-domain vote.
 - **AC-4 (controls).** Each AC-1/AC-2 row is red on base. Reverting the
   resolution change reddens them. Existing bare-constructor suites stay green.
   Targeted builds only, through `scripts/ken-cargo`; no-regression means
@@ -111,5 +124,6 @@ scoped property, and `ResourceKind` scoped. No kernel change and no
 
 ## Gate
 
-Spec text rides this branch (AC-3), so it needs the Spec-domain vote as well
-as the Architect's, and lands atomically.
+Spec text (AC-3, AC-3a) and conformance cases (AC-3b) ride this branch. It
+needs the Spec-domain vote as well as the Architect's and language QA's, on
+the exact tip, and lands atomically.
