@@ -679,6 +679,59 @@ mod tests {
         }
     }
 
+    /// Transition sentinel: px8tr's existing gather and worker-call retarget
+    /// are not pending-producer Matches at this base. If a later fixture grows
+    /// such a Match, review this scope rather than freezing its present count.
+    /// MEASURED: real continuation units exist but no source Match sits inside
+    /// a computational match, and admission publishes no package rows.
+    /// CLAIMED: this fixture stays on its existing gather/retarget path.
+    /// THE GAP: actual emission is covered separately by
+    /// `rt_seed_direct_and_context_gather_use_the_same_entry_words` and
+    /// `d5a_the_retargeted_worker_call_carries_the_raw_run_plus_the_context_capture_suffix`;
+    /// this test alone measures only the pre-emission population boundary.
+    #[test]
+    fn px8tr_gather_and_retarget_nonproducer_transition_sentinel() {
+        let (entry, declarations) =
+            crate::cranelift_backend::test_objects::px8tr_nested_post_effect_planning_inputs();
+        let declarations = declarations
+            .iter()
+            .map(|declaration| (declaration.symbol.as_str(), declaration))
+            .collect::<BTreeMap<_, _>>();
+        let plan = super::super::plan_static_transition_graph_with_symbols(
+            &entry,
+            &declarations,
+            &crate::NativeProcessSymbols::legacy_prelude(),
+            super::super::AbiRootIngress::Value,
+            true,
+        )
+        .expect("the two-parameter gather witness plans");
+        assert!(
+            !plan
+                .continuation_units()
+                .expect("continuation units")
+                .is_empty(),
+            "the gather/retarget fixture must contain real continuation units"
+        );
+        let pending_match_producers = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .filter(|occurrence| {
+                matches!(
+                    occurrence.expr,
+                    RuntimeExpr::ComputationalMatch { scrutinee, .. }
+                        if matches!(scrutinee.as_ref(), RuntimeExpr::Match { .. })
+                )
+            })
+            .count();
+        assert_eq!(pending_match_producers, 0);
+        assert!(
+            plan.selected_pending_calls.is_empty(),
+            "a nonproducer must not gain a selected pending-call package: {:?}",
+            plan.selected_pending_calls
+        );
+    }
+
     #[test]
     fn marked_pending_read_is_the_bound_ih_not_just_any_var_call() {
         let morphism = CheckedComputationalIHBinderMorphism::identity_for_test(4);
@@ -818,6 +871,38 @@ mod tests {
             )
             .expect_err("F6 call cannot carry the pending package"),
             PendingRefusal::RouteLeavesDefiningFunction,
+        );
+    }
+
+    /// A planned runtime-IR `ITree::Ret` constructor returns an open pending
+    /// route with no gate. This is a route-input F5 representative, not a
+    /// checked-source strict `return_body` witness: the bounded one-edit
+    /// source variant is rejected by typing (Unit versus ExitCode). The gate
+    /// in `route_package` represents the other path, so must-reach (rather
+    /// than an empty gate inventory) is the discriminating refusal here.
+    #[test]
+    fn f5_open_return_reaches_production_walker_and_must_reach_guard() {
+        let ret = RuntimeExpr::Construct {
+            constructor: "ctor:fixture::pending::ITree::Ret".to_owned(),
+            args: Vec::new(),
+        };
+        let plan = super::super::plan_static_transition_graph(&ret, &BTreeMap::new())
+            .expect("a strict return is a planned runtime-IR occurrence");
+        let root = plan.root_static_origin().expect("return root exists");
+        let owner = occurrence_authority(&plan, root).unwrap().owner;
+        let pending = PendingPathCounts::START.read_pending(true).unwrap();
+        let mut gates = BTreeSet::new();
+        let exits = walk_to_gate(&plan, root, owner, pending, &mut gates)
+            .expect("the local return itself does not cross a function");
+        assert_eq!(exits, vec![pending]);
+        assert!(gates.is_empty(), "the return is not a consuming gate");
+        assert!(matches!(
+            admit_routed_package(route_package(), vec![pending.consume().unwrap()]),
+            PendingCallAdmission::Planned(_)
+        ));
+        assert_eq!(
+            admit_routed_package(route_package(), exits),
+            PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach),
         );
     }
 
