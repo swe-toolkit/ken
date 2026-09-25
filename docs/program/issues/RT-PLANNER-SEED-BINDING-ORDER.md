@@ -128,3 +128,12 @@ amended. The Architect expects e1 = e2 = e3 (C1 = `_caps`, C2 = `_input`),
 after which its AC-1 proceeds without review. C1 and C2's backing classes
 swap labels (C1 the invocation-arena handle, C2 the ingress-borrowed
 pointee); both are admitted classes, so no D1 amendment is needed.
+
+## Symptom inventory
+
+Append one line per hard stop; never rewrite history.
+
+1. E2 unreachability was read off a refusal on the `recursive_unit_body =
+   None` arm, while five `Some(coordinates)` producer arms bypass it -- keyed
+   on one guard's arm, not on the producer set (Architect
+   `evt_tfcq2stzw5y9`).

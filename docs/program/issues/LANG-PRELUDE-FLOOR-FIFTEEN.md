@@ -31,8 +31,14 @@ binds a name in B.
 - `modules.rs::PRELUDE_FLOOR_NAMES` (`:123`) still holds the old ten; `Proved`
   is special-cased into `strict_builtin_names` (`:251`). 30 §4 already fixes
   fifteen; 33 §3 is stale and is reconciled by Spec S0.
-- For catalog roots, legacy reach outside B equals the census `expected` (47
-  rows, 87 names at `50966beb2`). Other unit classes are unmeasured.
+- For catalog roots, legacy reach outside B equals the census `expected`: 49
+  rows, 88 names, 522 pairs at `9ce9c6050` (D0 `evt_2rp2d3shp38a7`; the
+  `Data.Vector.Vector` row comes from `expected_vector_strict_floor_names()`).
+- **`ResourceKind`'s constructors are out of this slice.** S0 scopes them
+  (`ResourceKind.C` only), and `LANG-QUALIFIED-CONSTRUCTORS` AC-3 implements
+  that. Here the bare `FsHandle`/`Buffer`/`Mapping` handling in
+  `capture_strict_builtin_names` stays exactly as landed; neither widen nor
+  narrow it.
 - Inventory of all 503 names: `architect/work` `24f413275`,
   `notes/prelude-global-inventory-50966beb2.md`. Its keying column is a lower
   bound, not a measurement.
@@ -50,7 +56,9 @@ by-spelling read of the live globals map.
 
 ## Acceptance
 
-- **AC-0 (D0, scratch only, post to the WP thread, then proceed).** With
+- **AC-0 (D0) -- accepted as reported (`evt_2rp2d3shp38a7`); proceed.** Its
+  residuals are owed by the slices that consume them (see After landing), not
+  by this one. The original D0 text follows. With
   B-only resolution and the no-binding rule installed in scratch:
   - (a) Fall-through reach over every unit class (catalog roots, isolated
     files, examples, conformance, `ken-cli` fixtures, elaborator suites), as
@@ -102,4 +110,11 @@ by-spelling read of the live globals map.
 ## After landing
 
 AC-0 (d) is the population for the session-scope slice. AC-0 (c) is the input
-to the per-name routing of keyed names.
+to the per-name routing of keyed names. D0 residuals, each owed by its
+consumer:
+
+- the 222 `NO_READER_FOUND` names get a producer/reader closure before the
+  floor-additions slice routes any name out of the prelude;
+- the unrun elaborator integration suites and an exhaustive isolated-file reach
+  census come before the flip deletes the fall-through;
+- the per-form binder rejection proof belongs to the flip's no-binding rule.
