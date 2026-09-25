@@ -911,6 +911,8 @@ fn d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_
 /// slot actually loaded by the emitter at that lexical index. This is an
 /// emitted-Load-offset oracle, not a comparison of two planner records. The
 /// same input must arrive unchanged at the direct and context-capture readers.
+/// Parameter metadata is value-neutral only while all parameter slots carry
+/// the same declared carrier. This control trips if that premise changes.
 /// Promise class: durable invariant.
 #[test]
 fn rt_seed_two_entry_parameters_agree_with_emitted_loads_on_both_routes() {
@@ -943,12 +945,23 @@ fn rt_seed_two_entry_parameters_agree_with_emitted_loads_on_both_routes() {
                     source_owner, source_abi_position, ..
                 } if source_owner == owner
                     && source_abi_position < frame.header().parameters =>
-                    Some((input.ordinal, source_abi_position)),
+                    Some((input.ordinal, source_abi_position, input)),
                 _ => None,
             }).collect::<Vec<_>>();
             if entry_parameters.len() < 2 { continue; }
+            let parameter_slots = frame.slots().iter()
+                .filter(|slot| slot.kind == AbiSlotKind::Parameter)
+                .collect::<Vec<_>>();
+            let parameter_carrier = parameter_slots.first()
+                .expect("a converting owner has declared parameters").carrier;
+            for slot in &parameter_slots {
+                assert_eq!(slot.carrier, parameter_carrier,
+                    "disposition M depends on a uniform parameter-run carrier");
+            }
+            assert_eq!(parameter_carrier, AbiCarrier::ValueWord,
+                "disposition M must be revisited if parameter carriers change");
             let (offsets, _) = frame.slot_offsets().expect("one ABI offset walk");
-            for (ordinal, abi_position) in entry_parameters {
+            for (ordinal, abi_position, input) in entry_parameters {
                 let emitted = direct.iter().find(|read|
                     read.source_owner == owner
                         && read.worker_body_origin == unit.worker_body_origin()
@@ -970,6 +983,18 @@ fn rt_seed_two_entry_parameters_agree_with_emitted_loads_on_both_routes() {
                     "source coordinate must name the ABI offset actually loaded at the lexical seat");
                 assert_eq!(loaded.abi_ordinal, abi_position,
                     "the selected emitted Load came from the named parameter ordinal");
+                let slot = declared.0;
+                assert_eq!(input.carrier, slot.carrier,
+                    "disposition M requires capture carrier = emitter-loaded descriptor carrier");
+                assert_eq!(input.ownership, slot.ownership,
+                    "disposition M requires capture ownership = emitter-loaded descriptor ownership");
+                assert_eq!(input.storage_owner, slot.storage_owner,
+                    "disposition M requires capture storage owner = emitter-loaded descriptor owner");
+                assert_eq!(input.referent_affinity, vec![
+                    BoundaryReferentOwner::NoReferent,
+                    BoundaryReferentOwner::PersistentStore,
+                    BoundaryReferentOwner::InvocationArena,
+                ], "disposition M requires ValueWord's declared referent affinity");
                 assert_eq!(captured.word, emitted.word,
                     "entry-frame capture and direct emission must carry the same source value");
                 checked_pairs += 1;
