@@ -386,6 +386,9 @@ pub(crate) enum RExpr {
     /// Domain resolved as a `type` (mirrors type-position `Pi`); codomain
     /// resolved as an expr with `x` bound.
     RPi(String, Box<RType>, Box<RExpr>, Span),
+    /// `(x : A) × B` — dependent pair type in expression position.
+    /// The domain and bound codomain use the same resolution discipline as RPi.
+    RSigma(String, Box<RType>, Box<RExpr>, Span),
     /// `A -> B` — non-dependent function type, expr position (VAL2 #4).
     /// Both sides resolved as exprs; right-associative.
     RArrow(Box<RExpr>, Box<RExpr>, Span),
@@ -433,6 +436,7 @@ impl RExpr {
             | RExpr::RProj(_, _, s)
             | RExpr::RPosProj(_, _, s)
             | RExpr::RPi(_, _, _, s)
+            | RExpr::RSigma(_, _, _, s)
             | RExpr::RArrow(_, _, s)
             | RExpr::RAttachedProofRef { span: s, .. }
             | RExpr::RRecursiveResult { span: s, .. }
@@ -759,6 +763,12 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
             span.clone(),
         )),
         Expr::EPi(name, domain, codomain, span) => Ok(Type::TPi(
+            name.clone(),
+            domain.clone(),
+            Box::new(expr_as_type(codomain)?),
+            span.clone(),
+        )),
+        Expr::ESigma(name, domain, codomain, span) => Ok(Type::TSigma(
             name.clone(),
             domain.clone(),
             Box::new(expr_as_type(codomain)?),
@@ -2049,17 +2059,27 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             span: span.clone(),
         }),
 
-        Expr::EPi(x, a, b, span) => {
+        Expr::EPi(x, a, b, span) | Expr::ESigma(x, a, b, span) => {
             let ra = resolve_type(scope, a)?;
             scope.push(x);
-            let rb = resolve_expr_ctx(scope, b, ctx)?;
+            let rb_result = resolve_expr_ctx(scope, b, ctx);
             scope.pop();
-            Ok(RExpr::RPi(
-                x.clone(),
-                Box::new(ra),
-                Box::new(rb),
-                span.clone(),
-            ))
+            let rb = rb_result?;
+            if matches!(expr, Expr::EPi(..)) {
+                Ok(RExpr::RPi(
+                    x.clone(),
+                    Box::new(ra),
+                    Box::new(rb),
+                    span.clone(),
+                ))
+            } else {
+                Ok(RExpr::RSigma(
+                    x.clone(),
+                    Box::new(ra),
+                    Box::new(rb),
+                    span.clone(),
+                ))
+            }
         }
 
         Expr::EArrow(a, b, span) => {

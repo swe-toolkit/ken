@@ -2497,6 +2497,14 @@ fn rewrite_rexpr_inner(
                 s,
             ))
         })?,
+        RExpr::RSigma(x, a, b, s) => rewrite_rexpr_arm(|| {
+            Ok(RExpr::RSigma(
+                x,
+                Box::new(rewrite_rtype(scope, exports, *a)?),
+                Box::new(rewrite_rexpr(scope, exports, *b)?),
+                s,
+            ))
+        })?,
         RExpr::RArrow(a, b, s) => rewrite_rexpr_arm(|| {
             Ok(RExpr::RArrow(
                 Box::new(rewrite_rexpr(scope, exports, *a)?),

@@ -8659,6 +8659,8 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RPi(_, a, b, span) => infer_pi(cx, a, b, span),
 
+        RExpr::RSigma(_, a, b, span) => infer_sigma(cx, a, b, span),
+
         RExpr::RArrow(a, b, span) => infer_arrow(cx, a, b, span),
 
         RExpr::RTrunc(inner, span) => infer_trunc(cx, inner, span),
@@ -8775,6 +8777,40 @@ fn infer_pi(
         },
     )?;
     Ok((pi, sort))
+}
+
+/// `(x : A) × B` — dependent pair type in expression position (`32 §3`).
+/// The type domain is elaborated before introducing its binder, while the
+/// expression codomain sees that binder. The kernel, not the elaborator,
+/// checks both component sorts and chooses Ω only for the both-Ω case.
+fn infer_sigma(
+    cx: &mut ElabCtx,
+    a: &RType,
+    b: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let a_core = elab_type(cx, a)?;
+    let a_core = cx.metas.zonk_term(&a_core);
+    cx.ctx.push(a_core.clone());
+    let b_result = infer(cx, b);
+    cx.ctx.pop();
+    let (b_core, _) = b_result?;
+    let sigma = Term::sigma(a_core, cx.metas.zonk_term(&b_core));
+
+    let zonked_ctx = Context {
+        types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
+    };
+    let zonked_sigma = cx.metas.zonk_term(&sigma);
+    let sort = kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_sigma).map_err(
+        |error| match error {
+            CurrentKernelQueryError::View(error) => error,
+            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            },
+        },
+    )?;
+    Ok((sigma, sort))
 }
 
 /// `A -> B` — non-dependent function type in expr position (VAL2 #4,
@@ -10798,6 +10834,7 @@ fn infer_expr_row_type(
             .join(infer_expr_row_type(a, effect_rows, projection_ctx)),
         RExpr::RLam(_, _, _)
         | RExpr::RPi(_, _, _, _)
+        | RExpr::RSigma(_, _, _, _)
         | RExpr::RArrow(_, _, _)
         | RExpr::RTrunc(_, _) => crate::effects::RowType::empty(),
         RExpr::RAttachedProofRef {
@@ -11552,6 +11589,12 @@ fn reassociate_rexpr(
             span,
         ),
         RExpr::RPi(name, domain, codomain, span) => RExpr::RPi(
+            name,
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
+            span,
+        ),
+        RExpr::RSigma(name, domain, codomain, span) => RExpr::RSigma(
             name,
             Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
             Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
@@ -14329,7 +14372,7 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         // The domain is a `type`, not an `RExpr` — a mutual-recursion call
         // graph only cares about VALUE-level (expr) references, so only
         // the codomain (an `RExpr`) is scanned.
-        RExpr::RPi(_, _, b, _) => rexpr_mentions_name(b, name),
+        RExpr::RPi(_, _, b, _) | RExpr::RSigma(_, _, b, _) => rexpr_mentions_name(b, name),
         RExpr::RArrow(a, b, _) => rexpr_mentions_name(a, name) || rexpr_mentions_name(b, name),
         RExpr::RAttachedProofRef { .. } => false,
         RExpr::RTrunc(e, _) => rexpr_mentions_name(e, name),

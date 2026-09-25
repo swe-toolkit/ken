@@ -741,6 +741,10 @@ pub enum Expr {
     /// codomain is an expr binding `x`. Elaborates to the existing kernel
     /// `Pi` — no new kernel variant (types are terms, `11 §1`).
     EPi(String, Box<Type>, Box<Expr>, Span),
+    /// `(x : A) × B` — dependent pair type in expression position. `A` is a
+    /// surface type; `B` is an expression whose scope includes `x`. Lowers to
+    /// the existing kernel `Sigma`, not a new trusted former.
+    ESigma(String, Box<Type>, Box<Expr>, Span),
     /// `A -> B` — non-dependent function type, expr position (VAL2 #4,
     /// `32 §3`). BOTH sides are exprs (elaborate to `Type`-classified
     /// terms); right-associative. Elaborates to the existing kernel `Pi`.
@@ -785,6 +789,7 @@ impl Expr {
             | Expr::ECharLit(_, s)
             | Expr::EByteStr(_, s)
             | Expr::EPi(_, _, _, s)
+            | Expr::ESigma(_, _, _, s)
             | Expr::EArrow(_, _, s)
             | Expr::EAttachedProofRef { span: s, .. }
             | Expr::ERecursiveResult { span: s, .. }

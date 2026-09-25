@@ -703,7 +703,7 @@ pub fn type_names_in_expr(e: &Expr, out: &mut BTreeSet<String>) {
             type_names_in_expr(inner, out);
             type_names_in_type(ty, out);
         }
-        Expr::EPi(_binder, dom, cod, _) => {
+        Expr::EPi(_binder, dom, cod, _) | Expr::ESigma(_binder, dom, cod, _) => {
             type_names_in_type(dom, out);
             type_names_in_expr(cod, out);
         }

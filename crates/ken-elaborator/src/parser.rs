@@ -4260,18 +4260,12 @@ impl Parser {
         Ok(lhs)
     }
 
-    /// `parse_arrow_expr` — expr-position `->` (VAL2 #4, `32 §3`): the
-    /// dependent `(x:A) -> B` and non-dependent `A -> B` forms, both
-    /// elaborating to the existing kernel `Pi`. Binds looser than `==`/all
-    /// arithmetic, tighter than ascription (`32 §6`); right-associative.
-    ///
-    /// The dependent form needs a speculative parse: `(ident : type)` is
-    /// ALSO an ordinary parenthesized ascription (no trailing `->`), so
-    /// `is_dep_pi_ahead()`'s cheap token-shape check isn't sufficient by
-    /// itself (unlike type position, where `(ident:A)` is unambiguously a
-    /// Pi and never a bare ascription) — attempt it, and if the type
-    /// domain isn't followed by `RParen` then `Arrow`, rewind and fall
-    /// through to the ordinary ascription/grouping parse.
+    /// `parse_arrow_expr` — expression-position function types and dependent
+    /// Σ (`32 §3`). A dependent `(x:A) -> B` or `(x:A) × B` uses the same
+    /// speculative binder parse; the standalone `A -> B` remains unchanged.
+    /// Both binder forms associate right, tighter than ascription. Without
+    /// a following `->`/`×`, `(ident : type)` stays an ordinary ascription:
+    /// rewind and reparse it on the existing expression path.
     fn parse_arrow_expr(&mut self) -> Result<Expr, ElabError> {
         if matches!(self.peek(), Token::LParen) && self.is_dep_pi_ahead() {
             let save = self.pos;
@@ -4280,19 +4274,20 @@ impl Parser {
             let (x, _) = self.expect_ident()?;
             self.expect(&Token::Colon)?;
             let a = self.parse_type()?;
-            if matches!(self.peek(), Token::RParen) && matches!(self.lookahead(1), Token::Arrow) {
+            if matches!(self.peek(), Token::RParen)
+                && matches!(self.lookahead(1), Token::Arrow | Token::Times)
+            {
                 self.advance(); // ')'
-                self.advance(); // '->'
+                let separator = self.advance().0; // '->' or '×'
                 let b = self.parse_arrow_expr()?; // right-assoc
-                let end = b.span().end;
-                return Ok(Expr::EPi(
-                    x,
-                    Box::new(a),
-                    Box::new(b),
-                    Span::new(start, end),
-                ));
+                let span = Span::new(start, b.span().end);
+                return Ok(match separator {
+                    Token::Arrow => Expr::EPi(x, Box::new(a), Box::new(b), span),
+                    Token::Times => Expr::ESigma(x, Box::new(a), Box::new(b), span),
+                    _ => unreachable!("separator checked above"),
+                });
             }
-            // Not actually a dependent arrow (no trailing `->`) — this was
+            // Not a dependent arrow or pair — this was
             // a plain parenthesized ascription/expr; rewind and re-parse
             // through the ordinary path (pure backtrack: only `self.pos`
             // changed above).
@@ -5434,6 +5429,7 @@ impl Parser {
                         Expr::EProj(e, field, _) => Expr::EProj(e, field, span),
                         Expr::EPosProj(e, index, _) => Expr::EPosProj(e, index, span),
                         Expr::EPi(x, a, b, _) => Expr::EPi(x, a, b, span),
+                        Expr::ESigma(x, a, b, _) => Expr::ESigma(x, a, b, span),
                         Expr::EArrow(a, b, _) => Expr::EArrow(a, b, span),
                         Expr::ETrunc(e, _) => Expr::ETrunc(e, span),
                         Expr::EAttachedProofRef {
@@ -5653,6 +5649,12 @@ fn reassociate_default_expr(expr: Expr) -> Expr {
             Expr::EPosProj(Box::new(reassociate_default_expr(*value)), index, span)
         }
         Expr::EPi(name, domain, codomain, span) => Expr::EPi(
+            name,
+            Box::new(reassociate_default_type(*domain)),
+            Box::new(reassociate_default_expr(*codomain)),
+            span,
+        ),
+        Expr::ESigma(name, domain, codomain, span) => Expr::ESigma(
             name,
             Box::new(reassociate_default_type(*domain)),
             Box::new(reassociate_default_expr(*codomain)),

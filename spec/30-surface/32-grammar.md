@@ -312,6 +312,7 @@ expr ::=
   | expr binop expr  -- fixity-neutral operator spine
   | "(" ident ":" type ")" "->" expr  -- dependent function type Π (a term; §2, 11 §1)
   | expr "->" expr  -- non-dependent function type (arrow); elaborates to kernel Pi
+  | "(" ident ":" type ")" "×" expr  -- dependent pair type Σ (a term; §2, 13 §4)
   | let_expr  -- sequential local binding group
   | "if" expr "then" expr "else" expr  -- = match on Bool
   | match_expr  -- pattern match (34); single-scrutinee eqn: modifier (34 §3.6)
@@ -530,6 +531,28 @@ Int -> Int`). Two disambiguations, both by existing lookahead:
 
 The V0 minimal slice (§8) deliberately keeps `->` **type-position only**; that
 restriction is V0-local and is lifted here for the full surface.
+
+**Dependent pair types in expression position.** A dependent pair type
+`(x : A) × B` is a term, just as a dependent function type is. This production
+spells the same Σ former as §2: the first component uses the existing `type`
+grammar, `x` scopes over the right-hand `expr` only, and both components must
+elaborate as types or propositions. It elaborates to the existing kernel Σ; its
+sort is Ω exactly when both components are Ω, and otherwise follows `13 §4`'s
+predicative Σ sort. Thus, with `a, b : Ω`, `(x : a) × b` is the
+expression-position body of `And a b` and is convertible with the prelude
+conjunction. A relevant first component, such as `(x : Int) × P x` for
+`P : Int → Ω`, is Type-sorted and cannot be ascribed Ω.
+
+The form is selected only when `×` immediately follows the complete
+parenthesized `(ident : type)` binder at an expression boundary. A following
+`->` still selects the existing dependent Π; with neither separator,
+`(x : A)` remains the existing ascription. `×` is not added as a general
+expression infix operator: neither `A × B` nor arbitrary `e × f` gains an
+expression production. The new Σ form has the §6 loose, right-associative
+type-former binding (below arithmetic and above outer `:` ascription), like
+the existing expression-position Π; it is not an `application_atom`, so an
+application argument must be grouped, e.g. `f ((x : a) × b)`. No other
+expression form changes parse, and §2's type-position production is unchanged.
 
 ## 4. Patterns
 
