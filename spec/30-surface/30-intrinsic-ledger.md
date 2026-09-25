@@ -28,13 +28,18 @@ the *source contract needs that exact identity* (`30 §4`'s conjunction).
 Both proven → reserved, always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
-full unit reach is measured. A copied source declaration **cannot** replace a
-machinery-keyed `GlobalId`; there is **no intrinsic import module**. The
-unkeyed laws/helpers below are not candidates for floor membership.
+full unit reach is measured. `Empty` has a measured native reader and no
+independent source-name need: its required disposition is internal-only, but
+its fixed-ID capture has not landed. The source name is supplied by a catalog
+package, not the prelude, with an identity distinct from the compiler's. A
+copied source declaration **cannot** replace a machinery-keyed `GlobalId`;
+there is **no intrinsic import module**. The unkeyed laws/helpers below are
+not candidates for floor membership.
 
-The candidate names in this table are **observed spellings**, not names
-approved for permanent reservation. Before L2-3 admits any newly witnessed
-name, Spec checks that its spelling closely encloses its meaning (`30 §4`);
+Apart from the internal-only `Empty`, the candidate names in this table are
+**observed spellings**, not names approved for permanent reservation. Before
+L2-3 admits a newly witnessed name, Spec checks that its spelling closely
+encloses its meaning (`30 §4`);
 `NotFound`, `Other`, `Unsupported`, `Success`, `Failure`, `write`, `Stdout`, and
 `Instant` are operator-named specificity probes, not an exhaustive list or
 preselected renames. Spec owns the public naming fold in `35`/`38` and this
@@ -73,22 +78,26 @@ clients. L2-3 then admits only D0-witnessed types with the property selected
 above. A scoped type's constructor rows below identify exact parent and
 possible native reader, **not** additional bare names to add to B.
 
-## Possible reserved names: proposed reader per name
+## Possible reserved names and one internal identity: reader per name
 
 Each table entry is one named identity. Except for the constructor-private
 `PrivateBufferSpan` and `PrivateTransferCount` (not exported through `globals`
 but recorded on their types), these spellings occur in the 503-name global
-inventory. Rows sharing a reader still require individual D0 reads; a family
-label is not a keying proof for every member. Reservation is per **type and
-whole constructor family**, never a subset chosen by catalog use. For a scoped
-type, only the type is reserved; its constructor IDs remain exact and its
-public constructor paths are qualified. D0 traces each native constructor
-producer and checks the parent type's independent source requirement.
+inventory. `Empty` is recorded here as an **internal-only target with a
+measured mutable reader**, not a proposed reservation: the native site uses
+its name without a fixed-ID capture, and the independent source-name clause
+is false. Rows sharing a reader still require individual D0 reads; a family
+label is not a keying proof for every member. Reservation is
+per **type and whole constructor family**, never a subset chosen by catalog
+use. For a scoped type, only the type is reserved. Its constructor IDs remain
+exact, and its public constructor paths are qualified. D0 traces each native
+constructor producer and checks the parent type's independent source need.
 `prelude.rs` and `program_admission.rs` citations refer to the exact base
 above. No row alone reserves a name today.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
+| `Empty` (internal-only target, not a current floor candidate) | **Current implementation:** `elaborate_space_decl` looks up `elab.globals.get("Empty")` by spelling at each `space` (`elab.rs:13450`), then embeds the returned ID in effect/state-fold terms. Same-program `data Empty` replaces that live map entry (`data.rs:99`); this is not a fixed pre-source ID. **Required, not landed:** capture the compiler's `Empty` before source elaboration and use/compare its exact ID, as `Proved`'s fixed-identity check illustrates (`modules.rs:258–261`). **Source need:** none for that exact identity under `36 §4.1–4.2`; the source name belongs to the catalog package `Core.Logic.EmptyDec` with a distinct checked identity, not to the prelude. |
 | `Unit` | Effect-response result type used by the reifier (`38 §1.7`, `prelude.rs`); verify the exact type ID and source need. |
 | `MkUnit` | `CanonicalRuntimeRoles::unit`, effect-response constructor; verify exact parent `Unit`. |
 | `ProcessInput` | `program_admission.rs` checks the `main` parameter against its registered type (`33 §3.2.1`). |
@@ -166,10 +175,16 @@ above. No row alone reserves a name today.
 | `ResourceBracketReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 | `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 
-These candidates remain **outside** the current B. Capturing an ID proves
-keying, not independent source need. Both witnesses admit a type to B; its
-whole constructor family follows the scoped choice above. Without source need
-it is internal-only, and without keying it is package material if promised.
+These rows remain **outside** the current B. Capturing an ID proves
+keying, not independent source need. `Empty` has a native reader but its
+fixed-ID capture is owed; its intended disposition is internal-only. A future
+`36` contract requiring source to name that exact space identity needs separate
+Spec gates. If adopted, existing Q-B admits it
+to the floor without per-name operator approval, with atomic roster/count
+change and retirement of the catalog `Empty`; it adds nothing to today's floor.
+Both witnesses admit a type to B; its whole constructor family follows the
+scoped choice above. Without source need it is internal-only, and without
+keying it is package material if promised.
 For checked definitions the test remains per-name: `leqChar` does not inherit
 `eqChar`'s registry key. If `IOError` qualifies, its thirteen causes are one
 **scoped** family, not thirteen bare B names. D0 still names the native
