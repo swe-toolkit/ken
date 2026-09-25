@@ -4910,8 +4910,11 @@ mod tests {
                         "every input in the run comes from ONE unit's entry ABI"
                     );
                     assert_eq!(
-                        *source_abi_position as usize, ordinal,
-                        "and they are ORDERED, position matching ordinal"
+                        *source_abi_position as usize,
+                        inputs.len() - 1 - ordinal,
+                        "a two-parameter source body consumes the lexical binder order, \
+                         not the ABI slot order; the fused input's coordinate still names \
+                         the original ABI slot for its ABI-run reader"
                     );
                     assert!(
                         matches!(source, ContinuationInputSource::Parameter),

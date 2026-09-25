@@ -35,6 +35,26 @@ use super::calls::{recursive_position_unit_calls, RECURSIVE_POSITION_UNIT_CALLS}
 
 mod primitive;
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug)]
+struct RtSeedDirectWord {
+    worker_body_origin: StaticOriginId,
+    source_owner: PredeclaredFunctionId,
+    ordinal: u32,
+    word: cranelift_codegen::ir::Value,
+}
+
+#[cfg(test)]
+thread_local! {
+    static RT_SEED_DIRECT_WORDS: std::cell::RefCell<Vec<RtSeedDirectWord>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn rt_seed_direct_words_take() -> Vec<RtSeedDirectWord> {
+    RT_SEED_DIRECT_WORDS.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
 struct ClaimedContinuationResult {
     identity: ContinuationCallIdentity,
     recursive_position: u32,
@@ -10881,6 +10901,18 @@ impl<'a> Lowering<'a> {
                         )
                     })?,
             };
+            #[cfg(test)]
+            if matches!(&operand_environment, ContinuationOperandEnvironment::DirectEmission) {
+                if let (ContinuationSourceCoordinate::EntryAbi { source_owner, .. },
+                    LoweringOperand::Carried(word)) = (input.coordinate, &operand) {
+                    RT_SEED_DIRECT_WORDS.with(|cell| cell.borrow_mut().push(RtSeedDirectWord {
+                        worker_body_origin: unit.worker_body_origin(),
+                        source_owner,
+                        ordinal: input.ordinal,
+                        word: word.word,
+                    }));
+                }
+            }
             continuation_inputs.push(operand);
         }
         // **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- CONSTRUCT THE GENERATED

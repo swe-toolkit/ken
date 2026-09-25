@@ -9,8 +9,9 @@
 use super::*;
 use super::control::px8j_capture_source_trace;
 use crate::cranelift_backend::lowering::units::{
-    continuation_case_binder_run, ContinuationCaseBinderSource,
+    continuation_case_binder_run, srcbody_parameter_loads_take, ContinuationCaseBinderSource,
 };
+use crate::cranelift_backend::lowering::calls::rt_seed_capture_words_take;
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the witness compiles, and its checked-IH
 /// marker is consumed at the static-worker call edge exactly once.**
@@ -819,14 +820,14 @@ fn continuation_case_binder_run_hard_stops_rather_than_leaving_a_hole() {
 fn d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_slot() {
     with_d5a_witness_plan(|plan| {
         let units = plan.continuation_units().expect("continuation units");
-        // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` rider — the predeclared rows
-        // are COLLECTED here and asserted below, off a value that exists only
-        // because the population is non-empty.**
+        // Predeclared rows are collected and checked for root ownership and a
+        // real lexical/ABI coordinate split. A source body with two parameters
+        // reverses the binder run; the old position-equality law was false.
         //
-        // ⛔ The earlier form asserted the two equalities inside this loop and
-        // guarded them with a separate `assert!(predeclared > 0, …)`. That is
-        // the shape `D2a` repaired: the guard only NAMES the intent, so deleting
-        // it leaves the equalities compiling and passing vacuously on an empty
+        // ⛔ An earlier form asserted inside this loop and guarded it with
+        // a separate `assert!(predeclared > 0, …)`. That is the shape `D2a`
+        // repaired: the guard only NAMES the intent, so deleting it leaves the
+        // assertions compiling and passing vacuously on an empty
         // unit list. The non-zero check is now the CONSTRUCTOR of the count the
         // assertion loop ranges over — remove it and this is a compile error,
         // not a silent pass.
@@ -869,9 +870,10 @@ fn d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_
             }
         }
         let established_predeclared = std::num::NonZeroUsize::new(predeclared_rows.len()).expect(
-            "the witness must still plan at least one predeclared-owned continuation, or the \
-             equality law below is asserted over an empty population",
+            "the witness must plan a predeclared-owned continuation, or its source-owner \
+             relation below is asserted over an empty population",
         );
+        let mut predeclared_with_distinct_lexical_and_abi_positions = 0usize;
         for (owner, inputs) in predeclared_rows.iter().take(established_predeclared.get()) {
             for input in inputs {
                 assert_eq!(
@@ -881,15 +883,19 @@ fn d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_
                      projection naming another owner was built against a different \
                      emitter than the one that will run"
                 );
-                assert_eq!(
-                    input.availability.expect_direct_emission_slot(),
-                    input.coordinate.expect_entry_abi().1,
-                    "for a predeclared emitter the root ABI position and the immediate \
-                     slot index the same environment, so they must agree; this is the \
-                     consistency law that lets that arm read either field"
-                );
+                if input.availability.expect_direct_emission_slot()
+                    != input.coordinate.expect_entry_abi().1
+                {
+                    predeclared_with_distinct_lexical_and_abi_positions += 1;
+                }
             }
         }
+        assert!(
+            predeclared_with_distinct_lexical_and_abi_positions > 0,
+            "a source-body parameter reversal must expose at least one predeclared \
+             CurrentLexical index distinct from its EntryAbi position; a single-parameter \
+             witness would make the two coordinates accidentally coincide"
+        );
         assert!(
             specialization_with_a_real_difference > 0,
             "the witness must still plan at least one specialization-owned continuation whose \
@@ -898,6 +904,148 @@ fn d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_
              vacuous: the distinction `D5a` exists to draw would be a distinction without a \
              difference on the only fixture that measures it"
         );
+    });
+}
+
+/// A two-parameter source owner must assign each continuation input the ABI
+/// slot actually loaded by the emitter at that lexical index. This is an
+/// emitted-Load-offset oracle, not a comparison of two planner records. The
+/// same input must arrive unchanged at the direct and context-capture readers.
+/// Parameter metadata is value-neutral only while all parameter slots carry
+/// the same declared carrier. This control trips if that premise changes.
+/// Promise class: durable invariant.
+#[test]
+fn rt_seed_two_entry_parameters_agree_with_emitted_loads_on_both_routes() {
+    let _ = srcbody_parameter_loads_take();
+    let _ = rt_seed_direct_words_take();
+    let _ = rt_seed_capture_words_take();
+    crate::cranelift_backend::test_objects::emit_px8tr_nested_post_effect_object(
+        "rt_seed_two_entry_parameters", false,
+    )
+    .expect("the checked two-parameter owner emits the native object");
+    let loads = srcbody_parameter_loads_take();
+    let direct = rt_seed_direct_words_take();
+    let captured = rt_seed_capture_words_take();
+    with_d5a_witness_plan(|plan| {
+        let emittable = plan.emittable_units().expect("emittable owners");
+        let mut checked_pairs = 0;
+        for unit in plan.continuation_units().expect("continuation units") {
+            let ContinuationEmissionOwner::Predeclared(owner) = unit.emission_owner() else {
+                continue;
+            };
+            let Some(frame) = emittable.iter().copied().find(|frame| frame.function() == owner)
+            else { continue };
+            if !matches!(frame.definition(), AbiUnitDefinition::CallableDeclaration { .. }
+                | AbiUnitDefinition::ClosureBody { .. }) {
+                continue;
+            }
+            let entries = unit.continuation_inputs().expect("typed continuation inputs");
+            let entry_parameters = entries.iter().filter_map(|input| match input.coordinate {
+                ContinuationSourceCoordinate::EntryAbi {
+                    source_owner, source_abi_position, ..
+                } if source_owner == owner
+                    && source_abi_position < frame.header().parameters =>
+                    Some((input.ordinal, source_abi_position, input)),
+                _ => None,
+            }).collect::<Vec<_>>();
+            if entry_parameters.len() < 2 { continue; }
+            let parameter_slots = frame.slots().iter()
+                .filter(|slot| slot.kind == AbiSlotKind::Parameter)
+                .collect::<Vec<_>>();
+            let parameter_carrier = parameter_slots.first()
+                .expect("a converting owner has declared parameters").carrier;
+            for slot in &parameter_slots {
+                assert_eq!(slot.carrier, parameter_carrier,
+                    "disposition M depends on a uniform parameter-run carrier");
+            }
+            assert_eq!(parameter_carrier, AbiCarrier::ValueWord,
+                "disposition M must be revisited if parameter carriers change");
+            let (offsets, _) = frame.slot_offsets().expect("one ABI offset walk");
+            for (ordinal, abi_position, input) in entry_parameters {
+                let emitted = direct.iter().find(|read|
+                    read.source_owner == owner
+                        && read.worker_body_origin == unit.worker_body_origin()
+                        && read.ordinal == ordinal)
+                    .expect("the direct consumer read this exact source input");
+                let captured = captured.iter().find(|read|
+                    read.source_owner == owner
+                        && read.worker_body_origin == unit.worker_body_origin()
+                        && read.ordinal == ordinal)
+                    .expect("the context consumer read this exact source input");
+                let loaded = loads.iter().find(|load|
+                    load.body_origin == frame.body_occurrence() && load.word == emitted.word)
+                    .expect("direct operand is an actual emitter parameter Load");
+                let declared = frame.slots().iter().zip(&offsets)
+                    .find(|(slot, _)| slot.kind == AbiSlotKind::Parameter
+                        && slot.ordinal == abi_position)
+                    .expect("coordinate has a declared parameter slot");
+                assert_eq!(loaded.emitted_load_offset, *declared.1 as i32,
+                    "source coordinate must name the ABI offset actually loaded at the lexical seat");
+                assert_eq!(loaded.abi_ordinal, abi_position,
+                    "the selected emitted Load came from the named parameter ordinal");
+                let slot = declared.0;
+                assert_eq!(input.carrier, slot.carrier,
+                    "disposition M requires capture carrier = emitter-loaded descriptor carrier");
+                assert_eq!(input.ownership, slot.ownership,
+                    "disposition M requires capture ownership = emitter-loaded descriptor ownership");
+                assert_eq!(input.storage_owner, slot.storage_owner,
+                    "disposition M requires capture storage owner = emitter-loaded descriptor owner");
+                assert_eq!(input.referent_affinity, vec![
+                    BoundaryReferentOwner::NoReferent,
+                    BoundaryReferentOwner::PersistentStore,
+                    BoundaryReferentOwner::InvocationArena,
+                ], "disposition M requires ValueWord's declared referent affinity");
+                assert_eq!(captured.word, emitted.word,
+                    "entry-frame capture and direct emission must carry the same source value");
+                checked_pairs += 1;
+            }
+        }
+        assert!(checked_pairs >= 2,
+            "the fixture must actually reach two distinct parameter reads through both consumers");
+    });
+}
+
+/// The E3a value half is isolated from the earlier emitted-offset assertion:
+/// reverting only the lexical seed must reach this comparison and show that
+/// the context gather loaded a different word from direct emission. Promise
+/// class: durable relation across two consumers, not an SSA-number snapshot.
+#[test]
+fn rt_seed_direct_and_context_gather_use_the_same_entry_words() {
+    let _ = rt_seed_direct_words_take();
+    let _ = rt_seed_capture_words_take();
+    crate::cranelift_backend::test_objects::emit_px8tr_nested_post_effect_object(
+        "rt_seed_context_word_pair", false,
+    )
+    .expect("two-parameter witness reaches both consumers");
+    let direct = rt_seed_direct_words_take();
+    let captured = rt_seed_capture_words_take();
+    with_d5a_witness_plan(|plan| {
+        let mut checked = 0;
+        for unit in plan.continuation_units().expect("continuation units") {
+            let ContinuationEmissionOwner::Predeclared(owner) = unit.emission_owner() else {
+                continue;
+            };
+            let inputs = unit.continuation_inputs().expect("typed inputs");
+            let entry = inputs.iter().filter(|input| matches!(input.coordinate,
+                ContinuationSourceCoordinate::EntryAbi {
+                    source_owner, source_abi_position: 0 | 1, ..
+                } if source_owner == owner)).collect::<Vec<_>>();
+            if entry.len() != 2 { continue; }
+            for input in entry {
+                let emitted = direct.iter().find(|read|
+                    read.worker_body_origin == unit.worker_body_origin()
+                        && read.source_owner == owner && read.ordinal == input.ordinal)
+                    .expect("direct consumer actually read this entry input");
+                let gathered = captured.iter().find(|read|
+                    read.worker_body_origin == unit.worker_body_origin()
+                        && read.source_owner == owner && read.ordinal == input.ordinal)
+                    .expect("context gather actually read this entry input");
+                assert_eq!(emitted.word, gathered.word,
+                    "coordinate-keyed context gather must carry the direct emission value");
+                checked += 1;
+            }
+        }
+        assert!(checked >= 2, "both parameter reads must reach both consumers");
     });
 }
 
@@ -1572,7 +1720,7 @@ fn d5a_the_retargeted_worker_call_carries_the_raw_run_plus_the_context_capture_s
 ///   out-of-range slot is refused by frame membership *before* any environment
 ///   is indexed.
 /// - the **root-position substitution** itself, which is in range and identically
-///   shaped, and is refused by that same membership check.
+///   shaped, and is refused by current-lexical seat revalidation.
 ///
 /// ⛔ The out-of-range mutation is scoped to the specialization arm on purpose.
 /// Applied to a predeclared emitter the current-lexical revalidation refuses
@@ -1631,14 +1779,14 @@ fn d5a_the_capture_projection_reads_the_immediate_slot_and_bounds_it() {
         // and its claim survives here inverted -- as a refusal rather than a
         // documented gap.
         //
-        // ⛔ Same guard as the row above, different STIMULUS: that one moves the
-        // slot out of range, this one substitutes the root ABI position, which is
-        // in range and identically shaped. `D3c` measured that exact substitution
-        // selecting a different operand with nothing to notice.
+        // ⛔ Same guard as the first row, different STIMULUS: that row shifts
+        // the lexical index, this substitutes an in-range ABI slot number for
+        // it. `D3c` measured that substitution silently selecting a different
+        // operand before seat revalidation existed.
         (
             "the root-position substitution D3c measured as silent",
             D5aRouteMutation::ReadRootPositionAsImmediateSlot,
-            "the two disagree",
+            "does not hold that coordinate at",
         ),
     ];
     for (label, mutation, expected) in rows {

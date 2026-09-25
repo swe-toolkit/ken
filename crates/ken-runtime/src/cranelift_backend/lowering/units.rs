@@ -614,6 +614,34 @@ pub fn static_response_owner_body_mutation_is_exact() -> bool {
     STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
 }
 
+// Test-only E4 observation: the response capture value is loaded by the
+// declared owner-frame slot. Its source coordinate is metadata, not the key
+// selecting the value. Record only pairs that reach a two-parameter source.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static RT_SEED_RESPONSE_OBSERVING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static RT_SEED_RESPONSE_PAIRS: std::cell::RefCell<Vec<(u32, u32, i32)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_rt_seed_response_metadata_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<(u32, u32, i32)>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RT_SEED_RESPONSE_OBSERVING.with(|enabled| enabled.set(false));
+        }
+    }
+    RT_SEED_RESPONSE_OBSERVING.with(|enabled| assert!(!enabled.replace(true)));
+    RT_SEED_RESPONSE_PAIRS.with(|pairs| pairs.borrow_mut().clear());
+    let _restore = Restore;
+    let result = operation();
+    let pairs = RT_SEED_RESPONSE_PAIRS.with(|pairs| std::mem::take(&mut *pairs.borrow_mut()));
+    (result, pairs)
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 fn claim_static_response_owner_body_mutation(
     predicate: impl FnOnce(StaticResponseOwnerBodyMutation) -> bool,
@@ -3220,6 +3248,54 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                             )
                         })?,
                 );
+                #[cfg(feature = "px8-ds-test-support")]
+                if RT_SEED_RESPONSE_OBSERVING.with(std::cell::Cell::get) {
+                    if let ContinuationSourceCoordinate::EntryAbi {
+                        source_owner, source_abi_position, ..
+                    } = capture.source() {
+                        let source = compiler.static_transition_plan.emittable_units()?
+                            .into_iter()
+                            .find(|unit| unit.function() == source_owner)
+                            .expect("response EntryAbi source has an emittable owner");
+                        if source.header().parameters >= 2
+                            && source_abi_position < source.header().parameters {
+                            let source_slot = source.slots().get(source_abi_position as usize)
+                                .expect("source parameter has a descriptor slot");
+                            assert_eq!(source_slot.kind, AbiSlotKind::Parameter);
+                            let word = match context_suffix.last().expect("just appended capture") {
+                                LoweringOperand::Carried(word) => word.word,
+                                _ => panic!("response K capture was not an emitted word"),
+                            };
+                            let cranelift_codegen::ir::ValueDef::Result(inst, _) =
+                                builder.func.dfg.value_def(word) else {
+                                    panic!("response capture word has no emitted Load");
+                                };
+                            let cranelift_codegen::ir::InstructionData::Load { offset, .. } =
+                                builder.func.dfg.insts[inst] else {
+                                    panic!("response capture word was not loaded from its frame");
+                                };
+                            let emitted_offset = i32::from(offset);
+                            let response_slot = slots.iter().zip(offsets)
+                                .find(|(_, offset)| i32::try_from(**offset).ok() == Some(emitted_offset))
+                                .map(|(slot, _)| slot)
+                                .expect("emitted response Load offset names a descriptor slot");
+                            assert_eq!(response_slot.kind, AbiSlotKind::Parameter);
+                            assert_eq!(response_slot.ordinal, capture.producer_abi_slot(),
+                                "response capture must read by producer's index-keyed frame slot");
+                            assert_eq!(response_slot.carrier, source_slot.carrier,
+                                "response M: emitter-loaded slot and source descriptor carrier disagree");
+                            assert_eq!(response_slot.ownership, source_slot.ownership,
+                                "response M: emitter-loaded slot and source descriptor ownership disagree");
+                            assert_eq!(response_slot.storage_owner, source_slot.storage_owner,
+                                "response M: emitter-loaded slot and source descriptor storage owner disagree");
+                            assert_eq!(response_slot.carrier, AbiCarrier::ValueWord,
+                                "response M: ValueWord referent affinity must be revisited with a new parameter carrier");
+                            RT_SEED_RESPONSE_PAIRS.with(|pairs| pairs.borrow_mut().push((
+                                source_abi_position, response_slot.ordinal, emitted_offset,
+                            )));
+                        }
+                    }
+                }
             }
             for (ordinal, _, _) in emission.row.continuation_inputs() {
                 context_suffix.push(
@@ -4223,7 +4299,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
 /// The split is validated against the raw owner's own descriptor. A count from
 /// the context alone cannot distinguish declared arguments from raw captures,
 /// which is the same-cardinality permutation this boundary must reject.
-pub(super) fn generated_context_source_environment<T>(
+pub(in crate::cranelift_backend) fn generated_context_source_environment<T>(
     mut combined_parameters: Vec<T>,
     context_captures: Vec<T>,
     raw_parameters: u32,
@@ -7727,6 +7803,27 @@ pub(in crate::cranelift_backend) fn srcbody_bind_order_record(
     SRCBODY_BIND_ORDER.with(|cell| cell.borrow_mut().push(observation));
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct SrcbodyParameterLoad {
+    pub(in crate::cranelift_backend) body_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) abi_ordinal: u32,
+    pub(in crate::cranelift_backend) word: cranelift_codegen::ir::Value,
+    pub(in crate::cranelift_backend) emitted_load_offset: i32,
+}
+
+#[cfg(test)]
+thread_local! {
+    static SRCBODY_PARAMETER_LOADS: std::cell::RefCell<Vec<SrcbodyParameterLoad>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn srcbody_parameter_loads_take()
+-> Vec<SrcbodyParameterLoad> {
+    SRCBODY_PARAMETER_LOADS.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
 /// Drains every environment built on this thread since the last take.
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn srcbody_bind_order_take()
@@ -8020,6 +8117,8 @@ fn define_unit_body<M: Module>(
         let mut parameter_ordinals = Vec::new();
         #[cfg(test)]
         let mut capture_ordinals = Vec::new();
+        #[cfg(test)]
+        let mut parameter_loads = Vec::new();
         for (slot, offset) in unit.slots.iter().zip(&unit.offsets) {
             if matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture) {
                 #[cfg(test)]
@@ -8066,6 +8165,10 @@ fn define_unit_body<M: Module>(
                     base,
                     offset,
                 );
+                #[cfg(test)]
+                if slot.kind == AbiSlotKind::Parameter {
+                    parameter_loads.push((slot.ordinal, word));
+                }
                 let carried = CarriedBoundaryWord { word };
                 // The process root's two ABI ordinals are closed semantic
                 // roles, not generic ValueWord inputs. Recovering them here
@@ -8180,6 +8283,28 @@ fn define_unit_body<M: Module>(
         // join subtree beneath it. Reinstating a branch here would restore that
         // defect for whichever arm it did not cover.
         let body_origin = unit.body_occurrence;
+        #[cfg(test)]
+        for ordinal in parameter_ordinals.iter().copied() {
+            let word = parameter_loads
+                .iter()
+                .find(|(abi_ordinal, _)| *abi_ordinal == ordinal)
+                .expect("source binder ordinal was loaded from the declared parameter run")
+                .1;
+            let offset = match builder.func.dfg.value_def(word) {
+                cranelift_codegen::ir::ValueDef::Result(inst, _) =>
+                    match builder.func.dfg.insts[inst] {
+                        cranelift_codegen::ir::InstructionData::Load { offset, .. } => i32::from(offset),
+                        ref other => panic!("a source binder has no emitted Load: {other:?}"),
+                    },
+                other => panic!("a source binder is not defined by an emitted instruction: {other:?}"),
+            };
+            SRCBODY_PARAMETER_LOADS.with(|cell| cell.borrow_mut().push(SrcbodyParameterLoad {
+                body_origin,
+                abi_ordinal: ordinal,
+                word,
+                emitted_load_offset: offset,
+            }));
+        }
         #[cfg(test)]
         srcbody_bind_order_record(SrcbodyBindOrderObservation {
             host: SrcbodyBindHost::OrdinaryUnit,

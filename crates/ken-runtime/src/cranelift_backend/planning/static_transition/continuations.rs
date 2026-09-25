@@ -3261,7 +3261,54 @@ fn producer_local_value(
     ))
 }
 
+/// Seed the semantic walk in the same source-body binder order as the emitter.
+/// The entry ABI remains sorted by slot: only this lexical walk consumes the
+/// converted run. All production callers supply that exact ABI entry run, so
+/// reversing it at the walk boundary also reaches response consumers without
+/// teaching any ABI-run reader a second order.
 pub(super) fn walk_continuation_value_environment(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    target: StaticOriginId,
+    environment: &[ContinuationValueSourceAuthority],
+) -> Result<
+    (
+        ContinuationValueSourceAuthority,
+        Option<Vec<ContinuationValueSourceAuthority>>,
+    ),
+    CraneliftBackendError,
+> {
+    let owner = occurrence_authority(plan, origin)?.owner;
+    let descriptor = plan
+        .abi
+        .descriptors
+        .iter()
+        .find(|descriptor| descriptor.function == owner)
+        .ok_or_else(|| planner_error("continuation lexical seed has no ABI descriptor"))?;
+    let abi_entry = continuation_owner_entry_sources(plan, owner)?
+        .into_iter()
+        .map(ContinuationValueSourceAuthority::source)
+        .collect::<Vec<_>>();
+    if environment != abi_entry {
+        return Err(planner_error(
+            "continuation lexical walk is not seeded from its owner's exact ABI entry run",
+        ));
+    }
+    let converts = crate::cranelift_backend::lowering::units::source_body_binding_order(
+        descriptor.definition,
+    )?;
+    let lexical_entry =
+        crate::cranelift_backend::lowering::units::generated_context_source_environment(
+            abi_entry,
+            Vec::new(),
+            descriptor.header.parameters,
+            descriptor.header.captures,
+            converts,
+        )?;
+    walk_continuation_value_environment_impl(plan, origin, target, &lexical_entry)
+}
+
+fn walk_continuation_value_environment_impl(
     plan: &StaticTransitionPlan<'_>,
     origin: StaticOriginId,
     target: StaticOriginId,
@@ -3282,7 +3329,7 @@ pub(super) fn walk_continuation_value_environment(
     let expr = plan.planned_occurrence_expr(origin)?;
     let child = |position| plan.semantic.child_origin(origin, position);
     let walk = |position, environment: &[ContinuationValueSourceAuthority]| {
-        walk_continuation_value_environment(plan, child(position)?, target, environment)
+        walk_continuation_value_environment_impl(plan, child(position)?, target, environment)
     };
     let result = match expr {
         RuntimeExpr::CheckedJoinSite { .. }
