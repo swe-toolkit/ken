@@ -489,9 +489,10 @@ unrelated `ElabEnv` does not satisfy them.
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked aliases reaching all fifteen floor types,
-     values and exhaustive matches reaching every floor constructor, all three
-     Pair companion bindings, `bytes_at`/`bytes_slice` uses whose results are
+  1. entry `Floor` contains checked uses of all fifteen roster names in their
+     contract-appropriate positions, every exact constructor through values and
+     exhaustive matches, all three Pair companion bindings,
+     `bytes_at`/`bytes_slice` uses whose results are
      matched as `Option`, a `bytes_decode` use matched as
      `Result Utf8Error String`, and functions typed by `Cap a` and
      `Resource k`;
@@ -536,8 +537,9 @@ is historical evidence, not a sentinel retained beside the current contract.
   declarations that reach every recorded id, including actual
   `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`, and `Resource` signatures.
 - expect: every emitted type/body contains the corresponding recorded id. The
-  exact floor is `{Auth, Bool, Bottom, Char, Equal, List, Nat, Option, Pair,
-  Prop, Proved, ResourceKind, Result, Top, Utf8Error}`. `ResourceKind` is
+  exact fifteen-name prelude roster is `Auth`, `Bool`, `Bottom`, `Char`,
+  `Equal`, `List`, `Nat`, `Option`, `Pair`, `Prop`, `Proved`, `ResourceKind`,
+  `Result`, `Top`, and `Utf8Error`. `ResourceKind` is
   scoped: its constructor paths are `ResourceKind.FsHandle`,
   `ResourceKind.Buffer`, and `ResourceKind.Mapping`; the bare constructor names
   are not reserved by that family. The inductive members and their exact
@@ -579,48 +581,46 @@ is historical evidence, not a sentinel retained beside the current contract.
 
 - promise class: **durable invariant** — a qualified constructor in an atomic
   type argument resolves under its canonical parent
-- stage: **RED-UNTIL `LANG-QUALIFIED-CONSTRUCTORS`**
 - spec: `32 §2–3`, `34 §1.1`, `38 §1.7`
 - given: compare two fresh source units. The positive unit is:
   ```ken
-  def keepBuffer (r : Resource ResourceKind.Buffer)
+  fn keepBuffer (r : Resource ResourceKind.Buffer)
     : Resource ResourceKind.Buffer = r
-  def bufferKind : ResourceKind = ResourceKind.Buffer
+  const bufferKind : ResourceKind = ResourceKind.Buffer
+  const chooseBuffer : ResourceKind = if True then bufferKind else bufferKind
   ```
   The negative unit is:
   ```ken
-  def bufferKind : ResourceKind = ResourceKind.Buffer
-  def wrong (r : Resource bufferKind) : Resource bufferKind = r
+  const bufferKind : ResourceKind = ResourceKind.Buffer
+  fn wrong (r : Resource (if True then bufferKind else bufferKind))
+    : Resource (if True then bufferKind else bufferKind) = r
   ```
-- expect: the positive unit is accepted. In the negative unit,
-  `bufferKind` is accepted as a value, but `wrong` is rejected because a
-  lowercase value is not admitted as a general expression in an atomic type
-  argument.
-- why: the positive uses the qualified constructor as an atomic `atype` and
-  as a value. The negative distinguishes that permitted form from an arbitrary
-  expression while leaving the separately specified `tproj` form unchanged.
+- expect: the positive unit is accepted. The negative unit is rejected during
+  parsing at `if`, where an `atype` is required; `32 §2` adds no general
+  expression form to the type-argument grammar.
+- why: the positive unit accepts the conditional as a value of `ResourceKind`.
+  A focused implementation probe reports `ParseError` with
+  `expected a type, found KwIf`; the diagnostic wording is measured, not
+  contract-pinned. The negative uses that same expression in type position,
+  where it cannot be mistaken for a bare lowercase type variable.
 
 ### surface/modules/qualified-type-argument-refuses-another-parent
 
 - promise class: **discriminating** — a same-leaf constructor from another
   family cannot index `Resource`
-- stage: **RED-UNTIL `LANG-QUALIFIED-CONSTRUCTORS`**
 - spec: `32 §2–3`, `34 §1.1`, `38 §1.7`
-- given: elaborate each source unit independently:
+- given: in one source unit, declare the checked constructor and value, then
+  the function:
   ```ken
   data RivalKind = Buffer
-  def rival : RivalKind = RivalKind.Buffer
-  ```
-  and:
-  ```ken
-  data RivalKind = Buffer
-  def rival : RivalKind = RivalKind.Buffer
-  def wrong (r : Resource RivalKind.Buffer)
+  const rival : RivalKind = RivalKind.Buffer
+  fn wrong (r : Resource RivalKind.Buffer)
     : Resource RivalKind.Buffer = r
   ```
-- expect: the first unit is accepted. The second is rejected: a constructor
-  whose parent is `RivalKind` cannot index `Resource`, which requires a
-  `ResourceKind` argument. Do not select a constructor by its leaf spelling.
+- expect: `RivalKind.Buffer` resolves as the constructor with exact parent
+  `RivalKind`, and `rival` is well typed. The `wrong` function is rejected by a
+  type mismatch: `Resource` requires a `ResourceKind` argument, not a
+  `RivalKind` argument. It is not an unresolved-name or parse refusal.
 - why: the valid same-leaf constructor is the control. A resolver that selects
   the floor `ResourceKind.Buffer` by leaf spelling would accept the wrong
   `Resource` index and fail this pair.
@@ -628,35 +628,34 @@ is historical evidence, not a sentinel retained beside the current contract.
 ### surface/modules/module-type-ambiguity-in-type-argument
 
 - promise class: **discriminating** — type-position dual meanings fail closed
-- stage: **RED-UNTIL `LANG-QUALIFIED-CONSTRUCTORS`**
 - spec: `32 §2–3`, `33 §3.3`, `34 §1.1`
-- given: elaborate these source units independently. The module-only unit is:
+- given: compare three fresh source units. The module-only unit is:
   ```ken
-  module Kind { pub const Buffer : ResourceKind = ResourceKind.Buffer }
+  module Kind { data Buffer = MkBuffer; export Buffer, MkBuffer }
   import Kind
-  def moduleOnly (r : Resource Kind.Buffer)
-    : Resource Kind.Buffer = r
+  fn moduleOnly (x : List Kind.Buffer) : List Kind.Buffer = x
   ```
   The type-only unit is:
   ```ken
   module Source { data Kind = Buffer; export Kind, Buffer }
   import Source (Kind)
-  def typeOnly : Kind = Kind.Buffer
+  data Box (k : Kind) : Type where { MkBox : Box k }
+  fn typeOnly (x : Box Kind.Buffer) : Box Kind.Buffer = x
   ```
   The combined unit is:
   ```ken
   module Source { data Kind = Buffer; export Kind, Buffer }
-  module Kind { pub const Buffer : ResourceKind = ResourceKind.Buffer }
+  module Kind { data Buffer = MkBuffer; export Buffer, MkBuffer }
   import Kind
   import Source (Kind)
-  def clash (r : Resource Kind.Buffer) : Resource Kind.Buffer = r
+  fn clash (x : List Kind.Buffer) : List Kind.Buffer = x
   ```
 - expect: the module-only and type-only controls are accepted. The combined
   unit rejects with `AmbiguousReference` naming `Kind.Buffer`, before either
   meaning is chosen for the type argument.
-- why: the two controls show that each meaning is independently reachable.
-  The combined arm fails only when both the module export and the exact-parent
-  constructor path are visible; parse order must not select a winner.
+- why: the module child type and the constructor path are independently valid.
+  The combined arm makes both meanings visible at the same spelling; a parser
+  or resolver must not choose the module path by order.
 
 ### surface/modules/prelude-floor-clash-and-lookalike-matrix
 
@@ -1421,8 +1420,9 @@ monotone-downward and revocation management actions remain runner/host-internal
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
 - **Floor availability, identity, and instance ownership are separate axes.**
-  Strict uses of all ten floor types, every exact constructor, and all three
-  Pair companions accept on the recorded ids, including the public primitive
+  Strict uses of all fifteen prelude roster names, every exact constructor,
+  and all three Pair companions accept on the recorded ids, including the
+  public primitive
   signatures that require the signature arm. Every same-spelling floor binding
   rejects while each all-renamed lookalike gets distinct ids and local
   parentage. Ambient availability still does not make an unrelated module a

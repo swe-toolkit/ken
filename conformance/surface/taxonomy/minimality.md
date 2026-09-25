@@ -76,8 +76,9 @@ The signature arm closes to exactly **`{Auth, Bool, Char, List, Option,
 ResourceKind, Result, Utf8Error}`**; the internal-provision arm adds
 **`{Nat, Pair}`** and the five kernel-machinery-keyed proposition/equality
 members **`{Equal, Prop, Proved, Top, Bottom}`** (`30-taxonomy §4`). Their union
-is the landed fifteen-name floor **`{Auth, Bool, Bottom, Char, Equal, List,
-Nat, Option, Pair, Prop, Proved, ResourceKind, Result, Top, Utf8Error}`** at
+is the landed fifteen-name roster: `Auth`, `Bool`, `Bottom`, `Char`, `Equal`,
+`List`, `Nat`, `Option`, `Pair`, `Prop`, `Proved`, `ResourceKind`, `Result`,
+`Top`, and `Utf8Error`, realized at
 `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. For every inductive member, the
 floor admits constructors only by matching their kernel-recorded parent
 `GlobalId`. `ResourceKind` is scoped: its constructors are available as
@@ -96,22 +97,25 @@ possession.
 - spec: `30-taxonomy §4`; `33 §3.3`; `39 §2.0`
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
-  `Decl::Inductive` or checked `Decl::Transparent`. Independently snapshot the
-  fifteen expected type ids, every constructor id and recorded parent, the three
-  Pair companion ids and checked types, `declarations().len()`,
-  `next_global_id()`, and `trusted_base()`. Do not select declarations by helper
-  name, source file, or a hand-picked primitive list.
+  `Decl::Inductive` or checked `Decl::Transparent`. Independently record the
+  `GlobalId` and actual declaration kind for each name in the fifteen-name
+  roster, keeping type-forming identities distinct from the `Top`/`Bottom`
+  proposition constants and the `Proved : Top` proof binding. Also record each
+  constructor id and parent, the three Pair companion ids and checked types,
+  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Do not select
+  declarations by helper name, source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
-  internal-provision set `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}` equals
-  the exact fifteen-type floor. The
+  internal-provision name set `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}`
+  closes the fifteen-name roster. `Proved` has type `Top` and is a proof
+  binding, not a type former. The
   constructor set is exactly the constructors recorded under the seven
   inductive signature members plus `Nat`; no same-spelling constructor with
   another parent qualifies. The separate companion set is exactly
   `{mk_pair, pair_fst, pair_snd}`, and every companion type references the exact
-  Pair id. None of the type, constructor, or companion ids appears in
-  `trusted_base()`, and installing the floor changes neither declaration count
-  nor allocator position.
+  Pair id. Installing the floor changes neither declaration count nor allocator
+  position. None of the fifteen roster identities, constructor identities, or
+  Pair-companion identities enters `trusted_base()`.
 - controls: prove both equality directions with compile-preserving mutations.
   For under-inclusion, install a checked `Extra` type and a real test-only
   primitive whose signature names `Extra`, leaving the configured floor
@@ -135,7 +139,7 @@ possession.
   derivation and Strict resolution must match those closed inventories.
   Production resolution must not auto-admit an unreviewed newly observed name.
 
-The fifteen-type floor, Pair source-reaching cases, and the five
+The fifteen-name roster, Pair source-reaching cases, and the five
 `30-taxonomy §4` proposition/equality members are no longer staged behind
 `LANG-MOD-CANONICAL-PAIR-PACKAGE` or `PRELUDE_FLOOR_NAMES`; the landed target is
 `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. This records landed scope, not a
@@ -246,7 +250,7 @@ ordinary data representation.
   every primitive type closes the eight-member signature set; exact-identity,
   origin, and no-allocation witnesses add the internal set `{Nat, Pair}` (and
   the five kernel-machinery-keyed `30-taxonomy §4` members) and yield the
-  fifteen-type floor plus three Pair companions. The `OrdResult` bloat
+  fifteen-name roster plus three Pair companions. The `OrdResult` bloat
   finding proves the opposite direction (ruled remove; `Ordering`→package,
   §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/
