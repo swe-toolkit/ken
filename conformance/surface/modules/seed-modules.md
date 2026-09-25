@@ -480,16 +480,16 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the exact floor is closed
   in both directions
-- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE` floor realization**
-- spec: `30-taxonomy §4` (closed prelude floor), `33 §3.3` (exact ten-type
-  floor, three Pair companions, and no convenience-global fallback), `39 §2.0`
+- spec: `30-taxonomy §4` (closed fifteen-name prelude floor), `33 §3.3`
+  (the exact floor, three Pair companions, and no convenience-global
+  fallback), `39 §2.0`
   step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
   path to register the transparent Ken definition `def Ambient = Bool` under
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked aliases reaching all ten floor types,
+  1. entry `Floor` contains checked aliases reaching all fifteen floor types,
      values and exhaustive matches reaching every floor constructor, all three
      Pair companion bindings, `bytes_at`/`bytes_slice` uses whose results are
      matched as `Option`, a `bytes_decode` use matched as
@@ -517,11 +517,9 @@ unrelated `ElabEnv` does not satisfy them.
   checked convenience from a later arbitrary global. Widening all globals,
   removing the floor, or forbidding explicit imports each fails a different arm.
 
-The nine-member Nat realization is landed. The Pair additions to this floor arm
-and the Pair-specific rows below are **RED UNTIL the redirected
-`LANG-MOD-CANONICAL-PAIR-PACKAGE` floor-realization build**. The former
-strict-Pair rejection is historical evidence, not a sentinel retained beside
-the new contract.
+The fifteen-name floor realization, including the three Pair companions, is
+landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The strict-Pair rejection
+is historical evidence, not a sentinel retained beside the current contract.
 
 ### surface/modules/prelude-floor-reuses-exact-types-and-constructors
 
@@ -529,15 +527,21 @@ the new contract.
   identity and trust do not
 - spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
-  of `Auth`, `Bool`, `Char`, `List`, `Nat`, `Option`, `Pair`, `ResourceKind`,
-  `Result`, and `Utf8Error`; record every constructor id and kernel parent;
+  of `Auth`, `Bool`, `Bottom`, `Char`, `Equal`, `List`, `Nat`, `Option`,
+  `Pair`, `Prop`, `Proved`, `ResourceKind`, `Result`, `Top`, and `Utf8Error`;
+  record every constructor id and kernel parent;
   record `mk_pair`, `pair_fst`, and `pair_snd` plus their exact reference to the
   Pair id; and snapshot `declarations().len()`, `next_global_id()`, and
   `trusted_base()`. Through strict roots elaborate an entry with checked
   declarations that reach every recorded id, including actual
   `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`, and `Resource` signatures.
 - expect: every emitted type/body contains the corresponding recorded id. The
-  inductive members and their exact constructors are:
+  exact floor is `{Auth, Bool, Bottom, Char, Equal, List, Nat, Option, Pair,
+  Prop, Proved, ResourceKind, Result, Top, Utf8Error}`. `ResourceKind` is
+  scoped: its constructor paths are `ResourceKind.FsHandle`,
+  `ResourceKind.Buffer`, and `ResourceKind.Mapping`; the bare constructor names
+  are not reserved by that family. The inductive members and their exact
+  constructors are:
 
   | parent | constructors |
   |---|---|
@@ -546,7 +550,7 @@ the new contract.
   | `List` | `Nil`, `Cons` |
   | `Nat` | `Zero`, `Suc` |
   | `Option` | `None`, `Some` |
-  | `ResourceKind` | `FsHandle`, `Buffer` |
+  | `ResourceKind` | `FsHandle`, `Buffer`, `Mapping` |
   | `Result` | `Err`, `Ok` |
   | `Utf8Error` | `InvalidUtf8` |
 
@@ -560,14 +564,99 @@ the new contract.
   distinguish a replacement family, and a source-only positive that never uses
   the byte/capability/resource primitives would not prove their public result
   and parameter types are nameable.
-- **MEASURED:** the landed nine-type floor reuses all recorded ids and preserves
-  accounting and trust. At base `c1945c6fbbd7b0d8422123904fc6f7138fc85df9`,
-  the four transparent Pair-family declarations already exist as `g232`–`g235`
-  and remain untrusted. **CLAIMED:** the ten-type floor and three-companion
-  inventory expose those existing checked identities without creating or
-  trusting anything. **THE GAP:** the build must capture the Pair family through
-  the closed floor path, derive every constructor from recorded parentage, and
-  reject equal-shaped or same-spelling substitutions.
+- **MEASURED (carried from old base):** the nine-type floor reused its recorded
+  ids and preserved accounting and trust at the old base
+  `c1945c6fbbd7b0d8422123904fc6f7138fc85df9`; the four transparent Pair-family
+  declarations were `g232`–`g235` and remained
+  untrusted. **LANDED:** the fifteen-name floor and the scoped
+  `ResourceKind.FsHandle`, `.Buffer`, and `.Mapping` paths are the contract in
+  `30-taxonomy §4` and `33 §3.3`, realized at
+  `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. **THE GAP:** every constructor
+  must retain its recorded parent identity, and equal-shaped or same-spelling
+  substitutions must not replace a floor identity.
+
+### surface/modules/qualified-constructor-in-type-argument
+
+- promise class: **durable invariant** — a qualified constructor in an atomic
+  type argument resolves under its canonical parent
+- stage: **RED-UNTIL `LANG-QUALIFIED-CONSTRUCTORS`**
+- spec: `32 §2–3`, `34 §1.1`, `38 §1.7`
+- given: compare two fresh source units. The positive unit is:
+  ```ken
+  def keepBuffer (r : Resource ResourceKind.Buffer)
+    : Resource ResourceKind.Buffer = r
+  def bufferKind : ResourceKind = ResourceKind.Buffer
+  ```
+  The negative unit is:
+  ```ken
+  def bufferKind : ResourceKind = ResourceKind.Buffer
+  def wrong (r : Resource bufferKind) : Resource bufferKind = r
+  ```
+- expect: the positive unit is accepted. In the negative unit,
+  `bufferKind` is accepted as a value, but `wrong` is rejected because a
+  lowercase value is not admitted as a general expression in an atomic type
+  argument.
+- why: the positive uses the qualified constructor as an atomic `atype` and
+  as a value. The negative distinguishes that permitted form from an arbitrary
+  expression while leaving the separately specified `tproj` form unchanged.
+
+### surface/modules/qualified-type-argument-refuses-another-parent
+
+- promise class: **discriminating** — a same-leaf constructor from another
+  family cannot index `Resource`
+- stage: **RED-UNTIL `LANG-QUALIFIED-CONSTRUCTORS`**
+- spec: `32 §2–3`, `34 §1.1`, `38 §1.7`
+- given: elaborate each source unit independently:
+  ```ken
+  data RivalKind = Buffer
+  def rival : RivalKind = RivalKind.Buffer
+  ```
+  and:
+  ```ken
+  data RivalKind = Buffer
+  def rival : RivalKind = RivalKind.Buffer
+  def wrong (r : Resource RivalKind.Buffer)
+    : Resource RivalKind.Buffer = r
+  ```
+- expect: the first unit is accepted. The second is rejected: a constructor
+  whose parent is `RivalKind` cannot index `Resource`, which requires a
+  `ResourceKind` argument. Do not select a constructor by its leaf spelling.
+- why: the valid same-leaf constructor is the control. A resolver that selects
+  the floor `ResourceKind.Buffer` by leaf spelling would accept the wrong
+  `Resource` index and fail this pair.
+
+### surface/modules/module-type-ambiguity-in-type-argument
+
+- promise class: **discriminating** — type-position dual meanings fail closed
+- stage: **RED-UNTIL `LANG-QUALIFIED-CONSTRUCTORS`**
+- spec: `32 §2–3`, `33 §3.3`, `34 §1.1`
+- given: elaborate these source units independently. The module-only unit is:
+  ```ken
+  module Kind { pub const Buffer : ResourceKind = ResourceKind.Buffer }
+  import Kind
+  def moduleOnly (r : Resource Kind.Buffer)
+    : Resource Kind.Buffer = r
+  ```
+  The type-only unit is:
+  ```ken
+  module Source { data Kind = Buffer; export Kind, Buffer }
+  import Source (Kind)
+  def typeOnly : Kind = Kind.Buffer
+  ```
+  The combined unit is:
+  ```ken
+  module Source { data Kind = Buffer; export Kind, Buffer }
+  module Kind { pub const Buffer : ResourceKind = ResourceKind.Buffer }
+  import Kind
+  import Source (Kind)
+  def clash (r : Resource Kind.Buffer) : Resource Kind.Buffer = r
+  ```
+- expect: the module-only and type-only controls are accepted. The combined
+  unit rejects with `AmbiguousReference` naming `Kind.Buffer`, before either
+  meaning is chosen for the type argument.
+- why: the two controls show that each meaning is independently reachable.
+  The combined arm fails only when both the module export and the exact-parent
+  constructor path are visible; parse order must not select a winner.
 
 ### surface/modules/prelude-floor-clash-and-lookalike-matrix
 
@@ -1454,22 +1543,19 @@ identity/cycle/flat-`Σ` homes in §D5 remain unchanged. A direct call to the
 loader does not discharge the front-end row, and an eager scan does not
 discharge the lazy-poison pair.
 
-## Build-forward (closed signature + internal-provision floor)
+## Build realization (closed signature + internal-provision floor)
 
-`LANG-MOD-NAT-FLOOR-REALIZATION` landed the signature-eight plus kernel-origin
-`Nat` nine-type floor. The redirected
-`LANG-MOD-CANONICAL-PAIR-PACKAGE` build extends the same mechanism with
-compiler-origin `Pair`, producing the explicit ten-type inventory
-`{Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error}`
-and the separate three-companion inventory
-`{mk_pair, pair_fst, pair_snd}`. The executable closure check derives the
-signature eight and exact internal `{Nat, Pair}` independently; it never widens
-resolution from compiler-global presence. Constructor capture remains exact
-parent-derived. Pair-family capture reuses the four pre-source ids and checks
-that every companion type references the exact Pair id. The build flips the
-four strict-Pair rows, keeps non-members such as `Prod` unavailable, and closes
-every Pair-binding clash before allocation. Canonical `Ord Nat`, `Ord Pair`,
-and `DecEq Pair` placement follows the class-owner rule. Floor installation adds
+The fifteen-name floor and the separate three-companion inventory landed at
+`0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The executable closure derives the
+signature eight and exact internal `{Nat, Pair, Equal, Prop, Proved, Top,
+Bottom}` independently; it never widens resolution from compiler-global
+presence. Constructor capture remains exact-parent-derived, including the
+scoped `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and
+`ResourceKind.Mapping` paths. Pair-family capture reuses the four pre-source
+ids and keys every companion type to the exact Pair id. The landing closes the
+strict-Pair rows, keeps non-members such as `Prod` unavailable, and closes every
+Pair-binding clash before allocation. Canonical `Ord Nat`, `Ord Pair`, and
+`DecEq Pair` placement follows the class-owner rule. Floor installation adds
 zero declarations, ids, or trusted entries.
 
 ## Build-forward (N3 Lane B)

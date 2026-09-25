@@ -65,27 +65,29 @@ and no-allocation witnesses. This is the surface analog of the kernel's closed
 | **`Char`** | signature: `String ↔ List Char` | checked transparent scalar type (`35 §2.4`); the constructor-free signature member. |
 | **`List`** | signature: `String ↔ List Char` and `Bytes ↔ List UInt8` | ordinary checked `data List`; signature-named at two independent primitive surfaces. |
 | **`Option`** | signature: `bytes_at` and `bytes_slice` results | ordinary checked `data Option a = None \| Some a`; strict source must name and eliminate the exact result family. |
-| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer`; the opaque primitive former needs this exact parameter identity. |
+| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping`; the opaque primitive former needs this exact parameter identity. Source uses the scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`. |
 | **`Result`** | signature: `bytes_decode : Bytes → Result Utf8Error String` | ordinary checked `data Result e a = Err e \| Ok a`; strict source must eliminate the exact result family. |
 | **`Utf8Error`** | signature: the error argument of `bytes_decode`'s result | ordinary checked `data Utf8Error = InvalidUtf8`; no replacement family can inhabit the primitive result. |
 | **`Nat`** | internal provision, kernel origin: source must reach the canonical natural/index family | ordinary checked `data Nat = Zero \| Suc Nat`; strict-floor installation reuses those exact ids and allocates none. |
 | **`Pair`** | internal provision, compiler-bootstrap origin: source must reach the one transparent non-dependent Sigma family | ordinary checked transparent definition; floor installation reuses its exact id. Its exact companions `mk_pair`/`pair_fst`/`pair_snd` are bindings, not type members. |
 | **`Ω` (Omega)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
-The signature arm therefore closes to exactly **`{Auth, Bool, Char, List,
-Option, ResourceKind, Result, Utf8Error}`**; the internal-provision arm adds
+The signature arm closes to exactly **`{Auth, Bool, Char, List, Option,
+ResourceKind, Result, Utf8Error}`**; the internal-provision arm adds
 **`{Nat, Pair}`** and the five kernel-machinery-keyed proposition/equality
 members **`{Equal, Prop, Proved, Top, Bottom}`** (`30-taxonomy §4`). Their union
-is the fifteen-type floor; the executable configured floor reaches fifteen only
-when the sequenced `PRELUDE_FLOOR_NAMES` extension lands, so the executable case
-below stays RED until then. For every
-inductive member, the floor admits constructors only by matching their
-kernel-recorded parent `GlobalId`; `Char` and transparent `Pair` have no
-constructor arm. Pair's companion inventory is exactly
-`{mk_pair, pair_fst, pair_snd}`; each checked type is keyed to the exact Pair id.
-Every listed family, definition, constructor, and companion is outside
-`trusted_base()`. Compiler-installed checked declarations outside these closed
-inventories are not admitted by mere possession.
+is the landed fifteen-name floor **`{Auth, Bool, Bottom, Char, Equal, List,
+Nat, Option, Pair, Prop, Proved, ResourceKind, Result, Top, Utf8Error}`** at
+`0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. For every inductive member, the
+floor admits constructors only by matching their kernel-recorded parent
+`GlobalId`. `ResourceKind` is scoped: its constructors are available as
+`ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`,
+not as bare names. `Char` and transparent `Pair` have no constructor arm.
+Pair's companion inventory is exactly `{mk_pair, pair_fst, pair_snd}`; each
+checked type is keyed to the exact Pair id. Every listed family, definition,
+constructor, and companion is outside `trusted_base()`. Compiler-installed
+checked declarations outside these closed inventories are not admitted by mere
+possession.
 
 ### surface/taxonomy/prelude-signature-inventory-is-executable-and-closed
 
@@ -121,24 +123,23 @@ inventories are not admitted by mere possession.
 - why: producer traversal closes the population by construction. A selected
   `reg_*` grep omits primitives registered through another helper; a spelling
   list cannot distinguish a constructor attached to a lookalike family.
-- **MEASURED:** at base `06c62313af62`, the producer traversal returned the
-  exact eight-id signature set; admitting its union with `Nat` preserved ids,
-  accounting, and trust. At base `c1945c6fbbd7b0d8422123904fc6f7138fc85df9`,
-  the compiler installs transparent `Pair = g232`, `mk_pair = g233`,
-  `pair_fst = g234`, and `pair_snd = g235`, all outside `trusted_base()`, while
-  the current configured floor remains nine. **CLAIMED:** the exact internal
-  witness set is `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}`, its union with
-  the signature set is the fifteen-type target, and the three companions form a
-  separate binding inventory.
-  **THE GAP:** the floor-realization build must make the executable derivation
-  and Strict resolution match those closed inventories. Production resolution
-  must not auto-admit an unreviewed newly observed name.
+- **MEASURED (carried from old bases):** at `06c62313af62`, the producer
+  traversal returned the exact eight-id signature set; admitting its union with
+  `Nat` preserved ids, accounting, and trust. At
+  `c1945c6fbbd7b0d8422123904fc6f7138fc85df9`, the compiler installed transparent
+  `Pair = g232`, `mk_pair = g233`, `pair_fst = g234`, and `pair_snd = g235`, all
+  outside `trusted_base()`, while the configured floor was nine. **LANDED:** the
+  fifteen-name floor and three-companion inventory are recorded in
+  `30-taxonomy §4` and realized at
+  `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. **THE GAP:** the executable
+  derivation and Strict resolution must match those closed inventories.
+  Production resolution must not auto-admit an unreviewed newly observed name.
 
-This case and the Pair strict source-reaching cases in
-`../modules/seed-modules.md` are **RED UNTIL the redirected
-`LANG-MOD-CANONICAL-PAIR-PACKAGE` floor-realization build** and, for the five
-`30-taxonomy §4` proposition/equality members, the sequenced
-`PRELUDE_FLOOR_NAMES` floor extension.
+The fifteen-type floor, Pair source-reaching cases, and the five
+`30-taxonomy §4` proposition/equality members are no longer staged behind
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` or `PRELUDE_FLOOR_NAMES`; the landed target is
+`0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. This records landed scope, not a
+local test or CI result.
 
 **AC2 bloat finding — `OrdResult`.** `data OrdResult = Lt | Eq | Gt`
 (`prelude.rs`) sits in the elaborator prelude, but no primitive signature names
