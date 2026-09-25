@@ -62,8 +62,15 @@ members, including `Proved`, a proof term rather than a type former.
   "`Equal` is deleted"), and `30 §6`'s "`Equal` → delete" ruling, which
   `30 §4` supersedes: `Equal` is now the floor name whose body is the kernel's
   `Eq`, not a postulate. Spec decides whether `30 §6` is corrected in place or
-  marked as the historical ruling that produced `30 §4`. There is no
-  constructor, companion or floor inventory change.
+  marked as the historical ruling that produced `30 §4`.
+  - `39 §2.0`'s constructor admission and collision text is also in scope,
+    brought into line with `33 §3.3` (CV block on `73d59225b`, Steward ruling
+    `evt_10f2tf9zm2grh`). `ResourceKind` is scoped: `ResourceKind.FsHandle`,
+    `.Buffer` and `.Mapping`, with no bare constructor reserved. A scoped
+    constructor's bare spelling does not collide with the floor. The other
+    floor constructors stay bare and reserved.
+  - This restates settled `33` text. There is no change to the constructor,
+    companion or floor inventories that `30 §4` and `33 §3.3` define.
 
 ## Stop conditions
 
