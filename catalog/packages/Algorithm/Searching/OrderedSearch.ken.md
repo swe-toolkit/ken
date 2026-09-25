@@ -26,6 +26,8 @@ import Core.Classes.LawfulClasses (Ord, ord_leq_at)
 
 import Core.Classes.Membership (Membership)
 
+import Core.Logic.EmptyDec (Empty, Dec, Yes, No)
+
 fn elem_step (tail_member : Bool) (x_before_head : Bool) (head_before_x : Bool) : Bool =
   match x_before_head {
     True ↦

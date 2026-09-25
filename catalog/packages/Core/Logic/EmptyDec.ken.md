@@ -35,27 +35,28 @@ keys, checked pattern-refinement — builds on this pair.
 
 ## 2. Definition
 
-`Empty`, `Dec`, `Yes`, `No`, and `decide` are standard names, available to
-every Ken program rather than declared by this entry. `Dec` accepts a
-proposition-valued parameter, a generality not yet expressible in an ordinary
-surface `data` declaration. A zero-constructor data type can be declared with
-the explicit-family form `data Empty : Type0 where { }`; the legacy
-`data D = …` form shown below remains illustrative.
+This entry declares `Empty`, `Dec`, `Yes`, `No`, and `decide`. Import their
+names when a program needs them. `Empty` is an uninhabited Type-sorted family;
+`Dec` stores either proof of a proposition or a refutation into this `Empty`.
+The explicit-family data form admits both the zero-constructor declaration
+and the proposition-valued parameter.
 
-Conceptually, the standard declarations have this shape:
+```ken
+data Empty : Type where {}
 
-```ken ignore
-data Empty : Type0 =
+data Dec (P : Omega) : Type where {
+  Yes : P → Dec P;
+  No : (P → Empty) → Dec P
+}
 
-data Dec (P : Ω) : Type0 =
-  Yes P
-  | No (P → Empty)
+fn decide (P : Omega) (d : Dec P) : Bool =
+  match d {
+    Yes p ↦ True;
+    No f ↦ False
+  }
 
-fn decide (P : Ω) (d : Dec P) : Bool =
-  match d { Yes p ↦ True ; No f ↦ False }
+export Empty, Dec, Yes, No, decide
 ```
-
-What this entry *does* author, as real surface code.
 
 The general Type-sorted eliminator for `Empty` — an uninhabited type
 eliminates into anything — is deliberately not named `absurd`: that
