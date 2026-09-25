@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-SEED-BINDING-ORDER
 title: "Planner lexical-walk seed must follow the owner's source-body binding order: for a converting owner (CallableDeclaration, ClosureBody) with two or more entry parameters, every EntryAbi coordinate the continuation walk attaches names the mirror parameter, so coordinate-keyed consumers load the wrong ABI slot and copy the wrong carrier and lifetime metadata; seed the walk with the emitter's own ordering function, keep ABI-run consumers in ABI order, and prove it with a two-sided two-parameter witness"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
