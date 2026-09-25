@@ -137,7 +137,7 @@ statement. No change to `filter`, `mem` or any other definition.
   debt, the first admitted growth of that census.
   - Exactly one name, `filter`, is added, only to
     `Data.Collections.Derived` and to the rows whose closure roots-loads it
-    (19 in the CI reading). No other row changes, no name is removed, and
+    (20 closure rows, 21 rows in all). No other row changes, no name is removed, and
     `discovered`, `clean` and the residual set are unchanged.
   - A one-line comment at the Derived row says `filter` is admitted
     prelude-convenience debt under this ruling and names this AC. The other

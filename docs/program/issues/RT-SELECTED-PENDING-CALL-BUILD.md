@@ -1,18 +1,22 @@
 ---
 id: RT-SELECTED-PENDING-CALL-BUILD
 title: "Build the selected pending-call package designed in RT-SELECTED-PENDING-CALL-PACKAGE D1: a companion package beside the pending ITree word, built in the executed arm from its own ordered S/C members, carried through the six transport families to D2's one-event consuming gate, so the px7l/px7m rows can lower natively; first checkpoint measures backing classes, arm-edge dominance and traversed families before the build proceeds"
-status: ready
+status: draft
 owner: runtime
 size: L
 gate: architect
 tier: T1
-depends_on: [RT-SELECTED-PENDING-CALL-PACKAGE]
+depends_on: [RT-SELECTED-PENDING-CALL-PACKAGE, RT-PLANNER-SEED-BINDING-ORDER]
 blocks: []
 github: null
 origin: "RT-SELECTED-PENDING-CALL-PACKAGE AC-3: Architect D1 disposition 'REPRESENTABLE D1, no §5 STOP' (evt_3y5xkyf1v02dj) on main 1303e5cd4 and D0 evt_3ywcecyzbyqkh; runtime-leader request evt_2vx0eh0v312rb. Serves the L1 objective under operator 2026-09-23 'concur with rec on L1 carrier'. Steward-filed per COORDINATION section 2."
 ---
 
 # Build the selected pending-call package
+
+**Status: parked at AC-0 on `RT-PLANNER-SEED-BINDING-ORDER`**, under
+`evt_6yjef2cy4nv1e`'s e2 ≠ e3 outcome (Architect `evt_2eqe033bxff6f`). On
+resume, rebase onto it and re-run AC-0(e).
 
 ## Settled inputs -- at `1303e5cd4`
 
@@ -22,6 +26,10 @@ origin: "RT-SELECTED-PENDING-CALL-PACKAGE AC-3: Architect D1 disposition 'REPRES
   placement, the contents, F1-F6 transport, the static-candidate gate over
   `call_declared_unit_target`, D2's issuer as the only call-event authority,
   and exactly one call. This frame does not restate it.
+- **D1 amendment 1** (Architect `evt_54vq22cwfnp9k`), recorded verbatim in
+  the same file, governs this build: backing class (f), the F4 gate at every
+  carried-residual consumer, nested arms, C0 and the dominance test. D1
+  amendment 2 (Architect `evt_6yjef2cy4nv1e`) replaces its AC-0(e).
 - **D0 census** `evt_3ywcecyzbyqkh`. Body 322's six members [S0, S1, S2,
   C0, C1, C2] are planner declarations only on main. The first refusal is
   `reject_carried_residual_arguments`, and it is not a D2 typed fault.
@@ -54,6 +62,10 @@ natively. Any row that stays ignored gets a measured reason in its
     whether it is in the AC-1 admission population. A row outside the
     population stays ignored with that measured reason; it is not a new
     admission.
+  - (e) the C1/C2 operand order: the static three-way check of D1
+    amendment 2 (source truth, planner, emitter, source-to-ABI mapping),
+    before AC-1. All agree continues into AC-1 with a static pin against the
+    source declaration; planner ≠ emitter or source ≠ planner is a STOP.
 - **AC-1 (admission, D1 item 0).**
   - A package is planned only for a pending producer `Match` whose arms
     declare different recursive body units: the population

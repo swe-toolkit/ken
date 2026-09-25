@@ -341,3 +341,158 @@ reports each of the six members' class as measured.
   static frame slots. The only runtime resources are one live slot and one
   generation per selection, both already profiled. **There is no new
   unprofiled resource, hence no STOP.**
+
+## D1 amendment 1 (AC-0 ruling, Architect `evt_54vq22cwfnp9k`, at `5a3f3dad0`)
+
+Recorded verbatim from the Architect's ruling on the
+`RT-SELECTED-PENDING-CALL-BUILD` AC-0 checkpoint `evt_2dkb9zeymy5g0`.
+A1-A4 and AC-0(e) are D1 amendments.
+
+**RT-SELECTED-PENDING-CALL-BUILD AC-0 ruling on base `5a3f3dad0`: no §5 STOP.
+The build proceeds after one measurement, AC-0(e) below, under D1 amendments
+A1-A4.** The measurement is the AC-0 checkpoint `evt_2dkb9zeymy5g0`, and it is
+good work: the S2 finding and the source-machine F4 site are both real.
+
+**§1a for the build chain stays at 0.** AC-0 is a measurement my ruling asked
+for, so it is non-advancing, and there is no inventory row.
+
+### A1. S2 is admitted as a new class (f): an ingress-borrowed pointee.
+
+- **What it is:** host-owned process-input storage that the native harness
+  allocates **before** `ken_activation_v1_begin` and frees only **after**
+  `ken_activation_v1_destroy`.
+- **Measured order** at `object_linker_packaging.rs:2436-2495`: `calloc` of
+  `pool`, then store open, then activation begin, then
+  `bind_process_frame(root)`, then `ken_nc23_entrypoint`. After that come
+  `take_selected_call_failure`, activation finish and destroy, store destroy,
+  and **`free(pool)` last**.
+- **Why this is safe:** every package lives strictly inside the entrypoint's
+  execution, because D1 item 0 refuses the generated root. So the pointee
+  outlives every ticket and every call.
+- **It is not a new resource.** It is existing caller-owned backing, and no
+  D1 allocation is involved.
+- **Condition:** (f) applies only to harness templates whose ingress release
+  follows activation destroy. The build verifies this for **each**
+  generated-root template in `object_linker_packaging.rs` (there are at least
+  two C templates, near `:2121` and `:2270`). A program built for any
+  template that does not satisfy it is refused.
+- **Borrowed loads:** the pointer word is copied, the pointee is never
+  touched before the consume, and the callee alone dereferences it.
+
+### A2. The F4 gate goes at every carried-residual consumer, not only `core.rs::lower_recursor_residual_call`.
+
+- My D1 named one site. The fixture's operative site is
+  `source.rs::source_call_state`'s carried branch (`:4990-5016`), which your
+  backtrace shows is where all four rows refuse.
+- The gate is **one shared helper**. It is called first inside each
+  carried-residual branch whenever a companion is present, before the
+  `recursive_unit_body` check, at every consumer of
+  `reject_carried_residual_arguments`. The doc at `core.rs:3095` names four.
+- Companion-less behavior stays byte-for-byte the same.
+- The source machine carries values as `RoutedAnswer` and in env bindings,
+  which are D1's placements, so the companion rides there. The gate emits
+  into the same function as the arm, `Predeclared(3)`, so the fixture's route
+  has no F5 or F6 crossing.
+
+### A3. Nested arms (px7m dynamic-ok).
+
+- The candidate set is the leaf `ITree::Vis` units across nested producer
+  Matches: worker 369 and nested worker 332.
+- The package is built in the **innermost** selected arm, after every
+  enclosing `brif` edge. It reaches the outer join through each intervening
+  F2 join, with zero-ticket padding on arms that construct no package.
+
+### A4. C0 and the emission-site evidence.
+
+- **C0 is class (a).** Both arms receive the same environment `[Bool, v11,
+  v10]`, as you measured. The claim `CurrentLexical` alias 0 at emission 339
+  therefore resolves to lexical index 0 at the arm, which is `terminal`, the
+  immediate Bool. Resolution works the same way for sibling 343's C0 (D0).
+- **Source-to-environment association is the accepted AC-0 standard** for
+  S0-S2 and C0-C2 on this base. The 322 arm cannot be emitted before the
+  build exists, so materialization belongs to AC-2's positive witness.
+- **The arm-edge dominance in AC-0(b) becomes a build obligation.** A
+  lowering test runs cranelift's dominator tree over the emitted function.
+  It asserts the issue call's block is dominated by the selected arm's entry
+  block (block10 for 322). A mutation that hoists the issue above the `brif`
+  must turn the test red.
+
+### AC-0(e)
+
+Replaced by D1 amendment 2 (AC-0(e) ruling) below.
+
+## D1 amendment 2 (AC-0(e) ruling, Architect `evt_6yjef2cy4nv1e`, at `5a3f3dad0`)
+
+Recorded verbatim from the Architect's ruling on the AC-0(e) measurement
+`evt_7aq38g6trgka1`. It replaces amendment 1's AC-0(e).
+
+**AC-0(e) ruling: the measurement is accepted as a null result. My
+discriminator could not fire, and that error is mine. AC-0(e) is replaced by
+the static three-way check below. AC-1 stays unauthorized until it returns.**
+
+**Why the read test was empty.** The two captures are the parameters `_input`
+and `_caps`. The underscore names mark them as unused. On this fixture a swap
+is therefore semantically invisible. On any program that does read them, the
+callee would receive a wrong-typed value: a heap pointer where it expects a
+`ProgramCaps` handle. I should have checked that the world could produce my
+terminating observation before asking for it. The implementer was right not to
+manufacture a read, and the traversal controls make the zero a real
+measurement.
+
+**The coordinate reading and the alias reading are one reading, not two.** At
+`5a3f3dad0`, `continuations.rs::nearest_exact_alias` (`:4401`) computes the
+alias index **from** the coordinate. It searches the planner's seat
+environment, which `continuation_owner_entry_sources` seeds in ascending
+entry-ABI-position order (`:3094` sort) and then walks forward
+(`current_lexical_availability`, `:4468`). So "C1 is at ABI position 0" and
+"C1 is at lexical index 1" are the planner's single claim that position 0 sits
+at index 1. The real disagreement in AC-0 is between the **planner's** seat
+environment and the **emitter's** actual environment. The emitter applies the
+`converts` reversal: `units.rs::source_body_binding_order` (`:7748`) returns
+true for `CallableDeclaration` and `ClosureBody`, and
+`generated_context_source_environment` then reverses the parameter run.
+
+### Revised AC-0(e): a static three-way check on base `5a3f3dad0`, scratch-only.
+
+Do it for C1 and C2 of body 322, and separately for body 343.
+
+- **(e1) Source truth.** Take the continuation's (origin 11) capture ordinals
+  1 and 2. Report which source parameter each one captures, **by name**, and
+  that name's declaration position in the owner's source signature. Read this
+  from the retained source or elaborated term, not from any planner record.
+- **(e2) Planner.** Report the requested coordinate's `source_abi_position`,
+  the index `nearest_exact_alias` returned, and the planner seat-environment
+  entry at that index.
+- **(e3) Emitter.** At the emission seat (the Match355 arm environment),
+  report the Cranelift value at that lexical index and **the ABI slot it was
+  loaded from**. Read the slot from the load's frame offset against the unit's
+  `AbiSlot` run, **not** from the value's number. That is exactly where the
+  AC-0 labels "v10 = ordinal 0, v11 = ordinal 1" could be wrong.
+- **(e4)** Report the mapping from source parameter declaration position to
+  ABI slot position for the owner (`Predeclared(3)`).
+
+### Outcomes
+
+- **All agree for k = 1, 2** (e1's name → e4's slot = e2's position = e3's
+  loaded slot): proceed into AC-1 with no further review. Build with
+  `assemble_continuation_call_operands` and do not write a second resolution.
+  The pinning test is static. It asserts that 322's C1/C2 operands load from
+  the ABI slot of the **source-named** parameter. It must compare against the
+  source declaration, not against the planner coordinate, because a pin
+  compared with its own source cannot fail.
+- **e2 ≠ e3:** the planner seat environment and the emitter environment
+  disagree for a converting body. That is a pre-existing defect in the landed
+  direct-emission route, including 343's. **STOP**, and it gets its own node.
+- **e1 ≠ e2:** the planner coordinate names the wrong parameter. **STOP**, and
+  it gets its own node.
+
+**Prediction, stated so the check can refute it:** taken at face value, the
+AC-0 numbers already give e2 ≠ e3. C1's coordinate is position 0 and its alias
+index is 1, while the emitter's index 1 holds v11, loaded from ordinal 1.
+**The likely outcome is therefore STOP**, unless e3 shows that the value labels
+were wrong. I have not read `continuation_emission_seat_environment` far enough
+to know whether it applies the reversal. That is part of what e2 reports.
+
+**§1a for the build chain stays at 0.** This is a measurement my ruling asked
+for, returned and re-specified. It does not advance the chain, and there is no
+inventory row.
