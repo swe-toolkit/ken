@@ -1,7 +1,7 @@
 ---
 id: CAT-LOGIC-PRELUDE-MOVE
 title: "Move the prelude's Not and its Dec/Yes/No/decide unit into catalog packages: Not into Core.Logic.Not, and Empty, Dec, Yes, No and decide declared as checked definitions in Core.Logic.EmptyDec, with every consumer importing them and an import-removal control per moved inductive name; first L3 slice of the minimal-prelude program"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: architect
