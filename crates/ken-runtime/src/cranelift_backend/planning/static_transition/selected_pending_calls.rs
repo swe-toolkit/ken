@@ -770,6 +770,35 @@ mod tests {
     // takes a generated call instead of the local consuming edge. These are
     // separate from the generated-root location control above.
     #[test]
+    fn generated_call_crossing_reaches_the_production_route_walker() {
+        let expression = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["x".to_owned()],
+                body: Box::new(RuntimeExpr::Var(0)),
+            }),
+            args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))],
+        };
+        let plan = super::super::plan_static_transition_graph(&expression, &BTreeMap::new())
+            .expect("generated-call route fixture plans");
+        let call = plan.root_static_origin().expect("call root exists");
+        let owner = occurrence_authority(&plan, call)
+            .expect("call owns an occurrence")
+            .owner;
+        assert_eq!(
+            walk_to_gate(
+                &plan,
+                call,
+                owner,
+                PendingPathCounts::START,
+                &mut BTreeSet::new()
+            )
+            .expect_err("F6 call cannot carry the pending package"),
+            PendingRefusal::RouteLeavesDefiningFunction,
+        );
+    }
+
+    #[test]
     fn strict_return_and_generated_call_routes_refuse_before_consumption() {
         let package = route_package();
         let selected = PendingPathCounts::START.read_pending(true).unwrap();
