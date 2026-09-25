@@ -63,7 +63,7 @@ import Data.Numeric.Nat.Order (min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_leq, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
@@ -875,7 +875,7 @@ fn foldl (a : Type) (b : Type) (f : b → a → b) (z : b) (xs : List a) : b =
   }
 ```
 
-### 4.3 CAT-3 D2 — verified `List Bool` insertion sort
+### 4.3 CAT-3 D2 — generic insertion sort and `List Bool` laws
 
 `Perm` is intentionally the package-local count/multiset equality surface —
 an ordinary `Prop`-valued function over an explicit comparator, never a raw
@@ -887,7 +887,9 @@ specialize them to `List Bool` under `bool_leq`, showing the specialized
 `sort_bool` (a direct case-split implementation, not `sort` applied to
 `bool_leq`) is both order-preserving (`sort_bool_sorted`) and a genuine
 permutation of its input (`sort_bool_perm`, via the two count-preservation
-lemmas for `True`/`False`).
+lemmas for `True`/`False`). The generic `insert` preserves every count for
+any comparator, and `sort` preserves counts and is sorted when the comparator
+is total; no transitivity or comparator-indexed equality is required.
 
 ```ken
 pub fn eq_from_ord (a : Type) (le : a → a → Bool) (x : a) (y : a) : Bool =
@@ -920,6 +922,422 @@ fn sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
   match xs {
     Nil ↦ Nil a;
     Cons h t ↦ insert a le h (sort a le t)
+  }
+
+fn derived_sort_head_ordered (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : Prop =
+  match xs {
+    Nil ↦ Top;
+    Cons h t ↦ Equal Bool (le x h) True
+  }
+
+theorem derived_sort_sorted_cons
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : is_sorted a le xs → derived_sort_head_ordered a le x xs → is_sorted a le (Cons a x xs) =
+  match xs {
+    Nil ↦ λsorted_xs. λhead_before. Proved;
+    Cons h t ↦
+      λsorted_xs.
+        λhead_before.
+          and_intro
+            (Equal Bool (le x h) True)
+            (is_sorted a le (Cons a h t))
+            head_before
+            sorted_xs
+  }
+
+theorem derived_sort_sorted_tail
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : is_sorted a le (Cons a x xs) → is_sorted a le xs =
+  match xs {
+    Nil ↦ λsorted_input. Proved;
+    Cons h t ↦
+      λsorted_input.
+        and_snd (Equal Bool (le x h) True) (is_sorted a le (Cons a h t)) sorted_input
+  }
+
+theorem derived_sort_sorted_head
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : is_sorted a le (Cons a x xs) → derived_sort_head_ordered a le x xs =
+  match xs {
+    Nil ↦ λsorted_input. Proved;
+    Cons h t ↦
+      λsorted_input.
+        and_fst (Equal Bool (le x h) True) (is_sorted a le (Cons a h t)) sorted_input
+  }
+
+theorem derived_sort_right_of_left_false
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (x : a)
+      (y : a)
+      (left_false : Equal Bool (le x y) False)
+    : Equal Bool (le y x) True =
+  trans
+    Bool
+    (le y x)
+    (bool_or (le x y) (le y x))
+    True
+    (sym
+      Bool
+      (bool_or (le x y) (le y x))
+      (le y x)
+      (cong Bool Bool (le x y) False (λdecision. bool_or decision (le y x)) left_false))
+    (total x y)
+
+theorem derived_sort_head_after_insert_cons_case
+      (a : Type) (le : a → a → Bool) (h : a) (x : a) (y : a) (ys : List a) (decision : Bool)
+    : Equal Bool (le x y) decision
+      → Equal Bool (le h x) True
+      → derived_sort_head_ordered a le h (Cons a y ys)
+      → derived_sort_head_ordered a le h (insert a le x (Cons a y ys)) =
+  match decision {
+    True ↦
+      λcomparison.
+        λh_before_x.
+          λh_before_y.
+            J
+              (λchoice _.
+                derived_sort_head_ordered
+                  a
+                  le
+                  h
+                  (match choice {
+                    True ↦ Cons a x (Cons a y ys);
+                    False ↦ Cons a y (insert a le x ys)
+                  }))
+              h_before_x
+              (sym Bool (le x y) True comparison);
+    False ↦
+      λcomparison.
+        λh_before_x.
+          λh_before_y.
+            J
+              (λchoice _.
+                derived_sort_head_ordered
+                  a
+                  le
+                  h
+                  (match choice {
+                    True ↦ Cons a x (Cons a y ys);
+                    False ↦ Cons a y (insert a le x ys)
+                  }))
+              h_before_y
+              (sym Bool (le x y) False comparison)
+  }
+
+theorem derived_sort_head_after_insert
+      (a : Type) (le : a → a → Bool) (h : a) (x : a) (xs : List a)
+    : Equal Bool (le h x) True
+      → derived_sort_head_ordered a le h xs
+      → derived_sort_head_ordered a le h (insert a le x xs) =
+  match xs {
+    Nil ↦ λh_before_x. λh_before_xs. h_before_x;
+    Cons y ys ↦
+      λh_before_x.
+        λh_before_y.
+          derived_sort_head_after_insert_cons_case
+            a
+            le
+            h
+            x
+            y
+            ys
+            (le x y)
+            Refl
+            h_before_x
+            h_before_y
+  }
+
+theorem derived_sort_insert_sorted_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (x : a)
+      (h : a)
+      (t : List a)
+      (ih : is_sorted a le t → is_sorted a le (insert a le x t))
+      (decision : Bool)
+    : Equal Bool (le x h) decision
+      → is_sorted a le (Cons a h t)
+      → is_sorted a le (insert a le x (Cons a h t)) =
+  match decision {
+    True ↦
+      λcomparison.
+        λsorted_xs.
+          J
+            (λdecision _.
+              is_sorted
+                a
+                le
+                (match decision {
+                  True ↦ Cons a x (Cons a h t);
+                  False ↦ Cons a h (insert a le x t)
+                }))
+            (derived_sort_sorted_cons a le x (Cons a h t) sorted_xs comparison)
+            (sym Bool (le x h) True comparison);
+    False ↦
+      λcomparison.
+        λsorted_xs.
+          let
+            tail_is_sorted = derived_sort_sorted_tail a le h t sorted_xs;
+            inserted_tail_is_sorted = ih tail_is_sorted;
+            h_before_x = derived_sort_right_of_left_false a le total x h comparison;
+            h_before_tail = derived_sort_sorted_head a le h t sorted_xs;
+            h_before_inserted_tail =
+              derived_sort_head_after_insert a le h x t h_before_x h_before_tail;
+            branch_is_sorted =
+              derived_sort_sorted_cons
+                a
+                le
+                h
+                (insert a le x t)
+                inserted_tail_is_sorted
+                h_before_inserted_tail
+          in
+            J
+              (λdecision _.
+                is_sorted
+                  a
+                  le
+                  (match decision {
+                    True ↦ Cons a x (Cons a h t);
+                    False ↦ Cons a h (insert a le x t)
+                  }))
+              branch_is_sorted
+              (sym Bool (le x h) False comparison)
+  }
+
+proof sorted for insert
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (x : a)
+      (xs : List a)
+    : is_sorted a le xs → is_sorted a le (insert a le x xs) =
+  match xs {
+    Nil ↦ λsorted_xs. Proved;
+    Cons h t ↦
+      derived_sort_insert_sorted_cons_case
+        a
+        le
+        total
+        x
+        h
+        t
+        (insert::sorted a le total x t)
+        (le x h)
+        Refl
+  }
+
+proof sorted for sort
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (xs : List a)
+    : is_sorted a le (sort a le xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦ insert::sorted a le total h (sort a le t) (sort::sorted a le total t)
+  }
+
+theorem derived_sort_count_cons_cong
+      (a : Type)
+      (eqf : a → a → Bool)
+      (q : a)
+      (h : a)
+      (xs : List a)
+      (ys : List a)
+      (counts_equal : Equal Nat (count a eqf q xs) (count a eqf q ys))
+    : Equal Nat (count a eqf q (Cons a h xs)) (count a eqf q (Cons a h ys)) =
+  match eqf q h eqn : occurrence {
+    True ↦
+      J
+        (λdecision _.
+          Equal
+            Nat
+            (match decision {
+              True ↦ Suc (count a eqf q xs);
+              False ↦ count a eqf q xs
+            })
+            (match decision {
+              True ↦ Suc (count a eqf q ys);
+              False ↦ count a eqf q ys
+            }))
+        (cong Nat Nat (count a eqf q xs) (count a eqf q ys) Suc counts_equal)
+        (sym Bool (eqf q h) True occurrence);
+    False ↦
+      J
+        (λdecision _.
+          Equal
+            Nat
+            (match decision {
+              True ↦ Suc (count a eqf q xs);
+              False ↦ count a eqf q xs
+            })
+            (match decision {
+              True ↦ Suc (count a eqf q ys);
+              False ↦ count a eqf q ys
+            }))
+        counts_equal
+        (sym Bool (eqf q h) False occurrence)
+  }
+
+fn derived_sort_count_after_two
+      (tail_count : Nat) (first_occurs : Bool) (second_occurs : Bool)
+    : Nat =
+  match first_occurs {
+    True ↦
+      Suc
+        (match second_occurs {
+          True ↦ Suc tail_count;
+          False ↦ tail_count
+        });
+    False ↦
+      match second_occurs {
+        True ↦ Suc tail_count;
+        False ↦ tail_count
+      }
+  }
+
+theorem derived_sort_count_swap_decisions
+      (tail_count : Nat) (x_occurs : Bool) (y_occurs : Bool)
+    : Equal Nat
+        (derived_sort_count_after_two tail_count x_occurs y_occurs)
+        (derived_sort_count_after_two tail_count y_occurs x_occurs) =
+  match x_occurs {
+    True ↦
+      match y_occurs {
+        True ↦ Refl;
+        False ↦ Refl
+      };
+    False ↦
+      match y_occurs {
+        True ↦ Refl;
+        False ↦ Refl
+      }
+  }
+
+theorem derived_sort_count_cons_swap
+      (a : Type) (eqf : a → a → Bool) (q : a) (x : a) (y : a) (xs : List a)
+    : Equal Nat
+        (count a eqf q (Cons a x (Cons a y xs)))
+        (count a eqf q (Cons a y (Cons a x xs))) =
+  derived_sort_count_swap_decisions (count a eqf q xs) (eqf q x) (eqf q y)
+
+theorem derived_sort_insert_count_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (eqf : a → a → Bool)
+      (q : a)
+      (ih : Equal Nat (count a eqf q (Cons a x t)) (count a eqf q (insert a le x t)))
+      (decision : Bool)
+    : Equal Bool (le x h) decision
+      → Equal Nat
+        (count a eqf q (Cons a x (Cons a h t)))
+        (count a eqf q (insert a le x (Cons a h t))) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λdecision _.
+            Equal
+              Nat
+              (count a eqf q (Cons a x (Cons a h t)))
+              (count
+                a
+                eqf
+                q
+                (match decision {
+                  True ↦ Cons a x (Cons a h t);
+                  False ↦ Cons a h (insert a le x t)
+                })))
+          Refl
+          (sym Bool (le x h) True comparison);
+    False ↦
+      λcomparison.
+        let
+          swapped_count = derived_sort_count_cons_swap a eqf q x h t;
+          recursive_count = ih;
+          inserted_count =
+            derived_sort_count_cons_cong
+              a
+              eqf
+              q
+              h
+              (Cons a x t)
+              (insert a le x t)
+              recursive_count;
+          branch_count =
+            trans
+              Nat
+              (count a eqf q (Cons a x (Cons a h t)))
+              (count a eqf q (Cons a h (Cons a x t)))
+              (count a eqf q (Cons a h (insert a le x t)))
+              swapped_count
+              inserted_count
+        in
+          J
+            (λdecision _.
+              Equal
+                Nat
+                (count a eqf q (Cons a x (Cons a h t)))
+                (count
+                  a
+                  eqf
+                  q
+                  (match decision {
+                    True ↦ Cons a x (Cons a h t);
+                    False ↦ Cons a h (insert a le x t)
+                  })))
+            branch_count
+            (sym Bool (le x h) False comparison)
+  }
+
+proof count for insert
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a) (eqf : a → a → Bool) (q : a)
+    : Equal Nat (count a eqf q (Cons a x xs)) (count a eqf q (insert a le x xs)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      derived_sort_insert_count_cons_case
+        a
+        le
+        x
+        h
+        t
+        eqf
+        q
+        (insert::count a le x t eqf q)
+        (le x h)
+        Refl
+  }
+
+proof perm for sort
+      (a : Type) (le : a → a → Bool) (xs : List a) (eqf : a → a → Bool)
+    : Perm a eqf xs (sort a le xs) =
+  match xs {
+    Nil ↦ λq. Proved;
+    Cons h t ↦
+      λq.
+        let
+          original_count = count a eqf q (Cons a h t);
+          tail_sorted_count = count a eqf q (Cons a h (sort a le t));
+          final_count = count a eqf q (insert a le h (sort a le t));
+          tail_counts_equal =
+            derived_sort_count_cons_cong a eqf q h t (sort a le t) (sort::perm a le t eqf q);
+          insertion_counts_equal = insert::count a le h (sort a le t) eqf q
+        in
+          trans
+            Nat
+            original_count
+            tail_sorted_count
+            final_count
+            tail_counts_equal
+            insertion_counts_equal
   }
 
 fn bool_head_leq (x : Bool) (xs : List Bool) : Prop =
@@ -1448,6 +1866,9 @@ reference implementation.
    `StringBijection`'s `string_to_list_char_retraction`. The private
    `concat_map_append` proof uses structural induction and the checked
    `list_append::assoc`, `cong`, `sym`, and `trans` proofs, not these axioms.
+   The generic sort proofs consume an explicit totality premise only for
+   sortedness; they neither add an axiom nor invoke the inherited `Ord Int`
+   assumptions.
 6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
    lifting the tail IH under the head constructor; private `mem_filter`
    and `mem_filter_sound` split named predicate/comparator outcomes and use
@@ -1456,9 +1877,13 @@ reference implementation.
    `list_append` and uses
    `list_append::assoc` in reverse. The `nth` bounds proofs split the list
    before the index so lookup, length, and order reduce together. `§4.3`:
-   full case-split specialized to `List Bool`/`bool_leq`,
-   closing by `Proved`/`Refl`/`cong`/`trans`/`sym` per branch — no postulate
-   anywhere in the verified-sort slice. `§4.4`: every law field closes by
+   generic `insert::count` preserves every count with any comparator and
+   `sort::perm` composes the tail and insertion equalities. The generic
+   `insert::sorted` and `sort::sorted` use only comparator totality; private
+   decision-variable helpers rewrite applied comparator branches without
+   relying on a proof-side match to refine the goal. The separate `List Bool`
+   proofs case-split under `bool_leq`, closing by `Proved`/`Refl`/`cong`/
+   `trans`/`sym`. `§4.4`: every law field closes by
    `Refl` (each concrete operation reduces definitionally once applied, no
    case-split needed).
 7. **Consumers.** `catalog/packages/Data/Collections/Map.ken` (the proved
@@ -1476,6 +1901,9 @@ reference implementation.
    `crates/ken-elaborator/tests/cat_derived_filter_membership_law.rs` —
    pins both private checked contracts to the installed prelude `filter`
    and distinguishes incompatible from compatible concrete equations.
+   `crates/ken-elaborator/tests/cat_derived_sort_laws.rs` — pins four
+   attached private raw contracts to Derived's own `insert`/`sort`, checks
+   generic consumers and a total versus non-total comparator on one fixture.
    `crates/ken-elaborator/tests/cat3_collections_package.rs` — confirms the
    CAT-3 D1/D2/D3 surface elaborates with zero `trusted_base()` delta, that
    every law is proof-returning (not a bare `Prop` wrapper) and postulates
