@@ -58,8 +58,8 @@ fn decide (P : Omega) (d : Dec P) : Bool =
 export Empty, Dec, Yes, No, decide
 ```
 
-The general Type-sorted eliminator for `Empty` — an uninhabited type
-eliminates into anything — is deliberately not named `absurd`: that
+The general Type-sorted eliminator for this catalog `Empty` — an uninhabited
+type eliminates into anything — is deliberately not named `absurd`: that
 identifier is reserved checked-mode surface sugar for `Ω`-classified
 `Bottom`-elimination. A declaration named `absurd` is rejected, so
 `absurd_empty` is the clear, reachable name this entry uses instead:
@@ -72,10 +72,10 @@ import Core.Logic.Transport (sym, trans)
 fn absurd_empty (C : Type) (e : Empty) : C = match e {}
 ```
 
-`Yes`/`No` already work directly as constructors; the lowercase `yes`/`no`
-pair below is a purely ergonomic smart-constructor wrapper that reads
-better at call sites and mirrors `yes`/`no` on the referenced Lean/Agda
-`Decidable`/`Dec`:
+`Yes`/`No` already work directly as this catalog `Dec`'s constructors; the
+lowercase `yes`/`no` pair below is a purely ergonomic smart-constructor wrapper
+that reads better at call sites and mirrors `yes`/`no` on the referenced
+Lean/Agda `Decidable`/`Dec`:
 
 ```ken
 fn yes (prp : Ω) (p : prp) : Dec prp = Yes prp p
@@ -97,7 +97,8 @@ propositional equality. In the `True` branch, the retained equation has type
 `d.complete x y pxy : IsTrue (d.eq x y) = Equal Bool (d.eq x y) True`.
 Combining that result with the retained branch equation via `sym`/`trans` gives
 `Equal Bool False True`, which reduces to `Bottom`. The `absurd` sugar then
-discharges it into `Empty` directly; this bridge is `Ω → Type`, not `Empty → C`:
+discharges it into this catalog `Empty` directly; this bridge is `Ω → Type`,
+not `Empty → C`:
 
 ```ken
 fn dec_eq_decides (a : Type) (d : DecEq a) (x : a) (y : a) : Dec (Equal a x y) =
@@ -139,8 +140,8 @@ const true_is_true_tag : Bool = decide (Equal Bool True True) true_is_true
 const true_is_not_false_tag : Bool = decide (Equal Bool True False) true_is_not_false
 ```
 
-`yes`/`no` construct `Dec` values directly when you already have the proof
-or refutation in hand — no `DecEq` needed:
+`yes`/`no` construct this catalog `Dec` directly when you already have the
+proof or refutation in hand — no `DecEq` needed:
 
 ```ken example
 const any_proof_decides : Dec (Equal Bool True True) = yes (Equal Bool True True) Proved
@@ -151,8 +152,8 @@ const refutation_decides : Dec (Equal Bool True False) =
   no (Equal Bool True False) refute_true_false
 ```
 
-`absurd_empty` — an inhabitant of `Empty`, however obtained, discharges ANY
-goal:
+`absurd_empty` eliminates an inhabitant of this catalog `Empty`, however
+obtained, into any Type-sorted goal:
 
 ```ken example
 fn contradiction_implies_anything (e : Empty) : Bool = absurd_empty Bool e
