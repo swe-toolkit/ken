@@ -235,6 +235,7 @@ pub fn empty_prelude_env() -> PreludeEnv {
         prod_id: z,
         mkprod_id: z,
         equal_id: z,
+        empty_id: z,
         and_id: z,
         issorted_id: z,
         perm_id: z,
@@ -350,6 +351,10 @@ pub struct PreludeEnv {
     // Ω connectives / predicates (postulates, applied form).
     /// `Equal : Π(A:Type). A → A → Ω` — propositional equality (the `≡`).
     pub equal_id: GlobalId,
+    /// The compiler-internal empty family installed before source elaboration.
+    /// Space desugaring uses this exact identity even when source declares a
+    /// different `Empty` or removes its initial spelling from `globals`.
+    pub empty_id: GlobalId,
     /// `And : Ω → Ω → Ω` — conjunction (the `∧`).
     pub and_id: GlobalId,
     /// `is_sorted : Π(A:Type). List A → Ω`.
@@ -3057,6 +3062,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         prod_id,
         mkprod_id,
         equal_id,
+        empty_id,
         and_id,
         issorted_id,
         perm_id,

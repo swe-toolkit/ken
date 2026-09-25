@@ -13447,10 +13447,7 @@ pub(crate) fn elaborate_space_decl(
         .insert(space.name.clone(), initial_id);
 
     let prelude = elab.prelude_env.clone();
-    let empty_id = *elab.globals.get("Empty").ok_or_else(|| {
-        ElabError::Internal("space desugaring requires the prelude Empty type".to_string())
-    })?;
-    let empty_type = Term::indformer(empty_id, vec![]);
+    let empty_type = Term::indformer(prelude.empty_id, vec![]);
     let unit_type = Term::indformer(prelude.unit_id, vec![]);
     let resp_empty = Term::lam(empty_type.clone(), unit_type.clone());
 

@@ -11,6 +11,8 @@ use ken_kernel::{declare_primitive, Decl, GlobalId, PrimReduction, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
+// The original ten types remain the signature/internal-provision witnesses.
+// LANG-PRELUDE-FLOOR-FIFTEEN adds the five separately kernel-keyed members.
 const LANDED_FLOOR_NAMES: [&str; 10] = [
     "Auth",
     "Bool",
@@ -345,6 +347,8 @@ fn primitive_signature_inventory_is_executable_and_closed() {
     let mut observed_plus_internal_provision = observed.clone();
     assert!(observed_plus_internal_provision.insert(env.globals["Nat"]));
     assert!(observed_plus_internal_provision.insert(env.globals["Pair"]));
+    observed_plus_internal_provision
+        .extend(["Bottom", "Equal", "Prop", "Proved", "Top"].map(|name| env.globals[name]));
     assert_eq!(configured, observed_plus_internal_provision);
     assert!(!configured.contains(&env.globals["Prod"]));
 
@@ -378,16 +382,15 @@ fn primitive_signature_inventory_is_executable_and_closed() {
 /// **MEASURED:** each per-family fixture elaborates through strict roots, its
 /// checked type/body mentions the pre-existing family and constructor ids, and
 /// only the fixture's one witness declaration is allocated. **CLAIMED:** the
-/// ten-name type floor reuses canonical identities and is constructor-parent
+/// original ten type families reuse canonical identities and are constructor-parent
 /// closed with zero trust growth. **THE GAP:** this checks the current closed
 /// inventory; the producer-derived signature equality above guards why eight
 /// members belong.
 #[test]
-fn strict_roots_accept_all_ten_canonical_families_and_constructors() {
-    assert_eq!(
-        PRELUDE_FLOOR_NAMES.as_slice(),
-        LANDED_FLOOR_NAMES.as_slice()
-    );
+fn strict_roots_accept_original_ten_canonical_families_and_constructors() {
+    for name in LANDED_FLOOR_NAMES {
+        assert!(PRELUDE_FLOOR_NAMES.contains(&name));
+    }
 
     for case in &FLOOR_CASES {
         let root = FixtureRoot::new(case.name);

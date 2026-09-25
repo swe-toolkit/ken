@@ -271,13 +271,18 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
         [
             "Auth",
             "Bool",
+            "Bottom",
             "Char",
+            "Equal",
             "List",
             "Nat",
             "Option",
             "Pair",
+            "Prop",
+            "Proved",
             "ResourceKind",
             "Result",
+            "Top",
             "Utf8Error",
         ]
         .as_slice()
@@ -286,7 +291,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
         assert!(is_prelude_floor_name(name));
     }
     for name in [
-        "True", "Int", "Ordering", "Equal", "Prod", "mk_pair", "pair_fst", "pair_snd",
+        "True", "Int", "Ordering", "And", "Prod", "mk_pair", "pair_fst", "pair_snd",
     ] {
         assert!(!is_prelude_floor_name(name));
     }
@@ -362,17 +367,14 @@ fn ambient_dependencies(root: &Path, entry: &str) -> Result<Vec<String>, String>
 }
 
 fn expected_vector_strict_floor_names() -> Vec<String> {
-    ["Equal", "Proved"]
-        .into_iter()
-        .map(str::to_string)
-        .collect()
+    vec![]
 }
 
 /// Promise class: transition sentinel for Vector's amended provider imports.
 /// Retire or rebaseline when a separately authorized Vector provider changes.
-/// MEASURED: strict roots loading of only the real Vector module consumes the
-/// stated compiler conveniences after its checked provider closure is loaded.
-/// CLAIMED: the corpus census's Vector row reflects the current loader path.
+/// MEASURED: strict roots loading of the real Vector module consumes no
+/// ambient conveniences after its checked provider closure and fifteen-member
+/// floor load. CLAIMED: Vector enters the census's clean partition.
 /// THE GAP: this is one row, not a substitute for the full-corpus census in CI.
 #[test]
 fn vector_strict_floor_provider_transition_sentinel() {
@@ -385,7 +387,7 @@ fn vector_strict_floor_provider_transition_sentinel() {
 }
 
 /// Transition sentinel for catalog migration: this is a behavioral census,
-/// not a source-text census. The ten-type floor intentionally removes its
+/// not a source-text census. The fifteen-type floor intentionally removes its
 /// families and constructors from these residual dependency vectors; every
 /// remaining name still requires an explicit provider migration.
 #[test]
@@ -417,49 +419,25 @@ fn catalog_ambient_passthrough_migration_census() {
     let expected = vec![
         (
             "Algorithm.Numeric.Gcd".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // With its own Dec-family imports, this package now reaches the
             // strict-floor census. Its conjunction names remain prelude-bound
             // until the separate collections slice moves And and is_sorted.
             "Algorithm.Searching.OrderedSearch".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Algorithm.Sorting.InsertionSort".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -482,11 +460,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Application.CommandLine.ArgParse".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -511,15 +484,10 @@ fn catalog_ambient_passthrough_migration_census() {
             "Application.Configuration.Decoder".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
                 "MkProcessInput",
                 "MkProd",
                 "ProcessInput",
                 "Prod",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -542,11 +510,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Application.Input.Schema".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -570,20 +533,10 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Capability.Diagnostics.Core".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Diagnostics.Render now declares its exact Diagnostics.Core and
@@ -593,11 +546,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.Diagnostics.Render".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -658,11 +606,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.Filesystem.Path.Posix".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -684,11 +627,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.Formatting.Doc".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -711,11 +649,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.Parsing.Cursor".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -737,11 +670,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.Parsing.Decoder".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -761,21 +689,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // Transport dependencies. Its ordinary package boundary loads
             // while strict mode retains compiler conveniences.
             "Capability.Parsing.Numeric".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Parsing.Parsing now declares its exact Diagnostics.Core,
@@ -785,11 +702,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.Parsing.Parsing".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -812,13 +724,8 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.Process.Arguments".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
                 "MkProcessInput",
                 "ProcessInput",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -835,7 +742,7 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Capability.Process.Environment".to_string(),
-            ["Equal", "MkProcessInput", "ProcessInput", "Prod"]
+            ["MkProcessInput", "ProcessInput", "Prod"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -849,7 +756,7 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Capability.Process.WorkingDirectory".to_string(),
-            ["Equal", "MkProcessInput", "ProcessInput"]
+            ["MkProcessInput", "ProcessInput"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -859,7 +766,6 @@ fn catalog_ambient_passthrough_migration_census() {
             [
                 "BufferSpan",
                 "BufferWindow",
-                "Equal",
                 "MkBufferWindow",
                 "TransferCount",
                 "buffer_nat_add",
@@ -884,7 +790,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.System.IO".to_string(),
             [
                 "BufferSpan",
-                "Equal",
                 "ResourceError",
                 "TransferCount",
                 "Unit",
@@ -933,11 +838,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Core.Classes.EffectfulClasses".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -954,19 +854,10 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Core.Classes.LawfulClasses".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Migrated to declared imports by CAT-LAWFULFUNCTORS-STANDALONE-IMPORT
@@ -976,11 +867,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Core.Classes.LawfulFunctors".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -999,97 +885,50 @@ fn catalog_ambient_passthrough_migration_census() {
             // Membership explicitly imports IsTrue and contributes no ambient
             // name beyond its LawfulClasses provider's existing residual.
             "Core.Classes.Membership".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Core.Logic.Compare".to_string(),
-            ["And", "Equal", "Proved", "and_intro"]
+            ["And", "and_intro"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
         ),
         (
             "Core.Logic.EmptyDec".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        ),
-        (
-            // This new proposition provider still uses the existing ambient
-            // Bottom name until the later floor change admits it.
-            "Core.Logic.Not".to_string(),
-            ["Bottom"].into_iter().map(str::to_string).collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // The operator facade this WP adds. It declares the standard
             // operator bindings and inherits its ambient set from the
             // conjunction vocabulary those bindings are checked against.
             "Core.Operators.Standard".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // The historical package now imports the canonical class owner and
             // declares no local instance. Its remaining convenience set is
             // inherited from that provider's checked proof vocabulary.
             "Data.Binary.BytesKeys".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // AC-5: Derived closure set plus charToInt, this package's own provider-less builtin use.
             "Data.Binary.BytesPrimitiveContracts".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1109,11 +948,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Collections.Deque".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1133,11 +967,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Collections.Derived".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1156,12 +985,7 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Collections.Map".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
                 "MkUnit",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1183,11 +1007,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Collections.NonEmpty".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1210,11 +1029,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Collections.PriorityQueue".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1230,27 +1044,11 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            "Data.Numeric.Nat.Arithmetic".to_string(),
-            ["Equal", "Proved"]
+            "Data.Numeric.Nat.Order".to_string(),
+            ["And", "and_fst", "and_intro", "and_snd"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
-        ),
-        (
-            "Data.Numeric.Nat.Order".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
         ),
         (
             // Json now declares its exact Derived and Cursor dependencies. Its
@@ -1259,11 +1057,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Serialization.Json".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1277,13 +1070,6 @@ fn catalog_ambient_passthrough_migration_census() {
             .into_iter()
             .map(str::to_string)
             .collect(),
-        ),
-        (
-            "Data.Sums.Combinators".to_string(),
-            ["Equal", "Proved"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
         ),
         (
             // Validation now declares its EffectfulClasses, LawfulFunctors,
@@ -1292,11 +1078,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Sums.Validation".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1310,57 +1091,22 @@ fn catalog_ambient_passthrough_migration_census() {
             .into_iter()
             .map(str::to_string)
             .collect(),
-        ),
-        (
-            // Codec now declares its exact Transport dependency. Its ordinary
-            // package boundary loads, while strict mode still records the
-            // compiler-convenience `Equal` alias outside the formal floor.
-            "Data.Text.Codec".to_string(),
-            ["Equal"].into_iter().map(str::to_string).collect(),
-        ),
-        (
-            // Migrated to declared Transport imports by
-            // CAT-MIGRATE-TIER-B-PROVIDERS. The module now loads at its strict
-            // package boundary and retains only the compiler-convenience
-            // `Equal` alias outside the formal floor.
-            "Data.Text.StringBijection".to_string(),
-            ["Equal"].into_iter().map(str::to_string).collect(),
         ),
         (
             // Equality and order moved to their canonical class owner. The
             // historical package imports that owner and adds no local instance;
             // this is the provider's remaining checked proof vocabulary.
             "Data.Text.StringKeys".to_string(),
-            [
-                "And",
-                "Bottom",
-                "Equal",
-                "Prop",
-                "Proved",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        ),
-        (
-            // Vector imports Combinators.idf and Transport.cong;
-            // strict mode still records the providers' compiler conveniences.
-            "Data.Vector.Vector".to_string(),
-            expected_vector_strict_floor_names(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Tooling.Testing.Property".to_string(),
             [
                 "And",
-                "Bottom",
-                "Equal",
                 "MkUnit",
-                "Prop",
-                "Proved",
-                "Top",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1374,13 +1120,6 @@ fn catalog_ambient_passthrough_migration_census() {
             .into_iter()
             .map(str::to_string)
             .collect(),
-        ),
-        (
-            "Tooling.Verification.FoKripke".to_string(),
-            ["Bottom", "Equal", "Proved", "Top"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
         ),
     ];
     assert_eq!(
@@ -1399,6 +1138,13 @@ fn catalog_ambient_passthrough_migration_census() {
         .collect::<BTreeSet<_>>();
     let expected_clean = [
         "Core.Function.Combinators",
+        "Core.Logic.Not",
+        "Data.Numeric.Nat.Arithmetic",
+        "Data.Sums.Combinators",
+        "Data.Text.Codec",
+        "Data.Text.StringBijection",
+        "Data.Vector.Vector",
+        "Tooling.Verification.FoKripke",
         "Core.Logic.Or",
         "Core.Logic.OrdResult",
         "Core.Logic.Transport",
