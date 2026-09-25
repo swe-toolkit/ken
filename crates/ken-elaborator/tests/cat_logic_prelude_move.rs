@@ -83,7 +83,9 @@ impl Drop for Fixture {
     }
 }
 
-/// Promise class: durable invariant. MEASURED: one roots-loaded consumer
+/// Promise class: transition sentinel. Retire or rebaseline at the L2-4 flip,
+/// when omission yields UnboundName instead of a fall-through TypeMismatch.
+/// MEASURED: one roots-loaded consumer
 /// using catalog Empty/Dec/Yes/No/decide checks, but omitting each inductive
 /// import individually reaches a kernel TypeMismatch. CLAIMED: the imported
 /// family, constructors and refutation target share one checked identity,
@@ -119,7 +121,9 @@ fn decision_family_imports_select_one_catalog_identity() {
     }
 }
 
-/// Promise class: durable invariant. MEASURED: the real OrderedSearch module
+/// Promise class: transition sentinel. Retire or rebaseline at the L2-4 flip,
+/// when omission yields UnboundName instead of a fall-through TypeMismatch.
+/// MEASURED: the real OrderedSearch module
 /// checks when all four catalog names are imported; changing only its import
 /// list by deleting one name reaches a kernel TypeMismatch in each arm.
 /// CLAIMED: its search uses one catalog decision family rather than silently
