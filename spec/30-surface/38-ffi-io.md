@@ -430,10 +430,12 @@ ResourceKindMismatch {
 under its own surface constructor and canonical wire discriminator. It is not
 `MalformedResource`: the token is valid and live, but belongs to the other
 kind. A buffer passed to an Fs-handle-only operation reports
-`{ expected: FsHandle, actual: Buffer }`; a file handle passed to a
-buffer-only operation reports the reversed payload. Valid same-kind controls
-succeed. These two rejecting directions and the two accepting controls are one
-non-degenerate conformance unit.
+`{ expected: FsHandle, actual: Buffer }`; those fields are frozen
+`ResourceKindV1` wire tags, not bare Ken constructor spellings. Ken source
+uses `ResourceKind.FsHandle` and `ResourceKind.Buffer`. A file handle passed
+to a buffer-only operation reports the reversed payload. Valid same-kind
+controls succeed. These two rejecting directions and the two accepting
+controls are one non-degenerate conformance unit.
 
 #### 1.7.1 Buffer views and positioned single transfers
 
@@ -763,9 +765,10 @@ what keeps raw pointers out of application Ken
 The closed Ken resource-kind inventory becomes
 `ResourceKind.FsHandle | ResourceKind.Buffer | ResourceKind.Mapping`. A
 wrong-kind live token reports `ResourceKindMismatch` (`§1.7`) with the `Mapping`
-identity in the offending position, under the same non-degenerate accept/reject
-discipline (a mapping token to a buffer- or file-only operation, and the
-reverse, reject; same-kind controls succeed).
+wire tag (Ken's `ResourceKind.Mapping` constructor) in the offending
+position, under the same non-degenerate accept/reject discipline (a mapping
+token to a buffer- or file-only operation, and the reverse, reject;
+same-kind controls succeed).
 
 **Acquisition and lifetime.** An opaque, constructor-private `MappingHandle` is
 acquired **only** through the public `withMapping` bracket — its sole producer —
