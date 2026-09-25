@@ -8,6 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::{
     RuntimeArtifactIdentity, RuntimeDeclaration, RuntimeDeclarationKind, RuntimeEffectBoundary,
@@ -1456,7 +1457,9 @@ impl<'a> RuntimeIrEvaluatorState<'a> {
             RuntimeValue::Bool(value) => Ok(EvaluatedValue::Bool(*value)),
             RuntimeValue::Int(value) => Ok(EvaluatedValue::Int(value.clone())),
             RuntimeValue::Bytes(value) => Ok(EvaluatedValue::Bytes(value.clone())),
-            RuntimeValue::String(value) => Ok(EvaluatedValue::String(value.clone())),
+            RuntimeValue::String(value) => {
+                Ok(EvaluatedValue::String(value.chars().nfc().collect()))
+            }
             RuntimeValue::Constructor { constructor, args } => Ok(EvaluatedValue::Constructor {
                 constructor: constructor.clone(),
                 args: args
@@ -1569,7 +1572,9 @@ impl<'a> RuntimeIrEvaluatorState<'a> {
             RuntimeGroundValue::Bool(value) => Ok(EvaluatedValue::Bool(*value)),
             RuntimeGroundValue::Int(value) => Ok(EvaluatedValue::Int(value.clone())),
             RuntimeGroundValue::Bytes(value) => Ok(EvaluatedValue::Bytes(value.clone())),
-            RuntimeGroundValue::String(value) => Ok(EvaluatedValue::String(value.clone())),
+            RuntimeGroundValue::String(value) => {
+                Ok(EvaluatedValue::String(value.chars().nfc().collect()))
+            }
             RuntimeGroundValue::Constructor { constructor, args } => {
                 Ok(EvaluatedValue::Constructor {
                     constructor: constructor.clone(),
@@ -1657,6 +1662,7 @@ impl<'a> RuntimeIrEvaluatorState<'a> {
             "bytes_concat" => eval_bytes_concat(&primitive.symbol, args),
             "bytes_encode" => eval_bytes_encode(&primitive.symbol, args),
             "bytes_decode" => eval_bytes_decode(&primitive.symbol, args, &primitive.partiality),
+            "list_char_to_string" => eval_list_char_to_string(&primitive.symbol, args),
             "byte_length" => eval_string_byte_length(&primitive.symbol, args),
             "char_length" => eval_string_char_length(&primitive.symbol, args),
             other => Err(eval_unsupported(
@@ -1816,7 +1822,7 @@ fn eval_bytes_decode(
     Ok(RuntimeIrOutcome::Value(match String::from_utf8(bytes) {
         Ok(value) => EvaluatedValue::Constructor {
             constructor: ok.clone(),
-            args: vec![EvaluatedValue::String(value)],
+            args: vec![EvaluatedValue::String(value.chars().nfc().collect())],
         },
         Err(_) => EvaluatedValue::Constructor {
             constructor: err.clone(),
@@ -1826,6 +1832,41 @@ fn eval_bytes_decode(
             }],
         },
     }))
+}
+
+fn eval_list_char_to_string(
+    symbol: &str,
+    args: Vec<EvaluatedValue>,
+) -> Result<RuntimeIrOutcome, RuntimeIrEvaluationError> {
+    let [list]: [EvaluatedValue; 1] = args
+        .try_into()
+        .map_err(|args: Vec<_>| wrong_arity(symbol, 1, args.len()))?;
+    let mut text = String::new();
+    let mut cursor = &list;
+    loop {
+        let EvaluatedValue::Constructor { constructor, args } = cursor else {
+            return Err(wrong_type(symbol, "a closed List Char"));
+        };
+        if constructor.ends_with("::Nil") && args.is_empty() {
+            break;
+        }
+        if !constructor.ends_with("::Cons") || args.len() != 2 {
+            return Err(wrong_type(symbol, "a closed List Char"));
+        }
+        let EvaluatedValue::Int(head) = &args[0] else {
+            return Err(wrong_type(symbol, "a List Char scalar head"));
+        };
+        let scalar = head
+            .checked_to_u64()
+            .and_then(|value| u32::try_from(value).ok())
+            .and_then(char::from_u32)
+            .ok_or_else(|| wrong_type(symbol, "a Unicode scalar Char head"))?;
+        text.push(scalar);
+        cursor = &args[1];
+    }
+    Ok(RuntimeIrOutcome::Value(EvaluatedValue::String(
+        text.chars().nfc().collect(),
+    )))
 }
 
 fn eval_string_byte_length(
