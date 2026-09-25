@@ -1,18 +1,22 @@
 ---
 id: RT-SELECTED-PENDING-CALL-BUILD
 title: "Build the selected pending-call package designed in RT-SELECTED-PENDING-CALL-PACKAGE D1: a companion package beside the pending ITree word, built in the executed arm from its own ordered S/C members, carried through the six transport families to D2's one-event consuming gate, so the px7l/px7m rows can lower natively; first checkpoint measures backing classes, arm-edge dominance and traversed families before the build proceeds"
-status: active
+status: draft
 owner: runtime
 size: L
 gate: architect
 tier: T1
-depends_on: [RT-SELECTED-PENDING-CALL-PACKAGE]
+depends_on: [RT-SELECTED-PENDING-CALL-PACKAGE, RT-PLANNER-SEED-BINDING-ORDER]
 blocks: []
 github: null
 origin: "RT-SELECTED-PENDING-CALL-PACKAGE AC-3: Architect D1 disposition 'REPRESENTABLE D1, no §5 STOP' (evt_3y5xkyf1v02dj) on main 1303e5cd4 and D0 evt_3ywcecyzbyqkh; runtime-leader request evt_2vx0eh0v312rb. Serves the L1 objective under operator 2026-09-23 'concur with rec on L1 carrier'. Steward-filed per COORDINATION section 2."
 ---
 
 # Build the selected pending-call package
+
+**Status: parked at AC-0 on `RT-PLANNER-SEED-BINDING-ORDER`**, under
+`evt_6yjef2cy4nv1e`'s e2 ≠ e3 outcome (Architect `evt_2eqe033bxff6f`). On
+resume, rebase onto it and re-run AC-0(e).
 
 ## Settled inputs -- at `1303e5cd4`
 
