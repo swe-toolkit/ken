@@ -32,6 +32,27 @@
 
 use super::*;
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug)]
+pub(in crate::cranelift_backend) struct RtSeedCaptureWord {
+    pub(in crate::cranelift_backend) worker_body_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) source_owner: PredeclaredFunctionId,
+    pub(in crate::cranelift_backend) ordinal: u32,
+    pub(in crate::cranelift_backend) word: cranelift_codegen::ir::Value,
+}
+
+#[cfg(test)]
+thread_local! {
+    static RT_SEED_CAPTURE_WORDS: std::cell::RefCell<Vec<RtSeedCaptureWord>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn rt_seed_capture_words_take()
+-> Vec<RtSeedCaptureWord> {
+    RT_SEED_CAPTURE_WORDS.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
 #[cfg(any(test, feature = "px8-ds-test-support"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum TrapCallerProtocolMutation {
@@ -1154,6 +1175,16 @@ impl<'a> Lowering<'a> {
                         )
                     })?
                     .clone();
+                #[cfg(test)]
+                if let (ContinuationSourceCoordinate::EntryAbi { source_owner, .. },
+                    LoweringOperand::Carried(word)) = (capture.coordinate, &operand) {
+                    RT_SEED_CAPTURE_WORDS.with(|cell| cell.borrow_mut().push(RtSeedCaptureWord {
+                        worker_body_origin: body_origin,
+                        source_owner,
+                        ordinal: capture.ordinal,
+                        word: word.word,
+                    }));
+                }
                 inputs.push(operand);
             }
             self.call_declared_unit_target(

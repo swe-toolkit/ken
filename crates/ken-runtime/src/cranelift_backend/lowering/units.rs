@@ -4223,7 +4223,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
 /// The split is validated against the raw owner's own descriptor. A count from
 /// the context alone cannot distinguish declared arguments from raw captures,
 /// which is the same-cardinality permutation this boundary must reject.
-pub(super) fn generated_context_source_environment<T>(
+pub(in crate::cranelift_backend) fn generated_context_source_environment<T>(
     mut combined_parameters: Vec<T>,
     context_captures: Vec<T>,
     raw_parameters: u32,
@@ -7727,6 +7727,27 @@ pub(in crate::cranelift_backend) fn srcbody_bind_order_record(
     SRCBODY_BIND_ORDER.with(|cell| cell.borrow_mut().push(observation));
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct SrcbodyParameterLoad {
+    pub(in crate::cranelift_backend) body_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) abi_ordinal: u32,
+    pub(in crate::cranelift_backend) word: cranelift_codegen::ir::Value,
+    pub(in crate::cranelift_backend) emitted_load_offset: i32,
+}
+
+#[cfg(test)]
+thread_local! {
+    static SRCBODY_PARAMETER_LOADS: std::cell::RefCell<Vec<SrcbodyParameterLoad>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn srcbody_parameter_loads_take()
+-> Vec<SrcbodyParameterLoad> {
+    SRCBODY_PARAMETER_LOADS.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
 /// Drains every environment built on this thread since the last take.
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn srcbody_bind_order_take()
@@ -8020,6 +8041,8 @@ fn define_unit_body<M: Module>(
         let mut parameter_ordinals = Vec::new();
         #[cfg(test)]
         let mut capture_ordinals = Vec::new();
+        #[cfg(test)]
+        let mut parameter_loads = Vec::new();
         for (slot, offset) in unit.slots.iter().zip(&unit.offsets) {
             if matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture) {
                 #[cfg(test)]
@@ -8066,6 +8089,10 @@ fn define_unit_body<M: Module>(
                     base,
                     offset,
                 );
+                #[cfg(test)]
+                if slot.kind == AbiSlotKind::Parameter {
+                    parameter_loads.push((slot.ordinal, word));
+                }
                 let carried = CarriedBoundaryWord { word };
                 // The process root's two ABI ordinals are closed semantic
                 // roles, not generic ValueWord inputs. Recovering them here
@@ -8180,6 +8207,28 @@ fn define_unit_body<M: Module>(
         // join subtree beneath it. Reinstating a branch here would restore that
         // defect for whichever arm it did not cover.
         let body_origin = unit.body_occurrence;
+        #[cfg(test)]
+        for ordinal in parameter_ordinals.iter().copied() {
+            let word = parameter_loads
+                .iter()
+                .find(|(abi_ordinal, _)| *abi_ordinal == ordinal)
+                .expect("source binder ordinal was loaded from the declared parameter run")
+                .1;
+            let offset = match builder.func.dfg.value_def(word) {
+                cranelift_codegen::ir::ValueDef::Result(inst, _) =>
+                    match builder.func.dfg.insts[inst] {
+                        cranelift_codegen::ir::InstructionData::Load { offset, .. } => i32::from(offset),
+                        ref other => panic!("a source binder has no emitted Load: {other:?}"),
+                    },
+                other => panic!("a source binder is not defined by an emitted instruction: {other:?}"),
+            };
+            SRCBODY_PARAMETER_LOADS.with(|cell| cell.borrow_mut().push(SrcbodyParameterLoad {
+                body_origin,
+                abi_ordinal: ordinal,
+                word,
+                emitted_load_offset: offset,
+            }));
+        }
         #[cfg(test)]
         srcbody_bind_order_record(SrcbodyBindOrderObservation {
             host: SrcbodyBindHost::OrdinaryUnit,
