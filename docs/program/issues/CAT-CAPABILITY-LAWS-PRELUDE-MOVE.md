@@ -62,21 +62,30 @@ stop and report the mismatch.
 - **AC-1 (import proof, not a kernel verdict).** A kernel-verdict control
   cannot catch a fall-through here: the prelude copies are transparent and stay
   registered, so they check green.
-  - With each moved prelude name removed from `globals` before loading,
-    Buffer and IO still check, and every attached-proof selector (`proof
-    bounded for ...`, `proof success_complete for ...`, and the rest) still
-    resolves.
+  - With the five moved functions and the two retired names
+    (`buffer_nat_add`, `buffer_suc_cong`) removed from `globals` before
+    loading, Buffer and IO still check, and every attached-proof selector
+    (`proof bounded for ...`, `proof success_complete for ...`, and the rest)
+    still resolves. Attached-proof globals need no removal: a local selector
+    resolves to the module-qualified key (Architect `evt_6y1zf4fje6rgt`).
   - On base, the same removal makes Buffer and IO fail `UnboundName`.
 - **AC-2 (statements).** Every consumer theorem statement is byte-identical
   except the sanctioned `bounded` retarget. Attached proofs keep their
   statements.
-- **AC-3 (census).** Deletion-only: Buffer's row loses `buffer_nat_add` and
-  `transfer_count_request_budget`, and IO's row loses the four `write_all_*`
-  functions. There are no new leaves. Before the build, predict any names that
-  the new `Data.Numeric.Nat.Arithmetic` and `Core.Logic.Transport` imports
-  bring into Buffer's and IO's closures; each must already be ambient in an
-  existing row. No `trusted_base()` change. Targeted builds only, through
-  `scripts/ken-cargo`; no-regression means green in CI.
+- **AC-3 (census).** Deletion-only, exact sets:
+  - Buffer loses 3, going from 15 to 12: `buffer_nat_add`,
+    `transfer_count_request_budget` and
+    `transfer_count_request_budget::bounded`.
+  - IO loses 8, going from 15 to 7: the four `write_all_*` functions and their
+    four `::` proofs. It keeps `BufferSpan`, `Equal`, `ResourceError`,
+    `TransferCount`, `Unit`, `write_all_exact_prefix_prop` and
+    `write_all_exact_prefix_prop::exact_prefix`.
+  - There are no new leaves. If `Suc` or `False` appears as one, stop before
+    rebaselining. Names that the new `Data.Numeric.Nat.Arithmetic` and
+    `Core.Logic.Transport` imports bring in must already be ambient in an
+    existing row.
+  - No `trusted_base()` change. Targeted builds only, through
+    `scripts/ken-cargo`; no-regression means green in CI.
 
 ## Stop conditions
 
