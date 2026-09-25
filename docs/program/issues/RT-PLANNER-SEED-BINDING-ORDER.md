@@ -89,22 +89,35 @@ handles the raw-capture and context-capture suffix.
   - (iii) Confirm or refute the prediction that 343's direct-emission values
     are correct.
   Proceed to the repair without review unless (iii) refutes it.
-- **AC-1 (witness, two-sided).** A fixture in which a continuation, after a
-  pending selection, reads both entry parameters, with distinguishable values
-  of the **same** type and, separately, of **different** types. Reach it
-  both through direct emission and through a context-capture (entry-frame)
-  route. It is red on base in every coordinate-keyed route and green after
-  the fix. A single-parameter fixture is not a witness.
+- **AC-1 (witness, two-sided).** A fixture in which a continuation of a
+  converting owner with two entry parameters (for example after an effectful
+  bind in `proc main (input) (caps)`) reads both parameters, with
+  distinguishable values of the **same** type and, separately, of
+  **different** types. No pending selection is involved. Reach it both
+  through direct emission and through a context-capture (entry-frame) route.
+  It is red on base in every coordinate-keyed route and green after the fix.
+  A single-parameter fixture is not a witness.
+  - A coordinate-keyed consumer that AC-0(ii) finds unreachable from source
+    is named as such and is covered by a planner-level control instead. For
+    a two-parameter converting owner, the control asserts that the
+    `EntryAbi` label at each seat index names the ABI slot the emitter loads
+    at that index. It compares against the emitter's load offset, not
+    against another planner record.
 - **AC-2 (controls).** Direct-emission operands come out byte-identical
   before and after the fix, asserted by the node. Reverting only the seed
   change reddens AC-1. Targeted builds only, through `scripts/ken-cargo`.
   No-regression means green in CI.
+  - Byte-identity is asserted over the AC-0(i) direct-emission population.
+    Any landed row whose planner accept/refuse outcome changes is listed
+    with the record that changed it. A row that newly accepts is a STOP for
+    review, because a looser lifetime label is the soundness direction.
 
 ## Stop conditions
 
 - AC-0(iii) finds 343's direct-emission values wrong: STOP for a ruling,
   because the byte-identical control assumes they are right.
 - The fix needs a second ordering function, or changes an ABI-run consumer.
+- A row newly accepts (AC-2).
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
