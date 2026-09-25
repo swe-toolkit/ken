@@ -75,7 +75,10 @@ natively. Any row that stays ignored gets a measured reason in its
     runtime `Spent`:
     - a pending value read twice;
     - a route that reaches the generated root;
-    - a member with an unclassifiable backing.
+    - in increments 1-2, a package route that crosses F5 or F6, meaning it
+      leaves its defining function (Architect `evt_327ykvk4cv8bq`: route
+      confinement discharges the backing question; the AC-0 member classes
+      stay evidence and nothing branches on them).
 - **AC-2 (proof, D1 item 6).**
   - **Positive.** Run the px7l fixture natively and assert:
     - the selected arm's host effect happens once;
@@ -120,7 +123,18 @@ natively. Any row that stays ignored gets a measured reason in its
   order: STOP. Its de Bruijn reads would then take the mirror parameter's
   phase. Seed it through `source_body_binding_order` first (latent at
   `6bdd75394`, because every entry there is `ResultPhaseSummary::carrier()`).
+- **The F5/F6 increment starts with a design ruling.** Carrying a package
+  across a return or a generated unit call needs a per-member backing
+  authority, which the names-only plane (`abi.rs:55-60`) cannot supply. That
+  increment opens with an Architect ruling on a typed or provenance-tagged
+  authority, and may be framed as its own successor.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
 ## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. AC-1's per-member backing refusal has no planner-plane authority:
+   `AbiSlot` is uniformly `ValueWord`/`OwnedByFrame` and the plane is
+   names-only (`abi.rs:55-60`) -- keyed on the per-value pointee type the
+   plane deliberately does not carry. Discharged by route confinement (no
+   F5/F6 crossing) for increments 1-2 (Architect `evt_327ykvk4cv8bq`).
