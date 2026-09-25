@@ -1,7 +1,7 @@
 ---
 id: LANG-QUALIFIED-CONSTRUCTORS
 title: "Resolve qualified constructors T.C in expressions and patterns for every data type, add the per-type scoped-constructors property (a scoped family's constructors are reachable only as T.C, so only T is reserved), fail closed on module-versus-type ambiguity, and scope ResourceKind with its spec and prelude respelling in the same change"
-status: ready
+status: active
 owner: language
 size: M
 gate: architect
