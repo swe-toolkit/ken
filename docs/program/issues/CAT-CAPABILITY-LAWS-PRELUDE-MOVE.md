@@ -1,7 +1,7 @@
 ---
 id: CAT-CAPABILITY-LAWS-PRELUDE-MOVE
 title: "Move the prelude's unkeyed capability laws into their single catalog consumers: transfer_count_request_budget with its bounded proof into Capability.System.Buffer (retargeted over Nat add), and write_all_complete, write_all_call_bound, write_all_first_error and write_all_all_success with their attached proofs into Capability.System.IO; second L3 slice of the minimal-prelude program"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: architect
