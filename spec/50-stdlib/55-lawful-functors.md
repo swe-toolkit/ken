@@ -269,10 +269,10 @@ CAT-3 (collection laws) extend mechanically:
 ## 8. Derivation paths and `trusted_base()` delta (AC1)
 
 - **The classes** are `class` declarations = record types (`33 §5.2`,
-  right-nested Σ over `13 §3`), built from the kernel's `Equal`/`Ω` vocabulary
-  (`15`/`16`, prelude) + the Σ/record machinery. **No new kernel former, zero
-  delta.** The `§6` higher-kinded extension is **outer-ring** — still zero
-  kernel diff, zero delta.
+  right-nested Σ over `13 §3`), built from the checked prelude `Equal` alias
+  of kernel `Eq`, kernel `Ω` (`15`/`16`), and the Σ/record machinery. **No new
+  kernel former, zero delta.** The `§6` higher-kinded extension is
+  **outer-ring** — still zero kernel diff, zero delta.
 - **The instances are ZERO-DELTA — the inductive-carrier exemplar** (the path
   `51 §6`'s `Int` instances could *not* take). `List`/`Bool`/`Option` are real
   inductives with eliminators, so every ∀-law is a real kernel proof; **no

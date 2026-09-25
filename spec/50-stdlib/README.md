@@ -34,15 +34,17 @@ two lower tiers of the surface taxonomy (`../30-surface/30`):
 - **Prelude (Ken-defined, always-present, `30 §4`)** — the **closed** union of
   the primitive-signature arm (`Auth`, `Bool`, `Char`, `List`, `Option`,
   `ResourceKind`, `Result`, `Utf8Error`) and the internal-provision arm
-  (`Nat`, kernel origin; `Pair`, compiler-bootstrap origin). This is the exact
-  ten-type floor. Constructors enter only through exact recorded parentage;
-  Pair's separate exact companion inventory is
+  (`Nat`, kernel origin; `Pair`, compiler-bootstrap origin; `Equal`, `Prop`,
+  `Proved`, `Top`, `Bottom`, keyed by kernel machinery). Its exact fifteen-name
+  floor is `{Auth, Bool, Bottom, Char, Equal, List, Nat, Option, Pair, Prop,
+  Proved, ResourceKind, Result, Top, Utf8Error}`. `Proved : Top` is a checked
+  proof term, not a type former. Constructors enter only through exact recorded
+  parentage; Pair's separate exact companion inventory is
   `{mk_pair, pair_fst, pair_snd}`. `Ordering` is **not** prelude — no primitive
   returns it and it has no internal-provision witness, so it is a package
-  (`30 §4`). The kernel's own
-  logic vocabulary (`Ω`, `⊤`/`⊥`, the derived connectives, `Eq`,
-  `Decidable`/`DecEq`, `../10-kernel/15`/`16`) is referenced, **not**
-  re-declared (`30 §6`: `Equal` is deleted for the kernel's `Eq`).
+  (`30 §4`). Kernel `Ω` and native `Eq`/`J` remain kernel vocabulary, not
+  duplicate prelude postulates. `Equal` is the checked prelude floor definition
+  whose body is that native `Eq` (`30 §4`, `§6`).
 
 Everything below is a **package**: imported, derivable, re-checked. Core data
 `Unit`/`Empty`/`Either` plus the core combinators (`id`, `∘`, `const`, `flip`)
