@@ -924,6 +924,82 @@ fn sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
     Cons h t ↦ insert a le h (sort a le t)
   }
 
+proof sorted for insert
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (x : a)
+      (xs : List a)
+    : is_sorted a le xs → is_sorted a le (insert a le x xs) =
+  match xs {
+    Nil ↦ λsorted_xs. Proved;
+    Cons h t ↦
+      derived_sort_insert_sorted_cons_case
+        a
+        le
+        total
+        x
+        h
+        t
+        (insert::sorted a le total x t)
+        (le x h)
+        Refl
+  }
+
+proof sorted for sort
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (xs : List a)
+    : is_sorted a le (sort a le xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦ insert::sorted a le total h (sort a le t) (sort::sorted a le total t)
+  }
+
+proof count for insert
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a) (eqf : a → a → Bool) (q : a)
+    : Equal Nat (count a eqf q (Cons a x xs)) (count a eqf q (insert a le x xs)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      derived_sort_insert_count_cons_case
+        a
+        le
+        x
+        h
+        t
+        eqf
+        q
+        (insert::count a le x t eqf q)
+        (le x h)
+        Refl
+  }
+
+proof perm for sort
+      (a : Type) (le : a → a → Bool) (xs : List a) (eqf : a → a → Bool)
+    : Perm a eqf xs (sort a le xs) =
+  match xs {
+    Nil ↦ λq. Proved;
+    Cons h t ↦
+      λq.
+        let
+          original_count = count a eqf q (Cons a h t);
+          tail_sorted_count = count a eqf q (Cons a h (sort a le t));
+          final_count = count a eqf q (insert a le h (sort a le t));
+          tail_counts_equal =
+            derived_sort_count_cons_cong a eqf q h t (sort a le t) (sort::perm a le t eqf q);
+          insertion_counts_equal = insert::count a le h (sort a le t) eqf q
+        in
+          trans
+            Nat
+            original_count
+            tail_sorted_count
+            final_count
+            tail_counts_equal
+            insertion_counts_equal
+  }
+
 fn derived_sort_head_ordered (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : Prop =
   match xs {
     Nil ↦ Top;
@@ -1108,39 +1184,6 @@ theorem derived_sort_insert_sorted_cons_case
               (sym Bool (le x h) False comparison)
   }
 
-proof sorted for insert
-      (a : Type)
-      (le : a → a → Bool)
-      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
-      (x : a)
-      (xs : List a)
-    : is_sorted a le xs → is_sorted a le (insert a le x xs) =
-  match xs {
-    Nil ↦ λsorted_xs. Proved;
-    Cons h t ↦
-      derived_sort_insert_sorted_cons_case
-        a
-        le
-        total
-        x
-        h
-        t
-        (insert::sorted a le total x t)
-        (le x h)
-        Refl
-  }
-
-proof sorted for sort
-      (a : Type)
-      (le : a → a → Bool)
-      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
-      (xs : List a)
-    : is_sorted a le (sort a le xs) =
-  match xs {
-    Nil ↦ Proved;
-    Cons h t ↦ insert::sorted a le total h (sort a le t) (sort::sorted a le total t)
-  }
-
 theorem derived_sort_count_cons_cong
       (a : Type)
       (eqf : a → a → Bool)
@@ -1295,49 +1338,6 @@ theorem derived_sort_insert_count_cons_case
                   })))
             branch_count
             (sym Bool (le x h) False comparison)
-  }
-
-proof count for insert
-      (a : Type) (le : a → a → Bool) (x : a) (xs : List a) (eqf : a → a → Bool) (q : a)
-    : Equal Nat (count a eqf q (Cons a x xs)) (count a eqf q (insert a le x xs)) =
-  match xs {
-    Nil ↦ Refl;
-    Cons h t ↦
-      derived_sort_insert_count_cons_case
-        a
-        le
-        x
-        h
-        t
-        eqf
-        q
-        (insert::count a le x t eqf q)
-        (le x h)
-        Refl
-  }
-
-proof perm for sort
-      (a : Type) (le : a → a → Bool) (xs : List a) (eqf : a → a → Bool)
-    : Perm a eqf xs (sort a le xs) =
-  match xs {
-    Nil ↦ λq. Proved;
-    Cons h t ↦
-      λq.
-        let
-          original_count = count a eqf q (Cons a h t);
-          tail_sorted_count = count a eqf q (Cons a h (sort a le t));
-          final_count = count a eqf q (insert a le h (sort a le t));
-          tail_counts_equal =
-            derived_sort_count_cons_cong a eqf q h t (sort a le t) (sort::perm a le t eqf q);
-          insertion_counts_equal = insert::count a le h (sort a le t) eqf q
-        in
-          trans
-            Nat
-            original_count
-            tail_sorted_count
-            final_count
-            tail_counts_equal
-            insertion_counts_equal
   }
 
 fn bool_head_leq (x : Bool) (xs : List Bool) : Prop =
