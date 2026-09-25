@@ -15,6 +15,23 @@ use crate::{
 };
 
 #[test]
+fn ground_string_ingress_normalizes_before_boundary_observation() {
+    // A returned String may be NFC-normalized by the boundary serializer,
+    // making a round-trip observation green even if lowering kept the wrong
+    // bytes. Inspect the direct specialization before that boundary instead.
+    let seed =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let mut lowering = super::super::tests::control::root_authority_test_lowering(&seed);
+    let mut function = Function::new();
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut function, &mut context);
+    let lowered = lowering
+        .lower_ground_value(&mut builder, &RuntimeGroundValue::String("e\u{301}".into()))
+        .expect("ground string lowers without a new runtime resource");
+    assert!(matches!(lowered, Lowered::String(text) if text == "é"));
+}
+
+#[test]
 fn cranelift_runs_scalar_seed_and_verifies_function() {
     let example = nc5_seed_examples()
         .into_iter()

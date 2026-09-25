@@ -183,6 +183,7 @@ use aggregates::GovernedAllocationMutation;
 use aggregates::SELF_AUTHORIZED_FALLBACK_REACHES;
 
 // --- external dependencies -------------------------------------------------
+use unicode_normalization::UnicodeNormalization;
 pub(in crate::cranelift_backend) use std::collections::{BTreeMap, BTreeSet};
 
 // `RT-FNSPLIT-B2V` `D4`. Re-exported at facade scope like every other import in
@@ -13107,7 +13108,7 @@ impl<'a> Lowering<'a> {
                 self.lower_big_int_constant(builder, value)
             }
             RuntimeValue::Bytes(value) => Ok(Lowered::Bytes(value.clone())),
-            RuntimeValue::String(value) => Ok(Lowered::String(value.clone())),
+            RuntimeValue::String(value) => Ok(Lowered::String(value.chars().nfc().collect())),
             RuntimeValue::Constructor { constructor, args } => Ok(Lowered::Constructor {
                 constructor: constructor.clone(),
                 synthesized_identity: None,
@@ -13245,7 +13246,7 @@ impl<'a> Lowering<'a> {
                 self.lower_big_int_constant(builder, value)
             }
             RuntimeGroundValue::Bytes(value) => Ok(Lowered::Bytes(value.clone())),
-            RuntimeGroundValue::String(value) => Ok(Lowered::String(value.clone())),
+            RuntimeGroundValue::String(value) => Ok(Lowered::String(value.chars().nfc().collect())),
             RuntimeGroundValue::Constructor { constructor, args } => Ok(Lowered::Constructor {
                 constructor: constructor.clone(),
                 synthesized_identity: None,

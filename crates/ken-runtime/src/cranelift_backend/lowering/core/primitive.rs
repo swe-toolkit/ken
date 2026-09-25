@@ -4,11 +4,12 @@
 //! projection, representation checks, symbol dispatch, and emission.
 
 use super::*;
+use unicode_normalization::UnicodeNormalization;
 
 #[cfg(test)]
 mod tests;
 
-fn lowered_char_list(value: &Lowered) -> Option<Vec<u8>> {
+fn lowered_char_list(value: &Lowered) -> Option<Vec<char>> {
     let Lowered::Constructor {
         constructor, args, ..
     } = value
@@ -31,7 +32,7 @@ fn lowered_char_list(value: &Lowered) -> Option<Vec<u8>> {
     else {
         return None;
     };
-    let head = u8::try_from(*head).ok()?;
+    let head = u32::try_from(*head).ok().and_then(char::from_u32)?;
     let mut tail = lowered_char_list(args[1].specialized_at("a char list tail field").ok()?)?;
     tail.insert(0, head);
     Some(tail)
@@ -253,19 +254,13 @@ impl<'a> Lowering<'a> {
                         ),
                     )
                 })?;
-                let bytes = lowered_char_list(&value).ok_or_else(|| {
+                let chars = lowered_char_list(&value).ok_or_else(|| {
                     unsupported(
                         "PrimitiveCall",
-                        "list_char_to_string requires a closed List Char",
+                        "list_char_to_string requires a closed List Char of Unicode scalars",
                     )
                 })?;
-                let value = String::from_utf8(bytes).map_err(|_| {
-                    unsupported(
-                        "PrimitiveCall",
-                        "list_char_to_string received non-UTF-8 Char values",
-                    )
-                })?;
-                Ok(Lowered::String(value))
+                Ok(Lowered::String(chars.into_iter().nfc().collect()))
             }
             "byte_length" => self.lower_string_byte_length(builder, lowered_args),
             "char_length" => self.lower_string_char_length(builder, lowered_args),
@@ -776,7 +771,9 @@ impl<'a> Lowering<'a> {
                 constructor: ok.clone(),
                 synthesized_identity: None,
                 occurrence: None,
-                args: vec![ConstructorField::specialized(Lowered::String(value))],
+                args: vec![ConstructorField::specialized(Lowered::String(
+                    value.chars().nfc().collect(),
+                ))],
             },
             Err(_) => Lowered::Constructor {
                 constructor: err.clone(),
