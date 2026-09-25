@@ -1,8 +1,7 @@
 # Live lane roster
 
 Current operational state only. The operator owns lane count, ordering, and
-objectives. The Steward updates this file only when one of those fields changes
-and cites the ruling that changed it.
+objectives; the Steward updates a field only with the ruling that changed it.
 
 Hard limit: 80 lines. Replace stale text; never append history. Do not record
 completed work, review transcripts, measurements, explanations, prior states, or
@@ -22,8 +21,6 @@ These rulings remain operative and are retained verbatim.
 
 - **2026-09-23:** "doc only merges may have reviewers. However, if it is a
   doc change that I directed you to make a review is not necessary."
-  Narrows `evt_12a47d49frwjd`: a route cites the operator direction it
-  carries out; other doc-only changes get their domain's reviewer.
 
 ## Catalog direction
 
@@ -31,6 +28,9 @@ These rulings remain operative and are retained verbatim.
   built-ins to be overriden. It makes for confusing code, allows obfuscation
   and is therefore a security risk. Anything in the prelude should be
   considered "built-in" and therefore a fixed part of the language surface."
+  Then: "Because the built-in and prelude definitions can't be overriden,
+  then -- out of kindness to the authors of ken code -- they should be the
+  minimal set required." (the prelude is 30 §4's closed set)
 - **2026-09-13:** "The proofs are not done. A catalog package is not finished
   until its proofs are complete. Declaring that they are tested computation is
   less valuable than proven correct behavior."
@@ -70,8 +70,8 @@ pending-call. it has to be addressed."). Spec serves BYTES D2.
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-SEED-BINDING-ORDER` -- `active`, M, T1 (anchor `evt_5ajc3arrq3ghz`): planner seed ignores source-body binding order | `RT-SELECTED-PENDING-CALL-BUILD` -- parked at AC-0 on it; resume re-runs AC-0(e) | Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed. Hard stop 0 |
-| L2 | language | One resolution mode: strict admits the whole prelude, legacy passthrough deleted, binding a built-in name anywhere (incl. local binders) is an error (operator 2026-09-25) | None | Elaborator slice(s) of the built-in program | Architect redesign (`evt_2fatgkrh53r0v`, `evt_4m989tyj519np`), then Spec S0, then frame |
-| L3 | foundation | Remove catalog collisions with built-ins (prelude is fixed surface, operator 2026-09-25), then resume proof backfill | `CAT-DERIVED-SORT-LAWS` -- `active`, S, T1 (anchor `evt_3fannpxh75c55`) | Built-in program: Architect redesign under the ruling (`evt_2fatgkrh53r0v`); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
+| L2 | language | One resolution mode: strict admits the whole prelude, legacy passthrough deleted, binding a prelude name anywhere (incl. local binders) is an error (operator 2026-09-25) | None | Elaborator slice(s) of the built-in program | Architect redesign (`evt_4nqhpet9va5w0`), then Spec S0, then frame |
+| L3 | foundation | Move definable prelude conveniences into packages and remove collisions (minimal fixed prelude, operator 2026-09-25), then resume proof backfill | `CAT-DERIVED-SORT-LAWS` -- `active`, S, T1 (anchor `evt_3fannpxh75c55`) | Built-in program: Architect redesign (`evt_4nqhpet9va5w0`); `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 after its Spec D2 lands | Census (operator 2026-09-25, option (b)): inherited-row growth is admitted without frame authorization; a module's own new ambient name needs its WP frame's authorization, only when no provider exists and a local alternative is redundant or changes the statement |
 
 ## Update rule
 
