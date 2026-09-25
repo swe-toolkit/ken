@@ -47,12 +47,16 @@ and arity:
 Every top-level definition name in one compilation unit occupies the same flat
 namespace, independent of the role that introduced it. A second top-level
 definition of a name already defined in that unit is a **hard surface error**
-(ADR 0014, MRES-5/MRES-8). Thus `class Eq` and a data constructor named `Eq`
-collide and are rejected by the same rule: types are terms, so class and
-constructor names do not inhabit separate namespaces (D8-③; MRES-7).
-Arity-gated surface sugar remains outside this duplicate-definition rule: the
-established `Eq`/`J` sugar may coexist with lower-arity definitions of those
-names (MRES-8).
+(ADR 0014, MRES-5/MRES-8). Thus `class Widget` and a data constructor named
+`Widget` collide by this rule: types are terms, so class and constructor names
+do not inhabit separate namespaces (D8-③; MRES-7). A name in B instead
+rejects on first introduction by §3.3, without waiting for a second
+declaration.
+
+The arity-gated `Eq`/`J` sugar is kernel/built-in vocabulary (§3.3): no
+source declaration or binder may reuse either protected name, at any arity.
+This supersedes MRES-8's former lower-arity coexistence exception; the
+ordinary duplicate-definition rule still governs names outside B.
 
 The keyword is **checked bidirectionally** against the signature and the body's
 inferred effects (`36 §1.6.2`); a mismatch — an `fn` that performs an effect, a
@@ -157,9 +161,9 @@ groups (MRES-2).
 The in-repo loader discovers the source graph; the `admits` / `program` /
 `package` boundary below adds the instance-admission rule over that graph. The
 compiled-package manifest and content-addressed package manager remain a later
-round. Multi-root precedence is likewise deferred. The module-level clash and
-narrower lexical-shadowing rules are specified in §3.3; neither the loader nor
-the admission boundary alters either rule.
+round. Multi-root precedence is likewise deferred. The built-in name
+protection and ordinary non-built-in clash rules are specified in §3.3;
+neither the loader nor the admission boundary bypasses them.
 
 #### 3.2.1 Admission-boundary headers
 
@@ -233,51 +237,58 @@ is a **surface error** (`24`) — it never reaches the kernel:
   declaration before collision checking: `M.foo`, `N.foo`, and a selectively
   imported or renamed name retain the imported declaration's canonical
   identity.
-- **Top-level identity-keyed clash.** Consider every binding of an unqualified
-  name supplied by a top-level local definition, a selective or renamed import,
-  or the prelude. If more than one binding names **distinct canonical
-  declarations**, resolution raises **`AmbiguousReference`**. This single rule
-  covers all four pairings: local×import, local×prelude, import×import, and
-  import×prelude. It is order-independent and fail-closed: a latent clash is
-  rejected even when no expression references the name. Multiple paths that
-  bind the name to the **same** canonical declaration are idempotent and are
-  not a clash. An exported name entering a consumer's scope participates by
-  that same canonical identity, so a direct import and a re-exported path to
-  one declaration remain non-ambiguous, while two declarations do not.
-- **Explicit resolution.** Leave a colliding item out of a selective import,
-  rename it per-name, use qualified or aliased access, or rename the local
-  definition so exactly one unqualified binding remains. Prelude bindings are
-  the immutable primitive floor: they cannot be excluded or renamed. A local
-  that clashes with the prelude must be renamed; a colliding selective import
-  must be omitted, renamed, or kept qualified.
-- **Narrower lexical shadowing.** A `λ`, `let`, parameter, or pattern binder in
-  a narrower lexical scope still shadows an outer or imported name. Resolution
-  is lexical (innermost wins) and is never a module-level clash error; this
-  term-language rule is orthogonal to the preceding top-level rule.
-- **Per-unit dependency closure.** Each source unit resolves its body in its own
-  module scope: its local declarations, its explicit imports, the kernel and
-  built-in vocabulary, and the closed prelude floor from `30-taxonomy §4`.
-  Among Ken-defined type names that floor is exactly `{Auth, Bool, Char, List,
-  Nat, Option, Pair, ResourceKind, Result, Utf8Error}`. Its constructor bindings
-  are derived, never listed by spelling alone: `ANone`/`APartial`/`AFull` must
-  have parent `Auth`; `True`/`False` parent `Bool`; `Nil`/`Cons` parent `List`;
-  `Zero`/`Suc` parent `Nat`; `None`/`Some` parent `Option`;
-  `FsHandle`/`Buffer` parent `ResourceKind`; `Err`/`Ok` parent `Result`; and
-  `InvalidUtf8` parent `Utf8Error`. Each parent comparison is against the exact
-  floor `GlobalId`. `Char` and transparent `Pair` are constructor-free.
-  `Pair`'s separate companion-binding inventory is exactly
-  `{mk_pair, pair_fst, pair_snd}`. Each companion is admitted only at its exact
-  pre-source identity with a checked type keyed to the exact floor `Pair`; the
-  three operations do not increase the ten-type count. Loading a dependency is
-  not an implicit import: the dependency cannot borrow imports from its caller,
-  and its own imports do not enter the caller's scope. An implementation-private
-  convenience registered outside the closed floor is not ambient authority for
-  name resolution. A package must import such a name from its defining public
-  interface; otherwise the reference is unbound even if the implementation
-  happens to hold a global entry with that spelling. A local transparent
-  Pair-shaped definition may be definitionally equal to non-dependent Σ, but it
-  has a distinct `GlobalId` and does not substitute for the floor declaration
-  (`34 §"Canonical non-dependent pair floor family"`).
+- **One strict mode, for every source unit.** Resolve a source name through its
+  lexical locals (including declarations already admitted to the same
+  incremental session), explicit imports, the kernel/built-in vocabulary, or
+  the closed prelude of `30-taxonomy §4`. The same rule applies to roots-loaded
+  and isolated-file compilation and to incremental elaboration. No other
+  lookup in an implementation-global table can make a spelling visible. A
+  loaded dependency is not implicitly imported and neither unit inherits the
+  other's imports. A registered convenience outside the prelude needs an
+  explicit public provider import; without one it is unbound.
+- **Closed built-in name set B.** For resolution and name protection, B is the
+  kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
+  `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
+  checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom, Char,
+  Equal, List, Nat,
+  Option, Pair, Prop, Proved, ResourceKind, Result, Top, Utf8Error}`. The latter
+  is a fifteen-member floor, not the superseded ten-member inventory. A floor
+  constructor enters B only with its exact registered parent identity:
+  `ANone`/`APartial`/`AFull` under `Auth`, `True`/`False` under `Bool`,
+  `Nil`/`Cons` under `List`, `Zero`/`Suc` under `Nat`, `None`/`Some` under
+  `Option`, `FsHandle`/`Buffer`/`Mapping` under `ResourceKind`, `Err`/`Ok` under
+  `Result`, and `InvalidUtf8` under `Utf8Error`. `Char`, transparent `Pair`,
+  and the added proposition/equality members introduce no constructors.
+  `Pair`'s exact three companions `{mk_pair, pair_fst, pair_snd}` also enter B
+  with their checked types keyed to that `Pair` identity. Kernel native names
+  and reserved formers/sugar remain kernel vocabulary, not extra prelude
+  identities. Neither the closed roster nor B includes arbitrary compiler
+  globals; future floor membership is operator-gated (`30-taxonomy §4`).
+- **No binding of a built-in name.** No declaration or binder may introduce a
+  name in the built-in set B. This is a hard surface error at introduction,
+  even if the proposed target has the same canonical identity as the built-in
+  and even if no later occurrence uses the binding. It covers top-level
+  `const`/`fn`/`proc`/`def`/`prop`/`theorem` and other definitions; `data`
+  types and constructors; records and fields; classes and methods; attached
+  proof identities and synthesized instance dictionaries; selective, renamed,
+  or re-export import aliases (including a module alias named in B); and
+  `λ`, `let`, function/constructor/record parameters, Π, match-pattern,
+  `eqn`, and `where` dictionary binders. Exporting or importing a floor
+  identity by a *different* name outside B preserves its canonical identity;
+  it does not create a second floor identity. Qualified use of an existing
+  floor name is not a new binding. Lexical shadowing applies only to names
+  outside B; an inner binder cannot override B.
+- **Non-B top-level identity clash.** A top-level local, a selective or
+  renamed import, and a re-exported name may supply the same unqualified
+  name outside B. If two bindings name **distinct canonical declarations**,
+  reject the latent clash as **`AmbiguousReference`** even when unused,
+  independent of declaration order. Multiple paths to the same canonical
+  declaration remain idempotent. Omit a colliding selective item, rename it
+  outside B, qualify it, or rename the local. The B-introduction rule above
+  takes precedence over this ordinary ambiguity rule; neither `rename` nor a
+  same-identity path authorizes a source binding in B. A same-shaped local
+  `Pair` declaration has a different `GlobalId` and never substitutes for the
+  protected floor identity (`34 §"Canonical non-dependent pair floor family"`).
 - **Effect-row and capability vocabulary is a separate namespace and is not
   subject to this rule.** An `EffectName` in a `visits [...]` row or a
   `capabilities` clause (`32 §1` capability-declaration syntax; `36 §1` the
@@ -289,10 +300,10 @@ is a **surface error** (`24`) — it never reaches the kernel:
   with the import-required catalog package that provides the corresponding
   filesystem surface (its authority, error, and path *types*), which are
   ordinary identities under the closure rule above.
-- Every failure — unresolved name, **`AmbiguousReference`** from a top-level
-  clash, or an out-of-scope private name (`§4`) — is a **surface diagnostic**;
-  the flattened `Σ` the kernel receives contains only resolved, in-scope
-  references.
+- Every failure — unresolved name, forbidden B introduction,
+  **`AmbiguousReference`** from a non-B top-level clash, or an out-of-scope
+  private name (`§4`) — is a **surface diagnostic**; the flattened `Σ` the
+  kernel receives contains only resolved, in-scope references.
 
 ## 4. Visibility and abstract export
 
@@ -366,14 +377,14 @@ This remains true through renaming and any number of re-export hops. The export
 statement keeps the provenance grep-recoverable at the republishing module.
 
 A compiler-installed floor identity has an internal origin rather than a source
-**defined-at** module. Its ambient availability and any public re-export still
-preserve that identity; neither operation manufactures a source owner. This
-holds for signature-arm members and for kernel- or compiler-origin members of
-the internal-provision arm. In particular, re-exporting the canonical `Nat`
-family or its constructors, or the canonical
-`Pair`/`mk_pair`/`pair_fst`/`pair_snd` family, does not make the republishing
-module the source owner. A same-shaped source declaration has a different
-identity, never another path to the floor identity.
+**defined-at** module. Its ambient availability and a public alias **named
+outside B** preserve that identity; neither operation manufactures a source
+owner. This holds for signature-arm members and for kernel- or compiler-origin
+members of the internal-provision arm. A source `export`/`import` may not
+introduce a name in B, even to republish the identical `Nat` or
+`Pair`/`mk_pair`/`pair_fst`/`pair_snd` identity under its protected spelling
+(§3.3). A same-shaped source declaration has a different identity, never
+another path to the floor identity.
 
 Two distinct identities may not occupy one surface name in a module interface:
 that is a hard surface error at the re-export site, reported with both the

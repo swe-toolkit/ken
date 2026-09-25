@@ -41,6 +41,13 @@ proves the taxonomy *is* simultaneously the TCB-hygiene proof: it drives the
 invariant in **both** directions — no built-in has a derivation path
 (irredundant) and no package/prelude entry lacks one (complete).
 
+The **built-in name set B** for resolution and binding protection (`33 §3.3`)
+spans two trust tiers: the irreducible kernel/built-in vocabulary of §3 and the
+closed, re-checked prelude of §4. A name being permanently available and
+unshadowable does **not** put its Ken-defined declaration in `trusted_base()`;
+the invariant above applies to the irreducible tier, not to every name in B.
+Keeping the prelude minimal limits the names authors cannot bind.
+
 ## 2. The three tiers
 
 | Tier | What it is | Trust level | In `trusted_base()`? |
@@ -196,31 +203,26 @@ constructor-free. A same-shaped source family or definition has a different
 identity and is not the floor member. Every floor type, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
 
-**The effect surface and the Program-I entrypoint ABI.** The same
-internal-provision arm admits the intrinsics behind Ken's effect surface and
-its Program-I entrypoint ABI, on the machinery-keying witness above — this is
-not a new arm, only that witness read over the effect reifier, erasure, and the
-host runner as well as the kernel and bootstrap. The positive shape: the
-one-element effect result `Unit`, whose exact identity the effect reifier
-produces wherever a native effect response yields it, so a source-defined `Unit`
-fails to interoperate, and the entrypoint-ABI types the host runner is keyed to
-at
-`main`. Two boundaries stay **out**. A bootstrap-installed type that no
-mechanism is keyed to, whose source-defined equivalent would serve — `Empty`,
-installed for `Dec` but forced by nothing — fails the keying clause and stays an
-import-required package. And a construction over a landed ABI is not an identity
-at all: a catalog policy wrapper (`Capability/Process/Exit`'s
-`exit_with`/`exit_from_result` are transparent terms over the one `ExitCode`)
-or any catalog-defined `data` is an ordinary package identity, never floor. The
-exact witnessed set — and which mechanism keys each identity — is recorded by
-the per-name intrinsic ledger; **extending the closed roster and its count to
-that set is an operator-owned floor-membership change**, adding no
-`trusted_base()` entry (every added member is re-checked and out of the trusted
-base, exactly as the fifteen above) and landing atomically with the roster. The
-floor now stands at the fifteen stated above; this effect-surface and
-entrypoint-ABI set remains a further per-name application of the same arm, an
-operator-gated floor-membership change floored as the ledger confirms each
-witness.
+**Effect-surface and Program-I candidates are not yet floor members.** The
+internal-provision arm can be applied to identities the effect reifier, erasure,
+or host runner keys, but only when the independent source-naming requirement
+also holds. `Unit` and the Program-I input/exit families are candidates, not
+an automatic extension merely because the compiler registers them. A source
+wrapper over an ABI (for example `Capability/Process/Exit`'s
+`exit_with`/`exit_from_result`) does not become an intrinsic identity by using
+one. `Empty`, installed for `Dec` but not forced by a native identity reader,
+fails the keying clause and remains an import-required package.
+
+The [open per-name intrinsic ledger](30-intrinsic-ledger.md) records candidate
+names, possible keying mechanisms, missing witness arms, and the separate
+spec-promised package surface. A proposed name joins the **closed** floor only
+by an operator-owned, per-name membership change that names its exact
+pre-source identity and updates this roster and its count atomically. No
+ledger row is a floor admission. Re-checked additions would not themselves
+add a `trusted_base()` entry. Until a candidate is admitted, it has no
+ambient-prelude privilege: a source-facing need must be met by an explicit
+package import or a separately authorized identity-preserving intrinsic route.
+Merely being present in the compiler's global table is neither route.
 
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
@@ -246,12 +248,11 @@ path from the built-ins stated in-spec**. `Nat` and `Pair` are therefore not
 package carriers: they are the kernel-origin and compiler-bootstrap members of
 the internal-provision arm. `Option` and `Result` are likewise not packages:
 public primitive signatures name their canonical compiler-installed
-identities. `Empty` and `Either` remain packages; `Unit` is the one the
-effect-surface extension in §4 moves floor-side (the effect reifier is keyed to
-its exact identity), pending that operator-gated floor-membership change. A
-same-shaped source definition of `Pair` allocates a distinct identity; it
-neither replaces the floor family nor converts structural equality into floor
-provenance.
+identities. `Empty` and `Either` remain packages; `Unit` is a candidate for the
+internal-provision arm, **not** a sixteenth floor member without the per-name
+witness and operator-gated change of §4. A same-shaped source definition of
+`Pair` allocates a distinct identity; it neither replaces the floor family nor
+converts structural equality into floor provenance.
 
 The reframed catalog is
 `../50-stdlib/README.md` — the lawful classes (`Num`/`Ord`/`Eq`/`Monoid`/
@@ -262,6 +263,13 @@ The monolithic **L8 stdlib dissolves** into this catalog
 postulated**" discipline carries to the package builds (ES4). Pair's admission
 under the general internal-provision rule is part of the prelude boundary above,
 not a package exception.
+
+A compiler-owned identity keyed by native machinery but not admitted to the
+closed prelude cannot be replaced by a same-shaped ordinary package
+*declaration*. Its possible explicit-import route must preserve the exact
+registered identity; whether a compiler-provided intrinsic module supplies
+that route is an open operator question, not a fourth ambient tier. A checked
+helper with no such identity reader remains ordinary package material.
 
 **The derivation-path discipline (normative).** Every catalog entry states a
 real Ken definition path from the built-ins. A catalog entry with **no** path is
