@@ -762,6 +762,29 @@ mod tests {
             PendingCallAdmission::Refused(negative),
             PendingCallAdmission::Refused(PendingRefusal::RouteLeavesDefiningFunction)
         );
+        // The negative also traverses the real walker, not just its extracted
+        // owner predicate. This root is a planned runtime-IR occurrence with
+        // its own function; only the package's claimed owner differs.
+        let root_expr = RuntimeExpr::Value(crate::RuntimeValue::Bool(true));
+        let plan = super::super::plan_static_transition_graph(&root_expr, &BTreeMap::new())
+            .expect("a generated-root occurrence plans");
+        let root = plan.root_static_origin().expect("root occurrence exists");
+        let actual = occurrence_authority(&plan, root).unwrap().owner;
+        assert_ne!(
+            actual, local,
+            "fixture must actually cross the owner boundary"
+        );
+        assert_eq!(
+            walk_to_gate(
+                &plan,
+                root,
+                local,
+                PendingPathCounts::START,
+                &mut BTreeSet::new()
+            )
+            .expect_err("the generated root cannot consume another owner's package"),
+            PendingRefusal::RouteLeavesDefiningFunction,
+        );
     }
 
     // The identity wrapper source edit checks but erases its call before
