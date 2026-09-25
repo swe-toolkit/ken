@@ -1005,6 +1005,50 @@ fn rt_seed_two_entry_parameters_agree_with_emitted_loads_on_both_routes() {
     });
 }
 
+/// The E3a value half is isolated from the earlier emitted-offset assertion:
+/// reverting only the lexical seed must reach this comparison and show that
+/// the context gather loaded a different word from direct emission. Promise
+/// class: durable relation across two consumers, not an SSA-number snapshot.
+#[test]
+fn rt_seed_direct_and_context_gather_use_the_same_entry_words() {
+    let _ = rt_seed_direct_words_take();
+    let _ = rt_seed_capture_words_take();
+    crate::cranelift_backend::test_objects::emit_px8tr_nested_post_effect_object(
+        "rt_seed_context_word_pair", false,
+    )
+    .expect("two-parameter witness reaches both consumers");
+    let direct = rt_seed_direct_words_take();
+    let captured = rt_seed_capture_words_take();
+    with_d5a_witness_plan(|plan| {
+        let mut checked = 0;
+        for unit in plan.continuation_units().expect("continuation units") {
+            let ContinuationEmissionOwner::Predeclared(owner) = unit.emission_owner() else {
+                continue;
+            };
+            let inputs = unit.continuation_inputs().expect("typed inputs");
+            let entry = inputs.iter().filter(|input| matches!(input.coordinate,
+                ContinuationSourceCoordinate::EntryAbi {
+                    source_owner, source_abi_position: 0 | 1, ..
+                } if source_owner == owner)).collect::<Vec<_>>();
+            if entry.len() != 2 { continue; }
+            for input in entry {
+                let emitted = direct.iter().find(|read|
+                    read.worker_body_origin == unit.worker_body_origin()
+                        && read.source_owner == owner && read.ordinal == input.ordinal)
+                    .expect("direct consumer actually read this entry input");
+                let gathered = captured.iter().find(|read|
+                    read.worker_body_origin == unit.worker_body_origin()
+                        && read.source_owner == owner && read.ordinal == input.ordinal)
+                    .expect("context gather actually read this entry input");
+                assert_eq!(emitted.word, gathered.word,
+                    "coordinate-keyed context gather must carry the direct emission value");
+                checked += 1;
+            }
+        }
+        assert!(checked >= 2, "both parameter reads must reach both consumers");
+    });
+}
+
 /// **`D5a` — a generated context resolves under the continuation identity that
 /// owns it, and under no other.**
 ///
