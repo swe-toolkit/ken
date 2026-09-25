@@ -90,6 +90,19 @@ stop and report the mismatch.
     re-predicts the `Core.Logic.Not` row.
   - No `trusted_base()` change. Targeted builds only, through
     `scripts/ken-cargo`; no-regression means green in CI.
+- **AC-4 (non-catalog consumers, Architect `evt_1kkygg9f7psn8`).**
+  - Enumerate every non-catalog source that loads or exposes OrderedSearch,
+    `Data.Collections.Map`, `Core.Logic.EmptyDec` or `Core.Logic.Not`,
+    transitive importers included. Look in `crates/*/tests`, `r_layer_tests`,
+    `ken-cli` fixtures, `examples/` and `conformance/`.
+  - Classify each loose source there that names `Dec`, `Yes`, `No`, `Empty`,
+    `decide` or `Not` bare:
+    - (a) consumes the moved value, so it exposes the catalog module;
+    - (b) is independent;
+    - (c) is a labelled prelude-identity transition sentinel.
+
+    Post the list with the candidate. For `Not`, which is transparent, this
+    sweep is the only detector.
 
 ## Stop conditions
 
@@ -105,3 +118,8 @@ Append one line per hard stop; never rewrite history.
 
 1. `And`'s transparent body `λa b. Σ(_:a).b` at Ω has no catalog spelling --
    keyed on a surface-grammar gap (Σ only in type position).
+2. A non-catalog loose source (`cat_bsearch_acceptance.rs:198`) names bare
+   `Dec` against OrderedSearch's catalog `Dec` -- keyed on bare-name
+   resolution to the still-registered prelude identity during the L3→L2-4
+   dual-identity window; invisible to the catalog-roots census and AC-2's
+   catalog-scoped controls (Architect `evt_1kkygg9f7psn8`).
