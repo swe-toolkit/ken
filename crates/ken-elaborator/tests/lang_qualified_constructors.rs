@@ -23,6 +23,123 @@ fn assert_constructor(term: Term, id: GlobalId) {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: `Resource ResourceKind.Buffer`
+/// in a binder and result type produces the exact checked Pi that the
+/// pre-scoping `Resource Buffer` spelling produced on base 0a94e80dc:
+/// `Pi (Resource Buffer) (Resource Buffer)` with the same canonical IDs.
+/// CLAIMED: T.C is an atomic type argument selecting C's checked identity.
+/// THE GAP: other-parent and dual-meaning paths have independent controls.
+#[test]
+fn qualified_resource_type_matches_prescoping_bare_checked_term() {
+    let mut env = env();
+    let trust = env.env.trusted_base();
+    let resource = env.globals["Resource"];
+    let buffer = env.prelude_env.runtime_roles.resource_kind_buffer;
+    env.elaborate_decl(
+        "fn hold_buffer (r : Resource ResourceKind.Buffer) : Resource ResourceKind.Buffer = r",
+    )
+    .expect("qualified constructor is admitted as a type argument");
+    let (_, actual) = env
+        .env
+        .const_type(env.globals["hold_buffer"])
+        .expect("checked type");
+    let resource_buffer = Term::app(
+        Term::const_(resource, vec![]),
+        Term::constructor(buffer, vec![]),
+    );
+    let expected = Term::pi(resource_buffer.clone(), resource_buffer);
+    assert_eq!(
+        actual, expected,
+        "qualified type must preserve the bare-era kernel term"
+    );
+    assert_eq!(env.env.trusted_base(), trust);
+}
+
+/// Promise class: durable invariant. MEASURED: another data type's Buffer
+/// resolves as its own checked constructor but cannot index Resource; the
+/// error is kernel type mismatch, not a parser refusal. CLAIMED: a matching
+/// leaf cannot donate the ResourceKind parent's type-argument identity.
+/// THE GAP: the qualified ResourceKind.Buffer positive runs separately.
+#[test]
+fn other_parent_buffer_cannot_index_resource_type() {
+    let mut env = env();
+    let floor_buffer = env.prelude_env.runtime_roles.resource_kind_buffer;
+    env.elaborate_file(
+        "data RivalKind = Buffer\n\
+         const rival : RivalKind = RivalKind.Buffer",
+    )
+    .expect("same-named rival constructor is a checked positive");
+    let rival_buffer = env.globals["Buffer"];
+    assert_ne!(rival_buffer, floor_buffer);
+    assert_eq!(
+        env.env
+            .constructor(rival_buffer)
+            .expect("checked rival constructor")
+            .0
+            .id,
+        env.globals["RivalKind"]
+    );
+    assert_constructor(body(&env, "rival"), rival_buffer);
+    env.elaborate_decl(
+        "fn own (r : Resource ResourceKind.Buffer) : Resource ResourceKind.Buffer = r",
+    )
+    .expect("the floor kind is a valid type index in the same environment");
+    let error = env
+        .elaborate_decl("fn wrong (r : Resource RivalKind.Buffer) : Resource RivalKind.Buffer = r")
+        .expect_err("a constructor of RivalKind cannot index ResourceKind");
+    assert!(
+        matches!(
+            error,
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "wrong other-parent type-position refusal: {error:?}"
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: a module-only Kind.Buffer
+/// checks as a Resource index; importing a distinct type Kind with its own
+/// Buffer then makes that same type-argument spelling AmbiguousReference.
+/// CLAIMED: type position never breaks a module/type tie by parser order.
+/// THE GAP: both candidates must actually be visible at the conflict site.
+#[test]
+fn module_and_type_constructor_conflict_in_type_argument() {
+    let mut env = env();
+    env.elaborate_file(
+        "module Source { data Kind = Buffer; export Kind, Buffer }\n\
+         module Kind { pub const Buffer : ResourceKind = ResourceKind.Buffer }\n\
+         import Kind",
+    )
+    .expect("one checked module Kind.Buffer is initially visible");
+    env.elaborate_decl("fn module_only (r : Resource Kind.Buffer) : Resource Kind.Buffer = r")
+        .expect("module-only type argument is well formed");
+    let source_buffer = env.globals["Source.Buffer"];
+    assert_eq!(
+        env.env
+            .constructor(source_buffer)
+            .expect("checked source constructor")
+            .0
+            .id,
+        env.globals["Source.Kind"]
+    );
+    assert_ne!(
+        source_buffer,
+        env.prelude_env.runtime_roles.resource_kind_buffer
+    );
+    env.elaborate_file("import Source (Kind)")
+        .expect("second type meaning is visible");
+    let error = env
+        .elaborate_decl("fn clash (r : Resource Kind.Buffer) : Resource Kind.Buffer = r")
+        .expect_err("type argument has two real namespace meanings");
+    assert!(
+        matches!(error, ElabError::AmbiguousReference { ref name, .. }
+            if name == "Kind.Buffer"),
+        "wrong type-position ambiguity: {error:?}"
+    );
+}
+
 /// Promise class: durable invariant. MEASURED: local qualified and bare
 /// expressions contain the same checked constructor ID. CLAIMED: T.C is a
 /// type-family selector, never a fresh or spelling-derived declaration.
