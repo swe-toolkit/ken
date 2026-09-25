@@ -50,8 +50,9 @@ stop and report the mismatch.
 ## Deliverable
 
 Elaborator resolution of `T.C` in expressions and patterns, the pattern
-grammar production from 32 §4, the scoped property, and `ResourceKind` scoped.
-No kernel change and no `trusted_base()` change.
+grammar production from 32 §4, the type-argument production (AC-3a), the
+scoped property, and `ResourceKind` scoped. No kernel change and no
+`trusted_base()` change.
 
 ## Acceptance
 
@@ -79,6 +80,22 @@ No kernel change and no `trusted_base()` change.
 
   Spec and implementation flip together. Catalog prose hits are respelled.
   Bare `Buffer`, `Mapping` and `FsHandle` are no longer reserved.
+- **AC-3a (type position, Spec ruling on the conformance-validator gap).**
+  AC-3 writes `ResourceKind.C` as a type argument (`Resource
+  ResourceKind.Buffer`), which 32 §2 does not admit. On this branch:
+  - `32-grammar.md` §2 admits a qualified constructor reference `T.C` as an
+    `atype` in type application;
+  - its resolution contract joins the qualified-reference rules in §3: it
+    resolves to the canonical constructor identity, and `T` must resolve to
+    that constructor's exact parent type;
+  - `34-data-match.md` §1.1 cross-references it.
+
+  The extension admits no other expression or projection in type arguments,
+  leaves `tproj` unchanged, and makes no scoped constructor available bare.
+  Module-versus-type ambiguity stays `AmbiguousReference`. Tests: `Resource
+  ResourceKind.Buffer` elaborates to the same term as the pre-scoping bare
+  spelling. A same-named constructor under another parent type is refused.
+  The ambiguity case fails closed in type position too.
 - **AC-4 (controls).** Each AC-1/AC-2 row is red on base. Reverting the
   resolution change reddens them. Existing bare-constructor suites stay green.
   Targeted builds only, through `scripts/ken-cargo`; no-regression means
