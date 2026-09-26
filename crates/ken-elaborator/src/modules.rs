@@ -185,6 +185,21 @@ impl ModuleState {
             return Err(ElabError::Internal("prelude scope sealed twice".into()));
         }
         self.session_scope = self.root_scope.clone();
+        // Bootstrap elaboration checked these selectors in the prelude root,
+        // before the session ledger existed. Admit their checked identities at
+        // the seal so later source references never borrow the flat spelling.
+        let prelude_attached: Vec<_> = self.root_scope.local_attached_proofs.iter()
+            .map(|name| {
+                self.root_scope.checked_local_ids.get(name).copied()
+                    .map(|id| (name.clone(), id))
+                    .ok_or_else(|| ElabError::Internal(format!(
+                        "prelude attached proof `{name}` has no checked identity"
+                    )))
+            })
+            .collect::<Result<_, _>>()?;
+        for (name, id) in prelude_attached {
+            self.session_scope.bind_checked_session_local(&name, id)?;
+        }
         if self.session_scope.private_ids != self.private_ids {
             return Err(ElabError::Internal(
                 "session scope lost the prelude private identity roster".into(),
@@ -557,6 +572,10 @@ struct Scope {
     /// Its own declaration, not the subject's provider, grants the local
     /// `proof p for subject` selector (including same-unit SCC references).
     local_attached_proofs: HashSet<String>,
+    /// Attached-proof selectors declared in the current expansion only.
+    /// A prior checked selector may be selected from session_ids only when
+    /// this unit has not prebound the same selector or its subject.
+    current_attached_proofs: HashSet<String>,
     /// Names mentioned by a facade export remain deliberately unavailable to
     /// the body unless a separate import/local binding supplies them. Keeping
     /// this negative fact makes the normative facade-vs-binding failure an
@@ -685,6 +704,15 @@ impl Scope {
         self.bindings
             .insert(bare.to_string(), qualified.to_string());
         Ok(())
+    }
+}
+
+fn record_checked_attached(scope: &mut Scope, decl: &Decl, id: ken_kernel::GlobalId) {
+    if let Decl::AttachedProofDecl { subject, proof_name, .. } = decl.unwrap_pub() {
+        let selected = format!("{subject}::{proof_name}");
+        if scope.current_attached_proofs.contains(&selected) {
+            scope.checked_local_ids.insert(selected, id);
+        }
     }
 }
 
@@ -913,12 +941,23 @@ fn resolve_checked_ref(
     let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
     let imported_qualified = name.rsplit_once('.')
         .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
-    if selected.is_some_and(|id| scope.private_ids.contains(&id))
-        || (selected.is_none() && (imported_bare || imported_qualified))
-    {
+    guard_selected_private_id(scope, name, selected, span)?;
+    if selected.is_none() && (imported_bare || imported_qualified) {
         return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
     }
     Ok((canonical, selected))
+}
+
+fn guard_selected_private_id(
+    scope: &Scope,
+    name: &str,
+    selected: Option<ken_kernel::GlobalId>,
+    span: &Span,
+) -> Result<(), ElabError> {
+    if selected.is_some_and(|id| scope.private_ids.contains(&id)) {
+        return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
+    }
+    Ok(())
 }
 
 fn resolve_class_ref(
@@ -949,10 +988,21 @@ fn resolve_attached_ref(
         } else {
             format!("{canonical_subject}::{proof_name}")
         };
+        guard_selected_private_id(scope, &selected, Some(*id), span)?;
         return Ok((canonical, Some(*id)));
     }
+    let canonical = format!("{canonical_subject}::{proof_name}");
+    if scope.current_attached_proofs.contains(&selected)
+        || (!subject.contains('.') && scope.current_local_names.contains(subject))
+    {
+        return Ok((canonical, None));
+    }
+    if let Some(id) = scope.session_ids.get(&selected).copied() {
+        guard_selected_private_id(scope, &selected, Some(id), span)?;
+        return Ok((canonical, Some(id)));
+    }
     if subject_is_local || scope.local_attached_proofs.contains(&selected) {
-        return Ok((format!("{canonical_subject}::{proof_name}"), None));
+        return Err(ElabError::UnboundName { name: selected, span: span.clone() });
     }
     // D0's legacy ambient path remains available only when the subject is
     // genuinely untracked. An imported subject has a selected provider, so
@@ -2811,9 +2861,11 @@ fn rewrite_rdecl(
         RDeclKind::AttachedProof {
             subject,
             proof_name,
-        } => RDeclKind::AttachedProof {
-            subject: resolve_ref(scope, exports, &subject, &rdecl.span)?,
-            proof_name,
+            ..
+        } => {
+            let (subject, subject_id) =
+                resolve_checked_ref(scope, exports, &subject, &rdecl.span)?;
+            RDeclKind::AttachedProof { subject, proof_name, subject_id }
         },
         RDeclKind::Law { param, fields } => RDeclKind::Law {
             param,
@@ -2971,6 +3023,7 @@ fn rewrite_rdecl(
         RDeclKind::AttachedProof {
             subject,
             proof_name,
+            ..
         } => format!("{subject}::{proof_name}"),
         RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. } => {
             direct_class_name.expect("direct class declaration name is resolved above").0
@@ -3447,7 +3500,10 @@ fn prebind_scope_declarations(
             continue;
         }
         if let Decl::AttachedProofDecl { subject, proof_name, .. } = inner {
-            scope.local_attached_proofs.insert(format!("{subject}::{proof_name}"));
+            let selected = format!("{subject}::{proof_name}");
+            scope.local_attached_proofs.insert(selected.clone());
+            scope.current_attached_proofs.insert(selected.clone());
+            scope.checked_local_ids.remove(&selected);
             continue;
         }
         let bare = inner.name().to_string();
@@ -4155,6 +4211,9 @@ fn expand_scope(
                 // state it would have seen processed alone at its position.
                 let mut bare_names: Vec<String> = Vec::with_capacity(run_member_count);
                 let mut rdecls: Vec<crate::resolve::RDecl> = Vec::with_capacity(run_member_count);
+                let run_members: Vec<_> = run.iter()
+                    .filter(|candidate| is_recursive_candidate(candidate.unwrap_pub()))
+                    .collect();
                 for d in run
                     .iter()
                     .filter(|candidate| is_recursive_candidate(candidate.unwrap_pub()))
@@ -4222,6 +4281,7 @@ fn expand_scope(
                         record_checked_local(
                             scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
                         );
+                        record_checked_attached(scope, run_members[k], result.def_id);
                         ids.push(result);
                     } else {
                         let members: Vec<crate::resolve::RDecl> =
@@ -4295,12 +4355,13 @@ fn expand_scope(
                             &members,
                             &declared_fixities,
                         )?;
-                        for (rdecl, result) in members.iter().zip(results) {
+                        for (m, (rdecl, result)) in scc.iter().copied().zip(members.iter().zip(results)) {
                             register_effect_row(elab, &result);
                             register_declared_effect_row(elab, rdecl)?;
                             record_checked_local(
                                 scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
                             );
+                            record_checked_attached(scope, run_members[m], result.def_id);
                             ids.push(result);
                         }
                     }
@@ -4414,6 +4475,7 @@ fn expand_scope(
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
                     record_checked_local(scope, &bare, &result.name, result.def_id);
+                    record_checked_attached(scope, inner, result.def_id);
                     let constructor_names: Option<Vec<&str>> = match inner {
                         Decl::DataDecl { ctors, .. } => {
                             Some(ctors.iter().map(|ctor| ctor.name.as_str()).collect())
@@ -4598,8 +4660,15 @@ fn expand_scope(
         for (name, id) in checked {
             scope.bind_checked_session_local(&name, id)?;
         }
+        let checked_attached: Vec<_> = scope.current_attached_proofs.iter()
+            .filter_map(|name| scope.checked_local_ids.get(name).map(|id| (name.clone(), *id)))
+            .collect();
+        for (name, id) in checked_attached {
+            scope.bind_checked_session_local(&name, id)?;
+        }
     }
     scope.current_local_names.clear();
+    scope.current_attached_proofs.clear();
     Ok((ids, exports_here))
 }
 
@@ -5383,6 +5452,16 @@ mod namespace_effect_tests {
         assert!(env.module_state.prelude_sealed);
         assert_eq!(env.module_state.root_scope.private_ids, env.module_state.private_ids);
         assert_eq!(env.module_state.session_scope.private_ids, env.module_state.private_ids);
+        let prelude_attached = &env.module_state.root_scope.local_attached_proofs;
+        let checked_count = prelude_attached.iter()
+            .filter(|name| env.module_state.root_scope.checked_local_ids.contains_key(*name))
+            .count();
+        let selected_count = prelude_attached.iter()
+            .filter(|name| env.module_state.session_scope.session_ids.contains_key(*name))
+            .count();
+        assert_eq!(checked_count, prelude_attached.len());
+        assert_eq!(selected_count, checked_count);
+        eprintln!("prelude attached selectors: {} checked: {checked_count} session: {selected_count}", prelude_attached.len());
         let prelude_bindings = env.module_state.root_scope.bindings.clone();
         let prelude_ids = env.module_state.root_scope.checked_local_ids.clone();
         env.declare_postulate_raw("SessionRaw", ken_kernel::Term::ty(ken_kernel::Level::Zero))

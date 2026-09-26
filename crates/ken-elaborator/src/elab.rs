@@ -12138,7 +12138,7 @@ fn elaborate_associated_rdecl(
             rdecl,
             None,
         ),
-        RDeclKind::AttachedProof { subject, .. } => elaborate_checked_theorem(
+        RDeclKind::AttachedProof { subject, subject_id, .. } => elaborate_checked_theorem(
             env,
             globals,
             num_values,
@@ -12147,7 +12147,7 @@ fn elaborate_associated_rdecl(
             provenance,
             standard_operators,
             rdecl,
-            Some(subject),
+            Some((subject, *subject_id)),
         ),
         RDeclKind::Law { param, fields } => elaborate_law(
             env,
@@ -14120,12 +14120,13 @@ pub(crate) fn elaborate_mutual_group(
                 RDeclKind::Theorem => {
                     ensure_omega_type(env, &Context::new(), ty_core, &rdecl.span)?
                 }
-                RDeclKind::AttachedProof { subject, .. } => {
+                RDeclKind::AttachedProof { subject, subject_id, .. } => {
                     ensure_omega_type(env, &Context::new(), ty_core, &rdecl.span)?;
                     validate_attached_subject_occurs_applied(
                         env,
                         globals,
                         subject,
+                        *subject_id,
                         ty_core,
                         &rdecl.span,
                     )?;
@@ -14721,7 +14722,7 @@ fn elaborate_checked_theorem(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
-    attached_subject: Option<&str>,
+    attached_subject: Option<(&str, Option<GlobalId>)>,
 ) -> Result<ElabResult, ElabError> {
     if globals.contains_key(&rdecl.name) {
         return Err(ElabError::TypeMismatch {
@@ -14739,11 +14740,12 @@ fn elaborate_checked_theorem(
         let ty_core = elab_type(&mut cx, ty)?;
         let ty_core = cx.metas.zonk_term(&ty_core);
         ensure_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
-        if let Some(subject) = attached_subject {
+        if let Some((subject, subject_id)) = attached_subject {
             validate_attached_subject_occurs_applied(
                 cx.env,
                 cx.globals,
                 subject,
+                subject_id,
                 &ty_core,
                 &rdecl.span,
             )?;
@@ -14824,12 +14826,12 @@ fn validate_attached_subject_occurs_applied(
     env: &GlobalEnv,
     globals: &HashMap<String, GlobalId>,
     subject: &str,
+    selected_id: Option<GlobalId>,
     proof_ty: &Term,
     span: &Span,
 ) -> Result<(), ElabError> {
-    let subject_id = globals
-        .get(subject)
-        .copied()
+    let subject_id = selected_id
+        .or_else(|| globals.get(subject).copied())
         .ok_or_else(|| ElabError::UnboundName {
             name: subject.to_string(),
             span: span.clone(),

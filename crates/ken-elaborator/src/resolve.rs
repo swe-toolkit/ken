@@ -184,7 +184,12 @@ pub(crate) enum RDeclKind {
     /// `theorem name ... : theorem = proof`.
     Theorem,
     /// `proof p for subject ... : theorem = proof`.
-    AttachedProof { subject: String, proof_name: String },
+    AttachedProof {
+        subject: String,
+        proof_name: String,
+        /// Selected checked subject; same-unit subjects defer to the writer.
+        subject_id: Option<ken_kernel::GlobalId>,
+    },
     /// A `law Name (param) { field : φ ; … }` bundle.
     Law {
         param: String,
@@ -1437,6 +1442,7 @@ pub(crate) fn resolve_decl_in_unit(
                 kind: RDeclKind::AttachedProof {
                     subject: subject.clone(),
                     proof_name: proof_name.clone(),
+                    subject_id: None,
                 },
             })
         }
