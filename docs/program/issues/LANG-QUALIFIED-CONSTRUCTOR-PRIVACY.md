@@ -1,7 +1,7 @@
 ---
 id: LANG-QUALIFIED-CONSTRUCTOR-PRIVACY
 title: "Qualified T.C resolution reaches the prelude's hidden resource constructors (BufferHandle.PrivateBufferHandle, MappingHandle.PrivateMappingHandle, BufferSpan, TransferCount, ResourceTraceIdentity) in ambient elaborate_file: key constructor privacy on identity so every resolution path refuses a hidden constructor"
-status: active
+status: merged
 owner: language
 size: S
 gate: architect
