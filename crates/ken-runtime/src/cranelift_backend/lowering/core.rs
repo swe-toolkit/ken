@@ -1247,7 +1247,7 @@ mod branched_scrutinee_unit_body_observer_tests {
     }
 }
 
-fn agreeing_recursive_body_unit<Unit>(
+pub(in crate::cranelift_backend) fn agreeing_recursive_body_unit<Unit>(
     declared_units: impl IntoIterator<Item = Unit>,
 ) -> Result<Option<Unit>, CraneliftBackendError>
 where
@@ -2250,6 +2250,11 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         &declarations,
         oriented_subcontinuation_plan.as_ref(),
     )?;
+    // Pending-call admission also needs the checked call-template authority.
+    // Install it before emission, in the only scope holding both plans. The
+    // emitter does not read this read-only increment-1 decision.
+    static_transition_plan
+        .install_selected_pending_calls(oriented_subcontinuation_plan.as_ref())?;
     // **The wiring's own observation, and it exists because the increment is
     // otherwise unobservable.**
     //

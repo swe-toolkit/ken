@@ -2893,6 +2893,17 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-SELECTED-PENDING-CALL-BUILD` increment 1: read-only admission.
+        // The complete file has zero emission sites for all five needles.
+        Census {
+            file: "planning/static_transition/selected_pending_calls.rs",
+            source: include_str!("../../../planning/static_transition/selected_pending_calls.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning/static_transition/semantic_ir.rs",
             source: include_str!("../../../planning/static_transition/semantic_ir.rs"),
@@ -3663,6 +3674,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../planning/static_transition/responses.rs"),
     ),
     (
+        "planning/static_transition/selected_pending_calls.rs",
+        include_str!("../../../planning/static_transition/selected_pending_calls.rs"),
+    ),
+    (
         "planning/static_transition/semantic_ir.rs",
         include_str!("../../../planning/static_transition/semantic_ir.rs"),
     ),
@@ -3980,6 +3995,7 @@ fn the_backend_production_surface_inventory_is_closed() {
             // into its own domain module.
             ("planning/static_transition.rs", "occurrences"),
             ("planning/static_transition.rs", "responses"),
+            ("planning/static_transition.rs", "selected_pending_calls"),
             ("planning/static_transition.rs", "semantic_ir"),
             // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the Emittable* vocabulary and
             // the StaticTransitionPlan projections that derive it, factored into

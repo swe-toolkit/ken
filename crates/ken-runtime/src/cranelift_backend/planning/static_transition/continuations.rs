@@ -1912,6 +1912,9 @@ impl<'plan> ContinuationUnitView<'plan> {
     pub(in crate::cranelift_backend) fn worker_capture_count(&self) -> usize {
         self.key.worker.captures.len()
     }
+    pub(in crate::cranelift_backend) fn worker_captures(&self) -> &[ContinuationWorkerCaptureProvenance] {
+        &self.key.worker.captures
+    }
 
     /// Byte offsets for this unit's slot run, and the frame size, from the
     /// **one** offset walk `B2F` owns.
