@@ -538,10 +538,14 @@ spells the same Σ former as §2: the first component uses the existing `type`
 grammar, `x` scopes over the right-hand `expr` only, and both components must
 elaborate as types or propositions. It elaborates to the existing kernel Σ; its
 sort is Ω exactly when both components are Ω, and otherwise follows `13 §4`'s
-predicative Σ sort. Thus, with `a, b : Ω`, `(x : a) × b` is the
-expression-position body of `And a b` and is convertible with the prelude
-conjunction. A relevant first component, such as `(x : Int) × P x` for
-`P : Int → Ω`, is Type-sorted and cannot be ascribed Ω.
+predicative Σ sort. Thus, with `a, b : Ω`, `(x : a) × b` is an
+expression-position body for a Ken-defined conjunction: a catalog package can
+define `fn And (a : Omega) (b : Omega) : Omega = (x : a) × b` using the existing
+Σ former. This grammar production does not place `And` in the closed prelude
+or make an unimported package name visible; clients name a catalog `And` only
+through an explicit import (`30 §4`, `33 §3.3`). A relevant first component,
+such as `(x : Int) × P x` for `P : Int → Ω`, is Type-sorted and cannot be
+ascribed Ω.
 
 The form is selected only when `×` immediately follows the complete
 parenthesized `(ident : type)` binder at an expression boundary. A following
