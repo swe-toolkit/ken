@@ -880,18 +880,9 @@ configuration: `../docs/ops/compute-budget.md`.
   `cargo test`. It holds a machine-wide lock (`KEN_BUILD_SLOTS`, default 1) so
   only one build runs at a time across all agents. Bypassing it is the fastest
   way to swap-death the box.
-- ** Scope to the touched crate** (`-p <crate>`, or `--test <name>` for one
-  suite), **NEVER `--workspace` (operator hard rule).** Full-workspace builds,
-  the `--locked` gate, the conformance suite, and any `--release`/LTO build run
-  **in CI on GitHub**, not on the laptop — a local `--workspace` run is what OOMs
-  the box and stalls everyone. Lean on CI green (the publisher path polls those
-  exact checks before merging), don't reproduce it locally. **Every local agent
-  is responsible only for the affected areas** — implementer, QA, leader, enclave,
-  Steward alike. A WP frame's "no-regression" / "workspace-green" acceptance
-  criterion therefore means **green in CI**, *never* a local `cargo test
-  --workspace`; authors write frame ACs that way and readers execute them that
-  way. (Operator, 2026-07-13 — a kenfmt implementer burned ~1h on a local locked
-  workspace run the frame wrongly mandated; the venue is CI, full stop.)
+- **Scope to the touched crate** (`-p <crate>` or `--test <name>`), never
+  `--workspace`: the full workspace runs in CI, so a frame's "no-regression"
+  means green in CI (operator hard rule; enforced, §12a).
 - **`source scripts/ken-env.sh`** at session start for the shared `sccache` +
   `CARGO_HOME`, so you don't recompile dependencies other agents already built.
 - **Idle = paused.** A resident agent costs RAM even when not building. If your
@@ -901,41 +892,28 @@ configuration: `../docs/ops/compute-budget.md`.
   hardware grows (the Steward/operator raises the caps; do not raise them
   unilaterally).
 
-### 12a. NEVER `git stash` — the stash stack is SHARED across every worktree
+### 12a. Enforced prohibitions
 
-**Binding on every seat, no exceptions** (Steward, 2026-07-22, after a live
-near-miss).
+Each rule below is refused mechanically, so a seat need not remember it. The
+Bash rules are in `scripts/hooks/bash-policy`, which Claude Code seats run
+as a PreToolUse hook and pi seats through pi-convo's `tool_call` hook.
 
-`git stash` stores entries in `refs/stash` on the **shared repository**, not
-per-worktree. The fleet runs **~70 agent worktrees over one clone**, so every
-seat sees and mutates **one stack**. A bare `git stash pop` from *any* worktree
-takes `stash@{0}` — **whichever agent parked something last**, which is almost
-never you. Observed live: **12 entries from at least four different agents.**
+- **Never `git stash pop`, `clear` or a bare `git stash`:** the stash stack
+  is shared by every worktree, so commit instead.
+- **Never a `--workspace` or `--all` cargo run** (§12); `scripts/ken-cargo`
+  refuses one too.
+- **Never `gh run rerun`:** a rerun is a publisher-path write (`gh-access`).
+- **Never `git checkout` or `git restore` of `moot.toml`:** the primary
+  checkout's copy holds live seat configuration.
+- **Never call `mcp__convo__get_transcript`:** its `limit` does not bound the
+  payload, which drops your convo transport; use `detail: "standard"`.
+  `.claude/settings.json` denies it and pi-convo does not register it.
+- **Never move or delete a held ref** (`wp/RT-BRACKET-PRODUCER-AUTHENTICITY`,
+  `wp/KERNEL-NORMALIZE-ORIGIN-TRACE`, `wp/RT-BRACKET-SETTLEMENT-PLANE`):
+  `.githooks/reference-transaction` aborts the update.
 
-**The near-miss.** A build implementer ran `git stash pop` mid-slice and nearly
-consumed another team's parked diagnostic work. It was saved **only because the
-apply hit a merge conflict** — git retains the entry on conflict rather than
-dropping it. **On a clean apply it would have silently destroyed another
-agent's work**, and the owner would have found an empty stack with no error, no
-log, and no way to learn who took it. **This is the failure class no individual
-seat can detect**, which is why it is fleet law and not a team-local item.
-
-**Use one of these instead — all per-branch, so they cannot collide:**
-
-- **Commit it.** A WP commit on your own `<role>/work` branch is the normal
-  move, and is what the handoff gate expects anyway.
-- **`git worktree add`** a scratch worktree for the experiment.
-- If you genuinely must stash: **`git stash push -m "<role>: <what>"`**, and
-  thereafter **only `git stash apply stash@{n}`** on an entry whose message you
-  wrote yourself. **Never `pop`. Never a bare index.** Prefer committing.
-
-** Do not reap the existing stack.** Those entries belong to other seats.
-
-> Same shared-substrate family as the **single object store** (a commit that
-> verifies locally may never have been pushed — §14) and the **shared `/tmp`**
-> (at 99% full it silently dropped a git write). **Worktrees look isolated and
-> are not** — before assuming any git state is yours alone, ask whether the
-> underlying ref lives in the clone or in the worktree.
+A refusal quotes its rule. If one blocks legitimate work, report it to the
+Steward instead of working around it.
 
 ### 12b. Tear down the scratch worktrees you spin up
 

@@ -1,11 +1,8 @@
 # Live lane roster
 
-Current operational state only. The operator owns lane count, ordering, and
-objectives; the Steward updates a field only with the ruling that changed it.
-
-Hard limit: 80 lines. Replace stale text; never append history. Do not record
-completed work, review transcripts, measurements, explanations, prior states, or
-superseded instructions. Git and the WP thread are the history.
+Current state only; the operator owns lanes, order and objectives. Hard limit
+80 lines: replace stale text, never append history, measurements or
+transcripts. Git and the WP thread are the history.
 
 ## Live roster direction
 
@@ -63,18 +60,21 @@ as its own node. Investigation opens a repair, never a separate report node.
 BYTES K3/F4'/four postulates ("concur with rec."), the L1 bracket redesign
 ("option (a)."), and the L1 pending-call precursor ("authorize option (a) for
 pending-call. it has to be addressed."). Spec serves BYTES D2.
+**2026-09-26** ("concur with rec."): the three `l1_acceptance` ignored rows
+go to L2 and `ds5b` to L1; TCB growth they need still returns to the operator.
+**2026-09-26:** "CI is now at 28 minutes. schedule work to bring that down
+under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`.
 
 ## Current state
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-SELECTED-PENDING-CALL-BUILD` increment 2 (increment 1 landed `303b0bf71`; released `evt_6tytznvz5qbma`) | `RT-COMPMATCH-TREE-SCRUTINEE`, whose AC-0 re-measures the first refusal of the unowned ignored rows | Increment 2 RELEASED as C1-C5 (`evt_a8csxz1hcj46`; frame section): classifier, trap terminator, no package, delete package machinery, un-ignore px7l x2 and px7m ok. Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`); px8ta stays ignored. Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed |
-| L2 | language | One resolution mode: strict admits only the minimal prelude, legacy passthrough deleted, binding a prelude name anywhere (incl. local binders) is an error (operator 2026-09-25) | `LANG-SESSION-SCOPE` -- `914d7f616` WITHDRAWN on red CI (3 reject-expecting tests now Ok, `evt_6d8bvpja8cqe7`); language ring respins | `LANG-EXPRESSION-SIGMA`: Spec route (a) renamed export (`fn and` + `export and as And`); Spec and CV turns at `b38deb752` (`evt_bq5st60jz2j5`); Language fixture turn held until SESSION-SCOPE lands, then Architect test-delta review and CV exact-tip vote; then floor additions for ledger-witnessed keyed names (operator 2026-09-25: an ever-present intrinsic's name is reserved; no intrinsic module; `Prod`/`zip` disposition belongs here), then flip and enforce | Language ring on the SESSION-SCOPE respin, then the Sigma fixture turn. Flip frame carries the Architect's SESSION-SCOPE carries (`evt_74ac7bpmpcd0c`: remaining `globals` writes, px8p harness write, raw-over-import `session_ids`, `owner_member` AC) |
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-PENDING-ROUTE-CONTINUATION-DROP` (Adversary F1/F2 on `912c44cf4`: native drops a selected arm's continuation; refusal surfaces as an ICE); Architect rules the repair at D0 | `RT-COMPMATCH-TREE-SCRUTINEE` (AC-0 table of 9 CLI rows plus `ds5b` in flight; Architect rules the group) | Finish the COMPMATCH AC-0 table, then the regression repair before any COMPMATCH build. Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`). Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed |
+| L2 | language | One resolution mode: strict admits only the minimal prelude, legacy passthrough deleted, binding a prelude name anywhere (incl. local binders) is an error (operator 2026-09-25) | `LANG-SESSION-SCOPE` recut RELEASED (one provenance-tagged session map, R1-R5; Architect `evt_1gz54y177tm3c`; frame section), built from current main; stop count 4 | `LANG-EXPRESSION-SIGMA`: Spec route (a) renamed export (`fn and` + `export and as And`); Spec and CV turns at `b38deb752` (`evt_bq5st60jz2j5`); Language fixture turn held until SESSION-SCOPE lands, then Architect test-delta review and CV exact-tip vote; then floor additions for ledger-witnessed keyed names (operator 2026-09-25: an ever-present intrinsic's name is reserved; no intrinsic module; `Prod`/`zip` disposition belongs here), then flip and enforce | Language ring on the SESSION-SCOPE respin, then the Sigma fixture turn. Flip frame carries the Architect's SESSION-SCOPE carries (`evt_74ac7bpmpcd0c`: remaining `globals` writes, px8p harness write, raw-over-import `session_ids`, `owner_member` AC) |
 | L3 | foundation | Move definable prelude conveniences into packages and remove collisions (minimal fixed prelude, operator 2026-09-25), then resume proof backfill | `CAT-AND-SORTED-PRELUDE-MOVE` -- `ready`, M, T1; waits on `LANG-EXPRESSION-SIGMA` (list_map subsumption landed `3a2b30628`) | `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 | Kick the And move when Sigma lands. `Prod`/`zip` stay (runtime and ABI keyed; L2 floor question); `fold` is a separate removal |
 
 ## Update rule
 
-Retain exactly one value for each table field. An update deletes the old value.
-Link the WP issue or thread instead of copying detail here. Verify a row against
-its issue file and current `origin/main` before acting. Correct stale state in
-the next product-attached update; never publish a standalone currency commit.
+One value per table field; an update deletes the old one. Link the WP issue or
+thread rather than copying detail. Verify a row against its issue file and
+`origin/main` before acting; never publish a standalone currency commit.

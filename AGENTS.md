@@ -122,53 +122,12 @@ to write Ken's code.** Per `CLEAN-ROOM.md`:
 When unsure whether you may look at something under `local/refs/`, the answer
 is no — ask the operator or the Spec enclave.
 
-## NEVER call `get_transcript` (convo MCP) — it kills your own transport
+## Enforced prohibitions
 
-**Operator prohibition, 2026-07-26. Binds every seat.** Do not call
-`mcp__convo__get_transcript` — not with a small `limit`, not "just once", not as
-a fallback when another read comes back thin.
-
-**Why:** its `limit` argument does **not** bound the response. A `limit=4` call
-returned a payload large enough to take the session's convo **stdio connection
-down with it** — every `mcp__convo__*` tool disappeared mid-turn.
-
-**The cost is not a failed read — it is losing the ability to POST.** You go
-blind and mute together: no `post_response` to unblock a ring waiting on you, no
-`list_decisions`, no `orientation`. And it is silent to everyone else — the
-fleet keeps posting into a channel you can no longer hear, and your seat looks
-merely quiet.
-
-**The reason you used to be tempted is GONE. Use `detail: "standard"`.**
-
-Verified 2026-08-09 against the upgraded `mootup` dependency, which added event
-search/pagination and better thread ergonomics. `get_recent_context` and
-`get_mentions` **now take a `detail` argument, and `detail: "standard"` returns
-the full message text** — with a real `limit` and a `since_event_id` cursor:
-
-```
-get_mentions(detail="standard", limit=1)                   full body, latest mention
-get_recent_context(detail="standard", limit=N)             full bodies, newest N
-get_recent_context(detail="standard", since_event_id=ID)   cursor poll
-```
-
-⇒ **The old rationale — *"`get_transcript` is the only read that returns
-bodies"* — is FALSE.** That was the entire pull toward it, and the moment it bit
-was when you needed the full text of a **truncated notification** while
-something was blocked. **That case is now served by a bounded, cursored call.**
-`detail` defaults to `"minimal"`, so pass it explicitly; a thin result means you
-omitted the argument, **never** that you need `get_transcript`.
-
-The HTTP read path still works as a fallback, with **your own** credential
-(never another seat's `api_key`; never dump `.moot/actors.json` to learn its
-shape): `GET {API}/api/spaces/{space_id}/events?limit=N` with `Authorization:
-Bearer <own key>`, `API` from `moot.toml`'s `convo.api_url`. **Prefer
-`detail: "standard"` — one call, and no credential handling.**
-
-**The `get_transcript` prohibition itself is UNCHANGED and remains absolute.**
-It is the operator's to lift, not yours, and the upgrade is **not** a licence to
-retry it. A working `get_transcript` in some future version is still not a
-reason to try it now to find out — the failure costs you the ability to **post**,
-and there is now no read it uniquely provides.
+Never call `mcp__convo__get_transcript`, and read full message bodies with
+`get_recent_context` or `get_mentions` at `detail: "standard"`. This rule and
+the others in `agent/COORDINATION.md §12a` (stash, workspace builds,
+`gh run rerun`, `moot.toml`, held refs) are refused mechanically.
 
 ## Conventions
 
@@ -176,19 +135,10 @@ and there is now no read it uniquely provides.
   humans-read, decide on intrinsic merits not effort, small auditable TCB,
   reflect-don't-extend, subsume-don't-proliferate, honesty about the boundary).
   When the spec does not settle a choice, reason from it.
-- ** LOCAL BUILDS/TESTS ARE TARGETED ONLY — NEVER `--workspace` (operator, hard
-  rule).** This box has limited CPU/RAM; a full `cargo build`/`cargo test
-  --workspace` OOMs or wedges it and stalls the whole fleet. Build and test
-  **only through `scripts/ken-cargo`, scoped to the crate you touched** (`-p
-  <crate>`, or `--test <name>` for one suite) — the affected areas, nothing more.
-  **The full-workspace build, the `--locked` gate, and the conformance suite run
-  in CI on GitHub — NOT on the laptop.** The scripted publisher polls those exact
-  CI checks before it merges, so the whole-repo gate always runs; reproducing it
-  locally is redundant and is *the* resource sink. This binds **every local
-  agent — implementer, QA, leader, enclave, Steward — no exceptions.** A WP
-  frame's "no-regression" / "workspace-green" acceptance criterion means
-  **green in CI**, never a local `--workspace` run; author and read frame ACs
-  that way. Canonical statement + rationale: **`agent/COORDINATION.md §12`**.
+- **Local builds and tests are targeted only:** use `scripts/ken-cargo`
+  scoped to the crate or suite you touched, never `--workspace`. The whole
+  workspace runs in CI, so "no-regression" in a frame means green in CI
+  (`agent/COORDINATION.md §12`).
 - **Write in plain text. No decorative icons** (operator, 2026-08-01). Do not
   open lines, headings, table cells, or emphasis with symbols like star, warning
   sign, no-entry, check mark, or any emoji. **The operator finds them
