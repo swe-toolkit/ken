@@ -138,7 +138,11 @@ def check_cargo(words):
     tool = words[0].rsplit("/", 1)[-1]
     if tool not in ("cargo", "ken-cargo"):
         return None
-    if "--workspace" in words or "--all" in words:
+    args = words[1:words.index("--")] if "--" in words else words[1:]
+    sub = next((a for a in args if not a.startswith(("-", "+"))), None)
+    if sub == "fmt":
+        return None  # formatting compiles nothing
+    if "--workspace" in args or "--all" in args:
         return ("Workspace-wide cargo runs are forbidden locally "
                 "(COORDINATION §12): build and test one crate through "
                 "`scripts/ken-cargo -p <crate>`. CI runs the whole workspace.")
