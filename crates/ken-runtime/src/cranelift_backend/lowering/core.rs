@@ -13154,8 +13154,22 @@ impl<'a> Lowering<'a> {
         // both checks are pure, take no coordinate, and are exactly the two
         // `transfer_into_carrier` runs on the same value one step later. What
         // moves is *when*, and nothing else.
-        for argument in args {
+        for (position, argument) in args.iter().enumerate() {
             if let LoweringOperand::Specialized(value) = argument {
+                // A specialized Vis with a raw lexical K has escaped its
+                // response owner. Its K is a closure, but reporting only the
+                // generic closure-transfer error hides the earlier ownership
+                // violation. Other raw closures retain their ordinary refusal.
+                if position == 1
+                    && matches!(value, Lowered::Closure { .. } | Lowered::DeclarationClosure { .. })
+                    && self.function_local.static_response_owner.is_none()
+                    && self.static_transition_plan.specialized_response_at_vis(origin)
+                {
+                    return Err(unsupported(
+                        "StaticResponseDeferred",
+                        "a deferred host response is compiler control and can only enter its exact response owner",
+                    ));
+                }
                 if value.contains_boundary_closure_environment()? {
                     self.represented_boundary_admissibility(value)?;
                 } else {

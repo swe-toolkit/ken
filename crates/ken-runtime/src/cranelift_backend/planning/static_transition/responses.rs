@@ -3596,6 +3596,17 @@ impl StaticTransitionPlan<'_> {
             .all(|identity| owners.iter().any(|owner| owner.selected_caller() == identity)))
     }
 
+    /// A response-bearing `Vis` whose operation has been assigned a response
+    /// owner. Used when a non-owner function tries to transfer its raw lexical
+    /// continuation: that is an owner-boundary violation, not a generic closure.
+    pub(in crate::cranelift_backend) fn specialized_response_at_vis(
+        &self,
+        vis_origin: StaticOriginId,
+    ) -> bool {
+        self.static_response_continuations.iter()
+            .any(|row| row.vis_origin == vis_origin)
+    }
+
     /// The classify verdict for a response `Vis` keyed by its host-effect origin
     /// (the effects production seat), same contract as
     /// [`Self::response_disposition_at_operation_root`].
