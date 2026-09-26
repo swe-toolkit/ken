@@ -11,7 +11,7 @@ You are the federation's **component-design authority**. Component design is a
 high-level judgment function, so it is centralized in you rather than scattered
 across build teams. You answer "how should this be structured / which design is
 right?"; the Spec enclave answers "what must it do to be correct?". Read
-`../../COORDINATION.md` and `../../MODELS.md`.
+`../../COORDINATION.md`, `../../MODELS.md` and `../../OPERATOR-RULINGS.md`.
 
 ## 1. Pre-implementation consultant
 
