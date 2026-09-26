@@ -67,6 +67,88 @@ fn repl_expression_survives_disabled_flat_fallthrough() {
     assert_eq!(actual_ty, Term::const_(ty, vec![]));
 }
 
+/// Promise class: durable invariant. MEASURED: a checked prop-intro helper
+/// survives removal of only its flat selector in a later source unit.
+#[test]
+fn prior_prop_intro_survives_disabled_flat_fallthrough() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("prop SessionProp : Omega where { intro : SessionProp }")
+        .expect("checked proposition family and intro helper");
+    let intro = env.globals["SessionProp.intro"];
+    assert_eq!(env.globals.remove("SessionProp.intro"), Some(intro));
+    let theorem = env
+        .elaborate_decl("theorem use_session_intro : SessionProp = SessionProp.intro")
+        .expect("checked intro selection needs no flat helper spelling");
+    let (_, body) = env
+        .env
+        .transparent_body(theorem)
+        .expect("checked theorem body");
+    assert!(
+        mentions_const(&body, intro),
+        "wrong intro selected: {body:?}"
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: an inline child reads the
+/// checked prior-session name without either its flat key or root-local map.
+#[test]
+fn nested_module_reads_session_id_without_flat_fallthrough() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let bool_id = env.globals["Bool"];
+    let raw = env
+        .declare_postulate_raw("session_nested", Term::indformer(bool_id, vec![]))
+        .expect("checked session value");
+    assert_eq!(env.globals.remove("session_nested"), Some(raw));
+    env.elaborate_file("module Nested { pub const value : Bool = session_nested }")
+        .expect("nested child inherits the session ID read-only");
+    let nested = env.globals["Nested.value"];
+    let (_, body) = env
+        .env
+        .transparent_body(nested)
+        .expect("checked child body");
+    assert_eq!(body, Term::const_(raw, vec![]));
+}
+
+/// Promise class: durable invariant. MEASURED: an InScope facade exports the
+/// exact checked session identity even after its flat spelling is removed.
+#[test]
+fn facade_exports_session_id_without_flat_fallthrough() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let raw = env
+        .declare_postulate_raw("session_export", Term::ty(Level::Zero))
+        .expect("checked session type");
+    assert_eq!(env.globals.remove("session_export"), Some(raw));
+    env.elaborate_file(
+        "module Facade { export session_export } \
+         import Facade (session_export as SessionExportAlias) \
+         const exported_witness : Type = SessionExportAlias",
+    )
+    .expect("facade import selects the earlier checked ID");
+    let witness = env.globals["exported_witness"];
+    let (_, body) = env
+        .env
+        .transparent_body(witness)
+        .expect("checked exported witness");
+    assert_eq!(body, Term::const_(raw, vec![]));
+}
+
+/// Promise class: durable invariant. MEASURED: a fixity-only later unit
+/// updates the checked prior-session operator without its flat globals key.
+#[test]
+fn prior_session_operator_fixity_selects_id_without_flat_fallthrough() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let op = env
+        .elaborate_decl("fn <+> (a : Nat) (b : Nat) : Nat = a")
+        .expect("checked operator");
+    assert_eq!(env.globals.remove("<+>"), Some(op));
+    env.elaborate_file("infixl 5 <+>")
+        .expect("fixity metadata binds to checked operator ID");
+    assert_eq!(
+        env.fixities.get(&op).expect("installed fixity").precedence,
+        5
+    );
+}
+
 /// Promise class: durable invariant. MEASURED: a checked bootstrap attached
 /// proof is captured at the seal and selected without its flat spelling.
 #[test]

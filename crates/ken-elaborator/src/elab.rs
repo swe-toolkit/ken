@@ -96,6 +96,9 @@ pub struct ElabResult {
     /// Present only when the real const elaboration path consumed the parsed
     /// row annotation and ran the row-poly escape check.
     pub effect_row_type: Option<crate::effects::RowType>,
+    /// Checked proposition-intro helper identities produced by this declaration.
+    /// Captured from each helper's returned result, never the mutable globals map.
+    pub prop_intro_ids: Vec<(String, GlobalId)>,
 }
 
 impl ElabResult {
@@ -12172,6 +12175,7 @@ fn elaborate_associated_rdecl(
                 foreign_binding: None,
                 temporal_obligations: vec![],
                 effect_row_type: None,
+                prop_intro_ids: vec![],
             })
         }
         RDeclKind::ExplicitDataDecl {
@@ -12201,6 +12205,7 @@ fn elaborate_associated_rdecl(
                 foreign_binding: None,
                 temporal_obligations: vec![],
                 effect_row_type: None,
+                prop_intro_ids: vec![],
             })
         }
         RDeclKind::TypeAlias { ty } => {
@@ -12229,6 +12234,7 @@ fn elaborate_associated_rdecl(
                 foreign_binding: None,
                 temporal_obligations: vec![],
                 effect_row_type: None,
+                prop_intro_ids: vec![],
             })
         }
         RDeclKind::Foreign {
@@ -12423,6 +12429,7 @@ fn elab_record_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -12567,6 +12574,7 @@ fn elab_class_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -13080,6 +13088,7 @@ fn elab_instance_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -13169,6 +13178,7 @@ fn elab_derive(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -13239,6 +13249,7 @@ fn elaborate_foreign_decl(
         foreign_binding: Some(binding),
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -13429,6 +13440,7 @@ pub(crate) fn elaborate_space_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     }];
 
     let state_type = Term::const_(state_id, vec![]);
@@ -13722,6 +13734,7 @@ pub(crate) fn elaborate_space_decl(
             foreign_binding: None,
             temporal_obligations: vec![],
             effect_row_type: Some(declared_row),
+            prop_intro_ids: vec![],
         });
     }
     Ok(results)
@@ -13817,6 +13830,7 @@ fn elaborate_v0(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -13960,6 +13974,7 @@ fn elaborate_recursive_view(
                 foreign_binding: None,
                 temporal_obligations: vec![],
                 effect_row_type: None,
+                prop_intro_ids: vec![],
             })
         }
         Err(e) => {
@@ -14225,6 +14240,7 @@ pub(crate) fn elaborate_mutual_group(
                     foreign_binding: None,
                     temporal_obligations: vec![],
                     effect_row_type: None,
+                    prop_intro_ids: vec![],
                 })
                 .collect())
         }
@@ -14583,6 +14599,7 @@ fn elaborate_view_with_spec(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -14627,6 +14644,7 @@ fn elaborate_prove(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -14676,6 +14694,7 @@ fn elaborate_prop_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     };
 
     for intro in intros {
@@ -14706,7 +14725,7 @@ fn elaborate_prop_decl(
             &helper_rdecl,
             None,
         )?;
-        produced.def_id = id;
+        produced.prop_intro_ids.push((intro.name.clone(), helper.def_id));
         produced.obligations.extend(helper.obligations);
     }
 
@@ -14771,6 +14790,7 @@ fn elaborate_checked_theorem(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -15028,6 +15048,7 @@ fn elaborate_temporal(
         foreign_binding: None,
         temporal_obligations: vec![obl],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 
@@ -15107,6 +15128,7 @@ fn elaborate_law(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        prop_intro_ids: vec![],
     })
 }
 

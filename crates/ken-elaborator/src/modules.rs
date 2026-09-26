@@ -200,6 +200,22 @@ impl ModuleState {
         for (name, id) in prelude_attached {
             self.session_scope.bind_checked_session_local(&name, id)?;
         }
+        // Every prelude PropDecl recorded its helper IDs from the checked
+        // producer result. Capture those, too, before source can mutate the
+        // flat map; metadata names alone do not establish an identity.
+        let prelude_intros: Vec<_> = self.prop_intros.iter()
+            .flat_map(|(family, names)| names.iter().map(move |name| format!("{family}.{name}")))
+            .map(|name| {
+                self.root_scope.checked_local_ids.get(&name).copied()
+                    .map(|id| (name.clone(), id))
+                    .ok_or_else(|| ElabError::Internal(format!(
+                        "prelude prop intro `{name}` has no checked identity"
+                    )))
+            })
+            .collect::<Result<_, _>>()?;
+        for (name, id) in prelude_intros {
+            self.session_scope.bind_checked_session_local(&name, id)?;
+        }
         if self.session_scope.private_ids != self.private_ids {
             return Err(ElabError::Internal(
                 "session scope lost the prelude private identity roster".into(),
@@ -707,13 +723,110 @@ impl Scope {
     }
 }
 
-fn record_checked_attached(scope: &mut Scope, decl: &Decl, id: ken_kernel::GlobalId) {
-    if let Decl::AttachedProofDecl { subject, proof_name, .. } = decl.unwrap_pub() {
-        let selected = format!("{subject}::{proof_name}");
-        if scope.current_attached_proofs.contains(&selected) {
-            scope.checked_local_ids.insert(selected, id);
+/// Enumerate every checked selector minted by one root declaration. This is
+/// deliberately a total Decl match, separate from declaration collision
+/// classification: a new producer must name its checked-ID source here.
+fn capture_checked_root_result(
+    decl: &Decl,
+    result: &crate::elab::ElabResult,
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    checked: &mut HashMap<String, ken_kernel::GlobalId>,
+) -> Result<(), ElabError> {
+    match decl {
+        Decl::Pub(inner) => capture_checked_root_result(inner, result, scope, exports, checked)?,
+        Decl::ViewDecl { name, .. }
+        | Decl::LetDecl { name, .. }
+        | Decl::ProveDecl { name, .. }
+        | Decl::TheoremDecl { name, .. }
+        | Decl::AxiomDecl { name, .. }
+        | Decl::LawDecl { name, .. }
+        | Decl::TypeAlias { name, .. }
+        | Decl::ForeignDecl { name, .. }
+        | Decl::TemporalDecl { name, .. }
+        | Decl::RecordDecl { name, .. }
+        | Decl::ClassDecl { name, .. } => {
+            if result.name != *name {
+                return Err(ElabError::Internal(format!(
+                    "checked root `{name}` returned a different selector `{}`",
+                    result.name
+                )));
+            }
+            checked.insert(name.clone(), result.def_id);
+        }
+        Decl::AttachedProofDecl { subject, proof_name, .. } => {
+            checked.insert(format!("{subject}::{proof_name}"), result.def_id);
+        }
+        Decl::PropDecl { name, intros, .. } => {
+            if result.name != *name || result.prop_intro_ids.len() != intros.len() {
+                return Err(ElabError::Internal(format!(
+                    "prop `{name}` returned incomplete checked intro identities"
+                )));
+            }
+            checked.insert(name.clone(), result.def_id);
+            for intro in intros {
+                let id = result.prop_intro_ids.iter()
+                    .find_map(|(produced, id)| (produced == &intro.name).then_some(*id))
+                    .ok_or_else(|| ElabError::Internal(format!(
+                        "prop `{name}` intro `{}` has no checked ID", intro.name
+                    )))?;
+                checked.insert(format!("{name}.{}", intro.name), id);
+            }
+        }
+        Decl::DataDecl { name, ctors, .. } => {
+            checked.insert(name.clone(), result.def_id);
+            let members = scope.constructor_members.get(&result.def_id).ok_or_else(|| {
+                ElabError::Internal(format!("checked data `{name}` has no constructor family"))
+            })?;
+            for ctor in ctors {
+                let id = members.get(&ctor.name).copied().ok_or_else(|| {
+                    ElabError::Internal(format!("checked data `{name}` lacks `{}`", ctor.name))
+                })?;
+                checked.insert(ctor.name.clone(), id);
+            }
+        }
+        Decl::ExplicitDataDecl { name, ctors, .. } => {
+            checked.insert(name.clone(), result.def_id);
+            let members = scope.constructor_members.get(&result.def_id).ok_or_else(|| {
+                ElabError::Internal(format!("checked data `{name}` has no constructor family"))
+            })?;
+            for ctor in ctors {
+                let leaf = match ctor {
+                    ExplicitDataCtor::Simple(simple) => &simple.name,
+                    ExplicitDataCtor::Signature { name, .. } => name,
+                };
+                let id = members.get(leaf).copied().ok_or_else(|| {
+                    ElabError::Internal(format!("checked data `{name}` lacks `{leaf}`"))
+                })?;
+                checked.insert(leaf.clone(), id);
+            }
+        }
+        Decl::InstanceDecl { class_name, head_type, span, .. } => {
+            if let Some(head) = named_type_head(head_type) {
+                let name = synthesized_dictionary_name(scope, exports, class_name, head, span)?;
+                checked.insert(name.surface, result.def_id);
+            }
+        }
+        Decl::DeriveDecl { class_name, data_name, span } => {
+            let name = synthesized_dictionary_name(scope, exports, class_name, data_name, span)?;
+            checked.insert(name.surface, result.def_id);
+        }
+        Decl::SpaceDecl { .. } => {
+            // A space emits multiple checked definitions: the state and each
+            // operation. Every result name is the actual emitted selector.
+            checked.insert(result.name.clone(), result.def_id);
+        }
+        Decl::BoundaryDecl { .. }
+        | Decl::FixityDecl { .. }
+        | Decl::ModuleDecl { .. }
+        | Decl::ImportDecl { .. }
+        | Decl::ExportDecl { .. } => {
+            return Err(ElabError::Internal(
+                "non-producing declaration reached root selector capture".into()
+            ));
         }
     }
+    Ok(())
 }
 
 fn record_checked_local(
@@ -928,9 +1041,22 @@ fn resolve_checked_ref(
         return Ok((name.to_string(), Some(id)));
     }
     let canonical = resolve_ref(scope, exports, name, span)?;
-    let selected = scope
-        .qualified_ids
-        .get(name)
+    let selected = select_checked_id(scope, name, span)?;
+    let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
+    let imported_qualified = name.rsplit_once('.')
+        .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
+    if selected.is_none() && (imported_bare || imported_qualified) {
+        return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
+    }
+    Ok((canonical, selected))
+}
+
+fn select_checked_id(
+    scope: &Scope,
+    name: &str,
+    span: &Span,
+) -> Result<Option<ken_kernel::GlobalId>, ElabError> {
+    let selected = scope.qualified_ids.get(name)
         .or_else(|| scope.binding_ids.get(name))
         .or_else(|| {
             (!scope.current_local_names.contains(name))
@@ -938,26 +1064,19 @@ fn resolve_checked_ref(
                 .flatten()
         })
         .copied();
-    let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
-    let imported_qualified = name.rsplit_once('.')
-        .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
-    guard_selected_private_id(scope, name, selected, span)?;
-    if selected.is_none() && (imported_bare || imported_qualified) {
-        return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
-    }
-    Ok((canonical, selected))
+    selected.map(|id| require_public_id(scope, name, id, span)).transpose()
 }
 
-fn guard_selected_private_id(
+fn require_public_id(
     scope: &Scope,
     name: &str,
-    selected: Option<ken_kernel::GlobalId>,
+    id: ken_kernel::GlobalId,
     span: &Span,
-) -> Result<(), ElabError> {
-    if selected.is_some_and(|id| scope.private_ids.contains(&id)) {
+) -> Result<ken_kernel::GlobalId, ElabError> {
+    if scope.private_ids.contains(&id) {
         return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
     }
-    Ok(())
+    Ok(id)
 }
 
 fn resolve_class_ref(
@@ -979,17 +1098,14 @@ fn resolve_attached_ref(
     let subject_is_local = !subject.contains('.') && scope.locals.contains(subject);
     let canonical_subject = resolve_ref(scope, exports, subject, span)?;
     let selected = format!("{subject}::{proof_name}");
-    if let Some(id) = scope.qualified_ids.get(&selected) {
-        // Only an actually exported attached proof is entered under this
-        // subject selector. Its ID is selected by the subject's provider,
-        // never by the process-global canonical spelling.
+    if scope.qualified_ids.contains_key(&selected) {
+        // The imported provider's checked identity outranks this session.
         let canonical = if selected.contains('.') {
             resolve_ref(scope, exports, &selected, span)?
         } else {
             format!("{canonical_subject}::{proof_name}")
         };
-        guard_selected_private_id(scope, &selected, Some(*id), span)?;
-        return Ok((canonical, Some(*id)));
+        return Ok((canonical, select_checked_id(scope, &selected, span)?));
     }
     let canonical = format!("{canonical_subject}::{proof_name}");
     if scope.current_attached_proofs.contains(&selected)
@@ -997,8 +1113,7 @@ fn resolve_attached_ref(
     {
         return Ok((canonical, None));
     }
-    if let Some(id) = scope.session_ids.get(&selected).copied() {
-        guard_selected_private_id(scope, &selected, Some(id), span)?;
+    if let Some(id) = select_checked_id(scope, &selected, span)? {
         return Ok((canonical, Some(id)));
     }
     if subject_is_local || scope.local_attached_proofs.contains(&selected) {
@@ -1523,7 +1638,8 @@ fn publish_family_intros(
             let canonical = format!("{canonical_family}.{intro}");
             let id = match source_members {
                 Some(members) => members.get(&format!("{source_family}.{intro}")).copied(),
-                None => globals.get(&canonical).copied(),
+                None => select_checked_id(scope, &canonical, span)?
+                    .or_else(|| globals.get(&canonical).copied()),
             }
             .ok_or_else(|| ElabError::UnboundName {
                 name: surface.clone(),
@@ -1605,12 +1721,6 @@ fn apply_export(
             for item in items {
                 let had_scope_binding = scope.bindings.contains_key(&item.name);
                 let canonical = resolve_ref(scope, exports, &item.name, span)?;
-                if !had_scope_binding && !globals.contains_key(&canonical) {
-                    return Err(ElabError::UnboundName {
-                        name: item.name.clone(),
-                        span: span.clone(),
-                    });
-                }
                 let surface = published_name(item);
                 if scope.current_local_names.contains(&item.name) {
                     // The same unit can export a local before it is checked.
@@ -1622,24 +1732,29 @@ fn apply_export(
                     );
                     continue;
                 }
-                let selected_id = scope
-                    .qualified_ids
-                    .get(&item.name)
-                    .or_else(|| scope.binding_ids.get(&item.name))
-                    .copied()
-                    .or_else(|| {
-                        // Locals checked earlier in this unit have their ID
-                        // in `globals`. An imported binding must already have
-                        // its selected ID; the mutable table is not evidence.
-                        (scope.locals.contains(&item.name)
+                let selected = select_checked_id(scope, &item.name, span)?;
+                if selected.is_none() && !had_scope_binding && !globals.contains_key(&canonical) {
+                    return Err(ElabError::UnboundName {
+                        name: item.name.clone(),
+                        span: span.clone(),
+                    });
+                }
+                let selected_id = match selected {
+                    Some(id) => id,
+                    None => {
+                        // Same-unit locals and legacy ambient exports retain
+                        // their existing spelling route until the flip.
+                        let id = (scope.locals.contains(&item.name)
                             || (!had_scope_binding && !item.name.contains('.')))
                             .then(|| globals.get(&canonical).copied())
                             .flatten()
-                    })
-                    .ok_or_else(|| ElabError::UnboundName {
-                        name: item.name.clone(),
-                        span: span.clone(),
-                    })?;
+                            .ok_or_else(|| ElabError::UnboundName {
+                                name: item.name.clone(),
+                                span: span.clone(),
+                            })?;
+                        require_public_id(scope, &item.name, id, span)?
+                    }
+                };
                 publish_checked_identity(
                     scope, exports_here, surface, &canonical, selected_id, span,
                 )?;
@@ -3509,6 +3624,13 @@ fn prebind_scope_declarations(
         let bare = inner.name().to_string();
         scope.current_local_names.insert(bare.clone());
         scope.checked_local_ids.remove(&bare);
+        if let Decl::PropDecl { intros, .. } = inner {
+            for intro in intros {
+                let selector = format!("{bare}.{}", intro.name);
+                scope.current_local_names.insert(selector.clone());
+                scope.checked_local_ids.remove(&selector);
+            }
+        }
         let qualified = if unqualified_local {
             bare.clone()
         } else {
@@ -3707,6 +3829,15 @@ fn pending_fixity_for<'a>(
         .find(|candidate| candidate.canonical_name == canonical_name)
 }
 
+fn checked_or_legacy_fixity_target(
+    elab: &ElabEnv,
+    scope: &Scope,
+    candidate: &PendingFixity,
+) -> Result<Option<ken_kernel::GlobalId>, ElabError> {
+    Ok(select_checked_id(scope, &candidate.source_operator, &candidate.declaration_span)?
+        .or_else(|| elab.globals.get(&candidate.canonical_name).copied()))
+}
+
 fn conflicting_fixity(
     operator: &str,
     first: Fixity,
@@ -3817,7 +3948,7 @@ fn collect_scope_fixities(
         if new_operators.contains(candidate.source_operator.as_str()) {
             continue;
         }
-        let Some(id) = elab.globals.get(&candidate.canonical_name).copied() else {
+        let Some(id) = checked_or_legacy_fixity_target(elab, scope, candidate)? else {
             continue;
         };
         if let Some(existing) = elab.fixities.get(&id).copied() {
@@ -3838,7 +3969,7 @@ fn collect_scope_fixities(
         if new_operators.contains(candidate.source_operator.as_str()) {
             continue;
         }
-        if let Some(id) = elab.globals.get(&candidate.canonical_name).copied() {
+        if let Some(id) = checked_or_legacy_fixity_target(elab, scope, candidate)? {
             install_declared_fixity(elab, &candidate.source_operator, id, candidate)?;
         }
     }
@@ -3957,6 +4088,7 @@ fn expand_scope(
     let declared_fixities = collect_scope_fixities(elab, decls, scope)?;
 
     let mut ids = Vec::new();
+    let mut unit_checked = HashMap::new();
     let mut i = 0;
     while i < decls.len() {
         let decl = &decls[i];
@@ -4031,6 +4163,10 @@ fn expand_scope(
                 let child_prefix = qualify(prefix, name);
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
                 child_scope.private_ids.clone_from(&scope.private_ids);
+                // A child does not inherit imports or local ownership; it
+                // reads the prior-session checked identities without writing
+                // them back to the parent or changing the child boundary.
+                child_scope.session_ids.clone_from(&scope.session_ids);
                 let (child_ids, child_exports) = expand_scope(
                     elab,
                     inner,
@@ -4179,7 +4315,15 @@ fn expand_scope(
                 }
                 let resolved =
                     resolve::resolve_space_decl(&qualified_name, cells, operations, span)?;
-                ids.extend(elaborate_resolved_space(elab, &resolved)?);
+                let produced = elaborate_resolved_space(elab, &resolved)?;
+                if prefix.is_empty() {
+                    for result in &produced {
+                        capture_checked_root_result(
+                            decl, result, scope, &elab.module_state.exports, &mut unit_checked,
+                        )?;
+                    }
+                }
+                ids.extend(produced);
                 i += 1;
             }
             // A maximal run of non-`pub` definitions — auto-grouped by
@@ -4281,7 +4425,12 @@ fn expand_scope(
                         record_checked_local(
                             scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
                         );
-                        record_checked_attached(scope, run_members[k], result.def_id);
+                        if prefix.is_empty() {
+                            capture_checked_root_result(
+                                run_members[k], &result, scope, &elab.module_state.exports,
+                                &mut unit_checked,
+                            )?;
+                        }
                         ids.push(result);
                     } else {
                         let members: Vec<crate::resolve::RDecl> =
@@ -4361,7 +4510,12 @@ fn expand_scope(
                             record_checked_local(
                                 scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
                             );
-                            record_checked_attached(scope, run_members[m], result.def_id);
+                            if prefix.is_empty() {
+                                capture_checked_root_result(
+                                    run_members[m], &result, scope, &elab.module_state.exports,
+                                    &mut unit_checked,
+                                )?;
+                            }
                             ids.push(result);
                         }
                     }
@@ -4475,7 +4629,6 @@ fn expand_scope(
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
                     record_checked_local(scope, &bare, &result.name, result.def_id);
-                    record_checked_attached(scope, inner, result.def_id);
                     let constructor_names: Option<Vec<&str>> = match inner {
                         Decl::DataDecl { ctors, .. } => {
                             Some(ctors.iter().map(|ctor| ctor.name.as_str()).collect())
@@ -4581,6 +4734,11 @@ fn expand_scope(
                             )?;
                         }
                     }
+                    if prefix.is_empty() {
+                        capture_checked_root_result(
+                            decl, &result, scope, &elab.module_state.exports, &mut unit_checked,
+                        )?;
+                    }
                     ids.push(result);
                 } else {
                     // Not module-qualifiable (class/instance/law/foreign/
@@ -4624,6 +4782,11 @@ fn expand_scope(
                             &result.name, result.def_id, inner.span(),
                         )?;
                     }
+                    if prefix.is_empty() {
+                        capture_checked_root_result(
+                            decl, &result, scope, &elab.module_state.exports, &mut unit_checked,
+                        )?;
+                    }
                     ids.push(result);
                 }
                 i += 1;
@@ -4648,23 +4811,15 @@ fn expand_scope(
             &span,
         )?;
     }
-    if prefix.is_empty() && elab.module_state.prelude_sealed {
-        // Only names checked by this source unit enter the session ledger.
-        // Prebinding has removed stale checked IDs for these names; an SCC
-        // member not yet checked therefore cannot acquire an earlier ID.
-        let checked: Vec<_> = scope
-            .current_local_names
-            .iter()
-            .filter_map(|name| scope.checked_local_ids.get(name).map(|id| (name.clone(), *id)))
-            .collect();
-        for (name, id) in checked {
-            scope.bind_checked_session_local(&name, id)?;
-        }
-        let checked_attached: Vec<_> = scope.current_attached_proofs.iter()
-            .filter_map(|name| scope.checked_local_ids.get(name).map(|id| (name.clone(), *id)))
-            .collect();
-        for (name, id) in checked_attached {
-            scope.bind_checked_session_local(&name, id)?;
+    if prefix.is_empty() {
+        // All producers above use the same total capture. Prelude bootstrap
+        // retains checked IDs for the seal; later calls also bind the newly
+        // checked selectors into the one incremental session ledger.
+        for (name, id) in unit_checked {
+            scope.checked_local_ids.insert(name.clone(), id);
+            if elab.module_state.prelude_sealed {
+                scope.bind_checked_session_local(&name, id)?;
+            }
         }
     }
     scope.current_local_names.clear();
@@ -5462,6 +5617,18 @@ mod namespace_effect_tests {
         assert_eq!(checked_count, prelude_attached.len());
         assert_eq!(selected_count, checked_count);
         eprintln!("prelude attached selectors: {} checked: {checked_count} session: {selected_count}", prelude_attached.len());
+        let prelude_intro_names: Vec<_> = env.module_state.prop_intros.iter()
+            .flat_map(|(family, names)| names.iter().map(move |name| format!("{family}.{name}")))
+            .collect();
+        let checked_intros = prelude_intro_names.iter()
+            .filter(|name| env.module_state.root_scope.checked_local_ids.contains_key(*name))
+            .count();
+        let selected_intros = prelude_intro_names.iter()
+            .filter(|name| env.module_state.session_scope.session_ids.contains_key(*name))
+            .count();
+        assert_eq!(checked_intros, prelude_intro_names.len());
+        assert_eq!(selected_intros, checked_intros);
+        eprintln!("prelude prop intros: {} checked: {checked_intros} session: {selected_intros}", prelude_intro_names.len());
         let prelude_bindings = env.module_state.root_scope.bindings.clone();
         let prelude_ids = env.module_state.root_scope.checked_local_ids.clone();
         env.declare_postulate_raw("SessionRaw", ken_kernel::Term::ty(ken_kernel::Level::Zero))
@@ -5476,6 +5643,44 @@ mod namespace_effect_tests {
             env.module_state.seal_prelude_scope(),
             Err(ElabError::Internal(_))
         ));
+    }
+
+    /// Promise class: durable invariant. The same session-ID reader admits a
+    /// public prelude ID while refusing a deliberately injected private one
+    /// through child expressions and InScope facade exports.
+    #[test]
+    fn child_and_facade_session_paths_preserve_private_identity_gate() {
+        let mut env = ElabEnv::new().expect("prelude");
+        let public = env.globals["True"];
+        let hidden = env.prelude_env.buffer_handle_resource_id;
+        assert_ne!(public, hidden);
+        env.bind_session_name("PublicSession", public)
+            .expect("public checked identity");
+        assert_eq!(env.globals.remove("PublicSession"), Some(public));
+        // Only this internal test can construct a private session ID. The
+        // public binding API rejects it; both downstream readers must refuse.
+        env.module_state.session_scope.session_ids.insert("PrivateSession".into(), hidden);
+        env.globals.insert("PrivateSession".into(), hidden);
+
+        env.elaborate_file("module GoodChild { pub const value : Bool = PublicSession }")
+            .expect("child reads selected public ID without flat alias");
+        let child_id = env.globals["GoodChild.value"];
+        assert_eq!(env.env.transparent_body(child_id).unwrap().1,
+                   ken_kernel::Term::constructor(public, vec![]));
+        let child_error = env.elaborate_file(
+            "module BadChild { pub const value : Bool = PrivateSession }",
+        ).expect_err("child may not borrow a private prelude ID");
+        assert!(matches!(child_error, ElabError::UnboundName { ref name, .. }
+            if name == "PrivateSession"), "{child_error:?}");
+
+        env.elaborate_file("module GoodFacade { export PublicSession }")
+            .expect("public session identity is exportable without globals");
+        assert_eq!(env.module_state.export_provenance["GoodFacade"]
+            .member_ids["GoodFacade"]["PublicSession"], public);
+        let export_error = env.elaborate_file("module BadFacade { export PrivateSession }")
+            .expect_err("a private prelude identity must not be exported");
+        assert!(matches!(export_error, ElabError::UnboundName { ref name, .. }
+            if name == "PrivateSession"), "{export_error:?}");
     }
 
     fn env_with_ambient_item_and_facade() -> (ElabEnv, GlobalId) {
