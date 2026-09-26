@@ -169,6 +169,27 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   refusal arm is red until that surface path is implemented. The `M.C`
   module-qualified pair pins the present visibility boundary independently.
 
+### surface/modules/facade-cannot-publish-hidden-constructor (soundness)
+- spec: `33 §4.1–§4.3` (defining-module export and re-export guard),
+  `33 §3.2` (facade selection without an import)
+- given: use the same provider file `M.ken` with
+  `pub data Token = MkToken`, and facade file `N.ken` with only
+  `export M (Token)` and `export M (MkToken)`; `N` does not import `M`.
+  Elaborate `N` through the real loader and its facade-export selection.
+- expect: `N` rejects at **surface resolution of its second export**:
+  `MkToken` is absent from `M`'s public interface, so `N` cannot publish it.
+  The accepted `export M (Token)` does not make `MkToken` available in `N`'s
+  body or interface. Detection does not depend on client use or a kernel
+  rejection.
+- discriminator: change **only** `M.ken` by adding `export MkToken`, then
+  elaborate the same `N` and a client file `Client.ken` that writes `import N`
+  and `const made : N.Token = N.MkToken`. Both accept. `N.MkToken`, the client
+  term, and `M.MkToken` all select the **same checked constructor identity**;
+  `N.Token` retains `M.Token`'s identity. Removing only the provider's export
+  restores the facade-site rejection while leaving `export M (Token)` valid.
+  A facade that can select a hidden constructor incorrectly accepts the
+  negative; one that mints a wrapper identity fails the positive.
+
 ## C. Visibility + resolution — surface-only, well-defined (AC3/AC4)
 
 ### surface/modules/private-name-access-rejected-at-surface (soundness)
