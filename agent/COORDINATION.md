@@ -107,8 +107,9 @@ field, and re-send**; never drop the post.
   `list_participants` / `orientation()`): not display names, not `@name` in
   the text, not a bare string. One id per actor whose move is next.
 - **`propose_decision`**: the decision text plus the WP/branch; mention the
-  required reviewers (Architect always; Spec only on `spec/` + `conformance/`
-  paths, §14). `thread_id`/`parent_event_id` take an id, never a name (§4a).
+  required reviewers (Architect only when the diff touches `catalog/`,
+  `crates/` or `spec/`, §8a; Spec only on `spec/` + `conformance/` paths,
+  §14). `thread_id`/`parent_event_id` take an id, never a name (§4a).
 
 ## 3. Status = what you're doing, in your own words
 
@@ -292,10 +293,12 @@ with no `[TYPE]` prefix in the body.
 
 ## 8a. Architect and Librarian are parallel, over disjoint domains
 
-**Operator directive, 2026-07-22.** The **Architect** reviews `catalog/` and
-`crates/`, the **Librarian** `library/`, at the same time, without needing to
-interact. Neither is a gate on the other; a candidate touching both goes to
-both at once.
+**Operator directive, 2026-07-22, scope amended 2026-09-26.** The
+**Architect** reviews `catalog/`, `crates/` and `spec/`, and nothing else: the
+rest of the project is outside its scope. The **Librarian** reviews
+`library/`. They review at the same time, without needing to interact.
+Neither is a gate on the other; a candidate touching both goes to both at
+once.
 
 - **A fold in one domain does not invalidate the other's approval**, which
   binds the exact SHA for its own domain. Re-run the Librarian only if the fold
@@ -320,9 +323,6 @@ both at once.
 - **A reviewed prefix is not thereby releasable**: approvals do not assert
   greenness. Establish greenness on the cut **and** on `main` before routing,
   so a red is attributable rather than inherited.
-- **`scripts/` and `agent/` are outside the operator's split.** Until the
-  operator rules, `scripts/` is the Architect's review surface and `agent/` the
-  Steward's own. This is the Steward's inference, not an operator ruling.
 
 Incidents: `COORDINATION-INCIDENTS.md#s8a`.
 
@@ -607,7 +607,8 @@ publishers.
 - **Review is a mootup Decision, and a soundness vote is frontier-class.**
   Reviewers read `git diff origin/main...wp/<ID>` locally and vote the merge
   Decision; there is no GitHub approval to mirror. Two load-bearing
-  Opus-tier reviewers: the **Architect** (soundness/design, always) and the
+  Opus-tier reviewers: the **Architect** (soundness/design, on `catalog/`,
+  `crates/` and `spec/`, §8a) and the
   **Spec** vote on `spec/` + `conformance/` paths, cast by the frontier-class
   member of team Spec, currently the **conformance-validator** (spec-author
   cannot self-review). The **spec-leader** assembles the Decision but does
@@ -665,23 +666,25 @@ publishers.
 
 Incidents: `COORDINATION-INCIDENTS.md#s14`.
 
-## 14a. The Architect does not vote on doc-only WPs
+## 14a. Doc-only WPs: the Architect votes only on its paths
 
-**Operator ruling, 2026-07-22:** *"architect does not need to rule on docs."*
+**Operator rulings, 2026-07-22 and 2026-09-26:** *"architect does not need to
+rule on docs"*, and the Architect's scope is `catalog/`, `crates/` and
+`spec/` (§8a).
 
-**A WP confined to `library/` merges on QA approval plus the diff-scope
-check**; the Steward resolves the Decision and publishes. **The Architect
-votes** when a doc change makes a **normative claim about the language**
-(`spec/` is the sole authority) **or its diff reaches outside `library/` at
-all**, except these:
+**The Architect votes on a doc-only WP whose diff touches `catalog/`,
+`crates/` or `spec/`.** A doc change to `spec/` is a normative claim about
+the language, so it is in scope. **A WP confined to `library/` merges on QA
+approval plus the diff-scope check**; the Steward resolves the Decision and
+publishes. Other doc paths route as follows:
 
 | exception | route | condition |
 |---|---|---|
 | **`docs/program/`** — Steward-owned program docs (trackers, issue files, WP frames, program guides) | Steward resolves, no Architect | the change is **currency or editorial**, and the Steward **authorized the expansion when routing the WP**. A change that alters *program law* or a WP's **acceptance criteria** is not editorial — it is a frame amendment, and it is the Steward's to author, not a ring's to fold in. |
-| **workflow corpus** — `agent/**`, workflow/publisher scripts, startup prompts, CI workflow files | Operator-designated non-Steward author; Steward may route an accepted exact SHA but never author or amend it | The operator authorized the change. Apply `skill-style` to playbooks. Architect review is required only when the edit changes a soundness or design gate. |
+| **workflow corpus** — `agent/**`, workflow/publisher scripts, startup prompts, CI workflow files | Operator-designated non-Steward author; Steward may route an accepted exact SHA but never author or amend it | The operator authorized the change. Apply `skill-style` to playbooks. No Architect review: outside its scope (§8a). |
 
-**The predicate fails closed.** Never restate it as a list of directories: a
-list silently routes an unlisted path to no-Architect.
+Any other path outside `catalog/`, `crates/` and `spec/` needs no Architect
+vote.
 
 **A `docs/program/` edit owes no `library/SOURCE-ATTESTATIONS` fold.** Leave
 `library/` byte-untouched; currency lands at the next release point via

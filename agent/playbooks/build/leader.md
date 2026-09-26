@@ -251,8 +251,10 @@ merge + ship Event. You never run `gh` or read checks yourself.
   publisher-path handling.
   - **Run the diff-scope check *before* you propose the Decision (promoted V0,
     recurring):** `git diff --name-only origin/main...wp/<ID>` and request only
-    the reviewers whose **owned paths** the diff touches. The **Architect always**
-    (design review). **Spec only if a `spec/` or `conformance/` path is touched** —
+    the reviewers whose **owned paths** the diff touches. The **Architect** only
+    if `catalog/`, `crates/` or `spec/` is touched (design review;
+    COORDINATION §8a). **Spec only if a `spec/` or `conformance/` path is
+    touched** —
     a **crates-only** build WP (it *implements* an already-merged spec without
     changing it) is **Architect + CI, no Spec vote** (the K3/V0 ruling; the kernel
     re-checks anything it produces). Requesting a Spec vote you don't need invites
@@ -304,8 +306,8 @@ the language has tokens) is cheap to test and common.
 **measurable fact**, the **claimed boundary** (what it does and does not
 entail), the **residual owner** (who guards what the mechanism cannot), and the
 **current SHA**. End it with the `Checks:` line from `agent/memory/CHECKS.md`
-for the checks the handoff's claims fired. Splitting them across messages is how a measured fact gets read
-as the broader claim.
+for the checks the handoff's claims fired. Splitting them across messages is
+how a measured fact gets read as the broader claim.
 
 ## Stay in your lane
 
