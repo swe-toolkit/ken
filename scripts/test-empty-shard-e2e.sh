@@ -33,14 +33,14 @@ python3 "$repo/scripts/ci-duration-shard.py" inventory.json evidence.json filter
 python3 - <<'PY'
 import json
 plan=json.load(open('filters/assignments.json'))
-assert len(plan['bins']) == 8
+assert len(plan['bins']) == 9
 empty=next(i+1 for i,b in enumerate(plan['bins']) if not b['tests'])
 open('empty-index','w').write(str(empty))
 PY
 empty=$(<empty-index)
 python3 "$repo/scripts/ci-duration-shard.py" project-empty inventory.json "selected-$empty.json"
 python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$empty" "selected-$empty.json"
-for n in $(seq 1 8); do
+for n in $(seq 1 9); do
   planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
   python3 "$repo/scripts/ci-duration-shard.py" project-selected inventory.json filters/assignments.json "$n" "selected-$n.json"
   python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$n" "selected-$n.json"
@@ -59,7 +59,7 @@ echo "$*" >> "$LOG"
 EOF
 chmod +x bin/cargo
 : > dispatch.log
-for n in $(seq 1 8); do
+for n in $(seq 1 9); do
   expected_planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
   expected_expression=$(<"filters/bin-$n.expr")
   dispatched_planned=$expected_planned
@@ -77,11 +77,11 @@ LOG="$root/mutation.log" PATH="$root/bin:$PATH" "$repo/scripts/run-ci-shard.sh" 
 if assert_expected_command "$expected_expression" mutation.log; then
   exit 1
 fi
-# Both eight-artifact mutations retain seven valid siblings.
-mkdir mutation-eight
-cp -a realized-shards mutation-eight/
+# Artifact mutations retain the other eight valid siblings.
+mkdir mutation-shards
+cp -a realized-shards mutation-shards/
 (
-  cd mutation-eight
+  cd mutation-shards
   cp ../unfiltered-inventory.json raw-source.json
   "$repo/scripts/stage-ci-shard-artifact.sh" 1 raw-source.json ../inventory.json ../selected-1.json
   rm -rf realized-shards/realized-shard-1
@@ -126,7 +126,7 @@ import os
 os.mkdir('old')
 open('old/inventory.json','w').write(json.dumps(v))
 PY
-  for n in $(seq 1 8); do
+  for n in $(seq 1 9); do
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json old/inventory.json ../selected-$n.json
     rm -rf realized-shards/realized-shard-$n
     mv realized-shard-$n realized-shards/
@@ -135,7 +135,7 @@ PY
   test "$status" -eq 2
   grep -Fx 'realized-shard check failed: filtered and unfiltered discovered inventories differ' err
   mkdir fixed
-  for n in $(seq 1 8); do
+  for n in $(seq 1 9); do
     python3 "$repo/scripts/ci-duration-shard.py" project-filtered ../unfiltered-inventory.json fixed/inventory.json
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json fixed/inventory.json ../selected-$n.json
     rm -rf realized-shards/realized-shard-$n
@@ -151,17 +151,17 @@ cp -a realized-shards mutation-selected-shape/
   python3 - <<'PY'
 import json, os
 v=json.load(open('../inventory.json')); os.mkdir('old')
-for n in range(1, 9):
+for n in range(1, 10):
  v=json.load(open(f'../selected-{n}.json')); del v['rust-suites']['native']; v['test-count'] = 1; open(f'old/selected-{n}.json','w').write(json.dumps(v))
 PY
-  for n in $(seq 1 8); do
+  for n in $(seq 1 9); do
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json old/selected-$n.json
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/
   done
   set +e; python3 "$repo/scripts/check-ci-shard-union.py" 2>err; status=$?; set -e
   test "$status" -eq 2
   grep -Fx 'realized-shard check failed: selected listing differs from unfiltered authority' err
-  for n in $(seq 1 8); do
+  for n in $(seq 1 9); do
     python3 "$repo/scripts/ci-duration-shard.py" project-selected ../inventory.json ../filters/assignments.json "$n" "selected-$n.json"
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json selected-$n.json
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/

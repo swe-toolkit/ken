@@ -8,8 +8,8 @@ from pathlib import Path
 import sys
 
 
-SHARD_COUNT = 8
-RT_PARITY_SHARD_COUNT = 6
+SHARD_COUNT = 9
+RT_PARITY_SHARD_COUNT = 8
 ROOT = Path("realized-shards")
 RT_PARITY_ROOT = Path("realized-rt-parity")
 EXCLUDED_BINARIES = {
@@ -168,7 +168,7 @@ def artifact_paths(root: Path) -> list[tuple[Path, Path, Path]]:
     expected = {f"realized-shard-{index}" for index in range(1, SHARD_COUNT + 1)}
     artifacts = {path.name: path for path in root.iterdir() if path.is_dir()} if root.is_dir() else {}
     if set(artifacts) != expected:
-        raise ShardCheckError("expected exactly eight realized-shard artifacts")
+        raise ShardCheckError(f"expected exactly {SHARD_COUNT} realized-shard artifacts")
     paths = []
     for index in range(1, SHARD_COUNT + 1):
         artifact = artifacts[f"realized-shard-{index}"]
@@ -187,7 +187,9 @@ def check_rt_parity_shards() -> int:
     expected = {f"rt-parity-shard-{index}" for index in range(1, RT_PARITY_SHARD_COUNT + 1)}
     artifacts = {path.name: path for path in RT_PARITY_ROOT.iterdir() if path.is_dir()} if RT_PARITY_ROOT.is_dir() else {}
     if set(artifacts) != expected:
-        raise ShardCheckError("expected exactly six rt_parity_native shard artifacts")
+        raise ShardCheckError(
+            f"expected exactly {RT_PARITY_SHARD_COUNT} rt_parity_native shard artifacts"
+        )
 
     inventories = []
     selections = []
@@ -276,7 +278,7 @@ def main() -> int:
         f"realized shard partition verified: {len(union)} canonical test identities; "
         f"{len(REQUIRED_RT_PARITY_ARMS)} required rt_parity control arms present"
         + (
-            f"; {rt_parity_count} rt_parity_native identities across six shards"
+            f"; {rt_parity_count} rt_parity_native identities across {RT_PARITY_SHARD_COUNT} shards"
             if rt_parity_count is not None else ""
         )
     )

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Focused controls for duration shard selection."""
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -9,6 +10,10 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("ci-duration-shard.py").resolve()
+_spec = importlib.util.spec_from_file_location("ci_duration_shard", SCRIPT)
+_planner = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_planner)
+SHARD_COUNT = _planner.N
 
 
 class DurationShardControls(unittest.TestCase):
@@ -62,6 +67,57 @@ class DurationShardControls(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stderr.strip(), "filtered live inventory selected zero testcases")
 
+    def test_current_workspace_timing_artifact_has_full_run_population(self):
+        durations = _planner.read_durations(
+            "docs/program/evidence/ci-workspace-timings-36265192923.tsv"
+        )
+        self.assertEqual(len(durations), 4148)
+        self.assertAlmostEqual(sum(durations.values()), 16069.293)
+        self.assertEqual(
+            durations[
+                "ken-elaborator::lang_mod_strict_resolution_d0 "
+                "catalog_ambient_passthrough_migration_census"
+            ],
+            549.96,
+        )
+
+    def test_unseen_tests_use_default_and_stale_rows_warn_and_drop(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            suites = {
+                name: {
+                    "binary-id": "fixture::ordinary",
+                    "binary-name": "ordinary",
+                    "testcases": {name: {"filter-match": {"status": "matches"}}},
+                }
+                for name in ("known", "unseen")
+            }
+            (root / "inventory.json").write_text(
+                json.dumps({"test-count": 2, "rust-suites": suites})
+            )
+            (root / "timings.tsv").write_text(
+                "1 PASS [ 10.000s] (1/1) fixture::ordinary known\n"
+                "1 PASS [ 20.000s] (1/1) fixture::ordinary retired\n"
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "inventory.json", "timings.tsv"],
+                cwd=root,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("600.0s default for 1 unmeasured workspace tests", result.stderr)
+        self.assertIn("dropping timing rows absent from current inventory", result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual(
+            sum(shard["seconds"] for shard in plan["bins"]),
+            610.0,
+        )
+        assigned = [name for shard in plan["bins"] for _, name in shard["tests"]]
+        self.assertCountEqual(assigned, ["known", "unseen"])
+
     def test_non_map_testcases_has_exact_error(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -72,8 +128,8 @@ class DurationShardControls(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stderr.strip(), "nextest rust suite has no testcase map")
 
-    def test_small_eligible_populations_keep_eight_bins(self):
-        for size in range(1, 9):
+    def test_small_eligible_populations_keep_all_planned_bins(self):
+        for size in range(1, SHARD_COUNT + 2):
             with tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 rows = [("fixture::ordinary", "ordinary", f"test_{i}", "matches") for i in range(size)]
@@ -85,13 +141,13 @@ class DurationShardControls(unittest.TestCase):
                 assignment = json.loads((root / "out" / "assignments.json").read_text())
             self.assertEqual(result.returncode, 0, result.stderr)
             bins = assignment["bins"]
-            self.assertEqual(len(bins), 8)
+            self.assertEqual(len(bins), SHARD_COUNT)
             self.assertEqual(sum(len(item["tests"]) for item in bins), size)
             self.assertEqual(
                 sorted(tuple(identity) for item in bins for identity in item["tests"]),
                 [("fixture::ordinary", f"test_{i}") for i in range(size)],
             )
-            self.assertEqual(sum(not item["tests"] for item in bins), 8 - size)
+            self.assertEqual(sum(not item["tests"] for item in bins), max(0, SHARD_COUNT - size))
 
     def test_validate_plan_accepts_exact_and_rejects_dispositions(self):
         with tempfile.TemporaryDirectory() as temporary:
