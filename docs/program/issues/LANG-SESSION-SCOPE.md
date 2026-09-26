@@ -83,3 +83,16 @@ instead. No kernel, `trusted_base()` or spec change.
    form (`subject::proof`) that is never in `current_local_names` or
    `checked_local_ids` (Architect `evt_5wgr0t36kk780`: record it by checked
    id in the one session ledger, gated by `private_ids`).
+2. Three consumers bypass the session ledger: the prop-intro selector
+   (never captured), a nested child scope (ledger not propagated), and the
+   `InScope` export (reads `globals`) -- keyed on per-reader ID selection
+   (Architect `evt_3pv9v8ed0v7we`).
+
+**Shared predicate (Architect `evt_3pv9v8ed0v7we`):** ID selection is
+implemented per reader and capture per producer form, with no single
+function every consumer calls and no single capture every producer passes
+through. The closure is one total-match capture at the sealed root (C1), one
+`select_checked_id` that every reader calls with the private gate inside it
+(C2), and child scopes inheriting the session ledger read-only (C3). Each
+consumer in the handoff census is routed through `select_checked_id`, named
+as a non-`globals` carry, or left to the flip.
