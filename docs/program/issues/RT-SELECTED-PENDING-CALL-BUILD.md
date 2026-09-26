@@ -225,3 +225,9 @@ Positive native px7m err depends on it.
    admission never names (Architect `evt_3ha2wfda16hbq`, HS5: linear
    package ledger L1, consuming-edge witness L2; outcome (i) at M6 stops
    for a Steward scope call).
+6. A refused pending route re-exposes BoundaryCarrier in the issuing
+   emission, so a compile-time package satisfies a gate on a path
+   execution never takes -- keyed on which emission lowers relocated work
+   (Architect `evt_2gfq6jwkepk3a`, HS6: held for Research; tentative shared
+   predicate with lines 3 and 5 -- the issuing emission is held responsible
+   for work Specialized-response relocation moved to another emission).
