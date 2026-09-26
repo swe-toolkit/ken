@@ -1,7 +1,7 @@
 ---
 id: CAT-COLLECTIONS-MAP-FILTER-PRELUDE-MOVE
 title: "Move the prelude's map and filter into Data.Collections.Derived as its structural ops, delete the two prelude declarations, and re-key every consumer and pin by exact identity; third L3 slice of the minimal-prelude program (Prod, zip, fold, And/and_*/is_sorted excluded)"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: architect
@@ -91,6 +91,6 @@ and test expectations. No kernel or `trusted_base()` change.
 - Any `prelude.rs` change beyond the two deletions and the bracket comment,
   or any kernel or `trusted_base()` change.
 - A census change outside AC-1, or a moved statement that is not
-  byte-identical to the prelude's.
+  term-identical to the prelude's.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
