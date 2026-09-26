@@ -7461,7 +7461,8 @@ impl<'a> Lowering<'a> {
         }
 
         for (producer, identity, inst) in &self.function_local.pending_call_emissions {
-            let package = self.static_transition_plan.admitted_pending_call(*producer)?;
+            let witness = self.static_transition_plan.admitted_pending_call(*producer)?;
+            let package = witness.package();
             let units = self.static_transition_plan.continuation_units()?;
             if !package.candidates.iter().any(|candidate| {
                 candidate.construct == identity.producer_construct_origin()

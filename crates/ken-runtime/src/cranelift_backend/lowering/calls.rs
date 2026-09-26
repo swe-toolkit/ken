@@ -2043,13 +2043,11 @@ impl<'a> Lowering<'a> {
                     "a pending call carried SSA values from another defining function".to_string(),
                 ));
             }
-            let plan = self.static_transition_plan.admitted_pending_call(package.plan)?.clone();
-            if plan.width != package.members.len()
-                || self.defining_emission_owner
-                    != Some(ContinuationEmissionOwner::Predeclared(plan.route.defining_function))
-            {
+            let witness = self.static_transition_plan.admitted_pending_call(package.plan)?.clone();
+            let plan = witness.package();
+            if plan.width != package.members.len() {
                 return Err(backend_module(
-                    "the pending call's member width or emission owner disagrees with its plan".to_string(),
+                    "the pending call's member width disagrees with its witness".to_string(),
                 ));
             }
             let mut targets = Vec::with_capacity(plan.candidates.len());

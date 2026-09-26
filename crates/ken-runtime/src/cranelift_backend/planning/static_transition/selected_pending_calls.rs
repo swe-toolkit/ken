@@ -7,9 +7,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    occurrences::occurrence_authority, planner_error, CheckedCaseBinderLayout,
-    CheckedCaseBinderRole, ContinuationSourceCoordinate, CraneliftBackendError,
-    PredeclaredFunctionId, RuntimeExpr, StaticOriginId, StaticTransitionPlan,
+    occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_error,
+    CheckedCaseBinderLayout, CheckedCaseBinderRole, ContinuationEmissionOwner,
+    ContinuationSourceCoordinate, CraneliftBackendError, PredeclaredFunctionId,
+    ResponseDisposition, RuntimeExpr, StaticOriginId, StaticTransitionPlan,
 };
 use crate::cranelift_backend::lowering::core::agreeing_recursive_body_unit;
 use crate::{CheckedComputationalIHInvocationKind, OrientedSubcontinuationPlanV1};
@@ -119,17 +120,71 @@ pub(in crate::cranelift_backend) struct PendingCallPackagePlan {
     pub(in crate::cranelift_backend) route: PendingCallRoute,
 }
 
+/// Response work reachable from a selected leaf, including the worker body
+/// named by its recursive unit. `None` is an actual no-response disposition,
+/// never an unknown owner represented by a missing row.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct SelectedPendingLeafResponse {
+    leaf: StaticOriginId,
+    vis: StaticOriginId,
+    disposition: Option<ResponseDisposition>,
+    owner: Option<ContinuationEmissionOwner>,
+}
+
+/// Admission asks "Planned or Refused?" and constructs this witness only from
+/// planner facts. Emission asks "is the invariant intact?" and consumes these
+/// facts, rather than independently re-deriving them from its current context.
+/// No condition dependent on the emission context belongs in this constructor.
+///
+/// The package's `members` are the per-member backing provenance: each worker
+/// names its checked lexical source and each context member its authenticated
+/// producer-local/entry-ABI coordinate. Its route binds those sources to the
+/// defining function and keeps the checked marker's binder coordinates. Pointee
+/// lifetime follows route confinement; no pointee class is guessed from a name.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct SelectedPendingRouteWitness {
+    owner: ContinuationEmissionOwner,
+    package: PendingCallPackagePlan,
+    responses: Vec<SelectedPendingLeafResponse>,
+}
+
+impl SelectedPendingRouteWitness {
+    fn new(
+        package: PendingCallPackagePlan,
+        responses: Vec<SelectedPendingLeafResponse>,
+    ) -> Self {
+        Self {
+            owner: ContinuationEmissionOwner::Predeclared(package.route.defining_function),
+            package,
+            responses,
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn owner(&self) -> ContinuationEmissionOwner {
+        self.owner
+    }
+
+    pub(in crate::cranelift_backend) fn package(&self) -> &PendingCallPackagePlan {
+        &self.package
+    }
+
+    pub(in crate::cranelift_backend) fn responses(&self) -> &[SelectedPendingLeafResponse] {
+        &self.responses
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PendingRefusal {
     RouteLeavesDefiningFunction,
     NotLinearOrMustReach,
     UnsupportedRouteEdge,
     MissingDeclaredMembers,
+    SelectedPendingLeafCrossesResponseOwner,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum PendingCallAdmission {
-    Planned(PendingCallPackagePlan),
+    Planned(SelectedPendingRouteWitness),
     Refused(PendingRefusal),
     NotApplicable,
 }
@@ -362,8 +417,8 @@ fn plan_selected_pending_calls(
             &slot_for_call,
         );
         let admission = match result {
-            Ok((paths, gates, visited, gate_binder_pairs)) => admit_routed_package(
-                PendingCallPackagePlan {
+            Ok((paths, gates, visited, gate_binder_pairs)) => {
+                let package = PendingCallPackagePlan {
                     producer,
                     candidates,
                     width,
@@ -373,9 +428,14 @@ fn plan_selected_pending_calls(
                         gates,
                         gate_binder_pairs,
                     },
-                },
-                paths,
-            ),
+                };
+                match selected_leaf_response_witness(plan, &package)? {
+                    Some(responses) => admit_routed_package(package, responses, paths),
+                    None => PendingCallAdmission::Refused(
+                        PendingRefusal::SelectedPendingLeafCrossesResponseOwner,
+                    ),
+                }
+            }
             Err(reason) => PendingCallAdmission::Refused(reason),
         };
         if by_producer.insert(producer, admission).is_some() {
@@ -394,7 +454,7 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn admitted_pending_call(
         &self,
         producer: StaticOriginId,
-    ) -> Result<&PendingCallPackagePlan, CraneliftBackendError> {
+    ) -> Result<&SelectedPendingRouteWitness, CraneliftBackendError> {
         match self.selected_pending_calls.get(&producer) {
             Some(PendingCallAdmission::Planned(package)) => Ok(package),
             Some(PendingCallAdmission::Refused(_)) => Err(planner_error(
@@ -411,7 +471,7 @@ impl StaticTransitionPlan<'_> {
         &self,
         producer: StaticOriginId,
         construct: StaticOriginId,
-    ) -> Result<Option<(&PendingCallPackagePlan, &PendingCandidate)>, CraneliftBackendError> {
+    ) -> Result<Option<(&SelectedPendingRouteWitness, &PendingCandidate)>, CraneliftBackendError> {
         let units = self.continuation_units()?;
         let bodies: BTreeSet<_> = units
             .iter()
@@ -429,17 +489,17 @@ impl StaticTransitionPlan<'_> {
                 "a producer with differing pending units fell through to NotApplicable",
             )),
             PendingCallAdmission::Refused(_) => Ok(None),
-            PendingCallAdmission::Planned(package) => {
-                let mut selected = package.candidates.iter().filter(|candidate| {
+            PendingCallAdmission::Planned(witness) => {
+                let mut selected = witness.package.candidates.iter().filter(|candidate| {
                     candidate.construct == construct
                 });
                 let candidate = selected.next().ok_or_else(|| {
                     planner_error("an admitted pending constructor has no matching arm candidate")
                 })?;
-                if selected.next().is_some() || package.producer != producer {
+                if selected.next().is_some() || witness.package.producer != producer {
                     return Err(planner_error("a pending constructor has ambiguous arm candidates"));
                 }
-                Ok(Some((package, candidate)))
+                Ok(Some((witness, candidate)))
             }
         }
     }
@@ -493,6 +553,7 @@ fn marked_pending_read(
 
 fn admit_routed_package(
     package: PendingCallPackagePlan,
+    responses: Vec<SelectedPendingLeafResponse>,
     paths: Vec<PendingPathCounts>,
 ) -> PendingCallAdmission {
     // Marked pending calls consume at their own gate; a second gate is
@@ -504,8 +565,63 @@ fn admit_routed_package(
     {
         PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach)
     } else {
-        PendingCallAdmission::Planned(package)
+        PendingCallAdmission::Planned(SelectedPendingRouteWitness::new(package, responses))
     }
+}
+
+/// For each selected leaf, include every source Vis in its constructor subtree
+/// and its declared worker body. A deferred response cannot execute its
+/// operation arguments in the original function when the handler owns them in
+/// a different emission. This is a whole-producer refusal, never a per-leaf
+/// fallback that would issue a ticket for only one side of a source Match.
+fn selected_leaf_response_witness(
+    plan: &StaticTransitionPlan<'_>,
+    package: &PendingCallPackagePlan,
+) -> Result<Option<Vec<SelectedPendingLeafResponse>>, CraneliftBackendError> {
+    let owner = ContinuationEmissionOwner::Predeclared(package.route.defining_function);
+    let mut responses = Vec::new();
+    for candidate in &package.candidates {
+        let mut seen = BTreeSet::new();
+        for occurrence in plan.source_occurrences.iter().flatten() {
+            let RuntimeExpr::Construct { constructor, args } = occurrence.expr else {
+                continue;
+            };
+            if !constructor.as_str().ends_with("::ITree::Vis") || args.len() != 2 {
+                continue;
+            }
+            let vis = occurrence.static_origin;
+            if !(occurrence_subtree_contains(plan, candidate.construct, vis)?
+                || occurrence_subtree_contains(plan, candidate.body, vis)?)
+                || !seen.insert(vis)
+            {
+                continue;
+            }
+            let mut specialized = plan.static_response_continuations.iter()
+                .filter(|row| row.vis_origin() == vis);
+            let specialized_owner = specialized.next().map(|row| row.base_owner());
+            if specialized.next().is_some() {
+                return Err(planner_error("a selected pending Vis has two specialized responses"));
+            }
+            let deferred = plan.deferred_response_at_vis(vis)?;
+            if specialized_owner.is_some() && deferred.is_some() {
+                return Err(planner_error("a selected pending Vis is both specialized and Deferred"));
+            }
+            let (disposition, response_owner) = if let Some(response_owner) = specialized_owner {
+                (Some(ResponseDisposition::Specialized), Some(response_owner))
+            } else if let Some(row) = deferred {
+                (Some(ResponseDisposition::Deferred), plan.deferred_response_handler_owner(&row)?)
+            } else {
+                (None, None)
+            };
+            if disposition.is_some() && response_owner != Some(owner) {
+                return Ok(None);
+            }
+            responses.push(SelectedPendingLeafResponse {
+                leaf: candidate.construct, vis, disposition, owner: response_owner,
+            });
+        }
+    }
+    Ok(Some(responses))
 }
 
 fn require_defining_function(
@@ -971,7 +1087,9 @@ pub(super) fn record_selected_pending_call_admissions(plan: &StaticTransitionPla
             let outcome = match admission {
                 PendingCallAdmission::NotApplicable => SelectedPendingCallOutcomeObservation::NotApplicable,
                 PendingCallAdmission::Refused(reason) => SelectedPendingCallOutcomeObservation::Refused(*reason),
-                PendingCallAdmission::Planned(package) => SelectedPendingCallOutcomeObservation::Planned {
+                PendingCallAdmission::Planned(witness) => {
+                    let package = witness.package();
+                    SelectedPendingCallOutcomeObservation::Planned {
                     candidates: package.candidates.iter().map(|candidate| {
                         SelectedPendingCallCandidateObservation {
                             arm: candidate.arm,
@@ -1008,6 +1126,7 @@ pub(super) fn record_selected_pending_call_admissions(plan: &StaticTransitionPla
                     gate_binder_pairs: package.route.gate_binder_pairs.iter().map(|pair| {
                         (pair.origin.observation_ordinal(), pair.walker_index, pair.morphism_index)
                     }).collect(),
+                }
                 },
             };
             SelectedPendingCallAdmissionObservation { producer: producer.observation_ordinal(), outcome }
@@ -1226,7 +1345,7 @@ mod tests {
                         },
                     )
                     .collect();
-                admit_routed_package(package, paths)
+                admit_routed_package(package, Vec::new(), paths)
             }
             Err(reason) => PendingCallAdmission::Refused(reason),
         }
@@ -1333,7 +1452,7 @@ mod tests {
         let gated = PendingPathCounts::START.consume().unwrap();
         assert!(require_defining_function(local, local).is_ok());
         assert!(matches!(
-            admit_routed_package(package.clone(), vec![gated]),
+            admit_routed_package(package.clone(), Vec::new(), vec![gated]),
             PendingCallAdmission::Planned(_)
         ));
         let negative = require_defining_function(local, generated_root)
@@ -1439,12 +1558,13 @@ mod tests {
         assert!(matches!(
             admit_routed_package(
                 route_package(),
+                Vec::new(),
                 vec![PendingPathCounts::START.consume().unwrap()]
             ),
             PendingCallAdmission::Planned(_)
         ));
         assert_eq!(
-            admit_routed_package(route_package(), exits),
+            admit_routed_package(route_package(), Vec::new(), exits),
             PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach),
         );
     }

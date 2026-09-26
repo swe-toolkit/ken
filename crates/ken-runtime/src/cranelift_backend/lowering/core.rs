@@ -7399,15 +7399,15 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<Option<PendingCallPackage>, CraneliftBackendError> {
         let producer = self.static_transition_plan.child_static_origin(frame, 0)?;
-        let Some((plan, candidate)) = self
+        let Some((witness, candidate)) = self
             .static_transition_plan
             .pending_call_candidate_at(producer, construct)?
-            .map(|(plan, candidate)| (plan.clone(), candidate.clone()))
+            .map(|(witness, candidate)| (witness.clone(), candidate.clone()))
         else {
             return Ok(None);
         };
-        if self.defining_emission_owner
-                != Some(ContinuationEmissionOwner::Predeclared(plan.route.defining_function))
+        let plan = witness.package();
+        if self.defining_emission_owner != Some(witness.owner())
         {
             return Err(backend(BackendFailure::PlannerInvariant(
                 "a pending call is not being built in its selected arm's defining function"
@@ -7450,7 +7450,7 @@ impl<'a> Lowering<'a> {
             position,
             producer_env,
             plan.route.defining_function,
-            ContinuationEmissionOwner::Predeclared(plan.route.defining_function),
+            witness.owner(),
             ContinuationOperandEnvironment::DirectEmission,
         )?;
         let mut worker = Vec::new();
