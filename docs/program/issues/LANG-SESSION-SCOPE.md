@@ -168,6 +168,14 @@ are the same predicate from the reader side. The recut above closes it.
    resolves only the defining module's own members and writes `Alias`
    provenance; `bind_session_name` stays public-exports only.
 
+6. Retained CC2/CC3/CC4/CAT5 acceptance fixtures (plus the cc6a
+   `globals.extend` writer) reach other modules' non-pub members:
+   `MkSourceId` (a private constructor of an abstract exported type),
+   `compare_char` (a private fn), and `span_to_byte_range_faithful`
+   (asserted as exported, but declared without `pub`). Keyed on the
+   pre-recut session leak of every module's non-pub names (Architect,
+   `evt_1wgwkd3tdsy0b`, stop 6).
+
 **Carry, not this WP (Foundation):** Map's public surface cannot be used by
 a client. `OrderedKeyMembership` is exported, but `Tree`'s constructors,
 `empty` and `Ordered` are private, so no client can build the carrier that
