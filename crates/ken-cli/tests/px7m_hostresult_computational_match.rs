@@ -95,14 +95,40 @@ fn assert_agreement(
     expected_operations: &[ken_runtime::HostOpV1],
 ) {
     let dir = output_dir(name);
-    let (output, admissions) = ken_runtime::with_selected_pending_call_admissions(|| {
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
-    });
+    let ((output, admissions), match_emissions) =
+        ken_runtime::with_selected_pending_match_emissions(|| {
+            ken_runtime::with_selected_pending_call_admissions(|| {
+                ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
+            })
+        });
     let output = output.expect("dynamic HostResult producer reaches the linked artifact");
     assert!(admissions.iter().any(|row| matches!(
         row.outcome,
         ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner { .. }
     )), "native selected route needs a validated response-owner admission: {admissions:#?}");
+    // P4a: the same Match origin has two distinct emitted populations. The
+    // owner's Vis branch is a trap, whereas each nested ordinary continuation
+    // lowers its Vis body; one aggregate count cannot prove the pairing.
+    let trapped_origins = match_emissions.iter().filter(|row|
+        row.kind == ken_runtime::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap
+            && row.emission_owner.starts_with("Predeclared(")
+    ).map(|row| row.origin).collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(trapped_origins.len(), 1,
+        "one owner-fed origin must emit the trap: {match_emissions:#?}");
+    let trapped_origin = *trapped_origins.iter().next().unwrap();
+    let ordinary_owners = match_emissions.iter().filter(|row|
+        row.origin == trapped_origin
+            && row.kind == ken_runtime::SelectedPendingMatchEmissionKind::OrdinaryVisBodyLowered
+            && row.emission_owner.starts_with("Specialization(")
+    ).map(|row| row.emission_owner.as_str()).collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(ordinary_owners.len(), 2,
+        "both ordinary specialization copies must lower the Vis body for the trapped origin: {match_emissions:#?}");
+    assert!(!match_emissions.iter().any(|row| row.origin == trapped_origin &&
+        (row.kind == ken_runtime::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap
+            && row.emission_owner.starts_with("Specialization(")
+         || row.kind == ken_runtime::SelectedPendingMatchEmissionKind::OrdinaryVisBodyLowered
+            && row.emission_owner.starts_with("Predeclared("))),
+        "the owner and ordinary outcomes must not swap: {match_emissions:#?}");
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -179,6 +205,41 @@ fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
             ken_runtime::HostOpV1::ConsoleFlush,
         ],
     );
+}
+
+// C4: native counterexample to the owner's checked Ret ingress. Without
+// bypass, the same checked program above exits normally; here the test-only
+// owner sends a Vis-tagged carrier through its unchecked Result slot. The
+// emitted C2 branch must terminate when that carrier reaches the Match.
+#[cfg(unix)]
+#[test]
+fn owner_ret_check_bypass_reaches_the_inner_vis_trap_natively() {
+    use std::os::unix::process::ExitStatusExt;
+    let dir = output_dir("owner-vis-trap");
+    let ((output, applications), emissions) =
+        ken_runtime::with_selected_pending_match_emissions(|| {
+            ken_runtime::with_static_response_owner_body_mutation(
+                ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
+                || ken_cli::build_native_program(
+                    OK_PROGRAM, ken_cli::SourceFormat::Ken,
+                    "px7m-owner-vis-bypass", dir.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                ),
+            )
+        });
+    assert_eq!(applications, 1, "one admitted owner must carry the test-only bypass");
+    let output = output.expect("the bypass builds a native artifact before it is run");
+    assert!(emissions.iter().any(|row|
+        row.kind == ken_runtime::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap),
+        "the object must emit the owner-fed inner Vis trap before native execution: {emissions:#?}");
+    let native = std::process::Command::new(&output.artifact.executable_path)
+        .current_dir(dir.path())
+        .env_clear()
+        .env("KEN_HOST_OBSERVATION_PATH", dir.path().join("bypass-trace"))
+        .output().expect("the linked executable starts");
+    assert_eq!(native.status.signal(), Some(4),
+        "the bypassed owner must trap in the native executable, not refuse at admission or emission; status={:?} stdout={:?} stderr={:?}",
+        native.status, native.stdout, native.stderr);
 }
 
 // Owner node: RT-CARRIED-RESIDUAL-IH-ARITY.

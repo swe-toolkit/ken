@@ -2042,15 +2042,22 @@ impl<'a> Lowering<'a> {
                 // ⛔ The validator is untouched and this does not force any block
                 // dead or delete origin 25. The repair is to stop asserting a
                 // deadness that was never true.
+                let owner_ret_only = self.static_transition_plan
+                    .owner_fed_match_population(
+                        match_origin,
+                        self.defining_emission_owner.ok_or_else(|| backend_module(
+                            "a Match join closeout has no defining emission owner".to_string(),
+                        ))?,
+                    )?;
+                // P2: mutate only the closeout consumer to an ordinary answer.
+                // The C2 emitter still traps Vis, so an undisposed Vis join is
+                // attributable to the missing owner-specific S2 disposition.
+                #[cfg(feature = "px8-ds-test-support")]
+                let owner_ret_only = owner_ret_only.filter(|_| {
+                    !crate::cranelift_backend::planning::force_owner_join_ordinary()
+                });
                 let final_reachable: BTreeSet<usize> =
-                    if let Some(ret) = self.static_transition_plan
-                        .owner_fed_match_population(
-                            match_origin,
-                            self.defining_emission_owner.ok_or_else(|| backend_module(
-                                "a Match join closeout has no defining emission owner".to_string(),
-                            ))?,
-                        )?
-                    {
+                    if let Some(ret) = owner_ret_only {
                         // Every re-entering edge is in the owner witness. A
                         // claimed-dead case whose join was emitted must refuse
                         // before the consumed-skip in subtree disposition.

@@ -543,6 +543,9 @@ pub enum StaticResponseOwnerBodyMutation {
     CallAfterAnswerCollapse,
     BypassTrapBeforeResult,
     VaryRet,
+    /// Test-only: send a Vis-tagged response through the Result slot without
+    /// the owner's Ret identity/arity checks, so the consuming trap is live.
+    BypassRetValidationAndReturnVis,
     OmitOwnerDefinition,
 }
 
@@ -2720,6 +2723,30 @@ pub(super) fn lower_continuation_selected_case_body(
             .join(", ")
     ));
     let lowered = compiler.lower_expr(builder, body, &env)?;
+    // The selected continuation's Vis body is lowered in its own function,
+    // not by replaying the enclosing Match there. Observe that completed
+    // body beside the carried owner's trapped branch at the same origin.
+    #[cfg(feature = "px8-ds-test-support")]
+    if case.constructor.ends_with("::ITree::Vis")
+        && compiler.static_transition_plan
+            .pending_result_validated_owner(frame_occurrence.static_origin)?
+    {
+        let owner = compiler.defining_emission_owner.ok_or_else(|| backend_module(
+            "a Vis continuation has no defining emission owner".to_string(),
+        ))?;
+        if compiler.static_transition_plan
+            .pending_match_has_reentering_calls(frame_occurrence.static_origin, owner)?
+            && compiler.static_transition_plan
+                .owner_fed_match_population(frame_occurrence.static_origin, owner)?
+                .is_none()
+        {
+            crate::cranelift_backend::planning::record_selected_pending_match_emission(
+                frame_occurrence.static_origin,
+                owner,
+                crate::cranelift_backend::planning::SelectedPendingMatchEmissionKind::OrdinaryVisBodyLowered,
+            );
+        }
+    }
 
     Ok(lowered)
 }
@@ -3036,8 +3063,13 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 backend_module("a response owner's exact K context was never declared".to_string())
             })?;
         #[cfg(feature = "px8-ds-test-support")]
+        let pending_vis_owner = compiler.static_transition_plan
+            .selected_pending_response_at_vis(emission.row.vis_origin())?.is_some();
+        #[cfg(feature = "px8-ds-test-support")]
         let body_mutation = claim_static_response_owner_body_mutation(
             |mutation| match mutation {
+                StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis =>
+                    pending_vis_owner,
                 StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
                     .static_transition_plan
                     .continuation_contexts()
@@ -3586,6 +3618,21 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     ));
                 }
             };
+            // A bypass alone is inconclusive on a source whose real owner
+            // returns Ret. This test-only mutation also supplies the nearest
+            // legal counterexample carrier: the same returned node, with the
+            // selected source Vis constructor identity substituted. No
+            // production path can bypass the exact Ret checks below.
+            #[cfg(feature = "px8-ds-test-support")]
+            let bypass_ret_validation = body_mutation
+                == Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis);
+            #[cfg(feature = "px8-ds-test-support")]
+            if bypass_ret_validation {
+                let vis_identity = compiler.static_transition_plan
+                    .constructor_symbol_identity(emission.row.vis_origin())?
+                    .tag_abi_word()?;
+                compiler.emit_carrier_store_tag_id(&mut builder, returned, vis_identity)?;
+            }
             let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
             #[cfg(feature = "px8-ds-test-support")]
             let ret_abi_word = if body_mutation
@@ -3603,8 +3650,18 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             let expected_ret = i64::try_from(ret_abi_word).map_err(|_| {
                 backend_module("response Ret identity exceeds the runtime tag word".to_string())
             })?;
+            #[cfg(feature = "px8-ds-test-support")]
+            if !bypass_ret_validation {
+                Lowering::require_i64(&mut builder, ret_tag, expected_ret);
+            }
+            #[cfg(not(feature = "px8-ds-test-support"))]
             Lowering::require_i64(&mut builder, ret_tag, expected_ret);
             let ret_fields = compiler.emit_carrier_field_count(&mut builder, returned)?;
+            #[cfg(feature = "px8-ds-test-support")]
+            if !bypass_ret_validation {
+                Lowering::require_i64(&mut builder, ret_fields, 1);
+            }
+            #[cfg(not(feature = "px8-ds-test-support"))]
             Lowering::require_i64(&mut builder, ret_fields, 1);
             let ret_validation_end = builder
                 .func
@@ -3652,6 +3709,16 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         frame_scope.close(compiler)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
+        // The scoped bypass deliberately violates the finished Ret verifier;
+        // every other mutation and every production emission still runs it.
+        #[cfg(feature = "px8-ds-test-support")]
+        if body_mutation != Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis) {
+            verify_static_response_finished_body(
+                &func, expected_context_target,
+                emission.row.k_ret_identity().tag_abi_word()?, &finished_body,
+            )?;
+        }
+        #[cfg(not(feature = "px8-ds-test-support"))]
         verify_static_response_finished_body(
             &func,
             expected_context_target,

@@ -23,9 +23,16 @@ mod responses;
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
 pub use selected_pending_calls::{
-    with_selected_pending_call_admissions, PendingRefusal,
-    SelectedPendingCallAdmissionObservation, SelectedPendingCallCandidateObservation,
-    SelectedPendingCalleeObservation, SelectedPendingCallOutcomeObservation,
+    with_owner_fed_join_forced_ordinary,
+    with_selected_pending_call_admissions, with_selected_pending_match_emissions,
+    PendingRefusal, SelectedPendingCallAdmissionObservation,
+    SelectedPendingCallCandidateObservation, SelectedPendingCalleeObservation,
+    SelectedPendingCallOutcomeObservation, SelectedPendingMatchEmissionKind,
+    SelectedPendingMatchEmissionObservation,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) use selected_pending_calls::{
+    force_owner_join_ordinary, record_selected_pending_match_emission,
 };
 mod semantic_ir;
 mod units;

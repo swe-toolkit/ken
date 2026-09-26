@@ -14405,13 +14405,11 @@ impl<'a> Lowering<'a> {
             None
         };
 
+        let emission_owner = self.defining_emission_owner.ok_or_else(|| backend_module(
+            "a carried Match has no defining emission owner".to_string(),
+        ))?;
         let pending_owner_ret_only = self.static_transition_plan
-            .owner_fed_match_population(
-                eliminator.static_origin,
-                self.defining_emission_owner.ok_or_else(|| backend_module(
-                    "a carried Match has no defining emission owner".to_string(),
-                ))?,
-            )?.is_some();
+            .owner_fed_match_population(eliminator.static_origin, emission_owner)?.is_some();
         for (index, case) in eliminator.cases.iter().enumerate() {
             // ⛔ Malformed recursive positions are rejected before any code is
             // emitted for this case, exactly as the specialized composed path
@@ -14453,6 +14451,12 @@ impl<'a> Lowering<'a> {
                 // this terminator. The unique user trap code identifies this
                 // compiler invariant on a test-only owner-check bypass.
                 builder.ins().trap(cranelift_codegen::ir::TrapCode::unwrap_user(73));
+                #[cfg(feature = "px8-ds-test-support")]
+                crate::cranelift_backend::planning::record_selected_pending_match_emission(
+                    eliminator.static_origin,
+                    emission_owner,
+                    crate::cranelift_backend::planning::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap,
+                );
                 builder.switch_to_block(next);
                 continue;
             }
@@ -14667,6 +14671,14 @@ impl<'a> Lowering<'a> {
                     "a carried `ComputationalMatch` arm",
                 )?;
                 builder.ins().jump(merge, &[word.word.into()]);
+            }
+            #[cfg(feature = "px8-ds-test-support")]
+            if case.constructor.ends_with("::ITree::Vis") {
+                crate::cranelift_backend::planning::record_selected_pending_match_emission(
+                    eliminator.static_origin,
+                    emission_owner,
+                    crate::cranelift_backend::planning::SelectedPendingMatchEmissionKind::OrdinaryVisBodyLowered,
+                );
             }
 
             builder.switch_to_block(next);

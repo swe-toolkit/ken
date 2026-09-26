@@ -500,7 +500,6 @@ impl StaticTransitionPlan<'_> {
         )? {
             return Ok(None);
         }
-
         let occurrence = self.source_occurrences.get(origin.0 as usize)
             .and_then(Option::as_ref)
             .ok_or_else(|| planner_error("an owner-fed Match has no planned occurrence"))?;
@@ -516,6 +515,20 @@ impl StaticTransitionPlan<'_> {
             return Err(planner_error("an owner-fed Match has no unique unary ITree::Ret case"));
         }
         Ok(Some(index))
+    }
+
+    /// Test observation for a specialization whose own calls re-enter this
+    /// Match; other specializations may lower the same selected Vis body but
+    /// are not members of the pair proving S1's emission-local partition.
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn pending_match_has_reentering_calls(
+        &self,
+        origin: StaticOriginId,
+        owner: ContinuationEmissionOwner,
+    ) -> Result<bool, CraneliftBackendError> {
+        Ok(self.continuation_calls()?.iter().any(|call| {
+            call.continuation_origin() == origin && call.emission_owner() == owner
+        }))
     }
 
     /// A response drive may consult an admitted pending route's immutable owner
@@ -1264,6 +1277,60 @@ pub struct SelectedPendingCallAdmissionObservation {
 
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
+    static FORCE_OWNER_JOIN_ORDINARY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FORCED_OWNER_JOIN_ORDINARY_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn force_owner_join_ordinary() -> bool {
+    FORCE_OWNER_JOIN_ORDINARY.with(|enabled| {
+        if !enabled.get() {
+            return false;
+        }
+        FORCED_OWNER_JOIN_ORDINARY_APPLICATIONS.with(|count| count.set(count.get() + 1));
+        true
+    })
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_owner_fed_join_forced_ordinary<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FORCE_OWNER_JOIN_ORDINARY.with(|enabled| enabled.set(false));
+        }
+    }
+    FORCE_OWNER_JOIN_ORDINARY.with(|enabled| assert!(!enabled.replace(true)));
+    FORCED_OWNER_JOIN_ORDINARY_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications = FORCED_OWNER_JOIN_ORDINARY_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectedPendingMatchEmissionKind {
+    ValidatedOwnerVisTrap,
+    OrdinaryVisBodyLowered,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SelectedPendingMatchEmissionObservation {
+    pub origin: u32,
+    pub emission_owner: String,
+    pub kind: SelectedPendingMatchEmissionKind,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static SELECTED_PENDING_MATCH_EMISSIONS:
+        std::cell::RefCell<Option<Vec<SelectedPendingMatchEmissionObservation>>> =
+        const { std::cell::RefCell::new(None) };
     static SELECTED_PENDING_CALL_OBSERVATIONS:
         std::cell::RefCell<Option<Vec<SelectedPendingCallAdmissionObservation>>> =
         const { std::cell::RefCell::new(None) };
@@ -1288,6 +1355,44 @@ pub fn with_selected_pending_call_admissions<T>(
         .unwrap_or_default();
     drop(restore);
     (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_selected_pending_match_emissions<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<SelectedPendingMatchEmissionObservation>) {
+    struct Restore(Option<Vec<SelectedPendingMatchEmissionObservation>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SELECTED_PENDING_MATCH_EMISSIONS.with(|cell| *cell.borrow_mut() = self.0.take());
+        }
+    }
+    let previous =
+        SELECTED_PENDING_MATCH_EMISSIONS.with(|cell| cell.borrow_mut().replace(Vec::new()));
+    let restore = Restore(previous);
+    let result = operation();
+    let rows = SELECTED_PENDING_MATCH_EMISSIONS
+        .with(|cell| cell.borrow_mut().take())
+        .unwrap_or_default();
+    drop(restore);
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_selected_pending_match_emission(
+    origin: StaticOriginId,
+    owner: ContinuationEmissionOwner,
+    kind: SelectedPendingMatchEmissionKind,
+) {
+    SELECTED_PENDING_MATCH_EMISSIONS.with(|cell| {
+        if let Some(rows) = cell.borrow_mut().as_mut() {
+            rows.push(SelectedPendingMatchEmissionObservation {
+                origin: origin.observation_ordinal(),
+                emission_owner: format!("{owner:?}"),
+                kind,
+            });
+        }
+    });
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1392,54 +1497,26 @@ fn walk_sequence(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CheckedComputationalIHBinderMorphism;
 
-    fn route_package() -> PendingCallPackagePlan {
-        let owner = PredeclaredFunctionId::for_test(3);
-        let producer = StaticOriginId::for_test(355);
-        let candidates = [343, 322]
-            .into_iter()
-            .enumerate()
-            .map(|(arm, body)| PendingCandidate {
-                arm,
-                construct: StaticOriginId::for_test(if arm == 0 { 352 } else { 339 }),
-                body: StaticOriginId::for_test(body),
-                members: vec![PendingMember::WorkerCapture {
-                    ordinal: 0,
-                    source: StaticOriginId::for_test(358),
-                }],
-            })
-            .collect();
-        PendingCallPackagePlan {
-            producer,
-            candidates,
-            width: 1,
-            route: PendingCallRoute {
-                defining_function: owner,
-                visited: vec![PendingRouteVisit {
-                    origin: StaticOriginId::for_test(19),
-                    kind: PendingRouteKind::CarriedResidual,
-                }],
-                gates: vec![StaticOriginId::for_test(19)],
-                gate_binder_pairs: vec![PendingGateBinderPair {
-                    origin: StaticOriginId::for_test(19),
-                    walker_index: 0,
-                    morphism_index: 0,
-                }],
-            },
-        }
+    #[test]
+    fn one_emission_owner_refuses_mixed_response_and_ordinary_returns() {
+        let owned = (StaticOriginId::for_test(352), StaticOriginId::for_test(343));
+        let ordinary = (StaticOriginId::for_test(332), StaticOriginId::for_test(321));
+        assert!(!owner_reentries_exclusive([owned], [ordinary])
+            .expect("ordinary-only emission is not Ret-only"));
+        assert!(owner_reentries_exclusive([owned], [owned])
+            .expect("owner-only emission is Ret-only"));
+        assert!(!owner_reentries_exclusive([owned], [])
+            .expect("no re-entry is not an owner-fed emission"));
+        let error = owner_reentries_exclusive([owned], [owned, ordinary])
+            .expect_err("one emitted Match cannot mix owner and ordinary returns");
+        assert_eq!(error.to_string(), planner_error(
+            "owner-fed and ordinary returns re-enter one Match in one emission owner",
+        ).to_string());
     }
 
     /// Transition sentinel: px8tr's existing gather and worker-call retarget
-    /// are not pending-producer Matches at this base. If a later fixture grows
-    /// such a Match, review this scope rather than freezing its present count.
-    /// MEASURED: real continuation units exist but no source Match sits inside
-    /// a computational match, and admission publishes no package rows.
-    /// CLAIMED: this fixture stays on its existing gather/retarget path.
-    /// THE GAP: actual emission is covered separately by
-    /// `rt_seed_direct_and_context_gather_use_the_same_entry_words` and
-    /// `d5a_the_retargeted_worker_call_carries_the_raw_run_plus_the_context_capture_suffix`;
-    /// this test alone measures only the pre-emission population boundary.
+    /// are not selected pending Match producers at this base.
     #[test]
     fn px8tr_gather_and_retarget_nonproducer_transition_sentinel() {
         let (entry, declarations) =
@@ -1458,322 +1535,78 @@ mod tests {
         .expect("the two-parameter gather witness plans");
         plan.install_selected_pending_calls(None)
             .expect("the read-only admission writer handles a nonproducer");
-        assert!(
-            !plan
-                .continuation_units()
-                .expect("continuation units")
-                .is_empty(),
-            "the gather/retarget fixture must contain real continuation units"
-        );
-        let pending_match_producers = plan
-            .source_occurrences
-            .iter()
-            .flatten()
-            .filter(|occurrence| {
-                matches!(
-                    occurrence.expr,
-                    RuntimeExpr::ComputationalMatch { scrutinee, .. }
-                        if matches!(scrutinee.as_ref(), RuntimeExpr::Match { .. })
-                )
-            })
-            .count();
-        assert_eq!(pending_match_producers, 0);
-        assert!(
-            plan.selected_pending_calls.is_empty(),
-            "a nonproducer must not gain a selected pending-call package: {:?}",
-            plan.selected_pending_calls
-        );
-    }
-
-    // From checked source on base 6bdd75394, the direct double bind fails
-    // first in response planning and a pure pair's second read is erased.
-    // This planner-route input deliberately places the *same* marked IH call
-    // before a Let body: Var(0) names the local result; Var(1) additionally
-    // reads the still-bound IH. It is not a checked-source second-read claim.
-    fn pending_route_input(
-        body_var: u32,
-        deny_raw_ih: bool,
-        call_template_id: u64,
-    ) -> PendingCallAdmission {
-        let expr = RuntimeExpr::Let {
-            value: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
-                call_template_id,
-                checked_occurrence_path: vec![20],
-                kind: CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
-                binder_morphism: CheckedComputationalIHBinderMorphism::identity_for_test(0),
-                body: Box::new(RuntimeExpr::Call {
-                    callee: Box::new(RuntimeExpr::Var(0)),
-                    args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))],
-                }),
-            }),
-            body: Box::new(RuntimeExpr::Var(body_var)),
-        };
-        let plan = super::super::plan_static_transition_graph(&expr, &BTreeMap::new())
-            .expect("a marked route input plans");
-        let root = plan.root_static_origin().expect("route root exists");
-        let owner = occurrence_authority(&plan, root)
-            .expect("root has an owner")
-            .owner;
-        let mut gates = BTreeSet::new();
-        // Two distinct valid call templates, but only one names this case's
-        // slot. Identity and slot must not be inferred from each other.
-        let slot_for_call = |id| match id {
-            171 => Some(202),
-            172 => Some(203),
-            _ => None,
-        };
-        let mut visited = PendingRouteEvidence::new(202, &slot_for_call);
-        match walk_to_gate(
-            &plan,
-            root,
-            owner,
-            0,
-            deny_raw_ih,
-            PendingPathCounts::START,
-            &mut gates,
-            &mut visited,
-        ) {
-            Ok(paths) => {
-                let mut package = route_package();
-                package.route.defining_function = owner;
-                package.route.gates = gates.into_iter().collect();
-                package.route.visited = visited
-                    .kinds
-                    .into_iter()
-                    .map(|(origin, kind)| PendingRouteVisit { origin, kind })
-                    .collect();
-                package.route.gate_binder_pairs = visited
-                    .gate_binder_pairs
-                    .into_iter()
-                    .map(
-                        |(origin, (walker_index, morphism_index))| PendingGateBinderPair {
-                            origin,
-                            walker_index,
-                            morphism_index,
-                        },
-                    )
-                    .collect();
-                admit_routed_package(package, Vec::new(), paths)
-            }
-            Err(reason) => PendingCallAdmission::Refused(reason),
-        }
+        assert!(!plan.continuation_units().expect("continuation units").is_empty());
+        assert!(plan.selected_pending_calls.is_empty());
     }
 
     #[test]
-    fn pending_route_input_second_raw_ih_read_is_refused_at_the_walker() {
-        assert!(matches!(
-            pending_route_input(0, true, 171),
-            PendingCallAdmission::Planned(_)
-        ));
-        assert_eq!(
-            pending_route_input(1, true, 171),
-            PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach)
-        );
-        // Disable only the raw occurrence check. The same negative then
-        // reaches one marked gate and becomes Planned, proving the refusal's
-        // provenance rather than relying on the independent gate counter.
-        assert!(matches!(
-            pending_route_input(1, false, 171),
-            PendingCallAdmission::Planned(_)
-        ));
-    }
-
-    #[test]
-    fn wrong_call_template_slot_refuses_at_the_production_walker() {
-        assert!(matches!(
-            pending_route_input(0, true, 171),
-            PendingCallAdmission::Planned(_)
-        ));
-        assert_eq!(
-            pending_route_input(0, true, 172),
-            PendingCallAdmission::Refused(PendingRefusal::UnsupportedRouteEdge)
-        );
-    }
-
-    #[test]
-    fn marked_pending_read_is_the_checked_slot_not_a_raw_var_index() {
+    fn checked_template_slot_identifies_the_marked_read_not_the_raw_var() {
         let call = |callee, args: Vec<RuntimeExpr>| RuntimeExpr::Call {
             callee: Box::new(RuntimeExpr::Var(callee)),
             args,
         };
         let one_arg = vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))];
         let kind = CheckedComputationalIHInvocationKind::CheckedHostVisContinuation;
-        // The callee is never evaluated by native lowering at this checked
-        // marker. Even a mismatched raw Var cannot change its template slot.
-        assert!(marked_pending_read(
-            kind,
-            &call(3, one_arg.clone()),
-            202,
-            Some(202)
-        ));
-        assert!(marked_pending_read(
-            kind,
-            &call(4, one_arg.clone()),
-            202,
-            Some(202)
-        ));
-        assert!(!marked_pending_read(
-            kind,
-            &call(3, one_arg.clone()),
-            202,
-            Some(203)
-        ));
-        assert!(!marked_pending_read(
-            kind,
-            &call(3, one_arg.clone()),
-            202,
-            None
-        ));
+        assert!(marked_pending_read(kind, &call(3, one_arg.clone()), 202, Some(202)));
+        assert!(marked_pending_read(kind, &call(4, one_arg.clone()), 202, Some(202)));
+        assert!(!marked_pending_read(kind, &call(3, one_arg.clone()), 202, Some(203)));
+        assert!(!marked_pending_read(kind, &call(3, one_arg.clone()), 202, None));
         assert!(!marked_pending_read(kind, &call(3, vec![]), 202, Some(202)));
         assert!(!marked_pending_read(
             CheckedComputationalIHInvocationKind::OrdinaryApplication,
-            &call(3, one_arg),
-            202,
-            Some(202),
+            &call(3, one_arg), 202, Some(202),
         ));
     }
 
     #[test]
-    fn agreeing_unit_keeps_the_existing_l2_route_out_of_package_admission() {
+    fn agreeing_unit_preserves_the_existing_l2_nonpending_route() {
         let same = StaticOriginId::for_test(343);
         let other = StaticOriginId::for_test(322);
-        assert_eq!(
-            agreed_unit_nonpackage([same, same]),
-            Some(PendingCallAdmission::NotApplicable)
-        );
+        assert_eq!(agreed_unit_nonpackage([same, same]),
+            Some(PendingCallAdmission::NotApplicable));
         assert_eq!(agreed_unit_nonpackage([same, other]), None);
-        assert_eq!(
-            agreed_unit_nonpackage(Vec::new()),
-            Some(PendingCallAdmission::NotApplicable)
-        );
+        assert_eq!(agreed_unit_nonpackage(Vec::new()),
+            Some(PendingCallAdmission::NotApplicable));
     }
 
-    // The only single-edit checked-source attempt that returns the pending
-    // ITree from main is rejected by checking (Unit versus ExitCode). A
-    // generated-root edge is therefore measured as a route-input fixture;
-    // unlike the F5/F6 fixture, it changes only the gate's function owner.
+    // An ordinary source return is an open exit; the checked marker must be
+    // consumed on every path before the owner can be admitted. These are
+    // planner-route inputs, not a claim that checked source emits this Ret.
     #[test]
-    fn generated_root_owner_cannot_receive_the_pending_gate() {
-        let package = route_package();
-        let local = package.route.defining_function;
-        let generated_root = PredeclaredFunctionId::for_test(0);
-        let gated = PendingPathCounts::START.consume().unwrap();
-        assert!(require_defining_function(local, local).is_ok());
-        assert!(matches!(
-            admit_routed_package(package.clone(), Vec::new(), vec![gated]),
-            PendingCallAdmission::Planned(_)
-        ));
-        let negative = require_defining_function(local, generated_root)
-            .expect_err("a gate in the generated root leaves its defining function");
-        assert_eq!(
-            PendingCallAdmission::Refused(negative),
-            PendingCallAdmission::Refused(PendingRefusal::RouteLeavesDefiningFunction)
-        );
-        // The negative also traverses the real walker, not just its extracted
-        // owner predicate. This root is a planned runtime-IR occurrence with
-        // its own function; only the package's claimed owner differs.
-        let root_expr = RuntimeExpr::Value(crate::RuntimeValue::Bool(true));
-        let plan = super::super::plan_static_transition_graph(&root_expr, &BTreeMap::new())
-            .expect("a generated-root occurrence plans");
-        let root = plan.root_static_origin().expect("root occurrence exists");
-        let actual = occurrence_authority(&plan, root).unwrap().owner;
-        assert_ne!(
-            actual, local,
-            "fixture must actually cross the owner boundary"
-        );
-        assert_eq!(
-            walk_to_gate(
-                &plan,
-                root,
-                local,
-                0,
-                true,
-                PendingPathCounts::START,
-                &mut BTreeSet::new(),
-                &mut PendingRouteEvidence::new(0, &|_| None),
-            )
-            .expect_err("the generated root cannot consume another owner's package"),
-            PendingRefusal::RouteLeavesDefiningFunction,
-        );
-    }
-
-    // The identity wrapper source edit checks but erases its call before
-    // runtime IR (F6 probe), so it is not a crossing witness. The F5 input
-    // returns with an open pending read and no consuming gate; the F6 input
-    // takes a generated call instead of the local consuming edge. These are
-    // separate from the generated-root location control above.
-    #[test]
-    fn generated_call_crossing_reaches_the_production_route_walker() {
-        let expression = RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::LexicalClosure {
-                captures: Vec::new(),
-                params: vec!["x".to_owned()],
-                body: Box::new(RuntimeExpr::Var(0)),
-            }),
-            args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))],
-        };
-        let plan = super::super::plan_static_transition_graph(&expression, &BTreeMap::new())
-            .expect("generated-call route fixture plans");
-        let call = plan.root_static_origin().expect("call root exists");
-        let owner = occurrence_authority(&plan, call)
-            .expect("call owns an occurrence")
-            .owner;
-        assert_eq!(
-            walk_to_gate(
-                &plan,
-                call,
-                owner,
-                0,
-                true,
-                PendingPathCounts::START,
-                &mut BTreeSet::new(),
-                &mut PendingRouteEvidence::new(0, &|_| None),
-            )
-            .expect_err("F6 call cannot carry the pending package"),
-            PendingRefusal::RouteLeavesDefiningFunction,
-        );
-    }
-
-    /// A planned runtime-IR `ITree::Ret` constructor exits with zero gates.
-    /// This is a route-input F5 representative, not a checked-source strict
-    /// `return_body` witness: the one-edit source variant fails typing (Unit
-    /// versus ExitCode). The other path's gate in `route_package` keeps the
-    /// inventory nonempty, so must-reach alone distinguishes the refusal.
-    #[test]
-    fn f5_open_return_reaches_production_walker_and_must_reach_guard() {
+    fn open_return_and_generated_crossings_keep_the_admission_refusals() {
         let ret = RuntimeExpr::Construct {
             constructor: "ctor:fixture::pending::ITree::Ret".to_owned(),
             args: Vec::new(),
         };
         let plan = super::super::plan_static_transition_graph(&ret, &BTreeMap::new())
-            .expect("a strict return is a planned runtime-IR occurrence");
-        let root = plan.root_static_origin().expect("return root exists");
+            .expect("a strict return plans");
+        let root = plan.root_static_origin().expect("root exists");
         let owner = occurrence_authority(&plan, root).unwrap().owner;
         let mut gates = BTreeSet::new();
         let exits = walk_to_gate(
-            &plan,
-            root,
-            owner,
-            0,
-            true,
-            PendingPathCounts::START,
-            &mut gates,
-            &mut PendingRouteEvidence::new(0, &|_| None),
-        )
-        .expect("the local return itself does not cross a function");
+            &plan, root, owner, 0, true, PendingPathCounts::START,
+            &mut gates, &mut PendingRouteEvidence::new(0, &|_| None),
+        ).expect("a local return is an open exit");
         assert_eq!(exits, vec![PendingPathCounts::START]);
-        assert!(gates.is_empty(), "the return is not a consuming gate");
-        assert!(matches!(
-            admit_routed_package(
-                route_package(),
-                Vec::new(),
-                vec![PendingPathCounts::START.consume().unwrap()]
-            ),
-            PendingCallAdmission::Planned(_)
-        ));
+        assert!(gates.is_empty());
         assert_eq!(
-            admit_routed_package(route_package(), Vec::new(), exits),
+            admit_validated_owner(root, Vec::new(), PendingCallRoute {
+                defining_function: owner,
+                visited: Vec::new(),
+                gates: Vec::new(),
+                gate_binder_pairs: Vec::new(),
+            }, Vec::new(), exits),
             PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach),
+        );
+
+        let generated = PredeclaredFunctionId::for_test(3);
+        assert_ne!(owner, generated);
+        assert_eq!(
+            walk_to_gate(
+                &plan, root, generated, 0, true, PendingPathCounts::START,
+                &mut BTreeSet::new(), &mut PendingRouteEvidence::new(0, &|_| None),
+            ).unwrap_err(),
+            PendingRefusal::RouteLeavesDefiningFunction,
         );
     }
 }
