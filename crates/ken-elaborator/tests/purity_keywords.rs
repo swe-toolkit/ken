@@ -71,6 +71,27 @@ fn surf1_d2_fn_calling_proc_reuses_escape_gate() {
     .expect("same body under proc with matching row must accept");
 }
 
+/// MEASURED: an ordinary single proc's declared Console row is still read
+/// from its checked ID after the flat source alias is removed.
+/// CLAIMED: the group-row repair leaves the non-group row path intact.
+/// THE GAP: this tests one declared concrete row, not all row expressions.
+#[test]
+fn surf1_d2_single_proc_with_visits_reaches_checker_by_id() {
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_decl("proc surf1_single_proc (n : Nat) : Bool visits [Console] = True")
+        .expect("a single proc with a nonempty row must check");
+    assert!(env.globals.remove("surf1_single_proc").is_some());
+
+    let bad_fn =
+        err_text(env.elaborate_decl("fn surf1_single_bad (n : Nat) : Bool = surf1_single_proc n"));
+    assert!(
+        bad_fn.contains("false purity or effect escape")
+            && bad_fn.contains("EffectEscapes")
+            && bad_fn.contains("Console"),
+        "single-proc Console row must remain effectful by checked ID: {bad_fn}"
+    );
+}
+
 #[test]
 fn surf1_d2_recursive_proc_group_with_visits_reaches_checker() {
     let mut env = ElabEnv::new().expect("base env");

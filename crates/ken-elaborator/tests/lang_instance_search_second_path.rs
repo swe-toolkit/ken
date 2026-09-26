@@ -43,6 +43,31 @@ fn sole_explicit_constraint_retains_the_legacy_d_alias_row() {
     );
 }
 
+/// Durable invariant: without a local constraint binder, the previous
+/// session's checked `d` stays selectable even after its flat alias is removed.
+/// MEASURED: a new source declaration checks and retains that exact global ID.
+/// CLAIMED: lexical shadowing does not erase the session binding itself.
+/// THE GAP: the fixture must remove only the flat alias, not the session scope.
+#[test]
+fn previous_session_d_remains_selected_without_a_local_constraint() {
+    let mut env = projection_fixture();
+    let prior = env
+        .globals
+        .remove("d")
+        .expect("fixture must own a checked d");
+    let checked = env
+        .elaborate_decl("const ordinary_d : Quiet Bool = d")
+        .expect("prior-session d must resolve without a local constraint");
+    let (_, body) = env
+        .env
+        .transparent_body(checked)
+        .expect("ordinary_d must be transparent");
+    assert!(
+        matches!(body, ken_kernel::Term::Const { id, .. } if id == prior),
+        "ordinary source must select the previous checked d, not a flat alias: {body:?}"
+    );
+}
+
 /// Durable invariant: the explicitly spelled local-constraint binder remains
 /// effectful independently of its `d` alias.
 #[test]

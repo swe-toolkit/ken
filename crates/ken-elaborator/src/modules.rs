@@ -748,7 +748,18 @@ impl Scope {
         self.locals.insert(bare.to_string());
         self.bindings
             .insert(bare.to_string(), qualified.to_string());
+        // A new local shadows an earlier session's checked identity. Checked
+        // session locals reinsert their own ID after this binding succeeds.
+        self.session_ids.remove(bare);
         Ok(())
+    }
+
+    /// Constraint dictionaries are lexical binders: unlike declarations, they
+    /// shadow imports as well as prior-session locals in this cloned scope.
+    fn bind_lexical_local(&mut self, name: &str, span: &Span) -> Result<(), ElabError> {
+        self.bindings.remove(name);
+        self.binding_ids.remove(name);
+        self.bind_local(name, name, span)
     }
 }
 
@@ -2936,14 +2947,10 @@ fn rewrite_rdecl(
         if constraints.is_empty() { None } else {
             let mut local = scope.clone();
             for constraint in constraints {
-                local.bindings.insert(constraint.binder.clone(), constraint.binder.clone());
-                local.locals.insert(constraint.binder.clone());
-                local.binding_ids.remove(&constraint.binder);
+                local.bind_lexical_local(&constraint.binder, &rdecl.span)?;
             }
             if constraints.len() == 1 {
-                local.bindings.insert("d".to_string(), "d".to_string());
-                local.locals.insert("d".to_string());
-                local.binding_ids.remove("d");
+                local.bind_lexical_local("d", &rdecl.span)?;
             }
             Some(local)
         }
@@ -3238,9 +3245,11 @@ fn register_effect_row(elab: &mut ElabEnv, result: &crate::elab::ElabResult) {
 fn register_declared_effect_row(
     elab: &mut ElabEnv,
     rdecl: &crate::resolve::RDecl,
+    checked_id: ken_kernel::GlobalId,
 ) -> Result<(), ElabError> {
     if let Some(row) = crate::elab::surface_declared_row_type(rdecl)? {
-        elab.effect_rows.insert(rdecl.name.clone(), row);
+        elab.effect_rows.insert(rdecl.name.clone(), row.clone());
+        elab.effect_rows_by_id.insert(checked_id, row);
     }
     Ok(())
 }
@@ -4537,7 +4546,7 @@ fn expand_scope(
                         )?;
                         for (m, (rdecl, result)) in scc.iter().copied().zip(members.iter().zip(results)) {
                             register_effect_row(elab, &result);
-                            register_declared_effect_row(elab, rdecl)?;
+                            register_declared_effect_row(elab, rdecl, result.def_id)?;
                             record_checked_local(
                                 scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
                             );

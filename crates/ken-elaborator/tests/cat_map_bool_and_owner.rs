@@ -77,9 +77,25 @@ fn module_transparent_kernel_equivalents(
 }
 
 fn map_dependency_env() -> ElabEnv {
+    map_dependency_env_with_lc_aliases(true)
+}
+
+fn map_dependency_env_without_bool_and_aliases() -> ElabEnv {
+    map_dependency_env_with_lc_aliases(false)
+}
+
+fn map_dependency_env_with_lc_aliases(grant_bool_and: bool) -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    if grant_bool_and {
+        catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    } else {
+        catalog_or::load_derived_importing_fixture_many_except(
+            &mut env,
+            &["list_append"],
+            &LC_BOOL_AND_SURFACES,
+        );
+    }
     env.elaborate_module_from_roots(
         &[catalog_or::catalog_root()],
         "Data.Numeric.Nat.Arithmetic",
@@ -104,10 +120,18 @@ fn map_dependency_env() -> ElabEnv {
         );
     }
     for imported in LC_BOOL_AND_SURFACES {
-        assert!(
-            env.globals.remove(imported).is_some(),
-            "fixture must withhold selectively imported `{imported}`"
-        );
+        let flat_alias = env.globals.remove(imported);
+        if grant_bool_and {
+            assert!(
+                flat_alias.is_some(),
+                "fixture must withhold selectively imported `{imported}`"
+            );
+        } else {
+            assert!(
+                flat_alias.is_none(),
+                "withdrawal fixture must not grant a `{imported}` alias"
+            );
+        }
     }
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
         .expect("Map's canonical is_some provider must roots-load");
@@ -245,7 +269,7 @@ fn replace_exactly_once(source: &str, from: &str, to: &str) -> String {
 }
 
 fn assert_import_mutation_fails(source: &str, label: &str) {
-    let mut env = map_dependency_env();
+    let mut env = map_dependency_env_without_bool_and_aliases();
     match env.elaborate_ken_md_file(source) {
         Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
             name, "bool_and",
@@ -255,14 +279,25 @@ fn assert_import_mutation_fails(source: &str, label: &str) {
     }
 }
 
-/// MEASURED: withdrawing Map's LC import or binding the canonical subject under
-/// the wrong local spelling makes the real Map source fail specifically at
-/// `bool_and`, while the fixture retains every unrelated legacy dependency.
+/// MEASURED: the real Map import selects LC's checked ID even with no ambient
+/// bool_and alias, while withdrawing that import or renaming its local binding
+/// fails specifically at `bool_and`. Other legacy dependencies are retained.
 /// CLAIMED: the LC edge is load-bearing and cannot be replaced by fixture
 /// ambient resolution. THE GAP: the provider's exact public inventory is owned
 /// by `cat_bool_pub_export`; this is the consumer-side control.
 #[test]
 fn map_bool_and_import_withdrawal_and_wrong_name_fail() {
+    let mut positive = map_dependency_env_without_bool_and_aliases();
+    let provider = positive.globals[&format!("{LAWFUL}.bool_and")];
+    let owned = positive
+        .elaborate_ken_md_file(MAP_KEN_MD)
+        .expect("Map's real LC import must check without a fixture alias");
+    assert!(
+        owned.iter().any(|id| positive.env.transparent_body(*id)
+            .is_some_and(|(_, body)| term_reference_count(&body, provider) > 0)),
+        "Map's import must select LC's exact checked bool_and ID"
+    );
+
     let import = "import Core.Classes.LawfulClasses (bool_and)\n\n";
     let withdrawn = replace_exactly_once(MAP_KEN_MD, import, "");
     assert_import_mutation_fails(&withdrawn, "withdrawn LC import");

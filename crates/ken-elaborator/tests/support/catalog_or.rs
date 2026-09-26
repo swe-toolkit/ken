@@ -118,6 +118,10 @@ pub fn load_core_logic_compare(env: &mut ElabEnv) {
 }
 
 pub fn expose_module(env: &mut ElabEnv, module: &str) {
+    expose_module_except(env, module, &[]);
+}
+
+fn expose_module_except(env: &mut ElabEnv, module: &str, excluded: &[&str]) {
     let prefix = format!("{module}.");
     let aliases: Vec<_> = env
         .globals
@@ -128,8 +132,10 @@ pub fn expose_module(env: &mut ElabEnv, module: &str) {
         })
         .collect();
     for (name, id) in aliases {
-        env.bind_session_name(&name, id)
-            .expect("checked catalog module alias");
+        if !excluded.contains(&name.as_str()) {
+            env.bind_session_name(&name, id)
+                .expect("checked catalog module alias");
+        }
     }
 }
 
@@ -154,11 +160,22 @@ pub fn load_derived_fixture(env: &mut ElabEnv) {
 /// Each consumer's real selective import must install its exact binding; other
 /// aliases remain available to the legacy dependency fixture.
 pub fn load_derived_importing_fixture_many(env: &mut ElabEnv, imports: &[&str]) {
+    load_derived_importing_fixture_many_except(env, imports, &[]);
+}
+
+/// Construct the same legacy dependency environment without granting selected
+/// LC session aliases. A missing source import must not be rescued by the
+/// fixture's synthetic flat exposure.
+pub fn load_derived_importing_fixture_many_except(
+    env: &mut ElabEnv,
+    imports: &[&str],
+    excluded_lc_aliases: &[&str],
+) {
     env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Derived's canonical Nat-order dependency must roots-load");
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
-    expose_module(env, "Core.Classes.LawfulClasses");
+    expose_module_except(env, "Core.Classes.LawfulClasses", excluded_lc_aliases);
     expose_module(env, "Data.Collections.Derived");
     for imported in imports {
         assert!(
