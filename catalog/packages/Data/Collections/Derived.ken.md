@@ -100,7 +100,7 @@ pub fn nth (a : Type) (n : Nat) (xs : List a) : Option a =
       }
   }
 
-fn take (a : Type) (n : Nat) (xs : List a) : List a =
+pub fn take (a : Type) (n : Nat) (xs : List a) : List a =
   match n {
     Zero ↦ Nil a;
     Suc m ↦
@@ -110,7 +110,7 @@ fn take (a : Type) (n : Nat) (xs : List a) : List a =
       }
   }
 
-fn drop (a : Type) (n : Nat) (xs : List a) : List a =
+pub fn drop (a : Type) (n : Nat) (xs : List a) : List a =
   match n {
     Zero ↦ xs;
     Suc m ↦
@@ -204,7 +204,7 @@ pub fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
       }
   }
 
-fn mem (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Bool =
+pub fn mem (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Bool =
   match xs {
     Nil ↦ False;
     Cons h t ↦
@@ -246,7 +246,7 @@ pub proof at_or_beyond_is_none for nth
       }
   }
 
-theorem take_drop_decomposition
+pub theorem take_drop_decomposition
       (a : Type) (n : Nat) (xs : List a)
     : Equal (List a) (list_append a (take a n xs) (drop a n xs)) xs =
   match n {
@@ -683,7 +683,7 @@ theorem mem_filter_sound
         (Refl)
   }
 
-theorem map_length
+pub theorem map_length
       (a : Type) (b : Type) (f : a → b) (xs : List a)
     : Equal Nat (length b (map a b f xs)) (length a xs) =
   match xs {
@@ -691,7 +691,7 @@ theorem map_length
     Cons h t ↦ cong Nat Nat (length b (map a b f t)) (length a t) Suc (map_length a b f t)
   }
 
-theorem length_take_min
+pub theorem length_take_min
       (a : Type) (n : Nat) (xs : List a)
     : Equal Nat (length a (take a n xs)) (min n (length a xs)) =
   match n {
@@ -815,7 +815,7 @@ theorem reverse_length
         (cong Nat Nat (length a (reverse a t)) (length a t) Suc (reverse_length a t))
   }
 
-fn zip (a : Type) (b : Type) (xs : List a) (ys : List b) : List (Pair a b) =
+pub fn zip (a : Type) (b : Type) (xs : List a) (ys : List b) : List (Pair a b) =
   match xs {
     Nil ↦ Nil (Pair a b);
     Cons h t ↦
@@ -825,7 +825,7 @@ fn zip (a : Type) (b : Type) (xs : List a) (ys : List b) : List (Pair a b) =
       }
   }
 
-theorem zip_length
+pub theorem zip_length
       (a : Type) (b : Type) (xs : List a) (ys : List b)
     : Equal Nat (length (Pair a b) (zip a b xs ys)) (min (length a xs) (length b ys)) =
   match xs {
@@ -892,7 +892,7 @@ fn range_from (start : Nat) (n : Nat) : List Nat =
     Suc m ↦ Cons Nat start (range_from (Suc start) m)
   }
 
-fn range (n : Nat) : List Nat = range_from Zero n
+pub fn range (n : Nat) : List Nat = range_from Zero n
 
 theorem range_from_length
       (start : Nat) (n : Nat)
@@ -909,9 +909,9 @@ theorem range_from_length
         (range_from_length (Suc start) m)
   }
 
-theorem range_length (n : Nat) : Equal Nat (length Nat (range n)) n = range_from_length Zero n
+pub theorem range_length (n : Nat) : Equal Nat (length Nat (range n)) n = range_from_length Zero n
 
-fn foldl (a : Type) (b : Type) (f : b → a → b) (z : b) (xs : List a) : b =
+pub fn foldl (a : Type) (b : Type) (f : b → a → b) (z : b) (xs : List a) : b =
   match xs {
     Nil ↦ z;
     Cons h t ↦ foldl a b f (f z h) t
@@ -951,7 +951,7 @@ pub fn count (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Nat =
 fn Perm (a : Type) (eqf : a → a → Bool) (xs : List a) (ys : List a) : Prop =
   (x : a) → Equal Nat (count a eqf x xs) (count a eqf x ys)
 
-fn insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
+pub fn insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
   match xs {
     Nil ↦ Cons a x (Nil a);
     Cons h t ↦
@@ -961,7 +961,7 @@ fn insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
       }
   }
 
-fn sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
+pub fn sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
   match xs {
     Nil ↦ Nil a;
     Cons h t ↦ insert a le h (sort a le t)
@@ -1432,7 +1432,7 @@ fn insert_true_bool (xs : List Bool) : List Bool =
       }
   }
 
-fn sort_bool (xs : List Bool) : List Bool =
+pub fn sort_bool (xs : List Bool) : List Bool =
   match xs {
     Nil ↦ Nil Bool;
     Cons h t ↦
@@ -1460,7 +1460,7 @@ theorem sorted_insert_true_bool
       }
   }
 
-theorem sort_bool_sorted (xs : List Bool) : is_sorted Bool bool_leq (sort_bool xs) =
+pub theorem sort_bool_sorted (xs : List Bool) : is_sorted Bool bool_leq (sort_bool xs) =
   match xs {
     Nil ↦ Proved;
     Cons h t ↦
@@ -1579,7 +1579,7 @@ theorem sort_bool_count_true
       }
   }
 
-theorem sort_bool_perm
+pub theorem sort_bool_perm
       (xs : List Bool)
     : Perm Bool (eq_from_ord Bool bool_leq) xs (sort_bool xs) =
   match xs {
@@ -1609,11 +1609,11 @@ support that is not part of this slice. Every law field below closes by
 definitionally once applied.
 
 ```ken
-class View A {
+pub class View A {
   project : A → A
 }
 
-class Lens A {
+pub class Lens A {
   get : Pair Bool Bool → Bool;
   set : Bool → Pair Bool Bool → Pair Bool Bool;
   get_set : (a : Bool) → (s : Pair Bool Bool) → Equal Bool (get (set a s)) a;
@@ -1625,28 +1625,28 @@ class Lens A {
     → Equal (Pair Bool Bool) (set b (set a s)) (set b s)
 }
 
-class Iso A {
+pub class Iso A {
   to : Bool → Bool;
   from : Bool → Bool;
   to_from : (x : Bool) → Equal Bool (to (from x)) x;
   from_to : (x : Bool) → Equal Bool (from (to x)) x
 }
 
-class Representation A {
+pub class Representation A {
   encode : Bool → Bool;
   decode : Bool → Bool;
   roundtrip : (x : Bool) → Equal Bool (decode (encode x)) x
 }
 
-class RefinementView A {
+pub class RefinementView A {
   project : ({b : Bool | Equal Bool b True}) → Bool
 }
 
-class IndexedView A {
+pub class IndexedView A {
   project : Pair Bool Bool → Bool → Bool
 }
 
-class SetoidMorphism A {
+pub class SetoidMorphism A {
   project : Bool → Bool;
   respects : (x : Bool) → (y : Bool) → (Equal Bool x y) → Equal Bool (project x) (project y)
 }
@@ -1751,7 +1751,7 @@ directly; otherwise `Lt`/`Gt` follow from `leqChar`'s antisymmetry and
 totality (both landed `Ord Char` laws, by transport from `Ord Int`).
 
 ```ken
-fn compare_char (a : Char) (b : Char) : OrdResult =
+pub fn compare_char (a : Char) (b : Char) : OrdResult =
   match eqChar a b {
     True ↦ ord_eq;
     False ↦
@@ -1782,10 +1782,10 @@ lexicographic order — the more fundamental op, subsuming `<=`/`<`/`==`
 (a `leq`-only interface cannot cheaply recover a 3-way result).
 
 ```ken
-fn concat (a : String) (b : String) : String =
+pub fn concat (a : String) (b : String) : String =
   list_char_to_string (list_append Char (string_to_list_char a) (string_to_list_char b))
 
-fn slice (i : Nat) (j : Nat) (s : String) : String =
+pub fn slice (i : Nat) (j : Nat) (s : String) : String =
   let
     characters = string_to_list_char s;
     suffix = drop Char i characters;
@@ -1794,12 +1794,12 @@ fn slice (i : Nat) (j : Nat) (s : String) : String =
   in
     list_char_to_string selected_window
 
-fn char_at (i : Nat) (s : String) : Option Char = nth Char i (string_to_list_char s)
+pub fn char_at (i : Nat) (s : String) : Option Char = nth Char i (string_to_list_char s)
 
-fn eq (a : String) (b : String) : Bool =
+pub fn eq (a : String) (b : String) : Bool =
   list_eq Char eqChar (string_to_list_char a) (string_to_list_char b)
 
-fn compare (a : String) (b : String) : OrdResult =
+pub fn compare (a : String) (b : String) : OrdResult =
   list_compare Char compare_char (string_to_list_char a) (string_to_list_char b)
 ```
 
@@ -1881,7 +1881,7 @@ reference implementation.
    `nth::at_or_beyond_is_none` (the two lookup bounds); `reverse`,
    `reverse::involutive`,
    `zip`, `concat_map`, `range`, `foldl` and their proofs (DS-4); `count`,
-   `Perm`, `insert`, `sort`, `sort_bool`, `sort_bool_sorted`,
+   `insert`, `sort`, `sort_bool`, `sort_bool_sorted`,
    `sort_bool_perm` (CAT-3 D2); `View`, `Lens`, `Iso`, `Representation`,
    `RefinementView`, `IndexedView`, `SetoidMorphism` (CAT-3 D3);
    `compare_char`, `concat`, `slice`, `char_at`, `eq`, `compare` (the 5

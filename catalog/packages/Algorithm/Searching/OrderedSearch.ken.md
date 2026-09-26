@@ -38,7 +38,7 @@ fn elem_step (tail_member : Bool) (x_before_head : Bool) (head_before_x : Bool) 
     False ↦ tail_member
   }
 
-fn elem (a : Type) (d : Ord a) (x : a) (xs : List a) : Bool =
+pub fn elem (a : Type) (d : Ord a) (x : a) (xs : List a) : Bool =
   match xs {
     Nil ↦ False;
     Cons head tail ↦ elem_step (elem a d x tail) (ord_leq_at a d x head) (ord_leq_at a d head x)
@@ -65,7 +65,7 @@ theorem list_membership_adapter_fidelity
         (elem a d query xs) =
   Refl
 
-fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
+pub fn sorted_for_search (a : Type) (d : Ord a) (xs : List a) : Prop =
   match xs {
     Nil ↦ Top;
     Cons head tail ↦
@@ -169,7 +169,7 @@ theorem elem_step_to_tail_before_head
     (search_sym Bool x_before_head True x_before)
     member
 
-fn search
+pub fn search
       (a : Type) (d : Ord a) (x : a) (xs : List a)
     : sorted_for_search a d xs → Dec (Equal Bool (elem a d x xs) True) =
   match xs {

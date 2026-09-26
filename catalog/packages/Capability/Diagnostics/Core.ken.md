@@ -17,6 +17,8 @@ data SourceId = MkSourceId Nat
 
 export SourceId
 
+pub fn source_id_from_nat (n : Nat) : SourceId = MkSourceId n
+
 data ByteRange = MkByteRange Nat Nat
 
 export ByteRange, MkByteRange
@@ -116,16 +118,16 @@ ranges, environment names are accepted as opaque names, and configuration key
 paths must contain at least one segment.
 
 ```ken
-fn ValidByteRange (range : ByteRange) : Prop =
+pub fn ValidByteRange (range : ByteRange) : Prop =
   Equal Bool (leq_nat (byte_range_start range) (byte_range_end range)) True
 
-fn ValidConfigKeyPath (path : List String) : Prop =
+pub fn ValidConfigKeyPath (path : List String) : Prop =
   match path {
     Nil ↦ Bottom;
     Cons key rest ↦ Top
   }
 
-fn ValidOrigin (origin : Origin) : Prop =
+pub fn ValidOrigin (origin : Origin) : Prop =
   match origin {
     SourceOrigin source range ↦ ValidByteRange range;
     ArgumentOrigin index range ↦ ValidByteRange range;
@@ -133,7 +135,7 @@ fn ValidOrigin (origin : Origin) : Prop =
     ConfigKeyOrigin path ↦ ValidConfigKeyPath path
   }
 
-fn ValidDiagnostic (diagnostic : Diagnostic) : Prop = ValidOrigin (diagnostic_origin diagnostic)
+pub fn ValidDiagnostic (diagnostic : Diagnostic) : Prop = ValidOrigin (diagnostic_origin diagnostic)
 ```
 
 ## 4. Trust and derivation

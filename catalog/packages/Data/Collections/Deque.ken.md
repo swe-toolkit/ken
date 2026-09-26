@@ -15,26 +15,26 @@ import Data.Collections.Derived (list_append, reverse)
 
 import Core.Logic.Transport (sym, trans)
 
-data Deque a = MkDeque (List a) (List a)
+pub data Deque a = MkDeque (List a) (List a)
 
-const empty (a : Type) : Deque a = MkDeque a (Nil a) (Nil a)
+pub const empty (a : Type) : Deque a = MkDeque a (Nil a) (Nil a)
 
-fn pushFront (a : Type) (x : a) (q : Deque a) : Deque a =
+pub fn pushFront (a : Type) (x : a) (q : Deque a) : Deque a =
   match q {
     MkDeque front back ↦ MkDeque a (Cons a x front) back
   }
 
-fn pushBack (a : Type) (x : a) (q : Deque a) : Deque a =
+pub fn pushBack (a : Type) (x : a) (q : Deque a) : Deque a =
   match q {
     MkDeque front back ↦ MkDeque a front (Cons a x back)
   }
 
-fn toList (a : Type) (q : Deque a) : List a =
+pub fn toList (a : Type) (q : Deque a) : List a =
   match q {
     MkDeque front back ↦ list_append a front (reverse a back)
   }
 
-fn popFront (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
+pub fn popFront (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
   match q {
     MkDeque front back ↦
       match front {
@@ -48,7 +48,7 @@ fn popFront (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
       }
   }
 
-fn popBack (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
+pub fn popBack (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
   match q {
     MkDeque front back ↦
       match back {
@@ -94,7 +94,7 @@ theorem deque_append_snoc_assoc
         (deque_append_snoc_assoc a rest tail x)
   }
 
-theorem toList_pushFront
+pub theorem toList_pushFront
       (a : Type) (x : a) (q : Deque a)
     : Equal (List a) (toList a (pushFront a x q)) (Cons a x (toList a q)) =
   match q {
@@ -108,7 +108,7 @@ theorem toList_pushFront
         Refl
   }
 
-theorem toList_pushBack
+pub theorem toList_pushBack
       (a : Type) (x : a) (q : Deque a)
     : Equal
         (List a)
@@ -118,7 +118,7 @@ theorem toList_pushBack
     MkDeque front back ↦ deque_append_snoc_assoc a front (reverse a back) x
   }
 
-data PopPreserves (a : Type) (x : a) (q : Deque a) : Option (Pair a (Deque a)) → Type where {
+pub data PopPreserves (a : Type) (x : a) (q : Deque a) : Option (Pair a (Deque a)) → Type where {
   MkPopPreserves :
     (q2 : Deque a)
     → Equal (List a) (toList a q2) (toList a q)
@@ -259,14 +259,14 @@ fn popBack_list_view (a : Type) (q : Deque a) : PopBackListView a q (popBack a q
       }
   }
 
-fn popFront_pushFront
+pub fn popFront_pushFront
       (a : Type) (x : a) (q : Deque a)
     : PopPreserves a x q (popFront a (pushFront a x q)) =
   match q {
     MkDeque front back ↦ MkPopPreserves a x (MkDeque a front back) (MkDeque a front back) Refl
   }
 
-fn popBack_pushBack
+pub fn popBack_pushBack
       (a : Type) (x : a) (q : Deque a)
     : PopPreserves a x q (popBack a (pushBack a x q)) =
   match q {

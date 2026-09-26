@@ -343,16 +343,25 @@ fn all_three_laws_are_checked_and_consumable_as_proofs() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the roots loader reports the exact six-name Doc surface; a real
+/// MEASURED: the roots loader reports the exact seven-name Doc surface; a real
 /// selective client constructs `Text` from `List Char` and calls `text_string`
 /// from `String`; the private `render_string` declaration remains owned,
-/// transparent, and unimportable. CLAIMED: Doc retains its structural carrier
-/// boundary and its internal opaque-String adapter without widening that API.
+/// transparent, and unimportable. CLAIMED: Doc retains its structural carrier,
+/// publishes deterministic `render` (stop-6 export repair,
+/// evt_76m3hykd9h4tz), and keeps its opaque-String adapter internal.
 /// THE GAP: loader shape does not prove rendering behavior or laws, which the
 /// three preceding tests exercise independently.
 #[test]
 fn pretty_doc_loader_surface_and_string_boundary_are_behavioral() {
-    let expected = names(&["Concat", "Doc", "Group", "Line", "Text", "text_string"]);
+    let expected = names(&[
+        "Concat",
+        "Doc",
+        "Group",
+        "Line",
+        "Text",
+        "render",
+        "text_string",
+    ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(
             PRETTY_DOC_KEN_MD,

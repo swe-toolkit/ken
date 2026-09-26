@@ -176,6 +176,11 @@ fn diagnostics_core_loader_visible_inventory_is_exact() {
         "origin_range_end",
         "origin_range_start",
         "origin_source_id",
+        "ValidByteRange",
+        "ValidConfigKeyPath",
+        "ValidDiagnostic",
+        "ValidOrigin",
+        "source_id_from_nat",
     ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(
@@ -206,13 +211,23 @@ fn diagnostics_core_publication_is_visibility_only() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every publishable Formatting.Doc declaration, constructor, and
-/// attached proof is queried through the roots loader; exactly the six-name
+/// attached proof is queried through the roots loader; exactly the seven-name
 /// downstream surface resolves in one selective client. CLAIMED: Doc publishes
-/// only its current carrier/construction boundary. THE GAP: declaration queries
+/// its carrier/construction boundary plus the deterministic renderer `render`
+/// (stop-6 export repair, evt_76m3hykd9h4tz). Layout internals (`render_mode`,
+/// `doc_fits`, `render_content_mode`) stay private. THE GAP: declaration queries
 /// do not show provider use, which the sibling identity test covers.
 #[test]
 fn formatting_doc_loader_visible_inventory_is_exact() {
-    let expected = names(&["Concat", "Doc", "Group", "Line", "Text", "text_string"]);
+    let expected = names(&[
+        "Concat",
+        "Doc",
+        "Group",
+        "Line",
+        "Text",
+        "render",
+        "text_string",
+    ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(
             FORMATTING_DOC_SOURCE,

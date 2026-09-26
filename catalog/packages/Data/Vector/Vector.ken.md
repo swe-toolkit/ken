@@ -37,33 +37,37 @@ import Core.Function.Combinators (idf)
 
 import Core.Logic.Transport (cong)
 
-data Vec (a : Type) : Nat → Type where {
+pub data Vec (a : Type) : Nat → Type where {
   VNil : Vec a Zero;
   VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)
 }
 
-data Fin : Nat → Type where {
+export VNil, VCons
+
+pub data Fin : Nat → Type where {
   FZero : (n : Nat) → Fin (Suc n);
   FSuc : (n : Nat) → Fin n → Fin (Suc n)
 }
 
-fn head (a : Type) (n : Nat) (xs : Vec a (Suc n)) : a =
+export FZero, FSuc
+
+pub fn head (a : Type) (n : Nat) (xs : Vec a (Suc n)) : a =
   match xs {
     VCons m x tail_xs ↦ x
   }
 
-fn tail (a : Type) (n : Nat) (xs : Vec a (Suc n)) : Vec a n =
+pub fn tail (a : Type) (n : Nat) (xs : Vec a (Suc n)) : Vec a n =
   match xs {
     VCons m x tail_xs ↦ tail_xs
   }
 
-fn map (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) : Vec b n =
+pub fn map (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) : Vec b n =
   match xs {
     VNil ↦ VNil b;
     VCons m x tail_xs ↦ VCons b m (f x) (map a b m f tail_xs)
   }
 
-fn zip_with
+pub fn zip_with
       (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b → c) (xs : Vec a n) (ys : Vec b n)
     : Vec c n =
   match xs {
@@ -74,7 +78,7 @@ fn zip_with
       }
   }
 
-fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
+pub fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
   match i {
     FZero m ↦
       match xs {
@@ -86,17 +90,17 @@ fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
       }
   }
 
-theorem head_vcons
+pub theorem head_vcons
       (a : Type) (n : Nat) (x : a) (xs : Vec a n)
     : Equal a (head a n (VCons a n x xs)) x =
   Refl
 
-theorem tail_vcons
+pub theorem tail_vcons
       (a : Type) (n : Nat) (x : a) (xs : Vec a n)
     : Equal (Vec a n) (tail a n (VCons a n x xs)) xs =
   Refl
 
-theorem map_vnil
+pub theorem map_vnil
       (a : Type) (b : Type) (f : a → b)
     : Equal (Vec b Zero) (map a b Zero f (VNil a)) (VNil b) =
   Proved
@@ -116,12 +120,12 @@ theorem vec_map_identity
         (vec_map_identity a m tail_xs)
   }
 
-theorem zip_with_vnil
+pub theorem zip_with_vnil
       (a : Type) (b : Type) (c : Type) (f : a → b → c)
     : Equal (Vec c Zero) (zip_with a b c Zero f (VNil a) (VNil b)) (VNil c) =
   Proved
 
-theorem lookup_fzero
+pub theorem lookup_fzero
       (a : Type) (n : Nat) (x : a) (xs : Vec a n)
     : Equal a (lookup a (Suc n) (VCons a n x xs) (FZero n)) x =
   Refl
