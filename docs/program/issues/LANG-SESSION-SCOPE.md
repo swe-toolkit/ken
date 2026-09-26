@@ -69,6 +69,49 @@ instead. No kernel, `trusted_base()` or spec change.
   (`lang_qualified_constructor_privacy`). Targeted builds only, through
   `scripts/ken-cargo`; no-regression means green in CI.
 
+## Recut: one provenance-tagged session map (Architect `evt_1gz54y177tm3c`)
+
+This supersedes the per-reader session tables of the withdrawn candidates
+`914d7f616` and `07f62fe6a`. Build from current `origin/main`. Same WP and
+objective; size M, tier T1.
+
+- **R1. Representation.** `ModuleState` holds one `session` map from name to
+  `{ id, provenance: Local | Alias | Import { qualified } }`, plus
+  `session_prefixes`. At unit start the unit's `Scope` tables are rebuilt
+  from it; only a successful unit commit folds that unit's own checked
+  locals and imports into it. A failed unit commits nothing. The only
+  writers are `commit_unit` and `bind_session_alias`, and every match on
+  the provenance is total.
+- **R2. Tiers.** Resolution inside a unit is current-unit, then session.
+  Distinct ids: session `Local` or `Import` against a later import is
+  `AmbiguousReference`; a later local shadows a session `Local` or `Alias`
+  but collides with a session `Import`; a later import replaces a session
+  `Alias`. The same id is always idempotent.
+- **R3. Visibility first.** `bind_session_name` refuses any id that is not
+  a pub export of its owner, and `catalog_or::expose_module` iterates the
+  export table, not a `globals` prefix scan.
+- **R4. Standalone expressions.** In `rewrite_standalone` only, a fully
+  qualified `M.x` left unresolved resolves through `exports[M][x]`; a
+  non-exported `M.x` is `UnboundName`. Source units keep 33 §3.2 strictly.
+- **R5. Children.** Loaded-module fences run in a discarded clone of the
+  module scope and never assign `session_scope`.
+- **Pins,** each a pair on a shared input with a mutation shown red then
+  restored: one per R2 row (mutation: route `Alias` through `bind_local`);
+  visibility (Map's non-pub `leq_nat` refused, LC's pub one accepted;
+  mutation: restore the prefix scan); standalone (`Core.Logic.Or.Or`
+  resolves, a non-pub `M.x` and an unimported source-unit `M.x` do not;
+  mutation: drop the export fallback); fence isolation (mutation: reassign
+  `session_scope`); and a failed unit leaves the session map byte-equal.
+- **Census.** Grep every write to `session` and `session_prefixes`. Run the
+  full `scripts/ken-cargo test -p ken-elaborator` with R5 alone, and name
+  and migrate every red or report it as a stop.
+- **Handoff evidence.** Full `scripts/ken-cargo test -p ken-elaborator` and
+  `-p ken-interp --test px8p_checked_buffer` on the rebased tip, with the
+  absolute result at the candidate and at its merge-base.
+- **Retained:** C1-C3, the D0 pins, the attached-proof rows, the three
+  `914d7f616` rows and the `07f62fe6a` pair controls. Stop if any retained
+  pin needs a changed expectation rather than a changed mechanism.
+
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change, or a changed census row.
@@ -96,3 +139,18 @@ through. The closure is one total-match capture at the sealed root (C1), one
 (C2), and child scopes inheriting the session ledger read-only (C3). Each
 consumer in the handoff census is routed through `select_checked_id`, named
 as a non-`globals` carry, or left to the flip.
+
+3. Session selection is fed by writers that are never retracted (Architect
+   `evt_5xcdk1h0f4w90`, stop 3, the `914d7f616` CI red; count published
+   late at `evt_51bwgshs12vks`).
+4. Standalone expressions resolve a fully qualified path through
+   source-unit rules, so `Core.Logic.Or.Or` is unbound; and a harness alias
+   for Map's non-pub `leq_nat` enters as a current-unit local and collides
+   with a later import -- keyed on session entries with no provenance and a
+   visibility check after tiering (Architect `evt_51bwgshs12vks`,
+   `evt_1gz54y177tm3c`, stop 4, the `07f62fe6a` CI red).
+
+**Predicate for lines 3 and 4** (`evt_51bwgshs12vks`): the persistent
+session scope is written by paths that do not own it, and readers cannot
+tell an entry's provenance, so current-unit rules apply to it. Lines 1 and 2
+are the same predicate from the reader side. The recut above closes it.
