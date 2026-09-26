@@ -263,32 +263,33 @@ are private (`41 §2`).
 
 ---
 
-## AC3 — combinators are stdlib `view`s with laws as propositions
+## AC3 — combinators have laws as propositions
 
-`map`/`filter`/`fold`/`zip` are prelude `view`s (`37 §4`), **not** a kernel
-iteration protocol; their laws are `≡`-propositions discharged by the prover,
-adding **no kernel rule**. A law in one declaration may reference a combinator
-in **another** (`map_id` references `map`) — the cross-declaration lowercase
-reference resolves via the landed `L-resolver-globals` fallback (`c3a3f1d`).
+`map` and `filter` are imported package functions from
+`Data.Collections.Derived`, not prelude `view`s (`37 §4`). This seed makes no
+placement claim about `fold`/`reduce` or `zip`. The laws are
+`≡`-propositions discharged by the prover, adding **no kernel rule**.
 
 ### surface/collections/functor-law-emits-obligation-cross-decl-resolves
-- spec: `37 §4`, `c3a3f1d` (`L-resolver-globals`), `22` (obligation emission)
-- given: `map_id : map id xs ≡ xs` stated in a declaration **separate** from the
-  one defining `map`.
+- spec: `37 §4`, `33 §3.2`/`§3.3`, `22` (obligation emission)
+- given: in the compilation unit containing `map_id`, explicitly import
+  `Data.Collections.Derived (map)` and
+  `Core.Function.Combinators (idf as id)`. State
+  `map_id : map id xs ≡ xs` in a declaration **separate** from the package
+  declaration of `map`.
 - expect: two faces. **(a) Resolution (real, landed):** the lowercase
-  cross-declaration reference `map` inside `map_id` **resolves** — an `EVar`
-  scope-miss falls through to the global `RCon` lookup (`c3a3f1d`), locals still
-  shadowing; it does **not** error `UnboundName`. **(b) Obligation (net-new):**
+  `map` reference in `map_id` resolves through the explicit package import;
+  it does **not** error `UnboundName`. **(b) Obligation (net-new):**
   elaborating `map_id` **emits a real `≡`-obligation** `map id xs ≡ xs` to the
   `22` pipeline (a proposition, `14 §5`/`21 §3`), dischargeable by the prover —
   observe the **emitted obligation**, not "it type-checks".
-- why: AC3 — combinator laws as propositions, **structural on the emitted
-  obligation**, plus the cleared resolver blocker. Face (a) drives the
-  **landed** resolver fallback (real, testable now); face (b) drives the
-  **net-new** law emission (producer-grep the real `22` emission, not a
-  synthetic obligation). A bug emitting **no** obligation (treating the law as a
-  comment) or failing the cross-decl reference is caught. (structural obligation
-  + resolver.)
+- why: AC3 — imported combinator laws remain propositions, **structural on the
+  emitted obligation**. Explicit imports make the provider context visible under
+  `33 §3.3`; the case does not claim ambient prelude availability. Face (b)
+  drives the **net-new** law emission (producer-grep the real `22` emission,
+  not a synthetic obligation). A bug emitting **no** obligation (treating the
+  law as a comment) or failing to resolve the imported `map` is caught.
+  (structural obligation; explicit-import context.)
 
 ### surface/collections/map-lookup-insert-law-emits-obligation
 **(SUPERSEDED → `../../stdlib/map/seed-map.md`.** These are now the **proved**
