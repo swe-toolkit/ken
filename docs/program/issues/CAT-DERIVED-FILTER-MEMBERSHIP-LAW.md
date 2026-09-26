@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-FILTER-MEMBERSHIP-LAW
 title: "Proof-backfill slice for Data/Collections/Derived.ken.md: prove, for every element type, comparator, predicate and list, that membership in filter p xs is membership in xs together with p, under a stated comparator/predicate compatibility hypothesis, over the existing prelude filter and Derived mem with no new trust"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: architect

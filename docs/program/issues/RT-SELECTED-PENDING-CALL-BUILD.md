@@ -185,11 +185,85 @@ natively. Any row that stays ignored gets a measured reason in its
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
+## Increment 2, released shape (Architect `evt_a8csxz1hcj46`)
+
+This supersedes AC-1a's L1/L2 package work for increment 2. Size M, tier
+T1. Build on `8d604670e` rebased to current `origin/main`, never on
+`a2697c91a`.
+
+- **C1.** One classifier of the direct callee feeding the returned-carrier
+  dispatch: StaticResponseOwner or OrdinarySpecialization. It reads the
+  resolved-callee fact the emitter uses (units.rs:1705-1796). Admission and
+  emission both consume it.
+- **C2.** A StaticResponseOwner-fed pending leaf lowers the Vis arm to a
+  named Internal trap terminator ("returned carrier is not Ret after a
+  validated response owner") and issues no package. Both px7l rows and
+  px7m ok run natively green and are un-ignored.
+- **C3.** An OrdinarySpecialization-fed pending leaf is Refused at admission
+  ("pending continuation result is not validated by a response owner").
+  Positive support is a future WP that starts from a row reaching the Vis
+  arm natively.
+- **C4, pins.**
+  - A test-only mutation that bypasses the owner's Ret check traps natively
+    at the C2 terminator, and the Ret rows are its positive control.
+  - A classifier pair shows the same leaf shape gets no package (C2) or
+    Refused (C3); say whether it is a surface or a synthesized unit test.
+  - The three native rows and the flipped row stay green. px7m err stays
+    Refused at E.
+- **C5, retirement (Steward: delete in this increment).** Delete the
+  Planned package, its producers and `call_selected_pending_package`, since
+  no admitted consumer remains. Keep admission's refusals and the witness
+  facts C1-C3 consume. `a2697c91a` is abandoned and not resumed.
+- **Join disposition (HS8/HS9 ruling `evt_3224sr4992fx0`; replaces R1-R4).**
+  - **S1' (HS10 ruling `evt_514pcf3xrh6qf`).** One planner query,
+    `owner_fed_match_population(origin, emission_owner)`, next to
+    `pending_result_validated_owner`, counting only calls re-entering
+    `origin` in that emission owner: all witness candidates gives
+    `Some(ret)`; none gives `None` (ordinary lowering, no trap, no
+    package); mixed is a planner error, never a widening.
+  - **S2.** `close_statically_unselected_match_cases` takes `{ret}` from S1'
+    for the current emission owner where it is `Some`, and refuses if a
+    non-Ret case join was consumed.
+  - **S3.** The C2 trap guard and the IH `selected_body = None` branch read
+    S1' for the same (origin, emission owner), so a copy traps iff its
+    function's ledger dispositions Vis.
+  - **S4.** Delete R1 (the core.rs record from `c1aa15d34`). The core.rs
+    Vis record and the predecessor union stay; S2 overrides them only
+    where S1' is `Some`.
+  - **Pins.** P1: both px7l rows and px7m ok green natively with zero
+    packages. P2: S1' forced to `None` for the funcid44 owner only
+    reproduces the join-19 refusal on px7l. P3: force-consuming a
+    Vis-subtree join trips "an owner-fed Match emitted a non-Ret case
+    body". P4a: on px7m ok, a test-visible event shows the C2 trap in the
+    owner-fed emission owner and the Vis body lowered in K0 and K1. P4b: a
+    synthesized mixed owner hits the mixed-arm planner error. C4's detector
+    still traps.
+  - **Stop** if the mixed-arm error fires on any row, if lowering the Vis
+    body in K0 or K1 reddens (never restore the package), or if any row
+    outside the expected set changes colour.
+- **Stop** if a deletion reddens any row or pin, meaning a consumer
+  exists; report the row.
+
 ## Shared predicate
 
 Pending-call admission decides Planned from facts the emitter re-derives
 elsewhere. AC-1a closes the class: the emitter consumes the admission
 witness, and each clause evaluates an emitter condition the census names.
+**Named predicate for inventory lines 3, 5, 6 and 7** (Architect M9 ruling
+`evt_1093kv89xyen7`): the pending package's only consumer sits on the Vis
+arm of the dispatch over the continuation-specialization result, and no
+measured row reaches that arm. Each line is a locally correct observation
+of a consumer that never executes. The fix is not another admission clause:
+settle whether the consumer is reachable (M10), then build only against a
+row that reaches it, or remove it. The parked L2 WIP `a2697c91a` is not
+resumed as written.
+**Predicate for lines 8 and 9** (`evt_3224sr4992fx0`): the join ledger
+admits a case as reachable on grounds other than emission (the C2 trap; the
+static-selection Vis record; the recursive-predecessor union's "a carried
+return has no template" premise). All were true only while something
+emitted the Vis body, and C2 removed its only emitter. Line 7 is not in
+this predicate. Line 10 is in the same family: deadness keyed coarser
+than the emitted instance, (emission owner, origin) (`evt_514pcf3xrh6qf`).
 Relocating a `Specialized` response to its owner is a lawful handoff that
 px7l already uses; it is not a future capability.
 
@@ -219,3 +293,40 @@ Positive native px7m err depends on it.
 4. HS3 ownership clause refused px7l's lawful Specialized relocation,
    because it was keyed on owner identity, which the emitter never tests
    (Architect `evt_2nn9ta5ywrkyh`).
+5. Pending package issued but never consumed: `RoutedAnswer.with_pending`
+   is consumed only at `source.rs:5008` (the Carried-base recursor branch)
+   and dropped silently on every other path -- keyed on a consumer edge
+   admission never names (Architect `evt_3ha2wfda16hbq`, HS5: linear
+   package ledger L1, consuming-edge witness L2; outcome (i) at M6 stops
+   for a Steward scope call).
+6. A refused pending route re-exposes BoundaryCarrier in the issuing
+   emission, so a compile-time package satisfies a gate on a path
+   execution never takes -- keyed on which emission lowers relocated work
+   (Architect `evt_2gfq6jwkepk3a`, HS6: held for Research; tentative shared
+   predicate with lines 3 and 5 -- the issuing emission is held responsible
+   for work Specialized-response relocation moved to another emission).
+7. The issuer resumes after the continuation-specialization call returns,
+   so the post-placeholder residual is live and belongs to the issuer --
+   keyed on the call/return shape of
+   `claim_and_call_resolved_continuation_inner` (Architect
+   `evt_6m1pamme41q09`, HS7: relocation-cut ruling withdrawn; M9 outcomes
+   P-A/P-B/P-C pre-ruled).
+8. The C2 trap replaces the owner-fed Vis case body, so that body's
+   planned joins (px7l StaticOriginId(19)) are neither emitted nor
+   dispositioned -- keyed on whether a trap terminator dispositions the
+   source subtree it replaces (Architect `evt_7565yjvhkhsk6`, HS8: not the
+   lines 3/5/6/7 predicate; disposition follows C1's deadness through the
+   existing statically-unselected-case record; research triggers at 9).
+9. R1's Ret-only record at origin11 is overridden at closure: the
+   partition unions reached cases across visits (reached_cases={0,1}) and
+   does not disposition a recursive predecessor's cases -- keyed on
+   per-origin reachability, while C2's deadness is per visit (by the callee
+   C1 classifies as feeding that visit) (Architect `evt_3a89bas8thgek`,
+   HS9: shares one predicate with line 8 -- the join partition is keyed on
+   the source origin within an emission, but C2's deadness belongs to one
+   visit of that origin; research triggered, ruling held).
+10. px7m-ok: a continuation call re-enters the owner-fed Match outside the
+    owner witness -- keyed on witness coverage of the re-entering edges
+    (Architect `evt_1xhb4d2bgavzq`, HS10: S1's premise that every
+    re-entering edge is owner-fed is false on an existing row; M12 probe
+    held; research triggers at 12).

@@ -1,7 +1,7 @@
 ---
 id: CAT-LAWFULFUNCTORS-LIST-MAP-SUBSUMPTION
 title: "Subsume Core.Classes.LawfulFunctors.list_map into Data.Collections.Derived.map: move its attached id and fusion proofs onto Derived.map, retarget the Functor List instance and EffectfulClasses, delete list_map, and re-key its pins by exact identity; fourth L3 slice of the minimal-prelude program"
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: architect
