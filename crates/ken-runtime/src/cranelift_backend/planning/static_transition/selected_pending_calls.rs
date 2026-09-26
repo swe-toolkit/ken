@@ -129,12 +129,25 @@ pub(in crate::cranelift_backend) struct SelectedPendingLeafResponse {
     vis: StaticOriginId,
     disposition: Option<ResponseDisposition>,
     owner: Option<ContinuationEmissionOwner>,
+    /// Joins in a Specialized operation lowered in a different emission.
+    relocated_joins: BTreeSet<StaticOriginId>,
+    /// The explicit lowering environments at a Deferred drive, not its frame.
+    effect_free: BTreeSet<u32>,
+    effect_fields: usize,
+    k_free: BTreeSet<u32>,
+    k_fields: usize,
 }
 
 /// Admission asks "Planned or Refused?" and constructs this witness only from
 /// planner facts. Emission asks "is the invariant intact?" and consumes these
 /// facts, rather than independently re-deriving them from its current context.
 /// No condition dependent on the emission context belongs in this constructor.
+///
+/// The response facts describe the actual emission paths: a Specialized
+/// response may lawfully relocate to a different owner when its operation
+/// carries no unaccounted joins; a Deferred drive lowers against its selected
+/// operation fields and its reconstructed K environment, not the owner's
+/// entire frame. A Planned route cannot rely on a field absent at those calls.
 ///
 /// The package's `members` are the per-member backing provenance: each worker
 /// names its checked lexical source and each context member its authenticated
@@ -179,7 +192,9 @@ pub enum PendingRefusal {
     NotLinearOrMustReach,
     UnsupportedRouteEdge,
     MissingDeclaredMembers,
-    SelectedPendingLeafCrossesResponseOwner,
+    RelocatedWorkMissingLoweringBinding,
+    SelectedPendingLeafRelocatesUnaccountedJoins,
+    DeferredResponseLoweredOutsideHandlerOwner,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -430,10 +445,8 @@ fn plan_selected_pending_calls(
                     },
                 };
                 match selected_leaf_response_witness(plan, &package)? {
-                    Some(responses) => admit_routed_package(package, responses, paths),
-                    None => PendingCallAdmission::Refused(
-                        PendingRefusal::SelectedPendingLeafCrossesResponseOwner,
-                    ),
+                    Ok(responses) => admit_routed_package(package, responses, paths),
+                    Err(reason) => PendingCallAdmission::Refused(reason),
                 }
             }
             Err(reason) => PendingCallAdmission::Refused(reason),
@@ -569,17 +582,19 @@ fn admit_routed_package(
     }
 }
 
-/// For each selected leaf, include every source Vis in its constructor subtree
-/// and its declared worker body. A deferred response cannot execute its
-/// operation arguments in the original function when the handler owns them in
-/// a different emission. This is a whole-producer refusal, never a per-leaf
-/// fallback that would issue a ticket for only one side of a source Match.
+/// Every Vis in a leaf's constructor and declared worker subtree is classified
+/// before the producer is admitted. This is a whole-producer decision, not a
+/// per-leaf fallback. (E) reads the explicit lowering environments constructed
+/// by the response owner, not its wider frame; (J) accounts for the joins a
+/// Specialized operation skips when its emitter returns a placeholder.
 fn selected_leaf_response_witness(
     plan: &StaticTransitionPlan<'_>,
     package: &PendingCallPackagePlan,
-) -> Result<Option<Vec<SelectedPendingLeafResponse>>, CraneliftBackendError> {
+) -> Result<Result<Vec<SelectedPendingLeafResponse>, PendingRefusal>, CraneliftBackendError> {
     let owner = ContinuationEmissionOwner::Predeclared(package.route.defining_function);
     let mut responses = Vec::new();
+    let mut environment_closed = true;
+    let mut unaccounted_joins = false;
     for candidate in &package.candidates {
         let mut seen = BTreeSet::new();
         for occurrence in plan.source_occurrences.iter().flatten() {
@@ -598,30 +613,171 @@ fn selected_leaf_response_witness(
             }
             let mut specialized = plan.static_response_continuations.iter()
                 .filter(|row| row.vis_origin() == vis);
-            let specialized_owner = specialized.next().map(|row| row.base_owner());
+            let specialized_row = specialized.next();
             if specialized.next().is_some() {
                 return Err(planner_error("a selected pending Vis has two specialized responses"));
             }
             let deferred = plan.deferred_response_at_vis(vis)?;
-            if specialized_owner.is_some() && deferred.is_some() {
+            if specialized_row.is_some() && deferred.is_some() {
                 return Err(planner_error("a selected pending Vis is both specialized and Deferred"));
             }
-            let (disposition, response_owner) = if let Some(response_owner) = specialized_owner {
-                (Some(ResponseDisposition::Specialized), Some(response_owner))
-            } else if let Some(row) = deferred {
-                (Some(ResponseDisposition::Deferred), plan.deferred_response_handler_owner(&row)?)
+            let (disposition, response_owner) = if let Some(row) = specialized_row {
+                (Some(ResponseDisposition::Specialized), Some(row.base_owner()))
+            } else if let Some(row) = deferred.as_ref() {
+                (Some(ResponseDisposition::Deferred), plan.deferred_response_handler_owner(row)?)
             } else {
                 (None, None)
             };
-            if disposition.is_some() && response_owner != Some(owner) {
-                return Ok(None);
+            let mut relocated_joins = BTreeSet::new();
+            let mut effect_free = BTreeSet::new();
+            let mut effect_fields = 0;
+            let mut k_free = BTreeSet::new();
+            let mut k_fields = 0;
+            if let Some(row) = specialized_row {
+                // A Specialized response may lawfully have a different owner:
+                // px7l does, and emits natively. Its operation arguments use
+                // exactly the frame environment already declared by this row.
+                for input in row.effect_environment() {
+                    if let super::StaticResponseEffectInput::OperationArgument { origin, environment } = input {
+                        let mut free = BTreeSet::new();
+                        pending_free_indices(plan.planned_occurrence_expr(*origin)?, 0, &mut free)?;
+                        environment_closed &= free.iter().all(|index| (*index as usize) < environment.len());
+                    }
+                }
+                if response_owner != Some(owner) {
+                    let operation = plan.semantic.child_origin(vis, 0)?;
+                    relocated_joins = plan.source_join_origins_in_owner_subtree(operation)?;
+                    unaccounted_joins |= !relocated_joins.is_empty();
+                }
+            }
+            // P1 Deferred rows have no handler-owned drive and fall through to
+            // ordinary lowering. E applies only where an actual selected owner
+            // synthesizes the field and K environments.
+            if let Some(row) = deferred.as_ref().filter(|_| response_owner.is_some()) {
+                let RuntimeExpr::Construct { args, .. } = plan.planned_occurrence_expr(vis)? else {
+                    return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
+                };
+                let [RuntimeExpr::Construct { args: operation_fields, .. },
+                    RuntimeExpr::LexicalClosure { captures, params, .. }] = args.as_slice() else {
+                    return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
+                };
+                let [RuntimeExpr::Construct { args: selected_fields, .. }] = operation_fields.as_slice() else {
+                    return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
+                };
+                if params.len() != 1 {
+                    return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
+                }
+                effect_fields = selected_fields.len();
+                let RuntimeExpr::Effect { args, capability, .. } =
+                    plan.planned_occurrence_expr(row.effect_origin())? else {
+                    return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
+                };
+                for arg in args {
+                    pending_free_indices(arg, 0, &mut effect_free)?;
+                }
+                if let Some(capability) = capability {
+                    pending_free_indices(&capability.value, 0, &mut effect_free)?;
+                }
+                environment_closed &= effect_free.iter().all(|index| (*index as usize) < effect_fields);
+                let Some(k_body) = plan.deferred_response_k_body(row)? else {
+                    return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
+                };
+                pending_free_indices(plan.planned_occurrence_expr(k_body)?, 0, &mut k_free)?;
+                k_fields = captures.len() + 1;
+                environment_closed &= k_free.iter().all(|index| (*index as usize) < k_fields);
+                // The drive runs under the response owner's K emission, not
+                // under the package's owner. A route with no such emission is
+                // a Deferred owner mismatch, not an implicit frame transfer.
             }
             responses.push(SelectedPendingLeafResponse {
                 leaf: candidate.construct, vis, disposition, owner: response_owner,
+                relocated_joins, effect_free, effect_fields, k_free, k_fields,
             });
         }
     }
-    Ok(Some(responses))
+    // An E failure must be visible before J for the same producer. J-a's
+    // accounting is deferred: no presently Planned row has nonempty R. Its
+    // complement refuses rather than making a selected join look unselected.
+    if !environment_closed {
+        return Ok(Err(PendingRefusal::RelocatedWorkMissingLoweringBinding));
+    }
+    if unaccounted_joins {
+        return Ok(Err(PendingRefusal::SelectedPendingLeafRelocatesUnaccountedJoins));
+    }
+    Ok(Ok(responses))
+}
+
+/// Local binder-aware scan of the inputs to the *explicit* lowering environments
+/// above. A nested binder is removed before comparing an external index with
+/// the caller's actual run. Lexical closure bodies are separate owner emissions;
+/// only their capture expressions evaluate at this call.
+fn pending_free_indices(
+    expr: &RuntimeExpr,
+    depth: u32,
+    free: &mut BTreeSet<u32>,
+) -> Result<(), CraneliftBackendError> {
+    let visit = |expr, depth, free: &mut BTreeSet<u32>| pending_free_indices(expr, depth, free);
+    let increase = |depth: u32, by: usize| -> Result<u32, CraneliftBackendError> {
+        depth.checked_add(u32::try_from(by).map_err(|_| planner_error("pending binder count exceeds u32"))?)
+            .ok_or_else(|| planner_error("pending binder depth exceeds u32"))
+    };
+    match expr {
+        RuntimeExpr::CheckedJoinSite { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => visit(body, depth, free)?,
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Trap(_)
+        | RuntimeExpr::Closure { .. } => {},
+        RuntimeExpr::Var(index) => {
+            if *index >= depth {
+                free.insert(index - depth);
+            }
+        }
+        RuntimeExpr::Let { value, body } => {
+            visit(value, depth, free)?;
+            visit(body, increase(depth, 1)?, free)?;
+        }
+        RuntimeExpr::If { scrutinee, then_expr, else_expr } => {
+            visit(scrutinee, depth, free)?;
+            visit(then_expr, depth, free)?;
+            visit(else_expr, depth, free)?;
+        }
+        RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
+            for arg in args { visit(arg, depth, free)?; }
+        }
+        RuntimeExpr::Match { scrutinee, cases, .. } => {
+            visit(scrutinee, depth, free)?;
+            for case in cases { visit(&case.body, increase(depth, case.binders)?, free)?; }
+        }
+        RuntimeExpr::ComputationalMatch { scrutinee, cases, .. } => {
+            visit(scrutinee, depth, free)?;
+            for case in cases {
+                let binders = case.argument_binders.checked_add(case.recursive_positions.len())
+                    .ok_or_else(|| planner_error("pending computational binder count overflow"))?;
+                visit(&case.body, increase(depth, binders)?, free)?;
+            }
+        }
+        RuntimeExpr::Record { fields } => {
+            for (_, field) in fields { visit(field, depth, free)?; }
+        }
+        RuntimeExpr::Project { record, .. } => visit(record, depth, free)?,
+        RuntimeExpr::LexicalClosure { captures, .. } => {
+            for capture in captures { visit(capture, depth, free)?; }
+        }
+        RuntimeExpr::Call { callee, args } => {
+            visit(callee, depth, free)?;
+            for arg in args { visit(arg, depth, free)?; }
+        }
+        RuntimeExpr::Effect { capability, args, .. } => {
+            if let Some(capability) = capability { visit(&capability.value, depth, free)?; }
+            for arg in args { visit(arg, depth, free)?; }
+        }
+    }
+    Ok(())
 }
 
 fn require_defining_function(
