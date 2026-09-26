@@ -37,11 +37,9 @@ leaders and the Steward run schedulers.
    own ring, not only to kickoffs you receive.
 4. **A ring silent with no member able to name its blocking event** is the
    cheapest stall to detect and the most expensive to miss. Detect it at the
-   ring, before the Steward's backstop is all that is left.
+   ring, before the Steward's backstop is all that is left (a finished turn
+   holding an orphaned shell can misread as BUSY).
 
-The ring knowing what it waits for is the primary mechanism; the watchdog is
-insurance, and a liveness instrument not falsified in the false-BUSY direction
-reads a finished turn holding an orphaned shell as BUSY.
 Incidents: `COORDINATION-INCIDENTS.md#s1a`.
 
 ## 2. Mention discipline
@@ -119,9 +117,8 @@ never post "I'm online". The third is yours: **semantic status**
 ("blocked-on-spec: OQ-17"), agent-composed, never auto-classified. **Update it
 on every change in your activity** (operator, 2026-07-03): picking up a WP, a
 sub-step, finishing, changing focus, going idle, blocking, unblocking. It is
-the federation's at-a-glance truth (`list_participants`) and the Steward's
-primary watchdog signal, and a lagging one reads as stalled when
-you work or working when you are done.
+the Steward's primary watchdog signal; a lagging one reads as stalled when you
+work, or working when you are done.
 
 ## 4. Threads are the spine
 
@@ -379,9 +376,6 @@ one message. Incidents: `COORDINATION-INCIDENTS.md#s9a`.
 
 ## 10⁻. Process work is subordinate to product flow: the Steward's hard ceiling
 
-The corpus exists to make the build better; when it competes with the build,
-it has inverted its purpose.
-
 1. **No process merge while a ring holds finished, unmerged work.** A WP that
    is QA-approved-and-unpublished, or held on the Steward, **is the queue**:
    playbook edits, memory promotions, and corpus refactors wait.
@@ -461,8 +455,7 @@ Use the §9 edges sparingly and event-driven:
    only for true blockers.
 5. **Outcomes:** a quick interpretive answer; a **durable artifact edit** (a
    `/spec` clarification + conformance test, or a component-design note) so no
-   team asks again; or, for a real fork, a **Decision**. The query rate is a
-   health gauge and should decay.
+   team asks again; or, for a real fork, a **Decision**.
 
 ## 12. Resource discipline (shared 8-core / 16 GB laptop)
 
@@ -643,10 +636,11 @@ publishers.
   **(5) Verify the assembled tip on two axes right before the Decision**
   ("rebased onto current main" is perishable). **Content:** `git diff
   <author-full-tip>:<file> <assembled>:<file>` is empty, taking **all** the
-  author's commits since merge-base. **Base/scope:** the candidate carries
-  only the WP's intended files, and every dep is an ancestor of the tip. A
-  squash lands merge-base → branch, so `git diff origin/main <sha>` is **not**
-  a staleness detector; a stale base matters only through the intersection:
+  author's commits since merge-base. **Base/scope:** `git diff --stat
+  $(git merge-base origin/main <sha>) <sha>`, which is what the squash lands,
+  lists only the WP's intended files, and every dep is an ancestor of the tip.
+  `git diff origin/main <sha>` is **not** a staleness detector; a stale base
+  matters only through the intersection:
 
   ```sh
   BASE=$(git merge-base <sha> origin/main)
