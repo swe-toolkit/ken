@@ -95,8 +95,14 @@ fn assert_agreement(
     expected_operations: &[ken_runtime::HostOpV1],
 ) {
     let dir = output_dir(name);
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
-        .expect("dynamic HostResult producer reaches the linked artifact");
+    let (output, admissions) = ken_runtime::with_selected_pending_call_admissions(|| {
+        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
+    });
+    let output = output.expect("dynamic HostResult producer reaches the linked artifact");
+    assert!(admissions.iter().any(|row| matches!(
+        row.outcome,
+        ken_runtime::SelectedPendingCallOutcomeObservation::Planned { .. }
+    )), "native selected route needs a Planned admission: {admissions:#?}");
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -203,7 +209,7 @@ fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SELECTED-PENDING-CALL-BUILD increment 2 emits the selected package but this row still refuses at ObjectEmission: function 5 leaves planned source join 393 (the Option path in failed_path) neither emitted nor statically unselected. This is not the former BoundaryCarrier first refusal; no native execution or gate consumption is claimed for this row pending a join-owner ruling."]
+#[ignore = "RT-SELECTED-PENDING-CALL-BUILD increment 2 refuses this selected pending route at admission: the deferred Effect has free Var(1) but its selected operation supplies one field. No native dynamic-error execution or D2 consume is claimed; the separate admission test pins the exact refusal reason."]
 fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
     assert_agreement(
         ERR_PROGRAM,
@@ -215,4 +221,32 @@ fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
             ken_runtime::HostOpV1::ConsoleWrite,
         ],
     );
+}
+
+// Transition sentinel: if response-owner environment extension plus J-a
+// accounting later admits this route, this reason pin intentionally reddens.
+// It does not infer native execution from checked-source planning.
+#[test]
+fn dynamic_err_pending_package_refuses_missing_effect_binding_before_join_accounting() {
+    let dir = output_dir("err-admission");
+    let (result, admissions) = ken_runtime::with_selected_pending_call_admissions(|| {
+        ken_cli::build_native_program(
+            ERR_PROGRAM,
+            ken_cli::SourceFormat::Ken,
+            "px7m-err-admission",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    let relevant: Vec<_> = admissions.iter().filter_map(|row| match row.outcome {
+        ken_runtime::SelectedPendingCallOutcomeObservation::Refused(reason) => Some(reason),
+        _ => None,
+    }).collect();
+    assert_eq!(relevant, [ken_runtime::PendingRefusal::RelocatedWorkMissingLoweringBinding],
+        "the checked ERR source must reach one pending producer, refused first by E: {admissions:#?}");
+    assert!(!admissions.iter().any(|row| matches!(
+        row.outcome,
+        ken_runtime::SelectedPendingCallOutcomeObservation::Planned { .. }
+    )), "one refused producer must not issue a Planned ticket: {admissions:#?}");
+    assert!(result.is_err(), "a refused pending route cannot emit an artifact");
 }
