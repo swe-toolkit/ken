@@ -209,6 +209,7 @@ fn map_resolves_exact_lawfulclasses_bool_and_family_without_local_identity() {
         .filter(|(_, id)| map_ids.contains(id))
         .map(|(name, id)| (name.clone(), *id))
         .collect::<Vec<_>>();
+    // Map-only census control: these prefixed keys are not source bindings.
     for (name, id) in owned_bindings {
         env.globals
             .insert(format!("Data.Collections.Map.{name}"), id);

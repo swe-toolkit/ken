@@ -277,6 +277,7 @@ fn strict_entry_rejects_forged_pre_source_floor_identity() {
     let actual = env.globals["Top"];
     let forged = env.globals["Bottom"];
     assert_ne!(actual, forged);
+    // Forgery control: replacing a floor spelling cannot replace its checked identity.
     assert_eq!(env.globals.insert("Top".to_string(), forged), Some(actual));
     let error = env
         .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")

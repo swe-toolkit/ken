@@ -177,7 +177,8 @@ fn every_ambient_name_representation_reaches_its_current_route() {
         .declare_postulate_raw("AmbientType", Term::ty(Level::Zero))
         .expect("declare ambient type");
     let true_id = globals.globals["True"];
-    globals.globals.insert("AmbientTrue".to_string(), true_id);
+    globals.bind_session_name("AmbientTrue", true_id)
+        .expect("legacy fixture alias of the checked True constructor");
     globals
         .elaborate_file(
             "fn ambient_id (x : Int) : Int = x \

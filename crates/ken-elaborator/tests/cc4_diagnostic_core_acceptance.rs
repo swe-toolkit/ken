@@ -37,7 +37,10 @@ fn dependency_env() -> ElabEnv {
                 .map(|suffix| (suffix.to_owned(), *id))
         })
         .collect();
-    env.globals.extend(lawful_aliases);
+    for (name, id) in lawful_aliases {
+        env.bind_session_name(&name, id)
+            .expect("checked LawfulClasses fixture alias");
+    }
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");

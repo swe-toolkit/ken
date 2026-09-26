@@ -57,6 +57,7 @@ fn ambient_globals() -> ElabEnv {
     env.declare_postulate_raw("AmbientType", Term::ty(Level::Zero))
         .expect("declare ambient type");
     let true_id = env.globals["True"];
+    // Forgery control: a flat ambient alias must not pass strict roots resolution.
     env.globals.insert("AmbientTrue".to_string(), true_id);
     env.elaborate_file(
         "fn ambient_id (x : Int) : Int = x \

@@ -111,7 +111,8 @@ pub fn load_core_logic_compare(env: &mut ElabEnv) {
     ] {
         for name in names {
             let id = env.globals[&format!("{module}.{name}")];
-            env.globals.insert((*name).to_owned(), id);
+            env.bind_session_name(name, id)
+                .expect("checked catalog provider alias");
         }
     }
 }
@@ -126,7 +127,10 @@ pub fn expose_module(env: &mut ElabEnv, module: &str) {
                 .map(|suffix| (suffix.to_owned(), *id))
         })
         .collect();
-    env.globals.extend(aliases);
+    for (name, id) in aliases {
+        env.bind_session_name(&name, id)
+            .expect("checked catalog module alias");
+    }
 }
 
 pub fn load_derived_fixture(env: &mut ElabEnv) {
@@ -141,9 +145,9 @@ pub fn load_derived_fixture(env: &mut ElabEnv) {
     // fixture spelling; no duplicate catalog declaration is elaborated. The
     // provider state preserves the pre-D6 class-owner context for later raw
     // instance fixtures while Derived itself imports the exact same identities.
+    env.module_state = provider_state;
     expose_module(env, "Core.Classes.LawfulClasses");
     expose_module(env, "Data.Collections.Derived");
-    env.module_state = provider_state;
 }
 
 /// Retain Derived's module record while withholding selected legacy flat aliases.
@@ -211,7 +215,12 @@ pub fn restore_lc_bool_and_flat_aliases(env: &mut ElabEnv) {
     for name in LC_BOOL_AND_IMPORTS {
         let canonical = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
         assert_eq!(
-            env.globals.insert(name.to_owned(), canonical),
+            {
+                let previous = env.globals.get(name).copied();
+                env.bind_session_name(name, canonical)
+                    .expect("restore checked LawfulClasses alias");
+                previous
+            },
             None,
             "LF must not leave a flat `{name}` binding behind"
         );
@@ -242,7 +251,8 @@ pub fn assert_derived_fixture_retains_lawfulclasses(env: &mut ElabEnv) {
 pub fn expose_core_logic_transport(env: &mut ElabEnv) {
     for name in ["cong", "sym", "trans"] {
         let id = env.globals[&format!("Core.Logic.Transport.{name}")];
-        env.globals.insert(name.to_owned(), id);
+        env.bind_session_name(name, id)
+            .expect("checked Transport alias");
     }
 }
 

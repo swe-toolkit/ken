@@ -40,7 +40,9 @@ fn install_def(
 ) -> GlobalId {
     let id = declare_def(&mut env.env, level_params, ty, body)
         .unwrap_or_else(|error| panic!("failed to install {name}: {error}"));
-    assert!(env.globals.insert(name.to_owned(), id).is_none());
+    assert!(!env.globals.contains_key(name));
+    env.bind_session_name(name, id)
+        .expect("checked kernel definition needs a session binding");
     id
 }
 

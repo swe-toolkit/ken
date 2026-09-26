@@ -33,7 +33,10 @@ fn expose_module(env: &mut ElabEnv, module: &str) {
                 .map(|suffix| (suffix.to_owned(), *id))
         })
         .collect::<Vec<_>>();
-    env.globals.extend(aliases);
+    for (name, id) in aliases {
+        env.bind_session_name(&name, id)
+            .expect("checked Deque fixture alias");
+    }
 }
 
 fn loaded_env() -> ElabEnv {

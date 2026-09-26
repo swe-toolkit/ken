@@ -41,12 +41,14 @@ pub struct ModuleState {
     /// the shared reader seam: admission consumes `admits`; the runner may
     /// independently consume `capabilities` after elaboration.
     boundary_header: Option<BoundaryHeader>,
-    /// The root (unqualified, file-level) scope: accumulates selective-import
-    /// bindings and top-level local names seen across separate
-    /// `elaborate_decl`/`elaborate_file` calls, so a later call's bare
-    /// references still see earlier imports/locals (a "file" is an implicit
-    /// module, `33 §3.1`).
+    /// Prelude-bootstrap root scope, sealed at the end of `ElabEnv::empty()`.
+    /// Later source and raw-postulate calls must never write it.
     root_scope: Scope,
+    /// Incremental file-level scope, copied once from the completed prelude.
+    /// It accumulates imports and checked locals across separate source calls.
+    session_scope: Scope,
+    /// No source entry point may modify the prelude scope after construction.
+    prelude_sealed: bool,
     /// Qualified module path (`"M"`, `"M.N"`) → {bare `pub` name → canonical
     /// qualified name}. Populated whenever a `module { … }` block elaborates.
     /// Only `pub` names are recorded here — the export table IS the
@@ -178,6 +180,72 @@ fn term_mentions_global(term: &ken_kernel::Term, target: ken_kernel::GlobalId) -
 }
 
 impl ModuleState {
+    pub(crate) fn seal_prelude_scope(&mut self) -> Result<(), ElabError> {
+        if self.prelude_sealed {
+            return Err(ElabError::Internal("prelude scope sealed twice".into()));
+        }
+        self.session_scope = self.root_scope.clone();
+        if self.session_scope.private_ids != self.private_ids {
+            return Err(ElabError::Internal(
+                "session scope lost the prelude private identity roster".into(),
+            ));
+        }
+        self.prelude_sealed = true;
+        Ok(())
+    }
+
+    fn active_scope_mut(&mut self) -> &mut Scope {
+        if self.prelude_sealed {
+            &mut self.session_scope
+        } else {
+            &mut self.root_scope
+        }
+    }
+
+    pub(crate) fn bind_checked_root_name(
+        &mut self,
+        name: &str,
+        id: ken_kernel::GlobalId,
+    ) -> Result<(), ElabError> {
+        self.active_scope_mut().bind_checked_session_local(name, id)
+    }
+
+    pub(crate) fn check_root_binding(&self, name: &str) -> Result<(), ElabError> {
+        let mut scope = if self.prelude_sealed {
+            self.session_scope.clone()
+        } else {
+            self.root_scope.clone()
+        };
+        scope.bind_local(name, name, &Span::zero())
+    }
+
+    pub(crate) fn is_private_id(&self, id: ken_kernel::GlobalId) -> bool {
+        self.private_ids.contains(&id)
+    }
+
+    pub(crate) fn bind_session_alias(
+        &mut self,
+        name: &str,
+        id: ken_kernel::GlobalId,
+    ) -> Result<(), ElabError> {
+        if !self.prelude_sealed {
+            return Err(ElabError::Internal("session aliases require a sealed prelude".into()));
+        }
+        if let Some(imported) = self.session_scope.binding_ids.get(name) {
+            if *imported == id {
+                // An explicit import has already selected this exact identity;
+                // do not turn it into a local or alter its collision behavior.
+                self.session_scope.session_ids.insert(name.to_string(), id);
+                return Ok(());
+            }
+        }
+        self.session_scope.bind_checked_session_local(name, id)
+    }
+
+    pub(crate) fn rewrite_standalone(&self, rexpr: RExpr) -> Result<RExpr, ElabError> {
+        rewrite_rexpr(&self.session_scope.clone(), &self.exports, rexpr)
+    }
+
     pub(crate) fn loaded_unit_count(&self) -> usize {
         self.loaded_units.len()
     }
@@ -460,6 +528,9 @@ struct Scope {
     /// Bare selective aliases are separate: their spelling has no prefix.
     qualified_ids: HashMap<String, ken_kernel::GlobalId>,
     binding_ids: HashMap<String, ken_kernel::GlobalId>,
+    /// Checked names bound in this incremental session, separate from imported
+    /// binding IDs so import collision diagnostics remain unchanged.
+    session_ids: HashMap<String, ken_kernel::GlobalId>,
     /// Export-name ID overrides for facade/in-scope republishing. A canonical
     /// spelling alone can no longer recover the imported provider's ID.
     exported_ids: HashMap<String, ken_kernel::GlobalId>,
@@ -494,6 +565,21 @@ struct Scope {
 }
 
 impl Scope {
+    /// The same checked-local discipline is used for raw postulates, harness
+    /// aliases, and the checked locals admitted by a source expansion.
+    fn bind_checked_session_local(
+        &mut self,
+        name: &str,
+        id: ken_kernel::GlobalId,
+    ) -> Result<(), ElabError> {
+        self.bind_local(name, name, &Span::zero())?;
+        self.current_local_names.insert(name.to_string());
+        record_checked_local(self, name, name, id);
+        self.current_local_names.remove(name);
+        self.session_ids.insert(name.to_string(), id);
+        Ok(())
+    }
+
     fn with_mode(mode: ResolutionMode, kernel_names: HashSet<String>) -> Self {
         Self {
             mode,
@@ -818,6 +904,11 @@ fn resolve_checked_ref(
         .qualified_ids
         .get(name)
         .or_else(|| scope.binding_ids.get(name))
+        .or_else(|| {
+            (!scope.current_local_names.contains(name))
+                .then(|| scope.session_ids.get(name))
+                .flatten()
+        })
         .copied();
     let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
     let imported_qualified = name.rsplit_once('.')
@@ -1959,7 +2050,13 @@ pub(crate) fn execute_loaded_entry_checked_fences(
                 "loaded module entry '{entry}' has no completed scope"
             ))
         })?;
-    elab.module_state.root_scope = scope;
+    // Checked fences are an incremental source read, not a prelude mutation.
+    if !elab.module_state.prelude_sealed {
+        return Err(ElabError::Internal(
+            "entry checked fences require a sealed prelude".into(),
+        ));
+    }
+    elab.module_state.session_scope = scope;
     elab.execute_ken_md_checked_fences(&source, &extracted)
 }
 
@@ -4489,6 +4586,19 @@ fn expand_scope(
             &span,
         )?;
     }
+    if prefix.is_empty() && elab.module_state.prelude_sealed {
+        // Only names checked by this source unit enter the session ledger.
+        // Prebinding has removed stale checked IDs for these names; an SCC
+        // member not yet checked therefore cannot acquire an earlier ID.
+        let checked: Vec<_> = scope
+            .current_local_names
+            .iter()
+            .filter_map(|name| scope.checked_local_ids.get(name).map(|id| (name.clone(), *id)))
+            .collect();
+        for (name, id) in checked {
+            scope.bind_checked_session_local(&name, id)?;
+        }
+    }
     scope.current_local_names.clear();
     Ok((ids, exports_here))
 }
@@ -4593,7 +4703,11 @@ pub fn expand_and_elaborate(
         elab.class_env.direct_use_instances.clear();
         elab.class_env.implicit_single_provider = false;
     }
-    let mut scope = elab.module_state.root_scope.clone();
+    let mut scope = if elab.module_state.prelude_sealed {
+        elab.module_state.session_scope.clone()
+    } else {
+        elab.module_state.root_scope.clone()
+    };
     let mut unit_definitions = HashSet::new();
     let mut local_modules = HashSet::new();
     declared_module_paths(decls, "", &mut local_modules);
@@ -4648,7 +4762,11 @@ pub fn expand_and_elaborate(
     if direct_call {
         elab.module_state.boundary_header = boundary.map(|(header, _)| header);
     }
-    elab.module_state.root_scope = scope;
+    if elab.module_state.prelude_sealed {
+        elab.module_state.session_scope = scope;
+    } else {
+        elab.module_state.root_scope = scope;
+    }
     Ok(results)
 }
 
@@ -4741,6 +4859,7 @@ mod namespace_effect_tests {
 
         let other = env.globals["True"];
         assert_ne!(proved, other, "the control must move the identity");
+        // Forgery control: the mutable display map must not admit a different Proved identity.
         env.globals.insert("Proved".to_string(), other);
         match env
             .module_state
@@ -4861,6 +4980,7 @@ mod namespace_effect_tests {
             let loaded_before = env.module_state.loaded_units.clone();
             let roots_before = env.module_state.catalog_roots.clone();
             assert_eq!(
+                // Forgery control: strict roots must reject this substituted prelude identity.
                 env.globals.insert("Proved".to_string(), alternate),
                 Some(tt)
             );
@@ -5255,6 +5375,30 @@ mod namespace_effect_tests {
         assert_eq!(env.module_state.export_provenance["Provider"].member_ids["Provider"]["C_instance_Nat"], id);
     }
 
+    /// Promise class: durable invariant. The seal copies private identities
+    /// exactly once and later raw/source writes affect only the session copy.
+    #[test]
+    fn prelude_scope_stays_sealed_across_incremental_bindings() {
+        let mut env = ElabEnv::new().expect("prelude construction");
+        assert!(env.module_state.prelude_sealed);
+        assert_eq!(env.module_state.root_scope.private_ids, env.module_state.private_ids);
+        assert_eq!(env.module_state.session_scope.private_ids, env.module_state.private_ids);
+        let prelude_bindings = env.module_state.root_scope.bindings.clone();
+        let prelude_ids = env.module_state.root_scope.checked_local_ids.clone();
+        env.declare_postulate_raw("SessionRaw", ken_kernel::Term::ty(ken_kernel::Level::Zero))
+            .expect("raw postulate binds the session");
+        let checked = env.elaborate_decl("const session_def : Type = SessionRaw")
+            .expect("source sees raw postulate");
+        assert_eq!(env.module_state.root_scope.bindings, prelude_bindings);
+        assert_eq!(env.module_state.root_scope.checked_local_ids, prelude_ids);
+        assert!(env.module_state.session_scope.session_ids.contains_key("SessionRaw"));
+        assert_eq!(env.module_state.session_scope.session_ids.get("session_def"), Some(&checked));
+        assert!(matches!(
+            env.module_state.seal_prelude_scope(),
+            Err(ElabError::Internal(_))
+        ));
+    }
+
     fn env_with_ambient_item_and_facade() -> (ElabEnv, GlobalId) {
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_file(
@@ -5265,7 +5409,7 @@ mod namespace_effect_tests {
         let item = env.globals["item"];
         assert_eq!(
             env.module_state
-                .root_scope
+                .session_scope
                 .bindings
                 .get("item")
                 .map(String::as_str),
@@ -5290,14 +5434,14 @@ mod namespace_effect_tests {
     #[test]
     fn apply_import_accepts_an_ambient_local_at_the_same_identity() {
         let (mut env, item) = env_with_ambient_item_and_facade();
-        let before = env.module_state.root_scope.bindings.clone();
+        let before = env.module_state.session_scope.bindings.clone();
 
         env.elaborate_file("import Provider (item)")
             .expect("the second route to the ambient identity must elaborate");
 
         assert_eq!(env.globals["item"], item);
         assert_eq!(
-            env.module_state.root_scope.bindings, before,
+            env.module_state.session_scope.bindings, before,
             "apply_import must leave the ambient binding table unchanged"
         );
     }
@@ -5312,7 +5456,7 @@ mod namespace_effect_tests {
     #[test]
     fn apply_import_accepts_the_same_identity_during_instance_replay() {
         let (mut env, item) = env_with_ambient_item_and_facade();
-        let before_item_binding = env.module_state.root_scope.bindings["item"].clone();
+        let before_item_binding = env.module_state.session_scope.bindings["item"].clone();
 
         env.elaborate_file(
             "class Marker a {} \
@@ -5323,7 +5467,7 @@ mod namespace_effect_tests {
 
         assert_eq!(env.globals["item"], item);
         assert_eq!(
-            env.module_state.root_scope.bindings["item"],
+            env.module_state.session_scope.bindings["item"],
             before_item_binding
         );
         assert!(
@@ -7360,6 +7504,7 @@ mod namespace_effect_tests {
         .expect("memory owner checks a different attached proof");
         let memory_proof = env.globals["A.id::extra"];
         assert_ne!(file_proof, memory_proof);
+        // Forgery control: a later display-map overwrite must not change file-backed selection.
         assert_eq!(env.globals.insert("A.id::same".to_string(), memory_proof), Some(file_proof));
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
             .expect("file attached proof selector uses file's checked ID");

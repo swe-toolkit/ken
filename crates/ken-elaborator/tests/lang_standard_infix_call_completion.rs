@@ -712,6 +712,7 @@ fn two_registered_head_spellings_rebound_to_one_live_name_select_by_id() {
     let expected_foo = env.class_env.instance_search("Ord", "Foo")
         .expect("Foo dictionary admitted");
     let foo_id = env.globals["Foo"];
+    // Forgery control: an alias in globals cannot change the saved instance-head ID.
     env.globals.insert("Bar".to_string(), foo_id);
     env.elaborate_file(
         "import Core.Operators.Standard (≤) \

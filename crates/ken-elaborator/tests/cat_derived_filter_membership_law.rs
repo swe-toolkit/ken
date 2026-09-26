@@ -31,7 +31,8 @@ fn load() -> (ElabEnv, GlobalId) {
     ] {
         for name in names {
             let id = env.globals[&format!("{module}.{name}")];
-            env.globals.insert((*name).to_owned(), id);
+            env.bind_session_name(name, id)
+                .expect("checked filter-law provider alias");
         }
     }
     assert_eq!(env.globals["filter"], prelude_filter);

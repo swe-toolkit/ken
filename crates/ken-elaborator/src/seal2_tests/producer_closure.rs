@@ -627,6 +627,7 @@ fn a_source_visible_producer_is_rejected_by_the_upstream_inventory() {
 #[should_panic(expected = "is neither a declaration nor a constructor")]
 fn unclassifiable_global_member_fails_loudly() {
     let mut env = ElabEnv::empty().expect("prelude");
+    // Map-only forgery control: producer enumeration must fail on an invalid ID.
     env.globals
         .insert("escaped_unknown_id".to_string(), ken_kernel::GlobalId(u32::MAX));
     let _ = closed_producers(&env, "BufferSpan");

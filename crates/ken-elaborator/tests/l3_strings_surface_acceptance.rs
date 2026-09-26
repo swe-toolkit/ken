@@ -33,8 +33,8 @@ fn mk_env() -> ElabEnv {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_fixture(&mut env);
     let canonical_sub = env.globals["Data.Numeric.Nat.Order.sub"];
-    env.globals
-        .insert("l3_canonical_nat_sub".to_owned(), canonical_sub);
+    env.bind_session_name("l3_canonical_nat_sub", canonical_sub)
+        .expect("checked canonical subtraction alias");
     env
 }
 

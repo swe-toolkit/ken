@@ -548,8 +548,8 @@ fn cat3_d1_law_surfaces_are_proof_returning_not_prop_wrappers() {
 fn cat3_d1_positive_surfaces_check_against_real_package_defs() {
     let mut env = mk_env();
     let canonical_min = env.globals["Data.Numeric.Nat.Order.min"];
-    env.globals
-        .insert("cat3_canonical_min".to_owned(), canonical_min);
+    env.bind_session_name("cat3_canonical_min", canonical_min)
+        .expect("checked canonical min alias");
     env.elaborate_decl("fn cat3_to_true (x : Nat) : Bool = True")
         .expect("helper predicate should elaborate");
     env.elaborate_decl("fn cat3_nat_eq_all (x : Nat) (y : Nat) : Bool = True")

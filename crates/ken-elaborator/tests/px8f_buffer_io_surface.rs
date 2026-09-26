@@ -371,6 +371,7 @@ fn buffer_span_producer_closure_resolves_public_constructors() {
     assert!(env.env.lookup(private_buffer_span).is_none());
     assert!(env.env.constructor(private_buffer_span).is_some());
     assert!(!env.globals.values().any(|id| *id == private_buffer_span));
+    // Map-only control: producer enumeration must notice this forged private ID.
     env.globals.insert(
         "escaped_private_buffer_span_constructor".to_string(),
         private_buffer_span,
@@ -388,6 +389,7 @@ fn buffer_span_producer_closure_resolves_public_constructors() {
 )]
 fn buffer_span_producer_closure_rejects_unknown_public_ids() {
     let mut env = ElabEnv::empty().expect("SPAN-SEAL prelude");
+    // Map-only control: producer enumeration must reject an invalid ID.
     env.globals
         .insert("escaped_unknown_id".to_string(), GlobalId(u32::MAX));
     let _ = public_buffer_span_producers(&env);

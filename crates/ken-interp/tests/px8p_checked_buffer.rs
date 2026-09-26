@@ -13,6 +13,7 @@ fn env() -> ken_elaborator::ElabEnv {
     let mut env = ken_elaborator::ElabEnv::empty().expect("PX8-P prelude");
     // The escape discriminator reaches the same private checked release node
     // used by `withBuffer`'s finalizer without publishing a raw release name.
+    // privileged harness alias of a private prelude id; resolves only through the legacy globals fall-through; the flip must replace it.
     env.globals.insert(
         "Px8pPrivateResourceRelease".to_string(),
         env.prelude_env.private_resource_release_id,

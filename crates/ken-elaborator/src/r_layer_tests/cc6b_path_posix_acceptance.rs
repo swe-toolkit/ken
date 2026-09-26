@@ -38,11 +38,9 @@ fn full_env() -> ElabEnv {
     .expect("the curated Posix surface must import together");
     for surface in PATH_POSIX_PUBLIC {
         let canonical = env.globals[&format!("{PATH_POSIX_MODULE}.{surface}")];
-        assert_eq!(
-            env.globals.insert(surface.to_owned(), canonical),
-            None,
-            "Posix public aliases must not collide"
-        );
+        assert_eq!(env.globals.get(surface), None, "Posix public aliases must not collide");
+        env.bind_session_name(surface, canonical)
+            .expect("the Posix alias keeps its checked provider identity");
     }
     env
 }

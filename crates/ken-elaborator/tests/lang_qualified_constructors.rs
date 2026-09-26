@@ -404,6 +404,7 @@ fn scoped_resource_kind_qualifies_every_arm_and_checks_coverage() {
     let buffer = env.prelude_env.runtime_roles.resource_kind_buffer;
     let forged = env.globals["True"];
     assert_ne!(forged, buffer);
+    // Forgery control: the checked ResourceKind member ignores the display-map ID.
     env.globals
         .insert("ResourceKind.Buffer".to_string(), forged);
     env.elaborate_file(
@@ -447,6 +448,7 @@ fn scoped_resource_kind_bare_member_neither_resolves_nor_binds() {
     let actual = env.prelude_env.runtime_roles.resource_kind_buffer;
     let forged = env.globals["True"];
     assert_ne!(actual, forged);
+    // Forgery control: scoped constructor resolution must ignore this display binding.
     env.globals
         .insert("ResourceKind.Buffer".to_string(), forged);
     env.elaborate_decl("const qualified : ResourceKind = ResourceKind.Buffer")
@@ -488,6 +490,7 @@ fn scoped_member_spellings_are_available_to_user_declarations() {
         .id;
     let forged = env.globals["True"];
     assert_ne!(resource_buffer, forged);
+    // Forgery control: user-defined leaf names cannot redirect the floor member.
     env.globals
         .insert("ResourceKind.Buffer".to_string(), forged);
     env.elaborate_file(
@@ -522,6 +525,7 @@ fn scoped_constructor_leaf_can_be_selectively_imported_from_user() {
         .expect("the selectively imported type is usable");
     let forged = env.globals["True"];
     assert_ne!(forged, resource_ctor);
+    // Forgery control: a selective import cannot change the floor family ID.
     env.globals
         .insert("ResourceKind.Buffer".to_string(), forged);
     env.elaborate_decl("const kind : ResourceKind = ResourceKind.Buffer")
@@ -626,6 +630,7 @@ fn forged_qualified_global_spelling_cannot_redirect_checked_member() {
     let checked_red = env.globals["Red"];
     let forged = env.globals["True"];
     assert_ne!(checked_red, forged);
+    // Forgery control: this dotted display key must not grant constructor authority.
     assert_eq!(env.globals.insert("Colour.Red".to_string(), forged), None);
     env.elaborate_decl("const selected : Colour = Colour.Red")
         .expect("the checked family member survives a forged spelling");

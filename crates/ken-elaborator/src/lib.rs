@@ -217,7 +217,7 @@ pub struct ElabEnv {
     /// not become per-declaration.
     pub resolution_provenance: Vec<classes::InstanceResolution>,
     /// Module/import/visibility bookkeeping (`33 §3-4`, ES3-build) —
-    /// persists the file-level (root) import scope and every elaborated
+    /// persists the sealed prelude, incremental session scope, and every elaborated
     /// module's `pub` export table across separate `elaborate_*` calls.
     /// Purely a surface-layer concern: never touches `env`/`Σ`.
     pub module_state: modules::ModuleState,
@@ -357,6 +357,7 @@ impl ElabEnv {
             &elab.globals,
             &elab.prelude_env.native_trusted_base,
         )?;
+        elab.module_state.seal_prelude_scope()?;
         Ok(elab)
     }
 
@@ -377,10 +378,29 @@ impl ElabEnv {
     /// Used by tests to pre-declare types, predicates, and propositions needed
     /// for conformance test setup.
     pub fn declare_postulate_raw(&mut self, name: &str, ty: Term) -> Result<GlobalId, ElabError> {
+        self.module_state.check_root_binding(name)?;
         let id = declare_postulate(&mut self.env, name.to_string(), vec![], ty)
             .map_err(|e| ElabError::Internal(format!("declare_postulate failed: {}", e)))?;
+        self.module_state.bind_checked_root_name(name, id)?;
+        // The flat writer remains until the legacy-resolution flip.
         self.globals.insert(name.to_string(), id);
         Ok(id)
+    }
+
+    /// Grant a session-local spelling to an already checked global identity.
+    /// A private prelude identity is never a source-visible binding.
+    pub fn bind_session_name(&mut self, name: &str, id: GlobalId) -> Result<(), ElabError> {
+        if (self.env.lookup(id).is_none() && self.env.constructor(id).is_none())
+            || self.module_state.is_private_id(id)
+        {
+            return Err(ElabError::Internal(format!(
+                "session alias `{name}` has no public checked identity"
+            )));
+        }
+        self.module_state.bind_session_alias(name, id)?;
+        // Keep the legacy flat reader operational until the later flip.
+        self.globals.insert(name.to_string(), id);
+        Ok(())
     }
 
     /// Elaborate a single V0/V1/L1 declaration from source.
@@ -571,6 +591,7 @@ impl ElabEnv {
     ) -> Result<(Term, Term), ElabError> {
         let expr = parser::parse_expr(src)?;
         let rexpr = resolve::resolve_expr_standalone(&expr)?;
+        let rexpr = self.module_state.rewrite_standalone(rexpr)?;
         elab::elaborate_rexpr(
             &mut self.env,
             &self.globals,

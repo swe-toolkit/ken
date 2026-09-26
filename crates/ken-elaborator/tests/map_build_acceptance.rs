@@ -220,6 +220,7 @@ fn cat_bool_reuse_d2_resolves_exact_is_some_provider_without_equivalent_local() 
         !transparent_ids.is_empty() && transparent_ids.is_subset(&bound_ids),
         "the real Map bindings must close over every direct transparent declaration"
     );
+    // Map-only census control: these prefixed keys are not source bindings.
     for (name, id) in owned_bindings {
         env.globals
             .insert(format!("Data.Collections.Map.{name}"), id);

@@ -42,7 +42,8 @@ fn load() -> ElabEnv {
     ] {
         for name in names {
             let id = env.globals[&format!("{module}.{name}")];
-            env.globals.insert((*name).to_owned(), id);
+            env.bind_session_name(name, id)
+                .expect("checked sort-law provider alias");
         }
     }
     env

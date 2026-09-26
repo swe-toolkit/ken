@@ -38,7 +38,10 @@ fn internal_vector_fixture_env() -> ElabEnv {
                 .map(|suffix| (suffix.to_owned(), *id))
         })
         .collect();
-    env.globals.extend(aliases);
+    for (name, id) in aliases {
+        env.bind_session_name(&name, id)
+            .expect("checked Vector fixture alias");
+    }
     env
 }
 
