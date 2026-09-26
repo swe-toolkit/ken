@@ -214,13 +214,28 @@ T1. Build on `8d604670e` rebased to current `origin/main`, never on
   Planned package, its producers and `call_selected_pending_package`, since
   no admitted consumer remains. Keep admission's refusals and the witness
   facts C1-C3 consume. `a2697c91a` is abandoned and not resumed.
-- **Join disposition (HS8, `evt_7565yjvhkhsk6`).** The trapped Vis body is
-  not retained. At the owner-fed dispatch, record the Ret case through the
-  existing `disposition_statically_unselected_match_cases`; no new walker,
-  predicate or origin inventory, and the existing backstops stay. A
-  mutation skipping that record reproduces the "neither emitted nor
-  statically unselected" refusal on px7l. Stop and report the enclosing
-  origin of any undispositioned join outside the Vis case body.
+- **Join disposition (HS8/HS9 ruling `evt_3224sr4992fx0`; replaces R1-R4).**
+  - **S1.** One planner query, `owner_fed_match_population(origin)`, next
+    to `pending_result_validated_owner`: `Some(ret)` iff the owner
+    admission holds and every continuation call re-entering `origin` is a
+    witness candidate. A re-entering call outside the witness is a planner
+    error, never a widening.
+  - **S2.** `close_statically_unselected_match_cases` takes `{ret}` from S1
+    where it is `Some`, and refuses if a non-Ret case join was consumed.
+  - **S3.** The C2 trap guard and the IH `selected_body = None` branch read
+    S1, so the trap and the disposition never disagree.
+  - **S4.** Delete R1 (the core.rs record from `c1aa15d34`). The core.rs
+    Vis record and the predecessor union stay; S2 overrides them only
+    where S1 is `Some`.
+  - **Pins.** P1: both px7l rows and px7m ok green natively with zero
+    packages. P2: S1 forced to `None` at closure reproduces the "neither
+    emitted nor statically unselected" refusal for StaticOriginId(19). P3:
+    force-consuming a Vis-subtree join trips "an owner-fed Match emitted a
+    non-Ret case body". P4: a re-entering call outside the witness fails
+    S1's coverage check (say whether synthesized). C4's detector still
+    traps.
+  - **Stop** if S1's coverage error fires on any existing row, or any row
+    outside the expected set changes colour.
 - **Stop** if a deletion reddens any row or pin, meaning a consumer
   exists; report the row.
 
@@ -237,6 +252,12 @@ of a consumer that never executes. The fix is not another admission clause:
 settle whether the consumer is reachable (M10), then build only against a
 row that reaches it, or remove it. The parked L2 WIP `a2697c91a` is not
 resumed as written.
+**Predicate for lines 8 and 9** (`evt_3224sr4992fx0`): the join ledger
+admits a case as reachable on grounds other than emission (the C2 trap; the
+static-selection Vis record; the recursive-predecessor union's "a carried
+return has no template" premise). All were true only while something
+emitted the Vis body, and C2 removed its only emitter. Line 7 is not in
+this predicate.
 Relocating a `Specialized` response to its owner is a lawful handoff that
 px7l already uses; it is not a future capability.
 
