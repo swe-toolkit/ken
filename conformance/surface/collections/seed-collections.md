@@ -62,8 +62,10 @@ constraint fails resolution = compile error); `42 §2` (`Lazy` is a thunk type
 whose force/memo primitive **may be deferred for G1** — so the buildable-now
 infinitude demo is the L2 unfold, **not** `Lazy`); `c3a3f1d`
 (`L-resolver-globals`: an `EVar` scope-miss falls through to a global `RCon`
-lookup — cross-declaration combinator references resolve). Cross-ref fidelity
-verified at each target; no dangling forward-ref.
+lookup). The separate `global-fallback-resolves-cross-decl-combinator` case
+witnesses that path without importing `map`; the `functor-law-…` case covers
+explicit package import and emitted law obligation. Cross-ref fidelity verified
+at each target; no dangling forward-ref.
 
 **Three staging facts that gate how a case is tagged (verified against the code,
 not the frame):**
@@ -263,32 +265,51 @@ are private (`41 §2`).
 
 ---
 
-## AC3 — combinators are stdlib `view`s with laws as propositions
+## AC3 — combinators have laws as propositions
 
-`map`/`filter`/`fold`/`zip` are prelude `view`s (`37 §4`), **not** a kernel
-iteration protocol; their laws are `≡`-propositions discharged by the prover,
-adding **no kernel rule**. A law in one declaration may reference a combinator
-in **another** (`map_id` references `map`) — the cross-declaration lowercase
-reference resolves via the landed `L-resolver-globals` fallback (`c3a3f1d`).
+`map` and `filter` are imported package functions from
+`Data.Collections.Derived`, not prelude `view`s (`37 §4`). This seed makes no
+placement claim about `fold`/`reduce` or `zip`. The laws are
+`≡`-propositions discharged by the prover, adding **no kernel rule**.
+
+### surface/collections/global-fallback-resolves-cross-decl-combinator
+- spec: `37 §4` (cross-declaration clause), `c3a3f1d`
+- given: one compilation unit declares a lowercase global `map` with the
+  collection-map signature, imports `Core.Function.Combinators (idf as id)`,
+  and separately declares `map_id : map id xs ≡ xs`. It does not import
+  `Data.Collections.Derived (map)`. Include a separate lexical reference under
+  a local binder also named `map`.
+- expect: the free `map` in `map_id` takes an `EVar` scope miss, falls through
+  to global `RCon`, and resolves to the same-unit `map` declaration; it does
+  not fail `UnboundName`. The shadowing reference resolves to its lexical
+  local, not the global. Assert the resolved identities / binder, not merely
+  that the declarations type-check.
+- why: this is the live, discriminating witness for the landed
+  `L-resolver-globals` behavior (`c3a3f1d`), separate from the explicit-import
+  package case below. Removing the fallback breaks the free reference; forcing
+  global lookup before lexical scope breaks the shadowing control.
+  (structural resolution.)
 
 ### surface/collections/functor-law-emits-obligation-cross-decl-resolves
-- spec: `37 §4`, `c3a3f1d` (`L-resolver-globals`), `22` (obligation emission)
-- given: `map_id : map id xs ≡ xs` stated in a declaration **separate** from the
-  one defining `map`.
+- spec: `37 §4`, `33 §3.2`/`§3.3`, `22` (obligation emission)
+- given: in the compilation unit containing `map_id`, explicitly import
+  `Data.Collections.Derived (map)` and
+  `Core.Function.Combinators (idf as id)`. State
+  `map_id : map id xs ≡ xs` in a declaration **separate** from the package
+  declaration of `map`.
 - expect: two faces. **(a) Resolution (real, landed):** the lowercase
-  cross-declaration reference `map` inside `map_id` **resolves** — an `EVar`
-  scope-miss falls through to the global `RCon` lookup (`c3a3f1d`), locals still
-  shadowing; it does **not** error `UnboundName`. **(b) Obligation (net-new):**
+  `map` reference in `map_id` resolves through the explicit package import;
+  it does **not** error `UnboundName`. **(b) Obligation (net-new):**
   elaborating `map_id` **emits a real `≡`-obligation** `map id xs ≡ xs` to the
   `22` pipeline (a proposition, `14 §5`/`21 §3`), dischargeable by the prover —
   observe the **emitted obligation**, not "it type-checks".
-- why: AC3 — combinator laws as propositions, **structural on the emitted
-  obligation**, plus the cleared resolver blocker. Face (a) drives the
-  **landed** resolver fallback (real, testable now); face (b) drives the
-  **net-new** law emission (producer-grep the real `22` emission, not a
-  synthetic obligation). A bug emitting **no** obligation (treating the law as a
-  comment) or failing the cross-decl reference is caught. (structural obligation
-  + resolver.)
+- why: AC3 — imported combinator laws remain propositions, **structural on the
+  emitted obligation**. Explicit imports make the provider context visible under
+  `33 §3.3`; the case does not claim ambient prelude availability. Face (b)
+  drives the **net-new** law emission (producer-grep the real `22` emission,
+  not a synthetic obligation). A bug emitting **no** obligation (treating the
+  law as a comment) or failing to resolve the imported `map` is caught.
+  (structural obligation; explicit-import context.)
 
 ### surface/collections/map-lookup-insert-law-emits-obligation
 **(SUPERSEDED → `../../stdlib/map/seed-map.md`.** These are now the **proved**
@@ -796,7 +817,9 @@ result **values** (`Lt`/`Eq`/`Gt`, not `Ordering`); the SCT check stays in its
   `list-pattern-matches-via-real-elim`,
   `array-update-preserves-unchanged-values`.
 - **AC3** (lawful combinators):
-  `functor-law-emits-obligation-cross-decl-resolves`,
+  `global-fallback-resolves-cross-decl-combinator` (unimported global
+  fallback), `functor-law-emits-obligation-cross-decl-resolves`
+  (explicit package import + emitted law obligation),
   `map-lookup-insert-law-emits-obligation`.
 - **AC4** (no coinduction + inductive infinitude):
   `no-coinductive-construct-in-kernel` (soundness),
@@ -897,10 +920,10 @@ L3 builds on **landed** substrate: the `String` **primitive** (`14 §5`,
 registered for L6 in `ken-elaborator/src/bytes.rs`), `List`/`Option`/`Result`
 **L2 `data`** + `elim_List` (`34`), the runtime value model's canonical bytes
 and extensional equality (`41 §2`/`§4`), the **`L-resolver-globals`**
-cross-declaration
-fallback (`c3a3f1d`), and the **strict-positivity + SCT** admission gates
-(`14 §8`/`17 §4`). The cases that ride **only** landed machinery are real now:
-`list-pattern-matches-via-real-elim`, the resolution face of `functor-law-…`,
+cross-declaration fallback (`c3a3f1d`), and the **strict-positivity + SCT**
+admission gates (`14 §8`/`17 §4`). The cases that ride **only** landed
+machinery are real now: `list-pattern-matches-via-real-elim`,
+`global-fallback-resolves-cross-decl-combinator`,
 `structurally-equal-collections-compare-equal` (the `List` half),
 `fuel-bounded-unfold-…`, and `no-coinductive-construct-…` (the kernel is clean
 today).

@@ -410,13 +410,15 @@ elements, never pointer or slot identity. Mutable cells exist only in a
 **Structural recursion / `match`** is the primitive way to consume `List` and
 other inductives (`34 §3`); it is what the verification layer reasons over. The
 higher-order combinators — `map`, `filter`, `fold`/`reduce`, `zip` — are
-ordinary **prelude `view`s** over the collection interfaces (`../50-stdlib/`),
-**not** a kernel iteration protocol. Comprehensions / `for`, if included, are
-**sugar** over the combinators (`OQ-syntax`); the semantic core is combinators +
-recursion.
+collection-interface operations (`../50-stdlib/`), **not** a kernel iteration
+protocol. `map` and `filter` are imported package functions from
+`Data.Collections.Derived`, not prelude `view`s; this does not reclassify
+`fold`/`reduce` or `zip`. Comprehensions / `for`, if included, are **sugar**
+over the combinators (`OQ-syntax`); the semantic core is combinators + recursion.
 
-The **laws are propositions** (`14 §5`, `21 §3`), stated and proved in the
-prelude, usable by the verification layer — they add **no kernel rule**:
+The **laws are propositions** (`14 §5`, `21 §3`), stated and proved in Ken
+source, usable by the verification layer — they add **no kernel rule**. Laws
+for imported `map` and `filter` are package content, not prelude bindings:
 
 ```
 -- functor laws (for List, Array, Option, …)
@@ -769,13 +771,17 @@ representation choices the laws and equality are invariant under; the proved
 
 ## 9. What WS-L must deliver here (L3, → L8) and acceptance
 
-Deliver in the surface/elaborator + prelude (lowering to the landed `41`): UTF-8
-`String` (byte/char views, the four conversions, `Char`); `List` (L2 `data`),
-`Array` (persistent abstract carrier), `Option`/`Result` (L2); the
-`map`/`filter`/`fold`/`zip` combinators with their laws as
-propositions; the fuel-bounded-unfold infinitude idiom; structural equality +
-`DecEq`/`Ord` (built-in instances now); and the verified `sort`. L8 extends this
-to the full lawful stdlib; L3 **unblocks T3** (the test/property framework).
+Deliver across the surface/elaborator, prelude, and explicitly imported
+packages, each where specified (lowering to the landed `41`): UTF-8 `String`
+(byte/char views, the four conversions, `Char`); `List` (L2 `data`), `Array`
+(persistent abstract carrier), `Option`/`Result` (L2); the
+`map`/`filter`/`fold`/`zip` combinators with their laws as propositions; the
+fuel-bounded-unfold infinitude idiom; structural equality + `DecEq`/`Ord`
+(built-in instances now); and the verified `sort`. Here `map` and `filter` are
+`Data.Collections.Derived` exports requiring explicit import (`33 §3.3`), not
+prelude operations; this sentence does not settle the placement of `fold` or
+`zip`. L8 extends this to the full lawful stdlib; L3 **unblocks T3** (the
+test/property framework).
 
 **Testable acceptance criteria.**
 
