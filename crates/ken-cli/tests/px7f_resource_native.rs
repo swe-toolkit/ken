@@ -440,7 +440,7 @@ fn bounded_epoch_refuses_before_the_checked_program_issues_an_effect() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that."]
+#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that. Re-measured at 310bf4f21: owner Vis StaticOriginId(578) fails the Ret-tag check at lowering/units.rs:3663-3671."]
 fn linked_public_right_denial_preserves_exact_masks() {
     let observation = run("right-denial", RIGHT_NOT_HELD);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
@@ -460,7 +460,7 @@ fn linked_public_right_denial_preserves_exact_masks() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that."]
+#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that. Re-measured at 310bf4f21: owner Vis StaticOriginId(609) fails the Ret-tag check at lowering/units.rs:3663-3671."]
 fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
     let observation = run("double-release", DOUBLE_RELEASE);
     assert_eq!(observation.exit_status, 0, "{observation:?}");

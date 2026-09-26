@@ -3559,19 +3559,24 @@ fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() 
         host_effect_seat_contract_of(operation, slot)
             .unwrap_or_else(|| panic!("{operation:?} {slot:?} has no contract"))
     };
-    // OPERATION alone. Same slot, same structural kind, same `Int`-shaped
-    // operand; different operations, and the availabilities differ because
-    // only one of them has a carrier route.
+    // OPERATION. Seat identity is (effect_origin, slot) (ledger key,
+    // lowering/effects.rs:1109); the operation is read from the Effect at
+    // effect_origin (build_host_effect_seat_plan), so a different operation
+    // implies a different origin, and the claim refuses a record whose
+    // operation disagrees with its visit (lowering/effects.rs:917). The contract
+    // table below is keyed on (operation, slot) and may coincide across
+    // operations; it is not the identity.
     let allocate = contract(
         ken_host::HostOpV1::BufferAllocate,
         EffectSeatSlot::Argument(0),
     );
-    let freeze_length = contract(ken_host::HostOpV1::BufferFreeze, EffectSeatSlot::Argument(1));
-    assert_eq!(allocate.1, EffectSeatNeed::ExactIntU64);
-    assert_eq!(freeze_length.1, EffectSeatNeed::ExactIntU64);
-    assert_ne!(
-        allocate, freeze_length,
-        "two exact-Int seats at the same ordinal of different operations collapsed"
+    let mapping = contract(
+        ken_host::HostOpV1::MappingAllocate,
+        EffectSeatSlot::Argument(0),
+    );
+    assert_eq!(
+        allocate, mapping,
+        "the seat contract is keyed on (operation, slot) and is not a seat identity; two operations may share one"
     );
     // ORDINAL alone. One operation, two argument seats, different needs.
     let write_tag = contract(ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(1));
@@ -3610,16 +3615,17 @@ fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() 
 ///
 /// MEASURED: both `MappingReadView` coordinates, the `MappingWriteView` start,
 /// and its byte-span payload admit their exact needs in specialized and carried
-/// phases, while both `BufferFreeze` coordinates remain specialized-only.
+/// phases.
 /// CLAIMED: checked Mapping composition cannot select a different availability
-/// merely by sequencing read and write, and the repair does not widen Buffer.
+/// merely by sequencing read and write.
 /// THE GAP: this pins planning admission; the native/interpreter surface tests
 /// independently exercise the paired lowering observers and exact wire values.
 ///
 /// Promise class: durable invariant. New Mapping operations may add seats, but
-/// these three window coordinates and BufferFreeze's separate contract remain.
+/// these three window coordinates remain. BufferFreeze 1/2 moved to either-phase
+/// in RT-COMPMATCH-TREE-SCRUTINEE on the r2/sp_a witnesses; see that WP's pin.
 #[test]
-fn mapping_window_seats_are_either_phase_without_widening_buffer_freeze() {
+fn mapping_window_seats_are_either_phase() {
     for (operation, ordinal) in [
         (ken_host::HostOpV1::MappingReadView, 1),
         (ken_host::HostOpV1::MappingReadView, 2),
@@ -3650,20 +3656,199 @@ fn mapping_window_seats_are_either_phase_without_widening_buffer_freeze() {
         "MappingWriteView argument 2 must admit its witnessed carried Bytes"
     );
 
+}
+
+/// The probe counts dispatches before checking the operation, so a bypass of
+/// the narrow-failure lane cannot appear green merely by returning a value.
+#[derive(Debug, Default, Eq, PartialEq)]
+struct BufferFreezePairProbe {
+    allocations: usize,
+    freezes: usize,
+    start: u64,
+    length: u64,
+}
+
+extern "C" fn buffer_freeze_pair_dispatch(
+    context: *const std::ffi::c_void,
+    operation: i64,
+    request: *const std::ffi::c_void,
+    request_size: i64,
+    reply: *mut std::ffi::c_void,
+) -> i64 {
+    // SAFETY: the invocation owns the probe throughout this synchronous call.
+    let probe = unsafe { &mut *(context.cast_mut().cast::<BufferFreezePairProbe>()) };
+    let op = if operation == ken_host::HostOpV1::BufferAllocate as i64 {
+        probe.allocations += 1;
+        ken_host::HostOpV1::BufferAllocate
+    } else if operation == ken_host::HostOpV1::BufferFreeze as i64 {
+        probe.freezes += 1;
+        ken_host::HostOpV1::BufferFreeze
+    } else {
+        return -1;
+    };
+    let wire = ken_host::host_effect_wire_layout_v1(op).expect("fixture operation has a wire");
+    if request_size != i64::from(wire.request_size) {
+        return -1;
+    }
+    // SAFETY: checked target-C wire offsets address aligned u64 fields.
+    let load = |index: usize| unsafe {
+        *(request.cast::<u8>().add(wire.request_offsets[index] as usize).cast::<u64>())
+    };
+    if op == ken_host::HostOpV1::BufferFreeze {
+        probe.start = load(1);
+        probe.length = load(2);
+    }
+    // SAFETY: the reply pointer names the generated wire record for this op.
+    unsafe { std::ptr::write_bytes(reply.cast::<u8>(), 0, wire.reply_size as usize) };
+    let tag = if op == ken_host::HostOpV1::BufferAllocate {
+        wire.reply_resource_tag
+    } else {
+        wire.reply_bytes_tag
+    };
+    // SAFETY: reply_tag_offset is an aligned u64 field in the wire record.
+    unsafe { *(reply.cast::<u8>().add(wire.reply_tag_offset as usize).cast::<u64>()) = tag };
+    if op == ken_host::HostOpV1::BufferAllocate {
+        // SAFETY: reply_detail_offset is the generated resource-token field.
+        unsafe { *(reply.cast::<u8>().add(wire.reply_detail_offset as usize).cast::<u64>()) = 11 };
+    }
+    0
+}
+
+fn buffer_freeze_pair_fixture(
+    symbols: &crate::NativeProcessSymbols,
+    start: RuntimeExpr,
+    length: RuntimeExpr,
+) -> RuntimeExpr {
+    let int = |n: i64| px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(n.into())));
+    let freeze = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::BufferFreeze,
+            capability: None,
+            args: vec![RuntimeExpr::Var(2), RuntimeExpr::Var(1), RuntimeExpr::Var(0), RuntimeExpr::Var(2)],
+        }),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: RuntimeExpr::Match {
+                    scrutinee: Box::new(RuntimeExpr::Var(0)),
+                    cases: vec![crate::RuntimeMatchCase {
+                        constructor: symbols.resource_invalid_bounds.clone(),
+                        binders: 0,
+                        body: int(71),
+                    }],
+                    default: RuntimeTrap {
+                        code: RuntimeTrapCode::PatternMatchFailure,
+                        message: "freeze error is not InvalidBounds".to_string(),
+                    },
+                },
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: int(41),
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "freeze result default".to_string(),
+        },
+    };
+    RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::BufferAllocate,
+            capability: None,
+            args: vec![RuntimeExpr::Value(RuntimeValue::Int(8.into()))],
+        }),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: int(90),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::LexicalClosure {
+                        captures: vec![RuntimeExpr::Var(0)],
+                        params: vec!["start".to_string(), "length".to_string()],
+                        body: Box::new(freeze),
+                    }),
+                    args: vec![start, length],
+                },
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "allocate result default".to_string(),
+        },
+    }
+}
+
+fn run_buffer_freeze_pair_fixture(
+    start: RuntimeExpr,
+    length: RuntimeExpr,
+) -> Result<(i64, BufferFreezePairProbe), CraneliftBackendError> {
+    let isa = native_isa()?;
+    let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
+    builder.symbol("ken_host_dispatch_v1", buffer_freeze_pair_dispatch as *const u8);
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let expr = buffer_freeze_pair_fixture(&symbols, start, length);
+    let compiled = compile_expr_into_module(
+        JITModule::new(builder), "rt_buffer_freeze_carried_pair", Linkage::Local,
+        &expr,
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
+        BTreeMap::new(), None, true, Some(&symbols),
+        Some(test_only_distinguished_root_join_plan()), None,
+    )?;
+    let input = BorrowedFixtureValue { kind: 1, tag: 0, data: std::ptr::null(), len: 0 };
+    let mut probe = BufferFreezePairProbe::default();
+    let invocation = RootIngressFixture {
+        process_input: &input,
+        host_context: (&mut probe as *mut BufferFreezePairProbe).cast(),
+        capability: 0,
+    };
+    let (_, result) = compiled.run_with_profile(
+        Some((&invocation as *const RootIngressFixture).cast()),
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    )?;
+    Ok((result.expect("fixture returns an exact Int outcome"), probe))
+}
+
+/// MEASURED: start and length cross a lexical closure parameter boundary,
+/// arrive as carried Ints, and the native BufferFreeze arm dispatches exactly
+/// once with the correct in-range wire pair or returns InvalidBounds before
+/// dispatch for an out-of-range start.
+/// CLAIMED: both either-phase contracts and both positioned readers compose
+/// to preserve native BufferFreeze's existing exact-Int narrow semantics.
+/// THE GAP: the two ignored CLI rows stop at unrelated response-owner checks;
+/// this unit pins the seat pair but not those rows' response continuation.
+/// Promise class: durable invariant; intended extensions preserve the paired
+/// coordinate law and the InvalidBounds result, not particular source origins.
+#[test]
+fn buffer_freeze_carried_start_and_length_dispatch_or_invalid_bounds() {
     for ordinal in [1, 2] {
-        let (semantic, need, avail) = host_effect_seat_contract_of(
-            ken_host::HostOpV1::BufferFreeze,
-            EffectSeatSlot::Argument(ordinal),
-        )
-        .unwrap_or_else(|| panic!("BufferFreeze argument {ordinal} contract"));
-        assert_eq!(semantic, EffectSeatOperation::NarrowExactInt);
+        let (_, need, avail) = host_effect_seat_contract_of(
+            ken_host::HostOpV1::BufferFreeze, EffectSeatSlot::Argument(ordinal),
+        ).expect("BufferFreeze coordinate has a planned contract");
         assert_eq!(need, EffectSeatNeed::ExactIntU64);
         assert!(avail.admits(EffectSeatPhase::SpecializedTemplate));
-        assert!(
-            !avail.admits(EffectSeatPhase::CarriedWord),
-            "ABI-S6 must not widen BufferFreeze argument {ordinal}"
-        );
+        assert!(avail.admits(EffectSeatPhase::CarriedWord));
     }
+    let value = |n: i64| RuntimeExpr::Value(RuntimeValue::Int(n.into()));
+    let (code, probe) = run_buffer_freeze_pair_fixture(value(2), value(4))
+        .expect("in-range carried start and length compile and run");
+    assert_eq!(code, 41, "in-range freeze must select the Ok branch");
+    assert_eq!(probe, BufferFreezePairProbe { allocations: 1, freezes: 1, start: 2, length: 4 });
+
+    let (code, probe) = run_buffer_freeze_pair_fixture(value(-1), value(4))
+        .expect("out-of-range carried start returns a host result, not a trap");
+    assert_eq!(code, 71, "negative start must select InvalidBounds");
+    assert_eq!(probe.allocations, 1);
+    assert_eq!(probe.freezes, 0, "InvalidBounds must precede host dispatch");
 }
 
 fn compile_resource_token_seat_probe() -> (JITModule, *const u8) {
@@ -5463,6 +5648,33 @@ fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
     set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
     recursive_port_process_compiles(&expr)
         .expect("the unmutated bracket compiles, so the rows below are not vacuous");
+    // RT-COMPMATCH moved BufferFreeze's two exact-Int seats to either-phase.
+    // This bracket no longer has a strict seat whose observed phase can be
+    // perturbed into a refusal. ConsoleRead's exact-Int count remains strict;
+    // use an independent checked process object for that one mutation.
+    let strict_phase_fixture = || {
+        let expr = RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::Effect {
+                family: "Console".to_string(),
+                operation: ken_host::HostOpV1::ConsoleRead,
+                capability: None,
+                args: vec![
+                    RuntimeExpr::Construct {
+                        constructor: "ctor:prelude::Stream::Stdin".to_string(),
+                        args: Vec::new(),
+                    },
+                    RuntimeExpr::Value(RuntimeValue::Int(4.into())),
+                ],
+            }),
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+                args: Vec::new(),
+            }),
+        };
+        emit_process_entrypoint_object_with_cranelift(&expr, "phase_count_strict_console_read")
+            .map(|_| ())
+    };
+    strict_phase_fixture().expect("the strict-phase witness compiles unchanged");
     for mutation in [
         EffectSeatVisitMutation::OmitComplementary,
         EffectSeatVisitMutation::DuplicateWithinVisit,
@@ -5470,7 +5682,11 @@ fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
         EffectSeatVisitMutation::PerturbObservedPhase,
     ] {
         set_effect_seat_visit_mutation(mutation);
-        let refusal = recursive_port_process_compiles(&expr);
+        let refusal = if mutation == EffectSeatVisitMutation::PerturbObservedPhase {
+            strict_phase_fixture().map(|_| ())
+        } else {
+            recursive_port_process_compiles(&expr)
+        };
         set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
         let error = match refusal {
             Ok(()) => panic!("{mutation:?} left the seat lifecycle satisfied"),

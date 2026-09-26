@@ -352,7 +352,7 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
 // its five siblings pass. It fits none of the effect-seat owners.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE: a deferred host response can only enter its exact response owner (StaticResponseDeferred, runtime-IR lowering); measured at 742bf929a"]
+#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE D1: paired BufferFreeze carried start/length seat repair now passes AC-0 refusal; next first failure at lowering/units.rs:6823 is forward-declared response owner lacking a verified selected incoming call. Caller producer construct StaticOriginId(1079), alternative 1, target specialization 2 has no emitted generated-function call. Remains ignored pending that independent owner repair; AC-0 at 310bf4f21 was BufferFreeze Argument(1) ExactIntU64 unavailable in CarriedWord"]
 fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
     in_large_stack_thread("sp-a-freeze", || {
         let diff = differential("sp-a-freeze", SP_A_FREEZE);

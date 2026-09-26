@@ -373,7 +373,7 @@ fn non_indexed_match_stays_unaffected() {
 /// relation`, readmission `TermJReduction`, following the
 /// `RT-CLOSURE-BOUNDARY-LANE` row's contract.
 #[test]
-#[ignore = "TermJReduction: the convoy cast's proof is not ReflVal and ken-interp has no Term::J reduction arm, so cast_reduce yields Unknown for the G1 scope; fails at base 7aae5fcc6"]
+#[ignore = "TermJReduction: the convoy cast's proof is not ReflVal and ken-interp has no Term::J reduction arm, so cast_reduce yields Unknown for the G1 scope; fails at base 7aae5fcc6 and remains the first refusal at 310bf4f21"]
 fn two_vector_zip_recursive_step_convoy_fixture() {
     let mut env = vec_env();
     elab_ok(
