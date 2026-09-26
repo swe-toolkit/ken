@@ -3,11 +3,19 @@
 import heapq
 import json
 import os
-import statistics
+import re
 import sys
+import warnings
 
 
-N = 8
+N = 9
+# Run 36265192923's largest workspace test was 549.960s; use 600s for
+# unseen tests until measured rather than the much smaller suite median.
+DEFAULT_DURATION_SECONDS = 600.0
+WORKSPACE_TIMING_ROW = re.compile(
+    r"^(?P<shard>\d+)\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
+    r"\s+\(\s*\d+/\d+\)\s+(?P<test_id>.+)$"
+)
 EXCLUDED_BINARIES = {
     "rt_parity_native",
     "px8f_buffer_native",
@@ -87,6 +95,41 @@ def selected_projection(inventory, assignment_path, shard, output):
         json.dump(value, file)
 
 
+def read_durations(path):
+    if path.endswith(".tsv"):
+        durations = {}
+        with open(path, encoding="utf-8") as source:
+            rows = source.readlines()
+        for line_number, line in enumerate(rows, 1):
+            match = WORKSPACE_TIMING_ROW.fullmatch(line.rstrip("\n"))
+            if not match:
+                raise SystemExit(f"{path}:{line_number}: malformed workspace timing row")
+            test_id = match.group("test_id")
+            if test_id in durations:
+                raise SystemExit(f"{path}:{line_number}: duplicate timing row {test_id}")
+            seconds = float(match.group("seconds"))
+            if seconds <= 0:
+                raise SystemExit(f"{path}:{line_number}: duration must be positive")
+            durations[test_id] = seconds
+        return durations
+    evidence = json.load(open(path))
+    records = evidence.get("records")
+    if not isinstance(records, list) or not records:
+        raise SystemExit("duration evidence has no records")
+    durations = {}
+    for row in records:
+        test_id = row.get("test_id")
+        seconds = row.get("seconds")
+        if not isinstance(test_id, str) or not test_id:
+            raise SystemExit("duration evidence has an invalid test_id")
+        if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+            raise SystemExit(f"duration evidence has an invalid duration for {test_id}")
+        if test_id in durations:
+            raise SystemExit(f"duration evidence has duplicate row {test_id}")
+        durations[test_id] = float(seconds)
+    return durations
+
+
 def validate_plan(assignment_path, shard, selected_path):
     assignment = json.load(open(assignment_path))
     bins = assignment.get("bins")
@@ -112,22 +155,48 @@ def main():
         validate_plan(sys.argv[2], int(sys.argv[3]), sys.argv[4])
         return
     inventory = json.load(open(sys.argv[1]))
-    evidence = json.load(open(sys.argv[2]))
-    durations = {r["test_id"]: r["seconds"] for r in evidence["records"]}
-    median = statistics.median(durations.values())
+    durations = read_durations(sys.argv[2])
     bins = [(0.0, index, []) for index in range(N)]
     heapq.heapify(bins)
     live = sorted((f"{binary_id} {name}", binary_id, name) for binary_id, name in tests(inventory))
     if not live:
         raise SystemExit("filtered live inventory selected zero testcases")
-    for rendered, binary_id, name in sorted(live, key=lambda x: (-durations.get(x[0], median), x[0])):
+    live_ids = {row[0] for row in live}
+    stale = sorted(
+        test_id for test_id in set(durations) - live_ids
+        if test_id.split(" ", 1)[0].rpartition("::")[2] not in EXCLUDED_BINARIES
+    )
+    if stale:
+        warnings.warn(
+            "dropping timing rows absent from current inventory: " + ", ".join(stale),
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    missing = sorted(live_ids - set(durations))
+    if missing:
+        warnings.warn(
+            f"using {DEFAULT_DURATION_SECONDS}s default for {len(missing)} unmeasured workspace tests",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    for rendered, binary_id, name in sorted(
+        live, key=lambda row: (-durations.get(row[0], DEFAULT_DURATION_SECONDS), row[0])
+    ):
         total, index, selected = heapq.heappop(bins)
         selected.append((binary_id, name))
-        heapq.heappush(bins, (total + durations.get(rendered, median), index, selected))
+        heapq.heappush(
+            bins,
+            (total + durations.get(rendered, DEFAULT_DURATION_SECONDS), index, selected),
+        )
     result = []
-    for _, index, selected in sorted(bins, key=lambda x: x[1]):
+    for total, index, selected in sorted(bins, key=lambda x: x[1]):
         terms = [f"(binary_id(={binary}) & test(={name}))" for binary, name in selected]
-        result.append({"bin": index + 1, "tests": selected, "filter": " | ".join(terms)})
+        result.append({
+            "bin": index + 1,
+            "seconds": round(total, 3),
+            "tests": selected,
+            "filter": " | ".join(terms),
+        })
     output = sys.argv[3] if len(sys.argv) > 3 else None
     if output:
         os.makedirs(output, exist_ok=True)

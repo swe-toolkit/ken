@@ -20,6 +20,8 @@ _spec = importlib.util.spec_from_file_location("check_ci_shard_union", SCRIPT)
 _checker = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_checker)
 REQUIRED_RT_PARITY_ARMS = _checker.REQUIRED_RT_PARITY_ARMS
+SHARD_COUNT = _checker.SHARD_COUNT
+RT_PARITY_SHARD_COUNT = _checker.RT_PARITY_SHARD_COUNT
 
 
 def listing(rows, matches):
@@ -39,7 +41,10 @@ class Fixtures(unittest.TestCase):
     def fixture(self, empty_index=None):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name) / "realized-shards"
-        ordinary = [("fixture::bin", f"test_{index}") for index in range(1, 8 if empty_index else 9)]
+        ordinary = [
+            ("fixture::bin", f"test_{index}")
+            for index in range(1, SHARD_COUNT if empty_index else SHARD_COUNT + 1)
+        ]
         native = [
             (f"fixture::{name}", "native_test")
             for name in ("rt_parity_native", "px8f_buffer_native", "px8f_write_partition")
@@ -54,20 +59,21 @@ class Fixtures(unittest.TestCase):
         rows = ordinary + native
         parity_rows = [
             ("fixture::rt_parity_native", f"parity_test_{index}")
-            for index in range(1, 13)
+            for index in range(1, RT_PARITY_SHARD_COUNT * 2 + 1)
         ]
         parity_root = Path(temporary.name) / "realized-rt-parity"
-        for index in range(1, 7):
+        for index in range(1, RT_PARITY_SHARD_COUNT + 1):
             artifact = parity_root / f"rt-parity-shard-{index}"
             artifact.mkdir(parents=True)
-            selected = set(parity_rows[(index - 1) * 2 : index * 2])
+            per_shard = len(parity_rows) // RT_PARITY_SHARD_COUNT
+            selected = set(parity_rows[(index - 1) * per_shard : index * per_shard])
             for filename, matches in (
                 ("inventory.json", set(parity_rows)),
                 (f"selected-{index}.json", selected),
             ):
                 (artifact / filename).write_text(json.dumps(listing(parity_rows, matches)))
         assignments = list(ordinary)
-        for index in range(1, 9):
+        for index in range(1, SHARD_COUNT + 1):
             identity = None if index == empty_index else assignments.pop(0)
             artifact = root / f"realized-shard-{index}"
             artifact.mkdir(parents=True)
@@ -92,11 +98,15 @@ class Fixtures(unittest.TestCase):
         with self.fixture() as temporary:
             result = self.run_fixture(temporary)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("12 rt_parity_native identities across six shards", result.stdout)
+        self.assertIn(
+            f"{RT_PARITY_SHARD_COUNT * 2} rt_parity_native identities across {RT_PARITY_SHARD_COUNT} shards",
+            result.stdout,
+        )
 
     def test_rt_parity_empty_shard_reds(self):
         def empty_shard(root):
-            path = root.parent / "realized-rt-parity" / "rt-parity-shard-6" / "selected-6.json"
+            shard = RT_PARITY_SHARD_COUNT
+            path = root.parent / "realized-rt-parity" / f"rt-parity-shard-{shard}" / f"selected-{shard}.json"
             value = json.loads(path.read_text())
             for suite in value["rust-suites"].values():
                 for metadata in suite["testcases"].values():
@@ -113,11 +123,12 @@ class Fixtures(unittest.TestCase):
         self.assert_red(overlap, "rt_parity_native shard selections overlap")
 
         def omission(root):
-            path = root.parent / "realized-rt-parity" / "rt-parity-shard-6" / "selected-6.json"
+            shard = RT_PARITY_SHARD_COUNT
+            path = root.parent / "realized-rt-parity" / f"rt-parity-shard-{shard}" / f"selected-{shard}.json"
             value = json.loads(path.read_text())
             for suite in value["rust-suites"].values():
-                if "parity_test_11" in suite["testcases"]:
-                    suite["testcases"]["parity_test_11"]["filter-match"]["status"] = "mismatch"
+                if "parity_test_15" in suite["testcases"]:
+                    suite["testcases"]["parity_test_15"]["filter-match"]["status"] = "mismatch"
             path.write_text(json.dumps(value))
         self.assert_red(omission, "rt_parity_native shard union differs from full suite")
 
@@ -127,20 +138,20 @@ class Fixtures(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_each_empty_shard_position_is_a_valid_partition(self):
-        for index in range(1, 9):
+        for index in range(1, SHARD_COUNT + 1):
             with self.fixture(empty_index=index) as temporary:
                 result = self.run_fixture(temporary)
             self.assertEqual(result.returncode, 0, f"empty shard {index}: {result.stderr}")
 
     def test_empty_position_mutations_red(self):
-        empty = 8
+        empty = SHARD_COUNT
         self.assert_red(lambda root: (root / "realized-shard-8" / "unfiltered-inventory.json").unlink(), "member is missing", empty)
         self.assert_red(lambda root: (root / "realized-shard-8" / "inventory.json").unlink(), "member is missing", empty)
         self.assert_red(lambda root: (root / "realized-shard-8" / "selected-8.json").unlink(), "member is missing", empty)
         def selected_truncation(root):
             path = root / "realized-shard-8" / "selected-8.json"
             value = json.loads(path.read_text())
-            del value["rust-suites"]["suite-8"]
+            del value["rust-suites"][f"suite-{SHARD_COUNT - 1}"]
             value["test-count"] -= 1
             path.write_text(json.dumps(value))
         self.assert_red(selected_truncation, "selected listing differs from unfiltered authority", empty)
@@ -176,7 +187,10 @@ class Fixtures(unittest.TestCase):
         self.assert_red(sibling_overlap, "realized shard selections overlap", empty)
 
     def test_missing_or_extra_artifact_and_member_red(self):
-        self.assert_red(lambda root: (root / "realized-shard-8").rename(root / "extra"), "exactly eight")
+        self.assert_red(
+            lambda root: (root / f"realized-shard-{SHARD_COUNT}").rename(root / "extra"),
+            f"expected exactly {SHARD_COUNT}",
+        )
         self.assert_red(lambda root: (root / "realized-shard-1" / "inventory.json").unlink(), "member is missing")
 
     def test_invalid_json_object_and_schema_rows_red(self):
@@ -247,7 +261,7 @@ class Fixtures(unittest.TestCase):
                 value["rust-suites"]["suite-0"]["binary-name"] = "rt_parity_native"
                 path.write_text(json.dumps(value))
         self.assert_red(ordinary_over_excluded, "filtered inventory differs from unfiltered live complement")
-        for index in (8, 9, 10):
+        for index in (SHARD_COUNT, SHARD_COUNT + 1, SHARD_COUNT + 2):
             def native_included(root, index=index):
                 path = root / "realized-shard-1" / "inventory.json"
                 value = json.loads(path.read_text())
@@ -284,7 +298,7 @@ class Fixtures(unittest.TestCase):
         def union_extra_native(root):
             path = root / "realized-shard-8" / "selected-8.json"
             value = json.loads(path.read_text())
-            value["rust-suites"]["suite-8"]["testcases"]["native_test"]["filter-match"]["status"] = "matches"
+            value["rust-suites"][f"suite-{SHARD_COUNT}"]["testcases"]["native_test"]["filter-match"]["status"] = "matches"
             path.write_text(json.dumps(value))
         self.assert_red(union_extra_native, "union differs")
 

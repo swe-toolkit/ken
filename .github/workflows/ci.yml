@@ -43,26 +43,28 @@ jobs:
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
-  # The suite is CPU-bound, not scheduling-bound. Measured on run
-  # 29838398785: 1891 tests, 3893 CPU-seconds of real work, executed in 984s
-  # wall on a 4-vCPU runner — an effective parallelism of 3.96x out of a
-  # theoretical 4.00. nextest was already saturating the machine, so no
-  # further scheduling change can help. The only two levers left are LESS
-  # WORK (see `opt-level` in the root Cargo.toml) and MORE CORES — which is
-  # what this matrix buys: 8 shards x 4 vCPU = 32 effective cores.
+  # The nine workspace and eight parity runners replace the 8+6 matrices.
+  # Three pairs of existing jobs are coalesced, keeping the post-classification
+  # first wave at 23 simultaneous jobs, below the observed 25-job ceiling.
+  #
+  # Run 36265192923 measured 4,148 passing test rows, with 2,591s of summed
+  # time on its heaviest shard. Reassigning its timings into nine bins yields
+  # 1,785s per bin; the two slow-shard wall/sum ratios project about 15.4m
+  # for the new maximum. Timing is noisy under concurrency, so this remains a
+  # planning estimate, not an AC-2 claim.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
-  # slowest crate (`ken-cli` holds the heaviest binaries);
-  # `--partition count:N/8` ignores crate boundaries and balances by count.
+  # slowest crate (`ken-cli` holds the heaviest binaries). Nine runners x 4
+  # vCPU retain 36 effective cores while spreading the workspace workload.
   #
-  # This trades ~8x total compute for ~8x wall clock. Actions minutes are
+  # This trades ~9x total compute for ~9x wall clock. Actions minutes are
   # free on public repos, so the trade is worth it — but it IS a real
   # increase in compute, not a free win.
   # See docs/program/11-test-suite-and-ci-remediation.md §1/§3.
   test-shard:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: test shard ${{ matrix.shard }}/8
+    name: test shard ${{ matrix.shard }}/9
     runs-on: ubuntu-latest
     strategy:
       # Do not cancel siblings on first failure — a full picture of which
@@ -70,7 +72,7 @@ jobs:
       # independent.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
     steps:
       - uses: actions/checkout@v4
       # NO dependency cache, deliberately. `Swatinem/rust-cache` was removed
@@ -146,7 +148,7 @@ jobs:
         run: |
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
-          python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-shard-duration-balance-33230600665.json duration-filters
+          python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-workspace-timings-36265192923.tsv duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
             python3 scripts/ci-duration-shard.py project-empty inventory.json "selected-${{ matrix.shard }}.json"
@@ -174,91 +176,23 @@ jobs:
         if: matrix.shard == 1
         run: cargo test --workspace --doc --locked
 
-  # Findings exit zero and route without blocking. Instrument failures exit
-  # nonzero and are enforced by build-test's needs/result gate below because no
-  # trustworthy measurement was made.
-  ignored-row-sweep:
-    needs: classify-paths
-    if: needs.classify-paths.outputs.mode == 'full'
-    name: ignored-row sweep (findings non-blocking)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
-        with:
-          tool: nextest
-      - name: Select and run ignored rows
-        shell: bash
-        run: |
-          python3 scripts/ci-ignored-sweep.py verify-row-claims
-          cargo nextest list --workspace --locked --run-ignored=only \
-            --message-format json > ignored-row-all.json
-          filter=$(python3 scripts/ci-ignored-sweep.py filter \
-            ignored-row-all.json)
-          expected=$(python3 scripts/ci-ignored-sweep.py expected ignored-row-all.json)
-          cargo nextest list --workspace --locked --run-ignored=only \
-            -E "$filter" --message-format json > ignored-row-list.json
-          python3 scripts/ci-ignored-sweep.py verify-list \
-            ignored-row-all.json ignored-row-list.json "$expected"
-
-          set +e
-          cargo nextest run --workspace --locked --run-ignored=only \
-            --no-fail-fast --color never --status-level pass \
-            --final-status-level pass -E "$filter" \
-            2>&1 | tee ignored-row-sweep.log
-          run_status=${PIPESTATUS[0]}
-          set -e
-
-          python3 scripts/ci-ignored-sweep.py report \
-            ignored-row-list.json ignored-row-sweep.log \
-            "$expected" "$run_status" \
-            | tee -a "$GITHUB_STEP_SUMMARY"
-
-  # ── Slow native binaries, each restored to the gate in its own job ───────
+  # ── Slow native binaries, restored to the gate ─────────────────────────
   #
-  # WHY A JOB EACH rather than letting them back into the shards: two of the
-  # three (native-write-partition, native-buffer) are a SINGLE #[test] each,
-  # running ~4 minutes, so no scheduler can subdivide either one. The third
-  # (native-rt-parity) grew with the RT-SSA recut into large mutation grids and
-  # became the gate's pace-setter (one monolithic #[test] ran 42 serial native
-  # builds at ~34m, which no scheduler could subdivide). D2
-  # (CI-GATE-TIME-REDUCTION) decomposed those grids into one independently-
-  # schedulable #[test] per mutation arm, so this binary is now genuinely
-  # subdividable and runs as its own duration-balanced matrix (below, 6-way) instead
-  # of a single dominating shard. The two single-#[test] px8f jobs still cannot be
-  # subdivided and stay alone. It keeps its own sharded job (not the main shard
-  # lane) so it stays the interp/native differential oracle AND so its decomposed
-  # arms are pinned by their own realized-arm coverage roster
-  # (scripts/check-ci-shard-union.py, AC-NO-FALSE-GREEN) rather than scattering
-  # across the general shards. Per-shard concurrency is unchanged (nextest's
-  # num_cpus), so the decomposition does not raise a runner's peak parallel native
-  # builds; the shard count is tuned by the PR-gate measurement.
+  # The two px8f controls are currently empty: each has one ignored test, so
+  # their no-tests=pass invocations share an auxiliary job and build. The
+  # native parity binary was decomposed from one 42-build test into independent
+  # arms; it runs as an eight-way duration-balanced matrix. Keeping parity
+  # separate preserves its differential role and realized-arm coverage roster
+  # (scripts/check-ci-shard-union.py, AC-NO-FALSE-GREEN).
   #
-  # ⚠ SCOPED ON PURPOSE — `-p <crate> --test <name>`, NOT `--workspace`.
-  # With `--workspace`, nextest compiles all 200 test binaries in order to
-  # run one: measured 390s of Test step against 266s of actual test
-  # execution, i.e. ~124s of pure waste per job per run. Scoping compiles
-  # only the target being run.
-  # The `Build` step deliberately stays `--workspace`: it is only ~65s, and
-  # it is what proves the whole workspace still compiles under `--locked`.
-  #
-  # ⚠ THESE FILTERS MUST STAY COMPLEMENTARY TO THE SHARD EXCLUSION ABOVE.
-  # Each binary is named in FOUR places: excluded from the shard filter
-  # above, included in its own dedicated job below, listed in build-test's
-  # `needs:`, and checked in the pass/fail loop below that. The four do NOT
-  # fail the same way if one drifts from the others — see
-  # docs/program/issues/CI-SKIPPED-NATIVE-TESTS.md's Undo section for the
-  # per-case reasoning. The two ends of the risk: dropping only the
-  # dedicated job while `needs:`/the check loop still name it is a workflow
-  # syntax error (loud, nothing runs); dropping only the check-loop entry
-  # while the job and `needs:` stay is the dangerous one — the job still
-  # runs and gates the schedule, but its result is never inspected, so a
-  # real failure there can still leave `build-test` green.
+  # These native targets stay scoped to `-p <crate> --test <name>`, not
+  # `--workspace`: a workspace-scoped nextest run measured 390s against 266s
+  # of target test work, about 124s of avoidable compilation. The explicit
+  # Build step remains workspace-wide to check `--locked` compilation.
   native-write-partition:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: native-slow (px8f_write_partition)
+    name: native-slow (empty auxiliary controls)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -302,58 +236,9 @@ jobs:
       # the job selects a real test again and this comment stops being true.
       # `--no-tests=pass` suppresses only the empty-selection error, never a
       # failing test, so the flag can stay when the row returns.
-      - name: Test
+      - name: Test write partition
         run: cargo nextest run --locked -p ken-verify --test px8f_write_partition --no-tests=pass
-
-  # ~310s measured pre-C6, ~240s projected post-C6 (C6 gave its sibling
-  # px8f_write_partition -22.7%: 309s -> 239s). Fits the same headroom.
-  native-buffer:
-    needs: classify-paths
-    if: needs.classify-paths.outputs.mode == 'full'
-    name: native-slow (px8f_buffer_native)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build
-        run: cargo build --workspace --locked
-      - name: Install cargo-nextest
-        # SHA-PINNED, not tag-tracked. `@nextest` / `@v2` are FLOATING tags the
-        # maintainer can repoint at any commit, so a compromised or moved tag
-        # would execute new code in our build with no diff and no review. A SHA
-        # cannot be moved; upgrading is an explicit, reviewable commit.
-        #
-        # Pinned to the RELEASE commit (v2.84.0) with the tool passed
-        # explicitly, NOT to the `@nextest` alias commit (37ba6721). The alias
-        # is auto-generated at publish time and sits off the release lineage
-        # with a one-word message, so it is immutable but not reviewable — you
-        # cannot map it back to a version without digging. This form is both.
-        #
-        # To upgrade: pick the new release SHA from
-        # https://github.com/taiki-e/install-action/releases and update the
-        # comment to match. Keep the version comment in sync with the SHA — a
-        # stale version comment is a false provenance claim.
-        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
-        with:
-          tool: nextest
-      # THIS JOB CURRENTLY SELECTS ZERO TESTS, and `--no-tests=pass` is what
-      # keeps that from being an error.
-      #
-      # px8f_buffer_native.rs has exactly one `#[test]`, at :203,
-      # `linked_checked_write_all_observes_short_progress_and_matches_interpreter`,
-      # and it is `#[ignore]`d pending RT-CARRIED-RESOURCE-SCALAR. nextest's
-      # `--no-tests` default is `auto`, which fails on an empty selection
-      # (exit 4, "no tests to run"), so without this flag the job hard-fails
-      # and takes the aggregator with it.
-      #
-      # Read the green here correctly: this job is green because it is EMPTY,
-      # not because anything passed. It carries no signal about the linked
-      # checked-write path while that row is ignored.
-      #
-      # RT-CARRIED-RESOURCE-SCALAR re-arms it: when that node un-ignores :203
-      # the job selects a real test again and this comment stops being true.
-      # `--no-tests=pass` suppresses only the empty-selection error, never a
-      # failing test, so the flag can stay when the row returns.
-      - name: Test
+      - name: Test buffer partition
         run: cargo nextest run --locked -p ken-cli --test px8f_buffer_native --no-tests=pass
 
   # ~266.7s wall measured as one binary (7 tests).
@@ -376,6 +261,12 @@ jobs:
   # five of the six rows, and RT-CLOSURE-BOUNDARY-LANE owns :652. Un-ignoring
   # only one node's rows leaves the differential partly dark.
   #
+  # Run 36265192923 measured 21,413s of total parity-test time. LPT over the
+  # maximum per-test durations from runs 36260020054 and 36265192923 assigns
+  # 24,845s total with a 3,114s maximum bin. At the observed 3.7-3.9x runner
+  # parallelism, the max-bin estimate is about 14m before build overhead.
+  # This is a noise-tolerant planning estimate, not an AC-2 claim.
+  #
   # This job deliberately does NOT take `--no-tests=pass`, unlike its two
   # px8f siblings above. It still selects a live test, so an empty selection
   # here would mean something broke in selection, and it must stay an error.
@@ -383,12 +274,12 @@ jobs:
   native-rt-parity:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: native-slow (rt_parity_native) ${{ matrix.shard }}/6
+    name: native-slow (rt_parity_native) ${{ matrix.shard }}/8
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -422,6 +313,7 @@ jobs:
           python3 scripts/ci-rt-parity-shard.py \
             rt-parity-artifact/inventory.json \
             docs/program/evidence/ci-rt-parity-timings-36260020054.tsv \
+            docs/program/evidence/ci-rt-parity-timings-36265192923.tsv \
             rt-parity-artifact/plan.json
           filter=$(python3 -c 'import json,os; print(json.load(open("rt-parity-artifact/plan.json"))["bins"][int(os.environ["SHARD"])-1]["filter"])')
           cargo nextest list --locked -p ken-cli --test rt_parity_native \
@@ -457,14 +349,6 @@ jobs:
         run: >-
           cargo test --locked -p ken-elaborator --features z3-process
           --test v3_z3_process_adapter
-
-  z3-emission-control:
-    needs: classify-paths
-    if: needs.classify-paths.outputs.mode == 'full'
-    name: z3 emission control
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - name: Test binary-independent SMT-LIB emission
         run: >-
           cargo test --locked -p ken-elaborator --features z3-process --lib
@@ -472,7 +356,7 @@ jobs:
   # ⛔ DO NOT RENAME OR DELETE THIS JOB. `build + test` is a REQUIRED status
   # check in branch protection (docs/ops/github-setup.md §"Required status
   # checks"). The sharded matrix above publishes checks named `test shard
-  # N/8`, which branch protection does not know about — so if this
+  # N/9`, which branch protection does not know about — so if this
   # name-preserving aggregator were removed, the required check would never
   # report and EVERY pull request would become unmergeable until an admin
   # edited branch protection. This job exists so the workflow can be resharded
@@ -492,11 +376,9 @@ jobs:
       - classify-paths
       - test-shard
       - native-write-partition
-      - native-buffer
       - native-rt-parity
       - z3-process-adapter
-      - z3-emission-control
-      - ignored-row-sweep
+      - issue-tracker
       - verify-realized-shard-union
     # `always()` so this reports a definite conclusion even when a job fails
     # or is skipped. Without it, a failed dependency leaves this job *skipped*,
@@ -507,28 +389,22 @@ jobs:
         run: |
           shards='${{ needs.test-shard.result }}'
           write='${{ needs.native-write-partition.result }}'
-          buffer='${{ needs.native-buffer.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
           z3_adapter='${{ needs.z3-process-adapter.result }}'
-          z3_emission='${{ needs.z3-emission-control.result }}'
-          ignored_sweep='${{ needs.ignored-row-sweep.result }}'
+          issue_tracker='${{ needs.issue-tracker.result }}'
           shard_union='${{ needs.verify-realized-shard-union.result }}'
           echo "test-shard matrix:      $shards"
-          echo "native-write-partition: $write"
-          echo "native-buffer:          $buffer"
+          echo "native auxiliary tests: $write"
           echo "native-rt-parity:       $rt_parity"
-          echo "z3-process-adapter:     $z3_adapter"
-          echo "z3-emission-control:    $z3_emission"
-          echo "ignored-row-sweep:      $ignored_sweep"
+          echo "z3 checks:              $z3_adapter"
+          echo "issue tracker + ignored-row sweep: $issue_tracker"
           echo "realized-shard-union:   $shard_union"
           failed=0
           for pair in "test shards:$shards" \
-                      "native-write-partition:$write" \
-                      "native-buffer:$buffer" \
+                      "native auxiliary tests:$write" \
                       "native-rt-parity:$rt_parity" \
-                      "z3-process-adapter:$z3_adapter" \
-                      "z3-emission-control:$z3_emission" \
-                      "ignored-row-sweep:$ignored_sweep" \
+                      "z3 checks:$z3_adapter" \
+                      "issue tracker and ignored-row sweep:$issue_tracker" \
                       "realized-shard-union:$shard_union"; do
             name="${pair%:*}"; result="${pair##*:}"
             if [ "$result" != "success" ] && ! { [ '${{ needs.classify-paths.outputs.mode }}' = doc-only ] && [ "$result" = skipped ]; }; then
@@ -576,7 +452,8 @@ jobs:
         run: echo "path-guard not yet implemented (WP F1)"
 
   issue-tracker:
-    name: work-item tracker (schema + regeneration)
+    needs: classify-paths
+    name: work-item tracker and ignored-row sweep
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -591,6 +468,38 @@ jobs:
       # line; see scripts/gen-progress.sh).
       - name: Check IMPLEMENTATION-PROGRESS.md is current
         run: scripts/gen-progress.sh --check
+      - name: Install cargo-nextest for ignored-row sweep
+        if: needs.classify-paths.outputs.mode == 'full'
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
+        with:
+          tool: nextest
+      - name: Select and run ignored rows
+        if: needs.classify-paths.outputs.mode == 'full'
+        shell: bash
+        run: |
+          python3 scripts/ci-ignored-sweep.py verify-row-claims
+          cargo nextest list --workspace --locked --run-ignored=only \
+            --message-format json > ignored-row-all.json
+          filter=$(python3 scripts/ci-ignored-sweep.py filter \
+            ignored-row-all.json)
+          expected=$(python3 scripts/ci-ignored-sweep.py expected ignored-row-all.json)
+          cargo nextest list --workspace --locked --run-ignored=only \
+            -E "$filter" --message-format json > ignored-row-list.json
+          python3 scripts/ci-ignored-sweep.py verify-list \
+            ignored-row-all.json ignored-row-list.json "$expected"
+
+          set +e
+          cargo nextest run --workspace --locked --run-ignored=only \
+            --no-fail-fast --color never --status-level pass \
+            --final-status-level pass -E "$filter" \
+            2>&1 | tee ignored-row-sweep.log
+          run_status=${PIPESTATUS[0]}
+          set -e
+
+          python3 scripts/ci-ignored-sweep.py report \
+            ignored-row-list.json ignored-row-sweep.log \
+            "$expected" "$run_status" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
   verify-realized-shard-union:
     needs: [classify-paths, test-shard, native-rt-parity]
