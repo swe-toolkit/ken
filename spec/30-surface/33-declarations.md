@@ -341,6 +341,17 @@ names at their definition. A module's **interface** is the union of its own
 name absent from that union is invisible outside its module, and accessing it
 from outside is a **surface error** (name not in scope), *not* a kernel error.
 
+A `data` declaration introduces separate names for its type former and each
+constructor (`34 §1`). `pub data T = C …` publishes **only `T`**; it does not
+publish `C` or any other constructor by implication. The same rule holds for
+the explicit family form (`34 §2`). Constructors have no separate `pub` prefix
+inside either data production (`32 §1`); the defining module publishes a
+constructor by explicitly listing its name in an in-scope `export C`
+declaration (`§3.2`). A private type cannot become a public constructor
+family merely by exporting a constructor: clients need the parent type in scope
+for its constructor to be usable. Within the defining module, both the type
+and its constructors remain available regardless of their export status.
+
 **The default is private — settled (was `OQ-syntax`).** Rationale:
 private-by-default is the **least-surface, information-hiding-forward** choice —
 a module exposes only its intended interface, so the coupling surface a client
@@ -354,8 +365,9 @@ set.
 
 ### 4.2 Abstract export — the opaque constant, not a new mechanism
 
-A type may be exported **abstractly**: its name is `pub`, its **constructors are
-not**. Clients see the type but cannot `match` on or construct its hidden
+A type may be exported **abstractly**: its name is public (`pub` on the
+declaration or an explicit `export T`), while its **constructors are not**.
+Clients see the type but cannot `match` on or construct its hidden
 constructors. This is **exactly** the kernel's existing **opaque constant**
 (`../10-kernel/11 §4` — an opaque `c : A` is "how … abstract interfaces are
 represented") — information hiding with **no new kernel feature**:
@@ -419,7 +431,10 @@ an identity already present under the same surface name is idempotent.
 
 Visibility travels with canonical identity, not with a public path. Re-exporting
 an abstract type therefore republishes the same opaque constant while its
-constructors remain hidden; `export` cannot widen constructor visibility. For
+constructors remain hidden: exporting the **type alone** at another module
+cannot publish any of its constructors. An explicit constructor export by the
+defining module (`§4.1`) is a separate public name, which a facade may then
+re-export without changing its canonical identity. For
 a locally defined name, `export foo` has the same interface effect as declaring
 `pub foo`, without creating a second identity. `pub` on the local definition
 remains the idiomatic spelling.

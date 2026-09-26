@@ -143,6 +143,32 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   of the abstract-export case: hiding is real **and** costs the kernel
   nothing.
 
+### surface/modules/public-type-does-not-publish-constructors (soundness)
+- spec: `33 §4.1–§4.2` (separate type and constructor exports), `34 §1.1`
+  (constructor qualification checks visibility), `32 §1` (data/export syntax)
+- given: a real provider file `M.ken` containing
+  `pub data Token = MkToken` and `const own : Token = MkToken`; the latter
+  establishes that the defining module can construct its own value. Elaborate
+  each client independently through the same real loader and resolver, with
+  `import M`:
+  1. `fn keep (x : M.Token) : M.Token = x`;
+  2. `const made : M.Token = M.MkToken`;
+  3. `fn inspect (x : M.Token) : M.Token = match x { M.MkToken ↦ x }`.
+- expect: provider and client 1 accept; `Token` is in `M`'s public interface,
+  while `MkToken` is not. Clients 2 and 3 reject **at surface resolution**
+  because `M.MkToken` is not exported; neither reaches a kernel type or match
+  error. Merely qualifying the constructor via its visible parent
+  (`M.Token.MkToken`) does not change either refusal.
+- discriminator: add only `export MkToken` to the provider and rerun all three
+  clients. All now accept; both constructor uses select the provider's exact
+  checked constructor identity, and the public interface contains a separate
+  entry for `MkToken`. Removing only this export restores both rejections
+  while client 1 still accepts. Neither an implicit `pub data` constructor
+  export nor a qualification bypass can pass this pair.
+- staging: `34 §1.1` marks `T.C` qualification as an L2 follow-on; its extra
+  refusal arm is red until that surface path is implemented. The `M.C`
+  module-qualified pair pins the present visibility boundary independently.
+
 ## C. Visibility + resolution — surface-only, well-defined (AC3/AC4)
 
 ### surface/modules/private-name-access-rejected-at-surface (soundness)
