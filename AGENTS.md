@@ -70,9 +70,10 @@ had a lesson naming their cause in the responsible seat's required reading,
 and none of the ten was prevented.
 
 **The rest of `agent/memory/` is reference, searched on demand.** When a
-decision touches an area where the fleet has been burned before, grep your
+decision touches an area where the fleet has been burned before, search your
 scopes (the table below) for the mechanism term, not only the subject name,
-and read the hits. Nothing requires you to read a lesson you did not search
+and read the hits: `scripts/memory-search --role <your-role> <terms>`. It
+ranks the hits and matches across line wraps, which grep misses. Nothing requires you to read a lesson you did not search
 for.
 
 | Your role | Scopes to search (under `agent/memory/`) |

@@ -18,8 +18,10 @@ as personal) and the reasoning.
   after compaction, and applies each check when its trigger fires. Hard limit:
   12 checks, 100 lines.
 - **Everything else is reference, searched on demand.** No seat bulk-reads a
-  scope directory. A seat greps its scopes (the table in `AGENTS.md`) by
-  mechanism term when a decision touches a known hazard.
+  scope directory. A seat searches its scopes (the table in `AGENTS.md`) by
+  mechanism term when a decision touches a known hazard, with
+  `scripts/memory-search --role <role> <terms>`. Its query log shows which
+  lessons are actually looked up.
 
 Why: the 2026-09-25 audit of the 20 latest advancing hard stops found a lesson
 naming the cause for 16 of them. Ten sat in the responsible seat's required
@@ -30,7 +32,7 @@ of decision is what the corpus is for.
 
 ## Adding a lesson (growth rules)
 
-1. **Search first.** If a lesson already covers the mechanism, extend it:
+1. **Search first** (`scripts/memory-search --all <terms>`). If a lesson already covers the mechanism, extend it:
    add the new instance or sharpen the rule. Do not add a sibling file.
 2. **A recurring cause goes to `CHECKS.md`.** When a cause has produced a
    hard stop more than once, merge it into an existing check or replace the
