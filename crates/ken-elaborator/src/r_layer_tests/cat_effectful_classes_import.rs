@@ -36,6 +36,7 @@ fn parsed_import_inventory() -> BTreeMap<String, BTreeSet<String>> {
     let declarations = parser::parse_decls(&extracted_source())
         .expect("EffectfulClasses extracted source must parse");
     let mut inventory = BTreeMap::new();
+    let mut derived_alias_seen = false;
     for declaration in declarations {
         match declaration.unwrap_pub() {
             Decl::ImportDecl {
@@ -60,12 +61,24 @@ fn parsed_import_inventory() -> BTreeMap<String, BTreeSet<String>> {
                     "EC repeats dependency module `{module}`"
                 );
             }
+            Decl::ImportDecl {
+                module,
+                kind: ImportKind::Aliased(alias),
+                ..
+            } if module == DERIVED && alias == "DC" => {
+                assert!(!derived_alias_seen, "EC repeats its Derived module alias");
+                derived_alias_seen = true;
+            }
             Decl::ImportDecl { module, .. } => {
-                panic!("EC dependency {module} must remain selective")
+                panic!("EC dependency {module} must remain selective or the Derived alias")
             }
             _ => {}
         }
     }
+    assert!(
+        derived_alias_seen,
+        "EC must qualify its Derived.map dependency"
+    );
     inventory
 }
 
@@ -80,7 +93,6 @@ fn expected_import_inventory() -> BTreeMap<String, BTreeSet<String>> {
                 "Functor".to_owned(),
                 "Functor_instance_List".to_owned(),
                 "Functor_instance_Option".to_owned(),
-                "list_map".to_owned(),
             ]),
         ),
         (
@@ -172,7 +184,8 @@ fn effectful_classes_roots_loads_standalone() {
 }
 
 /// MEASURED: the parser reports an exact four-module selective-import
-/// inventory; the production roots loader resolves EC; and one real EC
+/// inventory plus the Derived module alias; the production roots loader
+/// resolves EC; and one real EC
 /// declaration mentions each ordinary, class, generated-dictionary, and
 /// attached-proof provider by exact `GlobalId`. CLAIMED: EC declares its whole
 /// direct provider closure rather than borrowing ambient bindings. THE GAP:
@@ -244,18 +257,18 @@ fn effectful_classes_import_closure_is_exact_and_identity_preserving() {
         ),
         (
             local_global(&env, "list_ap"),
-            global(&env, &format!("{LAWFUL_FUNCTORS}.list_map")),
-            "list_map",
+            global(&env, &format!("{DERIVED}.map")),
+            "map",
         ),
         (
             local_global(&env, "list_ap_id"),
-            global(&env, &format!("{LAWFUL_FUNCTORS}.list_map::id")),
-            "list_map::id",
+            global(&env, &format!("{DERIVED}.map::id")),
+            "map::id",
         ),
         (
             local_global(&env, "pf_probe"),
-            global(&env, &format!("{LAWFUL_FUNCTORS}.list_map::fusion")),
-            "list_map::fusion",
+            global(&env, &format!("{DERIVED}.map::fusion")),
+            "map::fusion",
         ),
         (
             local_global(&env, "list_bind"),

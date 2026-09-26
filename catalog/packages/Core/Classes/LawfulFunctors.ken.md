@@ -35,6 +35,8 @@ a propositional equation in `Omega`.
 ```ken
 import Data.Collections.Derived (list_append)
 
+import Data.Collections.Derived as DC
+
 import Core.Classes.LawfulClasses as LC
 
 import Core.Function.Combinators (comp, idf)
@@ -160,36 +162,6 @@ pub class Functor (f : Type → Type) {
     → Equal (f c) (map a c (comp a b c g h) x) (map b c g (map a b h x))
 }
 
-pub fn list_map (a : Type) (b : Type) (g : a → b) (xs : List a) : List b =
-  match xs {
-    Nil ↦ Nil b;
-    Cons h t ↦ Cons b (g h) (list_map a b g t)
-  }
-
-pub proof id for list_map
-      (a : Type) (xs : List a)
-    : Equal (List a) (list_map a a (idf a) xs) xs =
-  match xs {
-    Nil ↦ Proved;
-    Cons h t ↦
-      cong (List a) (List a) (list_map a a (idf a) t) t (Cons a h) ((proof id for list_map) a t)
-  }
-
-pub proof fusion for list_map
-      (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (xs : List a)
-    : Equal (List c) (list_map a c (comp a b c g h) xs) (list_map b c g (list_map a b h xs)) =
-  match xs {
-    Nil ↦ Proved;
-    Cons x rest ↦
-      cong
-        (List c)
-        (List c)
-        (list_map a c (comp a b c g h) rest)
-        (list_map b c g (list_map a b h rest))
-        (Cons c (g (h x)))
-        ((proof fusion for list_map) a b c g h rest)
-  }
-
 fn option_map (a : Type) (b : Type) (g : a → b) (x : Option a) : Option b =
   match x {
     None ↦ None b;
@@ -216,9 +188,9 @@ proof fusion for option_map
   }
 
 instance Functor List {
-  map = list_map;
-  id_law = proof id for list_map;
-  fusion_law = proof fusion for list_map
+  map = DC.map;
+  id_law = proof id for DC.map;
+  fusion_law = proof fusion for DC.map
 }
 
 instance Functor Option {

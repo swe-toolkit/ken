@@ -59,6 +59,8 @@ the canonical comparison provider; `sub` is imported from the canonical Nat
 order provider and described in `§4.5`, next to the string ops that need it.
 
 ```ken
+import Core.Function.Combinators (comp, idf)
+
 import Data.Numeric.Nat.Order (min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
@@ -148,6 +150,10 @@ adds a wrapper or a new trust assumption. The two attached `nth` laws connect
 successful lookup and out-of-bounds lookup to the structural `length` fold in
 both directions.
 
+The `map::id` and `map::fusion` proofs use structural induction and `cong` to
+lift the tail equation under `Cons`. They cite `idf` and `comp` from
+`Core.Function.Combinators` and live beside the operation they justify.
+
 Migrated here per the attached-proof ownership rule — an attached proof
 `f::law` belongs to the module that defines `f` — the three `list_append`
 monoid laws `left_unit`/`assoc`/`right_unit` are proved beside `list_append`
@@ -165,6 +171,27 @@ pub fn map (a : Type) (b : Type) (f : a → b) (xs : List a) : List b =
   match xs {
     Nil ↦ Nil b;
     Cons h t ↦ Cons b (f h) (map a b f t)
+  }
+
+pub proof id for map (a : Type) (xs : List a) : Equal (List a) (map a a (idf a) xs) xs =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦ cong (List a) (List a) (map a a (idf a) t) t (Cons a h) ((proof id for map) a t)
+  }
+
+pub proof fusion for map
+      (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (xs : List a)
+    : Equal (List c) (map a c (comp a b c g h) xs) (map b c g (map a b h xs)) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦
+      cong
+        (List c)
+        (List c)
+        (map a c (comp a b c g h) rest)
+        (map b c g (map a b h rest))
+        (Cons c (g (h x)))
+        ((proof fusion for map) a b c g h rest)
   }
 
 pub fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
@@ -1848,7 +1875,8 @@ reference implementation.
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
 2. **Public API.** `OrdResult`, `list_append`, `nth`, `take`, `drop`,
    `sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
-   `filter`, `mem`, `length`, `min`, `take_drop_decomposition`,
+   `map::id`, `map::fusion`, `filter`, `mem`, `length`, `min`,
+   `take_drop_decomposition`,
    `map_length`, `length_take_min` (CAT-3 D1); `nth::some_below_length`,
    `nth::at_or_beyond_is_none` (the two lookup bounds); `reverse`,
    `reverse::involutive`,
@@ -1885,9 +1913,11 @@ reference implementation.
    The generic sort proofs consume an explicit totality premise only for
    sortedness; they neither add an axiom nor invoke the inherited `Ord Int`
    assumptions.
-6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
-   lifting the tail IH under the head constructor; private `mem_filter`
-   and `mem_filter_sound` split named predicate/comparator outcomes and use
+6. **Proof families.** `map::id` and `map::fusion` induct over `List`,
+   lifting the tail proof under `Cons` with `cong`; `§4.1`/`§4.2` also use
+   structural induction + `cong`/`trans` under the head constructor. Private
+   `mem_filter` and `mem_filter_sound` split named predicate/comparator
+   outcomes and use
    `cong` over this module's `filter` branch, with compatibility needed only
    for the first law. Private `concat_map_append` lifts the IH under
    `list_append` and uses
@@ -1905,7 +1935,9 @@ reference implementation.
 7. **Consumers.** `Application.CommandLine.ArgParse`,
    `Capability.Filesystem.Path.Posix`, `Data.Binary.BytesPrimitiveContracts`,
    `Data.Collections.NonEmpty`, and `Tooling.Testing.Property` import the
-   checked `map`; the module's `map_length` and filter-membership laws use
+   checked `map`; `Core.Classes.LawfulFunctors` uses `map` and both laws in
+   `Functor List`, and `Core.Classes.EffectfulClasses` cites them through a
+   qualified alias. The module's `map_length` and filter-membership laws use
    its structural operations locally. `Application.Configuration.Decoder`
    imports this module wholesale. `catalog/packages/Data/Collections/Map.ken`
    (the proved `Map`/`Set` BST) depends on its `list_append`.

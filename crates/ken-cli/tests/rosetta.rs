@@ -19,7 +19,7 @@
 //! source. This legacy runner extracts the canonical closure, removes every
 //! now-redundant import edge from the flattened provider sources with exact
 //! cardinality checks, and orders Transport, Or, OrdResult, Compare, the
-//! canonical Nat operations, then Derived.
+//! canonical Nat operations and function combinators, then Derived.
 //!
 //! **This concatenation is NOT applied blanket to every example.**
 //! Empirically, unconditionally prepending declarations that a given
@@ -177,6 +177,7 @@ fn collections_prelude() -> String {
         })
         .collect::<Vec<_>>()
         .join("\n");
+    let combinators = catalog_source("catalog/packages/Core/Function/Combinators.ken.md");
     let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
 
     // `ken run` consumes one flat source unit here. Remove every import whose
@@ -190,6 +191,7 @@ fn collections_prelude() -> String {
         remove_flattened_import(&mut compare, "Compare", import);
     }
     for import in [
+        "import Core.Function.Combinators (comp, idf)",
         "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)",
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Or (Or, Inl, Inr)",
@@ -201,7 +203,7 @@ fn collections_prelude() -> String {
     }
 
     format!(
-        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{collections}"
+        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{combinators}\n{collections}"
     )
 }
 
