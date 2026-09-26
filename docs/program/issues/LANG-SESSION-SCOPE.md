@@ -75,3 +75,11 @@ instead. No kernel, `trusted_base()` or spec change.
 - A session-bound name would resolve to a different `GlobalId` than on base.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. A prior-session attached-proof selector resolves by spelling
+   (`resolve_attached_ref` -> `RCon` -> `globals`) -- keyed on a selector
+   form (`subject::proof`) that is never in `current_local_names` or
+   `checked_local_ids` (Architect `evt_5wgr0t36kk780`: record it by checked
+   id in the one session ledger, gated by `private_ids`).
