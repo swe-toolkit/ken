@@ -63,6 +63,8 @@ as its own node. Investigation opens a repair, never a separate report node.
 BYTES K3/F4'/four postulates ("concur with rec."), the L1 bracket redesign
 ("option (a)."), and the L1 pending-call precursor ("authorize option (a) for
 pending-call. it has to be addressed."). Spec serves BYTES D2.
+**2026-09-26** ("concur with rec."): the three `l1_acceptance` ignored rows
+go to L2 and `ds5b` to L1; TCB growth they need still returns to the operator.
 
 ## Current state
 
@@ -74,7 +76,6 @@ pending-call. it has to be addressed."). Spec serves BYTES D2.
 
 ## Update rule
 
-Retain exactly one value for each table field. An update deletes the old value.
-Link the WP issue or thread instead of copying detail here. Verify a row against
-its issue file and current `origin/main` before acting. Correct stale state in
-the next product-attached update; never publish a standalone currency commit.
+One value per table field; an update deletes the old one. Link the WP issue or
+thread rather than copying detail. Verify a row against its issue file and
+`origin/main` before acting; never publish a standalone currency commit.
