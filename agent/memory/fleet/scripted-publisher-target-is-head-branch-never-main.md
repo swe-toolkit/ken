@@ -43,6 +43,31 @@ untracked config via a scratch backup.
 any publish, `git rev-parse main` vs `origin/main` — if local `main` is
 behind, never let it become the push source.
 
+## A branch-name target resolves the shared LOCAL ref first
+
+The same mechanism bites with a candidate branch name, not only `main`.
+`resolve_branch` checks `refs/heads/<name>` before `refs/remotes/origin/<name>`,
+and `refs/heads/` lives in the common git dir, shared by every worktree. If
+another seat's worktree holds `wp/<NODE>` at an older commit, `--target
+wp/<NODE>` pushes that stale local ref with `--force-with-lease`, reversing
+your own correct push (measured 2026-09-05: a rebased `a2c69c697` was
+force-pushed back to the pre-rebase `f28f05ee5`).
+
+- **Passing the SHA does not fully route around it.** A SHA target maps to a
+  local `wp/` branch already at that commit if exactly one exists; failing
+  that, to the one remote `wp/` branch at that commit, but if a local branch
+  of the same name already exists it is kept as is, and the script then
+  pushes that local ref's commit. Before publishing, check
+  `git for-each-ref refs/heads/<name>` for the name the target resolves to.
+- **Never `git branch -f` a shared name to fix it**: it may be checked out in
+  another seat's worktree. Push the correct SHA to a fresh, unclaimed name
+  (for example `wp/<NODE>-respin`) and target that; confirm it is unclaimed
+  with `git for-each-ref refs/heads/<name>`, since `git ls-remote` sees only
+  the remote.
+- **Read the publisher's first push line.** `+ <newer>...<older> (forced
+  update)`, the reverse of your own push, is the tell, and it appears before
+  any CI wait, while `origin/main` is still untouched.
+
 ## The exact flag surface — read `usage()`, don't recall it
 
 The script's argument parser has rejected guesses on flag names before

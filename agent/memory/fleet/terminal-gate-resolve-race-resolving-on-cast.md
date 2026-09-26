@@ -34,3 +34,22 @@ anti-stall guarantee (a fully-voted Decision never sits `proposed` — see
 architect gate can be skipped review on main for the cost of letting one sit
 unresolved) without the double-call. Generalizes to any reviewer role that might
 cast a terminal vote, not just the Architect.
+
+## The announcement is not the control: read before you write
+
+The "resolving on cast" signal failed on 2026-08-15 (two Decisions minted for
+one SHA seconds apart), because **a signal deconflicts only the actions that
+start after it is read**. The other seat's `propose_decision` was already in
+flight when the announcement was written. A race is an ordering problem, and
+announcing intent cannot reach an action already under way.
+
+- **Call `list_decisions` immediately before every `propose_decision` or
+  `resolve_decision`**, including when you have announced "resolving on
+  cast". The live read is the control; the announcement is advisory.
+- **If a duplicate Decision is minted anyway, resolve both with the same
+  verdict; never reject one.** A `rejected` Decision on an approved SHA reads
+  as "not approved" to whoever finds it first. In each resolution say it is a
+  duplicate record of one approval, name the canonical one, restate the
+  verdict so each stands alone, and leave neither `proposed`.
+- The same holds past Decisions: any "I am about to create X" announcement is
+  advisory; only a read immediately before the write is a control.

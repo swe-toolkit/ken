@@ -45,16 +45,40 @@ Two repairs that work, in order of preference:
 1. **Close and reopen the PR.** This re-evaluates the check set.
 2. **Push a trivial commit** (a doc or comment touch) to re-trigger cleanly.
 
+## A fourth state: a passed check frozen at `in_progress`, where a rerun is right
+
+Measured 2026-08-20 (PR #2664): `mergeable: MERGEABLE` but
+`mergeStateStatus: BLOCKED`, because one required check-run had
+`conclusion: success` and `completed_at` set on a `completed` run while its own
+`status` stayed frozen at `in_progress`. Branch protection reads the required
+context by `status`, so a check that passed still blocks the merge, and the
+publisher waits on it forever. The tell is the pair `conclusion=success` plus
+`status=in_progress` on a completed run.
+
+Here the polarity of the repair is the opposite of the orphan case:
+
+1. **`gh run rerun <runid>` on the whole run** (not `--job`, which refuses a
+   job GitHub thinks is still running). It needs `actions: write` on the token.
+   The PR stays open, so a waiting publisher simply sees the fresh green check
+   on its next poll.
+2. Without that scope, **close and reopen the PR** (`ci.yml` triggers on
+   `pull_request` default types, which include `reopened`). Stop the waiting
+   publisher first and relaunch it after.
+
+The head SHA does not change either way, so a Decision bound to that SHA stays
+valid; confirm `headRefOid` is unchanged afterwards.
+
 ## Why this is worth a lesson rather than a note
 
-The three states — slow CI, dead run with pending jobs, orphaned queued check —
-are **indistinguishable from the publisher's poll line**, which is the only
-surface most seats see. The poll output is identical in all three. So the
+The states — slow CI, dead run with pending jobs, orphaned queued check, and a
+passed check frozen at `in_progress` — are **indistinguishable from the
+publisher's poll line**, which is the only surface most seats see. So the
 instinct to "just retry the check" is reached from a view that cannot tell which
-state it is in, and in one of the three that retry is irreversible.
+state it is in, and a retry is irreversible in one state and correct in
+another.
 
 A failed publisher merge also leaves an **orphan PR that every later check
 greens over**, so the wreckage does not announce itself on the next run either.
 
-**Before touching a stuck check: establish which of the three states you are
-in.** If you cannot, waiting is free and rerunning is not.
+**Before touching a stuck check: establish which state you are in.** If you
+cannot, waiting is free and rerunning is not.

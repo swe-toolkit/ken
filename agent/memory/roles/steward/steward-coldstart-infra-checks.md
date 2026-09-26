@@ -44,6 +44,16 @@ fleet-wide blockers that look like a quiet federation:
    = operator infra (often a planned pause, e.g. a fleet model rollout), not
    your problem to fix — **escalate, don't thrash.** REST reads let you build a
    full SITREP (who landed what, dropped handoffs) while the MCP is dark. Space
-   id + per-actor keys live in `/workspaces/ken/.moot/actors.json`. Extends
-   compact wiped memory reflog first (ground-truth before concluding stalled);
-   REST-fallback companion to mootup posting from agent.
+   id + per-actor keys live in `/workspaces/ken/.moot/actors.json`.
+
+4. **GitHub auth: a logged-out `gh` is the resting state, not a blocker.**
+   `gh auth status` reporting not logged in, an empty `GH_TOKEN`, no
+   `~/.config/gh`, and a raw `git push` failing with "could not read Username"
+   are all expected. `scripts/scripted-pr-automerge.sh` self-authenticates:
+   when `gh auth status` fails it mints a token with
+   `.devcontainer/mint-gh-token.sh` and runs `gh auth setup-git` before it
+   pushes. Route merges through the script; escalate only if the mint script
+   is absent or its mint step fails.
+
+Extends compact wiped memory reflog first (ground-truth before concluding
+stalled); REST-fallback companion to mootup posting from agent.

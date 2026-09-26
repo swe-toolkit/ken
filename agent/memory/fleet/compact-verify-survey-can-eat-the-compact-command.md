@@ -43,6 +43,13 @@ non-negotiable:**
   then is it accepted. Don't fire Enter and assume; confirm the transition, then
   poll ctx→0. (Same "surface signal lies" theme — the send returns success while
   nothing was submitted.)
+- **The slash menu can fail to open at all, and the model then answers
+  `/compact` in prose as ordinary chat (2026-09-04).** The reply is confident
+  and on-topic ("Ready. All state is durable...") while ctx keeps climbing
+  and no `Compacting…` bar ever appears, so it is the most convincing false
+  positive of the three. Send `/` alone first, `capture-pane` to confirm the
+  command list rendered, then send the filter text and a separate Enter. A
+  reply that talks about compacting is not evidence that it happened.
 
 Sibling of the compaction discipline in re read latest events immediately before
 a stall nudge — same theme: the surface signal (sent / idle box / stale ctx)

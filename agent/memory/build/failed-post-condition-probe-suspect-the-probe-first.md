@@ -74,3 +74,12 @@ Two probe traps in the same family, worth knowing by shape: `git diff
 --stat` **always exits 0**, so it cannot be used as an emptiness test (use
 `--quiet`); and a test can be green while consuming a tiny fraction of a
 budget nobody stated, so "it passed" is not "it exercised the path."
+
+**A knob swept to find a threshold can throttle the instrument, not only the
+subject.** Sweeping `RUST_MIN_STACK` to find a test's stack need also
+constrains the compiler's own threads; at low values `rustc` itself dies, and
+"no stack overflow observed" scores as a pass for the wrong reason, so the
+cheapest cells look safest and the sweep inverts. Build once at the default
+stack with `--no-run`, then run the test binary directly at each swept value.
+A "has overflowed its stack" message is not an independent detection layer:
+the Rust runtime prints it for any Rust binary, the compiler included.

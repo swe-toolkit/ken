@@ -72,3 +72,24 @@ contradiction. This is the contract-spec analog of the clean separation verdict
 mapping silence is a latent conformance bug wants between *what is decided* and
 *what is rendered* — here, between *what the spec locks* and *what the
 downstream team binds*.
+
+## Unspellable is not unclosable
+
+The same split between a concept and its rendering decides whether a general
+rule has really failed on a hard case. Measured 2026-09-16
+(`SPEC-MEMBERSHIP-CLASS-CONTRACT`): a rule requiring a top-level binding for a
+class-method operator appeared to fail on `∈`, whose query type is a
+projection of an earlier class parameter, and was reversed on a real but
+mis-located measurement (no surface type form for that projection, no catalog
+precedent). The object-level projection already existed in the kernel term
+language, so the binding's telescope was closed and checkable all along; only
+the surface grammar could not spell it, and only at the use site outside the
+class, never inside the class body where earlier fields are in scope.
+
+Before withdrawing a rule on a hard case, locate the obstruction's layer.
+"Cannot be written in today's surface syntax" and "does not exist as a
+checkable object" look identical to a grep over surface syntax, and they
+license different remedies: a notation gap is a dependency routed to the
+surface owner, a semantic obstruction is a reason to narrow the rule. Check
+whether the needed constructor, eliminator or projection already exists, and
+whether the obstruction is at the declaration site or only the use site.
