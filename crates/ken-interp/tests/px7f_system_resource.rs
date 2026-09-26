@@ -14,12 +14,12 @@ fn env() -> ken_elaborator::ElabEnv {
     let mut env = ken_elaborator::ElabEnv::empty().expect("PX7-F prelude");
     env.elaborate_file(
         r#"
-        fn px7f_escape_body (resource : Resource FsHandle)
-          : HostIO AFull (ResourceBodyResult Unit (Resource FsHandle)) =
+        fn px7f_escape_body (resource : Resource ResourceKind.FsHandle)
+          : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
           Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit (Resource FsHandle))
-            (ResourceBodyOk Unit (Resource FsHandle) resource)
+            (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
+            (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)
 
         fn px7f_metadata_after (outcome : Result ResourceError FileMetadata)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) =
@@ -34,7 +34,7 @@ fn env() -> ken_elaborator::ElabEnv {
               (ResourceBodyOk ResourceError Unit MkUnit)
           }
 
-        proc px7f_metadata_body (resource : Resource FsHandle)
+        proc px7f_metadata_body (resource : Resource ResourceKind.FsHandle)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) visits [FS] =
           bind (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -56,7 +56,7 @@ fn env() -> ken_elaborator::ElabEnv {
               (ResourceBodyOk ResourceError Unit MkUnit)
           }
 
-        proc px7f_early_release_body (resource : Resource FsHandle)
+        proc px7f_early_release_body (resource : Resource ResourceKind.FsHandle)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) visits [FS] =
           bind (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -66,7 +66,7 @@ fn env() -> ken_elaborator::ElabEnv {
             (\outcome. px7f_release_after outcome)
 
         proc px7f_after_escaped_bracket
-          (bracket : ResourceBracketResult Unit (Resource FsHandle))
+          (bracket : ResourceBracketResult Unit (Resource ResourceKind.FsHandle))
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
           match bracket {
             ResourceBracketOk resource |-> resourceMetadata AFull resource;
@@ -86,7 +86,7 @@ fn env() -> ken_elaborator::ElabEnv {
           }
 
         proc px7f_after_escaped_outer
-          (outcome : Result FileError (ResourceBracketResult Unit (Resource FsHandle)))
+          (outcome : Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
           match outcome {
             Err open_error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
@@ -100,9 +100,9 @@ fn env() -> ken_elaborator::ElabEnv {
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
           bind (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit (Resource FsHandle)))
+            (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
             (Result ResourceError FileMetadata)
-            (withResource AFull Unit (Resource FsHandle)
+            (withResource AFull Unit (Resource ResourceKind.FsHandle)
               cap path ResourceMetadata px7f_escape_body)
             (\outcome. px7f_after_escaped_outer outcome)
         "#,
@@ -241,7 +241,12 @@ fn injected_release_failure(env: &ken_elaborator::ElabEnv, store: &mut EvalStore
         apply(constructor, EvalVal::Int(7), &env.env, store)
     };
     let io = apply_constructor_many(env, store, "Other", [EvalVal::Int(5)]);
-    let kind = ctor(env, store, "FsHandle");
+    let kind = eval(
+        &[],
+        &Term::constructor(env.prelude_env.fs_handle_id, vec![]),
+        &env.env,
+        store,
+    );
     apply_constructor_many(env, store, "ReleaseFailed", [kind, identity, io])
 }
 
@@ -259,7 +264,7 @@ fn assert_injected_release_failure(env: &ken_elaborator::ElabEnv, value: &EvalVa
     assert_eq!(*id, env.globals["ReleaseFailed"]);
     assert!(matches!(
         &args[0],
-        EvalVal::Ctor { id, .. } if *id == env.globals["FsHandle"]
+        EvalVal::Ctor { id, .. } if *id == env.prelude_env.fs_handle_id
     ));
     assert!(matches!(
         &args[1],

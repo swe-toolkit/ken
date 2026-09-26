@@ -8,7 +8,7 @@ fn output_dir() -> tempfile::TempDir {
 }
 
 const RESOURCE_PROGRAM: &str = r#"program capabilities FS AFull
-fn px8x_body (_resource : Resource FsHandle)
+fn px8x_body (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

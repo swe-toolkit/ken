@@ -219,10 +219,11 @@ type ::=
   | "Type" level?  -- a universe (12)
   | "forall" tyvar+ "." type  -- explicit polymorphism (usually implicit)
   | tyvar | atype
-atype ::= ConId | tyvar | "(" type ")"
+atype ::= ConId | qualified_constructor_ref | tyvar | "(" type ")"
   | "‖" type "‖"  -- propositional truncation (16 §6)
   | tproj  -- field of a value binder (58b §2)
 tproj ::= ident ("." (ident | ConId))+  -- left-assoc; base is a VALUE binder
+qualified_constructor_ref ::= ConId ("." ConId)+  -- T.C, including M.T.C
 label ::= expr | "ct"  -- a lattice label ℓ, or timing-sensitive ct (61 §3,§5a)
 ```
 
@@ -230,7 +231,9 @@ Universe levels are usually inferred (`12 §4`); `Type` means `Type ℓ` for an
 inferred `ℓ`. Implicit arguments `{…}` are inserted by elaboration (`39`). Type
 application is shown by juxtaposition (`ConId atype*`); the chapters also use
 the bracketed spelling `F[T]` (e.g. `Wrapping[T]`, `35 §3`) — the same
-construct, spelling `[OQ-syntax]`.
+construct, spelling `[OQ-syntax]`. The `qualified_constructor_ref` arm
+admits `T.C` as an atomic type argument; it adds no other expression or
+projection form. The `tproj` arm remains the value-binder-rooted form below.
 
 **Projection in type position `d.Query`.** `tproj` lets a parameter be typed by
 a field of an **earlier parameter in the same telescope** — the form
@@ -343,7 +346,11 @@ field_assign ::= ident "=" expr | ident  -- punning allowed
 The existing dotted `qualified_global_ref` primary admits `T.C` in an
 expression; §33 §3.3 resolves it as a type constructor or module export and
 rejects a dual reading. The pattern addition in §4 admits the same spelling
-without changing expression grammar or the constructor's identity.
+without changing expression grammar or the constructor's identity. In a type
+argument, §2's `T.C` resolves to the constructor's canonical checked identity
+only when `T` resolves to that constructor's exact parent type. A
+module-export/type-constructor dual meaning remains `AmbiguousReference`
+(`33 §3.3`), even if both paths name the same identity.
 
 `let_expr` contains one or more bindings. A semicolon occurs only between two
 bindings: a trailing semicolon before `in` and a comma in place of a semicolon

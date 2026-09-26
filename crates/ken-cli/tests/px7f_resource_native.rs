@@ -44,14 +44,14 @@ fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
 }
 
 const ESCAPE_CLOSED: &str = r#"program capabilities FS AFull
-fn escape_body (resource : Resource FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit (Resource FsHandle)) =
+fn escape_body (resource : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
   Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit (Resource FsHandle))
-    (ResourceBodyOk Unit (Resource FsHandle) resource)
+    (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
+    (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)
 
-proc after_escape (bracket : ResourceBracketResult Unit (Resource FsHandle))
+proc after_escape (bracket : ResourceBracketResult Unit (Resource ResourceKind.FsHandle))
   : HostIO AFull ExitCode visits [FS] =
   match bracket {
     ResourceBracketOk resource |->
@@ -71,7 +71,7 @@ proc after_escape (bracket : ResourceBracketResult Unit (Resource FsHandle))
   }
 
 proc after_outer
-  (outcome : Result FileError (ResourceBracketResult Unit (Resource FsHandle)))
+  (outcome : Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
   : HostIO AFull ExitCode visits [FS] =
   match outcome {
     Err open_error |-> host_exit AFull (Failure 96);
@@ -84,13 +84,13 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
     MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit (Resource FsHandle))) ExitCode
-        (withResource AFull Unit (Resource FsHandle)
+        (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
+        (withResource AFull Unit (Resource ResourceKind.FsHandle)
           cap (bytes_encode "held.bin") ResourceMetadata
           (\resource. Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit (Resource FsHandle))
-            (ResourceBodyOk Unit (Resource FsHandle) resource)))
+            (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
+            (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)))
         (\outcome. after_outer outcome)
   }
 "#;
@@ -109,7 +109,7 @@ fn metadata_after (outcome : Result ResourceError FileMetadata)
       (ResourceBodyOk ResourceError Unit MkUnit)
   }
 
-proc metadata_body (resource : Resource FsHandle)
+proc metadata_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -220,14 +220,14 @@ fn double_release_after_second (outcome : Result ResourceError Unit)
   }
 
 proc double_release_after_first
-  (resource : Resource FsHandle) (first : Result ResourceError Unit)
+  (resource : Resource ResourceKind.FsHandle) (first : Result ResourceError Unit)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit) (ResourceBodyResult ResourceError Unit)
     (release AFull resource) (\second. double_release_after_second second)
 
-proc double_release_body (resource : Resource FsHandle)
+proc double_release_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

@@ -8,7 +8,8 @@ Security boundary: filesystem operations are authorized per operation by the
 seven named rights in `RightSet`. `rights_for_authority` maps `Full`, `Partial`,
 and `None` authority to those rights; `Full` retains all rights, including write
 and delete, but exercises them only within its `FsScope`. Each `FsScope` is
-rooted in an `FsHandle` and records its `FsIdentity` lineage; the `FsRootSpec`
+rooted in a `ResourceKind.FsHandle` resource and records its `FsIdentity`
+lineage; the `FsRootSpec`
 spelling is resolved once during executor initialization and is not retained by
 operations. `SymlinkPolicy` is a carried, expressible per-scope two-state
 choice, `NoFollow` or `FollowWithinScope`, rather than a global policy. The

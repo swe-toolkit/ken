@@ -18,7 +18,7 @@ fn after_metadata (outcome : Result ResourceError FileMetadata)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
   }
 
-proc body (resource : Resource FsHandle)
+proc body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit)
     visits [FS, FsHandleMetadata] =
   bind (Coproduct (FSOp AFull) AmbientOp)
@@ -33,7 +33,7 @@ proc target (cap : Cap AFull) (path : Bytes)
 "#;
 
 const DECLARED_HEADROOM_WITHOUT_METADATA: &str = r#"
-fn body (resource : Resource FsHandle)
+fn body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

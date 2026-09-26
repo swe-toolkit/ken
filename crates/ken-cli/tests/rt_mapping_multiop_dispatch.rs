@@ -15,7 +15,7 @@ const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
     (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
 
-proc metadata_chain (file : Resource FsHandle)
+proc metadata_chain (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
 __CHAIN__
 

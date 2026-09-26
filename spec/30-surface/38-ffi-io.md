@@ -415,8 +415,9 @@ bound into the checked/native plan. Reading either limit from an environment
 variable, silently growing a buffer, or placing buffers in the capability table
 is non-conforming.
 
-The closed resource-kind inventory becomes `FsHandle | Buffer` (`§1.9` adds a
-third kind, `Mapping`). Supplying a
+The closed Ken resource-kind inventory becomes
+`ResourceKind.FsHandle | ResourceKind.Buffer` (`§1.9` adds
+`ResourceKind.Mapping`). Supplying a
 live token of the wrong kind produces the distinct fail-visible identity
 
 ```text
@@ -429,10 +430,12 @@ ResourceKindMismatch {
 under its own surface constructor and canonical wire discriminator. It is not
 `MalformedResource`: the token is valid and live, but belongs to the other
 kind. A buffer passed to an Fs-handle-only operation reports
-`{ expected: FsHandle, actual: Buffer }`; a file handle passed to a
-buffer-only operation reports the reversed payload. Valid same-kind controls
-succeed. These two rejecting directions and the two accepting controls are one
-non-degenerate conformance unit.
+`{ expected: FsHandle, actual: Buffer }`; those fields are frozen
+`ResourceKindV1` wire tags, not bare Ken constructor spellings. Ken source
+uses `ResourceKind.FsHandle` and `ResourceKind.Buffer`. A file handle passed
+to a buffer-only operation reports the reversed payload. Valid same-kind
+controls succeed. These two rejecting directions and the two accepting
+controls are one non-degenerate conformance unit.
 
 #### 1.7.1 Buffer views and positioned single transfers
 
@@ -449,7 +452,7 @@ The checked handle binds capacity to the exact acquisition, not to a caller's
 request:
 
 ```ken
-data BufferHandle = PrivateBufferHandle (Resource Buffer) Int
+data BufferHandle = PrivateBufferHandle (Resource ResourceKind.Buffer) Int
 ```
 
 `withBuffer capacity` is the sole producer of `BufferHandle`. It constructs the
@@ -457,10 +460,10 @@ handle only after successfully allocating a buffer of that capacity, then
 passes the handle to the bracket body. `PrivateBufferHandle` and both field
 projections are absent from the public name map. Checked user code can
 therefore neither forge a resource/capacity pairing, replace the stored
-capacity, project the raw `Resource Buffer`, nor construct a handle outside
-`withBuffer`. The handle may be copied as an ordinary checked value, but every
-copy denotes that same acquisition and becomes invalid when the bracket
-settles.
+capacity, project the raw `Resource ResourceKind.Buffer`, nor construct a
+handle outside `withBuffer`. The handle may be copied as an ordinary checked
+value, but every copy denotes that same acquisition and becomes invalid when
+the bracket settles.
 
 The public prelude API has these argument and result shapes:
 
@@ -469,11 +472,11 @@ proc withBuffer (a : Auth) (e : Type) (r : Type) (capacity : Int)
   (body : BufferHandle -> HostIO a (ResourceBodyResult e r))
   : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [FS]
 
-proc readAt (a : Auth) (file : Resource FsHandle) (fileOffset : Int)
+proc readAt (a : Auth) (file : Resource ResourceKind.FsHandle) (fileOffset : Int)
   (buffer : BufferHandle) (window : BufferWindow)
   : HostIO a (Result ResourceError ReadProgress) visits [FS]
 
-proc writeAt (a : Auth) (file : Resource FsHandle) (fileOffset : Int)
+proc writeAt (a : Auth) (file : Resource ResourceKind.FsHandle) (fileOffset : Int)
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError WriteProgress) visits [FS]
 
@@ -483,7 +486,7 @@ proc spanBytes (a : Auth) (buffer : BufferHandle) (span : BufferSpan)
 proc freeze (a : Auth) (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError Bytes) visits [FS]
 
-proc writeAll (a : Auth) (file : Resource FsHandle) (fileOffset : Int)
+proc writeAll (a : Auth) (file : Resource ResourceKind.FsHandle) (fileOffset : Int)
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError Unit) visits [FS]
 ```
@@ -529,7 +532,7 @@ writeAt file fileOffset bufferHandle span
 ```
 
 For a positive admitted request, each wrapper projects the exact
-`Resource Buffer` from `bufferHandle` and invokes exactly one
+`Resource ResourceKind.Buffer` from `bufferHandle` and invokes exactly one
 constructor-private host operation. `spanBytes`/`freeze`, `writeAll`, and
 bracket settlement use that same private projection; settlement releases the
 exact acquisition stored in the handle. The host resource token, private host
@@ -759,11 +762,13 @@ mapping/lifetime/bounded-access substrate L2-8 MMIO later builds on, and it is
 what keeps raw pointers out of application Ken
 (`../../docs/program/10-linux-abi-completion.md §4`, §6).
 
-The closed resource-kind inventory becomes `FsHandle | Buffer | Mapping`. A
+The closed Ken resource-kind inventory becomes
+`ResourceKind.FsHandle | ResourceKind.Buffer | ResourceKind.Mapping`. A
 wrong-kind live token reports `ResourceKindMismatch` (`§1.7`) with the `Mapping`
-identity in the offending position, under the same non-degenerate accept/reject
-discipline (a mapping token to a buffer- or file-only operation, and the
-reverse, reject; same-kind controls succeed).
+wire tag (Ken's `ResourceKind.Mapping` constructor) in the offending
+position, under the same non-degenerate accept/reject discipline (a mapping
+token to a buffer- or file-only operation, and the reverse, reject;
+same-kind controls succeed).
 
 **Acquisition and lifetime.** An opaque, constructor-private `MappingHandle` is
 acquired **only** through the public `withMapping` bracket — its sole producer —
@@ -771,25 +776,26 @@ mirroring `withBuffer` (`§1.7.1`) and the `FsHandle` real-syscall-backed
 acquire/release pattern (`§1.3.1`):
 
 ```ken
-data MappingHandle = PrivateMappingHandle (Resource Mapping) MappingExtent
+data MappingHandle = PrivateMappingHandle (Resource ResourceKind.Mapping) MappingExtent
 ```
 
 `PrivateMappingHandle` and its field projections are absent from the public name
 map: checked user code can neither forge a resource/extent pairing, project the
-raw `Resource Mapping`, nor construct a handle outside `withMapping`. The handle
-may be copied as an ordinary checked value, but every copy denotes the same
-acquisition and becomes invalid when the bracket settles — the runtime
-invalidates escaped copies exactly as for file and buffer resources. Lifetime is
+raw `Resource ResourceKind.Mapping`, nor construct a handle outside
+`withMapping`. The handle may be copied as an ordinary checked value, but every
+copy denotes the same acquisition and becomes invalid when the bracket
+settles — the runtime invalidates escaped copies exactly as for file and buffer
+resources. Lifetime is
 bracket-scoped; a use after settle, or after revocation at the
 `../60-security/62 §4.2` admission boundary, yields the single `Revoked`
 identity, classified `Permanent` (`§1.8`): a revoked mapping is gone, and retry
 cannot restore it.
 
 **Source, offset, protection, and views.** `withMapping` takes the mapping
-source — anonymous with a length, or a file `Resource FsHandle` with a length
-(the mapping starts at file offset 0) — and a requested protection (`ReadOnly`
-or `ReadWrite`). Ken
-observes only the opaque `MappingHandle`, an immutable `MappingWindow`
+source — anonymous with a length, or a file `Resource ResourceKind.FsHandle`
+with a length (the mapping starts at file offset 0) — and a requested
+protection (`ReadOnly` or `ReadWrite`). Ken observes only the opaque
+`MappingHandle`, an immutable `MappingWindow`
 (offset, length) naming a read subrange, and the scalar extent. A read view
 (`mapBytes`) copies a window's bytes out; a write view (`mapWrite offset bytes`)
 copies the caller's `bytes` into the subrange `[offset, offset + len bytes)`. The
@@ -823,8 +829,8 @@ proc mapWrite (a : Auth) (mapping : MappingHandle) (offset : Int) (bytes : Bytes
 ```
 
 where the read window `MappingWindow = MkMappingWindow Int Int` (offset, length),
-`MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int` (each a
-length; a `FileBacked` mapping starts at file offset 0), and
+`MappingSource = Anonymous Int | FileBacked (Resource ResourceKind.FsHandle) Int`
+(each a length; a `FileBacked` mapping starts at file offset 0), and
 `MappingProt = ReadOnly | ReadWrite`. A `ReadOnly` mapping refuses `mapWrite`
 with a fail-visible `ResourceError`.
 

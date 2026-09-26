@@ -125,12 +125,13 @@ data Expr = Lit Int | Add Expr Expr | Neg Expr
 
 For **every** data type `T`, `T.C` denotes the constructor `C` whose
 kernel-recorded parent is the exact resolved identity of `T`. It is admitted
-in expressions and in constructor patterns (`32 §3–4`); both uses resolve to
-the same canonical constructor `GlobalId` as an eligible bare use. The type
-path may come from a local declaration, a prelude identity, or an explicit
-import; a different same-shaped type cannot donate its constructor. A
-qualified constructor is still subject to visibility: `T.C` cannot expose a
-private constructor hidden by abstract export (`33 §4.2`).
+in expressions and in constructor patterns (`32 §3–4`), and as an atomic
+type argument (`32 §2–3`) under the same exact-parent rule. All three uses
+resolve to the same canonical constructor `GlobalId` as an eligible bare
+use. The type path may come from a local declaration, a prelude identity, or
+an explicit import; a different same-shaped type cannot donate its
+constructor. A qualified constructor is still subject to visibility: `T.C`
+cannot expose a private constructor hidden by abstract export (`33 §4.2`).
 
 The per-type **scoped constructors** property selects whether that family's
 constructors have bare source bindings. If it is enabled, only `T` is a

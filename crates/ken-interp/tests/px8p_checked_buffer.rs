@@ -50,7 +50,7 @@ proc px8p_private_release (resource : BufferHandle)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit)
     (InL (FSOp AFull) AmbientOp
-      (Px8pPrivateResourceRelease AFull Buffer
+      (Px8pPrivateResourceRelease AFull ResourceKind.Buffer
         (Px8pBufferHandleResource resource)))
     (\settled. Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

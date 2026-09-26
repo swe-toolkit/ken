@@ -99,13 +99,13 @@ fn checked_surface_is_public_but_proof_carrying_constructors_stay_private() {
     env.elaborate_file(
         r#"
 proc px8f_exact_read
-  (a : Auth) (file : Resource FsHandle) (offset : Int)
+  (a : Auth) (file : Resource ResourceKind.FsHandle) (offset : Int)
   (buffer : BufferHandle) (window : BufferWindow)
   : HostIO a (Result ResourceError ReadProgress) visits [FS] =
   readAt a file offset buffer window
 
 proc px8f_exact_write
-  (a : Auth) (file : Resource FsHandle) (offset : Int)
+  (a : Auth) (file : Resource ResourceKind.FsHandle) (offset : Int)
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError WriteProgress) visits [FS] =
   writeAt a file offset buffer span
@@ -116,7 +116,7 @@ proc px8f_exact_freeze
   freeze a buffer span
 
 proc px8f_exact_write_all
-  (a : Auth) (file : Resource FsHandle) (offset : Int)
+  (a : Auth) (file : Resource ResourceKind.FsHandle) (offset : Int)
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError Unit) visits [FS] =
   writeAll a file offset buffer span
@@ -126,7 +126,7 @@ theorem px8f_write_all_all_success_theorem_uses_subject
   write_all_all_success_holds Zero
 
 proc px8f_readsome_public_consumers
-  (a : Auth) (file : Resource FsHandle) (offset : Int)
+  (a : Auth) (file : Resource ResourceKind.FsHandle) (offset : Int)
   (buffer : BufferHandle) (window : BufferWindow)
   : HostIO a (Result ResourceError Unit) visits [FS] =
   bind
@@ -295,12 +295,12 @@ fn checked_source_cannot_forge_or_project_mapping_handles() {
     for (private, source) in [
         (
             "PrivateMappingHandle",
-            "fn escaped (resource : Resource Mapping) (extent : MappingExtent) \
+            "fn escaped (resource : Resource ResourceKind.Mapping) (extent : MappingExtent) \
              : MappingHandle = PrivateMappingHandle resource extent",
         ),
         (
             "mapping_handle_resource",
-            "fn escaped (mapping : MappingHandle) : Resource Mapping = \
+            "fn escaped (mapping : MappingHandle) : Resource ResourceKind.Mapping = \
              mapping_handle_resource mapping",
         ),
         (
@@ -428,12 +428,12 @@ fn checked_source_cannot_forge_or_project_buffer_handles() {
     for (private, source) in [
         (
             "PrivateBufferHandle",
-            "fn escaped (resource : Resource Buffer) : BufferHandle = \
+            "fn escaped (resource : Resource ResourceKind.Buffer) : BufferHandle = \
              PrivateBufferHandle resource 8",
         ),
         (
             "buffer_handle_resource",
-            "fn escaped (buffer : BufferHandle) : Resource Buffer = \
+            "fn escaped (buffer : BufferHandle) : Resource ResourceKind.Buffer = \
              buffer_handle_resource buffer",
         ),
         (
