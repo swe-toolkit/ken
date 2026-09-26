@@ -35,6 +35,8 @@ a propositional equation in `Omega`.
 ```ken
 import Data.Collections.Derived (list_append)
 
+import Data.Collections.Derived as DC
+
 import Core.Classes.LawfulClasses as LC
 
 import Core.Function.Combinators (comp, idf)
@@ -186,9 +188,9 @@ proof fusion for option_map
   }
 
 instance Functor List {
-  map = list_map;
-  id_law = proof id for list_map;
-  fusion_law = proof fusion for list_map
+  map = DC.map;
+  id_law = proof id for DC.map;
+  fusion_law = proof fusion for DC.map
 }
 
 instance Functor Option {

@@ -101,8 +101,8 @@ fn ac3_wide_declaration_signatures_nest_and_keep_fitting_binders_flat() {
 /// the exact broken rendering plus the no-break mutation closes that gap.
 #[test]
 fn selective_import_items_wrap_without_inventory_or_fixed_point_drift() {
-    let source = "import Core.Classes.LawfulFunctors\n  (Foldable, Foldable_instance_List, Foldable_instance_Option, Functor, Functor_instance_List, Functor_instance_Option, list_map)\n\nimport Core.Function.Combinators (comp, idf)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
-    let expected = "import Core.Classes.LawfulFunctors\n  (Foldable,\n    Foldable_instance_List,\n    Foldable_instance_Option,\n    Functor,\n    Functor_instance_List,\n    Functor_instance_Option,\n    list_map)\n\nimport Core.Function.Combinators (comp, idf)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
+    let source = "import Core.Classes.LawfulFunctors\n  (Foldable, Foldable_instance_List, Foldable_instance_Option, Functor, Functor_instance_List, Functor_instance_Option, monoid_mempty)\n\nimport Core.Function.Combinators (comp, idf)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
+    let expected = "import Core.Classes.LawfulFunctors\n  (Foldable,\n    Foldable_instance_List,\n    Foldable_instance_Option,\n    Functor,\n    Functor_instance_List,\n    Functor_instance_Option,\n    monoid_mempty)\n\nimport Core.Function.Combinators (comp, idf)\n\nimport Core.Logic.Transport (cong, sym, trans)\n\nimport Data.Collections.Derived (concat_map, list_append)\n";
 
     let inventory = |text: &str| {
         parse_lossless(text)

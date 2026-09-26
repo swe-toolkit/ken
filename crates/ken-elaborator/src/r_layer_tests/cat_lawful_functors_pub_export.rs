@@ -14,6 +14,7 @@ use ken_kernel::{convert, convert_type, Context, Decl as KernelDecl, GlobalId, T
 
 const LAWFUL_CLASSES: &str = "Core.Classes.LawfulClasses";
 const LAWFUL_FUNCTORS: &str = "Core.Classes.LawfulFunctors";
+const DERIVED: &str = "Data.Collections.Derived";
 const LAWFUL_FUNCTORS_KEN_MD: &str =
     include_str!("../../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 
@@ -344,9 +345,6 @@ fn authorized_surfaces() -> BTreeSet<String> {
         "Monoid",
         "Semigroup",
         "fold_map_step",
-        "list_map",
-        "list_map::fusion",
-        "list_map::id",
         "monoid_mempty",
     ]
     .into_iter()
@@ -367,6 +365,52 @@ fn lawful_functors_loader_visible_inventory_is_exact() {
         authorized_surfaces(),
         "LawfulFunctors must expose exactly the authorized provider inventory"
     );
+}
+
+/// MEASURED: the checked List Functor dictionary's three field terms are
+/// exactly the Derived operation and its two attached proofs, while neither
+/// module registers the withdrawn duplicate. CLAIMED: the List instance has
+/// one canonical map and law owner. THE GAP: Option and the remaining class
+/// fields are covered by the unchanged package and class-instance checks.
+#[test]
+fn lawful_functors_list_instance_selects_derived_map_and_both_laws() {
+    let env = load_lawful_functors();
+    let list_instance = env
+        .class_env
+        .instances
+        .get(&("Functor".to_owned(), "List".to_owned()))
+        .expect("Functor List instance must remain registered")
+        .instance_id;
+    let (_, body) = env
+        .env
+        .transparent_body(list_instance)
+        .expect("Functor List instance must be a transparent dictionary");
+    let Term::Pair(map_field, laws) = &body else {
+        panic!("Functor List dictionary must start with its map field: {body:?}");
+    };
+    let Term::Pair(id_field, remaining) = laws.as_ref() else {
+        panic!("Functor List dictionary must carry both law fields: {laws:?}");
+    };
+    let Term::Pair(fusion_field, _) = remaining.as_ref() else {
+        panic!("Functor List dictionary must carry its fusion law: {remaining:?}");
+    };
+    for (actual, surface) in [
+        (map_field.as_ref(), "map"),
+        (id_field.as_ref(), "map::id"),
+        (fusion_field.as_ref(), "map::fusion"),
+    ] {
+        let provider = env.globals[&format!("{DERIVED}.{surface}")];
+        assert!(
+            matches!(actual, Term::Const { id, .. } if *id == provider),
+            "Functor List field must select Derived.{surface} directly: {actual:?}"
+        );
+    }
+    for module in [LAWFUL_FUNCTORS, DERIVED] {
+        assert!(
+            !env.globals.contains_key(&format!("{module}.list_map")),
+            "{module} must not register a second list map"
+        );
+    }
 }
 
 /// MEASURED: the roots loader identifies LF's owned declarations separately
@@ -513,14 +557,18 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
         ("Semigroup", "ec_closure_semigroup_identity"),
         ("comp", "ec_closure_comp"),
         ("idf", "ec_closure_idf"),
-        ("list_map", "ec_closure_list_map"),
-        ("list_map::id", "ec_closure_list_map_id"),
-        ("list_map::fusion", "ec_closure_list_map_fusion"),
+        ("map", "ec_closure_derived_map"),
+        ("map::id", "ec_closure_derived_map_id"),
+        ("map::fusion", "ec_closure_derived_map_fusion"),
         ("fold_map_step", "ec_closure_fold_map_step"),
         ("monoid_mempty", "ec_closure_monoid_mempty"),
     ]
     .map(|(surface, consumer)| {
-        let provider = provider_identity(&env, surface);
+        let provider = if surface == "map" || surface.starts_with("map::") {
+            env.globals[&format!("{DERIVED}.{surface}")]
+        } else {
+            provider_identity(&env, surface)
+        };
         assert!(
             env.env.transparent_body(provider).is_some(),
             "{surface} must retain its existing transparent provider declaration"
@@ -530,7 +578,8 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
 
     env.elaborate_file(
         "import Core.Classes.LawfulFunctors \
-           (Functor, Foldable, Monoid, Semigroup as selected_semigroup, list_map, fold_map_step, monoid_mempty)\n\
+           (Functor, Foldable, Monoid, Semigroup as selected_semigroup, fold_map_step, monoid_mempty)\n\
+         import Data.Collections.Derived (map)\n\
          import Core.Function.Combinators (comp, idf)\n\
          fn ec_closure_functor_identity \
            (f : Type → Type) (dict : Functor f) : Functor f = dict\n\
@@ -543,20 +592,20 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
            (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = \
            comp a b c g h x\n\
          fn ec_closure_idf (a : Type) (x : a) : a = idf a x\n\
-         fn ec_closure_list_map \
+         fn ec_closure_derived_map \
            (a : Type) (b : Type) (g : a → b) (xs : List a) : List b = \
-           list_map a b g xs\n\
-         theorem ec_closure_list_map_id \
+           map a b g xs\n\
+         theorem ec_closure_derived_map_id \
            (a : Type) (xs : List a) \
-           : Equal (List a) (list_map a a (idf a) xs) xs = \
-           (proof id for list_map) a xs\n\
-         theorem ec_closure_list_map_fusion \
+           : Equal (List a) (map a a (idf a) xs) xs = \
+           (proof id for map) a xs\n\
+         theorem ec_closure_derived_map_fusion \
            (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (xs : List a) \
            : Equal \
                (List c) \
-               (list_map a c (comp a b c g h) xs) \
-               (list_map b c g (list_map a b h xs)) = \
-           (proof fusion for list_map) a b c g h xs\n\
+               (map a c (comp a b c g h) xs) \
+               (map b c g (map a b h xs)) = \
+           (proof fusion for map) a b c g h xs\n\
          fn ec_closure_fold_map_step \
            (a : Type) (m : Type) (dict : Monoid m) (g : a → m) (x : a) (acc : m) : m = \
            fold_map_step a m dict g x acc\n\

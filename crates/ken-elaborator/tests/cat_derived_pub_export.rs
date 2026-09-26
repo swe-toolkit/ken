@@ -3,8 +3,9 @@
 //! Promise class: durable invariants. The ten public collection operations
 //! retain their `Data.Collections.Derived` identities. The two `nth` bound
 //! proofs, three `list_append` monoid-law attached proofs
-//! (`list_append::{left_unit, assoc, right_unit}`), and the checked
-//! `reverse::involutive` attached proof are published beside their subjects.
+//! (`list_append::{left_unit, assoc, right_unit}`), the `map::{id, fusion}`
+//! proofs, and the checked `reverse::involutive` proof are published beside
+//! their subjects.
 //! The helper `reverse_snoc` and verified-sort carrier remain private.
 
 use std::collections::BTreeSet;
@@ -66,6 +67,8 @@ fn derived_exports_all_ten_operation_identities() {
     let mut env = load_derived();
     let providers = [
         ("map", "cat_derived_pub_map"),
+        ("map::id", "cat_derived_pub_map_id"),
+        ("map::fusion", "cat_derived_pub_map_fusion"),
         ("filter", "cat_derived_pub_filter"),
         ("list_append", "cat_derived_pub_list_append"),
         ("nth", "cat_derived_pub_nth"),
@@ -89,8 +92,15 @@ fn derived_exports_all_ten_operation_identities() {
     env.elaborate_file(
         "import Data.Collections.Derived \
            (map, filter, list_append, nth, length, reverse, concat_map, eq_from_ord, count, bytes_nat_length)\n\
+         import Core.Function.Combinators (comp, idf)\n\
          fn cat_derived_pub_map (xs : List Bool) : List Bool = \
            map Bool Bool (\\x. x) xs\n\
+         theorem cat_derived_pub_map_id (a : Type) (xs : List a) : \
+           Equal (List a) (map a a (idf a) xs) xs = map::id a xs\n\
+         theorem cat_derived_pub_map_fusion \
+           (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (xs : List a) : \
+           Equal (List c) (map a c (comp a b c g h) xs) (map b c g (map a b h xs)) = \
+           map::fusion a b c g h xs\n\
          fn cat_derived_pub_filter (xs : List Bool) : List Bool = \
            filter Bool (\\x. x) xs\n\
          fn cat_derived_pub_list_append (xs : List Bool) (ys : List Bool) : List Bool = \
@@ -204,7 +214,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// literal contract set. CLAIMED: Derived's complete loader-visible export
 /// surface is exactly the ten authorized operations, two `nth` bound
 /// proofs, three `list_append` monoid-law attached proofs, and the one
-/// `reverse::involutive` attached proof. THE GAP: none
+/// `map::{id, fusion}` proofs and `reverse::involutive` attached proof.
+/// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
 #[test]
@@ -214,8 +225,10 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
     // module namespace. `IsTrue` is already available in the base environment;
     // re-importing that package name would be ambiguous, so import only the
     // other foreign name from its canonical provider.
-    env.elaborate_file("import Core.Classes.LawfulClasses (leq_nat)")
-        .expect("Derived proof dependencies must elaborate for publication queries");
+    env.elaborate_file(
+        "import Core.Classes.LawfulClasses (leq_nat)\nimport Core.Function.Combinators (comp, idf)",
+    )
+    .expect("Derived proof dependencies must elaborate for publication queries");
     let published = top_level_publication_queries()
         .into_iter()
         .filter(|query| match env.elaborate_file(&query.source) {
@@ -250,6 +263,8 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "list_append::left_unit".to_owned(),
             "list_append::right_unit".to_owned(),
             "map".to_owned(),
+            "map::fusion".to_owned(),
+            "map::id".to_owned(),
             "nth".to_owned(),
             "nth::at_or_beyond_is_none".to_owned(),
             "nth::some_below_length".to_owned(),
@@ -257,6 +272,6 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "reverse::involutive".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         ten operations, two nth proofs, three list_append proofs and reverse::involutive"
+         ten operations, two map proofs, two nth proofs, three list_append proofs and reverse::involutive"
     );
 }

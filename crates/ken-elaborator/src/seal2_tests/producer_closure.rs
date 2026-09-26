@@ -318,6 +318,13 @@ fn lawful_functors_surface() -> ElabEnv {
     env
 }
 
+fn effectful_classes_surface() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("EffectfulClasses dependency environment");
+    env.elaborate_module_from_roots(&[catalog_packages_dir()], "Core.Classes.EffectfulClasses")
+        .expect("EffectfulClasses must load with its known dependency environment");
+    env
+}
+
 fn decoder_surface() -> ElabEnv {
     let mut env = ElabEnv::new().expect("Decoder dependency environment");
     for provider in [
@@ -357,7 +364,12 @@ const ENUMERATED_CARRIER_ENVIRONMENTS: &[EnumeratedCarrierEnvironment] = &[
     EnumeratedCarrierEnvironment {
         roots: &["Core/Classes/LawfulFunctors.ken.md"],
         load: lawful_functors_surface,
-        loaded_witnesses: &["Core.Classes.LawfulFunctors.list_map"],
+        loaded_witnesses: &["Core.Classes.LawfulFunctors.fold_map_step"],
+    },
+    EnumeratedCarrierEnvironment {
+        roots: &["Core/Classes/EffectfulClasses.ken.md"],
+        load: effectful_classes_surface,
+        loaded_witnesses: &["Core.Classes.EffectfulClasses.list_ap"],
     },
 ];
 

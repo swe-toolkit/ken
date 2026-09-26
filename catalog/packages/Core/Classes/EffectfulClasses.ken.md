@@ -56,14 +56,15 @@ import Core.Classes.LawfulFunctors
     Foldable_instance_Option,
     Functor,
     Functor_instance_List,
-    Functor_instance_Option,
-    list_map)
+    Functor_instance_Option)
 
 import Core.Function.Combinators (comp, idf)
 
 import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Collections.Derived (concat_map, list_append)
+
+import Data.Collections.Derived as DC
 
 pub fn apply_to (a : Type) (b : Type) (y : a) (g : a → b) : b = g y
 
@@ -488,7 +489,7 @@ The implementation selectively imports the canonical `concat_map` from
 fn list_pure (a : Type) (x : a) : List a = Cons a x (Nil a)
 
 fn list_ap (a : Type) (b : Type) (mf : List (a → b)) (mx : List a) : List b =
-  concat_map (a → b) b (λg. list_map a b g mx) mf
+  concat_map (a → b) b (λg. DC.map a b g mx) mf
 
 fn list_bind (a : Type) (b : Type) (m : List a) (k : a → List b) : List b = concat_map a b k m
 ```
@@ -573,8 +574,8 @@ proof assoc for list_bind
 ```
 
 `ap_id`/`ap_hom`/`map_coh` for `List` compose with
-`list_append::right_unit` (`Data/Collections/Derived.ken`) and `list_map::id`
-(`Core/Classes/LawfulFunctors.ken`) — zero new induction needed for any of the
+`list_append::right_unit` and `DC.map::id`, both owned by
+`Data.Collections.Derived` — zero new induction needed for any of the
 three:
 
 ```ken
@@ -583,11 +584,11 @@ theorem list_ap_id
     : Equal (List a) (list_ap a a (list_pure (a → a) (idf a)) v) v =
   trans
     (List a)
-    (list_append a (list_map a a (idf a) v) (Nil a))
-    (list_map a a (idf a) v)
+    (list_append a (DC.map a a (idf a) v) (Nil a))
+    (DC.map a a (idf a) v)
     v
-    ((proof right_unit for list_append) a (list_map a a (idf a) v))
-    ((proof id for list_map) a v)
+    ((proof right_unit for list_append) a (DC.map a a (idf a) v))
+    ((proof id for DC.map) a v)
 
 theorem list_ap_hom
       (a : Type) (b : Type) (g : a → b) (x : a)
@@ -602,29 +603,29 @@ theorem list_map_coh
         (list_ap a b (list_pure (a → b) g) x) =
   sym
     (List b)
-    (list_append b (list_map a b g x) (Nil b))
-    (list_map a b g x)
-    ((proof right_unit for list_append) b (list_map a b g x))
+    (list_append b (DC.map a b g x) (Nil b))
+    (DC.map a b g x)
+    ((proof right_unit for list_append) b (DC.map a b g x))
 ```
 
 `ap_ich` needs one real induction. A self-recursive proof stated directly
 via `list_ap` does not typecheck at the recursive call (`list_ap`'s own
-unfolding to a `list_map` form needs `list_append::right_unit`, a PROOF, not a raw
+unfolding to a `DC.map` form needs `list_append::right_unit`, a PROOF, not a raw
 reduction, so the induction hypothesis's type does not definitionally
 match what `cong` needs at each step) — split into the true inductive
-content, phrased directly over `concat_map`/`list_map`, and the outer
+content, phrased directly over `concat_map`/`DC.map`, and the outer
 `list_ap`-phrased lemma composing it with the one `list_append::right_unit` step:
 
 ```ken
 fn list_ap_inner (a : Type) (b : Type) (y : a) (g : a → b) : List b =
-  list_map a b g (list_pure a y)
+  DC.map a b g (list_pure a y)
 
 theorem list_ap_ich_general
       (a : Type) (b : Type) (u : List (a → b)) (y : a)
     : Equal
         (List b)
         (concat_map (a → b) b (list_ap_inner a b y) u)
-        (list_map (a → b) b (apply_to a b y) u) =
+        (DC.map (a → b) b (apply_to a b y) u) =
   match u {
     Nil ↦ Proved;
     Cons g0 t ↦
@@ -632,7 +633,7 @@ theorem list_ap_ich_general
         (List b)
         (List b)
         (concat_map (a → b) b (list_ap_inner a b y) t)
-        (list_map (a → b) b (apply_to a b y) t)
+        (DC.map (a → b) b (apply_to a b y) t)
         (Cons b (g0 y))
         (list_ap_ich_general a b t y)
   }
@@ -646,44 +647,44 @@ theorem list_ap_ich
   trans
     (List b)
     (concat_map (a → b) b (list_ap_inner a b y) u)
-    (list_map (a → b) b (apply_to a b y) u)
-    (list_append b (list_map (a → b) b (apply_to a b y) u) (Nil b))
+    (DC.map (a → b) b (apply_to a b y) u)
+    (list_append b (DC.map (a → b) b (apply_to a b y) u) (Nil b))
     (list_ap_ich_general a b u y)
     (sym
       (List b)
-      (list_append b (list_map (a → b) b (apply_to a b y) u) (Nil b))
-      (list_map (a → b) b (apply_to a b y) u)
-      ((proof right_unit for list_append) b (list_map (a → b) b (apply_to a b y) u)))
+      (list_append b (DC.map (a → b) b (apply_to a b y) u) (Nil b))
+      (DC.map (a → b) b (apply_to a b y) u)
+      ((proof right_unit for list_append) b (DC.map (a → b) b (apply_to a b y) u)))
 ```
 
 `ap_cmp` (composition) is the load-bearing law of the four — the standard
 "every combination of three lists" associativity fact. `pure f`'s own
-`ap` reduces to a plain `list_map` (a fact worth its own name,
+`ap` reduces to a plain `DC.map` (a fact worth its own name,
 `list_ap_pure_left`, since it generalizes both `ap_hom` and the front of
-`ap_cmp`); the rest is three "fusion" facts relating `concat_map`/`list_map`
+`ap_cmp`); the rest is three "fusion" facts relating `concat_map`/`DC.map`
 composition, plus the already-proved `list_bind::assoc` for the one genuinely
 new inductive step (concat_map-after-concat_map):
 
 ```ken
 theorem list_ap_pure_left
       (a : Type) (b : Type) (g : a → b) (xs : List a)
-    : Equal (List b) (list_ap a b (list_pure (a → b) g) xs) (list_map a b g xs) =
-  proof right_unit for list_append b (list_map a b g xs)
+    : Equal (List b) (list_ap a b (list_pure (a → b) g) xs) (DC.map a b g xs) =
+  proof right_unit for list_append b (DC.map a b g xs)
 
 theorem list_map_append_distrib
       (a : Type) (b : Type) (g : a → b) (xs : List a) (ys : List a)
     : Equal
         (List b)
-        (list_map a b g (list_append a xs ys))
-        (list_append b (list_map a b g xs) (list_map a b g ys)) =
+        (DC.map a b g (list_append a xs ys))
+        (list_append b (DC.map a b g xs) (DC.map a b g ys)) =
   match xs {
     Nil ↦ Refl;
     Cons h t ↦
       cong
         (List b)
         (List b)
-        (list_map a b g (list_append a t ys))
-        (list_append b (list_map a b g t) (list_map a b g ys))
+        (DC.map a b g (list_append a t ys))
+        (list_append b (DC.map a b g t) (DC.map a b g ys))
         (Cons b (g h))
         (list_map_append_distrib a b g t ys)
   }
@@ -695,7 +696,7 @@ theorem concat_map_map_fusion
       (a : Type) (b : Type) (c : Type) (f : b → List c) (g : a → b) (xs : List a)
     : Equal
         (List c)
-        (concat_map b c f (list_map a b g xs))
+        (concat_map b c f (DC.map a b g xs))
         (concat_map a c (compose_f_g a b c f g) xs) =
   match xs {
     Nil ↦ Proved;
@@ -703,36 +704,36 @@ theorem concat_map_map_fusion
       cong
         (List c)
         (List c)
-        (concat_map b c f (list_map a b g t))
+        (concat_map b c f (DC.map a b g t))
         (concat_map a c (compose_f_g a b c f g) t)
         (list_append c (f (g h)))
         (concat_map_map_fusion a b c f g t)
   }
 
 fn map_after (a : Type) (b : Type) (c : Type) (g : b → c) (f : a → List b) (x : a) : List c =
-  list_map b c g (f x)
+  DC.map b c g (f x)
 
 theorem list_map_concat_map_fusion
       (a : Type) (b : Type) (c : Type) (g : b → c) (f : a → List b) (xs : List a)
     : Equal
         (List c)
-        (list_map b c g (concat_map a b f xs))
+        (DC.map b c g (concat_map a b f xs))
         (concat_map a c (map_after a b c g f) xs) =
   match xs {
     Nil ↦ Proved;
     Cons h t ↦
       trans
         (List c)
-        (list_map b c g (list_append b (f h) (concat_map a b f t)))
-        (list_append c (list_map b c g (f h)) (list_map b c g (concat_map a b f t)))
+        (DC.map b c g (list_append b (f h) (concat_map a b f t)))
+        (list_append c (DC.map b c g (f h)) (DC.map b c g (concat_map a b f t)))
         (list_append c (map_after a b c g f h) (concat_map a c (map_after a b c g f) t))
         (list_map_append_distrib b c g (f h) (concat_map a b f t))
         (cong
           (List c)
           (List c)
-          (list_map b c g (concat_map a b f t))
+          (DC.map b c g (concat_map a b f t))
           (concat_map a c (map_after a b c g f) t)
-          (list_append c (list_map b c g (f h)))
+          (list_append c (DC.map b c g (f h)))
           (list_map_concat_map_fusion a b c g f t))
   }
 
@@ -769,15 +770,15 @@ lambda/`.field`-in-declared-type gap — `§6` Finding) and a three-part
 lift through the outer `ap` via `cong`, fuse via `concat_map_map_fusion`),
 the MIDDLE (`list_bind::assoc` for the outer `concat_map`-after-`concat_map`,
 `concat_map_map_fusion` again for the inner one), and the END (an inductive
-reconciliation of the two remaining `concat_map`/`list_map` orderings,
-needing `list_map::fusion` plus
+reconciliation of the two remaining `concat_map`/`DC.map` orderings,
+needing `DC.map::fusion` plus
 `list_map_append_distrib`):
 
 ```ken
 fn ap_map_v (a : Type) (b : Type) (c : Type) (v : List (a → b)) (g1 : b → c) : List (a → c) =
-  list_map (a → b) (a → c) (compose a b c g1) v
+  DC.map (a → b) (a → c) (compose a b c g1) v
 
-fn ap_map_w (a : Type) (c : Type) (w : List a) (h2 : a → c) : List c = list_map a c h2 w
+fn ap_map_w (a : Type) (c : Type) (w : List a) (h2 : a → c) : List c = DC.map a c h2 w
 
 theorem list_ap_cmp_front
       (a : Type) (b : Type) (c : Type) (u : List (b → c)) (v : List (a → b))
@@ -798,7 +799,7 @@ theorem list_ap_cmp_front
     (concat_map
       ((a → b) → a → c)
       (a → c)
-      (λh. list_map (a → b) (a → c) h v)
+      (λh. DC.map (a → b) (a → c) h v)
       (list_ap
         (b → c)
         ((a → b) → a → c)
@@ -807,9 +808,9 @@ theorem list_ap_cmp_front
     (concat_map
       ((a → b) → a → c)
       (a → c)
-      (λh. list_map (a → b) (a → c) h v)
-      (list_map (b → c) ((a → b) → a → c) (compose a b c) u))
-    (concat_map (b → c) (a → c) (λg1. list_map (a → b) (a → c) (compose a b c g1) v) u)
+      (λh. DC.map (a → b) (a → c) h v)
+      (DC.map (b → c) ((a → b) → a → c) (compose a b c) u))
+    (concat_map (b → c) (a → c) (λg1. DC.map (a → b) (a → c) (compose a b c g1) v) u)
     (cong
       (List ((a → b) → a → c))
       (List (a → c))
@@ -818,26 +819,26 @@ theorem list_ap_cmp_front
         ((a → b) → a → c)
         (list_pure ((b → c) → (a → b) → a → c) (compose a b c))
         u)
-      (list_map (b → c) ((a → b) → a → c) (compose a b c) u)
-      (λp. concat_map ((a → b) → a → c) (a → c) (λh. list_map (a → b) (a → c) h v) p)
+      (DC.map (b → c) ((a → b) → a → c) (compose a b c) u)
+      (λp. concat_map ((a → b) → a → c) (a → c) (λh. DC.map (a → b) (a → c) h v) p)
       (list_ap_pure_left (b → c) ((a → b) → a → c) (compose a b c) u))
     (concat_map_map_fusion
       (b → c)
       ((a → b) → a → c)
       (a → c)
-      (λh. list_map (a → b) (a → c) h v)
+      (λh. DC.map (a → b) (a → c) h v)
       (compose a b c)
       u)
 
 fn ap_comp_h1
       (a : Type) (b : Type) (c : Type) (v : List (a → b)) (w : List a) (g1 : b → c)
     : List c =
-  concat_map (a → b) c (λh1. list_map a c (compose a b c g1 h1) w) v
+  concat_map (a → b) c (λh1. DC.map a c (compose a b c g1 h1) w) v
 
 fn ap_then_bind
       (a : Type) (b : Type) (c : Type) (v : List (a → b)) (w : List a) (g1 : b → c)
     : List c =
-  list_map b c g1 (concat_map (a → b) b (λh1. list_map a b h1 w) v)
+  DC.map b c g1 (concat_map (a → b) b (λh1. DC.map a b h1 w) v)
 
 theorem pf_probe
       (a : Type) (b : Type) (c : Type) (v : List (a → b)) (w : List a) (g1 : b → c)
@@ -847,52 +848,49 @@ theorem pf_probe
     Cons h0 t ↦
       trans
         (List c)
-        (list_append c (list_map a c (compose a b c g1 h0) w) (ap_comp_h1 a b c t w g1))
-        (list_append c (list_map b c g1 (list_map a b h0 w)) (ap_then_bind a b c t w g1))
-        (list_map
+        (list_append c (DC.map a c (compose a b c g1 h0) w) (ap_comp_h1 a b c t w g1))
+        (list_append c (DC.map b c g1 (DC.map a b h0 w)) (ap_then_bind a b c t w g1))
+        (DC.map
           b
           c
           g1
-          (list_append b (list_map a b h0 w) (concat_map (a → b) b (λh1. list_map a b h1 w) t)))
+          (list_append b (DC.map a b h0 w) (concat_map (a → b) b (λh1. DC.map a b h1 w) t)))
         (trans
           (List c)
-          (list_append c (list_map a c (compose a b c g1 h0) w) (ap_comp_h1 a b c t w g1))
-          (list_append c (list_map b c g1 (list_map a b h0 w)) (ap_comp_h1 a b c t w g1))
-          (list_append c (list_map b c g1 (list_map a b h0 w)) (ap_then_bind a b c t w g1))
+          (list_append c (DC.map a c (compose a b c g1 h0) w) (ap_comp_h1 a b c t w g1))
+          (list_append c (DC.map b c g1 (DC.map a b h0 w)) (ap_comp_h1 a b c t w g1))
+          (list_append c (DC.map b c g1 (DC.map a b h0 w)) (ap_then_bind a b c t w g1))
           (cong
             (List c)
             (List c)
-            (list_map a c (compose a b c g1 h0) w)
-            (list_map b c g1 (list_map a b h0 w))
+            (DC.map a c (compose a b c g1 h0) w)
+            (DC.map b c g1 (DC.map a b h0 w))
             (λz. list_append c z (ap_comp_h1 a b c t w g1))
-            ((proof fusion for list_map) a b c g1 h0 w))
+            ((proof fusion for DC.map) a b c g1 h0 w))
           (cong
             (List c)
             (List c)
             (ap_comp_h1 a b c t w g1)
             (ap_then_bind a b c t w g1)
-            (list_append c (list_map b c g1 (list_map a b h0 w)))
+            (list_append c (DC.map b c g1 (DC.map a b h0 w)))
             (pf_probe a b c t w g1)))
         (sym
           (List c)
-          (list_map
+          (DC.map
             b
             c
             g1
-            (list_append
-              b
-              (list_map a b h0 w)
-              (concat_map (a → b) b (λh1. list_map a b h1 w) t)))
+            (list_append b (DC.map a b h0 w) (concat_map (a → b) b (λh1. DC.map a b h1 w) t)))
           (list_append
             c
-            (list_map b c g1 (list_map a b h0 w))
-            (list_map b c g1 (concat_map (a → b) b (λh1. list_map a b h1 w) t)))
+            (DC.map b c g1 (DC.map a b h0 w))
+            (DC.map b c g1 (concat_map (a → b) b (λh1. DC.map a b h1 w) t)))
           (list_map_append_distrib
             b
             c
             g1
-            (list_map a b h0 w)
-            (concat_map (a → b) b (λh1. list_map a b h1 w) t)))
+            (DC.map a b h0 w)
+            (concat_map (a → b) b (λh1. DC.map a b h1 w) t)))
   }
 
 theorem list_ap_cmp_mid1
@@ -910,8 +908,8 @@ theorem list_ap_cmp_mid1
     (concat_map
       (a → c)
       c
-      (λh2. list_map a c h2 w)
-      (concat_map (b → c) (a → c) (λg1. list_map (a → b) (a → c) (compose a b c g1) v) u))
+      (λh2. DC.map a c h2 w)
+      (concat_map (b → c) (a → c) (λg1. DC.map (a → b) (a → c) (compose a b c g1) v) u))
     (concat_map
       (b → c)
       c
@@ -919,21 +917,21 @@ theorem list_ap_cmp_mid1
         concat_map
           (a → c)
           c
-          (λh2. list_map a c h2 w)
-          (list_map (a → b) (a → c) (compose a b c g1) v))
+          (λh2. DC.map a c h2 w)
+          (DC.map (a → b) (a → c) (compose a b c g1) v))
       u)
     (concat_map
       (b → c)
       c
-      (λg1. concat_map (a → b) c (λh1. list_map a c (compose a b c g1 h1) w) v)
+      (λg1. concat_map (a → b) c (λh1. DC.map a c (compose a b c g1 h1) w) v)
       u)
     ((proof assoc for list_bind)
       (b → c)
       (a → c)
       c
       u
-      (λg1. list_map (a → b) (a → c) (compose a b c g1) v)
-      (λh2. list_map a c h2 w))
+      (λg1. DC.map (a → b) (a → c) (compose a b c g1) v)
+      (λh2. DC.map a c h2 w))
     (concat_map_pointwise_eq
       (b → c)
       c
@@ -941,11 +939,10 @@ theorem list_ap_cmp_mid1
         concat_map
           (a → c)
           c
-          (λh2. list_map a c h2 w)
-          (list_map (a → b) (a → c) (compose a b c g1) v))
-      (λg1. concat_map (a → b) c (λh1. list_map a c (compose a b c g1 h1) w) v)
-      (λg1.
-        concat_map_map_fusion (a → b) (a → c) c (λh2. list_map a c h2 w) (compose a b c g1) v)
+          (λh2. DC.map a c h2 w)
+          (DC.map (a → b) (a → c) (compose a b c g1) v))
+      (λg1. concat_map (a → b) c (λh1. DC.map a c (compose a b c g1 h1) w) v)
+      (λg1. concat_map_map_fusion (a → b) (a → c) c (λh2. DC.map a c h2 w) (compose a b c g1) v)
       u)
 
 theorem list_ap_cmp_mid2
@@ -1016,8 +1013,8 @@ theorem list_ap_cmp
     (concat_map
       (a → c)
       c
-      (λh2. list_map a c h2 w)
-      (concat_map (b → c) (a → c) (λg1. list_map (a → b) (a → c) (compose a b c g1) v) u))
+      (λh2. DC.map a c h2 w)
+      (concat_map (b → c) (a → c) (λg1. DC.map (a → b) (a → c) (compose a b c g1) v) u))
     (list_ap b c u (list_ap a b v w))
     (cong
       (List (a → c))
@@ -1031,7 +1028,7 @@ theorem list_ap_cmp
           (list_pure ((b → c) → (a → b) → a → c) (compose a b c))
           u)
         v)
-      (concat_map (b → c) (a → c) (λg1. list_map (a → b) (a → c) (compose a b c g1) v) u)
+      (concat_map (b → c) (a → c) (λg1. DC.map (a → b) (a → c) (compose a b c g1) v) u)
       (λq. list_ap a c q w)
       (list_ap_cmp_front a b c u v))
     (list_ap_cmp_mid a b c u v w)
