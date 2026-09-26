@@ -96,8 +96,28 @@ fn owner_scoped_false_ordinary_answer_restores_join_refusal() {
     });
     assert!(applied > 0, "the owner-fed emission must be reached");
     let error = outcome.expect_err("undisposed owner Vis join must refuse object emission");
-    assert!(format!("{error:?}").contains("StaticOriginId(19)"),
-        "the precise Vis-subtree join must refuse: {error:?}");
+    assert!(format!("{error:?}").contains(
+        "function left planned source join StaticOriginId(19) neither emitted nor statically unselected"
+    ), "the precise Vis-subtree join must refuse: {error:?}");
+}
+
+// P3: a test-only Vis-subtree ledger consumption in the owner function must
+// be rejected as an already-emitted non-Ret case, before S2 can hide it.
+// The normal emission above supplies the positive, unmutated control.
+#[test]
+fn owner_vis_join_consumption_refuses_before_dead_subtree_disposition() {
+    let dir = tempfile::tempdir().unwrap();
+    let (outcome, applied) = ken_runtime::with_owner_vis_join_consumed(|| {
+        ken_cli::build_native_program(
+            PX7L, ken_cli::SourceFormat::Ken, "rt-pending-vis-consumed",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    assert_eq!(applied, 1, "the owner-fed non-Ret subtree must supply one Vis join");
+    let error = outcome.expect_err("a consumed dead Vis join must refuse object emission");
+    assert!(format!("{error:?}").contains("an owner-fed Match emitted a non-Ret case body"),
+        "the emitted-case check, not a later join error, must refuse: {error:?}");
 }
 
 /// Refused upstream by the response planner at 6bdd75394; not an admission

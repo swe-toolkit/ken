@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::{
     occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_error,
     CheckedCaseBinderLayout, CheckedCaseBinderRole, ContinuationEmissionOwner,
-    ContinuationSourceCoordinate, CraneliftBackendError, PredeclaredFunctionId,
+    CraneliftBackendError, PredeclaredFunctionId,
     ResolvedContinuationCallee, ResponseDisposition, RuntimeExpr, StaticOriginId,
     StaticTransitionPlan,
 };
@@ -130,7 +130,7 @@ impl SelectedPendingLeafResponse {
     }
 }
 
-/// Admission asks "Planned or Refused?" and constructs this witness only from
+/// Admission asks "validated owner or refused?" and constructs this witness only from
 /// planner facts. Emission asks "is the invariant intact?" and consumes these
 /// facts, rather than independently re-deriving them from its current context.
 /// No condition dependent on the emission context belongs in this constructor.
@@ -139,14 +139,13 @@ impl SelectedPendingLeafResponse {
 /// response may lawfully relocate to a different owner when its operation
 /// carries no unaccounted joins; a Deferred drive lowers against its selected
 /// operation fields and its reconstructed K environment, not the owner's
-/// entire frame. A Planned route cannot rely on a field absent at those calls.
+/// entire frame. An admitted route cannot rely on a field absent at those calls.
 ///
 /// A successful response-owner call validates Ret before publishing the
 /// returned word. The route and response facts retain the admission refusals;
 /// neither is a runtime package or an instruction to issue a second call.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct SelectedPendingRouteWitness {
-    owner: ContinuationEmissionOwner,
     producer: StaticOriginId,
     candidates: Vec<PendingCandidate>,
     route: PendingCallRoute,
@@ -161,16 +160,11 @@ impl SelectedPendingRouteWitness {
         responses: Vec<SelectedPendingLeafResponse>,
     ) -> Self {
         Self {
-            owner: ContinuationEmissionOwner::Predeclared(route.defining_function),
             producer,
             candidates,
             route,
             responses,
         }
-    }
-
-    pub(in crate::cranelift_backend) fn owner(&self) -> ContinuationEmissionOwner {
-        self.owner
     }
 
     pub(in crate::cranelift_backend) fn responses(&self) -> &[SelectedPendingLeafResponse] {
@@ -186,7 +180,6 @@ pub enum PendingRefusal {
     MissingDeclaredMembers,
     RelocatedWorkMissingLoweringBinding,
     SelectedPendingLeafRelocatesUnaccountedJoins,
-    DeferredResponseLoweredOutsideHandlerOwner,
     PendingResultNotValidatedByResponseOwner,
 }
 
@@ -767,7 +760,7 @@ fn selected_leaf_response_witness(
         }
     }
     // An E failure must be visible before J for the same producer. J-a's
-    // accounting is deferred: no presently Planned row has nonempty R. Its
+    // accounting is deferred: no presently admitted row has nonempty R. Its
     // complement refuses rather than making a selected join look unselected.
     if !environment_closed {
         return Ok(Err(PendingRefusal::RelocatedWorkMissingLoweringBinding));
@@ -1497,6 +1490,7 @@ fn walk_sequence(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CheckedComputationalIHBinderMorphism;
 
     #[test]
     fn one_emission_owner_refuses_mixed_response_and_ordinary_returns() {
@@ -1508,7 +1502,21 @@ mod tests {
             .expect("owner-only emission is Ret-only"));
         assert!(!owner_reentries_exclusive([owned], [])
             .expect("no re-entry is not an owner-fed emission"));
-        let error = owner_reentries_exclusive([owned], [owned, ordinary])
+        let owner = ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId::for_test(3));
+        let different_owner = ContinuationEmissionOwner::Predeclared(
+            PredeclaredFunctionId::for_test(4),
+        );
+        let split_emissions = [(owner, owned), (different_owner, ordinary)];
+        assert!(owner_reentries_exclusive(
+            [owned], split_emissions.into_iter()
+                .filter(|(emission, _)| *emission == owner)
+                .map(|(_, coordinates)| coordinates),
+        ).expect("an ordinary return in a different emission does not mix"));
+        let calls = [(owner, owned), (owner, ordinary), (different_owner, ordinary)];
+        let incoming_in_one_emission = calls.into_iter()
+            .filter(|(emission, _)| *emission == owner)
+            .map(|(_, coordinates)| coordinates);
+        let error = owner_reentries_exclusive([owned], incoming_in_one_emission)
             .expect_err("one emitted Match cannot mix owner and ordinary returns");
         assert_eq!(error.to_string(), planner_error(
             "owner-fed and ordinary returns re-enter one Match in one emission owner",
@@ -1540,6 +1548,34 @@ mod tests {
     }
 
     #[test]
+    fn ordinary_specialization_cannot_publish_an_unvalidated_pending_result() {
+        let origin = StaticOriginId::for_test(355);
+        let route = PendingCallRoute {
+            defining_function: PredeclaredFunctionId::for_test(3),
+            visited: Vec::new(),
+            gates: vec![StaticOriginId::for_test(47)],
+            gate_binder_pairs: Vec::new(),
+        };
+        let candidate = PendingCandidate {
+            arm: 0,
+            construct: StaticOriginId::for_test(352),
+            body: StaticOriginId::for_test(343),
+            callee: ResolvedContinuationCallee::OrdinarySpecialization(
+                super::super::ContinuationSpecializationId(0),
+            ),
+        };
+        assert_eq!(
+            admit_validated_owner(
+                origin, vec![candidate], route, Vec::new(),
+                vec![PendingPathCounts::START.consume().unwrap()],
+            ),
+            PendingCallAdmission::Refused(
+                PendingRefusal::PendingResultNotValidatedByResponseOwner,
+            ),
+        );
+    }
+
+    #[test]
     fn checked_template_slot_identifies_the_marked_read_not_the_raw_var() {
         let call = |callee, args: Vec<RuntimeExpr>| RuntimeExpr::Call {
             callee: Box::new(RuntimeExpr::Var(callee)),
@@ -1567,6 +1603,83 @@ mod tests {
         assert_eq!(agreed_unit_nonpackage([same, other]), None);
         assert_eq!(agreed_unit_nonpackage(Vec::new()),
             Some(PendingCallAdmission::NotApplicable));
+    }
+
+    // Planner-route input: the real walker still enforces AC-0(d), even
+    // though no package is issued for a validated response-owner return.
+    fn pending_route_input(
+        body_var: u32,
+        deny_raw_ih: bool,
+        call_template_id: u64,
+    ) -> Result<(Vec<PendingPathCounts>, BTreeSet<StaticOriginId>), PendingRefusal> {
+        let expr = RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
+                call_template_id,
+                checked_occurrence_path: vec![20],
+                kind: CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
+                binder_morphism: CheckedComputationalIHBinderMorphism::identity_for_test(0),
+                body: Box::new(RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(0)),
+                    args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))],
+                }),
+            }),
+            body: Box::new(RuntimeExpr::Var(body_var)),
+        };
+        let plan = super::super::plan_static_transition_graph(&expr, &BTreeMap::new())
+            .expect("a marked route input plans");
+        let root = plan.root_static_origin().expect("root exists");
+        let owner = occurrence_authority(&plan, root).expect("root has owner").owner;
+        let mut gates = BTreeSet::new();
+        let slot_for_call = |id| match id {
+            171 => Some(202),
+            172 => Some(203),
+            _ => None,
+        };
+        let paths = walk_to_gate(
+            &plan, root, owner, 0, deny_raw_ih, PendingPathCounts::START,
+            &mut gates, &mut PendingRouteEvidence::new(202, &slot_for_call),
+        )?;
+        Ok((paths, gates))
+    }
+
+    #[test]
+    fn second_raw_ih_read_refuses_before_the_checked_route_gate() {
+        let (paths, gates) = pending_route_input(0, true, 171)
+            .expect("the single marked call can consume the gate");
+        assert!(!gates.is_empty());
+        assert!(paths.iter().all(|path| path.consuming_gates == 1));
+        assert_eq!(pending_route_input(1, true, 171).unwrap_err(),
+            PendingRefusal::NotLinearOrMustReach);
+        let (paths, gates) = pending_route_input(1, false, 171)
+            .expect("disabling only the raw read guard still reaches the gate");
+        assert!(!gates.is_empty());
+        assert!(paths.iter().all(|path| path.consuming_gates == 1));
+    }
+
+    #[test]
+    fn wrong_template_slot_refuses_at_the_production_walker() {
+        assert!(pending_route_input(0, true, 171).is_ok());
+        assert_eq!(pending_route_input(0, true, 172).unwrap_err(),
+            PendingRefusal::UnsupportedRouteEdge);
+    }
+
+    #[test]
+    fn generated_call_crossing_refuses_at_the_production_walker() {
+        let expr = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(), params: vec!["x".to_owned()],
+                body: Box::new(RuntimeExpr::Var(0)),
+            }),
+            args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))],
+        };
+        let plan = super::super::plan_static_transition_graph(&expr, &BTreeMap::new())
+            .expect("generated call route plans");
+        let call = plan.root_static_origin().expect("root exists");
+        let owner = occurrence_authority(&plan, call).expect("call owner exists").owner;
+        assert_eq!(walk_to_gate(
+            &plan, call, owner, 0, true, PendingPathCounts::START,
+            &mut BTreeSet::new(), &mut PendingRouteEvidence::new(0, &|_| None),
+        ).unwrap_err(), PendingRefusal::RouteLeavesDefiningFunction);
     }
 
     // An ordinary source return is an open exit; the checked marker must be

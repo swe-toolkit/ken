@@ -160,7 +160,8 @@ fn contains_recursive_bind_ir(expr: &ken_runtime::RuntimeExpr) -> bool {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-// Selected pending-call package now reaches the native D2 consuming gate.
+// The selected return is validated by its response owner; no call package
+// is emitted. This test observes native effect consumption, not admission.
 fn delayed_capturing_generic_bind_agrees_across_real_executors() {
     let dir = output_dir("agreement");
     let output = ken_cli::build_native_program(
@@ -239,7 +240,8 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-// Selected pending-call package now reaches the native D2 consuming gate.
+// The selected return is validated by its response owner; no call package
+// is emitted. This test observes native effect consumption, not admission.
 fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
     let dir = output_dir("consumed-response");
     let output = ken_cli::build_native_program(

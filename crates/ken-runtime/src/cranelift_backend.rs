@@ -80,6 +80,8 @@ pub(crate) use artifact::api::{
 // into the private `lowering` module severs that path, and neither
 // `-p ken-runtime` build config can observe the break — only the consumer can.
 #[cfg(feature = "px8-ds-test-support")]
+pub use lowering::joins::with_owner_vis_join_consumed;
+#[cfg(feature = "px8-ds-test-support")]
 pub use lowering::units::{
     retained_unit_call_target_mutation_is_exact,
     static_response_caller_retarget_mutation_is_exact,

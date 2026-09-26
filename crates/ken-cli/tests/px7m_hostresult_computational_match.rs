@@ -207,11 +207,31 @@ fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
     );
 }
 
+// This source-only flip changes which outer after_write arm names the observed
+// label; it does not turn the inner Vis into a native owner return. Both
+// executors must report the changed output with the same effect sequence.
+#[test]
+fn flipped_outer_arm_label_preserves_the_inner_owner_contract() {
+    let flipped = OK_PROGRAM
+        .replace("two_step \"unexpected-error\"", "two_step \"flipped-ok\"")
+        .replace("two_step \"ok-payload\"", "two_step \"flipped-err\"");
+    assert_agreement(
+        &flipped,
+        "px7m-flipped-outer-arm",
+        b"probe:flipped-err\n",
+        &[
+            ken_runtime::HostOpV1::ConsoleWrite,
+            ken_runtime::HostOpV1::ConsoleWrite,
+            ken_runtime::HostOpV1::ConsoleFlush,
+        ],
+    );
+}
+
 // C4: native counterexample to the owner's checked Ret ingress. Without
 // bypass, the same checked program above exits normally; here the test-only
 // owner sends a Vis-tagged carrier through its unchecked Result slot. The
 // emitted C2 branch must terminate when that carrier reaches the Match.
-#[cfg(unix)]
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[test]
 fn owner_ret_check_bypass_reaches_the_inner_vis_trap_natively() {
     use std::os::unix::process::ExitStatusExt;
