@@ -34,7 +34,8 @@ Every Full CI run on main finishes in under 20 minutes of wall time.
   - `checked_ih_fresh_result_route_observation_is_forward_and_paired` 602 s
   - `composed_return_forward_ret_authority_controls_refuse` 453 s
 
-  The first three and the fourth share runners 4/6 and 6/6.
+  The 834, 602 and 453 s tests all ran on runner 4/6, and the 626 s test
+  on 6/6.
 - **The partition is by count** (`--partition count:N/6` in
   `.github/workflows/ci.yml`), so it cannot see duration.
 

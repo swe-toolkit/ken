@@ -1,11 +1,8 @@
 # Live lane roster
 
-Current operational state only. The operator owns lane count, ordering, and
-objectives; the Steward updates a field only with the ruling that changed it.
-
-Hard limit: 80 lines. Replace stale text; never append history. Do not record
-completed work, review transcripts, measurements, explanations, prior states, or
-superseded instructions. Git and the WP thread are the history.
+Current state only; the operator owns lanes, order and objectives. Hard limit
+80 lines: replace stale text, never append history, measurements or
+transcripts. Git and the WP thread are the history.
 
 ## Live roster direction
 
@@ -65,6 +62,8 @@ BYTES K3/F4'/four postulates ("concur with rec."), the L1 bracket redesign
 pending-call. it has to be addressed."). Spec serves BYTES D2.
 **2026-09-26** ("concur with rec."): the three `l1_acceptance` ignored rows
 go to L2 and `ds5b` to L1; TCB growth they need still returns to the operator.
+**2026-09-26:** "CI is now at 28 minutes. schedule work to bring that down
+under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`.
 
 ## Current state
 
