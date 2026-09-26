@@ -23,9 +23,16 @@ mod responses;
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
 pub use selected_pending_calls::{
-    with_selected_pending_call_admissions, PendingRefusal,
-    SelectedPendingCallAdmissionObservation, SelectedPendingCallCandidateObservation,
-    SelectedPendingCallCaptureObservation, SelectedPendingCallOutcomeObservation,
+    with_owner_fed_join_forced_ordinary,
+    with_selected_pending_call_admissions, with_selected_pending_match_emissions,
+    PendingRefusal, SelectedPendingCallAdmissionObservation,
+    SelectedPendingCallCandidateObservation, SelectedPendingCalleeObservation,
+    SelectedPendingCallOutcomeObservation, SelectedPendingMatchEmissionKind,
+    SelectedPendingMatchEmissionObservation,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) use selected_pending_calls::{
+    force_owner_join_ordinary, record_selected_pending_match_emission,
 };
 mod semantic_ir;
 mod units;
@@ -125,7 +132,7 @@ pub(in crate::cranelift_backend) use units::{
 
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use continuations::{
-    ContinuationSpecializationId, ContinuationEmissionOwner, ContinuationContextId, PlannedContinuationContext, ContinuationContextView, ContinuationInputSource, ProducerLocalBinding, ProducerLocalLocator, ContinuationSourceCoordinate, ContinuationEnvironmentClaimOver, ContinuationEnvironmentClaim, ContinuationEnvironmentDraft, ContinuationFrameRequirement, ContinuationFrameIdentity, ContinuationAvailabilityOver, ContinuationAvailabilityViews, ContinuationAvailabilityDraft, ContinuationSourceSlotAuthority, ContinuationWorkerCaptureSource, ContinuationWorkerCaptureProvenance, ContinuationConsumingOccurrence, RequiredConsumerProjection, DirectOuterProjection, CheckedIhPostCallConsumerStep, ContinuationCallIdentity, ContinuationUnitView, ContinuationOrdinaryEnvelopeRole, ComposedWorkerRouteEligibility, ComposedWorkerView, ComposedCallTarget, ContinuationInputView, ContinuationCallView, ContinuationResultEdge, verify_current_lexical_availability, verify_predeclared_entry_frame_membership, FusionComposedEdge, FusionOwnedOuterRealization, FusionCompositionLayer, AdmittedContinuationDiscovery, CheckedCaseBinderRole, CheckedCaseBinderLayout, CheckedIhBinding, CheckedTransportCoordinate, StaticContinuationFusionId, StaticContinuationFusionKey, StaticContinuationFusionDescriptor, StaticContinuationFusionPlan, StaticContinuationFusionView, fusion_redirect_target, BodyEmissionDisposition, FusionOwnedBody, FusionRegionClaim, FusionClaimRefusal, FusionRegionClaimLedger, build_static_continuation_fusion_plan, StaticContinuationFusionCandidate,
+    ContinuationSpecializationId, ContinuationEmissionOwner, ContinuationContextId, PlannedContinuationContext, ContinuationContextView, ContinuationInputSource, ProducerLocalBinding, ProducerLocalLocator, ContinuationSourceCoordinate, ContinuationEnvironmentClaimOver, ContinuationEnvironmentClaim, ContinuationEnvironmentDraft, ContinuationFrameRequirement, ContinuationFrameIdentity, ContinuationAvailabilityOver, ContinuationAvailabilityViews, ContinuationAvailabilityDraft, ContinuationSourceSlotAuthority, ContinuationWorkerCaptureSource, ContinuationWorkerCaptureProvenance, ContinuationConsumingOccurrence, RequiredConsumerProjection, DirectOuterProjection, CheckedIhPostCallConsumerStep, ContinuationCallIdentity, ResolvedContinuationCallee, ContinuationUnitView, ContinuationOrdinaryEnvelopeRole, ComposedWorkerRouteEligibility, ComposedWorkerView, ComposedCallTarget, ContinuationInputView, ContinuationCallView, ContinuationResultEdge, verify_current_lexical_availability, verify_predeclared_entry_frame_membership, FusionComposedEdge, FusionOwnedOuterRealization, FusionCompositionLayer, AdmittedContinuationDiscovery, CheckedCaseBinderRole, CheckedCaseBinderLayout, CheckedIhBinding, CheckedTransportCoordinate, StaticContinuationFusionId, StaticContinuationFusionKey, StaticContinuationFusionDescriptor, StaticContinuationFusionPlan, StaticContinuationFusionView, fusion_redirect_target, BodyEmissionDisposition, FusionOwnedBody, FusionRegionClaim, FusionClaimRefusal, FusionRegionClaimLedger, build_static_continuation_fusion_plan, StaticContinuationFusionCandidate,
 };
 #[cfg(test)]
 #[allow(unused_imports)]

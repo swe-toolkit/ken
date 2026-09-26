@@ -33,9 +33,12 @@ pub use static_transition::{
     with_checked_ih_generated_entry_confluence_mutation,
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
-    with_selected_pending_call_admissions, PendingRefusal,
-    SelectedPendingCallAdmissionObservation, SelectedPendingCallCandidateObservation,
-    SelectedPendingCallCaptureObservation, SelectedPendingCallOutcomeObservation,
+    with_owner_fed_join_forced_ordinary,
+    with_selected_pending_call_admissions, with_selected_pending_match_emissions,
+    PendingRefusal, SelectedPendingCallAdmissionObservation,
+    SelectedPendingCallCandidateObservation, SelectedPendingCalleeObservation,
+    SelectedPendingCallOutcomeObservation, SelectedPendingMatchEmissionKind,
+    SelectedPendingMatchEmissionObservation,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
@@ -65,6 +68,7 @@ pub(in crate::cranelift_backend) use static_transition::{
     record_composed_return_forward_edge_collapsibility,
     record_composed_return_forward_ret_authority,
     record_composed_return_forward_ret_role_witness,
+    force_owner_join_ordinary, record_selected_pending_match_emission,
     take_composed_return_forward_ret_population_mutation,
 };
 
@@ -145,6 +149,7 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
 pub(super) use static_transition::{
     ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
+    ResolvedContinuationCallee,
     ContinuationConsumingOccurrence, ContinuationEmissionOwner,
     ContinuationInputView, RequiredConsumerProjection, DirectOuterProjection,
     CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep,

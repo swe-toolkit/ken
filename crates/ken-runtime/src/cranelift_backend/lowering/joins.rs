@@ -34,6 +34,30 @@
 
 use super::*;
 
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static FORCE_OWNER_VIS_JOIN_CONSUMED: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static OWNER_VIS_JOIN_CONSUMPTION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_owner_vis_join_consumed<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FORCE_OWNER_VIS_JOIN_CONSUMED.with(|enabled| enabled.set(false));
+        }
+    }
+    FORCE_OWNER_VIS_JOIN_CONSUMED.with(|enabled| assert!(!enabled.replace(true)));
+    OWNER_VIS_JOIN_CONSUMPTION_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications = OWNER_VIS_JOIN_CONSUMPTION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum TrapIdentityMutation {
@@ -2042,8 +2066,53 @@ impl<'a> Lowering<'a> {
                 // ⛔ The validator is untouched and this does not force any block
                 // dead or delete origin 25. The repair is to stop asserting a
                 // deadness that was never true.
+                let owner_ret_only = self.static_transition_plan
+                    .owner_fed_match_population(match_origin, self.defining_emission_owner)?;
+                // P2: mutate only the closeout consumer to an ordinary answer.
+                // The C2 emitter still traps Vis, so an undisposed Vis join is
+                // attributable to the missing owner-specific S2 disposition.
+                #[cfg(feature = "px8-ds-test-support")]
+                let owner_ret_only = owner_ret_only.filter(|_| {
+                    !crate::cranelift_backend::planning::force_owner_join_ordinary()
+                });
                 let final_reachable: BTreeSet<usize> =
-                    if recursive_predecessors.contains(&match_origin) {
+                    if let Some(ret) = owner_ret_only {
+                        // Every re-entering edge is in the owner witness. A
+                        // claimed-dead case whose join was emitted must refuse
+                        // before the consumed-skip in subtree disposition.
+                        for (index, root) in case_bodies.iter().copied().enumerate() {
+                            if index == ret {
+                                continue;
+                            }
+                            for join in self.static_transition_plan
+                                .source_join_origins_in_owner_subtree(root)?
+                            {
+                                // P3: supply the normally-impossible ledger
+                                // state at the closure boundary, without
+                                // changing the emitter's C2 trap. A natural
+                                // Vis-body emission stops earlier on its IH.
+                                #[cfg(feature = "px8-ds-test-support")]
+                                if FORCE_OWNER_VIS_JOIN_CONSUMED.with(std::cell::Cell::get)
+                                    && OWNER_VIS_JOIN_CONSUMPTION_APPLICATIONS.with(|count| {
+                                        if count.get() == 0 {
+                                            count.set(1);
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    })
+                                {
+                                    self.function_local.consumed_join_origins.insert(join);
+                                }
+                                if self.function_local.consumed_join_origins.contains(&join) {
+                                    return Err(backend_module(
+                                        "an owner-fed Match emitted a non-Ret case body".to_string(),
+                                    ));
+                                }
+                            }
+                        }
+                        BTreeSet::from([ret])
+                    } else if recursive_predecessors.contains(&match_origin) {
                         (0..case_bodies.len()).collect()
                     } else {
                         reached_cases

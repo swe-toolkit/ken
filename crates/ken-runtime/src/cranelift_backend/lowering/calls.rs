@@ -1948,7 +1948,7 @@ impl<'a> Lowering<'a> {
             builder.seal_block(continued);
         }
 
-        fn issue_selected_call_ticket(
+        pub(super) fn issue_selected_call_ticket(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             target: &units::DeclaredUnitCall,
@@ -1982,13 +1982,23 @@ impl<'a> Lowering<'a> {
             ticket: cranelift_codegen::ir::Value,
             target: &units::DeclaredUnitCall,
         ) -> Result<(), CraneliftBackendError> {
+            let (body, callee) = Self::selected_call_target_words(builder, target)?;
+            self.consume_selected_call_ticket_expected(builder, ticket, body, callee)
+        }
+
+        fn consume_selected_call_ticket_expected(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            ticket: cranelift_codegen::ir::Value,
+            body: cranelift_codegen::ir::Value,
+            callee: cranelift_codegen::ir::Value,
+        ) -> Result<(), CraneliftBackendError> {
             let services = self.function_local.services_pointer.ok_or_else(|| {
                 backend_module("selected gate has no published activation services".to_string())
             })?;
             let consume = self.function_local.selected_call_consume.ok_or_else(|| {
                 backend_module("selected gate has no checked consuming helper".to_string())
             })?;
-            let (body, callee) = Self::selected_call_target_words(builder, target)?;
             #[cfg(test)]
             let callee = if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
                 == SelectedTicketGateMutation::WrongTarget

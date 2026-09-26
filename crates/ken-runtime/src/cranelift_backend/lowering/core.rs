@@ -4428,8 +4428,10 @@ impl<'a> Lowering<'a> {
                         frame_field,
                         joined: frame.answer_route,
                     });
-                    self.lower_carried_computational_match(builder, word, frame, &eliminators[1..])
-                        .map(ProducerTrampolineStep::ordinary)
+                    self.lower_carried_computational_match(
+                        builder, word, frame, &eliminators[1..],
+                    )
+                    .map(ProducerTrampolineStep::ordinary)
                 }
                 // ── RT-PRODUCER-MATCH-PORT `D2` — THE CELL IS NOW LIVE ──────
                 //
@@ -5343,8 +5345,7 @@ impl<'a> Lowering<'a> {
         };
         let vis_origin = row.vis_origin();
         let handler_owner = self
-            .static_transition_plan
-            .deferred_response_handler_owner(row)?
+            .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
                 unsupported(
                     "StaticResponseDeferred",
@@ -5593,6 +5594,30 @@ impl<'a> Lowering<'a> {
         ))
     }
 
+    /// For a pending route, admission fixes the handler owner once; ordinary
+    /// responses retain the existing response-plan lookup. The caller still
+    /// compares this owner with the emission it is actually lowering in.
+    fn admitted_deferred_handler_owner(
+        &self,
+        row: &crate::cranelift_backend::planning::DeferredResponseRow,
+    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if let Some(witness) = self
+            .static_transition_plan
+            .selected_pending_response_at_vis(row.vis_origin())?
+        {
+            if witness.disposition()
+                != Some(crate::cranelift_backend::planning::ResponseDisposition::Deferred)
+            {
+                return Err(backend(BackendFailure::PlannerInvariant(
+                    "an admitted pending response disagrees with its Deferred disposition"
+                        .to_string(),
+                )));
+            }
+            return Ok(witness.owner());
+        }
+        self.static_transition_plan.deferred_response_handler_owner(row)
+    }
+
     /// Consume a Deferred `Vis` inside its statically selected response handler.
     ///
     /// The established P1 route proves a one-use, tail-resumptive lexical K. The
@@ -5615,8 +5640,7 @@ impl<'a> Lowering<'a> {
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let handler_owner = self
-            .static_transition_plan
-            .deferred_response_handler_owner(row)?
+            .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
                 unsupported(
                     "StaticResponseDeferred",
@@ -5989,8 +6013,7 @@ impl<'a> Lowering<'a> {
                     .deferred_no_unit_response_in_body(body)?
                 {
                     let current_owns_response = self
-                        .static_transition_plan
-                        .deferred_response_handler_owner(&row)?
+                        .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner));
                     if !current_owns_response
                         || handler_owned_deferred_response_mutation_applies(
@@ -7330,10 +7353,8 @@ impl<'a> Lowering<'a> {
         // the exact producer RAISES it. ⛔ Not a default written at the
         // consumer: a site that hard-codes `DirectScrutinee` on a path an
         // exact call result reaches would erase the fact being transported.
-        Ok(self.continue_composed_value(
-            RoutedAnswer::direct(produced),
-            eliminators,
-        ))
+        let answer = RoutedAnswer::direct(produced);
+        Ok(self.continue_composed_value(answer, eliminators))
     }
 
     fn lower_bounded_nat_computational(
@@ -8575,7 +8596,9 @@ impl<'a> Lowering<'a> {
                 }
                 self.emit_checked_ih_captured_environment(builder, worker)
             }
-            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) | None => {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
+
+            | None => {
                 Err(unsupported(
                     "CheckedIhCapturedEnvironment",
                     "the selected checked-IH field holds neither its static worker nor its carried captured environment",
@@ -8683,7 +8706,9 @@ impl<'a> Lowering<'a> {
                     "a Direct application requires the carried captured environment, not a static worker",
                 ));
             }
-            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) | None => {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
+
+            | None => {
                 return Err(unsupported(
                     "CheckedIhApplicationResult",
                     "the Direct application has no carried captured environment at its ruled recursive field",
@@ -9074,7 +9099,9 @@ impl<'a> Lowering<'a> {
                 }
                 return Ok(LoweringOperand::Carried(*word));
             }
-            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) | None => {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
+
+            | None => {
                 return Err(unsupported(
                     "CheckedIhEnvironmentTransport",
                     "the transport source case environment holds neither its selected static worker nor the already-transported environment word at the ruled recursive field",
@@ -12956,7 +12983,9 @@ impl<'a> Lowering<'a> {
                     Some(LoweringEnvironmentBinding::StaticWorker(binding)) => {
                         Some(binding.clone())
                     }
-                    Some(LoweringEnvironmentBinding::Value(_)) | None => None,
+                    Some(LoweringEnvironmentBinding::Value(_))
+
+                    | None => None,
                 }
             })
             .collect()
@@ -14192,9 +14221,7 @@ impl<'a> Lowering<'a> {
                 eliminator.answer_route,
             );
             let route_control = builder.ins().iconst(types::I64, route_control_word);
-            builder
-                .ins()
-                .jump(header, &[scrutinee.word.into(), route_control.into()]);
+            builder.ins().jump(header, &[scrutinee.word, route_control]);
             let unreachable = builder.create_block();
             builder.switch_to_block(unreachable);
             return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
@@ -14209,10 +14236,7 @@ impl<'a> Lowering<'a> {
             eliminator.answer_route,
         );
         let route_control = builder.ins().iconst(types::I64, route_control_word);
-        builder.ins().jump(
-            header,
-            &[scrutinee.word.into(), route_control.into()],
-        );
+        builder.ins().jump(header, &[scrutinee.word, route_control]);
         builder.switch_to_block(header);
         let scrutinee = CarriedBoundaryWord {
             word: builder.block_params(header)[0],
@@ -14256,9 +14280,10 @@ impl<'a> Lowering<'a> {
             .find(|active| active.active_frame_origin == eliminator.static_origin)
             .map(|active| active.header)
         {
-            builder
-                .ins()
-                .jump(header, &[scrutinee.word.into(), route_control.into()]);
+            let header_width = builder.block_params(header).len();
+            let mut arguments = vec![scrutinee.word, route_control];
+            arguments.extend((2..header_width).map(|_| builder.ins().iconst(types::I64, 0)));
+            builder.ins().jump(header, &arguments);
             let unreachable = builder.create_block();
             builder.switch_to_block(unreachable);
             return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
@@ -14380,6 +14405,9 @@ impl<'a> Lowering<'a> {
             None
         };
 
+        let pending_owner_ret_only = self.static_transition_plan
+            .owner_fed_match_population(eliminator.static_origin, self.defining_emission_owner)?
+            .is_some();
         for (index, case) in eliminator.cases.iter().enumerate() {
             // ⛔ Malformed recursive positions are rejected before any code is
             // emitted for this case, exactly as the specialized composed path
@@ -14414,6 +14442,27 @@ impl<'a> Lowering<'a> {
             builder.ins().brif(matched, selected, &[], next, &[]);
 
             builder.switch_to_block(selected);
+            if pending_owner_ret_only && case.constructor.ends_with("::ITree::Vis") {
+                // Internal: returned carrier is not Ret after a validated
+                // response owner. The owner checks exact Ret identity and
+                // arity before storing Result, so native success cannot reach
+                // this terminator. The unique user trap code identifies this
+                // compiler invariant on a test-only owner-check bypass.
+                builder.ins().trap(cranelift_codegen::ir::TrapCode::unwrap_user(73));
+                #[cfg(feature = "px8-ds-test-support")]
+                {
+                    let emission_owner = self.defining_emission_owner.ok_or_else(|| backend_module(
+                        "a validated owner Vis trap has no defining emission owner".to_string(),
+                    ))?;
+                    crate::cranelift_backend::planning::record_selected_pending_match_emission(
+                        eliminator.static_origin,
+                        emission_owner,
+                        crate::cranelift_backend::planning::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap,
+                    );
+                }
+                builder.switch_to_block(next);
+                continue;
+            }
             let binders = i64::try_from(case.argument_binders).map_err(|_| {
                 unsupported(
                     "BoundaryCarrier",
@@ -14491,6 +14540,15 @@ impl<'a> Lowering<'a> {
                         .and_then(|index| ih_slots[index]);
                     // ⭐ Clause 1 — the CARRIED arm passes its projected operand
                     // **directly**. ⛔ No wrap, no `specialized_at`, no template.
+                    let selected_body = if pending_owner_ret_only {
+                        // This IH is not consumed by the reachable Ret arm;
+                        // the Vis arm terminates above before any IH is built.
+                        None
+                    } else {
+                        self.recursive_position_unit_body(
+                            eliminator.static_origin, position, &case.constructor,
+                        )?
+                    };
                     let induction_hypothesis = self.make_computational_recursor(
                         children[position].clone(),
                         eliminator.cases.to_vec(),
@@ -14509,16 +14567,13 @@ impl<'a> Lowering<'a> {
                         cursor,
                         splice_caller,
                         None,
-                        self.recursive_position_unit_body(
-                            eliminator.static_origin,
-                            position,
-                            &case.constructor,
-                        )?,
+                        selected_body,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
-                    induction_hypotheses
-                        .push(LoweringEnvironmentBinding::Value(induction_hypothesis));
+                    induction_hypotheses.push(LoweringEnvironmentBinding::Value(
+                        induction_hypothesis,
+                    ));
                 }
                 active_scope = Some((activation, cursor, producer_origin, splice_caller));
             }
@@ -14619,6 +14674,16 @@ impl<'a> Lowering<'a> {
                     "a carried `ComputationalMatch` arm",
                 )?;
                 builder.ins().jump(merge, &[word.word.into()]);
+            }
+            #[cfg(feature = "px8-ds-test-support")]
+            if case.constructor.ends_with("::ITree::Vis") {
+                if let Some(emission_owner) = self.defining_emission_owner {
+                    crate::cranelift_backend::planning::record_selected_pending_match_emission(
+                        eliminator.static_origin,
+                        emission_owner,
+                        crate::cranelift_backend::planning::SelectedPendingMatchEmissionKind::OrdinaryVisBodyLowered,
+                    );
+                }
             }
 
             builder.switch_to_block(next);
@@ -15545,8 +15610,7 @@ impl<'a> Lowering<'a> {
                     .deferred_response_at_vis(static_origin)?
                 {
                     if self
-                        .static_transition_plan
-                        .deferred_response_handler_owner(&row)?
+                        .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner))
                     {
                         if !handler_owned_deferred_response_mutation_applies(

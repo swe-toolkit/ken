@@ -95,8 +95,40 @@ fn assert_agreement(
     expected_operations: &[ken_runtime::HostOpV1],
 ) {
     let dir = output_dir(name);
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
-        .expect("dynamic HostResult producer reaches the linked artifact");
+    let ((output, admissions), match_emissions) =
+        ken_runtime::with_selected_pending_match_emissions(|| {
+            ken_runtime::with_selected_pending_call_admissions(|| {
+                ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
+            })
+        });
+    let output = output.expect("dynamic HostResult producer reaches the linked artifact");
+    assert!(admissions.iter().any(|row| matches!(
+        row.outcome,
+        ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner { .. }
+    )), "native selected route needs a validated response-owner admission: {admissions:#?}");
+    // P4a: the same Match origin has two distinct emitted populations. The
+    // owner's Vis branch is a trap, whereas each nested ordinary continuation
+    // lowers its Vis body; one aggregate count cannot prove the pairing.
+    let trapped_origins = match_emissions.iter().filter(|row|
+        row.kind == ken_runtime::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap
+            && row.emission_owner.starts_with("Predeclared(")
+    ).map(|row| row.origin).collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(trapped_origins.len(), 1,
+        "one owner-fed origin must emit the trap: {match_emissions:#?}");
+    let trapped_origin = *trapped_origins.iter().next().unwrap();
+    let ordinary_owners = match_emissions.iter().filter(|row|
+        row.origin == trapped_origin
+            && row.kind == ken_runtime::SelectedPendingMatchEmissionKind::OrdinaryVisBodyLowered
+            && row.emission_owner.starts_with("Specialization(")
+    ).map(|row| row.emission_owner.as_str()).collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(ordinary_owners.len(), 2,
+        "both ordinary specialization copies must lower the Vis body for the trapped origin: {match_emissions:#?}");
+    assert!(!match_emissions.iter().any(|row| row.origin == trapped_origin &&
+        (row.kind == ken_runtime::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap
+            && row.emission_owner.starts_with("Specialization(")
+         || row.kind == ken_runtime::SelectedPendingMatchEmissionKind::OrdinaryVisBodyLowered
+            && row.emission_owner.starts_with("Predeclared("))),
+        "the owner and ordinary outcomes must not swap: {match_emissions:#?}");
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -160,7 +192,8 @@ fn assert_agreement(
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "NO LIVE OWNER for this row's follow-on representation work; RT-CONTEXT-CAPTURE-CLAIM-ABSENCE established B at clean 1f33e45d8: PredeclaredFunctionId(5) ProducerLocal binding/environment origins 395/391 return Ok(None) from predeclared_entry_frame_slot. Under the current ABI there is no truthful predeclared-entry context-capture claim for this mid-body value. Depth-3 diagnostic stack: L1 recursive_position_captures_all_planner_recoverable -> L2 agreeing_recursive_body_unit -> L3 resolve_context_capture_claim. The unforced baseline stops at L1 with the correct BoundaryCarrier arity refusal; L2 and L3 were reached only by the prior temporary diagnostic forcings, not by this unforced test. L3 is the terminal claim-absence refusal for the current predeclared-entry route, not proof that every future authenticated representation is impossible. All refusal guards and gather_cannot_serve route selection remain unchanged; this row stays ignored."]
+// The selected return is validated Ret by its static response owner; no
+// pending-call package is issued on this native path.
 fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
     assert_agreement(
         OK_PROGRAM,
@@ -172,6 +205,61 @@ fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
             ken_runtime::HostOpV1::ConsoleFlush,
         ],
     );
+}
+
+// This source-only flip changes which outer after_write arm names the observed
+// label; it does not turn the inner Vis into a native owner return. Both
+// executors must report the changed output with the same effect sequence.
+#[test]
+fn flipped_outer_arm_label_preserves_the_inner_owner_contract() {
+    let flipped = OK_PROGRAM
+        .replace("two_step \"unexpected-error\"", "two_step \"flipped-ok\"")
+        .replace("two_step \"ok-payload\"", "two_step \"flipped-err\"");
+    assert_agreement(
+        &flipped,
+        "px7m-flipped-outer-arm",
+        b"probe:flipped-err\n",
+        &[
+            ken_runtime::HostOpV1::ConsoleWrite,
+            ken_runtime::HostOpV1::ConsoleWrite,
+            ken_runtime::HostOpV1::ConsoleFlush,
+        ],
+    );
+}
+
+// C4: native counterexample to the owner's checked Ret ingress. Without
+// bypass, the same checked program above exits normally; here the test-only
+// owner sends a Vis-tagged carrier through its unchecked Result slot. The
+// emitted C2 branch must terminate when that carrier reaches the Match.
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn owner_ret_check_bypass_reaches_the_inner_vis_trap_natively() {
+    use std::os::unix::process::ExitStatusExt;
+    let dir = output_dir("owner-vis-trap");
+    let ((output, applications), emissions) =
+        ken_runtime::with_selected_pending_match_emissions(|| {
+            ken_runtime::with_static_response_owner_body_mutation(
+                ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
+                || ken_cli::build_native_program(
+                    OK_PROGRAM, ken_cli::SourceFormat::Ken,
+                    "px7m-owner-vis-bypass", dir.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                ),
+            )
+        });
+    assert_eq!(applications, 1, "one admitted owner must carry the test-only bypass");
+    let output = output.expect("the bypass builds a native artifact before it is run");
+    assert!(emissions.iter().any(|row|
+        row.kind == ken_runtime::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap),
+        "the object must emit the owner-fed inner Vis trap before native execution: {emissions:#?}");
+    let native = std::process::Command::new(&output.artifact.executable_path)
+        .current_dir(dir.path())
+        .env_clear()
+        .env("KEN_HOST_OBSERVATION_PATH", dir.path().join("bypass-trace"))
+        .output().expect("the linked executable starts");
+    assert_eq!(native.status.signal(), Some(4),
+        "the bypassed owner must trap in the native executable, not refuse at admission or emission; status={:?} stdout={:?} stderr={:?}",
+        native.status, native.stdout, native.stderr);
 }
 
 // Owner node: RT-CARRIED-RESIDUAL-IH-ARITY.
@@ -203,7 +291,7 @@ fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "NO LIVE OWNER for this row's follow-on representation work; RT-CONTEXT-CAPTURE-CLAIM-ABSENCE established B at clean 1f33e45d8: PredeclaredFunctionId(5) ProducerLocal binding/environment origins 409/405 and 410/410 return Ok(None) from predeclared_entry_frame_slot. Under the current ABI there is no truthful predeclared-entry context-capture claim for this mid-body value. Depth-3 diagnostic stack: L1 recursive_position_captures_all_planner_recoverable -> L2 agreeing_recursive_body_unit -> L3 resolve_context_capture_claim. The unforced baseline stops at L1 with the correct BoundaryCarrier arity refusal; L2 and L3 were reached only by the prior temporary diagnostic forcings, not by this unforced test. L3 is the terminal claim-absence refusal for the current predeclared-entry route, not proof that every future authenticated representation is impossible. All refusal guards and gather_cannot_serve route selection remain unchanged; this row stays ignored."]
+#[ignore = "RT-SELECTED-PENDING-CALL-BUILD increment 2 refuses this selected pending route at admission E: the deferred Effect has free Var(1) but its selected operation supplies one field. No native dynamic-error execution is claimed; the separate admission test pins the exact refusal reason."]
 fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
     assert_agreement(
         ERR_PROGRAM,
@@ -215,4 +303,32 @@ fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
             ken_runtime::HostOpV1::ConsoleWrite,
         ],
     );
+}
+
+// Transition sentinel: if response-owner environment extension plus J-a
+// accounting later admits this route, this reason pin intentionally reddens.
+// It does not infer native execution from checked-source planning.
+#[test]
+fn dynamic_err_pending_route_refuses_missing_effect_binding_before_join_accounting() {
+    let dir = output_dir("err-admission");
+    let (result, admissions) = ken_runtime::with_selected_pending_call_admissions(|| {
+        ken_cli::build_native_program(
+            ERR_PROGRAM,
+            ken_cli::SourceFormat::Ken,
+            "px7m-err-admission",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    let relevant: Vec<_> = admissions.iter().filter_map(|row| match row.outcome {
+        ken_runtime::SelectedPendingCallOutcomeObservation::Refused(reason) => Some(reason),
+        _ => None,
+    }).collect();
+    assert_eq!(relevant, [ken_runtime::PendingRefusal::RelocatedWorkMissingLoweringBinding],
+        "the checked ERR source must reach one pending producer, refused first by E: {admissions:#?}");
+    assert!(!admissions.iter().any(|row| matches!(
+        row.outcome,
+        ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner { .. }
+    )), "one refused producer must not gain an owner-validated route: {admissions:#?}");
+    assert!(result.is_err(), "a refused pending route cannot emit an artifact");
 }

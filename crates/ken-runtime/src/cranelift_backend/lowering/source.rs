@@ -909,18 +909,14 @@ impl<'a> Lowering<'a> {
                         };
                         #[cfg(feature = "px8-ds-test-support")]
                         let binding = mutated_binding.as_ref().unwrap_or(binding);
+                        #[cfg(test)]
+                        crate::cranelift_backend::lowering::record_d2k_owner_event(
+                            crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller {
+                                site: "core.rs source-machine Var",
+                            },
+                        );
                         SourceMachineState::Value {
-                            value: RoutedAnswer::direct(
-                                binding
-                                    .value_at({
-                                        #[cfg(test)]
-                                        crate::cranelift_backend::lowering::record_d2k_owner_event(
-                                            crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs source-machine Var" },
-                                        );
-                                        "a source-machine Var in value position"
-                                    })?
-                                    .clone(),
-                            ),
+                            value: binding.routed_at("a source-machine Var")?,
                             control,
                         }
                     }
@@ -2591,7 +2587,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             if args.is_empty() {
                                 match self.source_call_state(
                                     builder,
-                                    value,
+                                    RoutedAnswer { value, route: incoming_route, role: incoming_role },
                                     Vec::new(),
                                     env,
                                     control,
@@ -2602,7 +2598,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             } else {
                                 let first = args.remove(0);
                                 control.continuation = SourceContinuation::CallArgument {
-                                    callee: SourceCallee::Value(value),
+                                    callee: SourceCallee::Value(RoutedAnswer { value, route: incoming_route, role: incoming_role }),
                                     remaining: args,
                                     lowered: Vec::new(),
                                     env: env.clone(),
@@ -4224,7 +4220,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
     fn source_call_state<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        callee: LoweringOperand,
+        callee: RoutedAnswer,
         args: Vec<LoweringOperand>,
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
@@ -4337,7 +4333,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         for _ in 0..validation_count {
                             let binding = self
                                 .validate_checked_ih_generated_entry_governed_arrival(
-                                    &callee,
+                                    &callee.value,
                                     &args,
                                     &env,
                                     &access,
@@ -4364,7 +4360,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     #[cfg(not(feature = "px8-ds-test-support"))]
                     {
                         self.validate_checked_ih_generated_entry_governed_arrival(
-                            &callee,
+                            &callee.value,
                             &args,
                             &env,
                             &access,
@@ -4391,7 +4387,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         // occurrence. A carried boundary word carries none of those and cannot
         // acquire them (`§2g`: the carrier holds the SSA word and nothing else),
         // so this is a specialized-only surface. ⛔ Fails closed.
-        let callee = callee.specialized_at("a source-machine call's callee")?;
+        let callee = callee.value.specialized_at("a source-machine call's callee")?;
         match callee {
             Lowered::Closure {
                 captures,

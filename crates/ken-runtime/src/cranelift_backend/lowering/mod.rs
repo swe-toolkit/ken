@@ -275,7 +275,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     ContinuationSpecializationId, DeferredResponseRow,
     ContinuationUnitView, DirectOuterProjection, CheckedIhPostCallConsumer,
     CheckedIhPostCallConsumerStep, EmittableCallKind,
-    FieldIdentity, JoinPlanToken,
+    FieldIdentity, JoinPlanToken, ResolvedContinuationCallee,
     CaseEmissionStatus, PlannedReferentLifetime,
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
@@ -1305,6 +1305,8 @@ struct FunctionLocalRefs {
     /// exclusive runtime branches emit the same source occurrence.
     checked_ih_transport_emissions:
         Vec<(CheckedIhEnvironmentTransport, cranelift_codegen::ir::Inst)>,
+    /// One record per pending gate's actual declared call, separate from the
+    /// causal-token map: multiple mutually exclusive gates may name one unit.
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8j`** — composed discharges this function
     /// has CLAIMED but not yet verified.
     ///
@@ -4531,6 +4533,16 @@ impl LoweringEnvironmentBinding {
             )),
         }
     }
+
+    fn routed_at(&self, edge: &'static str) -> Result<RoutedAnswer, CraneliftBackendError> {
+        match self {
+            Self::Value(operand) => Ok(RoutedAnswer::direct(operand.clone())),
+            Self::StaticWorker(_) => {
+                self.value_at(edge)?;
+                unreachable!("static worker value read must refuse")
+            }
+        }
+    }
 }
 
 /// A freshly bound operand entering the one binding authority. Every binder
@@ -6800,7 +6812,8 @@ pub(in crate::cranelift_backend) fn record_r3_run_worker_members(
         .enumerate()
         .filter_map(|(slot, binding)| match binding {
             LoweringEnvironmentBinding::StaticWorker(worker) => Some((slot, worker.transport)),
-            LoweringEnvironmentBinding::Value(_) => None,
+            LoweringEnvironmentBinding::Value(_)
+            => None,
         })
         .collect();
     R3_RUN_WORKER_MEMBERS.with(|cell| cell.borrow_mut().push(row));
@@ -10889,7 +10902,7 @@ fn source_case_has_no_checked_control_markers(expr: &RuntimeExpr) -> bool {
 enum SourceCallee {
     /// The pre-existing route: a lowered callee consumed by
     /// `source_call_state`.
-    Value(LoweringOperand),
+    Value(RoutedAnswer),
     /// **`D8e`** — an exact `Var` that resolved to a `D8d` target-derived
     /// binding. ⛔ Resolved once, at the `Call` occurrence, before the callee
     /// would otherwise have been evaluated as a value; there is no second

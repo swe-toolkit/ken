@@ -80,6 +80,8 @@ pub(crate) use artifact::api::{
 // into the private `lowering` module severs that path, and neither
 // `-p ken-runtime` build config can observe the break — only the consumer can.
 #[cfg(feature = "px8-ds-test-support")]
+pub use lowering::joins::with_owner_vis_join_consumed;
+#[cfg(feature = "px8-ds-test-support")]
 pub use lowering::units::{
     retained_unit_call_target_mutation_is_exact,
     static_response_caller_retarget_mutation_is_exact,
@@ -141,9 +143,12 @@ pub use planning::{
     with_checked_ih_generated_entry_confluence_mutation,
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
-    with_selected_pending_call_admissions, PendingRefusal,
-    SelectedPendingCallAdmissionObservation, SelectedPendingCallCandidateObservation,
-    SelectedPendingCallCaptureObservation, SelectedPendingCallOutcomeObservation,
+    with_owner_fed_join_forced_ordinary,
+    with_selected_pending_call_admissions, with_selected_pending_match_emissions,
+    PendingRefusal, SelectedPendingCallAdmissionObservation,
+    SelectedPendingCallCandidateObservation, SelectedPendingCalleeObservation,
+    SelectedPendingCallOutcomeObservation, SelectedPendingMatchEmissionKind,
+    SelectedPendingMatchEmissionObservation,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
