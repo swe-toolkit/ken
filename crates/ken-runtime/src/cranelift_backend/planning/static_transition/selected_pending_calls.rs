@@ -1547,32 +1547,172 @@ mod tests {
         assert!(plan.selected_pending_calls.is_empty());
     }
 
+    /// Synthetic two-leaf pending admission. The fixture supplies real typed
+    /// direct-callee resolutions for a response-owner call and a separate
+    /// ordinary call; only that resolved kind changes between the admissions.
     #[test]
-    fn ordinary_specialization_cannot_publish_an_unvalidated_pending_result() {
-        let origin = StaticOriginId::for_test(355);
+    fn same_pending_leaves_admit_owner_and_refuse_ordinary_callee() {
+        let response_ctor = "ctor:response::Read".to_owned();
+        let ret_ctor = "ctor:fixture::ITree::Ret".to_owned();
+        let vis_ctor = "ctor:fixture::ITree::Vis".to_owned();
+        let declaration = super::super::tests::b2o_transparent_declaration(RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: response_ctor.clone(), args: Vec::new(),
+            }),
+            cases: vec![crate::RuntimeMatchCase {
+                constructor: response_ctor.clone(), binders: 1,
+                body: RuntimeExpr::Let {
+                    value: Box::new(RuntimeExpr::Effect {
+                        family: "effect:FS".to_owned(),
+                        operation: ken_host::HostOpV1::BufferAllocate,
+                        capability: None,
+                        args: vec![RuntimeExpr::Value(crate::RuntimeValue::Int(1.into()))],
+                    }),
+                    body: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
+                        call_template_id: 1, checked_occurrence_path: Vec::new(),
+                        kind: CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
+                        binder_morphism: CheckedComputationalIHBinderMorphism::identity_for_test(0),
+                        body: Box::new(RuntimeExpr::Call {
+                            callee: Box::new(RuntimeExpr::Var(0)),
+                            args: vec![RuntimeExpr::Var(0)],
+                        }),
+                    }),
+                },
+            }],
+            default: crate::RuntimeTrap {
+                code: crate::RuntimeTrapCode::PatternMatchFailure,
+                message: "response unmatched".to_owned(),
+            },
+        });
+        let declarations = BTreeMap::from([(declaration.symbol.as_str(), &declaration)]);
+        let vis = RuntimeExpr::Construct {
+            constructor: vis_ctor.clone(),
+            args: vec![
+                RuntimeExpr::Construct { constructor: response_ctor, args: Vec::new() },
+                RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(), params: vec!["x".to_owned()],
+                    body: Box::new(RuntimeExpr::ComputationalMatch {
+                        scrutinee: Box::new(RuntimeExpr::Var(0)),
+                        cases: vec![
+                            crate::RuntimeComputationalMatchCase {
+                                constructor: ret_ctor.clone(), argument_binders: 1,
+                                recursive_positions: Vec::new(), body: RuntimeExpr::Var(0),
+                            },
+                            crate::RuntimeComputationalMatchCase {
+                                constructor: vis_ctor, argument_binders: 2,
+                                recursive_positions: vec![1], body: RuntimeExpr::Var(0),
+                            },
+                        ],
+                        default: crate::RuntimeTrap {
+                            code: crate::RuntimeTrapCode::PatternMatchFailure,
+                            message: "ITree unmatched".to_owned(),
+                        },
+                    }),
+                },
+            ],
+        };
+        let entry = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(vis),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: ret_ctor, argument_binders: 1,
+                    recursive_positions: Vec::new(), body: RuntimeExpr::Var(0),
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::ITree::Vis".to_owned(), argument_binders: 2,
+                    recursive_positions: vec![1], body: RuntimeExpr::Var(0),
+                },
+            ],
+            default: crate::RuntimeTrap {
+                code: crate::RuntimeTrapCode::PatternMatchFailure,
+                message: "ITree unmatched".to_owned(),
+            },
+        };
+        // This second caller has the same recursive Vis/K shape, but an
+        // operation with no matching host response route. Its callee must
+        // resolve to the ordinary specialization, independently of the
+        // response-owner caller above.
+        let mut ordinary = entry.clone();
+        let RuntimeExpr::ComputationalMatch { scrutinee, .. } = &mut ordinary else {
+            unreachable!("the fixture matches a response-bearing Vis")
+        };
+        let RuntimeExpr::Construct { args, .. } = scrutinee.as_mut() else {
+            unreachable!("the fixture selects a Vis constructor")
+        };
+        args[0] = RuntimeExpr::Value(crate::RuntimeValue::Bool(true));
+        let entry = RuntimeExpr::Let {
+            value: Box::new(ordinary),
+            body: Box::new(entry),
+        };
+        let plan = super::super::plan_static_transition_graph(&entry, &declarations)
+            .expect("response fixture plans");
+        let owners = plan.static_response_owner_specializations()
+            .expect("the fixture's response-owner relation plans")
+            .expect("the selected response is feasible");
+        let [owner] = owners.as_slice() else {
+            panic!("the fixture must have exactly one response owner");
+        };
+        let calls = plan.continuation_calls().expect("both typed callers plan");
+        let [first, second] = calls.as_slice() else {
+            panic!("the fixture must have exactly two typed direct callers");
+        };
+        let ordinary_identity = [first.identity(), second.identity()]
+            .into_iter()
+            .find(|identity| identity != owner.selected_caller())
+            .expect("one caller does not feed the response owner");
+        let owner_callee = plan.resolved_continuation_callee(owner.selected_caller())
+            .expect("response-owner direct callee resolves");
+        let ordinary_callee = plan.resolved_continuation_callee(&ordinary_identity)
+            .expect("ordinary direct callee resolves");
+        assert!(matches!(owner_callee, ResolvedContinuationCallee::StaticResponseOwner(_)),
+            "the selected host response must resolve to its owner");
+        assert!(matches!(ordinary_callee, ResolvedContinuationCallee::OrdinarySpecialization(_)),
+            "the caller without a host response must resolve to an ordinary specialization");
+
+        // These are the SAME pending producer, route, and two disagreeing body
+        // leaves. Changing only each leaf's resolved callee kind yields the
+        // precise C2/C3 pair. A validated witness carries no package by type.
+        let producer = StaticOriginId::for_test(355);
         let route = PendingCallRoute {
             defining_function: PredeclaredFunctionId::for_test(3),
             visited: Vec::new(),
             gates: vec![StaticOriginId::for_test(47)],
             gate_binder_pairs: Vec::new(),
         };
-        let candidate = PendingCandidate {
-            arm: 0,
-            construct: StaticOriginId::for_test(352),
-            body: StaticOriginId::for_test(343),
-            callee: ResolvedContinuationCallee::OrdinarySpecialization(
-                super::super::ContinuationSpecializationId(0),
-            ),
-        };
-        assert_eq!(
-            admit_validated_owner(
-                origin, vec![candidate], route, Vec::new(),
-                vec![PendingPathCounts::START.consume().unwrap()],
-            ),
-            PendingCallAdmission::Refused(
-                PendingRefusal::PendingResultNotValidatedByResponseOwner,
-            ),
+        let candidates = vec![
+            PendingCandidate {
+                arm: 0,
+                construct: StaticOriginId::for_test(352),
+                body: StaticOriginId::for_test(343),
+                callee: owner_callee,
+            },
+            PendingCandidate {
+                arm: 1,
+                construct: StaticOriginId::for_test(332),
+                body: StaticOriginId::for_test(321),
+                callee: owner_callee,
+            },
+        ];
+        let paths = vec![PendingPathCounts::START.consume().unwrap()];
+        let owner_admission = admit_validated_owner(
+            producer, candidates.clone(), route.clone(), Vec::new(), paths.clone(),
         );
+        let PendingCallAdmission::ValidatedResponseOwner(witness) = owner_admission else {
+            panic!("a response-owner-fed pending leaf must validate without a package");
+        };
+        assert_eq!(witness.producer, producer);
+        assert_eq!(witness.candidates, candidates);
+        assert_eq!(witness.route, route);
+        assert!(witness.responses.is_empty());
+
+        let ordinary_candidates = candidates.into_iter()
+            .map(|candidate| PendingCandidate { callee: ordinary_callee, ..candidate })
+            .collect();
+        assert_eq!(admit_validated_owner(
+            producer, ordinary_candidates, route, Vec::new(), paths,
+        ), PendingCallAdmission::Refused(
+            PendingRefusal::PendingResultNotValidatedByResponseOwner,
+        ));
     }
 
     #[test]
