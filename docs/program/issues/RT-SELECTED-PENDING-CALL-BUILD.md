@@ -79,6 +79,33 @@ natively. Any row that stays ignored gets a measured reason in its
       leaves its defining function (Architect `evt_327ykvk4cv8bq`: route
       confinement discharges the backing question; the AC-0 member classes
       stay evidence and nothing branches on them).
+- **AC-1a (admission witness, Architect `evt_46vm0djbs20k5`).**
+  - Admission returns a `SelectedPendingRouteWitness`, constructible only in
+    `planning/static_transition/selected_pending_calls.rs`. It carries the
+    package emission owner; per selected leaf, each `Vis`'s response
+    disposition and owner (from the plan functions at `responses.rs:3389`
+    and `:3548`); per-member backing; and binder coordinates.
+  - A route with any `Specialized` or `Deferred` `Vis` whose owner is not
+    the package emission owner is REFUSED at admission, reason "selected
+    pending leaf crosses a response owner", at the granularity admission
+    already refuses at. No per-leaf fallback.
+  - The emitter reads owner, dispositions, backing and coordinates from the
+    witness. Its one ownership check is an internal invariant assertion at
+    package entry (`defining_emission_owner == witness.owner`).
+  - **Closure census.** Every `unsupported(...)` and `backend_module(...)`
+    refusal reachable from the pending-route emission path, including the
+    `ObjectEmission` join closeout (`joins.rs:2234`), is classified in the
+    handoff as a witness clause, an asserted invariant, or unreachable on a
+    witnessed route, with the reason. An unclassified row is a finding.
+  - **Pins.** Each of px7l ×2, px7m ok and px7m err is reported Planned or
+    Refused. px7m err is Refused with the owner-crossing reason, asserted by
+    reason. A leaf whose `Vis` owner equals the package owner stays Planned
+    beside a crossing leaf that refuses. Dropping the ownership clause
+    returns px7m err to the join-393 refusal. No Planned row fails at
+    emission. If px7m ok shares px7m err's package, report both refused;
+    do not split the route per leaf.
+  - Forbidden: dispositioning join 393 as unselected, forcing the
+    placeholder across the owner boundary, or claiming the err row native.
 - **AC-2 (proof, D1 item 6).**
   - **Positive.** Run the px7l fixture natively and assert:
     - the selected arm's host effect happens once;
@@ -123,10 +150,6 @@ natively. Any row that stays ignored gets a measured reason in its
   order: STOP. Its de Bruijn reads would then take the mirror parameter's
   phase. Seed it through `source_body_binding_order` first (latent at
   `6bdd75394`, because every entry there is `ResultPhaseSummary::carrier()`).
-- **Increment 2 is held until the binder attribution lands** (Architect
-  `evt_3yce3vzbddvk0`): it emits raw `Var` reads on the px7l route, where
-  one `Match` binder is missing from erasure's remap. Increment 1 gates by
-  checked call template and records the (walker, morphism) index pair.
 - **The F5/F6 increment starts with a design ruling.** Carrying a package
   across a return or a generated unit call needs a per-member backing
   authority, which the names-only plane (`abi.rs:55-60`) cannot supply. That
@@ -135,16 +158,15 @@ natively. Any row that stays ignored gets a measured reason in its
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
-## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+## Shared predicate (Architect `evt_46vm0djbs20k5`, third stop)
 
-1. AC-1's per-member backing refusal has no planner-plane authority:
-   `AbiSlot` is uniformly `ValueWord`/`OwnedByFrame` and the plane is
-   names-only (`abi.rs:55-60`) -- keyed on the per-value pointee type the
-   plane deliberately does not carry. Discharged by route confinement (no
-   F5/F6 crossing) for increments 1-2 (Architect `evt_327ykvk4cv8bq`).
-2. The pending IH's runtime position has two derivations that disagree at
-   px7l origin 47 (IR binding structure 4, erasure-minted morphism and
-   callee `Var` 3): one `Match` case binder on the host-response dispatch
-   path has no group in erasure's `BranchBinderRemap` -- keyed on a runtime
-   binder that erasure's coordinate map does not record (Architect
-   `evt_3yce3vzbddvk0`).
+Three advancing stops had one cause: pending-call admission decided Planned
+from facts the emitter re-derives elsewhere. Those facts were per-member
+backing (`evt_327ykvk4cv8bq`), the IH binder coordinate
+(`evt_3yce3vzbddvk0`), and response ownership (`evt_3engggxek84h8`). AC-1a
+closes the class: the emitter consumes the admission witness instead of
+re-deriving.
+
+Positive support for an owner-crossing pending leaf (retargeting the
+response owner's resumption into the package, or calling the specialization
+from the arm) is a new capability and a future WP, not part of this one.
