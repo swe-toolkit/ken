@@ -29,7 +29,24 @@ use super::{
     occurrence_subtree_contains, planner_capacity_error, planner_error,
     CheckedIhEnvironmentTransport, CraneliftBackendError, StaticTransitionPlan,
 };
+use crate::cranelift_backend::grafted_spine_control_graph::GraftedSpineFunctionScope;
 use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue};
+
+/// A response site that may carry a `StaticResponseDeferred` placeholder.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum StaticResponseSite {
+    Effect(StaticOriginId),
+    OperationRoot(StaticOriginId),
+}
+
+impl StaticResponseSite {
+    fn matches(self, effect_origin: StaticOriginId, operation_root_origin: StaticOriginId) -> bool {
+        match self {
+            Self::Effect(origin) => origin == effect_origin,
+            Self::OperationRoot(origin) => origin == operation_root_origin,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) struct StaticResponseContinuationId(u32);
@@ -3540,6 +3557,43 @@ impl StaticTransitionPlan<'_> {
                 "one retained call body owns more than one unit-less Deferred response Vis",
             )),
         }
+    }
+
+    /// Whether a `StaticResponseDeferred` placeholder is sound at `site` in the
+    /// function `scope` defines. A placeholder resumes without dispatch, on the
+    /// premise that this function's caller was retargeted to a response owner.
+    /// A source Effect is shared by every Vis the handler arm serves, so row
+    /// existence at that site alone says nothing about this function's caller.
+    ///
+    /// Licensed iff this is a continuation specialization targeted by an owner
+    /// of a row at `site`, and every ordinary call targeting the specialization
+    /// is retargeted by some owner. Every other scope fails closed to ordinary
+    /// lowering, which dispatches or refuses rather than silently resuming.
+    pub(in crate::cranelift_backend) fn static_response_placeholder_licensed(
+        &self,
+        site: StaticResponseSite,
+        scope: GraftedSpineFunctionScope,
+    ) -> Result<bool, CraneliftBackendError> {
+        let GraftedSpineFunctionScope::Continuation(target) = scope else {
+            return Ok(false);
+        };
+        let owners = self.static_response_owner_specializations()?.map_err(|infeasible| {
+            planner_error(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            ))
+        })?;
+        let row_targets_scope = self.static_response_continuations.iter()
+            .filter(|row| site.matches(row.effect_origin, row.operation_root_origin))
+            .any(|row| owners.iter().any(|owner| {
+                owner.response() == row.id && owner.selected_caller().target() == target
+            }));
+        if !row_targets_scope {
+            return Ok(false);
+        }
+        Ok(self.ordinary_continuation_call_identities()?.iter()
+            .filter(|identity| identity.target() == target)
+            .all(|identity| owners.iter().any(|owner| owner.selected_caller() == identity)))
     }
 
     /// The classify verdict for a response `Vis` keyed by its host-effect origin

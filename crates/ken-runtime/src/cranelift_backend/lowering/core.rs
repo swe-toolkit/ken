@@ -15536,20 +15536,29 @@ impl<'a> Lowering<'a> {
                 // Recut §7 total match (AC-2) over the response classify verdict.
                 // No catch-all: adding a ResponseDisposition variant reddens the
                 // build here.
-                use crate::cranelift_backend::planning::ResponseDisposition;
+                use crate::cranelift_backend::planning::{ResponseDisposition, StaticResponseSite};
                 match self
                     .static_transition_plan
                     .response_disposition_at_operation_root(static_origin)
                 {
-                    // A Specialized response's operation root lowered OUTSIDE its
-                    // owner is compiler control: emit the placeholder, consumed
-                    // when the caller is retargeted to the owner.
+                    // A response root is compiler control only in a function
+                    // whose incoming callers are all retargeted to its owner.
+                    // A row at this root alone does not license the placeholder.
                     Some(ResponseDisposition::Specialized)
                         if self.function_local.static_response_owner.is_none() =>
                     {
-                        return Ok(LoweringOperand::Specialized(
-                            Lowered::StaticResponseDeferred,
-                        ));
+                        let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
+                            backend_module("a response operation root is lowered outside a defined function scope".to_string())
+                        })?;
+                        let site = StaticResponseSite::OperationRoot(static_origin);
+                        if self.static_transition_plan
+                            .static_response_placeholder_licensed(site, scope)? {
+                            return Ok(LoweringOperand::Specialized(
+                                Lowered::StaticResponseDeferred,
+                            ));
+                        }
+                        // Unlicensed: the root lowers ordinarily rather than
+                        // supplying a placeholder without an owner retarget.
                     }
                     // Deferred (R3): the residual falls through to the ordinary
                     // Construct arm below -- main's pre-WP lowering, the exact path
