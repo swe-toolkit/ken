@@ -1,0 +1,77 @@
+diff -ruN /tmp/claude-1000/-workspaces-ken--worktrees-steward/093cd815-72a1-4b7e-a154-98f2a9219a9a/scratchpad/pi-convo-orig/src/bashPolicy.ts src/bashPolicy.ts
+--- /tmp/claude-1000/-workspaces-ken--worktrees-steward/093cd815-72a1-4b7e-a154-98f2a9219a9a/scratchpad/pi-convo-orig/src/bashPolicy.ts	1970-01-01 00:00:00.000000000 +0000
++++ src/bashPolicy.ts	2026-09-26 14:17:15.165492784 +0000
+@@ -0,0 +1,41 @@
++/**
++ * Optional project command policy for the bash tool.
++ *
++ * Before each bash call, run an executable policy with the command on stdin.
++ * Exit 2 blocks the call and its stdout becomes the reason; any other result
++ * allows it. The policy path is PI_CONVO_BASH_POLICY, or else
++ * `scripts/hooks/bash-policy` under the session's cwd. With no policy file,
++ * this does nothing. A policy that fails to run allows the call (fail open),
++ * so a broken policy cannot wedge a seat.
++ */
++
++import { spawnSync } from "node:child_process";
++import { accessSync, constants } from "node:fs";
++import { join } from "node:path";
++import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
++
++function policyPath(cwd: string): string | undefined {
++  const candidate = process.env.PI_CONVO_BASH_POLICY ?? join(cwd, "scripts", "hooks", "bash-policy");
++  try {
++    accessSync(candidate, constants.X_OK);
++    return candidate;
++  } catch {
++    return undefined;
++  }
++}
++
++export function checkBashCommand(command: string, cwd: string): string | undefined {
++  const policy = policyPath(cwd);
++  if (!policy) return undefined;
++  const run = spawnSync(policy, [], { input: command, cwd, encoding: "utf8", timeout: 10_000 });
++  if (run.status === 2) return (run.stdout || "Refused by the project command policy.").trim();
++  return undefined;
++}
++
++export function registerBashPolicy(pi: ExtensionAPI): void {
++  pi.on("tool_call", (event, ctx) => {
++    if (event.toolName !== "bash") return;
++    const reason = checkBashCommand((event.input as { command?: string }).command ?? "", ctx.cwd);
++    if (reason) return { block: true, reason };
++  });
++}
+diff -ruN /tmp/claude-1000/-workspaces-ken--worktrees-steward/093cd815-72a1-4b7e-a154-98f2a9219a9a/scratchpad/pi-convo-orig/src/index.ts src/index.ts
+--- /tmp/claude-1000/-workspaces-ken--worktrees-steward/093cd815-72a1-4b7e-a154-98f2a9219a9a/scratchpad/pi-convo-orig/src/index.ts	2026-09-26 14:13:07.338072489 +0000
++++ src/index.ts	2026-09-26 14:17:15.174700475 +0000
+@@ -7,6 +7,7 @@
+  */
+ 
+ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
++import { registerBashPolicy } from "./bashPolicy.ts";
+ import { registerLifecycle } from "./lifecycle.ts";
+ import { registerNativeTools } from "./native.ts";
+ import { registerAllTools } from "./tools/index.ts";
+@@ -15,4 +16,5 @@
+   registerLifecycle(pi);
+   registerNativeTools(pi);
+   registerAllTools(pi);
++  registerBashPolicy(pi);
+ }
+diff -ruN /tmp/claude-1000/-workspaces-ken--worktrees-steward/093cd815-72a1-4b7e-a154-98f2a9219a9a/scratchpad/pi-convo-orig/src/tools/spaces.ts src/tools/spaces.ts
+--- /tmp/claude-1000/-workspaces-ken--worktrees-steward/093cd815-72a1-4b7e-a154-98f2a9219a9a/scratchpad/pi-convo-orig/src/tools/spaces.ts	2026-09-26 14:13:07.337958899 +0000
++++ src/tools/spaces.ts	2026-09-26 14:13:13.751279748 +0000
+@@ -134,7 +134,10 @@
+     }),
+   );
+ 
+-  pi.registerTool(
++  // get_transcript is off by default: its `limit` does not bound the response,
++  // and one oversized payload drops the session's convo transport, so the seat
++  // can no longer post. Opt in with PI_CONVO_ENABLE_GET_TRANSCRIPT=1.
++  if (process.env.PI_CONVO_ENABLE_GET_TRANSCRIPT === "1") pi.registerTool(
+     restTool({
+       name: "mcp__convo__get_transcript",
+       label: "get_transcript",

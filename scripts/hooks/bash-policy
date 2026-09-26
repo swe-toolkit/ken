@@ -20,8 +20,26 @@ SEPARATORS = re.compile(r"&&|\|\||[;|\n]")
 GIT_GLOBAL_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}
 
 
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+
+
+def strip_heredocs(command):
+    """Drop heredoc bodies: they are data written to a file, not commands."""
+    out, lines, i = [], command.split("\n"), 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        markers = [m.group(2) for m in HEREDOC.finditer(line)]
+        i += 1
+        for marker in markers:
+            while i < len(lines) and lines[i].strip() != marker:
+                i += 1
+            i += 1
+    return "\n".join(out)
+
+
 def segments(command):
-    for part in SEPARATORS.split(command):
+    for part in SEPARATORS.split(strip_heredocs(command)):
         try:
             words = shlex.split(part, posix=True)
         except ValueError:

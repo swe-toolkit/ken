@@ -12,6 +12,15 @@
 # time, with -j from .cargo/config.toml). Raise it as hardware grows.
 set -euo pipefail
 
+# Refuse workspace-wide runs (COORDINATION §12): one crate at a time locally;
+# CI runs the whole workspace.
+for arg in "$@"; do
+  if [[ "$arg" == "--workspace" || "$arg" == "--all" ]]; then
+    echo "ken-cargo: refused '$arg'. Build and test one crate with -p <crate>; CI runs the workspace (COORDINATION §12)." >&2
+    exit 2
+  fi
+done
+
 slots="${KEN_BUILD_SLOTS:-1}"
 
 # Build scratch goes on the repo volume, not the container's /tmp.
