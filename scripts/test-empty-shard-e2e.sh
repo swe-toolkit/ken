@@ -7,11 +7,20 @@ cd "$root"
 cat > inventory.json <<'EOF'
 {"test-count":1,"rust-suites":{"empty":{"binary-id":"fixture::empty","binary-name":"ordinary","testcases":{}},"live":{"binary-id":"fixture::live","binary-name":"ordinary","testcases":{"t":{"filter-match":{"status":"matches"}}}}}}
 EOF
-python3 - <<'PY2'
+python3 - "$repo" <<'PY2'
+import importlib.util
 import json
+import pathlib
+import sys
+repo = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("shard_check", repo / "scripts/check-ci-shard-union.py")
+checker = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(checker)
 raw=json.load(open("inventory.json"))
-raw["test-count"] = 2
+raw["test-count"] = 2 + len(checker.REQUIRED_RT_PARITY_ARMS)
 raw["rust-suites"]["native"] = {"binary-id":"fixture::native","binary-name":"rt_parity_native","testcases":{"n":{"filter-match":{"status":"matches"}}}}
+for arm in checker.REQUIRED_RT_PARITY_ARMS:
+    raw["rust-suites"]["native"]["testcases"][arm] = {"filter-match":{"status":"matches"}}
 open("unfiltered-inventory.json", "w").write(json.dumps(raw))
 open("raw.json", "w").write(json.dumps(raw))
 open("inventory.json", "w").write(json.dumps(raw))
@@ -112,7 +121,7 @@ cp -a realized-shards mutation-old-shape/
   python3 - <<'PY'
 import json
 v=json.load(open('../inventory.json'))
-del v['rust-suites']['native']; v['test-count'] -= 1
+del v['rust-suites']['native']; v['test-count'] = 1
 import os
 os.mkdir('old')
 open('old/inventory.json','w').write(json.dumps(v))
@@ -143,7 +152,7 @@ cp -a realized-shards mutation-selected-shape/
 import json, os
 v=json.load(open('../inventory.json')); os.mkdir('old')
 for n in range(1, 9):
- v=json.load(open(f'../selected-{n}.json')); del v['rust-suites']['native']; v['test-count'] -= 1; open(f'old/selected-{n}.json','w').write(json.dumps(v))
+ v=json.load(open(f'../selected-{n}.json')); del v['rust-suites']['native']; v['test-count'] = 1; open(f'old/selected-{n}.json','w').write(json.dumps(v))
 PY
   for n in $(seq 1 8); do
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json old/selected-$n.json

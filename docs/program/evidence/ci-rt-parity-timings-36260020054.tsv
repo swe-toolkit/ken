@@ -1,0 +1,185 @@
+1	PASS [  79.783s] ( 1/31) ken-cli::rt_parity_native buffer_allocate_malformed_capacity_narrows_to_invalid_bounds
+1	PASS [ 174.551s] ( 2/31) ken-cli::rt_parity_native checked_ih_fresh_result_header_to_ret_input_is_paired
+1	PASS [ 176.625s] ( 3/31) ken-cli::rt_parity_native checked_ih_direct_application_pairs_one_declared_call_result
+1	PASS [ 179.815s] ( 4/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_read_removal_stripe_1
+1	PASS [ 260.759s] ( 5/31) ken-cli::rt_parity_native checked_ih_generated_entry_confluence_is_interning_and_inheritance_order_independent
+1	PASS [  88.552s] ( 6/31) ken-cli::rt_parity_native composed_return_forward_ret_wrong_sink_refuses
+1	PASS [  93.466s] ( 7/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_write_removal_stripe_2
+1	PASS [  78.317s] ( 8/31) ken-cli::rt_parity_native continuation_inheritance_descriptor_only
+1	PASS [  78.138s] ( 9/31) ken-cli::rt_parity_native continuation_inheritance_reclassify_ret
+1	PASS [  78.247s] (10/31) ken-cli::rt_parity_native continuation_inheritance_wrong_k_domain
+1	PASS [  83.327s] (11/31) ken-cli::rt_parity_native d1_route_control_ordinary_read
+1	PASS [  80.809s] (12/31) ken-cli::rt_parity_native generated_entry_admission_drop_governed
+1	PASS [  83.595s] (13/31) ken-cli::rt_parity_native fs_read_at_malformed_offset_narrows_to_invalid_offset
+1	PASS [  80.987s] (14/31) ken-cli::rt_parity_native generated_entry_admission_non_governed_key_collision
+1	PASS [  86.302s] (15/31) ken-cli::rt_parity_native generated_entry_capsule_outer_carried
+1	PASS [  81.092s] (16/31) ken-cli::rt_parity_native generated_entry_confluence_destination_owner
+1	PASS [  80.719s] (17/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_capture_ordinal
+1	PASS [  81.018s] (18/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_constructor_role
+1	PASS [ 168.282s] (19/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_destination_owner
+1	PASS [ 167.808s] (20/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_locator_invocation
+1	PASS [  80.589s] (21/31) ken-cli::rt_parity_native generated_entry_confluence_locator_invocation
+1	PASS [  81.102s] (22/31) ken-cli::rt_parity_native generated_entry_confluence_route_removal
+1	PASS [  80.889s] (23/31) ken-cli::rt_parity_native generated_entry_confluence_route_wrong_ret_input_binder
+1	PASS [ 162.382s] (24/31) ken-cli::rt_parity_native generated_entry_forward_ret_access_locator_callee_disagreement
+1	PASS [ 170.379s] (25/31) ken-cli::rt_parity_native static_response_context_demand_ledger_closes_fixed_products
+1	PASS [ 271.822s] (26/31) ken-cli::rt_parity_native static_response_full_demand_drop_row_reds_and_restores
+1	PASS [ 272.149s] (27/31) ken-cli::rt_parity_native static_response_full_demand_read_permute_capture_reaches_and_restores
+1	PASS [ 270.452s] (28/31) ken-cli::rt_parity_native static_response_full_demand_response_prior_reds_and_restores
+1	PASS [ 279.474s] (29/31) ken-cli::rt_parity_native static_response_full_demand_write_vary_capture_reaches_and_restores
+1	PASS [ 205.203s] (30/31) ken-cli::rt_parity_native static_response_owner_body_omit_k_call_reds_and_restores
+1	PASS [ 211.220s] (31/31) ken-cli::rt_parity_native static_response_owner_body_vary_ret_reds_and_restores
+4	PASS [ 168.512s] ( 1/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_is_live_at_the_forward_edge
+4	PASS [   0.008s] ( 2/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_removal_stripes_cover_all
+4	PASS [ 173.864s] ( 3/31) ken-cli::rt_parity_native checked_ih_fresh_result_active_answer_route_is_paired
+4	PASS [ 174.442s] ( 4/31) ken-cli::rt_parity_native checked_ih_fresh_result_source_to_active_edge_is_paired
+4	PASS [  78.350s] ( 5/31) ken-cli::rt_parity_native continuation_inheritance_earlier_result
+4	PASS [ 254.370s] ( 6/31) ken-cli::rt_parity_native checked_ih_direct_application_drop_call_refuses_and_restores
+4	PASS [  93.146s] ( 7/31) ken-cli::rt_parity_native composed_return_forward_ret_projection_disagreement_refuses
+4	PASS [  77.929s] ( 8/31) ken-cli::rt_parity_native continuation_inheritance_source_slot_k_locator
+4	PASS [  83.087s] ( 9/31) ken-cli::rt_parity_native d1_route_control_drop_read
+4	PASS [  80.524s] (10/31) ken-cli::rt_parity_native generated_entry_admission_duplicate_non_governed
+4	PASS [ 163.506s] (11/31) ken-cli::rt_parity_native forward_ret_edge_substituted_word_reds
+4	PASS [ 168.074s] (12/31) ken-cli::rt_parity_native fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness
+4	PASS [  82.525s] (13/31) ken-cli::rt_parity_native generated_entry_capsule_static_worker
+4	PASS [  90.694s] (14/31) ken-cli::rt_parity_native generated_entry_arrival_non_governed_through_governed
+4	PASS [  80.640s] (15/31) ken-cli::rt_parity_native generated_entry_confluence_binding_position
+4	PASS [  81.121s] (16/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_active_frame
+4	PASS [ 167.108s] (17/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_locator_callee
+4	PASS [  81.072s] (18/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_closure_parameters
+4	PASS [  81.123s] (19/31) ken-cli::rt_parity_native generated_entry_confluence_locator_callee
+4	PASS [ 540.754s] (20/31) ken-cli::rt_parity_native composed_return_ret_sink_lookup_controls_refuse
+4	PASS [  80.318s] (21/31) ken-cli::rt_parity_native generated_entry_confluence_route_cross_variant
+4	PASS [  80.926s] (22/31) ken-cli::rt_parity_native generated_entry_confluence_route_wrong_delivery
+4	PASS [ 161.299s] (23/31) ken-cli::rt_parity_native generated_entry_forward_ret_access_binding_disagreement
+4	PASS [ 160.864s] (24/31) ken-cli::rt_parity_native generated_entry_forward_ret_access_locator_invocation_disagreement
+4	PASS [ 249.454s] (25/31) ken-cli::rt_parity_native static_response_context_demand_vary_input_reaches_and_restores
+4	PASS [ 268.970s] (26/31) ken-cli::rt_parity_native static_response_full_demand_merge_k_reds_and_restores
+4	PASS [ 269.850s] (27/31) ken-cli::rt_parity_native static_response_full_demand_read_vary_input_reaches_and_restores
+4	PASS [ 279.438s] (28/31) ken-cli::rt_parity_native static_response_full_demand_write_drop_input_reaches_and_restores
+4	PASS [  85.493s] (29/31) ken-cli::rt_parity_native suppressing_execute_then_resume_restores_the_pre_effect_write_trap
+4	PASS [ 242.272s] (30/31) ken-cli::rt_parity_native static_response_owner_body_before_host_validation_reds_and_restores
+4	PASS [ 222.889s] (31/31) ken-cli::rt_parity_native static_response_owner_body_raw_worker_reds_and_restores
+6	PASS [ 113.538s] ( 1/30) ken-cli::rt_parity_native checked_ih_generated_entry_arrival_cannot_be_replaced_by_producer_source
+6	PASS [ 113.912s] ( 2/30) ken-cli::rt_parity_native checked_ih_fresh_result_forward_emission_order_is_paired
+6	PASS [ 116.634s] ( 3/30) ken-cli::rt_parity_native composed_return_forward_ret_authority_read_removal_stripe_0
+6	PASS [  48.698s] ( 4/30) ken-cli::rt_parity_native continuation_inheritance_break_step
+6	PASS [ 165.442s] ( 5/30) ken-cli::rt_parity_native checked_ih_direct_application_environment_for_result_refuses_and_restores
+6	PASS [  55.875s] ( 6/30) ken-cli::rt_parity_native composed_return_forward_ret_wrong_member_refuses
+6	PASS [  50.136s] ( 7/30) ken-cli::rt_parity_native continuation_inheritance_wrong_k_consumer
+6	PASS [  54.302s] ( 8/30) ken-cli::rt_parity_native d1_route_control_misroute_direct_read
+6	PASS [ 118.363s] ( 9/30) ken-cli::rt_parity_native composed_return_forward_ret_authority_write_removal_stripe_1
+6	PASS [  49.671s] (10/30) ken-cli::rt_parity_native fs_read_at_endpoint_yields_read_eof_without_host_dispatch
+6	PASS [ 105.863s] (11/30) ken-cli::rt_parity_native continuation_inheritance_read_write_swap
+6	PASS [  54.383s] (12/30) ken-cli::rt_parity_native fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset
+6	PASS [  53.559s] (13/30) ken-cli::rt_parity_native generated_entry_admission_governed_to_non_governed
+6	PASS [  55.075s] (14/30) ken-cli::rt_parity_native generated_entry_capsule_non_carried_residual
+6	PASS [  52.640s] (15/30) ken-cli::rt_parity_native generated_entry_confluence_destination_body
+6	PASS [  53.184s] (16/30) ken-cli::rt_parity_native generated_entry_confluence_fresh_capture_occurrence
+6	PASS [ 111.191s] (17/30) ken-cli::rt_parity_native generated_entry_capsule_wrong_destination_body
+6	PASS [ 109.798s] (18/30) ken-cli::rt_parity_native generated_entry_capsule_wrong_locator_index
+6	PASS [  52.587s] (19/30) ken-cli::rt_parity_native generated_entry_confluence_fresh_constructor_coordinate
+6	PASS [  51.629s] (20/30) ken-cli::rt_parity_native generated_entry_confluence_locator_index
+6	PASS [  51.844s] (21/30) ken-cli::rt_parity_native generated_entry_confluence_route_duplication
+6	PASS [  52.473s] (22/30) ken-cli::rt_parity_native generated_entry_confluence_route_wrong_governed_key
+6	PASS [ 103.949s] (23/30) ken-cli::rt_parity_native generated_entry_forward_ret_access_destination_owner_disagreement
+6	PASS [ 108.606s] (24/30) ken-cli::rt_parity_native static_response_context_demand_duplicate_is_idempotent
+6	PASS [ 172.797s] (25/30) ken-cli::rt_parity_native static_response_full_demand_causal_prefix_reds_and_restores
+6	PASS [ 172.570s] (26/30) ken-cli::rt_parity_native static_response_full_demand_read_drop_input_reaches_and_restores
+6	PASS [ 173.616s] (27/30) ken-cli::rt_parity_native static_response_full_demand_response_operation_reds_and_restores
+6	PASS [ 179.119s] (28/30) ken-cli::rt_parity_native static_response_full_demand_write_permute_input_reaches_and_restores
+6	PASS [ 130.199s] (29/30) ken-cli::rt_parity_native static_response_owner_body_trap_bypass_reds_and_restores
+6	PASS [ 148.612s] (30/30) ken-cli::rt_parity_native static_response_owner_body_duplicate_k_call_reds_and_restores
+3	PASS [ 104.970s] ( 1/31) ken-cli::rt_parity_native checked_ih_fresh_result_ret_case_body_origin_is_paired
+3	PASS [ 151.818s] ( 2/31) ken-cli::rt_parity_native checked_ih_continuation_inheritance_derives_read_and_write_independently
+3	PASS [ 153.388s] ( 3/31) ken-cli::rt_parity_native checked_ih_direct_application_vary_transport_refuses_and_restores
+3	PASS [  53.870s] ( 4/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_read_removal_stripe_3
+3	PASS [  46.278s] ( 5/31) ken-cli::rt_parity_native continuation_inheritance_duplicate_k_locator
+3	PASS [ 207.205s] ( 6/31) ken-cli::rt_parity_native checked_ih_inheritance_and_fresh_result_route_are_byte_inert
+3	PASS [  57.050s] ( 7/31) ken-cli::rt_parity_native composed_return_forward_ret_producer_source_from_entry_refuses
+3	PASS [  46.253s] ( 8/31) ken-cli::rt_parity_native continuation_inheritance_remove_k_locator
+3	PASS [ 101.024s] ( 9/31) ken-cli::rt_parity_native composed_return_ret_sink_is_byte_inert
+3	PASS [  49.959s] (10/31) ken-cli::rt_parity_native d1_route_control_direct_read
+3	PASS [  49.427s] (11/31) ken-cli::rt_parity_native fs_read_at_malformed_window_narrows_to_invalid_bounds
+3	PASS [  48.178s] (12/31) ken-cli::rt_parity_native generated_entry_admission_duplicate_governed
+3	PASS [  53.138s] (13/31) ken-cli::rt_parity_native generated_entry_arrival_duplicate_lookup
+3	PASS [ 104.526s] (14/31) ken-cli::rt_parity_native forward_edge_collapsibility_discriminates_value_and_effect_tails
+3	PASS [  49.341s] (15/31) ken-cli::rt_parity_native generated_entry_capsule_specialized_sibling
+3	PASS [  49.528s] (16/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_invocation
+3	PASS [  48.392s] (17/31) ken-cli::rt_parity_native generated_entry_confluence_binding_frame
+3	PASS [  48.366s] (18/31) ken-cli::rt_parity_native generated_entry_confluence_filter_member
+3	PASS [  47.985s] (19/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_closure_origin
+3	PASS [  48.138s] (20/31) ken-cli::rt_parity_native generated_entry_confluence_identity_key
+3	PASS [  48.146s] (21/31) ken-cli::rt_parity_native generated_entry_confluence_remove_member
+3	PASS [  47.957s] (22/31) ken-cli::rt_parity_native generated_entry_confluence_route_wrong_active_frame
+3	PASS [  47.940s] (23/31) ken-cli::rt_parity_native generated_entry_confluence_route_wrong_selected_case
+3	PASS [  96.277s] (24/31) ken-cli::rt_parity_native generated_entry_forward_ret_access_locator_index_disagreement
+3	PASS [ 111.083s] (25/31) ken-cli::rt_parity_native static_response_full_demand_fan_out_population_is_distinct
+3	PASS [ 148.521s] (26/31) ken-cli::rt_parity_native static_response_context_demand_vary_capture_reaches_and_restores
+3	PASS [ 160.917s] (27/31) ken-cli::rt_parity_native static_response_full_demand_read_vary_capture_reaches_and_restores
+3	PASS [  49.056s] (28/31) ken-cli::rt_parity_native substitute_unrelated_owner_root_reds_on_a_specialized_owner_program
+3	PASS [ 166.689s] (29/31) ken-cli::rt_parity_native static_response_full_demand_write_drop_capture_reaches_and_restores
+3	PASS [ 154.193s] (30/31) ken-cli::rt_parity_native static_response_owner_body_after_answer_collapse_reds_and_restores
+3	PASS [ 139.704s] (31/31) ken-cli::rt_parity_native static_response_owner_body_raw_host_result_reds_and_restores
+2	PASS [   0.008s] ( 1/31) ken-cli::rt_parity_native checked_ih_fresh_result_pairing_leg_roster_covers_all
+2	PASS [   1.189s] ( 2/31) ken-cli::rt_parity_native buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface
+2	PASS [  44.437s] ( 3/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_read_removal_stripe_2
+2	PASS [  46.332s] ( 4/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_write_removal_stripe_3
+2	PASS [  83.580s] ( 5/31) ken-cli::rt_parity_native checked_ih_generated_entry_confluence_reaches_exact_capsules
+2	PASS [  37.487s] ( 6/31) ken-cli::rt_parity_native continuation_inheritance_duplicate
+2	PASS [  43.626s] ( 7/31) ken-cli::rt_parity_native composed_return_forward_ret_wrong_source_refuses
+2	PASS [  38.491s] ( 8/31) ken-cli::rt_parity_native continuation_inheritance_remove
+2	PASS [  38.036s] ( 9/31) ken-cli::rt_parity_native continuation_inheritance_wrong_k_index
+2	PASS [ 126.815s] (10/31) ken-cli::rt_parity_native checked_ih_direct_application_permute_captures_refuses_and_restores
+2	PASS [  41.647s] (11/31) ken-cli::rt_parity_native d1_route_control_unknown_read
+2	PASS [  39.839s] (12/31) ken-cli::rt_parity_native generated_entry_admission_drop_non_governed
+2	PASS [  42.065s] (13/31) ken-cli::rt_parity_native fs_read_at_malformed_offset_without_read_right_narrows_to_invalid_offset
+2	PASS [  40.807s] (14/31) ken-cli::rt_parity_native generated_entry_admission_non_governed_to_governed
+2	PASS [  41.160s] (15/31) ken-cli::rt_parity_native generated_entry_capsule_provenance_index
+2	PASS [  41.302s] (16/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_frame
+2	PASS [  41.386s] (17/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_slot
+2	PASS [  40.274s] (18/31) ken-cli::rt_parity_native generated_entry_confluence_duplicate_member
+2	PASS [  40.595s] (19/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_closure_body
+2	PASS [  40.352s] (20/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_ret_body
+2	PASS [  40.380s] (21/31) ken-cli::rt_parity_native generated_entry_confluence_projection_key
+2	PASS [  39.849s] (22/31) ken-cli::rt_parity_native generated_entry_confluence_route_reversed
+2	PASS [  39.786s] (23/31) ken-cli::rt_parity_native generated_entry_confluence_route_wrong_ret_input_body
+2	PASS [  81.568s] (24/31) ken-cli::rt_parity_native generated_entry_forward_ret_access_locator_domain_disagreement
+2	PASS [ 125.375s] (25/31) ken-cli::rt_parity_native static_response_context_demand_vary_body_reaches_and_restores
+2	PASS [ 133.639s] (26/31) ken-cli::rt_parity_native static_response_full_demand_duplicate_row_reds_and_restores
+2	PASS [ 132.159s] (27/31) ken-cli::rt_parity_native static_response_full_demand_read_permute_input_reaches_and_restores
+2	PASS [ 132.740s] (28/31) ken-cli::rt_parity_native static_response_full_demand_vary_row_reds_and_restores
+2	PASS [ 110.408s] (29/31) ken-cli::rt_parity_native static_response_owner_body_omit_owner_definition_reds_and_restores
+2	PASS [ 129.949s] (30/31) ken-cli::rt_parity_native static_response_full_demand_write_vary_input_reaches_and_restores
+2	PASS [ 159.131s] (31/31) ken-cli::rt_parity_native static_response_selected_caller_retarget_reaches_and_restores
+5	PASS [ 169.857s] ( 1/31) ken-cli::rt_parity_native checked_ih_generated_entry_admission_population_is_total
+5	PASS [ 173.836s] ( 2/31) ken-cli::rt_parity_native checked_ih_fresh_result_coemission_only_is_not_paired
+5	PASS [ 255.150s] ( 3/31) ken-cli::rt_parity_native checked_ih_direct_application_drop_capture_refuses_and_restores
+5	PASS [ 272.273s] ( 4/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_population_is_exact
+5	PASS [ 172.225s] ( 5/31) ken-cli::rt_parity_native composed_return_forward_ret_role_witness_pairs_c_and_certificate
+5	PASS [  77.575s] ( 6/31) ken-cli::rt_parity_native continuation_inheritance_final_residual_k_locator
+5	PASS [ 182.674s] ( 7/31) ken-cli::rt_parity_native composed_return_forward_ret_authority_write_removal_stripe_0
+5	PASS [  78.013s] ( 8/31) ken-cli::rt_parity_native continuation_inheritance_swap
+5	PASS [ 171.622s] ( 9/31) ken-cli::rt_parity_native composed_return_ret_sink_population_is_unique
+5	PASS [  82.734s] (10/31) ken-cli::rt_parity_native forward_ret_edge_suppressed_reverts_to_collapse
+5	PASS [  85.990s] (11/31) ken-cli::rt_parity_native d1_route_control_drop_write
+5	PASS [  80.607s] (12/31) ken-cli::rt_parity_native generated_entry_admission_governed_key_collision
+5	PASS [  85.623s] (13/31) ken-cli::rt_parity_native fs_write_at_malformed_offset_narrows_to_invalid_offset
+5	PASS [  83.012s] (14/31) ken-cli::rt_parity_native generated_entry_arrival_skip_lookup
+5	PASS [  80.765s] (15/31) ken-cli::rt_parity_native generated_entry_confluence_context_key
+5	PASS [  80.306s] (16/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_body_reads
+5	PASS [ 166.582s] (17/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_binding
+5	PASS [  80.557s] (18/31) ken-cli::rt_parity_native generated_entry_confluence_fresh_closure_record
+5	PASS [ 167.003s] (19/31) ken-cli::rt_parity_native generated_entry_capsule_wrong_locator_domain
+5	PASS [  80.418s] (20/31) ken-cli::rt_parity_native generated_entry_confluence_locator_domain
+5	PASS [  80.269s] (21/31) ken-cli::rt_parity_native generated_entry_confluence_route_disagreement
+5	PASS [  80.426s] (22/31) ken-cli::rt_parity_native generated_entry_confluence_route_wrong_direct_edge
+5	PASS [ 161.267s] (23/31) ken-cli::rt_parity_native generated_entry_forward_ret_access_destination_body_disagreement
+5	PASS [ 249.423s] (24/31) ken-cli::rt_parity_native static_response_context_demand_delete_reaches_and_restores
+5	PASS [ 248.904s] (25/31) ken-cli::rt_parity_native static_response_context_demand_vary_k_reaches_and_restores
+5	PASS [ 270.611s] (26/31) ken-cli::rt_parity_native static_response_full_demand_read_drop_capture_reaches_and_restores
+5	PASS [ 270.745s] (27/31) ken-cli::rt_parity_native static_response_full_demand_response_app_env_reds_and_restores
+5	PASS [  75.751s] (28/31) ken-cli::rt_parity_native uint64_checked_wrapper_admits_max_and_rejects_both_neighbors
+5	PASS [ 273.296s] (29/31) ken-cli::rt_parity_native static_response_full_demand_write_permute_capture_reaches_and_restores
+5	PASS [ 280.161s] (30/31) ken-cli::rt_parity_native static_response_owner_body_context_zero_reds_and_restores
+5	PASS [ 236.214s] (31/31) ken-cli::rt_parity_native static_response_owner_body_response_operation_reds_and_restores

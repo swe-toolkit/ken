@@ -225,7 +225,7 @@ jobs:
   # builds at ~34m, which no scheduler could subdivide). D2
   # (CI-GATE-TIME-REDUCTION) decomposed those grids into one independently-
   # schedulable #[test] per mutation arm, so this binary is now genuinely
-  # subdividable and runs as its own count-balanced matrix (below, 6-way) instead
+  # subdividable and runs as its own duration-balanced matrix (below, 6-way) instead
   # of a single dominating shard. The two single-#[test] px8f jobs still cannot be
   # subdivided and stay alone. It keeps its own sharded job (not the main shard
   # lane) so it stays the interp/native differential oracle AND so its decomposed
@@ -412,10 +412,36 @@ jobs:
         uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: nextest
+      - name: Plan duration-balanced parity shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p rt-parity-artifact
+          cargo nextest list --locked -p ken-cli --test rt_parity_native \
+            --message-format json > rt-parity-artifact/inventory.json
+          python3 scripts/ci-rt-parity-shard.py \
+            rt-parity-artifact/inventory.json \
+            docs/program/evidence/ci-rt-parity-timings-36260020054.tsv \
+            rt-parity-artifact/plan.json
+          filter=$(python3 -c 'import json,os; print(json.load(open("rt-parity-artifact/plan.json"))["bins"][int(os.environ["SHARD"])-1]["filter"])')
+          cargo nextest list --locked -p ken-cli --test rt_parity_native \
+            --message-format json -E "$filter" \
+            > "rt-parity-artifact/selected-${SHARD}.json"
+          printf '%s' "$filter" > rt-parity-artifact/filter.txt
       - name: Test
-        run: >-
-          cargo nextest run --locked -p ken-cli --test rt_parity_native
-          --partition count:${{ matrix.shard }}/6
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          filter=$(<rt-parity-artifact/filter.txt)
+          cargo nextest run --locked -p ken-cli --test rt_parity_native \
+            -E "$filter"
+      - name: Upload realized parity selection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rt-parity-shard-${{ matrix.shard }}
+          path: rt-parity-artifact/*
+          if-no-files-found: error
 
   z3-process-adapter:
     needs: classify-paths
@@ -471,6 +497,7 @@ jobs:
       - z3-process-adapter
       - z3-emission-control
       - ignored-row-sweep
+      - verify-realized-shard-union
     # `always()` so this reports a definite conclusion even when a job fails
     # or is skipped. Without it, a failed dependency leaves this job *skipped*,
     # and a skipped required check blocks the PR with no useful signal.
@@ -485,6 +512,7 @@ jobs:
           z3_adapter='${{ needs.z3-process-adapter.result }}'
           z3_emission='${{ needs.z3-emission-control.result }}'
           ignored_sweep='${{ needs.ignored-row-sweep.result }}'
+          shard_union='${{ needs.verify-realized-shard-union.result }}'
           echo "test-shard matrix:      $shards"
           echo "native-write-partition: $write"
           echo "native-buffer:          $buffer"
@@ -492,6 +520,7 @@ jobs:
           echo "z3-process-adapter:     $z3_adapter"
           echo "z3-emission-control:    $z3_emission"
           echo "ignored-row-sweep:      $ignored_sweep"
+          echo "realized-shard-union:   $shard_union"
           failed=0
           for pair in "test shards:$shards" \
                       "native-write-partition:$write" \
@@ -499,7 +528,8 @@ jobs:
                       "native-rt-parity:$rt_parity" \
                       "z3-process-adapter:$z3_adapter" \
                       "z3-emission-control:$z3_emission" \
-                      "ignored-row-sweep:$ignored_sweep"; do
+                      "ignored-row-sweep:$ignored_sweep" \
+                      "realized-shard-union:$shard_union"; do
             name="${pair%:*}"; result="${pair##*:}"
             if [ "$result" != "success" ] && ! { [ '${{ needs.classify-paths.outputs.mode }}' = doc-only ] && [ "$result" = skipped ]; }; then
               echo "::error::$name did not pass ($result)." >&2
@@ -563,7 +593,7 @@ jobs:
         run: scripts/gen-progress.sh --check
 
   verify-realized-shard-union:
-    needs: [classify-paths, test-shard]
+    needs: [classify-paths, test-shard, native-rt-parity]
     if: always() && needs.classify-paths.outputs.mode == 'full'
     runs-on: ubuntu-latest
     steps:
@@ -572,5 +602,11 @@ jobs:
         with:
           pattern: realized-shard-*
           path: realized-shards
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rt-parity-shard-*
+          path: realized-rt-parity
       - name: Verify realized partition
-        run: python3 scripts/check-ci-shard-union.py
+        run: |
+          test -d realized-rt-parity
+          python3 scripts/check-ci-shard-union.py
