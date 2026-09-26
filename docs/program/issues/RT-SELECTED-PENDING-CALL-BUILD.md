@@ -290,3 +290,11 @@ Positive native px7m err depends on it.
    source subtree it replaces (Architect `evt_7565yjvhkhsk6`, HS8: not the
    lines 3/5/6/7 predicate; disposition follows C1's deadness through the
    existing statically-unselected-case record; research triggers at 9).
+9. R1's Ret-only record at origin11 is overridden at closure: the
+   partition unions reached cases across visits (reached_cases={0,1}) and
+   does not disposition a recursive predecessor's cases -- keyed on
+   per-origin reachability, while C2's deadness is per visit (by the callee
+   C1 classifies as feeding that visit) (Architect `evt_3a89bas8thgek`,
+   HS9: shares one predicate with line 8 -- the join partition is keyed on
+   the source origin within an emission, but C2's deadness belongs to one
+   visit of that origin; research triggered, ruling held).
