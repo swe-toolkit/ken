@@ -101,3 +101,12 @@ to the user.
    the leaf's effect), placed ahead of existing refusals -- keyed on
    continuation contents (Architect `evt_26wqwj479dqy0`, stop 1; R1' replaces
    R1 at the admission seat).
+2. CORRECTION to 1 (not a new hard stop; §1a stays 1): the admission
+   reading behind 1 was withdrawn. The measured seat is the
+   StaticResponseDeferred placeholder outside an owner (`effects.rs:2825`,
+   `core.rs:15548` @`912c44cf4`). It was licensed by "a Specialized row
+   names this site", not by the retarget that justifies it. Keyed on the
+   source Effect occurrence origin, which one handler arm shares across Vis
+   (F1: Vis371 owned, Vis341 Deferred). Ruled L1 in `evt_1ecad0e6872t4`:
+   licence keyed on the function's retarget, fail closed to ordinary
+   lowering.
