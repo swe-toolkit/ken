@@ -214,6 +214,13 @@ T1. Build on `8d604670e` rebased to current `origin/main`, never on
   Planned package, its producers and `call_selected_pending_package`, since
   no admitted consumer remains. Keep admission's refusals and the witness
   facts C1-C3 consume. `a2697c91a` is abandoned and not resumed.
+- **Join disposition (HS8, `evt_7565yjvhkhsk6`).** The trapped Vis body is
+  not retained. At the owner-fed dispatch, record the Ret case through the
+  existing `disposition_statically_unselected_match_cases`; no new walker,
+  predicate or origin inventory, and the existing backstops stay. A
+  mutation skipping that record reproduces the "neither emitted nor
+  statically unselected" refusal on px7l. Stop and report the enclosing
+  origin of any undispositioned join outside the Vis case body.
 - **Stop** if a deletion reddens any row or pin, meaning a consumer
   exists; report the row.
 
@@ -277,3 +284,9 @@ Positive native px7m err depends on it.
    `claim_and_call_resolved_continuation_inner` (Architect
    `evt_6m1pamme41q09`, HS7: relocation-cut ruling withdrawn; M9 outcomes
    P-A/P-B/P-C pre-ruled).
+8. The C2 trap replaces the owner-fed Vis case body, so that body's
+   planned joins (px7l StaticOriginId(19)) are neither emitted nor
+   dispositioned -- keyed on whether a trap terminator dispositions the
+   source subtree it replaces (Architect `evt_7565yjvhkhsk6`, HS8: not the
+   lines 3/5/6/7 predicate; disposition follows C1's deadness through the
+   existing statically-unselected-case record; research triggers at 9).
