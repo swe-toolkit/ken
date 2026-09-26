@@ -18,7 +18,7 @@ origin: "Operator 2026-09-26: 'CI is now at 28 minutes. schedule work to bring t
 
 Every Full CI run on main finishes in under 20 minutes of wall time.
 
-## Settled inputs -- measured on main run `36231472089` (`90e53a629`)
+## Settled inputs -- measured on full-CI run `36231472089` (`90e53a629`)
 
 - **Wall time 28.4 min.** The critical path is `native-slow
   (rt_parity_native) 4/6` at 28.1 min. Every other job finishes by 21.2
@@ -57,9 +57,10 @@ critical path under 20 minutes with margin.
 - **AC-1.** Each split test keeps the same cases, assertions and outcomes;
   list old test to new tests. No test is deleted, ignored or weakened, and
   no mutation case is dropped.
-- **AC-2.** The PR's own Full CI run, and the first main run after it
-  lands, each finish under 20 minutes; post both timelines. A run within a
-  minute of the limit is a stop to re-balance, not a pass.
+- **AC-2.** The PR's own Full CI run, and the next full-CI candidate run
+  after it lands, each finish under 20 minutes; post both timelines. (Main
+  push runs are path-classified and short, so they do not measure this.) A
+  run within a minute of the limit is a stop to re-balance, not a pass.
 - **AC-3.** Targeted local checks only, through `scripts/ken-cargo`; CI is
   the measurement.
 

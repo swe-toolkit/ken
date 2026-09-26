@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Refuse shell commands that fleet law forbids outright.
+
+Reads one shell command on stdin. Exits 0 to allow it. Exits 2 to refuse it,
+printing the reason on stdout. Both harnesses call this before running a
+command: Claude Code through scripts/hooks/claude-bash-policy.sh, and pi
+through the pi-convo extension's tool_call hook.
+
+Each rule is an absolute prohibition from agent/COORDINATION.md. Enforcing it
+here means no seat has to remember it. Keep the rules few and exact: a false
+refusal stops a seat, so match only the forbidden form.
+"""
+
+import re
+import shlex
+import sys
+
+SEPARATORS = re.compile(r"&&|\|\||[;|\n]")
+
+GIT_GLOBAL_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}
+
+
+def segments(command):
+    for part in SEPARATORS.split(command):
+        try:
+            words = shlex.split(part, posix=True)
+        except ValueError:
+            words = part.split()
+        if words:
+            yield words
+
+
+def strip_prefix(words):
+    """Drop env assignments and wrappers such as `timeout 600`."""
+    i = 0
+    while i < len(words):
+        w = words[i]
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w):
+            i += 1
+        elif w in ("sudo", "command", "exec", "nice", "env"):
+            i += 1
+        elif w == "timeout":
+            i += 1
+            while i < len(words) and words[i].startswith("-"):
+                i += 1
+            i += 1  # the duration
+        else:
+            break
+    return words[i:]
+
+
+def git_subcommand(words):
+    """Return (subcommand, args) for a git invocation, else None."""
+    if not words or words[0].rsplit("/", 1)[-1] != "git":
+        return None
+    i = 1
+    while i < len(words) and words[i].startswith("-"):
+        i += 2 if words[i] in GIT_GLOBAL_WITH_VALUE else 1
+    if i >= len(words):
+        return None
+    return words[i], words[i + 1:]
+
+
+def check_git_stash(args):
+    sub = args[0] if args and not args[0].startswith("-") else None
+    if sub in ("list", "show", "branch"):
+        return None
+    if sub in ("pop", "clear"):
+        return (f"`git stash {sub}` is forbidden (COORDINATION §12a): the stash "
+                "stack is shared by every worktree. Commit instead, or apply "
+                "your own entry with `git stash apply stash@{n}`.")
+    if sub in ("apply", "drop"):
+        if any(re.match(r"^stash@\{\d+\}$", a) or re.match(r"^[0-9a-f]{7,40}$", a)
+               for a in args[1:]):
+            return None
+        return (f"`git stash {sub}` needs an explicit entry you wrote "
+                "(`stash@{n}` or its SHA); the stack is shared (§12a).")
+    if sub in (None, "push", "save"):
+        if "-m" in args or "--message" in args or any(a.startswith("--message=") for a in args):
+            return None
+        return ("A bare `git stash` is forbidden (COORDINATION §12a). Commit "
+                "the work, or `git stash push -m \"<role>: <what>\"`.")
+    return None
+
+
+def check_git(words):
+    parsed = git_subcommand(words)
+    if parsed is None:
+        return None
+    sub, args = parsed
+    if sub == "stash":
+        return check_git_stash(args)
+    if sub in ("checkout", "restore") and any(
+            a == "moot.toml" or a.endswith("/moot.toml") for a in args):
+        return ("Restoring `moot.toml` is forbidden: the primary checkout's copy "
+                "is deliberately dirty and holds live seat configuration.")
+    return None
+
+
+def check_cargo(words):
+    tool = words[0].rsplit("/", 1)[-1]
+    if tool not in ("cargo", "ken-cargo"):
+        return None
+    if "--workspace" in words or "--all" in words:
+        return ("Workspace-wide cargo runs are forbidden locally "
+                "(COORDINATION §12): build and test one crate through "
+                "`scripts/ken-cargo -p <crate>`. CI runs the whole workspace.")
+    return None
+
+
+def check_gh(words):
+    if words[0].rsplit("/", 1)[-1] != "gh":
+        return None
+    if words[1:3] == ["run", "rerun"]:
+        return ("`gh run rerun` is a write reserved to the publisher path. "
+                "Report the red to your leader; a respin or a publisher "
+                "close/reopen reruns CI.")
+    return None
+
+
+def main():
+    command = sys.stdin.read()
+    for raw in segments(command):
+        words = strip_prefix(raw)
+        if not words:
+            continue
+        for check in (check_git, check_cargo, check_gh):
+            reason = check(words)
+            if reason:
+                print(f"Refused by scripts/hooks/bash-policy: {reason}")
+                return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
