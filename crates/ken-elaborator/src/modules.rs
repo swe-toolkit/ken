@@ -101,6 +101,10 @@ pub struct ModuleState {
     /// Source leaf → checked constructor identity, keyed by the exact parent
     /// inductive ID. A flat `globals` spelling is never constructor authority.
     constructor_members: HashMap<ken_kernel::GlobalId, HashMap<String, ken_kernel::GlobalId>>,
+    /// Checked identities intentionally withheld by the prelude. A spelling
+    /// sweep alone is insufficient: qualified constructor resolution selects
+    /// members from the checked family record rather than from `globals`.
+    private_ids: HashSet<ken_kernel::GlobalId>,
     /// Whole families with qualified-only constructor bindings, selected by
     /// checked parent identity rather than individual constructor spellings.
     scoped_constructor_types: HashSet<ken_kernel::GlobalId>,
@@ -180,6 +184,36 @@ impl ModuleState {
 
     pub(crate) fn boundary_header(&self) -> Option<&BoundaryHeader> {
         self.boundary_header.as_ref()
+    }
+
+    /// Hide the complete closed prelude roster by checked identity, including
+    /// aliases installed under a different spelling. Resolve the whole roster
+    /// before changing either namespace so a missing entry cannot silently
+    /// leave some private members accessible.
+    pub(crate) fn hide_prelude_names(
+        &mut self,
+        globals: &mut HashMap<String, ken_kernel::GlobalId>,
+        names: &[&str],
+    ) -> Result<(), ElabError> {
+        let ids = names
+            .iter()
+            .map(|name| {
+                globals.get(*name).copied().ok_or_else(|| {
+                    ElabError::Internal(format!("prelude private name `{name}` is missing"))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        self.private_ids.extend(ids);
+        // The root scope is persistent across calls. File and inline scopes
+        // copy this immutable post-prelude roster when they are created.
+        self.root_scope.private_ids.clone_from(&self.private_ids);
+        globals.retain(|_, id| !self.private_ids.contains(id));
+        if globals.values().any(|id| self.private_ids.contains(id)) {
+            return Err(ElabError::Internal(
+                "prelude private identity remains visible after hiding".into(),
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn install_prelude_floor(&mut self) {
@@ -442,6 +476,9 @@ struct Scope {
     /// The parent-keyed checked constructor registry in this scope. Loaded
     /// providers still need an authorized public constructor export below.
     constructor_members: HashMap<ken_kernel::GlobalId, HashMap<String, ken_kernel::GlobalId>>,
+    /// Snapshot of the prelude's immutable private-ID roster. Every checked
+    /// reference in this scope must pass the same identity gate.
+    private_ids: HashSet<ken_kernel::GlobalId>,
     /// An `export Local` may precede Local's checked declaration. Delay its
     /// ID until that declaration finishes, then check any competing facade.
     pending_local_exports: HashMap<String, (String, Span)>,
@@ -737,6 +774,11 @@ fn resolve_constructor_path(
     if !owner_member && !selected_member {
         return Ok(None);
     }
+    if scope.private_ids.contains(member) {
+        // Do not reveal whether a missing leaf was an intentionally hidden
+        // constructor: use the ordinary spelling-resolution failure path.
+        return Ok(None);
+    }
     // An authorized module export and an authorized type member are two
     // meanings even when both eventually denote the same GlobalId.
     let module_member = scope.prefixes.get(type_path).is_some_and(|module| {
@@ -780,7 +822,9 @@ fn resolve_checked_ref(
     let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
     let imported_qualified = name.rsplit_once('.')
         .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
-    if selected.is_none() && (imported_bare || imported_qualified) {
+    if selected.is_some_and(|id| scope.private_ids.contains(&id))
+        || (selected.is_none() && (imported_bare || imported_qualified))
+    {
         return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
     }
     Ok((canonical, selected))
@@ -1791,6 +1835,7 @@ fn load_unit(
         elab.class_env.next_module();
 
         let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
+        scope.private_ids.clone_from(&elab.module_state.private_ids);
         let mut unit_definitions = HashSet::new();
         let mut ordered_inline_modules = HashSet::new();
         let (results, exports) = expand_scope(
@@ -3832,6 +3877,7 @@ fn expand_scope(
             } => {
                 let child_prefix = qualify(prefix, name);
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
+                child_scope.private_ids.clone_from(&scope.private_ids);
                 let (child_ids, child_exports) = expand_scope(
                     elab,
                     inner,
@@ -4612,12 +4658,66 @@ mod namespace_effect_tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use super::{decl_namespace_effect, ConstructorNameSource, DeclNamespaceEffect, Scope};
+    use super::{
+        decl_namespace_effect, resolve_checked_ref, ConstructorNameSource, DeclNamespaceEffect,
+        ModuleState, Scope,
+    };
     use crate::ast::{Decl, ExplicitDataCtor};
     use crate::error::{ElabError, Span};
     use crate::parser::parse_decls;
     use crate::ElabEnv;
     use ken_kernel::GlobalId;
+
+    /// Promise class: fail-closed identity admission. A missing roster entry
+    /// must leave both namespaces untouched, and a present ID must remove
+    /// ALL aliases while preserving the checked kernel constructor.
+    #[test]
+    fn private_roster_requires_every_name_and_sweeps_identity_aliases() {
+        let env = ElabEnv::new().expect("checked environment");
+        let id = env.globals["True"];
+        let mut globals = env.globals.clone();
+        globals.insert("OtherTrue".into(), id);
+        let mut state = ModuleState::default();
+        let err = state
+            .hide_prelude_names(&mut globals, &["True", "MissingRosterName"])
+            .expect_err("an incomplete private roster must be refused before changing state");
+        assert!(matches!(err, ElabError::Internal(ref msg) if msg.contains("MissingRosterName")));
+        assert!(state.private_ids.is_empty());
+        assert_eq!(globals.get("True"), Some(&id));
+        assert_eq!(globals.get("OtherTrue"), Some(&id));
+
+        state
+            .hide_prelude_names(&mut globals, &["True"])
+            .expect("complete roster admitted");
+        assert!(state.private_ids.contains(&id));
+        assert!(state.root_scope.private_ids.contains(&id));
+        assert!(!globals.values().any(|visible| *visible == id));
+        assert!(env.env.constructor(id).is_some(), "hiding never changes the kernel family");
+    }
+
+    /// Promise class: identity gate. A checked selection carried by a scope
+    /// cannot borrow a hidden ID even if the spelling has a live binding;
+    /// changing only the ID to a public constructor must succeed.
+    #[test]
+    fn selected_private_identity_is_unbound_even_with_a_spelling_binding() {
+        let env = ElabEnv::new().expect("checked environment");
+        let mut scope = Scope::default();
+        let hidden = env.prelude_env.private_fs_open_id;
+        let visible = env.globals["True"];
+        assert_ne!(hidden, visible);
+        scope.private_ids.insert(hidden);
+        scope.bindings.insert("alias".into(), "alias".into());
+        scope.binding_ids.insert("alias".into(), hidden);
+        let err = resolve_checked_ref(&scope, &HashMap::new(), "alias", &Span::zero())
+            .expect_err("private checked identity must not be selected");
+        assert!(matches!(err, ElabError::UnboundName { name, .. } if name == "alias"));
+        scope.binding_ids.insert("alias".into(), visible);
+        assert_eq!(
+            resolve_checked_ref(&scope, &HashMap::new(), "alias", &Span::zero())
+                .expect("the public constructor still resolves"),
+            ("alias".into(), Some(visible))
+        );
+    }
 
     /// Promise class: durable invariant (spec 16 §1.4; 33 §3.3).
     ///

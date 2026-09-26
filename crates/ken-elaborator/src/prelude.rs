@@ -2886,7 +2886,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // No raw acquire or representation constructor is a public Ken identity.
     // Their GlobalIds remain reachable only through the checked definitions
     // above and the immutable `PreludeEnv` driver record.
-    for private_name in [
+    let private_names = [
         "PrivateFsOpen",
         "PrivateFsHandleMetadata",
         "PrivateBufferAllocate",
@@ -2926,9 +2926,9 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "resource_settle_err_for",
         "resource_settle_result_for",
         "release_if_live",
-    ] {
-        elab.globals.remove(private_name);
-    }
+    ];
+    elab.module_state
+        .hide_prelude_names(&mut elab.globals, &private_names)?;
 
     // Program-I I-1 entrypoint ABI. These are ordinary, kernel-checked Ken
     // declarations: the host runner knows their fixed shape, but no kernel
