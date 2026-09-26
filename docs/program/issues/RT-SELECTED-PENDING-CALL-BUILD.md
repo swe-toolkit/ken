@@ -95,14 +95,24 @@ natively. Any row that stays ignored gets a measured reason in its
     - M2: for each join in `R`, the emission that consumes it, or none;
     - M3: for rows 341 and 378, the owner of the emission that lowers them,
       compared with their handler owners.
-  - **(J) join partition.** If every join in `R` is consumed by the
-    response-owner emission (J-a), the witness carries `R`, and the
-    package's required set subtracts it on witnessed pending routes only.
-    The owning emission closes over exactly `R`. px7m err may then go
-    native, and is pinned native if it does. If some join in `R` is
-    consumed nowhere (J-b), admission refuses with "selected pending leaf
-    relocates planned joins no emission lowers". Report whether a
-    non-pending route can reach the same shape.
+  - **M4, static only** (Architect `evt_2spyd3965e84m`; no suppression, no
+    compile past a refusal): for each relocated unit on px7l and px7m err
+    (the operation subtree of a `Specialized` `Vis` the package does not
+    own, and the drive subtree of each `Deferred` row), list each free
+    variable, its binder origin, and whether the response owner's frame
+    receives it.
+  - **(E) environment closure**, checked first. Every relocated unit's free
+    variables are among the bindings its owner emission receives (its
+    `StaticResponseEnvironmentBinding` frame sources plus its K ABI
+    parameters and captures). Otherwise the route is refused with
+    "relocated work references a binder its response owner does not
+    receive". If (E) holds everywhere, STOP and report the Var(1) cause.
+  - **(J) join partition**, checked after (E). A leaf with a non-empty `R`
+    that no witnessed accounting covers is refused with "selected pending
+    leaf relocates planned joins no emission lowers". The J-a accounting is
+    not built while no Planned row has a non-empty `R`; it is deferred with
+    the response-owner environment extension below. Never read "consumed
+    nowhere" off a compile that stopped before the owner emission ran.
   - **(D) Deferred drive.** For each `Deferred` row on the route, its
     handler owner equals the owner of the emission that lowers it.
     Otherwise it is refused with "Deferred response lowered outside its
@@ -112,12 +122,13 @@ natively. Any row that stays ignored gets a measured reason in its
     `ObjectEmission` join closeout (`joins.rs:2234`), is classified in the
     handoff as a witness clause, an asserted invariant, or unreachable on a
     witnessed route, with the reason. An unclassified row is a finding.
-  - **Pins.** The pair control is px7l (`R` empty, Planned, native) against
-    px7m err. Each of px7l ×2, px7m ok and px7m err is reported Planned or
-    Refused, a refusal asserted by reason. Dropping (J) returns px7m err to
-    the join-393 closeout. Dropping (D) reddens if any M3 row mismatches;
-    if none does, (D) is reported unexercised, not claimed. No Planned row
-    fails at emission.
+  - **Pins.** The pair control is px7l (Planned, native, (E) holds, `R`
+    empty) against px7m err (Refused by (E)). Each of px7l ×2, px7m ok and
+    px7m err is reported Planned or Refused, a refusal asserted by reason.
+    Mutations: dropping (E) refuses err by (J); dropping (E) and (J) returns
+    it to the join-393 closeout. (D) is reported exercised only by a
+    measured row; otherwise unexercised, not claimed. No Planned row fails
+    at emission.
   - **Stop** if `R` is not empty on px7l, or if one join is consumed by two
     emissions.
   - Forbidden: dispositioning join 393 as unselected, forcing the
@@ -181,6 +192,11 @@ elsewhere. AC-1a closes the class: the emitter consumes the admission
 witness, and each clause evaluates an emitter condition the census names.
 Relocating a `Specialized` response to its owner is a lawful handoff that
 px7l already uses; it is not a future capability.
+
+The next capability, a future WP (Architect `evt_2spyd3965e84m`): the
+response-owner environment extension, which passes binders from the pending
+package's scope into a response owner's frame, with the J-a join accounting.
+Positive native px7m err depends on it.
 
 ## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 
