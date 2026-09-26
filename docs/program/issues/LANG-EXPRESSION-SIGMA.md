@@ -1,7 +1,7 @@
 ---
 id: LANG-EXPRESSION-SIGMA
 title: "Add expression-position dependent Σ, mirroring the Π production, so a Σ at Ω such as And's body can be written in catalog Ken; spec grammar and parser/elaborator land together, with no kernel or trusted-base change; unblocks moving the And family out of the prelude"
-status: ready
+status: active
 owner: language
 size: S
 gate: architect

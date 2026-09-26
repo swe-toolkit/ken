@@ -1,7 +1,7 @@
 ---
 id: RT-ERASURE-SELECTED-HOST-BINDER-DEPTH
 title: "Erasure's runtime-selected host dispatch under-shifts the Clock and Entropy leaf continuations by one binder: clock_or_entropy is a third synthesized Match case binder, but the leaves are shifted as if under two, so a raw outer Var in their continuations reads one slot off; witness it on checked source, then fix the shift budget so every leaf's shift equals its real case depth"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: architect

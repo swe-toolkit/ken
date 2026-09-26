@@ -806,7 +806,7 @@ them, in the course of product work, or they wait.
 
 The edge is **report-only and one-directional**. In full:
 
-1. The Steward **may notify** the adversary on a code merge.
+1. The lieutenant **notifies** the adversary on a code merge (M8; operator, 2026-09-26).
 2. The Steward **may receive** reports.
 3. **Nothing else.**
 
