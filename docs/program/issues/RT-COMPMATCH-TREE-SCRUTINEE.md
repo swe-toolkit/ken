@@ -1,7 +1,7 @@
 ---
 id: RT-COMPMATCH-TREE-SCRUTINEE
 title: "Clear the next ignored L1 rows: re-measure the first refusal of every remaining unowned ignored runtime row at the increment-2 base, then repair the refusal the most rows share"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
@@ -18,7 +18,7 @@ origin: "Operator L1 directive 2026-09-17 (clear the ignored tests; top priority
 
 Un-ignore the largest group of runtime rows that one repair can clear.
 
-## Settled inputs -- to re-measure at `912c44cf4`
+## Settled inputs -- to re-measure at `310bf4f21`
 
 - **The rows.** Every owning node below is merged or closed, so these rows
   have no live owner. Their labels were measured before increment 2 and
@@ -56,7 +56,7 @@ chosen first refusal, with no other row changing colour.
 
 ## Acceptance
 
-- **AC-0 (D0, before any repair).** Run each row above at `912c44cf4` and
+- **AC-0 (D0, before any repair).** Run each row above at `310bf4f21` and
   post, in the WP thread, the verbatim first refusal and whether its label
   agrees. Group the rows by first refusal. The leader proposes the group
   to repair, preferring the one with the most rows, and the Architect rules

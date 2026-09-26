@@ -1,7 +1,7 @@
 ---
 id: RT-PENDING-ROUTE-CONTINUATION-DROP
 title: "An owner-validated pending route runs natively only when the owner runs the selected leaf's whole continuation; otherwise it is refused at compile time with its admission reason, never a silent drop and never a planner-invariant ICE"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: architect
