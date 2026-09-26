@@ -153,3 +153,128 @@ fn checked_double_bind_is_refused_upstream_not_admitted() {
         "the direct double bind must remain an upstream refusal, not a surrogate admission witness: {error:?}"
     );
 }
+
+// F1 and its controls change only the selected_body of the landed PX7L
+// source. This is a fixture constructor, not an admission/execution oracle.
+fn with_selected_body(body: &str) -> String {
+    let start = PX7L.find("  \\_. match terminal {").unwrap();
+    let end = PX7L.find("\n\nproc delayed").unwrap();
+    assert!(start < end);
+    format!("{}{}{}", &PX7L[..start], body, &PX7L[end..])
+}
+
+const F1_BODY: &str = r#"  \_. match terminal {
+    False |-> bind (Coproduct (FSOp APartial) AmbientOp)
+      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      (Result IOError Unit) Unit
+      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (\_. host_console APartial Unit (print_line "after-flush")) ;
+    True |-> host_console APartial Unit (print_line message)
+  }"#;
+
+fn assert_native_interpreted_route(
+    source: &str, name: &str, stdout: &[u8], ops: &[ken_runtime::HostOpV1],
+) {
+    let dir = tempfile::tempdir().unwrap();
+    let output = ken_cli::build_native_program(
+        source, ken_cli::SourceFormat::Ken, name, dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    ).expect("a selected route must emit an artifact");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &output.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(), environment: Vec::new(),
+            cwd: dir.path().to_owned(), plan_hash: output.plan_transport_hash,
+        },
+    ).expect("native selected route must return a complete observation");
+    let mut host = ken_interp::CaptureHost::new(Vec::new());
+    let interpreted = ken_cli::run_program_effect_observation(
+        source, ken_cli::SourceFormat::Ken, &[b"ken".to_vec()], &[], b"/", &mut host,
+    ).expect("the same checked source must run through the interpreter");
+    assert_eq!(native, interpreted, "native cannot drop a selected continuation");
+    assert_eq!(native.exit_status, 0);
+    assert_eq!(native.stdout, stdout);
+    assert_eq!(native.effect_trace.iter().map(|event| event.operation)
+        .collect::<Vec<_>>(), ops);
+}
+
+// Durable parity invariant: a shared handler Effect row belonging to another
+// Vis cannot let the reached Write case resume without dispatch. Under the
+// old row-only placeholder this source exited zero with empty native stdout.
+#[test]
+fn selected_pending_write_arm_runs_its_bind_continuation_natively() {
+    assert_native_interpreted_route(
+        &with_selected_body(F1_BODY), "rt-pending-selected-write",
+        b"after-flush\n",
+        &[ken_runtime::HostOpV1::ConsoleIsTerminal,
+          ken_runtime::HostOpV1::ConsoleFlush,
+          ken_runtime::HostOpV1::ConsoleWrite,
+          ken_runtime::HostOpV1::ConsoleFlush],
+    );
+}
+
+// Positive controls: the same leaf without a runtime Match or in the
+// non-selected arm follows the already-lawful ordinary execution path.
+#[test]
+fn selected_pending_write_arm_controls_agree_across_executors() {
+    const NO_MATCH: &str = r#"  \_. bind (Coproduct (FSOp APartial) AmbientOp)
+      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      (Result IOError Unit) Unit
+      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (\_. host_console APartial Unit (print_line "after-flush"))"#;
+    const UNSELECTED: &str = r#"  \_. match terminal {
+    False |-> host_console APartial Unit (print_line message) ;
+    True |-> bind (Coproduct (FSOp APartial) AmbientOp)
+      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      (Result IOError Unit) Unit
+      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (\_. host_console APartial Unit (print_line "after-flush"))
+  }"#;
+    assert_native_interpreted_route(
+        &with_selected_body(NO_MATCH), "rt-pending-no-match", b"after-flush\n",
+        &[ken_runtime::HostOpV1::ConsoleIsTerminal,
+          ken_runtime::HostOpV1::ConsoleFlush,
+          ken_runtime::HostOpV1::ConsoleWrite,
+          ken_runtime::HostOpV1::ConsoleFlush],
+    );
+    assert_native_interpreted_route(
+        &with_selected_body(UNSELECTED), "rt-pending-unselected", b"captured\n",
+        &[ken_runtime::HostOpV1::ConsoleIsTerminal,
+          ken_runtime::HostOpV1::ConsoleWrite,
+          ken_runtime::HostOpV1::ConsoleFlush],
+    );
+}
+
+// Transition sentinel: two prints in the selected arm still lack a binding
+// for deferred relocated work. Refusal must be classified to the user; a
+// planner invariant is a backend defect, not the admitted-route boundary.
+#[test]
+fn selected_pending_two_print_route_surfaces_its_admission_refusal() {
+    const OLD_ARM: &str = "False |-> host_console APartial Unit (print_line message)";
+    const TWO_PRINTS: &str = r#"False |-> bind (Coproduct (FSOp APartial) AmbientOp)
+      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      Unit Unit
+      (host_console APartial Unit (print_line message))
+      (\_. host_console APartial Unit (print_line "second"))"#;
+    assert_eq!(PX7L.matches(OLD_ARM).count(), 1);
+    let source = PX7L.replacen(OLD_ARM, TWO_PRINTS, 1);
+    let dir = tempfile::tempdir().unwrap();
+    let (outcome, rows) = ken_runtime::with_selected_pending_call_admissions(|| {
+        ken_cli::build_native_program(
+            &source, ken_cli::SourceFormat::Ken, "rt-pending-two-print",
+            dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    let refused = rows.iter().filter_map(|row| match row.outcome {
+        ken_runtime::SelectedPendingCallOutcomeObservation::Refused(reason) => Some(reason),
+        _ => None,
+    }).collect::<Vec<_>>();
+    assert_eq!(refused, [ken_runtime::PendingRefusal::RelocatedWorkMissingLoweringBinding],
+        "the source must reach this exact admission refusal: {rows:#?}");
+    let error = outcome.expect_err("a refused route cannot emit an artifact");
+    let text = error.to_string();
+    assert!(text.contains("unsupported runtime-IR lowering: PendingCallAdmission: refused pending call: RelocatedWorkMissingLoweringBinding"),
+        "the user must see the classified admission reason: {text}");
+    assert!(!text.contains("planner invariant") && !text.contains("compiler bug"),
+        "the admission refusal is not a compiler ICE: {text}");
+}

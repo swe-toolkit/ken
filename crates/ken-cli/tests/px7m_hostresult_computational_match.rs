@@ -330,5 +330,10 @@ fn dynamic_err_pending_route_refuses_missing_effect_binding_before_join_accounti
         row.outcome,
         ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner { .. }
     )), "one refused producer must not gain an owner-validated route: {admissions:#?}");
-    assert!(result.is_err(), "a refused pending route cannot emit an artifact");
+    let error = result.expect_err("a refused pending route cannot emit an artifact");
+    let text = error.to_string();
+    assert!(text.contains("unsupported runtime-IR lowering: PendingCallAdmission: refused pending call: RelocatedWorkMissingLoweringBinding"),
+        "the user must see the admission-E reason rather than a compiler ICE: {text}");
+    assert!(!text.contains("planner invariant") && !text.contains("compiler bug"),
+        "a classified admission refusal is not a compiler ICE: {text}");
 }
