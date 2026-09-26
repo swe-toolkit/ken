@@ -143,6 +143,53 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   of the abstract-export case: hiding is real **and** costs the kernel
   nothing.
 
+### surface/modules/public-type-does-not-publish-constructors (soundness)
+- spec: `33 §4.1–§4.2` (separate type and constructor exports), `34 §1.1`
+  (constructor qualification checks visibility), `32 §1` (data/export syntax)
+- given: a real provider file `M.ken` containing
+  `pub data Token = MkToken` and `const own : Token = MkToken`; the latter
+  establishes that the defining module can construct its own value. Elaborate
+  each client independently through the same real loader and resolver, with
+  `import M`:
+  1. `fn keep (x : M.Token) : M.Token = x`;
+  2. `const made : M.Token = M.MkToken`;
+  3. `fn inspect (x : M.Token) : M.Token = match x { M.MkToken ↦ x }`.
+- expect: provider and client 1 accept; `Token` is in `M`'s public interface,
+  while `MkToken` is not. Clients 2 and 3 reject **at surface resolution**
+  because `M.MkToken` is not exported; neither reaches a kernel type or match
+  error. Merely qualifying the constructor via its visible parent
+  (`M.Token.MkToken`) does not change either refusal.
+- discriminator: add only `export MkToken` to the provider and rerun all three
+  clients. All now accept; both constructor uses select the provider's exact
+  checked constructor identity, and the public interface contains a separate
+  entry for `MkToken`. Removing only this export restores both rejections
+  while client 1 still accepts. Neither an implicit `pub data` constructor
+  export nor a qualification bypass can pass this pair.
+- staging: `34 §1.1` marks `T.C` qualification as an L2 follow-on; its extra
+  refusal arm is red until that surface path is implemented. The `M.C`
+  module-qualified pair pins the present visibility boundary independently.
+
+### surface/modules/facade-cannot-publish-hidden-constructor (soundness)
+- spec: `33 §4.1–§4.3` (defining-module export and re-export guard),
+  `33 §3.2` (facade selection without an import)
+- given: use the same provider file `M.ken` with
+  `pub data Token = MkToken`, and facade file `N.ken` with only
+  `export M (Token)` and `export M (MkToken)`; `N` does not import `M`.
+  Elaborate `N` through the real loader and its facade-export selection.
+- expect: `N` rejects at **surface resolution of its second export**:
+  `MkToken` is absent from `M`'s public interface, so `N` cannot publish it.
+  The accepted `export M (Token)` does not make `MkToken` available in `N`'s
+  body or interface. Detection does not depend on client use or a kernel
+  rejection.
+- discriminator: change **only** `M.ken` by adding `export MkToken`, then
+  elaborate the same `N` and a client file `Client.ken` that writes `import N`
+  and `const made : N.Token = N.MkToken`. Both accept. `N.MkToken`, the client
+  term, and `M.MkToken` all select the **same checked constructor identity**;
+  `N.Token` retains `M.Token`'s identity. Removing only the provider's export
+  restores the facade-site rejection while leaving `export M (Token)` valid.
+  A facade that can select a hidden constructor incorrectly accepts the
+  negative; one that mints a wrapper identity fails the positive.
+
 ## C. Visibility + resolution — surface-only, well-defined (AC3/AC4)
 
 ### surface/modules/private-name-access-rejected-at-surface (soundness)
@@ -1590,3 +1637,10 @@ The parser dependency must populate both header projections from source before
 declared binding. The N4 admission reader remains unchanged. Tests that insert
 either projection directly, mint a `Cap` outside the runner path, or exercise a
 raw authority-polymorphic I-3 producer do not discharge §G.
+
+## Clean-room provenance
+
+The constructor-export cases and expected outcomes were derived from the
+candidate specification and first principles. No `local/refs/` implementation,
+permissive reference, copyleft reference, or excluded prototype was consulted
+for this clarification. An originality scan is not applicable.
