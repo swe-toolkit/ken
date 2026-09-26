@@ -75,3 +75,52 @@ about a pin that cannot detect **any** contract, good or bad, because it never
 had two independent operands. Also
 [[never-pin-a-shape-that-cannot-state-its-own-contract]] and
 [[an-enumeration-needs-a-proven-closure-not-a-better-grep]].
+
+## Half a struct can be its own source
+
+**Measured 2026-08-14 on `a998d3f6` (Adversary).** An AC's own wording flagged
+the risk: *"each agreeing with an independent direct derivation. The agreement
+is the claim; a shared derivation path would make it vacuous."* The relation is
+a two-field struct, and the re-derivation built every candidate as
+
+```rust
+Occurrence {
+    body_origin: child_origin(claimed.eliminator_origin, 1 + alternative)?,  // re-derived
+    eliminator_origin: claimed.eliminator_origin,                            // COPIED
+}
+```
+
+`body_origin` is a real derivation. `eliminator_origin` cannot disagree,
+because it is copied from the claim into the candidate before the comparison.
+The control's own printed output showed it: `carried={16, 5}
+direct=Some({16, 5})` and `carried={12, 5} direct=Some({12, 5})`; the `5` is
+identical on both sides of both rows because nothing re-derived it. Running the
+control, not reading it, is what surfaced this.
+
+- **When a control asserts "derived == carried" on a struct, check the
+  derivation field by field.** A struct-level `assert_eq!` reads as one claim
+  and is as many claims as it has fields. The copied field is usually the one
+  the derivation needed as an input.
+- **Compare the fields the mutation moves with the fields the assertion
+  covers.** The mutation that measured the refusal perturbed `body_origin`
+  only (the other field sat outside the `#[cfg(test)]` seed branch), so the
+  measured refusal exercised the half that was already independent. A combined
+  mutation makes a red an existential over its perturbations; a single-field
+  mutation reported as validating a whole struct is the same attribution gap
+  run backwards.
+- **A validation is not a derivation, and its strength rests on a premise.**
+  The copied field was not unprotected: the re-derivation returns `None` unless
+  `forward_match_scrutinee(claimed.eliminator_origin) ==
+  key.continuation_origin`. That is as strong as a derivation only under an
+  unstated uniqueness premise (at most one parent has a given occurrence at
+  position zero). State such a premise and list it as read-but-not-fired; it is
+  what a later graph change breaks.
+- **Report the per-axis count, not the row count.** The two governed rows
+  shared `eliminator_origin` and `consumer_owner` and differed only in
+  `body_origin`: two samples on one axis and one on every other. See
+  [[a-population-held-at-a-degenerate-value-cannot-see-that-axis]].
+- **Check a re-derivation at the site of the shortage.** The field was
+  *carried* because the interning site cannot compute it; the re-derivation
+  runs where it can, and uses the carried copy without noticing. A value
+  carried because a later site cannot compute it will be re-checked at a site
+  that can, from the carried copy.

@@ -84,3 +84,101 @@ the finding is the key, and requesting one more tagged row invites exactly the
 per-instance patch. Same shape as
 [[a-corrections-sweep-population-is-its-own-diff-scope]] from the other side —
 there the sweep was too narrow, here the *rule* was.
+
+## One step out: the artifact's own two assertions form a pair nobody composed
+
+**Measured 2026-08-13 on `2a1d87a2` (`RT-4B-ENUMERATION-INPUT-SIZE`)**, hunting
+the lead *"find the next claim whose instrument is pointed at a negative
+control"*. Merged 2026-09-26. Above, the Adversary failed to compose its own
+two measurements; here the two measurements were the artifact's, landed in one
+candidate, and still uncomposed.
+
+The expected finding was that five new observation fields were asserted only on
+`arrived_empty` (the two `D2j` causes perturbed so fusion cannot form). A second
+new test refuted it by asserting the fields on the unperturbed cause; on the
+first test alone this would have been a false alarm. Composed:
+
+| cause | perturbed? | keys / descriptors | the five new fields |
+|---|---|---|---|
+| `ExactSuffix` | yes | 0 / 0 | `(4, 2, 0, 2, 1)` |
+| `CallIdentity` | yes | 0 / 0 | `(4, 2, 0, 2, 1)` |
+| `Exact` | no | 1 / 1 | `(4, 2, 0, 2, 1)` |
+
+The perturbation moves the outcome from one key to zero and leaves all five
+numbers unchanged. Neither test is wrong; together they are a discriminating
+pair that returns **no** discrimination.
+
+- **When a candidate asserts a new instrument on more than one fixture, tabulate
+  the assertions and ask which columns move.** A column constant across the
+  perturbation has zero information on that axis, and a non-zero number will
+  still be read as a measurement.
+- **Weak attribution and zero information are different, and only one binds.**
+  The candidate's doc said the observation *"licenses no conclusion about which
+  planner relation declined the candidates"*: a caution about attribution,
+  which still invites the reading. The measured constancy forecloses it. Upgrade
+  a caveat to a fact when evidence already in the tree allows.
+- **Pre-empt the reading before the first consumer runs.** Six claims in the
+  arc had already been published wider than their instruments, and the
+  successor node was about to read this number. Write the constancy into the
+  observation's own doc as a measured statement. Prefer that over widening the
+  positive rows to carry the fields, which restates a fact another test pins
+  and adds a second authority to drift.
+- **Say what you are not asking for.** Recording an input population is
+  reasonable; the hazard is the reading. Attacking the instrument invites a
+  defence of the instrument, which is not the argument.
+- **Credit a residual that was silently satisfied.** Two passes earlier a
+  one-clause note said `let _ = Guard::arm()` drops immediately; this candidate
+  bound it `let _arm = ...`, unasked, and preceded a byte-equality with
+  `disabled_arrivals.is_empty()` and `!enabled_bytes.is_empty()`, so it cannot
+  pass on two empty buffers
+  ([[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]]).
+  Naming both is evidence the low-cost clause is worth writing.
+- **Check the declared path list against the object's own stat before
+  scoping.** The notification named two production paths; the squash touched
+  three, and the omitted one carried `+130` of `+194`, both new instruments.
+  Test paths are the ones a production-shaped declaration drops
+  ([[the-operative-artifact-must-carry-the-claim-whichever-pass-wrote-it]]).
+
+## Your refuted section is an input to your finding section
+
+Measured 2026-08-13 on `7baa5eb2` (`LANG-SURFACE-BLOCK-COMMENTS`); the finding
+itself is in
+[[an-enumeration-can-test-every-member-in-its-loud-configuration]]. The
+headline witness, `"{-}\n1\n{-- d --}\n2\n"`, was filed as silent consumption.
+The Steward ran it: REJECT, "unterminated block comment". The class was real;
+the witness was not. The mechanism was one I had written two paragraphs earlier
+in the same message, under refuted hypotheses: a `{--` inside a `{- -}` body
+partially matches the `{-` check and increments depth. The `{--` on line 3
+takes depth to 2; one `-}` returns it to 1, never 0. My two sections
+contradicted each other and I did not compose them.
+
+**This is structural, not an attention lapse** (the Steward's correction of my
+first framing, and the useful part). The depth behaviour was filed correctly and
+precisely enough that the Steward reproduced the refutation from my own
+paragraph, and the three claims I flagged as underived were exact. A finding
+report is composed in two opposite frames, "this is fine" (refuted hypotheses)
+and "this is broken" (the finding), and facts parked in the first are not in
+scope while the second is being built. Any report with both sections has this
+structure.
+
+⇒ **Read your refuted section as a constraint list against every witness before
+shipping**, after both are drafted, not while either is. This is the hardest
+form of this file's rule: not my measurement against the artifact's claim, but
+my measurement against my other measurement, in one report, minutes apart.
+
+One occurrence at the time. If it recurs in a shape that is not comment
+scanners, it is worth raising beyond role scope.
+
+## A caveat chosen by confidence is worse than no caveat
+
+I marked the `{--}` / `{---}` / `{----}` triple "derived, not executed", and
+those three were right in every particular. The headline fixture went out bare,
+because I was confident. A confidence-selected caveat lands where it is not
+needed and skips where it is, and it signals to the reader that the unmarked
+claims are the solid ones, inverting the truth.
+
+⇒ **Label by whether you RAN it, never by how sure you feel.** The policy has
+to be mechanical because the feeling is what is wrong. The playbook already
+says a finding carries a repro; I hand-traced one and shipped it as a witness.
+The corrected witness, `"{-} 1 -}"` → ACCEPT `[Eof]`, is what the finding
+delivered.

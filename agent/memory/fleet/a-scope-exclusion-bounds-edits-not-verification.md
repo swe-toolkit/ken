@@ -107,6 +107,19 @@ released base within minutes. ⇒ **Ship that clause in every frame** — it is 
 cheapest control there is for exactly this class, and it works because it invites
 the reader to disbelieve you.
 
+## A FOURTH INSTANCE: a REPORTING scope became a MEASUREMENT scope
+
+**2026-08-12, the Adversary, correcting its own `evt_h0mzz2y4666b`.** Its
+charter bounds what it may **report on** (`crates/` plus catalog/`library/`),
+so it appended `-- crates/` to greps by reflex. A grep over `crates/` returned
+one hit and the report said "the only in-tree record"; the tree held five
+occurrences in four files. **A rule about filing became a rule about looking.**
+Any permission boundary (edit, report, route) can do this. A conclusion
+containing *only*, *the sole*, *nowhere else*, *in-tree* or *anywhere* is a
+whole-tree claim, whatever scope you are allowed to act on. Full account, with
+its self-referential-census and repair-ranking corollaries:
+[[my-reporting-scope-silently-became-my-measurement-scope]].
+
 ## How to apply
 
 - **Label EVERY load-bearing premise, not only numbers** — a current-state

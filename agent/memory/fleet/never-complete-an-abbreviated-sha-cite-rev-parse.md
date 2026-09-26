@@ -60,6 +60,21 @@ instance entered the failure by a different door.
   not a weaker verification, it is none; the gap left behind is exactly
   where a plausible-looking value gets drafted in.
 
+## Variant: a relayed short SHA that names a tree
+
+On the receiving side, an abbreviated squash SHA in a merge report resolved to a
+**tree** object six times in one Adversary series (CAT-MIGRATE, 2026-09-03 to
+09-04): `aeb7ceef2`, `55aac6e55`, `a7dfb0c8b`, `625470d9f`, `93fb12895`,
+`913ace066`. `git cat-file -t` says `tree` and `git log` fails "is a tree, not a
+commit". The routine before reviewing anything cited that way: resolve the real
+commit by subject (`git log --oneline --all --grep=<WP-ID>`), confirm its parent
+is the named base (so first-parent equals merge-base, no union artifact), its
+first-parent `--stat` matches the reported shortstat, it is an ancestor of
+`origin/main`, and each changed path's blob equals the reviewed candidate's.
+`git diff --stat <reviewed> <landed>` coming back empty is stronger still: it
+covers paths outside the reported name-status. Worked examples:
+[[a-catalog-pub-flip-is-inert-to-consumers-so-hunt-its-signature-closure-trust-and-prose]].
+
 ## How to apply
 
 - **Never let `git log --oneline`, `--format=%h`, or a scrollback glance

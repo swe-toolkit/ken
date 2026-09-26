@@ -20,7 +20,8 @@ zero attachments, a byte-exact round-trip and an unchanged AST. Green.
 **three** guards. Correct, and **short by one.**
 
 **Round 3.** The Adversary ran the mutation across every binary that could
-reach a block or doc fixture and found a **fourth**.
+reach a block or doc fixture and found a **fourth** (measured on `6148a4bb`, by
+running the Architect's own mutation).
 
 ## The four split into two kinds, and only the census-shaped kind was found
 
@@ -67,7 +68,32 @@ the next reader a list that inherits that fragility without saying so.
 misleads. Rounds 1 and 2 were both published as corrections, and both were
 wrong in the same direction — too few guards, all of one kind.
 
-See [[an-absence-claim-is-refuted-at-the-consumer-not-where-the-subject-is-defined]]
+## How the fourth was found: run the mutation across the population
+
+Grep every test file containing a **fixture of the affected form** (a block or
+doc comment), then run every binary that reaches one, not the binaries the
+finding was about. Eight files, twelve binaries; everything else green, which is
+what makes "four" a count rather than a sample. The fourth sat in a file about
+surface syntax rather than attachment. **And bound it at the crate**: the sweep
+covered one crate and named the other crates as unrun, with the reason nothing
+was expected there and the note that expecting is not measuring.
+
+The setup-line finding was the **third instance of a load-bearing guard living
+in a line whose stated job is something else**; the earlier one was a
+`LineComment` filter that turned out to be the only variant-level pin
+([[count-a-maps-images-not-its-arms-before-claiming-per-arm-coverage]]).
+
+## The hand-off shape worth copying
+
+The Steward opened with *"one thing in the landed tree is known-wrong and is
+mine, so you do not need to find it"*, quoted the false sentence, and named the
+measurement that refuted it and who made it. That spends a review pass on what
+is unknown instead of rediscovering what two people already measured, and it
+makes the residual auditable: the reviewer could check the *replacement* rather
+than the *defect*, which is where the remaining error was.
+
+See
+[[an-absence-claim-is-refuted-at-the-consumer-not-where-the-subject-is-defined]]
 for the census discipline this depends on, and
 [[an-assertion-whose-expected-value-is-computed-from-the-thing-under-test-is-a-theorem]]
 for why production could not catch the mutation in the first place.

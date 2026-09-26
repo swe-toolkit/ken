@@ -1,6 +1,6 @@
 ---
 name: a-detector-that-re-derives-its-mechanisms-lookup-is-blind-where-the-two-disagree
-description: A sentinel standing in for a production filter re-implemented its callee join with `find` where production used a `BTreeMap`, and `continue`d on the case production deliberately retains — diff the two lookups as operations, and note that a non-vacuity guard bounds the scan's emptiness, never its coverage
+description: A sentinel standing in for a production filter re-implemented its callee join with `find` where production used a `BTreeMap`, and `continue`d on the case production deliberately retains — diff the two lookups as operations, and note that a non-vacuity guard bounds the scan's emptiness, never its coverage. Second instance - a "publishes exactly N" census hand-listing declaration kinds with `_ => None` diverged from the loader's is_qualifiable (SpaceDecl blind)
 ---
 
 # A detector that re-derives its mechanism's lookup is blind where the two disagree
@@ -90,3 +90,45 @@ the precise one is proofread as a claim.** Same shape as
 ⇒ **On any detector, read the FAILURE MESSAGE against the predicate separately
 from the doc.** The message is the artifact's actual interface to its future
 reader, it is written last, and it is where the loose summary lands.
+
+## Second instance: a "publishes exactly N" census over declaration kinds
+
+**Measured 2026-08-29 on CAT-DERIVED-PUB-EXPORT** rebased candidate
+`84d836e39` (product content byte-identical to gated `38cb273`),
+`crates/ken-elaborator/tests/cat_derived_pub_export.rs` +
+`catalog/packages/Data/Collections/Derived.ken.md`. Six `fn`s went `pub`; the
+test `derived_loader_publishes_exactly_the_six_authorized_top_level_definitions`
+compares the loader-visible export set to a hardcoded literal with a real
+`BTreeSet` equality, and its withdraw-one and add-one RED controls both pass.
+Those pin the enumerated members, not the boundary of what gets enumerated.
+
+The "nothing else" half is built by `top_level_publication_queries()`, which
+parses every top-level decl and emits an import probe only for a hand-written
+list of kinds (`ViewDecl`, `LetDecl`, `PropDecl`, `TheoremDecl`, `AxiomDecl`,
+`DataDecl`, `ExplicitDataDecl`, `TypeAlias`, `ClassDecl`, plus a separate
+`AttachedProofDecl` arm), with `_ => None` for the rest. The loader's own
+predicate is `is_qualifiable` in `crates/ken-elaborator/src/modules.rs`, an
+independently maintained `matches!`. Diff the two sets:
+
+- **`SpaceDecl`: in the loader set, not the census.** A future `pub space` in
+  this file would be a real export the "exactly six" assertion cannot see: a
+  reachable blind over-export slot.
+- **`InstanceDecl`: absent from both.** Harmless: the loader cannot publish it
+  either. Say so, so the note is not a false alarm.
+- **`ClassDecl`: in the census, not `is_qualifiable`.** The census's
+  `import M (ClassName)` is rejected `UnboundName`, so it filters correctly.
+
+No live defect at that SHA (Derived held only `fn`/`theorem`/`proof`/`class`/
+`instance`/`import`, and `fn` parses to `ViewDecl`, enumerated by both). Ranked
+LATENT. The census and its `_ => None` were still present on main at
+2026-09-26. The fix is the one above: derive the census from `is_qualifiable`
+or share one predicate.
+
+For any "exposes/publishes/exports exactly N, nothing else" control: (1) confirm
+a real set equality against a hardcoded N with withdraw-one and add-one both
+reddening; (2) find how it picks candidates, and the production predicate
+governing the same decision; (3) diff the two sets, naming the concrete decl
+that would land in each production-only slot. Kin of
+[[a-shardability-refactor-that-explodes-fat-multi-mode-tests-into-generative-macro-cases-drops-the-test-count-so-verify-by-mode-literal-multiset-census-not-by-counting-tests]]
+(there the census was complete) and of the fleet lesson that an exhaustiveness
+census is blind to exactly the wildcard sites it certifies absent.

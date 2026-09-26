@@ -156,6 +156,17 @@ early stops in the right place.
   This is the sibling of *an explanation that fits is the thing that stops you
   running the census*: an agreement that fits is what stops you re-reading your
   own file.
+- **WHAT THE ARTIFACT EMITS IS A THIRD CARRIER OF A WITHDRAWN CLAIM, after prose
+  and identifiers.** Recorded 2026-08-15 (Adversary, on
+  `7512b1e8b...40ed5d6e9`): a withdrawn "mechanism defect" framing was swept
+  through three recuts over prose and identifiers, and QA caught the last
+  survivor in a test name. The printed report was still headed with the
+  withdrawn framing, its columns neutral timings, so the copy a reader pastes
+  carried the retracted claim plus numbers while the correction stayed in the
+  source. **Sweep what the artifact emits (report headers, printed labels,
+  failure messages), not only what it says** — emitted text is the copy that
+  travels and outlives the file. Context:
+  [[a-stack-budget-is-prefix-plus-depth-times-frame-and-must-agree-with-every-other-bound-on-the-recursion]].
 
 ## The specific arithmetic rule, because it recurs
 

@@ -70,4 +70,22 @@ the distinction at all** — which is a structural finding, not a wording one,
 and it is what finally moved the fix from "correct the sentence" to "add the
 position axis wherever the phrase appears."
 
+## AN IMPERATIVE OUTLIVES ITS CLAIMS AND IS OBEYED
+
+Measured 2026-08-14 on `f807d7c3` (`LANG-PRELUDE-ELABORATION-DEPTH`). A landed
+eleven-line `LOAD-BEARING SHAPE` comment documented a cross-file coupling that
+a ready node existed to dissolve. Its four claims would go checkably false when
+that node landed. Its imperative, *"do not change this configuration without
+updating that file too"*, is not checkable at all, so nothing retires it: it
+keeps forbidding a change to a fixture that is by then free, addressed to the
+author the same frame invites in.
+
+⇒ **Split a comment into its claims and its imperative, and ask what retires
+the imperative.** A false claim invites correction from anyone who reads the
+code; an obsolete prohibition is obeyed. (Sibling of
+[[a-precise-fact-can-live-in-an-artifact-its-reader-never-opens]]: there the outcome
+was right and the reason could not fire; here the reason dies and the outcome
+keeps being enforced.) The census side of the same instance is in
+[[a-census-is-a-number-a-scope-a-predicate-and-a-tree]].
+
 Related: [[a-claim-accurate-about-something-narrower-than-its-reader-infers]].

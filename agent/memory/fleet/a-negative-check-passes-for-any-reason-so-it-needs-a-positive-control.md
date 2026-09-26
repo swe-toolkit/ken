@@ -364,3 +364,33 @@ sibling on *observation granularity*),
 [[publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read]] and
 [[a-pattern-match-is-evidence-about-what-encloses-it]] (the citation-side
 siblings of the 8th axis).
+
+## 9th axis: COMPILED IS NOT INSTRUMENTED
+
+Adversary, 2026-08-15, on `c4e622e93...5e8907597`. Two controls landed in one
+commit. One asserted `!baseline_callees.is_empty()` (*"the control must reach a
+real source-machine entry callee"*) before reading its absence-valued result.
+The other asserted `assert!(crossings.is_empty(), "must not gain a boundary
+crossing")` with nothing establishing that the recorder would have fired; its
+`assert!(result.is_ok())` proved the fixture **compiled**, not that the
+**instrument was live**.
+
+- **An absence assertion must answer: would this rig, in this process, have
+  recorded the thing whose absence I claim?** `result.is_ok()` shows something
+  ran, which feels like non-vacuity and is not.
+- **Run the neighbouring positive in-process rather than citing it.** The
+  sibling control already drove the identical expression with the selector
+  armed and observed crossings; making it a second arm of the same loop
+  survives refactors that a cross-test argument does not.
+- **One commit applying a discipline in one control and omitting it in another
+  is a slip, not a rejected standard.** Cite the author's own neighbouring line
+  back to them; it is cheaper to accept than an imported rule.
+- **Rank it honestly: the cost is attribution, not detection.** A dead recorder
+  would red the neighbour, so the corpus catches the regression. What is lost
+  is the row's standing when it is cited, e.g. to argue a retirement removes a
+  capability. Report "green for the right reason today, but it cannot carry the
+  argument it will be cited for", not the worst case.
+- **When a merge offers its verification for checking, check it.** Here the
+  twin's `crates/` delta was empty, one commit touched the production file,
+  and every change sat inside `#[cfg(test)]`: three commands, and the only thing
+  that makes such an invitation mean anything.
