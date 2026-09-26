@@ -79,6 +79,60 @@ natively. Any row that stays ignored gets a measured reason in its
       leaves its defining function (Architect `evt_327ykvk4cv8bq`: route
       confinement discharges the backing question; the AC-0 member classes
       stay evidence and nothing branches on them).
+- **AC-1a (admission witness; Architect `evt_46vm0djbs20k5`, clauses per
+  `evt_2nn9ta5ywrkyh`).**
+  - Admission returns a `SelectedPendingRouteWitness`, constructible only in
+    `planning/static_transition/selected_pending_calls.rs`. The emitter reads
+    its facts from the witness and does not re-derive them. Its one
+    ownership check is an internal assertion at package entry, over the
+    package owner only.
+  - **Census first, clauses second.** Every witness clause is the
+    planner-side evaluation of one emitter condition in the census below. No
+    clause is written from a model of the route.
+  - **Measure first** (a probe, removed after), on px7l and px7m err:
+    - M1: `R(leaf)`, the planned joins in the operation subtree of each
+      `Specialized` `Vis` the package lowers but does not own;
+    - M2: for each join in `R`, the emission that consumes it, or none;
+    - M3: for rows 341 and 378, the owner of the emission that lowers them,
+      compared with their handler owners.
+  - **M4, static only** (Architect `evt_2spyd3965e84m`; no suppression, no
+    compile past a refusal): for each relocated unit on px7l and px7m err
+    (the operation subtree of a `Specialized` `Vis` the package does not
+    own, and the drive subtree of each `Deferred` row), list each free
+    variable, its binder origin, and whether the response owner's frame
+    receives it.
+  - **(E) environment closure**, checked first. Every relocated unit's free
+    variables are among the bindings its owner emission receives (its
+    `StaticResponseEnvironmentBinding` frame sources plus its K ABI
+    parameters and captures). Otherwise the route is refused with
+    "relocated work references a binder its response owner does not
+    receive". If (E) holds everywhere, STOP and report the Var(1) cause.
+  - **(J) join partition**, checked after (E). A leaf with a non-empty `R`
+    that no witnessed accounting covers is refused with "selected pending
+    leaf relocates planned joins no emission lowers". The J-a accounting is
+    not built while no Planned row has a non-empty `R`; it is deferred with
+    the response-owner environment extension below. Never read "consumed
+    nowhere" off a compile that stopped before the owner emission ran.
+  - **(D) Deferred drive.** For each `Deferred` row on the route, its
+    handler owner equals the owner of the emission that lowers it.
+    Otherwise it is refused with "Deferred response lowered outside its
+    handler owner".
+  - **Closure census.** Every `unsupported(...)` and `backend_module(...)`
+    refusal reachable from the pending-route emission path, including the
+    `ObjectEmission` join closeout (`joins.rs:2234`), is classified in the
+    handoff as a witness clause, an asserted invariant, or unreachable on a
+    witnessed route, with the reason. An unclassified row is a finding.
+  - **Pins.** The pair control is px7l (Planned, native, (E) holds, `R`
+    empty) against px7m err (Refused by (E)). Each of px7l ×2, px7m ok and
+    px7m err is reported Planned or Refused, a refusal asserted by reason.
+    Mutations: dropping (E) refuses err by (J); dropping (E) and (J) returns
+    it to the join-393 closeout. (D) is reported exercised only by a
+    measured row; otherwise unexercised, not claimed. No Planned row fails
+    at emission.
+  - **Stop** if `R` is not empty on px7l, or if one join is consumed by two
+    emissions.
+  - Forbidden: dispositioning join 393 as unselected, forcing the
+    placeholder, or claiming px7m err native without the (J-a) accounting.
 - **AC-2 (proof, D1 item 6).**
   - **Positive.** Run the px7l fixture natively and assert:
     - the selected arm's host effect happens once;
@@ -123,10 +177,6 @@ natively. Any row that stays ignored gets a measured reason in its
   order: STOP. Its de Bruijn reads would then take the mirror parameter's
   phase. Seed it through `source_body_binding_order` first (latent at
   `6bdd75394`, because every entry there is `ResultPhaseSummary::carrier()`).
-- **Increment 2 is held until the binder attribution lands** (Architect
-  `evt_3yce3vzbddvk0`): it emits raw `Var` reads on the px7l route, where
-  one `Match` binder is missing from erasure's remap. Increment 1 gates by
-  checked call template and records the (walker, morphism) index pair.
 - **The F5/F6 increment starts with a design ruling.** Carrying a package
   across a return or a generated unit call needs a per-member backing
   authority, which the names-only plane (`abi.rs:55-60`) cannot supply. That
@@ -134,6 +184,19 @@ natively. Any row that stays ignored gets a measured reason in its
   authority, and may be framed as its own successor.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Shared predicate
+
+Pending-call admission decides Planned from facts the emitter re-derives
+elsewhere. AC-1a closes the class: the emitter consumes the admission
+witness, and each clause evaluates an emitter condition the census names.
+Relocating a `Specialized` response to its owner is a lawful handoff that
+px7l already uses; it is not a future capability.
+
+The next capability, a future WP (Architect `evt_2spyd3965e84m`): the
+response-owner environment extension, which passes binders from the pending
+package's scope into a response owner's frame, with the J-a join accounting.
+Positive native px7m err depends on it.
 
 ## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 
@@ -148,3 +211,11 @@ natively. Any row that stays ignored gets a measured reason in its
    path has no group in erasure's `BranchBinderRemap` -- keyed on a runtime
    binder that erasure's coordinate map does not record (Architect
    `evt_3yce3vzbddvk0`).
+3. A selected pending arm's operation field is `StaticResponseDeferred`, so
+   its argument join (px7m dynamic-err origin 393, owner
+   `PredeclaredFunctionId(5)`) has no evaluating seat on the pending route
+   -- keyed on which emission owns relocated deferred-response work, which
+   pending-call admission never consults (Architect `evt_3engggxek84h8`).
+4. HS3 ownership clause refused px7l's lawful Specialized relocation,
+   because it was keyed on owner identity, which the emitter never tests
+   (Architect `evt_2nn9ta5ywrkyh`).

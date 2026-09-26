@@ -17,8 +17,9 @@ origin: "Architect evt_16ve7jwxbzax3: CAT-LOGIC-PRELUDE-MOVE hard stop 1, And's 
 ## Objective
 
 A dependent pair type can be written in expression position, so
-`fn And (a : Omega) (b : Omega) : Omega = (x : a) × b` checks and is
-convertible with the prelude `And`.
+`fn And (a : Omega) (b : Omega) : Omega = (x : a) × b` checks in a catalog
+module. `And` is not a prelude floor member (`30-taxonomy.md §4`, `§6`), so
+the spec and conformance make no claim about a prelude `And`.
 
 ## Settled inputs -- Architect, measured at `ae5cce97f`
 
@@ -45,15 +46,23 @@ stop and report the mismatch.
 
 ## Acceptance
 
-- **AC-1 (positive).** `fn And (a : Omega) (b : Omega) : Omega = (x : a) × b`
-  in a catalog module checks, and a term of the prelude `And a b` checks
-  against it and back (convertible).
+- **AC-1 (positive, spec and conformance).** `fn And (a : Omega) (b :
+  Omega) : Omega = (x : a) × b` declared in a module checks, and a dependent
+  pair checks against `And a b`. The `32 §3` prose and the conformance pair
+  use only identities available under `33 §3.3`: the seed declares its own
+  `And` or imports one. Neither calls it a prelude conjunction.
+- **AC-1a (migration evidence, Rust suite only; Spec block
+  `evt_45yz6089crevc`, ruling `evt_nh39zr86trxt`).** The catalog definition
+  is convertible, both ways and in an open context, with the implementation's
+  current legacy prelude `And` term. The L3 move of the `And` family relies on
+  this. It is a property of the implementation during the migration, not a
+  spec claim, and it lives only in the Rust test.
 - **AC-2 (negative).** A Σ whose first component is relevant still sorts at
   `Type`, per `sort_sigma`, so ascribing it `Omega` is rejected. Existing
   type-position Σ suites stay green.
-- **AC-3 (controls).** AC-1 is red on base. Reverting the parser production
-  reddens it. Targeted builds only, through `scripts/ken-cargo`; no-regression
-  means green in CI.
+- **AC-3 (controls).** AC-1 and AC-1a are red on base. Reverting the parser
+  production reddens it. Targeted builds only, through `scripts/ken-cargo`;
+  no-regression means green in CI.
 
 ## Stop conditions
 
