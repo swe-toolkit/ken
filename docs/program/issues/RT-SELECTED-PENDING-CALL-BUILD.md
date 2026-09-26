@@ -1,7 +1,7 @@
 ---
 id: RT-SELECTED-PENDING-CALL-BUILD
 title: "Build the selected pending-call package designed in RT-SELECTED-PENDING-CALL-PACKAGE D1: a companion package beside the pending ITree word, built in the executed arm from its own ordered S/C members, carried through the six transport families to D2's one-event consuming gate, so the px7l/px7m rows can lower natively; first checkpoint measures backing classes, arm-edge dominance and traversed families before the build proceeds"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: architect
