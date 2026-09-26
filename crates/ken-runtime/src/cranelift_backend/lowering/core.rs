@@ -13162,6 +13162,7 @@ impl<'a> Lowering<'a> {
                 // violation. Other raw closures retain their ordinary refusal.
                 if position == 1
                     && matches!(value, Lowered::Closure { .. } | Lowered::DeclarationClosure { .. })
+                    && !value.contains_boundary_closure_environment()?
                     && self.function_local.static_response_owner.is_none()
                     && self.static_transition_plan.specialized_response_at_vis(origin)
                 {
