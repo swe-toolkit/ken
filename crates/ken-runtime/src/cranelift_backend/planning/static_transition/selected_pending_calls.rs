@@ -138,6 +138,16 @@ pub(in crate::cranelift_backend) struct SelectedPendingLeafResponse {
     k_fields: usize,
 }
 
+impl SelectedPendingLeafResponse {
+    pub(in crate::cranelift_backend) fn disposition(&self) -> Option<ResponseDisposition> {
+        self.disposition
+    }
+
+    pub(in crate::cranelift_backend) fn owner(&self) -> Option<ContinuationEmissionOwner> {
+        self.owner
+    }
+}
+
 /// Admission asks "Planned or Refused?" and constructs this witness only from
 /// planner facts. Emission asks "is the invariant intact?" and consumes these
 /// facts, rather than independently re-deriving them from its current context.
@@ -480,6 +490,30 @@ impl StaticTransitionPlan<'_> {
         }
     }
 
+    /// A response drive may consult an admitted package's immutable owner
+    /// evidence, without recomputing the source-to-emission relation locally.
+    /// An ordinary response with no pending witness retains its existing plan.
+    pub(in crate::cranelift_backend) fn selected_pending_response_at_vis(
+        &self,
+        vis: StaticOriginId,
+    ) -> Result<Option<&SelectedPendingLeafResponse>, CraneliftBackendError> {
+        let mut found = None;
+        for admission in self.selected_pending_calls.values() {
+            let PendingCallAdmission::Planned(witness) = admission else {
+                continue;
+            };
+            for response in witness.responses().iter().filter(|row| row.vis == vis) {
+                if found.is_some_and(|previous| previous != response) {
+                    return Err(planner_error(
+                        "two admitted pending leaves disagree on a response emission",
+                    ));
+                }
+                found = Some(response);
+            }
+        }
+        Ok(found)
+    }
+
     pub(in crate::cranelift_backend) fn pending_call_candidate_at(
         &self,
         producer: StaticOriginId,
@@ -685,9 +719,9 @@ fn selected_leaf_response_witness(
                 pending_free_indices(plan.planned_occurrence_expr(k_body)?, 0, &mut k_free)?;
                 k_fields = captures.len() + 1;
                 environment_closed &= k_free.iter().all(|index| (*index as usize) < k_fields);
-                // The drive runs under the response owner's K emission, not
-                // under the package's owner. A route with no such emission is
-                // a Deferred owner mismatch, not an implicit frame transfer.
+                // This row's handler owner is carried in the witness. The
+                // drive compares it with the owner of its actual emission;
+                // source-subtree membership is not a proxy for that emission.
             }
             responses.push(SelectedPendingLeafResponse {
                 leaf: candidate.construct, vis, disposition, owner: response_owner,

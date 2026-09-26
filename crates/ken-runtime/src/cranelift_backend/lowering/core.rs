@@ -5371,8 +5371,7 @@ impl<'a> Lowering<'a> {
         };
         let vis_origin = row.vis_origin();
         let handler_owner = self
-            .static_transition_plan
-            .deferred_response_handler_owner(row)?
+            .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
                 unsupported(
                     "StaticResponseDeferred",
@@ -5621,6 +5620,30 @@ impl<'a> Lowering<'a> {
         ))
     }
 
+    /// For a pending route, admission fixes the handler owner once; ordinary
+    /// responses retain the existing response-plan lookup. The caller still
+    /// compares this owner with the emission it is actually lowering in.
+    fn admitted_deferred_handler_owner(
+        &self,
+        row: &crate::cranelift_backend::planning::DeferredResponseRow,
+    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if let Some(witness) = self
+            .static_transition_plan
+            .selected_pending_response_at_vis(row.vis_origin())?
+        {
+            if witness.disposition()
+                != Some(crate::cranelift_backend::planning::ResponseDisposition::Deferred)
+            {
+                return Err(backend(BackendFailure::PlannerInvariant(
+                    "an admitted pending response disagrees with its Deferred disposition"
+                        .to_string(),
+                )));
+            }
+            return Ok(witness.owner());
+        }
+        self.static_transition_plan.deferred_response_handler_owner(row)
+    }
+
     /// Consume a Deferred `Vis` inside its statically selected response handler.
     ///
     /// The established P1 route proves a one-use, tail-resumptive lexical K. The
@@ -5643,8 +5666,7 @@ impl<'a> Lowering<'a> {
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let handler_owner = self
-            .static_transition_plan
-            .deferred_response_handler_owner(row)?
+            .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
                 unsupported(
                     "StaticResponseDeferred",
@@ -6017,8 +6039,7 @@ impl<'a> Lowering<'a> {
                     .deferred_no_unit_response_in_body(body)?
                 {
                     let current_owns_response = self
-                        .static_transition_plan
-                        .deferred_response_handler_owner(&row)?
+                        .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner));
                     if !current_owns_response
                         || handler_owned_deferred_response_mutation_applies(
@@ -15796,8 +15817,7 @@ impl<'a> Lowering<'a> {
                     .deferred_response_at_vis(static_origin)?
                 {
                     if self
-                        .static_transition_plan
-                        .deferred_response_handler_owner(&row)?
+                        .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner))
                     {
                         if !handler_owned_deferred_response_mutation_applies(
