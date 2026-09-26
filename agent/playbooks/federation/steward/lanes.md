@@ -63,7 +63,9 @@ pending-call. it has to be addressed."). Spec serves BYTES D2.
 **2026-09-26** ("concur with rec."): the three `l1_acceptance` ignored rows
 go to L2 and `ds5b` to L1; TCB growth they need still returns to the operator.
 **2026-09-26:** "CI is now at 28 minutes. schedule work to bring that down
-under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`.
+under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`. Memory
+program R1-R5, R7 (research report `7b545fbb1`): "You may update skills,
+coordination.md, and scripts as necessary." R2 waits on the search log.
 
 ## Current state
 
@@ -75,6 +77,5 @@ under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`.
 
 ## Update rule
 
-One value per table field; an update deletes the old one. Link the WP issue or
-thread rather than copying detail. Verify a row against its issue file and
-`origin/main` before acting; never publish a standalone currency commit.
+One value per field; an update deletes the old one. Link, never copy. Verify a
+row against its issue file and `origin/main`; no standalone currency commits.
