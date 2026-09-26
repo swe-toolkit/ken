@@ -3619,20 +3619,33 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 }
             };
             // A bypass alone is inconclusive on a source whose real owner
-            // returns Ret. This test-only mutation also supplies the nearest
-            // legal counterexample carrier: the same returned node, with the
-            // selected source Vis constructor identity substituted. No
-            // production path can bypass the exact Ret checks below.
+            // returns Ret. The test-only mutation supplies a Vis carrier of
+            // the source constructor's exact identity and field count. Its
+            // fields are never read: the C2 branch traps on the tag first.
             #[cfg(feature = "px8-ds-test-support")]
             let bypass_ret_validation = body_mutation
                 == Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis);
             #[cfg(feature = "px8-ds-test-support")]
-            if bypass_ret_validation {
-                let vis_identity = compiler.static_transition_plan
-                    .constructor_symbol_identity(emission.row.vis_origin())?
-                    .tag_abi_word()?;
-                compiler.emit_carrier_store_tag_id(&mut builder, returned, vis_identity)?;
-            }
+            let returned = if bypass_ret_validation {
+                let vis_origin = emission.row.vis_origin();
+                let vis_expr = compiler.retained_body_occurrence(vis_origin)?.expr.clone();
+                let RuntimeExpr::Construct { constructor, args } = vis_expr else {
+                    return Err(backend_module(
+                        "the test-only owner bypass lost its source Vis constructor".to_string(),
+                    ));
+                };
+                if !constructor.ends_with("::ITree::Vis") || args.len() != 2 {
+                    return Err(backend_module(
+                        "the test-only owner bypass needs a binary Vis constructor".to_string(),
+                    ));
+                }
+                compiler.transfer_constructor_operands(
+                    &mut builder, vis_origin, &constructor,
+                    &[LoweringOperand::Carried(returned), LoweringOperand::Carried(returned)],
+                )?
+            } else {
+                returned
+            };
             let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
             #[cfg(feature = "px8-ds-test-support")]
             let ret_abi_word = if body_mutation
