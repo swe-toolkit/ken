@@ -75,8 +75,8 @@ Ken has two execution paths with deliberately different roles.
 The **reference interpreter** evaluates supported Ken programs using strict
 call-by-value evaluation over the content-addressed value model and drives
 supported effects through explicit capabilities. The REPL and `ken run` use
-this execution path. The specification is the normative authority; interpreter
-reports are observations of a particular execution.
+this execution path. The interpreter is the reference semantics. Native
+correctness is agreement with the interpreter on the differential corpus.
 
 The **Rust bootstrap compiler** consumes kernel-admitted checked core, erases
 proof-only content, lowers executable code to Ken runtime IR, and uses
@@ -118,9 +118,14 @@ availability boundaries.
 
 ## Build
 
-Ken is implemented in Rust. For local development, use the repository's
-targeted build instructions in `AGENTS.md` and run checks for the crates you
-change. Full-workspace builds and tests run in CI.
+Ken is implemented in Rust. Build and run the CLI with:
+
+```bash
+cargo build -p ken-cli --locked
+cargo run -p ken-cli -- help
+```
+
+To run the CLI crate's tests, use `cargo test -p ken-cli --locked`.
 
 ## License
 
