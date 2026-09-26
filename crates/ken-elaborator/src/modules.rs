@@ -238,7 +238,14 @@ impl ModuleState {
         name: &str,
         id: ken_kernel::GlobalId,
     ) -> Result<(), ElabError> {
-        self.active_scope_mut().bind_checked_session_local(name, id)
+        let scope = self.active_scope_mut();
+        if scope.import_precedes_raw_binding(name) {
+            // The raw API still mints a checked session identity and writes
+            // globals, but the existing import remains the selected binding.
+            scope.session_ids.insert(name.to_string(), id);
+            return Ok(());
+        }
+        scope.bind_checked_session_local(name, id)
     }
 
     pub(crate) fn check_root_binding(&self, name: &str) -> Result<(), ElabError> {
@@ -247,6 +254,9 @@ impl ModuleState {
         } else {
             self.root_scope.clone()
         };
+        if scope.import_precedes_raw_binding(name) {
+            return Ok(());
+        }
         scope.bind_local(name, name, &Span::zero())
     }
 
@@ -600,6 +610,13 @@ struct Scope {
 }
 
 impl Scope {
+    /// A raw postulate writes its flat spelling even when an existing import
+    /// selects that spelling. Do not turn the import into a local: its checked
+    /// provider ID must keep precedence over the newly minted session ID.
+    fn import_precedes_raw_binding(&self, name: &str) -> bool {
+        self.binding_ids.contains_key(name) && !self.locals.contains(name)
+    }
+
     /// The same checked-local discipline is used for raw postulates, harness
     /// aliases, and the checked locals admitted by a source expansion.
     fn bind_checked_session_local(
@@ -5597,6 +5614,33 @@ mod namespace_effect_tests {
         ).expect("same checked synthesized dictionary has two lawful routes");
         let id = env.globals["C_instance_Nat"];
         assert_eq!(env.module_state.export_provenance["Provider"].member_ids["Provider"]["C_instance_Nat"], id);
+    }
+
+    /// Promise class: durable invariant. MEASURED: an imported alias keeps its
+    /// selected provider ID and import status when a raw postulate of the same
+    /// spelling records a distinct checked session ID. CLAIMED: raw admission
+    /// preserves both identities without converting the import to a local.
+    /// THE GAP: the integration test separately observes the flat write and
+    /// next source unit's checked selection rather than trusting these tables.
+    #[test]
+    fn raw_postulate_after_import_keeps_the_import_and_session_ledgers_distinct() {
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_file(
+            "module Provider { pub const item : Nat = Zero } import Provider (item)",
+        )
+        .expect("imported provider item");
+        let provider = env.globals["Provider.item"];
+        let nat = env.globals["Nat"];
+        let raw = env
+            .declare_postulate_raw("item", ken_kernel::Term::const_(nat, vec![]))
+            .expect("raw declaration preserves base admission");
+        let scope = &env.module_state.session_scope;
+        assert_ne!(raw, provider);
+        assert_eq!(scope.session_ids.get("item"), Some(&raw));
+        assert_eq!(scope.binding_ids.get("item"), Some(&provider));
+        assert_eq!(scope.bindings.get("item").map(String::as_str), Some("Provider.item"));
+        assert!(!scope.locals.contains("item"));
+        assert!(!scope.checked_local_ids.contains_key("item"));
     }
 
     /// Promise class: durable invariant. The seal copies private identities
