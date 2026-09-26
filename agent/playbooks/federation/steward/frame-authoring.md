@@ -105,7 +105,7 @@ Before marking the frame ready, verify:
 6. current-code facts name the measured SHA;
 7. stale or superseded prose was deleted rather than annotated;
 8. every `agent/memory/CHECKS.md` check the frame's settled inputs trigger was
-   run, and its result is in the frame (a consumer list is grepped across
+   run, and its measured result is on the frame's `Checks:` line (a consumer list is grepped across
    every root, an assumed enabler is written once, an exempted axis is
    measured).
 

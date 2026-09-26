@@ -303,7 +303,8 @@ the language has tokens) is cheap to test and common.
 **And state four things together in every handoff, in one place:** the exact
 **measurable fact**, the **claimed boundary** (what it does and does not
 entail), the **residual owner** (who guards what the mechanism cannot), and the
-**current SHA**. Splitting them across messages is how a measured fact gets read
+**current SHA**. End it with the `Checks:` line from `agent/memory/CHECKS.md`
+for the checks the handoff's claims fired. Splitting them across messages is how a measured fact gets read
 as the broader claim.
 
 ## Stay in your lane

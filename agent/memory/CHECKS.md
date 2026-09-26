@@ -16,6 +16,17 @@ never append. A check earns its place by preventing a recurring kind of
 stop, not by being true. The pointers lead to the full lessons in the
 reference corpus (`README.md`).
 
+**Record it on one `Checks:` line.** A ruling, frame, QA verdict and
+leader handoff each end with the checks that fired and what each measured:
+
+    Checks: 3 fired: grepped catalog/, crates/*/tests, examples/; 2 extra
+    consumers, both migrated. 8 fired: the failing config yields exit 1,
+    the repair exit 0.
+
+`Checks: none fired.` is the whole line when no trigger fired. A fired check
+without a measured result is not run. Do not list the checks that did not
+fire.
+
 1. **Two derivations agree.** Trace both to their inputs before counting
    the agreement as evidence. If one source minted both, the agreement is a
    single value checked against itself.
