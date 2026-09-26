@@ -44,6 +44,15 @@ live SHA, then classify each defect as boundary-violating (block) vs prose-stale
 two sites I'd independently flagged, so my finding **converged with the fold**
 and I approved `181f6f6` cleanly instead of blocking a stale read.
 
+**3. The author's dual: publish the old-to-new SHA mapping on every rebase of
+a reviewed branch.** A rebase silently invalidates every SHA-anchored finding
+in the thread (a block, an approval, a citation), and without the mapping a
+re-reader cannot tell which findings were answered. After rebasing a branch
+under review, state each old-to-new pair with a region claim ("byte-identical
+except two doc files"), so anyone can run `git diff --stat <old> <new>` to
+confirm it and a region-scoped approval can be re-attached to the new SHA
+instead of re-earned.
+
 Sibling of reconcile proof rides elaboration merge not build phase (ground-truth
 moving during authoring) and the "content-reconcile is necessary but not
 sufficient — re-derive from first principles" rule.

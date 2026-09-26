@@ -195,7 +195,8 @@ shared local branch** and vote in mootup.
 
 - When QA approves a WP, the owning **leader** opens a merge **Decision**
   (`propose_decision`, naming the WP ID + `wp/<ID>` branch) in the integration
-  space, mentioning the **Architect** (always) and **Spec** (only if it touches
+  space, mentioning the **Architect** (when it touches `catalog/`, `crates/` or
+  `spec/`) and **Spec** (only if it touches
   `/spec`, `/conformance`, or a designated soundness path), and asks the
   **publisher path** to publish the branch.
 - The **Architect** (+ **Spec** on its paths) read the diff locally (`git diff
@@ -203,8 +204,8 @@ shared local branch** and vote in mootup.
   concern and the alternative; an approval is a real judgment.
 - The **publisher publishes** `wp/<ID>` → CI runs build+test · conformance ·
   clean-room · path-guard on GitHub.
-- **Merge gate — all must hold:** the Decision is approved (Architect always +
-  Spec on its paths), CI is green, the clean-room check is green, and no passed
+- **Merge gate — all must hold:** the Decision is approved (Architect and
+  Spec, each on its paths), CI is green, the clean-room check is green, and no passed
   roadmap gate (G0–G8) regresses. The publisher then **squash-merges on
   GitHub** — branch protection requires the green checks and restricts the merge
   to the publisher — and **fetches**, so `origin/main` updates for all

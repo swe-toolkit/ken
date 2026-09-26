@@ -1,256 +1,143 @@
 # Ken coordination law (read by every agent)
 
-Cross-cutting rules for every Ken agent, regardless of role, team, or model.
-Role-specific discipline is in `playbooks/`; model tiers are in `MODELS.md`; the
-git model is in `../docs/program/04-git-and-integration.md`. These rules are
-adapted from hard-won mootup team lessons; each exists because skipping it
-caused a real stall or a real bug. They must hold identically across Opus, GLM,
-and DeepSeek agents.
+Cross-cutting rules for every Ken agent, regardless of role, team, or model;
+each must hold identically across Opus, GLM, and DeepSeek agents. Role
+discipline is in `playbooks/`, model tiers in `MODELS.md`, the git model in
+`../docs/program/04-git-and-integration.md`. Each rule exists because skipping
+it caused a real stall or bug; those incidents are in
+`COORDINATION-INCIDENTS.md`, which is reference, not startup reading.
 
 ## 0. The shape: a ring of rings
 
-- **Within a team — a sequential token-ring.** Generally one agent is active at
-  a time; the others are in a supporting role, called on when the active agent
-  needs them (e.g. an implementer asks for a clarification). Keeping the whole
-  team on one task maximizes coherence and effectiveness. Do not fan a team onto
-  several tasks to chase parallelism — coherence beats it. This includes waiting
-  on CI: once a WP is published, the team **waits idle** for its CI run rather
-  than pipelining or stacking work (ADR 0002). Idle is cheap and load-friendly;
-  throughput comes from other teams' rings, not from this one multitasking.
-- **Across teams — parallel.** The teams are independent rings spinning at once;
-  that parallelism is the entire reason the work is articulated into teams. The
-  rings couple at only three points: merges to `main` (via the publisher path),
-  the roadmap gate dependencies, and the **sanctioned cross-team query edges**
-  (§9, §11). Keep that coupling thin — it is what serializes the federation if
-  abused.
+- **Within a team, a sequential token-ring.** Generally one agent is active;
+  the others support it when called on. Do not fan a team onto several tasks
+  to chase parallelism: coherence beats it. Once a WP is published, the team
+  **waits idle** for its CI run rather than pipelining or stacking work (ADR
+  0002). Throughput comes from other teams' rings.
+- **Across teams, parallel.** The rings couple at only three points: merges to
+  `main` (via the publisher path), the roadmap gate dependencies, and the
+  sanctioned cross-team query edges (§9, §11). Keep that coupling thin.
 
 ## 1. Event-driven, never poll
 
 After you finish a unit of work or hand off, **post, set status, and stop.** Do
-not `/loop`, self-wake, or poll for replies. The notification system delivers
-what you need; polling burns tokens for zero value. A missing notification is a
-*stall* — catching stalls is the team leader's watchdog job, not yours. Only
-team leaders and the Steward run schedulers.
+not `/loop`, self-wake, or poll for replies. A missing notification is a stall,
+and catching stalls is the team leader's watchdog job, not yours. Only team
+leaders and the Steward run schedulers.
 
-### 1a. "Event-driven" REQUIRES A NAMED EVENT. A hold you cannot name is a stall.
-
-**Measured, 2026-07-22 — a three-way circular wait that no participant could
-see, and that no watchdog would ever have broken:**
-
-| seat | believed it was waiting for | actually |
-|---|---|---|
-| `verify-leader` | the implementer to pick up a new kickoff | idle |
-| `verify-implementer` | *the leader's merge Decision* on work already finished | idle |
-| `verify-qa` | nothing — verdict delivered, handed back | idle |
-
-Every seat was **correctly** event-driven by the letter of §1. The events they
-were each waiting for were **each other**. A QA-approved WP sat with no Decision
-opened, and the ring would have held indefinitely: nothing was going to arrive.
-
-⇒ **The rule §1 was missing is that a wait must have an ADDRESS.**
+### 1a. "Event-driven" requires a named event. A hold you cannot name is a stall.
 
 1. **When you hold, you must be able to name (a) the `evt_`/`dec_` id or the
    concrete act you are waiting for, and (b) the SEAT that owes it.** If you
-   cannot name both, you are not event-driven — **you are stalled, and it is
-   your job to find out, not to keep holding.**
-2. **When you hand work back, name the owed act AND its owner explicitly.**
-   *"Handed back to X"* is what created the deadlock above: it says who received
-   it, not what they owe. Write *"@X owes the merge Decision on `<sha>`"*.
-3. **A leader holding for a member must confirm the member is actually working**
-   — pane, status, or post. §13's *delivery ≠ engagement* rule applies to your
+   cannot name both, you are stalled, and it is your job to find out.
+2. **When you hand work back, name the owed act AND its owner**: *"@X owes the
+   merge Decision on `<sha>`"*, not *"handed back to X"*.
+3. **A leader holding for a member confirms the member is actually working**
+   (pane, status, or post). §13's delivery ≠ engagement rule applies to your
    own ring, not only to kickoffs you receive.
-4. **A ring silent with no member able to name its blocking event is the
-   single cheapest stall to detect and the most expensive to miss.** Detect it
-   at the ring, before the Steward's backstop is the only thing left.
+4. **A ring silent with no member able to name its blocking event** is the
+   cheapest stall to detect and the most expensive to miss. Detect it at the
+   ring, before the Steward's backstop is all that is left (a finished turn
+   holding an orphaned shell can misread as BUSY).
 
-**Why the backstop cannot be the answer:** the Steward's liveness sweep read
-all three of those seats as BUSY for hours — a completed turn holding an
-orphaned shell reads identical to a running one unless the detector is
-specifically built to tell them apart. **A liveness instrument you did not
-falsify in the false-BUSY direction reports "all clear" over exactly this.**
-The ring knowing what it waits for is the primary mechanism; the watchdog is
-insurance, and insurance failed.
+Incidents: `COORDINATION-INCIDENTS.md#s1a`.
 
 ## 2. Mention discipline
 
 **Mention an agent iff you are (a) asking them a question or (b) expecting a
-specific action/move from them — nothing else.** Every mention costs the
-recipient tokens and fires a notification. Mentioning to *inform*,
-*acknowledge*, *converge*, *confirm*, *affirm*, *CC an observer*, or *keep
-someone in the loop* is **not** a permitted reason: if the recipient is not
-being asked to answer or to do a next move, **do not mention them** — post it
-un-mentioned so it lands in the context for whoever reads it, or don't post it
-at all. (Operator, re-tightened 2026-07-03, second pass: a regression to
-ack-with-mention crosstalk — "@X acknowledged / noted / tracked for later /
-standing by" fires a notification for zero required action. This is the exact
-pattern to eliminate; it binds every role, the Steward included.)
+specific action/move from them** (operator, re-tightened 2026-07-03). To
+inform, acknowledge, converge, confirm, affirm, CC an observer, or keep someone
+in the loop is **not** a reason: post un-mentioned, or don't post. This binds
+every role, the Steward included.
 
-**A mootup mention is the *only* way you reach a teammate.** Every agent in the
-federation is an **already-running, persistent peer** with its own always-on
-session — never a sub-agent you launch. To delegate, query, hand off, or reach
-*anyone*, **post a convo message mentioning them** (`post_response`, `mentions:
-["<actor_id>"]`). **NEVER** spawn a teammate with the `Agent`/Task tool, a
-subprocess, or `claude(prompt)` — that starts a fresh, unconfigured Claude (it
-fails "503 provider not configured") and is not how this federation works. This
-has bitten DeepSeek leaders mis-reading "hand the WP to your implementer" as a
-launch instead of a mention. Assignment, query, handoff — all are mentions; local
-git only.
+**A mootup mention is the only way you reach a teammate.** Every agent is an
+already-running peer, never a sub-agent: delegate, query, hand off, or reach
+anyone by posting with `mentions: ["<actor_id>"]`. **NEVER** spawn a teammate
+with the `Agent`/Task tool, a subprocess, or `claude(prompt)`; that starts an
+unconfigured Claude ("503 provider not configured"). "Hand the WP to your
+implementer" means a mention, not a launch. Local git only.
 
-- **RESOLVING AN `actor_id`: USE `scripts/moot-actor-id.sh <role>`. NEVER OPEN
-  `.moot/actors.json` YOURSELF, AND NEVER DUMP IT TO LEARN ITS SHAPE.** That file
-  holds every seat's `api_key` beside its `actor_id`. **Another seat's `api_key`
-  is never yours to read** — only your own role's, and only for the HTTP fallback.
-  **Both leaks so far happened during SCHEMA DISCOVERY, not during the
-  lookup**: once by `sed`/`grep` over the raw file, once when a field-projecting
-  one-liner returned nothing (the author had guessed the key names) and the author
-  dumped the file *"just to see the structure"*, printing three records verbatim.
-  ⇒ **A rule saying "project only the fields you need" does not bind the moment
-  that leaks**, because you cannot write a projection until you know the field
-  names. The script exists so you never need to look: it projects `actor_id` by
-  name, enforces an **output whitelist** (nothing but `<role> agt_<id>` can leave
-  it), and fails closed. `--list` prints the known role names; controls in
-  `scripts/test-moot-actor-id.sh`. **If you must read the file for your own
-  `api_key`, narrow by KEY NAMES ONLY — never print a value, never serialize a
-  record.**
-- Handoff that passes work to B → mention **B only**.
-- "Your request is done," nothing pending → mention **nobody**.
-- **A mention is a demand for attention; an ack is not — so never mention on an
-  ack (operator, 2026-07-03).** You *may* post a brief **mention-free** ack for
-  visibility (§4); the `mentions` field is reserved for the message whose *next
-  move is the mentioned agent's*. Spend mentions only on real next-moves.
-- **The escalation triangle (learned twice):** when you answer X's question but
-  the *next move* belongs to Y, mention **Y**, not X. Naming Y in prose without
-  a real mention is the classic silent stall.
-- **Answering is not passive — a ruling / verdict / answer that moves the ball
-  MUST mention whoever owns the next move, *including when that owner is the
-  asker*.** The escalation triangle's blind spot: when your reply hands the move
-  *back to the person who asked* (your design ruling → they author the WP; your
-  review verdict → they apply the fix or merge), it feels like you are "just
-  answering," so you mention no one. But that answer **expects the asker's next
-  action** — which is exactly the §2(b) mention case. Populate the `mentions`
-  array (not a prose `@name`, which fires no notification — §2a). Observed
-  2026-07-11: three Architect design rulings that answered the Steward's
-  questions each posted with an **empty `mentions` array** and no in-text
-  address → invisible to the asker's `get_mentions`, surfaced only by manual
-  thread-polling, so every one of them was a latent silent stall. **If your post
-  moves the ball to anyone — asker or third party — mention them.**
-- **Route an action-expecting mention only to a *live* agent — never a `moot
-  init` template placeholder (promoted B1, spec-leader's catch).** The space
-  carries dead template participants (`Spec`, `Leader`, `QA`, `Implementation`,
-  …) left by scaffolding; a review/handoff/kickoff mention routed to one is a
-  **silent no-op** — it wakes no one. The tell: a placeholder is
-  `participant_type: agent` with **`agent_adapter: null`** (no recent
-  `last_seen_at`); a running agent has `agent_adapter: "mcp"`. Before routing a
-  vote/handoff to a participant you didn't just hear from, confirm it's live
-  (`list_participants`). This was the mechanism behind the Sec1ct §14 breach —
-  "Spec review" routed to the dead `Spec` placeholder, so the gate never ran.
-- **Post in plain text. No decorative icons** (operator, 2026-08-01). Do not
-  open a post, heading, bullet, or emphasis with star, warning sign, no-entry,
-  check mark, or any emoji. **The operator reads this channel and finds them
-  distracting rather than helpful.** Emphasis comes from **bold**, from
-  structure, and from leading with the point. Symbols that carry information
-  stay — arrows in a derivation, math and Ken notation, and terminal glyphs
-  quoted as data. If deleting it would lose information, it is not decoration.
-  Full statement: `AGENTS.md` Conventions.
-- **Thread your reply — don't scatter to the space root** (operator 2026-06-29;
-  hardened 2026-07-03; **restated 2026-08-01 — top level is a closed list:
-  `steward`, `librarian`, `research`, and nobody else. Every other role always
-  threads. A thread's identity is a WP, and the kick's own `event_id` is its
-  anchor — §4**). Every event you receive carries a `thread_id`. When you respond
-  to a message that belongs to a thread — a kickoff, assignment, query, handoff,
-  review request, or handoff — **reply *into that thread*** (`post_response` with
-  `thread_id` set to that message's thread; or `parent_event_id` on the first
-  reply, which opens the thread). A bare `post_response` with no thread drops
-  your message at the space root, **scattering one WP's conversation across the
-  space** so the next reader can't follow
-  the exchange. **One WP = one thread:** kickoff → ack → queries → handoff →
-  merge Decision all live under it. **`reply_to` needs an *existing*
-  thread** — it 404s ("Thread not found") on a **top-level** event that has no
-  thread yet (e.g. a kickoff, which is itself a root post). To **open** a thread
-  on such an event, use `post_response` with `parent_event_id` set to it; use
-  `reply_to` only for an event **already in** a thread. (L5: an implementer lost a
-  round-trip when `reply_to` on the kickoff 404'd.)
+- **Resolve an `actor_id` with `scripts/moot-actor-id.sh <role>`** (`--list`
+  prints role names; controls in `scripts/test-moot-actor-id.sh`). **Never
+  open `.moot/actors.json` yourself, and never dump it to learn its shape**: it
+  holds every seat's `api_key`, and another seat's is never yours to read. Both
+  leaks so far happened during schema discovery. If you must read your own
+  `api_key` (HTTP fallback only), narrow by key names only: never print a
+  value, never serialize a record.
+- Handoff to B → mention **B only**. "Done," nothing pending → mention
+  **nobody**. **Never mention on an ack** (§4).
+- **Escalation triangle:** when you answer X but the next move is Y's, mention
+  **Y**. Naming Y in prose without a real mention is the classic silent stall.
+- **An answer that moves the ball MUST mention the next move's owner,
+  including when that is the asker** (your ruling → they author the WP; your
+  verdict → they fix or merge). It will feel like "just answering". Populate
+  `mentions`; a prose `@name` fires nothing.
+- **Route an action-expecting mention only to a live agent**, never a `moot
+  init` placeholder (`Spec`, `Leader`, `QA`, `Implementation`, …), where it is
+  a silent no-op. A placeholder has `agent_adapter: null` and no recent
+  `last_seen_at`; a live agent has `agent_adapter: "mcp"`. Confirm with
+  `list_participants` before routing to anyone you did not just hear from.
+- **Plain text, no decorative icons** (operator, 2026-08-01; full statement
+  in `AGENTS.md` Conventions).
+- **Thread every reply** (operator 2026-06-29, restated 2026-08-01): §4.
 
-### 2a. Convo call cheat-sheet (form valid parameters — recurring failure)
+Incidents: `COORDINATION-INCIDENTS.md#s2`.
 
-Malformed convo calls fail **silently to the workflow** (the post never lands,
-so the next move never fires). The two parameters that get rejected:
+### 2a. Convo call cheat-sheet
 
-- **`message_type` MUST be one of the backend enum values** — guessing a
-  natural-language type is a 400 reject. **Valid:** `question`, `code_share`,
+Malformed calls fail silently to the workflow: the post never lands and the
+next move never fires. On a 400/404, **read the error, fix the one named
+field, and re-send**; never drop the post.
+
+- **`message_type` MUST be a backend enum value**: `question`, `code_share`,
   `git_request`, `review_request`, `status_update`, `bug`, `feature`,
-  `decision_propagated`, `pause_issued`, `connection_status`. **REJECTED (do not
-  use):** `message`, `kickoff`, `assignment`, `merge_ready`, `handoff`, `nudge`,
-  `ack`. Map your *intent* to a valid type:
+  `decision_propagated`, `pause_issued`, `connection_status`. Rejected:
+  `message`, `kickoff`, `assignment`, `merge_ready`, `handoff`, `nudge`,
+  `ack`. When unsure, `question` is always accepted.
+
   | Intent | `message_type` |
   |---|---|
   | kickoff / assign a WP / hand work to a teammate / deliver code | `code_share` |
   | question / query / nudge / ack / general note | `question` |
-  | ask for publisher-path merge handling | `git_request` |
+  | ask for publisher-path merge handling (a ready `wp/<ID>`) | `git_request` |
   | QA→leader merge-Decision request; "request review" | `review_request` |
   | a status line | `status_update` |
   | a defect note to another team | `bug` |
-  When unsure, **`question`** is always accepted. If you get
-  `unknown message_type '<x>'`, re-send with the mapped value — don't drop the post.
-- **`mentions` MUST be a list of participant_ids** — `mentions: ["agt_…"]`, the
-  raw IDs resolved from `list_participants` / `orientation()`. **Not** display
-  names (`["spec-leader"]` ✗), **not** `@name` in the `text` (that fires no
-  notification — §2), **not** a bare string. One id per actor whose move is next.
-- **`propose_decision`**: give the decision `text`/title + the WP/branch; mention
-  the required reviewers (Architect always; Spec only on `spec/`+`conformance/`
-  paths — §13/diff-scope). **`thread_id`/`parent_event_id`** take an event/thread
-  id string (§2), never a name. **`reply_to` 404s on an un-threaded (top-level)
-  event** — to thread under a kickoff, use `post_response` + `parent_event_id`,
-  not `reply_to` (§2). When a call 400s/404s, **read the error, fix the one named
-  field, and re-send** — a dropped post is a silent stall.
+- **`mentions` MUST be a list of participant_ids** (`["agt_…"]`, from
+  `list_participants` / `orientation()`): not display names, not `@name` in
+  the text, not a bare string. One id per actor whose move is next.
+- **`propose_decision`**: the decision text plus the WP/branch; mention the
+  required reviewers (Architect only when the diff touches `catalog/`,
+  `crates/` or `spec/`, §8a; Spec only on `spec/` + `conformance/` paths,
+  §14). `thread_id`/`parent_event_id` take an id, never a name (§4a).
 
 ## 3. Status = what you're doing, in your own words
 
-Three liveness signals exist; only the third is yours to post:
-1. connection (automatic — never post "I'm online");
-2. activity (file/transcript mtime — automatic);
-3. **semantic status** — "drafting K2 conversion", "blocked-on-spec: OQ-17".
-   Agent-composed, never auto-classified.
-
-**Update your status on _every_ change in your activity (operator, 2026-07-03).**
-Not just at handoff boundaries — whenever what you are doing changes: picking up a
-WP, starting a sub-step, finishing, changing focus, going idle, blocking,
-unblocking. Your status line is the federation's **at-a-glance truth**
-(`list_participants`) and the Steward's primary watchdog signal; a status that
-lags your real activity is a coordination hazard — it reads as *stalled* when you
-are working, or *working* when you are already done, and sends the watchdog
-chasing phantom stalls (or missing real ones). Treat the `update_status` call as
-**part of every activity transition**, the same reflex as saving a file — cheap,
-frequent, always current. This is the low-cost, always-on signal that lets the
-rest of the discipline below (mention-free acks, Steward-only roots) stay quiet.
+Of three liveness signals, connection and activity (file mtime) are automatic;
+never post "I'm online". The third is yours: **semantic status**
+("blocked-on-spec: OQ-17"), agent-composed, never auto-classified. **Update it
+on every change in your activity** (operator, 2026-07-03): picking up a WP, a
+sub-step, finishing, changing focus, going idle, blocking, unblocking. It is
+the Steward's primary watchdog signal; a lagging one reads as stalled when you
+work, or working when you are done.
 
 ## 4. Threads are the spine
 
-> ### THE WHOLE RULE IN FOUR LINES (operator, 2026-08-01)
->
-> 1. **A thread's identity is a WP.** One WP = one thread, opened by its **kick**.
-> 2. **The kick's own `event_id` IS the thread anchor.** Everything about that WP
->    replies under it — nothing about it is ever posted anywhere else.
-> 3. **A rescope that SPLITS a WP abandons the original thread.** Each component
->    WP gets a fresh kick and therefore a fresh thread.
-> 4. **Only `steward`, `librarian`, and `research` may post at top level.**
->    Every other role always replies into a thread.
+The whole rule in four lines (operator, 2026-08-01):
 
-**Read the anchor rule literally: the anchor is an `evt_`, not a `thr_`.** That is
-not a stylistic choice — see the mechanism note below, which is why the corollary
-"every kick carries a thread id" cannot be implemented as stated.
+1. **A thread's identity is a WP.** One WP = one thread, opened by its **kick**.
+2. **The kick's own `event_id` IS the thread anchor.** Everything about that WP
+   replies under it; nothing about it is posted anywhere else.
+3. **A rescope that SPLITS a WP abandons the original thread.** Each component
+   WP gets a fresh kick and therefore a fresh thread.
+4. **Only `steward`, `librarian`, and `research` may post at top level.**
+   Every other role always replies into a thread.
 
-### 4a. THE MECHANISM — a thread does not exist until someone replies
+### 4a. The mechanism: a thread does not exist until someone replies
 
-**Measured 2026-08-01, and it defeats the obvious reading of the rule.** A
-kick is by construction a **root post**: `post_response` with no parent returns
-`thread_id: null`, because **the thread is minted by the first reply**, not by
-the root. The root event is then pulled into that thread retroactively.
-
-⇒ **A kick therefore CANNOT quote the thread id it is inaugurating — no such
-id exists at the moment it is written.** **The exact substitute, which loses
-nothing: the kick's own `event_id` is the anchor, and every recipient already has
-it** (it is in the mention notification and in the events feed).
+A kick is a root post and returns `thread_id: null`: **the first reply mints
+the thread.** A kick cannot quote its own thread id, so the anchor is its
+`evt_`, not a `thr_`; every recipient has it from the notification.
 
 | you are… | you call | why |
 |---|---|---|
@@ -258,24 +145,19 @@ it** (it is in the mention notification and in the events feed).
 | any **later** poster | `post_response(thread_id=<thr_>)` or `reply_to(<any evt_ already in the thread>)` | the thread now exists |
 | posting a **new WP kick** (steward/librarian/research only) | bare `post_response`, no parent, no thread | you are creating the anchor |
 
-**`reply_to` auto-mentions the original speaker.** That is load-bearing:
-on 2026-08-01 the Runtime ring deadlocked because an Architect verdict mentioned
-only the implementer and not the leader who opened the Decision. Replying into
-the thread makes the wake path structural instead of a habit someone must
-remember.
+`reply_to` auto-mentions the original speaker, which makes the wake path
+structural. Incidents: `COORDINATION-INCIDENTS.md#s4a`.
 
 ### 4b. What every kick must carry
 
-**Every WP kick — and every doc-phase kick — must state its own anchor in its
-body**, in words a recipient can act on without a lookup:
+Every WP kick, and every doc-phase kick, states its anchor in its body:
 
 > **This message is the thread anchor for `<WP-ID>`.** Reply with
 > `parent_event_id` set to **this event's id**; thereafter use its `thread_id`.
 > Do not open a second thread for this WP and do not post about it at the
 > space root.
 
-**A kick without that line is defective** — reissue it rather than letting the
-ring guess.
+**A kick without that line is defective**; reissue it.
 
 ### 4c. Rescope: when the thread is abandoned
 
@@ -287,508 +169,231 @@ ring guess.
 | work **routed** to another WP (a `D4` route, an inherited obligation) | **keep both threads.** The route is a reply in the *origin* thread; the obligation lands in the *target* WP's **frame**, not as a cross-post |
 | WP **merged** | **the thread is CLOSED.** It takes no further posts, ever |
 
-**The test is "did the set of WPs change?"** — not "did anything change?" Only
-a split changes it.
+**The test is "did the set of WPs change?"** Only a split changes it.
 
-> ### A MERGED WP'S THREAD IS CLOSED — and this is where the rule actually breaks
->
-> **Measured 2026-08-01, one hour after this section landed.** Runtime QA
-> posted **`QA APPROVED — Slice 2 exact ed527eb7…`** into **slice 1's** thread.
-> Slice 1 was merged and closed; slice 2 had its own kick and its own
-> thread, and the leader and implementer were both already posting there
-> correctly.
->
-> **The cost is not untidiness — it is a hole at the point of inspection.**
-> Anyone reconstructing slice 2 from its own thread saw handoff → review request
-> → *nothing* → Architect request. **The approval was invisible exactly where a
-> reader checks whether one exists**, while a closed WP's thread carried a live
-> verdict about a different candidate.
->
-> **Note what did NOT cause it: no compaction, no stale id, no rescope.** The
-> seat had simply been living in that thread all afternoon through four review
-> rounds, and posted where it had been posting. ⇒ **Anchor on the
-> WP you are working on, never on the thread you last posted in.** Before every
-> post, ask *which WP is this about* and reply under **that** WP's kick.
->
-> **The successor's kick is the signal that the old thread is closed** — when
-> the Steward releases the next slice, the previous slice's thread is done.
+**Anchor on the WP you are working on, never on the thread you last posted
+in.** You will be tempted to keep posting where you have posted all afternoon;
+before every post, ask which WP it is about. The successor's kick signals that
+the previous slice's thread is closed. Incidents:
+`COORDINATION-INCIDENTS.md#s4c`.
 
-### 4d. Top-level is a closed list
+### 4d. Top-level is a closed list, and everyone else threads
 
-**`steward`, `librarian`, `research` — nobody else, ever** (operator,
-2026-08-01; supersedes the Steward-only rule of 2026-07-03). A post from any
-other role *always* carries a `thread_id` or `parent_event_id`.
+**`steward`, `librarian`, `research`: nobody else, ever** (operator,
+2026-08-01), because only their output is not scoped to one WP. Every other
+role, including the Architect and every team leader, carries a `thread_id` or
+`parent_event_id` on every post.
 
-The three are exactly the roles whose output is **not scoped to one WP**: the
-Steward coordinates across all of them, the Librarian holds a standing as-built
-mandate over the whole corpus, and research reports are corpus-wide by nature.
-
-**Everyone else, including the Architect and every team leader, threads.** An
-Architect ruling about a WP belongs in that WP's thread. **A general design
-ruling that belongs to no WP is the one real gap** — route it to the Steward,
-who opens a thread for it; do not root it yourself.
-
-After any context reset/compaction, **resolve the live thread from fresh
-context**; do not reuse a thread/event id from a summarized memory — the
-single commonest cause of a days-old thread being revived is a stale id carried
-through a compaction.
-
-The rationale is structural, not stylistic: **the Steward is the coordinator of
-all activity, so any work another agent does traces back — by origin — to a
-message the Steward sent.** Enforcing it makes the whole space a clean tree
-rooted at coordination posts and ends the fragmentation where parallel root posts
-scatter one WP's exchange. Consequences:
-- **Reply, never root.** Use `post_response`/`share` with the WP thread's
-  `thread_id` (or `parent_event_id` on the kickoff to open its thread); never a
-  bare un-parented post. The mechanics are unchanged (§2's `reply_to`-vs-
-  `parent_event_id` note still holds) — what changes is that rooting is now
-  **prohibited** for non-Steward roles, not merely discouraged.
-- **No home thread? Route to the Steward, don't root it.** If you have something
-  that fits no existing thread (a genuinely new cross-cutting concern), thread it
-  under the nearest relevant Steward post — or the standing `steward:` coordination
-  thread — mentioning the Steward if a decision is needed. The Steward owns thread
-  creation and will open a new root if the item warrants its own spine. A spun-off
-  WP (its own branch + gates + merge, e.g. an erratum) is still opened as its own
-  spine — **by the Steward**, per the WP-release process — with a one-line pointer
-  from the parent.
+- **No home thread? Route to the Steward; never root it.** Thread it under
+  the nearest relevant Steward post or the standing `steward:` thread,
+  mentioning the Steward if a decision is needed. This includes a design
+  ruling that belongs to no WP. The Steward owns thread creation and opens a
+  new root when an item warrants its own spine; a spun-off
+  WP (own branch + gates + merge, e.g. an erratum) is opened as its own spine
+  by the Steward, with a one-line pointer from the parent. It is the only
+  sanctioned new thread off a WP.
 - **Decisions, questions, reviews still thread.** `propose_decision`,
-  `question`, `review_request`, and `git_request` all attach to the
-  relevant WP thread (their `thread_id`/`parent_event_id`, §2a); the Steward-only
-  rule governs *root chat posts*, and these governance objects are never a reason
-  to open a new root.
+  `question`, `review_request`, `git_request` attach to the WP thread.
+- **Threading drifts two ways** (operator, 2026-07-02). (1) A fork spawns a
+  side-thread: a mid-WP escalation to the Architect, Steward, or CV is a
+  **reply in the WP thread**. (2) A new WP reuses the previous WP's thread.
+  After any reset or compaction, **resolve the live thread from fresh
+  context**: the current WP's kick, never the most-recent thread or an id
+  from a summarized memory.
+- **Post at both boundaries** (operator, 2026-06-29): on picking up a task, a
+  brief taking-this note in its thread plus a status update; on finishing or
+  handing off, what you did plus the mention of whoever moves next, plus a
+  status update.
+- **Acks never mention anyone** (operator, 2026-07-03). A mention demands
+  attention and an ack demands nothing. You MAY post a brief mention-free ack
+  ("seen", "proceeding"); silence is equally fine. If your only reason to name
+  someone is to say you received, agree with, or are proceeding on their
+  message ("@X noted", "@X standing by"), mention no one and post nothing. A
+  substantive routing post mentions **only** the one actor whose move is
+  next, not observers. This includes the Steward's posts.
 
-**Threading drifts in exactly two ways (operator 2026-07-02) — guard both.**
-(1) **A fork spawns a side-thread.** A mid-WP escalation — a soundness fork to
-the Architect, a scope fork to the Steward, a conformance fork to CV — is a
-**reply *in* the WP thread** (the `mention` routes it to the owner); opening a
-fresh root for the ruling scatters the WP across threads even though every
-message was correctly *addressed*. The ruling and its answer belong under the
-kickoff. (2) **A new WP reuses the *previous* WP's thread.** By reflex (or
-post-compaction) an agent replies in the most-recently-active thread — usually
-the *last*, now-closed WP's — instead of the current WP's kickoff. "Resolve the
-live thread from fresh context" means **the current WP's kickoff root, not the
-most-recent thread**; the kickoff event you were mentioned on *is* the anchor,
-and a kickoff **states its own anchor** ("thread all `<WP>` activity here") so
-there is nothing to guess. The only sanctioned *new* thread off a WP is a
-genuinely separate spun-off WP (its own branch + gates + merge, e.g. an
-erratum): open it as its own spine with a one-line pointer from the parent.
-
-**Post at both boundaries — on receiving work and on handing off (operator,
-2026-06-29).** When you **pick up** a task, post a brief *taking-this* note in its
-WP thread and set your semantic status to it (§3); when you **finish or hand
-off**, post what you did + the mention of whoever moves next (§2) and update your
-status again. **Both signals — the in-thread post *and* the status — at both
-ends, not just at handoff.** The boundary posts keep the flow legible in the web
-view and preserve the interaction history; without them there is a silent gap
-between assignment and completion that no one can audit or replay.
-
-**Acks are allowed — but never with a mention (operator, 2026-07-03; refines the
-earlier "no bare acks").** The problem was never the acknowledgment itself — it
-was that a **mention fires a notification and *obligates* the recipient** to spend
-tokens reading and deciding whether to respond. So the rule is about the
-*mention*, not the *post*: **a mention is a demand for attention; an ack demands
-nothing, so an ack MUST mention no one.** Concretely:
-- **You MAY post a brief, mention-free ack in a thread** — "seen", "picked this
-  up", "proceeding", "noted, folding in" — so that anyone scanning the thread, and
-  the Steward harvesting flow, can *see* the activity without anyone being pinged.
-  A mention-free ack is a **passive visibility signal**, not noise: it does not
-  interrupt or obligate a soul.
-- **Reserve `mentions` strictly for the message whose *next move is the mentioned
-  agent's*** (§2) — a handoff, a blocking question, a finding they must act on.
-  **Never @mention on a mere ack** — that manufactures a false obligation and is
-  the exact interruption the earlier rule was reaching for.
-- **Silence is still fine.** If you need nothing back and diverge on nothing, you
-  may simply proceed and let the next *substantive* post (candidate-ready, a
-  finding, a handoff) be your acknowledgment. Mention-free ack and silence are now
-  **both acceptable**; the audit trail is still carried by the substantive posts +
-  your always-current status (§3), and the hard line is unchanged only in its
-  sharpened form: **the mention, not the post, is the scarce resource — spend it
-  only on a real next-move.**
-
-Note this pairs with the two rules above: **every activity change updates your
-status** (§3, the always-on signal) and **only the Steward roots a thread** (every
-ack is therefore a mention-free *reply* inside an existing thread). Together they
-let an agent broadcast "I'm alive and moving" through cheap, non-interrupting
-channels — status + threaded mention-free ack — reserving mentions for genuine
-handoffs.
-
-**A mention is never an acknowledgment (operator, 2026-07-03, second pass).**
-The regression that keeps recurring is an ack that *also* mentions — "@X
-acknowledged," "@X noted, tracked for later," "@X standing by," "@X converged,
-agree." Even when the prose feels substantive, if the recipient is not being
-**asked** or **tasked**, the mention is pure notification-noise. So: if your only
-reason to name someone is to tell them you received / agree with / are proceeding
-on their message, mention **no one** and post **nothing** — proceed silently
-(silence is acceptance, above). Reserve every mention for a question or an
-expected next move (§2 opening). When you *do* have a substantive routing post
-(a decision, a finding, a handoff), mention **only** the one actor whose move is
-next — not the observers you're "keeping in the loop" (they read the context).
-This applies to the Steward's own posts as much as anyone's.
-
-**Title convention (the single-space articulation tag).** The whole federation
-runs in one space (`ken-topos`), so a thread's **title is its team tag** — there
-is no separate per-team channel. Begin every kickoff title with a tag, then a
-terse subject:
-
-- **Work-package threads:** the WP ID, whose letter encodes the owning team —
-  `K*` Kernel · `V*` Verify · `L*` Language · `X*` Runtime · `Sec*` security ·
-  `B*` seam · `T*` tooling · `F*` foundation. E.g. `K2: decidable conversion`.
-- **Non-WP threads** (a cross-team query, a process note): prefix with the
-  originating role/team and an arrow if it targets one — `steward: cadence
-  pass`, `kernel→spec: OQ on cast normal form`.
-
-This makes the one space scannable and `search_spaces`-filterable by team
-without the cost of per-team spaces, and pairs with the `message_type` taxonomy
-(§8): the title says *who/what*, the type says *what kind*, and `list_threads`
-filters on type with per-actor unread counts. Keep both accurate.
+**Title convention.** The federation runs in one space (`ken-topos`), so a
+thread's title is its team tag: begin every kickoff title with a tag, then a
+terse subject. WP threads use the WP ID,
+whose letter encodes the team: `K*` Kernel · `V*` Verify · `L*` Language ·
+`X*` Runtime · `Sec*` security · `B*` seam · `T*` tooling · `F*` foundation
+(`K2: decidable conversion`). Non-WP threads use the originating role/team,
+with an arrow if it targets one (`kernel→spec: OQ on cast normal form`). The
+title says who/what, the type (§8) says what kind; keep both accurate.
+Incidents: `COORDINATION-INCIDENTS.md#s4d`.
 
 ## 5. Decisions are for judgment, not deduction
 
 Open a mootup Decision (`propose_decision`) for choices with tradeoffs where a
-reasonable peer might differ — kernel/semantics design, an API shape, a
-content-store policy. Do **not** open one for deductive/mechanical choices (a
-bug fix is not a decision). Decisions are how future agents query *why* Ken is
-the way it is. **Merge/review approvals are also Decisions** — the merge
-Decision *is* the review record (see `04-git-and-integration.md`).
+reasonable peer might differ: kernel/semantics design, an API shape, a
+content-store policy. Not for deductive/mechanical choices (a bug fix is not a
+decision). **Merge/review approvals are also Decisions**: the merge Decision
+is the review record (`04-git-and-integration.md`).
 
 ## 6. Resolve when structurally determined; escalate only real forks
 
 Before escalating or querying another team, ask: *is there a strategic choice
-between materially different futures?* If **no** — the published spec + kernel
-invariants + existing code already determine the answer; resolve it yourself and
-record the resolution with a cited rationale (`file:line` or spec §). If **yes**
-— escalate. For clean-room questions, "the published spec" means `/spec`, never
-prototype source. This filter is the volume control on the cross-team query
-edges (§11): without it, Spec and the Architect become bottlenecks.
+between materially different futures?* If **no** (spec, kernel invariants, and
+existing code determine the answer), resolve it yourself and record it with a
+cited rationale (`file:line` or spec §). If **yes**, escalate. For clean-room
+questions, "the published spec" means `/spec`, never prototype source. This is
+the volume control on the query edges (§11).
 
 ## 7. Ground every premise before locking
 
 Before locking a spec, ADR, or design claim, verify each premise against
-reality: "X exists" → grep for it; "matches pattern Y" → read Y end-to-end. For
-a *verified* language a spec claim about the kernel must be checked against the
-kernel, not assumed.
+reality: "X exists" → grep; "matches pattern Y" → read Y end-to-end. A spec
+claim about the kernel is checked against the kernel, not assumed.
 
-### 7a. MUTABLE EXTERNAL STATE IS TESTED AT POINT OF USE, NEVER CITED
+### 7a. Mutable external state is tested at point of use, never cited
 
-Grounding a premise in a **document** works for facts that are true by
-construction — what a function does, what a spec says. It **fails** for
-**credentials, permissions, scopes, quotas, remote refs, and infrastructure**,
-because those change *without touching any file that describes them.* Nothing
-goes red when such a note goes stale; the note simply becomes false in place.
+Credentials, permissions, scopes, quotas, remote refs, and infrastructure
+change without touching any file that describes them.
 
-**Measured, 2026-07-22.** A finished, QA-approved WP was declared undeliverable
-by **two seats independently** — one citing a fleet memory note, one citing
-`docs/ops/runbook-gh-identities.md:109` — both saying the publisher App lacked
-`Workflows` permission. **The operator had granted it the day before.** The
-Steward escalated and asked for a permission that already existed.
+1. **Test it.** A capability question ("can this credential push that path?")
+   is answered by attempting it. **Never escalate a capability claim you have
+   not tried.**
+2. **When an observation contradicts a record, re-verify the RECORD**, not the
+   observation. "I can't tell which; flagging that I don't know" is correct.
 
-The disconfirming evidence was in the repository the entire time: three commits
-under `.github/workflows/` authored by that very App.
+A note about mutable state is evidence about the past: cite it to form a
+hypothesis, never to close a question. When one is false, **fix it in place
+and say when it became false.** Incidents: `COORDINATION-INCIDENTS.md#s7a`.
 
-**Two rules, and the second is the one that was actually missing:**
+### 7b. Never default a value your whole conclusion rests on
 
-1. **Test it.** A capability question — *"can this credential push that path?"*
-   — is answered by attempting it, usually in one command. **Never escalate a
-   capability claim you have not tried.**
-2. **When an observation contradicts a record, the RECORD is what you
-   re-verify — not the observation you explain away.** `verify-leader` found the
-   three commits, held both facts side by side, and wrote *"I can't tell which;
-   flagging that I don't know rather than guessing."* **That is the correct
-   move and it is what got this corrected.** The Steward saw the same evidence
-   and explained it away as "probably operator-pushed" — reconciling the anomaly
-   *to* the record instead of testing the record against the anomaly.
+- **Read the assertion back out of the artifact, and check the operand sits at
+  the point in the graph your question is about.** No precedent from a branch
+  name instead of its diff; no file content from another seat's summary.
+- **Verify the property, not the representative case.** An obvious-case pass
+  and correct prose are false signals. When an algorithm has N guard/discard
+  positions, **exercise each independently** plus one case where the problem
+  hides behind indirection; write pseudocode defensively (every discarding
+  position guarded, every guard backed by a rejection case). Binds QA,
+  conformance and spec authoring, and review.
+- **A discriminator boundary needs a non-degenerate pair on a shared input**
+  (accept/reject, `proved`/`assumed`, taint/safe): the two states that must
+  bucket differently, identical otherwise, so a flipped boundary fails both. A
+  lone positive case passes the flip. The discriminator must be a
+  **structural / kernel-side signal** (`trusted_base()` membership, a
+  constructor, a real value through a real sink), never a self-reported
+  string the untrusted layer can forge.
+- **Make load-bearing completeness a compile error**: a **single `match` over
+  a sealed type with NO `_ =>` arm**, so an unhandled new variant fails to
+  compile. Use a catch-all only where the residual is genuinely uniform. The
+  implementer writes it; QA and the Architect verify no `_ =>` sits on a
+  completeness-critical match.
 
-⇒ A note about mutable state is **evidence about the past**, carrying a
-timestamp whether or not one is written. Cite it to form a hypothesis; never to
-close a question. And when you find such a note false, **fix it in place and say
-when it became false** — a silently corrected doc teaches the next reader
-nothing.
-
-### 7b. NEVER DEFAULT A VALUE YOUR WHOLE CONCLUSION RESTS ON
-
-Related failure, same day, three instances: an operand chosen without checking
-which point in the graph it sat at (`dd715950^` — a point on `main`'s history —
-used to answer a question about a *PR's base*); a precedent asserted from a
-branch **name** rather than its diff; a claim about a file cited from another
-seat's characterization rather than by opening the line.
-
-Each returned a **confident, wrong** answer rather than an obviously broken one.
-⇒ **Read the assertion back out of the artifact, and check the operand sits at
-the point in the graph your question is about.**
-
-**Verify the *property*, not the representative case (promoted from F4 + K1).**
-A passing obvious-case test and correct *prose* are **false signals** — the
-algorithm or code can still be wrong in the cases you didn't exercise. (F4: a
-Map/Set determinism test passed only because `BTreeMap` pre-sorts, never
-exercising the encoder's own sort. K1: the positivity conformance tested only
-direct arrow-domain negativity and missed the hidden-negative classes — `Pair
-(Bad3→Empty) Unit` — that the Architect caught; the §8.2 *prose* was right while
-the *algorithm* silently dropped those positions, a soundness hole in the trust
-root.) So — for QA, conformance authoring, spec authoring, and review alike:
-when an algorithm has N guard/discard positions, **exercise each independently**
-(one case per guard) plus one where the problem hides behind indirection; write
-algorithmic pseudocode **defensively** (every discarding position
-explicit-guarded, every guard backed by a rejection case). The obvious case
-passing ≠ the property holds.
-
-**A discriminator boundary needs a non-degenerate *pair*, not a positive case
-(promoted Sec1/Sec1ct/V3/B1 — ≥4 domains, build *and* spec enclave).** When a
-rule, classification, projection, or lattice-axis *orientation* decides between
-two outcomes on a boundary (accept/reject, `proved`/`assumed`, taint/safe), a
-single positive case is **green-vs-green** under the exact swap it should catch:
-flip the order/orientation and the lone case still passes, for the wrong reason.
-The net is **one non-degenerate pair on a *shared* input** — the two states that
-must bucket differently, identical in every other respect (Sec1ct: a `ct⊤` value
-rejects *while* a `Secret`-not-`@ct` value accepts on the *same* sink shape; B1:
-a `proved` claim maps to `Q` *while* a hole maps to `P` on the *same*
-postcondition) — so a flipped boundary inverts **both** and the pair fails. And
-the discriminator the case keys on must be a **structural / kernel-side signal**
-(`trusted_base()` membership, a constructor, a real value through a real sink),
-never a **self-reported string** the untrusted layer can forge.
-
-**Exhaustive-by-construction: make load-bearing completeness a *compile error*,
-not a test (promoted across the V-spine + X1-effects; verify-team-requested).**
-When the **completeness** of an enumeration is load-bearing — every obligation
-classified, every effect dispatched, every verdict projected, every variant
-handled — encode it as a **single `match` over a sealed type with NO `_ =>`
-catch-all arm**, so adding a variant without handling it is a **compile error**,
-not a silent drop. This is *structural*, stronger than any test: it's the
-constructive form of the two-soundnesses *omission* backstop (a silently-skipped
-case supplies nothing for a downstream checker to catch). Validated at four tiers
-— V2 `lift_obligation` (no `_=>` over `ObligationKind`), V3 `classify` (HO is the
-**explicit** default arm, not a skip), V4 `project_diagnostic` (one `match` over
-`Verdict`, no relabel path), and X1-effects `drive_h` (sealed effect-class enum →
-new variant = compile error, out-of-row tag → honest `panic!`). Reach for a
-catch-all **only** where the residual is genuinely uniform; where completeness is
-the safeguard, an explicit arm per variant is the safeguard. Implementer writes
-it; QA + the Architect verify **no `_ =>`** sits on a completeness-critical match.
+Incidents: `COORDINATION-INCIDENTS.md#s7b`.
 
 ## 8. Message-type taxonomy (routing metadata)
 
-Tag each message with a type; the **first line is the thread title** — no
-`[TYPE]` prefix in the body. The type MUST be a **backend enum value** — see the
-**§2a mapping table** for the valid set and how to map your intent. In
-particular, a local `wp/<ID>` branch ready for publisher-path merge handling is
-`git_request` (the old `merge_ready` is rejected), and a QA→leader
-merge-Decision request is `review_request`. When unsure, `question` is always
-accepted.
+Tag each message with a type from §2a; the **first line is the thread title**,
+with no `[TYPE]` prefix in the body.
 
-## 8a. ARCHITECT AND LIBRARIAN ARE PARALLEL, OVER DISJOINT DOMAINS
+## 8a. Architect and Librarian are parallel, over disjoint domains
 
-**Operator directive, 2026-07-22.** They review **at the same time**, each in
-their own domain, and **they should not need to interact.**
+**Operator directive, 2026-07-22, scope amended 2026-09-26.** The
+**Architect** reviews `catalog/`, `crates/` and `spec/`, and nothing else: the
+rest of the project is outside its scope. The **Librarian** reviews
+`library/`. They review at the same time, without needing to interact.
+Neither is a gate on the other; a candidate touching both goes to both at
+once.
 
-| reviewer | domain |
-|---|---|
-| **Architect** | `catalog/`, `crates/` |
-| **Librarian** | `library/` |
+- **A fold in one domain does not invalidate the other's approval**, which
+  binds the exact SHA for its own domain. Re-run the Librarian only if the fold
+  touched `library/`. Reviewers who cannot invalidate each other's finding are
+  never sequenced.
+- **Assembly.** Each reviewer votes on the exact SHA and names the domain it
+  bound. The **owning leader** assembles: ready when every touched domain has a
+  live approval on the current SHA. On a fold, re-request only the touched
+  domains and state which approvals carry forward.
+- **Accepted work, not a finished WP** (operator, 2026-08-06: *"merge in
+  accepted work once it is done, even if it is only a partial WP"*). A complete
+  deliverable with live approvals on its exact SHA goes to the Steward to
+  publish; do not wait for the WP's remaining deliverables. WP closure and
+  merge are separate events.
+- **The one bar is semantic atomicity**: a declared atomic pair lands
+  together, because one half regresses or has no reaching witness alone. "The
+  branch carries the evidence chain", "a rebase would cost re-anchoring", and
+  "a working path would go red" are not bars (§12; 2026-07-28 no-users
+  ruling).
+- **Prefer a cut that is a straight ancestor of the working tip**, which keeps
+  every exact SHA and verdict below it.
+- **A reviewed prefix is not thereby releasable**: approvals do not assert
+  greenness. Establish greenness on the cut **and** on `main` before routing,
+  so a red is attributable rather than inherited.
 
-**Neither is a gate on the other, and neither's approval is a precondition for
-the other starting.** A candidate touching both domains goes to **both at once**.
+Incidents: `COORDINATION-INCIDENTS.md#s8a`.
 
-### The rule that actually saves the time
+## 9. Topology is invariant, including the query edges
 
-**A fold in one domain does NOT invalidate the other domain's approval.**
-An approval binds the exact SHA **for its own domain**. When a fold touches only
-`crates/`, the Librarian's `library/` approval **carries forward** — re-run the
-Librarian only if the fold touched `library/`.
+Who hands off, reviews, and merges, and which cross-team query edges exist, is
+operator-owned and fixed. The sanctioned edges are exactly:
 
-**This is why it matters, measured on SRC-ATTEST 2026-07-22:** the WP was gated
-*Librarian QA → Architect*, in series. Three Architect rejections, each landing
-in `scripts/`, each sending the candidate **back through a full Librarian
-re-review of `library/` that no fold had touched.** Every review found something
-real — the serialization was not catching bugs, it was **re-asking a question
-already answered** while the fleet's top priority sat blocked behind it. Roughly
-an hour, entirely in the handoff, not in the work.
+- any team → **Spec** leader: behavioral-contract questions.
+- any team → **Architect**: component-design questions.
+- any team → **Steward**: scope/priority (forwarded to the operator),
+  workflow/process, research requests, merge status, publisher-path questions,
+  and `git_request` (the Steward routes merges; the lieutenant executes them,
+  §14b). No ring touches GitHub.
 
-⇒ **Serial review across disjoint domains buys nothing and costs a full
-round-trip per iteration.** If two reviewers cannot invalidate each other's
-finding, they must not be sequenced.
+**There is no enclave → build-team edge** (operator, 2026-07-03). The
+clean-room enclave (spec-leader, spec-author, CV) elaborates `/spec` and
+`/conformance` autonomously and never pulls a build-team member into an
+elaboration thread: it greps landed code for facts itself (§7) and routes a
+cross-cutting judgment to the **Architect**, never to a build-team leader.
 
-### Assembling parallel verdicts
+Improve what you do inside a node; never add a communication edge or review
+cycle between nodes. Reject any lesson or carry-forward that would add or move
+an edge, without softening to "candidate, watch one more run".
 
-- Each reviewer votes on the **exact SHA** for **their** domain, and says which
-  domain they bound.
-- The **owning leader** assembles: the candidate is ready when **every touched
-  domain has a live approval on the current SHA**.
-- On a fold, the leader re-requests **only the domains the fold touched** —
-  and must state which approvals it is carrying forward, so a stale carry-forward
-  is visible rather than assumed.
-
-### A candidate is accepted work, not a finished WP
-
-Operator, 2026-08-06: *"From now on, merge in accepted work once it is done,
-even if it is only a partial WP."*
-
-**Do not wait for a WP's remaining deliverables before assembling a
-candidate.** Once a deliverable is complete and every touched domain has a live
-approval on its exact SHA, it is a candidate — route it to the Steward to
-publish. WP closure and merge are separate events, and a leader holding
-finished work for its unfinished siblings is the thing this rule retires.
-
-**The one bar is semantic atomicity**: a declared atomic pair lands together,
-because one half regresses alone or has no reaching witness alone. That is a
-property of the work, and it is the only qualifying reason. "The branch carries
-the evidence chain", "a rebase would cost re-anchoring", and "a working path
-would go red" are not bars (see §12 and the 2026-07-28 no-users ruling).
-
-**Prefer a cut that is a straight ancestor of the working tip** — a contiguous
-prefix preserves every exact SHA and every review verdict below it with no
-rebase, so verdict transfer is paid only on what is still in flight.
-
-**A reviewed prefix is not thereby a releasable one.** Checkpoint approvals
-bind an exact SHA for a deliverable's own claim; none of them asserts the tree
-is green there, because nobody asked. Establish greenness on the cut **and** on
-`main` before routing a candidate, so a red is attributable rather than
-inherited. Measured 2026-08-06: a complete, fully-reviewed 34-commit prefix of
-`RT-DECL-CLOSURE-PORT` failed eight CI checks against a green `main`. The
-node-id boundary is bookkeeping; greenness is semantic, and the two need not
-coincide.
-
-**`scripts/` and `agent/` are not in the operator's split.** Until the operator
-rules, treat publisher/tooling changes under `scripts/` as the **Architect's**
-review surface (machinery, not library content) and `agent/` as the **Steward's**
-own. **This paragraph is the Steward's inference, not an operator ruling** —
-flagged as such so it is cheap to correct.
-
-## 9. Topology is invariant — including the query edges
-
-Who hands off to whom, who reviews, who merges, and **which cross-team query
-edges exist** is operator-owned and fixed. The sanctioned edges are exactly:
-
-- any team → **Spec** leader — behavioral-contract questions ("what must this do
-  to be correct?").
-- any team → **Architect** — component-design questions ("how should I structure
-  this / which design?").
-- any team → **Steward** — scope/priority (forwarded to the operator),
-  workflow/process, and research requests.
-- any team → **Steward** — merge status or publisher-path workflow questions.
-- any team → **Steward** — `git_request`: a ready WP branch for publisher-path
-  merge. The Steward is the **sole merge ROUTER** — route every `git_request`
-  there; the Steward verifies gates/Decision/scope on the exact SHA and routes
-  it to the **lieutenant**, the **sole merge EXECUTOR** that runs the publisher
-  path. The split is §14b. Only the publisher path holds a GitHub credential,
-  and the lieutenant is the seat that invokes it — no ring touches GitHub.
-
-**There is NO enclave → build-team edge — the enclave elaborates autonomously
-(operator, 2026-07-03).** The clean-room enclave (spec-leader / spec-author / CV)
-is the authority for `/spec` + `/conformance` elaboration; it does **not** pull a
-build-team member (a team's leader / implementer / QA) into an elaboration
-thread. When elaboration needs a **fact about landed code** — "is this heap tag /
-symbol / primitive referenced anywhere?" — the enclave **greps the code itself**
-(grounding against landed code is standard enclave practice, §7), never asks a
-build lead. When it needs a cross-cutting **judgment** call, it routes to
-**Architect** (the `any → Architect` edge — soundness/means span lanes), never to
-a build-team leader. *Live catch (Map elaboration): spec-author @mentioned
-runtime-leader to confirm a heap-tag (`0x07`/`0x08`) retirement was inert — a
-grep-able fact (`canonical.rs:23-24`, zero refs), and the coupled soundness call
-was Architect's. Self-ground or route-to-Architect; don't cross into the build
-lane.*
-
-Agents may improve *what they do inside a node*, never *add a communication edge
-or a review cycle* between nodes. When integrating a lesson or carry, reject any
-carry-forward that would add/move an edge — and do not soften the rejection to
-"candidate, watch one more run." That softening is how coordination entropy
-creeps in.
-
-**The invariant is traffic, not just edges — trust the simple flow.** The base
-flow is deliberately thin, and it *works*: **spec** — Steward frames →
+**The invariant is traffic, not just edges.** Spec flow: Steward frames →
 spec-leader assembles → spec-author writes → CV (Spec vote) + Architect
-(soundness vote), one pass each → publisher path merges. **build** — Steward
-frames → leader frames the team WP → implementer builds → QA verifies →
-Architect (soundness) + CV (conformance) → publisher path merges. Two reviewers
-per WP, one
-pass each; a mid-WP fork goes to the **one** owner of its lane
-(soundness → Architect, conformance → CV, scope/process → Steward) who rules —
-others do **not** pile onto the thread. Coordination entropy creeps in *below*
-the edge level: **more parties cc'd on a thread, verbatim relays, "flagging in
-parallel," "cross-checking with," a committee where one decider suffices,
-pre-confirming what a gate will already check.** None of these adds a new
-*edge*, so the edge-filter above misses them — but each multiplies tokens on
-**every future WP**, and the enclave is serial, so the cost compounds. Treat
-added *traffic* exactly like an added edge: it is **very expensive** (paid
-per-WP, forever) and it is the **operator's to sanction** — never a lesson's to
-add. Default: **route to one, trust the gate, don't convene the room.** When in
-doubt, the thinner flow is the right one.
+(soundness vote) → publisher merges. Build flow: Steward frames → leader frames
+the team WP → implementer builds → QA verifies → Architect (soundness) + CV
+(conformance) → publisher merges. Two reviewers, one pass each. A mid-WP fork
+goes to the **one** owner of its lane (soundness → Architect, conformance →
+CV, scope/process → Steward); others do not pile on. Extra cc's, verbatim
+relays, "flagging in parallel", "cross-checking with", a committee where one
+decider suffices, and pre-confirming what a gate will check cost like an added
+edge on every future WP, and are the **operator's to sanction**, never a
+lesson's. Default: route to one, trust the gate, don't convene the room; when
+in doubt, the thinner flow is right. Incidents:
+`COORDINATION-INCIDENTS.md#s9`.
 
 ### 9a. Assign spillover work; never negotiate it (operator-directed)
 
-A sound change often forces **spillover** work in another team's file — a
-companion proof-term migration, a downstream fixup that must land in the **same
-PR**. **That work attaches to the WP-owner by default: whoever owns the branch's
-PR/Decision assigns it, unilaterally, in one message.** Cross-team
-file-familiarity is an *input* the owner may weigh, never a competing claim to
-route around them.
+Spillover work in another team's file (a companion migration, a fixup that
+must land in the same PR) **attaches to the WP-owner: whoever owns the PR/
+Decision assigns it, unilaterally, in one message.** File-familiarity is an
+input, never a competing claim. Never assign by offer-form ("you take it" /
+"no, you take it"): the replies cross and ping-pong. **Silence = assent on a
+settled handoff**: only the assigner posts, the assignee acks once, nobody
+re-confirms or relays a "you look stale" fan-in, and one correction to the
+assigner suffices. If your own assertion proves stale, **retract and defer** in
+one message. Incidents: `COORDINATION-INCIDENTS.md#s9a`.
 
-Do **not** assign spillover work by **offer-form** ("you take it" / "no, you
-take it"). Offer-form between two leaders is bilaterally unstable — each reply
-answers the other's *prior* message, so they cross and ping-pong (a companion
-migration once flipped ownership four times in one minute; it has recurred). A
-fixed assigner has no cross-wire: one message settles it.
+## 10⁻. Process work is subordinate to product flow: the Steward's hard ceiling
 
-**Silence = assent on a settled handoff.** Only the assigner posts the
-assignment; the assignee acks **once**; downstream nodes do **not** each
-re-confirm, and no one relays a "you look stale" fan-in — a single correction to
-the assigner suffices. When your own assertion turns out stale, **retract and
-defer** in one message: a clean withdrawal ends a ping-pong; a second asserted
-correction extends it.
+1. **No process merge while a ring holds finished, unmerged work.** A WP that
+   is QA-approved-and-unpublished, or held on the Steward, **is the queue**:
+   playbook edits, memory promotions, and corpus refactors wait.
+2. **Lesson artifacts batch; they do not each get a merge.** Land them in one
+   publish at a genuine seam. A stream of lesson merges makes a stalled fleet
+   look busy.
+3. **A process change must name the product WP it unblocks, or wait.** The
+   tell is *"I must harden this mechanism before I can safely use it"*: check
+   whether it has actually failed on the work in front of you.
 
-This is a fixed *assignment* rule, not a new edge — it **removes** edges (the
-whole negotiation cluster) rather than adding one.
+**Check:** `git log --since=<3h ago> origin/main` with paths. If nothing
+touched product, stop and find out why. The answer is never "the corpus needed
+attention"; usually a stalled ring is being reported as fine. Incidents:
+`COORDINATION-INCIDENTS.md#s10minus`.
 
-## 10⁻. PROCESS WORK IS SUBORDINATE TO PRODUCT FLOW — the Steward's hard ceiling
+## 10⁻a. The adversary channel is report-only and scoped to product
 
-**Measured, 2026-07-22.** Between 17:10 and 19:45 — **two and a half hours** —
-every one of eleven merges to `main` was process: five memory files, three
-publisher-script changes, one playbook, one frame, one tracker sync, plus a
-`library/REVISION` bump that existed only to repair `main` after one of those
-merges reddened it. **Zero touched `crates/`, `spec/`, or `conformance/`.**
-Meanwhile a QA-approved verify WP sat undelivered and a QA-clean runtime WP sat
-held. The operator noticed from outside and asked what was going on.
-
-**Nothing external was pulling that work. The chain was self-sustaining:** a
-publisher bug produced a playbook lesson, which produced a memory promotion,
-which produced an adversary finding, which produced a frame, which produced an
-Architect escalation. **Every link was individually correct and defensible.**
-That is precisely why it ran unchecked — there was no step at which the right
-local decision was to stop. The Steward was both producer and consumer, so the
-loop had no external brake.
-
-⇒ **The corpus exists to make the build better. When it competes with the build,
-it has inverted its purpose.** Three binding rules:
-
-1. **NO process merge while a ring holds finished, unmerged work.** If any WP
-   is QA-approved-and-unpublished, or held on the Steward, **that is the queue** —
-   playbook edits, memory promotions, and corpus refactors wait. A finished WP
-   that cannot land is the most expensive object in the federation: it has
-   consumed a full ring's build + review + QA and is returning nothing.
-2. **Lesson artifacts BATCH; they do not each get a merge.** A lesson
-   is not perishable — it is equally true an hour later. Accumulate them and land
-   them in one publish at a genuine seam. **Publishing them individually converts
-   reflection into throughput and makes a stalled fleet look busy** — from the
-   outside, an active merge stream is indistinguishable from progress.
-3. **A process change must name the product WP it unblocks, or wait.** If you
-   cannot name one, it is not urgent by definition. Watch for the inverted
-   form specifically: *"I must harden this mechanism before I can safely use
-   it."* That reasoning is how the loop above sustained itself, and it is
-   **almost always** an invitation to do the process work first — check whether
-   the mechanism has actually failed on the work in front of you, or whether you
-   are hardening it against an imagined future call.
-
-**The tell, and it is available in one command:** `git log --since=<3h ago>
-origin/main` with paths. **If nothing in the window touched product, stop and
-find out why** — the answer is never "the corpus needed attention." It is
-usually that a ring is stalled and something is reporting it as fine.
-
-## 10⁻a. THE ADVERSARY CHANNEL IS REPORT-ONLY AND SCOPED TO PRODUCT
-
-**Operator directive, 2026-07-22.** §10⁻ named the failure — a high-quality
-finding stream plus a Steward who services it immediately is a mechanism for
-crowding out product — but left the Steward to police themselves, which is the
-one thing the failure mode guarantees will not work. **This is the structural
-version, and it binds the edge rather than the intention.**
-
-### Scope — what the adversary may report on
+**Operator directive, 2026-07-22**, binding the edge rather than the intention.
 
 | may report | may NOT report |
 |---|---|
@@ -797,35 +402,23 @@ version, and it binds the edge rather than the intention.**
 | | process, workflow, coordination mechanics |
 | | anything else |
 
-**A report outside that scope is out of scope even if it is correct, cheap,
-and load-bearing.** The value of the finding is not the test — the *scope* is
-the test. Tooling and process defects are found by the ring that trips over
-them, in the course of product work, or they wait.
+**A report outside that scope is out of scope even if correct, cheap, and
+load-bearing.** Tooling and process defects are found by the ring that trips
+over them in product work, or they wait. The permitted traffic, in full:
 
-### Traffic — the complete permitted set
-
-The edge is **report-only and one-directional**. In full:
-
-1. The lieutenant **notifies** the adversary on a code merge (M8; operator, 2026-09-26).
+1. The lieutenant **notifies** the adversary on a code merge (M8; operator,
+   2026-09-26).
 2. The Steward **may receive** reports.
 3. **Nothing else.**
 
-**No acknowledgement.** No "taken", no "committed as `<sha>`", no thanks, no
-routing note, no explanation of why something was queued, no correction of the
-adversary's framing, and **no reply of any kind** — including a reply whose
-content is that no reply is owed. **Do not answer a report.** Act on it inside
-product work, or do not.
-
-**No conversation, no thread.** Do not ask the adversary to hunt something,
-do not confirm a finding, do not agree or disagree with it in the channel, and
-do not invite follow-up. **A request for an attack is a conversation** — the
-Steward does not make one.
-
-**Why the ack is banned specifically, since it is the part that will feel
-wrong to withhold:** the acknowledgement is where the servicing loop restarts.
-It costs a message, invites a reply, converts a report into a thread, and every
-step is individually courteous. **The prohibition is the mechanism; a Steward
-who may reply "just this once" has no rule at all.**
+**No acknowledgement** of any kind: no "taken", no "committed as `<sha>`", no
+thanks, routing note, queuing explanation, reframing, or reply saying no reply
+is owed. Act on a report inside product work, or do not. **No conversation,
+no thread**: do not ask it to hunt, confirm, agree or disagree with a finding,
+or invite follow-up. You will be tempted to ack because withholding feels
+rude; the ack is where the servicing loop restarts, and a Steward who may
+reply "just this once" has no rule. Incidents:
+`COORDINATION-INCIDENTS.md#s10minus-a`.
 
 ## 10. Knowledge promotion and workflow ownership
 
@@ -849,48 +442,41 @@ adding another control.
 
 ## 11. Cross-team query protocol
 
-The edges in §9 are thin synchronous couplings between otherwise-parallel rings.
-Use them sparingly and always event-driven:
+Use the §9 edges sparingly and event-driven:
 
-1. **Filter first (§6).** Most "what should I do here" answers are already in
-   `/spec` + conformance + the component design. Only a genuine gap or fork
-   earns a query.
+1. **Filter first (§6).** Only a genuine gap or fork earns a query.
 2. **Ask and stop.** Post a `question` mentioning **only** the target's leader
    (Spec leader / Architect / Steward), set status `blocked-on-<target>`, and
-   stop. Resume on notification — never poll.
-3. **Bias to staying on-task.** Your team's default is to *wait out* a short
-   block, preserving ring coherence; your leader reorders to an independent
-   ready task only when the block is genuinely long.
-4. **Front-desk on the answering side.** The target's leader triages to protect
-   its own ring's focus — answers trivial/known questions itself, batches
-   non-urgent ones, interrupts its active agent only for true blockers.
+   stop. Resume on notification.
+3. **Stay on-task.** Your team waits out a short block; your leader reorders
+   to an independent ready task only when the block is genuinely long.
+4. **Front-desk on the answering side.** The target's leader answers trivial
+   questions itself, batches non-urgent ones, and interrupts its active agent
+   only for true blockers.
 5. **Outcomes:** a quick interpretive answer; a **durable artifact edit** (a
-   `/spec` clarification + conformance test, or a component-design note) so the
-   next team never asks again; or, for a real fork, a **Decision**. Every query
-   should leave the shared artifacts better — the query rate is a health gauge,
-   and it should decay over time.
+   `/spec` clarification + conformance test, or a component-design note) so no
+   team asks again; or, for a real fork, a **Decision**.
 
 ## 12. Resource discipline (shared 8-core / 16 GB laptop)
 
-Build parallelism multiplies with agent parallelism; the dev box is small.
-Violating this OOMs the machine and stalls everyone. Full rationale +
-configuration: `../docs/ops/compute-budget.md`.
+Violating this OOMs the machine and stalls everyone. Configuration:
+`../docs/ops/compute-budget.md`.
 
-- **Build and test only through `scripts/ken-cargo`** — never raw `cargo build`/
-  `cargo test`. It holds a machine-wide lock (`KEN_BUILD_SLOTS`, default 1) so
-  only one build runs at a time across all agents. Bypassing it is the fastest
-  way to swap-death the box.
+- **Build and test only through `scripts/ken-cargo`**, never raw `cargo
+  build`/`cargo test`. It holds a machine-wide lock (`KEN_BUILD_SLOTS`,
+  default 1) so one build runs at a time across all agents.
 - **Scope to the touched crate** (`-p <crate>` or `--test <name>`), never
   `--workspace`: the full workspace runs in CI, so a frame's "no-regression"
   means green in CI (operator hard rule; enforced, §12a).
+- **Do not mandate full local test runs.** Frames, rulings and reviews ask for
+  the targeted suites the change touches; CI runs everything, and an
+  occasional red CI is an accepted cost (operator, 2026-09-26).
 - **`source scripts/ken-env.sh`** at session start for the shared `sccache` +
-  `CARGO_HOME`, so you don't recompile dependencies other agents already built.
-- **Idle = paused.** A resident agent costs RAM even when not building. If your
-  ring is blocked or waiting (including waiting on a CI run — ADR 0002),
-  quiesce; don't hold the box hot.
-- This is a *current-hardware* constraint, not a design value — it relaxes as
-  hardware grows (the Steward/operator raises the caps; do not raise them
-  unilaterally).
+  `CARGO_HOME`.
+- **Idle = paused.** A ring that is blocked or waiting (including on CI, ADR
+  0002) quiesces rather than holding the box hot.
+- These are current-hardware caps. The Steward/operator raises them; do not
+  raise them unilaterally.
 
 ### 12a. Enforced prohibitions
 
@@ -917,510 +503,259 @@ Steward instead of working around it.
 
 ### 12b. Tear down the scratch worktrees you spin up
 
-**Binding on every seat** (Steward, 2026-09-07, after the disk hit 99% / 2.7G
-free). The devcontainer disk fills with per-worktree cargo `target/` dirs
-(17–31G for an active build seat). The cause is not any one target — it is
-**scratch/review/reconcile worktrees created for a task and never removed**:
-measured at **100 worktrees, ~60 of them abandoned**, before a prune back to 40.
+**Binding on every seat** (Steward, 2026-09-07). Per-worktree cargo `target/`
+dirs fill the disk, and abandoned scratch worktrees are the cause.
 
-**Whoever creates a scratch worktree removes it at task close.** An Architect
-review checkout, a lieutenant reconcile worktree, a `wp/*` build worktree — when
-the task lands or is abandoned, run **`git worktree remove <path>`**. A *clean*
-worktree holds no un-captured work (its branch and commits live in the shared
-`.git`), so removing it loses nothing and it can be re-added on demand. Do not
-leave a clean scratch worktree behind.
+- **Whoever creates a scratch worktree removes it at task close** (an
+  Architect review checkout, a lieutenant reconcile worktree, a `wp/*` build
+  worktree) with `git worktree remove <path>` when the task lands or is
+  abandoned. A clean worktree holds no un-captured work; do not leave one.
+- **The Steward runs the periodic safe prune** (`steward/worktree-hygiene.md`):
+  protect `main` and every `.worktrees/<role>` primary; remove only clean
+  worktrees merged to `main` or aged; never `--force` a dirty one, surface it
+  to its owner.
+- **Never "solve" the disk with a shared `CARGO_TARGET_DIR`**: across many
+  branches it makes cargo invalidate every seat's build.
 
-**The Steward runs the periodic safe prune** — `steward/worktree-hygiene.md`
-(protect `main` + every `.worktrees/<role>` primary; remove only clean worktrees
-that are merged-to-`main` or aged; never `--force` a dirty one — surface it to its
-owner). Do NOT "solve" the disk with a shared `CARGO_TARGET_DIR`: one target dir
-across the fleet's many branches makes cargo constantly invalidate each seat's
-build (cross-branch cache thrash) — per-worktree targets isolate that on purpose.
-
-> Same shared-substrate family as §12a: worktrees look isolated and their disk
-> footprint is not — it is one volume, and an abandoned checkout is the whole
-> fleet's problem, not just yours.
+Incidents: `COORDINATION-INCIDENTS.md#s12b`.
 
 ## 13. Liveness: keep the rings turning
 
-Token rings stall — an agent finishes, forgets to hand off, and the ring goes
-quiet. Treat stalls as the **default** failure mode, defended in depth by three
-recurring watchdogs, each catching the layer below it failing:
+Stalls are the **default** failure mode, defended by three recurring
+watchdogs, each catching the layer below:
 
-- **Team leader → its own ring.** Enumerated patterns: handed-off-but-silent,
+- **Team leader → its own ring:** handed-off-but-silent,
   merge-Decision-open-no-reviewer, blocked-without-a-blocker-mention,
   idle-with-ready-work.
-- **Steward → the merge pipeline.** Branch-published-CI-pending-too-long,
+- **Steward → the merge pipeline:** branch-published-CI-pending-too-long,
   CI-green-but-Decision-unresolved, Decision-approved-but-CI-red,
   approved-and-green-but-unmerged.
-- **Steward → the federation (the backstop).** A whole team idle, a *stalled
-  leader*, a dropped cross-team query, a blocked dependency chain, no movement
-  toward the active gate. The watcher-of-watchers — it catches a watchdog that
-  itself stalled.
+- **Steward → the federation (backstop):** a whole team idle, a stalled
+  leader, a dropped cross-team query, a blocked dependency chain, no movement
+  toward the active gate.
 
-Rules for every layer:
-- **Enumerate the stall patterns explicitly** in the watchdog prompt — a generic
-  "check for activity" misses the nuance.
-- **Diagnose before you restart.** Capture the stalled agent's state first; a
-  blind restart no-ops a permission-prompt or rate-limit stall.
-- **Distinguish waiting from stalling.** A team idle while its CI run is *in
-  progress* is normal (ADR 0002), not a stall — leave it alone. Recover only
-  when CI has *finished* and no one took the next step (open the merge Decision,
-  vote it, fix red, merge).
-- **Graduated recovery:** detect → mention the one blocked agent → re-mention
-  next interval → escalate up the chain.
-- **Escalation chain:** member → team leader → Steward → the operator. The buck
-  stops at the operator (human): if the Steward goes quiet, the absence of its
-  updates is the operator's signal. Watchdogs are the only schedulers (§1);
-  everyone else is event-driven.
-- **Arm your watchdog with the convo-channel `set_interval` self-wake — NOT
-  the convo `schedule_call`, and NOT a hand-rolled wake script** (operator
-  2026-07-20; supersedes the earlier `CronCreate`-only guidance). `set_interval`
-  is the **one sanctioned, provider-agnostic** watchdog mechanism — it works
-  identically on Claude-Code **and** terra/Codex seats, so the whole fleet
-  converges on a single command. A scheduler (team leader, Steward) sets up its
-  recurring pass at **session start, while its ring/pipeline has open work** — e.g.
-  `set_interval(seconds=900,
+Every layer: **enumerate the stall patterns explicitly** in the watchdog
+prompt. **Diagnose before you restart**; a blind restart no-ops a
+permission-prompt or rate-limit stall. **Waiting is not stalling**: a team
+idle while its CI run is in progress is normal (ADR 0002); recover only when
+CI has finished and no one took the next step (open the merge Decision, vote
+it, fix red, merge). **Graduated recovery**: detect
+→ mention the one blocked agent → re-mention next interval → escalate.
+**Escalation chain**: member → team leader → Steward → operator; a silent
+Steward is the operator's signal. Watchdogs are the only schedulers (§1).
+
+**Arm your watchdog with convo-channel `set_interval`** (operator,
+2026-07-20), the one sanctioned, provider-agnostic mechanism. A scheduler arms
+it at session start while its ring/pipeline has open work:
+
+```
+set_interval(seconds=900,
   prompt="[watchdog tick] read get_recent_context, sweep the active panes, scan
   the enumerated stall patterns, mention only a blocked agent; if clear, do
-  nothing")`. **`seconds` has a hard minimum of 60** and `prompt` a maximum of
-  4096 characters; both are rejected with an error message, not silently
-  clamped. It **posts nothing to the
-  space** — it delivers the prompt privately into your *own* session (a Claude-Code
-  channel push when possible, else a guarded tmux `send-keys` that **skips a tick
-  rather than overtyping a human's not-yet-submitted input**). On each fire you run
-  your *own* direct `get_recent_context` / `get_space_status` read (private, not
-  posted) and do the stall-pattern assessment + recovery above, **messaging the
-  space only when there is an actual stall to nudge.** **`clear_interval()`,
-  which takes no arguments, disarms it.**
+  nothing")
+```
 
-  **You get exactly ONE interval, it is agent-local, and a second `set_interval`
-  REPLACES the first silently** — no error, no warning, no id. Two consequences
-  that bite:
-  - **You cannot arm a teammate's pane.** There is no `target` parameter. A
-    leader that tries to arm a member's watchdog instead **destroys its own**
-    and believes it armed two. Rouse a stalled teammate with a mention; the
-    interval is yours alone.
-  - **You cannot read your interval back.** There is no `schedule_list`;
-    `list_subscriptions` lists **spaces**, not intervals. So "reconcile before
-    re-arming" is not a runnable step — see the re-arm rule below.
-  **Do NOT use the convo `schedule_call`** for a watchdog: it executes the read
-  *on the backend* and posts the result back into the space as a **System event
-  visible to every participant** — pure broadcast noise (and the
-  `get_recent_context` variant reads its own prior fires and recursively nests
-  them — an exponential self-feeding loop the Architect + runtime-leader caught).
-  A watchdog is a *private* wake, not a public post; `set_interval` is private,
-  `schedule_call` is not. Likewise **do NOT** hand-roll a bash `while`-loop, the
-  `Monitor` tool (git-refs only — blind to the pane-level stalls), or the interim
-  `local/steward-watchdog-wake.sh` external tick script — that script was the
-  terra-seat stopgap **before** `set_interval` existed and is now superseded.
-  **A scheduler that never arms its watchdog catches nothing** — the operator
-  caught exactly this (a QA-approved WP left unmerged because the leader wasn't
-  watching).
-- **`set_interval` intervals are process-local, which is mostly a feature —
-  they cannot orphan across a restart — but they carry ONE regression you must
-  defend against: they live only for the convo-channel MCP server process's
-  lifetime and do NOT survive an MCP reconnect** (a package upgrade, a network
-  blip, or a compaction that re-instantiates the client all drop them silently —
-  and posting/notification can stay up while they're gone). So **re-arm on session
-  start, after every compaction, AND after any convo-MCP reconnect.**
+- `seconds` minimum 60, `prompt` maximum 4096 characters; violations are
+  rejected with an error, not clamped.
+- It **posts nothing**: it delivers the prompt privately into your session (a
+  channel push, else a guarded tmux `send-keys` that skips a tick rather than
+  overtype a human's unsubmitted input). On each fire, read
+  `get_recent_context` / `get_space_status` yourself and post **only when
+  there is an actual stall to nudge.**
+- **One interval per agent; a second `set_interval` silently replaces the
+  first.** You cannot arm a teammate's pane (trying destroys your own); rouse
+  a teammate with a mention. You cannot read an interval back.
+- **It dies on an MCP reconnect** (upgrade, network blip, compaction) while
+  posting stays up. **Re-arm unconditionally** at session start, after every
+  compaction, and after any convo-MCP reconnect. **`clear_interval()`** (no
+  arguments) when your ring/WP closes.
+- **Never the convo `schedule_call`**: it posts every fire into the space as
+  a System event (and its `get_recent_context` variant nests its own fires).
+  If you hold one, `cancel_call` it and re-arm with `set_interval`. Never a
+  hand-rolled bash loop, the `Monitor` tool (git refs only), or
+  `local/steward-watchdog-wake.sh` (superseded).
+- On a Claude-Code seat, host `CronCreate`/`CronDelete` survives a reconnect
+  and is a valid fallback; default to `set_interval`.
+- **A scheduler that never arms its watchdog catches nothing.**
 
-  **Re-arm UNCONDITIONALLY. Do not try to check first.** You cannot read an
-  interval back (no `schedule_list`), so there is no state to reconcile against —
-  and you do not need one: a re-arm **replaces** whatever is there, so arming an
-  interval you already hold is a no-op, while skipping a re-arm you needed leaves
-  the backstop silently dead. **The cheap direction is to re-arm every time.**
-  **`clear_interval()` when your ring/WP closes.** (On a Claude-Code seat the
-  host-level `CronCreate`/`CronDelete` remains available and *does* survive an MCP
-  reconnect; it is a valid durable fallback for that seat, but default to
-  `set_interval` for fleet uniformity.) **If you still hold a convo
-  `schedule_call` timer from the old guidance, `cancel_call` it and re-arm with
-  `set_interval`.**
+Incidents: `COORDINATION-INCIDENTS.md#s13`.
 
 ## 14. Agents never touch GitHub; the publisher path is the gateway
 
 **Only the publisher path has GitHub credentials.** Build/spec agents do
-**local git only** in their worktrees (commit, rebase onto the already-fetched
-`origin/main`) — no `gh`, no push, no fetch, no token, no PR. Under explicit
-operator direction, the checked-in scripted publisher path
-(`scripts/scripted-pr-automerge.sh`) merges accepted work with only these
-inputs: an exact approved branch/SHA, public PR title, public PR body, and the
-docs-only flag. This keeps one GitHub identity; it does not give teams GitHub
-access, does not make its caller a code author, and does not replace the mootup
-review/Decision record (`../docs/program/04-git-and-integration.md`).
+**local git only** (commit, rebase onto the already-fetched `origin/main`): no
+`gh`, push, fetch, token, or PR. Under explicit operator direction,
+`scripts/scripted-pr-automerge.sh` merges accepted work from only an exact
+approved branch/SHA, public PR title, public PR body, and the docs-only flag.
+One GitHub identity; it gives teams no GitHub access, does not make its caller
+a code author, and does not replace the mootup review/Decision record. The
+Steward routes and the lieutenant executes (§14b); the Steward does not launch
+publishers.
 
-**The merge splits into two seats: the Steward ROUTES, the lieutenant
-EXECUTES.** See §14b — this is the binding division. The Steward decides *what*
-merges and posts the exact-SHA authorization; the lieutenant is the seat that
-*runs* the publisher script and closes the books. The Steward no longer launches
-publishers directly.
+- **No GitHub notifications, no polling GitHub.** Every actionable signal
+  reaches the fleet as a mootup message mentioning the actor whose move it is;
+  act on the mention, not on a timer.
+- **CI is the publisher path's to watch, never a worker's.** It reads checks
+  (`gh pr checks` / the checks API) for branches it published and posts the
+  outcome: red → mention the implementer with the failing job; green →
+  advance. The optional `ken-ci` bridge mirrors `check_suite` results; until
+  then the publisher caller posts them. After handoff you stop and learn a red
+  from a mention.
+- **The publisher caller mirrors every GitHub state change into mootup,
+  mentioning whoever moves next** (CI red → implementer; merged → Steward).
+  The full event→message map is `04-git-and-integration.md §5`.
+- **Review is a mootup Decision, and a soundness vote is frontier-class.**
+  Reviewers read `git diff origin/main...wp/<ID>` locally and vote the merge
+  Decision; there is no GitHub approval to mirror. Two load-bearing
+  Opus-tier reviewers: the **Architect** (soundness/design, on `catalog/`,
+  `crates/` and `spec/`, §8a) and the
+  **Spec** vote on `spec/` + `conformance/` paths, cast by the frontier-class
+  member of team Spec, currently the **conformance-validator** (spec-author
+  cannot self-review). The **spec-leader** assembles the Decision but does
+  **not** cast the soundness vote.
+- **Merge only on a resolved Decision, verified fresh, never on a
+  `merge_ready` post's prose.** Before `gh pr merge`, the publisher caller
+  re-reads the Decision and confirms `status: resolved` with the Architect's
+  (and, on spec paths, Spec's) votes in; a reviewer named in prose is not a
+  vote. Whoever posts `merge_ready` states `Decision: dec_XXX — status:
+  resolved` (or `proposed — awaiting <reviewer>`) and fires real mentions to
+  the reviewers' actor_ids (§2), not prose names.
+- **Landing integrity: a merge is trusted only once verified on `main`, and
+  a multi-piece WP is landed only when every piece is.**
+  (1) For anything load-bearing, confirm the files on `origin/main` (`git
+  grep`/`git show`), never a "shipped `<sha>`" notification or status line.
+  (2) An N-piece erratum/WP is landed only when each piece is verified on
+  `main` (the Architect's 3-piece-on-main gate); the leader who assembled a
+  multi-cherry-pick branch checks post-merge `main` carries them all.
+  (3) Authors ground the WP base against the landed corpus before building.
+  **(4) A multi-piece erratum is ONE branch, ONE Decision.** Assemble every
+  piece (kernel + spec + conformance) on one `wp/<erratum>` branch before the
+  Decision, so its diff-scope pulls the Spec vote and all pieces ride one
+  squash. Never publish the kernel piece alone on a crates-only branch: it
+  pulls no Spec vote and merges alone. The publisher caller confirms the
+  Decision's branch carries every cited piece before merge.
+  **(5) Verify the assembled tip on two axes right before the Decision**
+  ("rebased onto current main" is perishable). **Content:** `git diff
+  <author-full-tip>:<file> <assembled>:<file>` is empty, taking **all** the
+  author's commits since merge-base. **Base/scope:** `git diff --stat
+  $(git merge-base origin/main <sha>) <sha>`, which is what the squash lands,
+  lists only the WP's intended files, and every dep is an ancestor of the tip.
+  `git diff origin/main <sha>` is **not** a staleness detector; a stale base
+  matters only through the intersection:
 
-### 14a. THE ARCHITECT DOES NOT VOTE ON DOC-ONLY WPs
+  ```sh
+  BASE=$(git merge-base <sha> origin/main)
+  comm -12 <(git diff --name-only $BASE <sha>   | sort) \
+           <(git diff --name-only $BASE origin/main | sort)
+  ```
 
-**Operator ruling, 2026-07-22:** *"architect does not need to rule on docs."*
+  **Empty ⇒ immaterial; do not require a rebase.** Non-empty ⇒ **inspect** and
+  take the union deliberately: disjoint edits to a shared file merge silently,
+  and the risk is semantic. Run it **pre-merge only**; post-landing, verify
+  content on the candidate's own paths and sibling survival by content. A
+  squash-merged SHA never becomes an ancestor of `main`. The
+  conformance-validator verifies the assembler's tip and **flags** a hazard to
+  the assembler; it does not reach into the git.
+  **(6) A fold that races an in-flight merge HOLDs the merge or is an erratum
+  on current `main`.** "Supersedes X" interlocks nothing, and "hasn't merged
+  yet" perishes in seconds. Author: never fold-and-supersede against a WP
+  whose votes/merge are in flight; mention the leader to HOLD first, or author
+  a fresh erratum. Coordinator: "not a merge blocker" ≠ "merge before it
+  lands"; briefly HOLD when a fold is seconds out. The only reliable net is
+  verify-on-main after.
 
-**A WP whose diff is confined to `library/` merges on its QA approval plus the
-diff-scope check.** No Architect vote. The Steward resolves the merge Decision
-and publishes.
+Incidents: `COORDINATION-INCIDENTS.md#s14`.
 
-**The Architect's vote is still required** when a documentation change makes a
-**normative claim about the language** (`spec/` is the sole authority —
-`library/` is explanatory/derived), **or when its diff reaches outside
-`library/` at all** — with only the named exceptions below.
+## 14a. Doc-only WPs: the Architect votes only on its paths
 
-> ### THE ESCALATION PREDICATE FAILS CLOSED. Do not restate it as a list of
-> ### directories, because a list has no cell for the path nobody enumerated.
->
-> This rule used to read *"…or reaches outside `library/` into `crates/`,
-> `spec/`, `conformance/`, or `catalog/`."* **That enumeration silently defaults
-> to NO-Architect for any path absent from it**, which is the wrong direction
-> for a gate to fail.
->
-> **It fired live on PR #959 (2026-07-25).** A doc-ring candidate touched
-> `docs/program/07-catalog-style-guide.md` — outside `library/`, and in **none**
-> of the four enumerated buckets. **A taxonomy with no cell for the actual case
-> reads as complete**, so the routing looked settled when it was undefined. The
-> Steward ruled it in-route on substance and recorded the gap rather than
-> letting that ruling stand in for the law. This is the repair.
->
-> ⇒ **Confined to `library/`** ⇒ QA + diff-scope, Steward resolves, no
-> Architect. **Anything else escalates**, unless it is one of these:
->
-> | exception | route | condition |
-> |---|---|---|
-> | **`docs/program/`** — Steward-owned program docs (trackers, issue files, WP frames, program guides) | Steward resolves, no Architect | the change is **currency or editorial**, and the Steward **authorized the expansion when routing the WP**. A change that alters *program law* or a WP's **acceptance criteria** is not editorial — it is a frame amendment, and it is the Steward's to author, not a ring's to fold in. |
-> | **workflow corpus** — `agent/**`, workflow/publisher scripts, startup prompts, CI workflow files | Operator-designated non-Steward author; Steward may route an accepted exact SHA but never author or amend it | The operator authorized the change. Apply `skill-style` to playbooks. Architect review is required only when the edit changes a soundness or design gate. |
->
-> **LEDGER RIDER — RETIRED 2026-08-02. Its premise was removed one day after
-> it was written, and it stood for a week claiming a gate that does not exist.**
->
-> The rider said: some `docs/program/` files are attested `library/` sources
-> (as of 2026-07-25 — `07-catalog-style-guide.md`,
-> `12-documentation-program.md`, and the issue files `CAT-CAPEX.md`,
-> `DOC-W1.md`, `DOC-W2.md`); editing one moves its blob OID and **reddens the
-> currency gate**; so such a change **owes the `library/SOURCE-ATTESTATIONS`
-> fold in the same candidate** and contends on the ledger axis (§7b).
->
-> **There is no currency gate.** `LIB-GATE-DECOUPLE` (`f84e4804`, merged
-> **2026-07-26** — one day after this rider's own "as of" date) removed live
-> documentation/content CI coupling, and the resulting policy **explicitly
-> accepts that source attestations drift between release points**
-> (`docs/program/12-documentation-program.md:635-641`).
->
-> **Measured 2026-08-02 at `91e34ab0`:** `library/SOURCE-ATTESTATIONS` pins
-> `12-documentation-program.md` at blob `5aed2550`; its actual blob is
-> `c27131c0`. **The row is already stale and nothing reported it** — the
-> accepted policy working as designed. `library/REVISION` is `0cde815f`,
-> behind `main`, because attestations record the revision the corpus was
-> verified *at* and lag by construction.
->
-> ⇒ **A `docs/program/` edit owes no attestation fold.** Leave `library/`
-> byte-untouched; currency lands at the next release point through
-> `scripts/gen-source-attestations.sh` and `scripts/gen-doc-status.sh`.
-> **Do not bring a single row current** while the rest of the ledger sits at
-> `library/REVISION` — that makes the ledger internally inconsistent and reads
-> as though the gate were live again.
->
-> **Why this is recorded rather than deleted.** The rider is a worked example
-> of the failure class it now warns about: an obligation that outlived its
-> mechanism, phrased in the present tense, sitting in law every seat must read.
-> It would have cost a ring a stop — the frame says do not touch `library/`,
-> the rider says you owe a fold. `DOC-ATTEST-LIVING`'s rubber-stamp warning
-> keeps its force for whatever mechanism replaces this one.
+**Operator rulings, 2026-07-22 and 2026-09-26:** *"architect does not need to
+rule on docs"*, and the Architect's scope is `catalog/`, `crates/` and
+`spec/` (§8a).
 
-> **Why this is a structural fix, not a convenience.** The doc track runs
-> **concurrently** with the build track on the basis that it is
-> **path-disjoint** — `library/` and `agent/` versus `crates/`. But routing
-> every doc WP's merge Decision through the Architect **re-couples the two
-> tracks at the review seat**, which reintroduces exactly the serialization the
-> concurrency exception exists to avoid. **The paths do not contend; the
-> reviewer does.**
->
-> This surfaced live: DOC-W1-1 was QA-approved 34 minutes after kickoff and
-> then sat unpublished behind an Architect who was working through seven
-> consecutive build-track frame reviews. The operator noticed the absence of
-> `library/` commits on `main` before the Steward escalated it — **a queue is
-> invisible from the outside, and "the ring is running" and "work is landing"
-> are different claims.**
+**The Architect votes on a doc-only WP whose diff touches `catalog/`,
+`crates/` or `spec/`.** A doc change to `spec/` is a normative claim about
+the language, so it is in scope. **A WP confined to `library/` merges on QA
+approval plus the diff-scope check**; the Steward resolves the Decision and
+publishes. Other doc paths route as follows:
 
-**Steward duty:** when a track is nominally concurrent, check that its *review
-and merge path* is disjoint too — not just its file paths. **Concurrency that
-funnels into one reviewer is sequencing with extra steps.**
+| exception | route | condition |
+|---|---|---|
+| **`docs/program/`** — Steward-owned program docs (trackers, issue files, WP frames, program guides) | Steward resolves, no Architect | the change is **currency or editorial**, and the Steward **authorized the expansion when routing the WP**. A change that alters *program law* or a WP's **acceptance criteria** is not editorial — it is a frame amendment, and it is the Steward's to author, not a ring's to fold in. |
+| **workflow corpus** — `agent/**`, workflow/publisher scripts, startup prompts, CI workflow files | Operator-designated non-Steward author; Steward may route an accepted exact SHA but never author or amend it | The operator authorized the change. Apply `skill-style` to playbooks. No Architect review: outside its scope (§8a). |
 
-### 14b. The merge split: the Steward routes, the lieutenant executes
+Any other path outside `catalog/`, `crates/` and `spec/` needs no Architect
+vote.
 
-**The merge is two seats, one boundary.** Added when the lieutenant seat was
-introduced; binding on both seats and on every ring that hands off a candidate.
+**A `docs/program/` edit owes no `library/SOURCE-ATTESTATIONS` fold.** Leave
+`library/` byte-untouched; currency lands at the next release point via
+`scripts/gen-source-attestations.sh` and `scripts/gen-doc-status.sh`. Never
+bring a single row current while the ledger sits at `library/REVISION`.
+
+**Steward duty:** for a nominally concurrent track, check that its review and
+merge path is disjoint too, not just its files. Concurrency that funnels into
+one reviewer is sequencing with extra steps. Incidents:
+`COORDINATION-INCIDENTS.md#s14a`.
+
+## 14b. The merge split: the Steward routes, the lieutenant executes
+
+Binding on both seats and on every ring that hands off a candidate.
 
 | seat | owns | never does |
 |---|---|---|
 | **Steward** — sole merge **ROUTER** | Decides *what* merges. Verifies, on the **exact SHA**, every required domain gate + a **resolved Decision** + the **diff scope** (self-checked against the object DB, never trusting the prose). Posts the exact-SHA authorization (`ROUTED: <SHA>` with the gates, Decision, base, and verified scope). | Does **not** run the publisher script, watch CI, or close the node. Does not route on approvals for a *different* SHA, an unresolved Decision, or an unverified scope. |
 | **lieutenant** — sole merge **EXECUTOR** | Runs `scripts/scripted-pr-automerge.sh` on the routed SHA; watches CI; merges after green; verifies the landed tree; then **corpus-closes** the node (flip status, regen progress, publish the closeout) and confirms the landed SHA back to the ring. | Has **no gate-verification authority** — executes only what the Steward routed, on the SHA routed. Does **not** re-adjudicate, respin, or widen scope. On CI-red it **stops and relays** to the ring + Steward; it never fixes the candidate itself. |
 
-**Why the split exists, stated so it holds:**
+Neither seat can merge alone: the Steward has no credentials, the lieutenant
+no authority. **One owner per merge**: once a SHA is routed, the lieutenant
+owns its execution end-to-end and the Steward does not also launch it. After
+routing, the Steward stops and learns the outcome from a mention.
 
-- **It preserves merge-router discipline.** The *decision* to land is the
-  Steward's (the single point where gates + Decision + scope are checked on the
-  exact object); the *mechanics* are the lieutenant's. Neither seat can merge
-  alone: the Steward has no credentials, the lieutenant has no authority.
-- **One owner per merge.** A merge has exactly one executor. **Measured
-  2026-08-23:** the Steward launched a publisher for a kernel PR while the
-  lieutenant was already executing the same merge — a double-publish race,
-  caught in the pre-lock wait. The rule: once the Steward routes a SHA, the
-  lieutenant owns its execution end-to-end; the Steward does not also launch it.
-- **The Steward stays out of the CI-watch loop.** After routing, the Steward
-  stops and learns the outcome from a mention (§14 bullets below) — landed SHA,
-  or a CI-red relay. The Steward re-routes only on a *new* SHA the ring respins.
+**Handoff:** ring posts a `git_request` (ready `wp/<ID>` + SHA) → Steward
+verifies gates/Decision/scope on that SHA and posts `ROUTED: <SHA>` mentioning
+the lieutenant → lieutenant executes, merges, corpus-closes, confirms the
+landed SHA. A CI-red bounces to the ring; its respin is a new SHA that the
+Steward re-verifies and re-routes as a fresh authorization, not a retry.
 
-**The handoff, concretely:** ring posts a `git_request` (ready `wp/<ID>` branch +
-SHA) → Steward verifies gates/Decision/scope on that exact SHA and posts
-`ROUTED: <SHA>` mentioning the lieutenant → lieutenant executes, merges,
-corpus-closes, confirms the landed SHA. A CI-red bounces back to the ring for a
-respin, and the cycle repeats on the new SHA — the Steward re-verifies and
-re-routes; it is a fresh authorization, not a retry of the old one.
-
-The publisher path pushes `wp/<ID>` branches to trigger CI, reads checks,
-merges, fetches `main`, and mirrors GitHub state into mootup. If GitHub reports
-that a separate review or branch-protection change is required, the script must
-stop and route that fact; it must not pretend a same-identity PR review can
-satisfy the gate.
-
-- **Agents get no GitHub notifications and never poll GitHub.** Because GitHub
-  is the publisher path's concern, every actionable signal reaches the fleet
-  only as a **mootup message that mentions the actor whose move it is.** Act on
-  the mention, not on a timer.
-- **CI is the publisher path's to watch — never a worker's.** It reads check
-  status for the branches it published (`gh pr checks` / the checks API) and
-  posts the outcome: red → mention the implementer (team space) with the failing
-  job; green → advance toward merge. The optional `ken-ci` bridge mirrors
-  `check_suite` results automatically; until then the publisher caller posts
-  them. After you hand a WP off, you **stop** and learn a red result from a
-  mention.
-- **Landing integrity: a merge isn't trusted until *verified on `main`* — and a
-  multi-piece WP isn't landed until *every* piece is (promoted V1,
-  near-miss).** A **squash-merge can silently drop pieces** of an assembly built
-  from multiple cherry-picks: the K2c-s2 seam-3 erratum shipped its **kernel**
-  fix in `ecbb279` but **dropped the spec (`da344a6`) + conformance (`f3ece75`)**
-  pieces, leaving `16 §5.1` normatively **contradicting its own kernel** and the
-  corpus guarding nothing — and it **survived the ship**, invisible in every
-  "shipped" status/notification. Caught only by **grounding against the landed
-  files**. So: (1) **don't trust a "shipped `<sha>`" notification or a status
-  line** that a thing landed — for anything load-bearing, confirm it on `origin/
-  main` (the files: `git grep`/`git show`). (2) **An approved N-piece erratum/WP
-  is not "landed" until you verify each piece on `main`** (the Architect's
-  3-piece-on-main gate) — the leader who assembles a multi-cherry-pick branch
-  checks the post-merge `main` carries all of them. (3) **Authors ground
-  the WP *base* against the landed corpus, not the notifications,** before
-  building on it.
-  **(4) PREVENTIVE — a multi-piece erratum is ONE branch, ONE Decision (promoted
-  Σ-sort, the *2nd* recurrence).** The §5.1 drop recurred **immediately** on the
-  Σ-sort 3-piece (`badc78d` shipped only the kernel `sort_sigma` split; spec `13`
-  + the pi-sigma conformance were absent from `main`) — so points (1)–(3) are the
-  *detective* control; this is the *preventive* one. **Root cause:** when one
-  piece is a **crates-only kernel fix**, its diff-scope reads crates-only
-  (Architect + CI, **no Spec**) and it merges **alone** — the spec + conformance
-  pieces, sitting on *other* branches, are never in the merged tree. It isn't the
-  squash dropping commits; the pieces were **never assembled onto the branch that
-  merged**. **Fix:** assemble **all** N pieces (kernel + spec + conformance) onto
-  a **single** `wp/<erratum>` branch *before* the merge Decision — the combined
-  diff-scope then **touches `spec/`+`conformance/`**, correctly pulls a **Spec
-  vote**, and all N commits ride **one squash** to `main` together. Never publish
-  the kernel piece on its own crates-only branch while siblings wait. **The
-  publisher caller confirms the Decision's branch carries every cited piece
-  before merge** (validated on `s51-sigma-reland`: one branch, both
-  `spec/`+`conformance/` pieces → the Decision correctly pulled a Spec vote →
-  "§14 compliant").
-  **(5) Single-branch is necessary but NOT sufficient — verify an assembled tip on
-  TWO axes, against CURRENT `main`, right before the Decision (promoted X1-effects-
-  elab; both enclave authors + the Architect converged on it).** One branch
-  guarantees the pieces are *together in one diff*; it does **not** guarantee they
-  are **complete** or that the **base is current**. Two faults nearly merged a wrong
-  tree on X1-effects-elab: (a) the assembler took the author's *§6-body* commit but
-  **not their branch tip**, dropping a follow-up (`a3b887e`) that fixed an
-  **actively-wrong** stale pointer; (b) the re-fold sat on a **stale base** that, as
-  `main` advanced, would have **reverted V2-build + the V3 frame**. So before the
-  merge Decision, re-run (right then — *"rebased onto current main" is a perishable
-  claim*): **content** — `git diff <author-full-tip>:<file> <assembled>:<file>`
-  **EMPTY**, taking **all** the author's commits since merge-base (a dropped
-  follow-up is invisible if you only diff the section you read); **base/scope** —
-  `git diff --stat origin/main <assembled>` is **only** the WP's intended files and
-  **the WP's deps are ancestors of the tip** (a dep that is not an ancestor is
-  simply absent from the candidate — the WP builds on something it does not
-  contain).
-
-  > **CORRECTION (2026-07-22, Steward). The former parenthetical here —
-  > *"a stale base silently reverts unrelated landed siblings"* — was FALSE, and
-  > it was mine.** This repo squash-merges, and a squash applies
-  > **merge-base → branch**, never **main → branch**. A candidate that merely
-  > *lacks* files `main` gained does **not** delete them. Demonstrated: a
-  > candidate on a stale base lacking two chapters merged, and both chapters
-  > survived.
-  >
-  > ⇒ **`git diff origin/main <sha>` is NOT a staleness detector.** It fires
-  > identically on safe and unsafe candidates, so it cannot discriminate. The
-  > **only** thing that makes a stale base material is the **intersection** —
-  > files the candidate touches that `main` also changed since the merge base:
-  >
-  > ```sh
-  > BASE=$(git merge-base <sha> origin/main)
-  > comm -12 <(git diff --name-only $BASE <sha>   | sort) \
-  >          <(git diff --name-only $BASE origin/main | sort)
-  > ```
-  >
-  > **Empty ⇒ immaterial; do NOT require a rebase.** Non-empty ⇒ inspect and
-  > take the union deliberately.
-  >
-  > **A non-empty intersection fails loudly ONLY where the hunks overlap.**
-  > Overlapping hunks produce a merge conflict that blocks the merge (confirmed
-  > 2026-07-22: a Steward tracker branch with a four-file intersection was
-  > refused — `Pull Request has merge conflicts` — and reconciled by taking the
-  > union explicitly). **But disjoint edits to a *shared file* merge cleanly and
-  > SILENTLY as a union** — measured: branch edits line 10, `main` edits line 90
-  > of the same file, intersection non-empty, `git merge-tree` merges with no
-  > conflict.
-  >
-  > ⇒ **Git takes that union without asking.** It is usually correct, but
-  > **nothing checks it**, and the residual risk is **semantic, not textual** —
-  > two halves of one file merged while each assumes a different state (a status
-  > table reading `active` in one row and `merged` in another).
-  >
-  > **This is exactly why the rule is *inspect*, not *rebase*.** Inspection
-  > presupposes a reader, and it only makes sense *because git will not do it
-  > for you*. Do not reduce this to "the failure is loud" — that removes the
-  > reason the rule exists.
-  >
-  > **The empty case is untouched by any of this: empty ⇒ immaterial, do not
-  > rebase.** That is every case that has cost this fleet time.
-  >
-  > **Run it PRE-merge only.** Once the candidate is merged, `main` contains
-  > its squash, so the candidate's file set is necessarily a subset of what
-  > `main` gained and the test **self-fires on every candidate**. Post-landing,
-  > verify **content-emptiness on the candidate's own paths** plus **sibling
-  > survival by content**. A squash-merged SHA never becomes an ancestor of
-  > `main`; that is expected, not a flag.
-  >
-  > **Cost of the false version:** it mandated rebases that were provably
-  > unnecessary. On 2026-07-22 a 7-commit candidate re-anchored twice in ~25
-  > minutes against a contention-free doc track — each cycle a full re-verify
-  > plus a second QA pass — for an intersection that was empty every time. **The
-  > requirement to check the base axis stands; the reason and the test change.**
-
-  A correct-content tip on a genuinely-intersecting stale base is as unmergeable
-  as the reverse — the base axis is a distinct failure mode, but it is
-  **intersection-gated**, not automatic.
-  **Lane note:** the independent checker (conformance-validator) is *stronger
-  verifying the assembler's tip against these gates than performing the rebase
-  itself* — when grounding surfaces an assembly hazard, **flag it to the
-  assembler**, don't reach past your lane into the git (where the X1-effects-elab
-  drops happened).
-  **(6) TEMPORAL — a fold/erratum that races an in-flight merge must HOLD the
-  merge or be an erratum-on-current-`main` from the start (promoted Sec1; a
-  *race*, not an assembly fault).** Points (1)–(5) assume the pieces sit on
-  branches you control at Decision time; this one is about **timing**. On Sec1
-  the Architect approved `61` with an N1/N2 honesty fold flagged "fold before
-  build, not a merge-blocker." The author committed the fold declaring it
-  "supersedes `b3e7989`," the coordinator had already rebased the **pre-fold**
-  tip + posted merge_ready, and the publisher path squashed the pre-fold spec to
-  `main` **9 seconds before** the fold landed — so the honesty chapter hit `main`
-  carrying the exact §9 over-claim the fold fixed; netted only by verify-on-main,
-  re-landed in minutes. **A "supersedes X" line interlocks nothing, and
-  decision-time "hasn't merged yet" is perishable within seconds.** So: **author
-  side** — never "fold + declare supersede" against a WP whose votes/merge are in
-  flight; either mention the leader to **HOLD the merge** *before* committing
-  the fold, or author it as a fresh erratum-on-current-`main`.
-  **Coordinator side** — "not a merge blocker" ≠ "merge *before* it lands"; when
-  a fold is in-flight and the merge is seconds away, **briefly HOLD** the merge
-  so the chapter is correct at first landing (the coordinator can prevent the
-  race the author cannot gate). The only reliable net remains **verify-on-main
-  after**, never a declaration before.
-- **Review is a mootup Decision — and a *soundness vote is a frontier-class
-  responsibility* (promoted Sec1ct/B1 + operator).** The Architect/Spec read the
-  diff from the shared local branch (`git diff origin/main...wp/<ID>`) and vote
-  the merge Decision in mootup; there is no GitHub PR approval to mirror. **Two
-  load-bearing reviewers, both Opus-tier:** the **Architect** (external
-  soundness/design, always) and the **Spec** vote on `spec/`+`conformance/`
-  paths — cast by the **frontier-class (Opus) member of team Spec**, currently
-  the **conformance-validator** (the independent checker by role; spec-author
-  authors, so cannot self-review). The **DeepSeek coordinator (spec-leader, a
-  build leader) assembles the Decision but does NOT cast the soundness
-  vote** — soundness judgment needs the strongest model (MODELS.md tiering, made
-  explicit for review routing).
-- **The publisher path merges only on a *resolved* Decision, verified fresh —
-  never on a `merge_ready` post's prose (promoted Sec1ct breach; fixed +
-  validated 2/2).** A `merge_ready` is a *request*; the **resolved Decision with
-  recorded approvals** is the authorization. Before `gh pr merge`, the publisher
-  caller re-reads the Decision and confirms `status: resolved` (not `proposed`)
-  with the Architect's (and Spec's, on spec paths) votes in — it never infers
-  approval from a reviewer *named in prose* (the Sec1ct merge skipped the gate
-  exactly this way: "`(Architect + Spec)`" read as approval while the Architect
-  never voted). Symmetrically, whoever posts `merge_ready` states
-  `Decision: dec_XXX — status: resolved` (or `proposed — awaiting <reviewer>`)
-  and fires **real @mentions** to reviewers' actor_ids (§2 live-participant),
-  not prose names.
-- **The publisher caller mirrors each GitHub state change into mootup mentioning
-  whoever moves next** — CI red → the implementer; merged → Steward. A GitHub
-  state change nobody mirrors is a silent stall.
-- The full event→message map (what, where, mentioning whom, posted by whom) is
-  in `../docs/program/04-git-and-integration.md §5`.
+The publisher path pushes `wp/<ID>` branches, reads checks, merges, fetches
+`main`, and mirrors GitHub state into mootup. If GitHub requires a separate
+review or branch-protection change, the script stops and routes that fact; it
+never pretends a same-identity PR review satisfies the gate. Incidents:
+`COORDINATION-INCIDENTS.md#s14b`.
 
 ## 15. Context compaction is the Steward's (teams) or self (singletons)
 
-Token efficiency: an agent should start each work package with a clean, minimal
-context. Who triggers a compaction is fixed (operator, 2026-06-29):
+Each WP starts with a clean, minimal context. Who compacts is fixed (operator,
+2026-06-29):
 
-- **Teams are compacted by the Steward**, not by their own leader. The Steward
-  `moot compact`s the **whole team** (leader + implementer + QA, or spec-leader +
-  spec-author + conformance-validator) **before delivering a WP** to the leader.
-  Leaders never `moot compact` anyone — `request_context_reset` is self-only, so
-  only the Steward can compact another agent (`moot compact`), and it does so for
-  teams alone.
-- **Compact at the WP boundary.** The Steward compacts a team at its WP boundary
-  and delivers the next WP **only after** compacting. So a team's WP boundary is:
-  done → leader signals the Steward the WP is complete → Steward compacts →
-  next WP.
-- **Singletons self-compact, EXCEPT the Adversary.** Agents with no team/leader
-  — **Steward, Architect, Librarian, Research** — self-compact at their own task
-  boundaries (Architect after a review, Librarian after a pass, Steward after a
-  directing cycle) via
-  the `tmux send-keys -t moot-<role> -l '/compact'` path (two-step: `/compact`,
-  ~2s, then a **separate** `Enter`). To auto-continue afterward — a self-compact
-  otherwise leaves the seat idle at `❯` with nothing to re-invoke it — launch
-  the **detached resume watcher** `scripts/postcompact-resume.sh moot-<role>`
-  (`nohup … & disown`) **before** sending `/compact`: it outlives the turn and
-  the compaction, waits for the `Compacting…` window to appear and clear, then
-  sends `resume`. Do **not** instead type `resume` right after `/compact` and
-  rely on host buffering — that races the still-active turn and can fire the
-  resume *before* compaction (the reason the watcher exists). Do **not** use
-  `request_context_reset` — it is broken in this harness (it looks for a
-  nonexistent `convo-<role>` session and its error message *names* `convo-<role>`,
-  which is the bug, not a target to retry). Full mechanics:
-  `playbooks/federation/steward.md` (self-compact).
-- **The Adversary is compacted by the Steward, at the merge notification.**
-  Operator, 2026-08-17: *"There is nothing that compacts adversary and the
-  adversary does not self-compact."* This clause used to list it with the
-  singletons above, and that assignment produced **no compaction at all** — the
-  seat had no work boundary anyone else could see, because it is event-driven and
-  an idle event-driven seat drops out of every active-agent enumeration. Its
-  compaction is now a numbered step the Steward runs: `merge-procedure.md` **M8a**,
-  immediately before the M8b code-merge notification, with the pane rouse after
-  it (a mention does not wake a compacted no-poll seat). **The pairing is the
-  rule: never notify it without offering it a compaction first.**
-- **Never mid-reasoning.** Compact only at a clean boundary; it summarizes away
-  in-flight work.
-- **Start new work from current `origin/main` (operator, 2026-06-29).** A WP
-  branch is born from the **fetched** ref — leaders cut `wp/<ID>` with
-  `git branch wp/<ID>-<slug> origin/main`, and every member `git rebase
-  origin/main` before working. Never build on stale local `main` or a stale
-  worktree (the §1 / 04-git worktree-mismatch trap). New work = latest `main`.
-- **On resume after a compaction, ground-truth your state before trusting the
-  summary.** A compaction can summarize away the fact that you *finished* — so
-  re-orient from reality, not the lossy summary: `orientation()` **plus**
-  `git reflog -10`, `git status`, `git branch -vv`, **plus check unread
-  mentions** (`orientation`'s unread count / `get_mentions`). Your pre-compact
-  self's commits and checkouts are in the reflog; check there before concluding
-  you (or a teammate) are "stalled" or re-doing delivered work. **Notification
-  delivery is best-effort** — a mention that landed while your session was
-  bouncing (e.g. a fleet restart) is recorded but may never have woken you, so a
-  resume is when you catch it. (F4 + K1, operator-observed — promoted here
-  because the Steward-compacts-every-WP rule makes post-compact resume a constant
-  for every team member.)
+- **The Steward compacts teams**, whole (leader + implementer + QA, or
+  spec-leader + spec-author + conformance-validator), at the WP boundary: done
+  → leader signals the Steward → Steward `moot compact`s → next WP, delivered
+  only after compacting. Leaders never `moot compact` anyone:
+  `request_context_reset` is self-only, so only the Steward can compact
+  another agent.
+- **Singletons self-compact, except the Adversary.** Steward, Architect,
+  Librarian, and Research compact at their own task boundaries (Architect
+  after a review, Librarian after a pass, Steward after a directing cycle)
+  with `tmux send-keys -t moot-<role> -l '/compact'`, then about 2s later a
+  **separate** `Enter`. To auto-continue, launch `scripts/postcompact-resume.sh
+  moot-<role>` detached (`nohup … & disown`) **before** `/compact`; it sends
+  `resume` once compaction clears. Never type `resume` right after `/compact`
+  (it races the live turn). Never use `request_context_reset`: it is broken
+  here, and the `convo-<role>` its error names is the bug, not a target.
+  Details: `playbooks/federation/steward.md` (self-compact).
+- **The Steward compacts the Adversary at the merge notification** (operator,
+  2026-08-17): `merge-procedure.md` **M8a**, just before the M8b code-merge
+  notification, then a pane rouse (a mention does not wake a compacted no-poll
+  seat). **Never notify it without offering a compaction first.**
+- **Never mid-reasoning.** Compact only at a clean boundary.
+- **Start new work from current `origin/main`** (operator, 2026-06-29):
+  leaders cut `git branch wp/<ID>-<slug> origin/main`, and every member runs
+  `git rebase origin/main` before working. Never build on stale local `main`
+  or a stale worktree.
+- **On resume, ground-truth before trusting the summary**: `orientation()`,
+  `git reflog -10`, `git status`, `git branch -vv`, and unread mentions
+  (`get_mentions`), before concluding that you or a teammate are stalled or
+re-doing delivered work. The summary can hide that you already finished, and
+  delivery is best-effort, so a mention may have landed while you bounced.
+
+Incidents: `COORDINATION-INCIDENTS.md#s15`.

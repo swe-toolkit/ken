@@ -1,0 +1,1263 @@
+source	disposition	target_or_reason
+MEMORY	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+a-backend-carried-widening-is-sound-iff-every-scalar-read-reruns-the-fail-closed-guard-and-you-must-census-every-reader-of-the-seat	DUP	agent/memory/CHECKS.md#2
+a-backend-outage-drops-a-handoff-and-the-ring-then-looks-merely-idle	DROP	convo-outage incident; false-idle-under-outage already covered loosely by fleet outage/idle corpus
+a-background-publisher-in-your-worktree-races-your-next-git-commit	DROP	steward git-race incident; covered loosely by existing steward publisher-window corpus
+a-background-publisher-survives-your-compaction-so-pgrep-before-restarting	DROP	same family; covered loosely by existing steward publisher-window corpus
+a-backgrounded-job-completion-fires-no-event-so-the-launcher-owns-re-entry	DROP	same family; covered loosely by existing fleet backgrounded-job/idle corpus
+a-balanced-budget-is-not-evidence-of-a-complete-encoding	DUP	agent/memory/build/a-check-that-measures-a-proxy-passes-for-the-wrong-reason.md
+a-bans-witness-is-never-among-the-tests-its-introduction-reddened	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-bare-read-or-grep-on-a-spec-path-answers-about-your-working-tree-not-the-review-sha	DUP	agent/memory/fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md
+a-baseline-anchor-must-have-zero-of-the-change-and-a-wip-seam-is-not-one	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+a-batch-instrument-keyed-on-an-artifact-is-blind-to-work-that-never-produced-one	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-behavior-inert-observer-scaffolding-landing-in-the-native-backend-is-clean-when-emitted-clif-is-byte-identical-the-artifact-is-write-only-and-new-error-sites-are-redundant-with-existing-invariants	DROP	too specific to one cranelift-backend WP-class; general additive/inert-verification points covered by cited existing siblings
+a-behaviour-preserving-refactors-green-suite-says-nothing-about-what-it-added	DUP	agent/memory/CHECKS.md#8
+a-bijection-shape-check-is-not-an-identity-check-a-column-permutation-is-invisible-to-it	DUP	agent/memory/CHECKS.md#8
+a-binder-run-can-look-uniform-and-be-two-contracts	DUP	agent/memory/CHECKS.md#6
+a-blessed-notation-glyph-is-a-lexer-alias-not-an-operator-mandate-and-the-ascii-guarantee-is-impossible-when-the-ascii-form-is-a-keyword	DROP	one-off spec ruling about a single notation glyph; not generalizable beyond that decision
+a-blocker-declared-in-neither-direction-renders-as-no-blockers	DROP	steward tracker-edge incident; covered loosely by extensive existing steward dependency-edge corpus
+a-blocks-stated-trace-can-be-satisfiable-without-fixing-the-worse-defect-it-implies	DUP	agent/memory/fleet/a-pin-cannot-disagree-with-its-own-source.md
+a-boundary-claim-needs-a-measurement-at-every-position-it-names	PROMOTE	new agent/memory/fleet/a-boundary-claim-needs-a-measurement-at-every-position-it-names.md
+a-boundary-marker-names-a-region-not-a-function	DUP	agent/memory/CHECKS.md#4
+a-branch-name-is-a-coordinate-and-git-log-never-reports-it	DUP	agent/memory/fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md
+a-bulk-field-insert-then-dedup-deletes-the-hand-authored-occurrence	DROP	narrow coding-mechanics incident (regex bulk-insert dedup); not broadly generalizable
+a-by-construction-argument-about-early-returns-says-nothing-about-the-success-path	DUP	agent/memory/CHECKS.md#8
+a-bypass-control-constructs-a-third-configuration	DROP	proposed for promotion, not taken: narrow mutation-control variant of the counterfactual family (CHECKS.md#8, roles/adversary)
+a-byte-inertness-invariant-that-diverges-only-at-the-final-codegen-hash-is-codegen-consuming-a-planner-only-certificate	DROP	too specific to one Ken codegen-hash layering scheme
+a-cadence-threshold-is-a-floor-on-when-to-ask-not-a-bar-on-answering-early	DROP	narrow one-WP cadence-counter incident; covered loosely by existing tripwire/threshold corpus
+a-callers-cfg-gate-must-imply-its-callees-cfg-gate	DUP	agent/memory/fleet/a-p-scoped-run-and-cis-workspace-run-compile-different-feature-sets.md
+a-campaign-roots-draft-status-is-a-node-kind-marker-not-a-work-state	DROP	steward tracker-status incident; covered loosely by existing steward node-status/lanes corpus
+a-candidate-that-adds-a-file-to-an-indexed-corpus-is-reviewed-for-reachability-not-content	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-candidate-that-is-not-landed-can-be-superseded-rather-than-owed	DUP	agent/memory/roles/steward/the-merge-tree-landed-test-reads-not-landed-for-a-candidate-that-landed-and-was-then-superseded.md
+a-capability-reachable-at-a-layer-is-not-threaded-to-every-path-into-it	DUP	agent/memory/CHECKS.md#4
+a-carried-resolved-fact-names-every-other-fact-that-must-travel-with-it	DUP	agent/memory/CHECKS.md#4
+a-carry-forward-condition-stated-as-a-two-way-diff-between-tips-crosses-two-bases	DROP	narrow git base-drift incident; covered loosely by existing two-way-diff-direction corpus
+a-catalog-abstract-adt-with-deferred-invariant-proofs-is-sound-by-recheck-iff-no-exported-prop-and-no-public-constructor-so-review-is-correct-core-plus-differential-and-structural-discrimination	DROP	extremely specific catalog-review methodology tied to one WP class
+a-catalog-fuel-bounded-decidable-closure-predicate-is-sound-by-recheck-and-honest-deferral-so-review-is-bound-tightness-plus-no-faithfulness-theorem-plus-no-public-constructor	DROP	extremely specific catalog-review methodology tied to one WP class
+a-catalog-laws-change-that-discharges-deferred-obligations-is-sound-by-recheck-when-no-postulate-and-laws-stay-private-so-review-is-read-statements-not-proofs-plus-privacy-plus-prose-honesty	DROP	extremely specific catalog-review methodology tied to one WP class
+a-catalog-proof-suite-over-a-recursive-scan-is-self-covering-via-elaboration-and-its-only-silent-weakening-is-a-vacuous-ordering-predicate	DROP	extremely specific catalog-review methodology tied to one WP class
+a-catalog-root-gaining-a-new-import-edge-can-red-the-seal2-producer-confinement-census	DROP	too specific to one catalog-migration incident (SEAL-2 census)
+a-catalog-standalone-census-cannot-mask-a-missing-import-only-if-non-prelude-unresolved-names-route-to-residual	DROP	too specific to one catalog import-declaration increment
+a-census-key-unique-per-process-is-not-unique-across-processes	DROP	narrow instrumentation gotcha (atomic counter across subprocesses); thinly generalizable
+a-census-keyed-on-the-consumers-name-cannot-see-a-site-that-renames-it	DUP	agent/memory/CHECKS.md#3
+a-census-of-corrections-counts-self-catches-and-misses-every-review-catch	DROP	single-episode attribution narrative; general point is a soft/subjective claim, hard to mechanize
+a-census-whose-pattern-appears-in-prose-about-the-census-measures-the-literature	DROP	proposed for promotion, not taken: covered by fleet/a-guard-added-to-a-pattern-can-consume-the-token-the-pattern-searches-for.md (prose-mention anchoring)
+a-cfg-test-reexport-is-a-production-only-red-the-test-profile-cannot-see	DUP	merged into promoted agent/memory/build/cargo-check-and-cargo-test-compile-different-code.md
+a-check-described-as-closing-a-gap-usually-only-narrows-it-and-the-tell-is-an-absolute-word	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+a-checkers-advertised-law-count-is-a-claim-not-a-guarantee	DUP	agent/playbooks/tools/pin-a-property.md#6a
+a-child-with-no-identity-of-its-own-silently-exempts-itself-from-the-parent-child-law	DUP	agent/memory/CHECKS.md#5
+a-ci-annotation-has-three-surfaces-and-two-of-them-lie	DUP	agent/memory/fleet/a-capped-list-is-a-sound-presence-oracle-and-a-broken-absence-oracle.md
+a-claim-about-someone-elses-obligation-reads-as-reporting-so-it-skips-your-verification	DROP	one-off Steward self-correction narrative; verification-discipline point covered by CHECKS list
+a-claim-can-attribute-an-outcome-by-possession-so-a-verb-keyed-sweep-cannot-see-it	DROP	narrow four-pass debugging narrative; grammatical-family sweep blind spot thinly generalizable on its own
+a-claim-inherits-the-scope-of-the-site-you-checked-not-the-scope-you-stated	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+a-classification-keyed-to-the-wrong-entity-gives-a-stable-wrong-answer	DUP	agent/memory/CHECKS.md#6
+a-classification-scheme-can-forbid-the-only-action-that-satisfies-a-sibling-ac	DROP	narrow WP-framing incident; not one of the standing checks, thinly generalizable
+a-classification-that-relieves-you-of-an-obligation-gets-more-scrutiny-not-less	PROMOTE	new agent/memory/fleet/a-classification-that-relieves-you-of-an-obligation-gets-more-scrutiny-not-less.md
+a-clean-candidate-shows-either-the-hazard-was-never-real-or-someone-steered-around-it	DROP	narrow adversary trap-note-retraction incident; heavily narrative
+a-clean-sweep-and-a-skipped-sweep-are-indistinguishable-in-the-artifact	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-clearance-names-the-axes-it-covers	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+a-closed-open-question-is-an-instruction-to-do-dead-work	DUP	agent/memory/fleet/a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable.md
+a-closeout-of-a-withdrawn-investigation-is-clean-when-the-src-diff-is-comment-only-and-the-adjudicated-residual-is-recorded-not-called-safe	DUP	CHECKS.md#8
+a-codex-seat-that-hits-its-weekly-limit-at-dispatch-strands-and-does-not-auto-resume-on-reset	DUP	agent/memory/roles/steward/a-stranded-delivery-is-corroborated-by-the-recipients-own-status.md
+a-collateral-gate-removal-can-drop-a-specialized-case-check-the-carried-path-fix-never-mentions	DUP	CHECKS.md#2
+a-command-that-waits-on-a-process-by-name-matches-its-own-shell-and-never-exits	DROP	narrow shell-scripting gotcha, superseded by Monitor/run_in_background tooling in current harness
+a-comment-only-diff-is-not-a-safe-diff-doc-comments-compile	DUP	merged into promoted agent/memory/build/rust-comments-and-attributes-are-not-inert.md
+a-complete-correct-census-can-answer-a-different-question-than-the-one-it-is-read-as-answering	DUP	agent/memory/fleet/repairing-a-census-completeness-does-not-re-aim-its-subject.md
+a-completeness-gap-exposed-by-a-correct-fix-can-live-in-a-different-layer-and-tcb-status	DUP	agent/memory/teams/kernel/sct-completeness-fix-conservative-construction.md
+a-concession-you-offer-gets-no-scrutiny-from-the-person-you-offer-it-to	DUP	agent/memory/fleet/a-wrong-correction-from-an-authority-seat-extracts-a-fabricated-confession.md
+a-conclusion-that-survives-a-broken-premise-is-the-hardest-to-interrogate	DUP	agent/memory/roles/steward/a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree.md
+a-condition-added-to-a-shared-predicate-belongs-to-only-one-of-its-consumers	DUP	CHECKS.md#5
+a-conflicting-pr-never-gets-ci-and-the-check-suite-sits-queued-forever	DUP	agent/memory/fleet/a-stuck-required-check-is-not-slow-ci-and-rerunning-it-wedges-the-pr.md
+a-conserved-total-is-evidence-of-no-net-change-and-offsetting-pairs-hide-exactly-there	DUP	CHECKS.md#6
+a-consolidation-is-a-re-derivation-not-a-copy	DUP	CHECKS.md#1
+a-constraint-can-be-practically-binding-for-a-reason-that-is-false	DUP	CHECKS.md#1
+a-constructor-symbol-is-not-an-occurrence-selector	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-consumer-that-runs-may-have-consumed-a-different-occurrence	DUP	CHECKS.md#2
+a-contention-check-run-as-a-branch-scan-cannot-see-that-the-node-is-already-merged	DUP	agent/memory/roles/steward/a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree.md
+a-control-can-prove-the-metadata-edge-while-claiming-the-operand-edge	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-control-keyed-on-a-message-the-refactor-deleted-passes-vacuously	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-control-pinned-to-an-exact-refusal-string-cannot-tell-the-guard-fell-from-the-guard-moved	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-control-retirement-census-rot-merge-is-sound-when-deleted-bodies-were-dead-and-every-retirement-note-names-a-successor-that-exists-carries-the-property-and-executes	DUP	CHECKS.md#8
+a-control-that-passes-unchanged-after-your-change-means-your-change-did-nothing	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-control-that-reads-the-classifier-survives-the-mutation-that-reddens-every-behavioural-control	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-control-that-reds-against-a-new-predicate-is-the-predicate-being-refuted	DUP	CHECKS.md#7
+a-controls-discriminating-power-is-a-measurement-never-a-reading	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-controls-population-is-a-claim-another-node-can-falsify-without-touching-the-control	DROP	proposed for promotion, not taken: CI-collision instance of CHECKS.md#6; one incident
+a-convenience-glob-hides-dependency-edges-in-both-directions	DROP	proposed for promotion, not taken: single refactor incident; Rust module hygiene, not a recurring hazard
+a-convo-mention-does-not-resume-a-freshly-compacted-claude-code-seat	DUP	agent/memory/fleet/a-seat-that-compacts-on-receiving-work-loses-the-work.md
+a-convo-outage-has-two-shapes-and-only-a-two-transport-probe-separates-them	DUP	agent/memory/fleet/convo-space-not-active-is-really-the-10k-event-cap.md
+a-coordinate-qualified-against-a-tree-other-than-the-readers-is-worse-than-a-bare-one	DUP	agent/memory/fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md
+a-coordinate-read-off-an-instrumented-tree-is-not-a-coordinate-in-the-tree	DUP	agent/memory/fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md
+a-coordinate-taken-from-a-dirty-tree-and-labelled-with-the-clean-sha	DUP	agent/memory/fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md
+a-coordinate-that-coincides-across-two-trees-is-right-by-accident	DUP	CHECKS.md#1
+a-corpus-row-describes-when-it-was-written-not-what-the-tree-contains	DUP	agent/memory/roles/steward/a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree.md
+a-correct-diagnosis-of-one-stall-makes-a-second-stall-underneath-it-read-as-expected	DUP	agent/memory/roles/steward/a-working-idle-grep-keyed-on-one-harnesses-footer-reports-false-idle-on-the-other.md
+a-correct-impossibility-argument-can-be-scoped-to-the-representation-not-the-value	DUP	agent/memory/roles/adversary/attack-an-impossibility-claim-at-module-scope-not-only-the-signature.md
+a-correct-lesson-compressed-into-a-standing-instruction-can-invert	DUP	CHECKS.md#1
+a-correct-mechanism-over-strengthened-into-a-post-condition-manufactures-defects	DUP	CHECKS.md#8
+a-correction-lands-on-the-artifact-but-not-on-the-belief	DUP	agent/memory/roles/steward/the-summary-generalizes-past-the-measurement-the-artifact-stated.md
+a-correction-on-main-does-not-reach-a-candidate-cut-before-it	DUP	agent/memory/fleet/a-correction-on-main-does-not-reach-a-candidate-cut-before-it.md (checked-in copy current; no fold)
+a-correction-that-applies-the-other-party-s-own-rule-needs-no-sign-off	DROP	single-incident interpersonal protocol note, not a generalizable technical lesson
+a-correction-that-explains-away-your-correct-measurement-arrives-with-more-authority-than-the-measurement	DUP	agent/memory/fleet/a-wrong-correction-from-an-authority-seat-extracts-a-fabricated-confession.md
+a-correction-to-an-enumeration-inherits-the-blind-spot-of-your-census	DUP	agent/memory/fleet/a-list-of-same-shape-guards-reads-as-complete-because-the-shape-is-what-made-them-findable.md
+a-correctly-named-inseparability-predicate-can-still-mislocate-the-defect-a-capability-gap-masquerades-as-a-decomposition-dependency	DROP	single-WP architect design-defect-location heuristic, too incident-specific to generalize
+a-count-can-be-the-exact-inverse-of-the-property-when-the-honest-label-is-a-string-field	DUP	agent/memory/build/a-check-that-measures-a-proxy-passes-for-the-wrong-reason.md
+a-count-handed-to-you-inside-a-correction-borrows-its-authority-its-method-does-not	DUP	agent/memory/fleet/an-injected-finding-is-a-change-request-and-the-least-resisted-one.md
+a-count-is-a-proxy-and-a-compensating-duplicate-beats-it	DUP	agent/memory/build/a-check-that-measures-a-proxy-passes-for-the-wrong-reason.md
+a-counter-at-the-call-site-measures-the-loop-not-the-call	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-counter-keyed-on-one-event-class-is-blind-to-another-that-causes-the-same-failure	DUP	CHECKS.md#2
+a-counter-with-no-per-attempt-reset-cannot-distinguish-a-stale-success-from-the-outcome-you-want	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-coverage-claim-about-a-neighbour-control-must-be-mutated-not-asserted	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-credential-in-your-own-home-directory-can-belong-to-someone-else	PROMOTE	new agent/memory/fleet/a-credential-in-your-own-home-directory-can-belong-to-someone-else.md
+a-criterion-that-rejects-one-option-must-be-run-against-the-one-you-are-choosing	DUP	CHECKS.md#7
+a-ctx-scan-that-greps-the-pane-buffer-matches-ctx-numbers-you-quoted-in-a-post	DUP	agent/memory/roles/steward/a-ctx-scan-greps-your-own-report-of-another-seats-ctx.md
+a-currency-guard-must-be-keyed-on-the-ref-its-own-measurement-is-taken-at	DUP	agent/memory/fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md
+a-dated-heading-dates-the-observation-not-the-instruction-under-it	DUP	agent/memory/fleet/a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable.md
+a-dead-code-oracle-is-spent-by-the-commit-that-clears-it	DUP	CHECKS.md#8
+a-debt-rows-owner-column-can-name-a-successor-that-was-never-filed	DUP	CHECKS.md#4
+a-decision-fork-can-omit-the-outcome-an-inert-instrument-produces	DUP	agent/memory/roles/adversary/suppressing-a-row-can-empty-a-whole-named-gate.md
+a-decision-is-mutated-in-place-so-reading-the-object-is-not-enough	DROP	narrow instance of extensively-covered stale-read/mutable-record-no-version genre
+a-declared-commit-count-that-undercounts-makes-a-whole-deliverable-absent-from-review	DUP	agent/memory/fleet/a-review-range-of-sha-caret-to-sha-reads-only-the-last-commit-and-the-scope-check-agrees.md
+a-decomposition-table-row-can-be-ahead-of-its-semantic-warrant-and-the-ownership-map-not-the-census-decides	DROP	one-off closed campaign-slice ruling (RT-BACKEND-MODULE-SPLIT item 17), too specific
+a-decoration-only-edit-can-falsify-a-nearby-untouched-claim	DUP	agent/memory/fleet/a-new-criterion-is-applied-forward-and-never-swept-backward-over-the-document-that-states-it.md
+a-defect-spanning-two-nodes-has-a-half-owned-by-nobody	DROP	specific tracker-node-ownership instance, covered loosely by node/witness genre
+a-deferral-annotation-can-be-present-and-cite-the-right-ac-yet-be-structurally-inert	DUP	agent/memory/roles/adversary/suppressing-a-row-can-empty-a-whole-named-gate.md
+a-deferral-rules-precondition-is-a-state-not-the-label-on-the-artifact	DROP	specific do-not-respin fleet-rule instance, narrow lane governance
+a-deleted-guard-can-be-the-only-enforcement-of-a-second-thing-nobody-named	PROMOTE	new agent/memory/fleet/a-deleted-guard-can-be-the-only-enforcement-of-a-second-thing-nobody-named.md
+a-denominator-you-did-not-choose-is-an-artifact-of-the-harness-not-a-population	DUP	CHECKS.md#6
+a-dependency-graph-answers-only-about-the-objects-it-contains	DUP	CHECKS.md#5
+a-derived-value-trusted-at-its-type-was-never-traced-to-its-producer	DROP	proposed for promotion, not taken: covered by fleet/grep-the-producer-not-the-cited-proxy.md
+a-design-fork-arm-that-derives-the-expected-child-model-from-the-actual-occurrences-collapses-two-authorities-and-makes-the-cross-check-vacuous	DROP	one-off architecture design-fork ruling for one Ken feature, too specific
+a-design-review-of-a-law-adding-commit-must-audit-populations-not-read-laws	DUP	agent/memory/fleet/a-design-review-reads-laws-one-at-a-time-and-cannot-see-a-law-whose-two-sides-range-over-different-populations.md
+a-detector-that-caught-every-known-failure-can-still-be-under-scoped	DUP	CHECKS.md#3
+a-diagnostic-string-interned-into-a-content-addressed-arena-shifts-every-later-span	DROP	specific compiler-instrumentation caveat, covered loosely by stale/opaque-coordinate genre
+a-diff-hunk-header-is-not-a-coordinate	DUP	agent/memory/roles/adversary/a-context-flag-multiplies-lines-per-match-so-head-drops-matches.md
+a-diff-relative-offset-under-a-site-heading-resolves-in-no-tree-at-all	DUP	agent/memory/roles/adversary/a-context-flag-multiplies-lines-per-match-so-head-drops-matches.md
+a-differential-over-an-aggregate-passes-while-one-of-n-contributors-defects	DUP	agent/memory/fleet/a-differential-over-an-aggregate-is-an-existential-not-a-universal.md
+a-directed-audit-request-reads-as-coverage-and-hides-its-own-complement	DUP	CHECKS.md#3
+a-discharged-checkpoints-text-is-still-operative-if-a-reader-would-build-from-it	DUP	agent/memory/fleet/a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable.md
+a-discriminator-can-be-refused-by-a-sibling-clause-of-the-same-guard	DROP	narrow mutation-testing footgun, covered loosely by discriminator/control genre
+a-disk-instrument-is-structurally-blind-to-a-tmpfs-and-tmp-is-ram	DUP	agent/memory/fleet/the-agent-scratchpad-is-tmpfs-so-every-byte-you-write-there-is-ram.md
+a-dispatch-guard-can-check-shape-and-not-membership-so-a-totality-claim-fails-on-the-foreign-case	DUP	CHECKS.md#5
+a-disposition-robust-verdict-stops-anyone-from-checking-the-numbers-that-feed-it	DUP	agent/memory/roles/adversary/an-error-in-the-safe-direction-is-a-claim-about-what-you-did-not-measure.md
+a-divergence-fix-converts-the-admission-gate-and-leaves-the-eliminator-sibling-with-the-identical-normalize-before-occurs	DUP	CHECKS.md#3
+a-divergence-in-one-function-does-not-generalize-to-a-sibling-you-never-opened	DUP	CHECKS.md#3
+a-doc-comment-is-not-inert-an-indented-block-inside-a-module-header-is-a-compiled-doctest	DUP	merged into promoted agent/memory/build/rust-comments-and-attributes-are-not-inert.md
+a-documented-limit-is-not-a-discharged-claim	DUP	agent/memory/fleet/narrowing-a-counts-scope-never-turns-a-tally-into-a-pairing.md
+a-fail-closed-default-and-a-measurement-are-the-same-symbol-carrying-opposite-information	DUP	CHECKS.md#8
+a-fail-closed-default-and-a-measurement-are-the-same-symbol	DUP	CHECKS.md#8
+a-fail-closed-residual-must-name-a-guard-on-the-path-the-value-actually-takes	DUP	CHECKS.md#2
+a-fail-fast-oracle-reports-a-lower-bound-on-a-class-never-its-size	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-failed-ci-job-log-reads-as-unavailable-when-it-is-only-escape-sequences	DROP	specific gh-cli technical gotcha, covered loosely by instrument-availability genre
+a-failed-publisher-merge-leaves-an-orphan-pr-that-every-later-check-greens-over	DUP	agent/memory/fleet/a-stuck-required-check-is-not-slow-ci-and-rerunning-it-wedges-the-pr.md
+a-failing-test-that-is-an-authored-detector-is-a-measurement-not-collateral	DUP	agent/playbooks/build/qa-test-design.md
+a-fails-again-trigger-cannot-tell-a-working-gate-from-a-failing-seat	DROP	specific reseat-trigger incident, narrow fleet-lane governance
+a-failure-list-keyed-on-bare-test-names-is-ambiguous-across-binaries	DROP	specific test-name-collision-across-binaries gotcha, covered loosely
+a-faithful-conformance-seed-can-freeze-a-design-defect	DUP	agent/memory/fleet/freezing-a-canonical-form-name-the-ambiguity-that-would-have-stopped-you.md
+a-faithfulness-ruling-on-duplicated-text-is-voided-by-any-edit-to-that-text	DROP	specific QA-fixture ruling, covered loosely by correction/edit-scope genre
+a-falsification-condition-needs-its-own-positive-control	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-falsifier-that-names-a-search-target-returns-the-first-thing-shaped-like-it	DROP	specific architecture-review incident, covered loosely by falsifier/positive-control genre
+a-fast-paths-soundness-can-be-inductive-on-the-property-you-are-repairing	DUP	CHECKS.md#2
+a-feature-gate-in-one-crate-cannot-gate-a-call-site-in-another	DUP	agent/memory/fleet/a-p-scoped-run-and-cis-workspace-run-compile-different-feature-sets.md
+a-fence-on-your-conclusion-is-not-a-fence-on-your-method	DROP	proposed for promotion, not taken: covered by the hedge lesson now promoted and CHECKS.md#8
+a-field-named-for-a-population-must-be-traced-to-its-producer-before-you-trust-it-ranges-over-that-population	DROP	restates this batch's own a-derived-value-trusted-at-its-type mechanism, redundant with sibling
+a-filter-keyed-on-a-name-cannot-see-the-case-that-omits-the-name	DROP	proposed for promotion, not taken: covered by fleet/a-capped-list-is-a-sound-presence-oracle-and-a-broken-absence-oracle.md and CHECKS.md#10
+a-first-hand-scope-error-passes-the-did-you-measure-or-carry-it-check	DROP	narrow scope-vs-provenance distinction, covered loosely by scope-measurement genre
+a-fix-covering-a-category-needs-a-structural-closure-not-hand-enumeration	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-fixed-input-that-states-a-conclusion-without-its-ground-hands-on-the-wrong-ground	DUP	CHECKS.md#4
+a-fixture-can-satisfy-its-acceptance-relation-and-be-invisible-to-the-consumer	DUP	CHECKS.md#5
+a-fixture-that-builds-one-occurrence-cannot-tell-routes-elsewhere-from-path-is-dead	DUP	CHECKS.md#6
+a-fixture-that-cycles-variants-gives-no-same-variant-nesting	DUP	CHECKS.md#9
+a-fleet-outage-can-be-platform-partitioned-and-only-a-pane-census-sees-it	PROMOTE	new agent/memory/roles/steward/a-fleet-outage-can-be-platform-partitioned-and-only-a-pane-census-sees-it.md
+a-fleet-participant-status-is-last-set-never-refreshed-not-a-live-owed-signal-verify-your-own-event-in-the-log-before-recasting	DROP	specific convo-status-staleness incident, largely absorbed by this batch's own pane-census file
+a-fleet-wide-broadcast-with-no-mentions-wakes-nobody	DUP	agent/memory/fleet/mention-discipline.md
+a-footer-counter-drop-is-not-evidence-of-a-turn-boundary	DROP	narrow pane-footer incident, self-corrected within file, covered loosely
+a-foreground-long-test-holding-the-shared-serialized-build-lock-deadlocks-a-priority-lane-and-a-futex-wait-is-not-a-hang	DUP	agent/memory/build/timeout-does-not-kill-grandchild-cargo-test.md
+a-fork-can-be-a-measurement-and-two-horns-can-share-the-predicate-a-control-keys-on	DROP	proposed for promotion, not taken: covered by CHECKS.md#8 (name what the failing configuration produces)
+a-frame-can-carry-a-stale-held-claim-about-its-own-release-gate	DUP	agent/memory/fleet/a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable.md
+a-frame-can-forbid-the-only-path-to-its-own-checkpoint-by-stating-an-end-state-property	DROP	single-WP narrative (RT-WORKER-BIND/RT-RECURSOR-TRANSPORT), too incident-specific
+a-frame-can-order-an-increments-control-before-the-increment-that-makes-it-constructible	DROP	single-WP circular-gate-behind-feature-flag narrative
+a-frame-can-pin-a-deliverable-to-a-cfg-test-accessor	DUP	agent/memory/roles/steward/frame-must-ground-substrate-obligations-not-just-names.md
+a-frame-can-pin-against-a-derivation-not-a-number	DROP	single-WP anchor-staleness narrative, mechanism generic already covered
+a-frame-can-specify-the-new-units-contract-and-be-silent-on-what-the-old-one-must-stop-doing	DROP	single-WP migration narrative, too incident-specific
+a-frame-is-not-the-work-package-so-it-does-not-get-the-wp-branch-name	DROP	single Ken branch-naming procedural incident
+a-frame-read-from-your-worktree-returns-the-base-copy-not-the-amended-one	DUP	agent/memory/fleet/a-correction-on-main-does-not-reach-a-candidate-cut-before-it.md
+a-frame-with-no-tracker-node-is-equally-consistent-with-done	DUP	agent/memory/roles/steward/a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree.md
+a-frames-banned-scope-can-forbid-the-only-way-to-discharge-its-own-ac	DUP	agent/memory/fleet/an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing.md
+a-frames-banned-scope-can-forbid-what-its-own-authorization-requires	DUP	agent/memory/fleet/an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing.md
+a-frames-deliverable-may-already-be-built-by-a-sibling-wp	DROP	single-WP narrative (own-earlier-phase attribution error)
+a-frames-either-or-fork-sends-the-ring-to-the-two-places-the-defect-is-not	DROP	single-WP false-dichotomy narrative
+a-frames-fixed-inputs-are-an-instrument-that-escapes-the-frames-own-instrument-discipline	DUP	agent/memory/enclave/count-the-population-before-you-place-it-inside-a-mechanism.md
+a-frames-retain-list-can-describe-a-branch-that-never-landed	DROP	single-WP narrative; git-ancestry half covered elsewhere
+a-frames-scope-ban-can-encode-a-diagnosis-and-then-protect-it	DROP	single-node narrative (self-sealing scope ban)
+a-frames-would-have-caught-it-claim-must-be-checked-against-the-mechanism-the-frame-proposes	DROP	single-node narrative, too incident-specific
+a-friendly-paraphrase-of-your-own-finding-is-the-cheapest-way-for-your-claim-to-grow	DUP	agent/memory/fleet/agreement-is-not-corroboration-when-a-premise-was-inherited.md
+a-front-end-source-validator-behind-a-capability-type-is-clean-when-no-alternate-constructor-bypasses-it-and-a-source-rewriting-formatter-is-not-in-the-trusted-compile-path	DROP	single-PR adversary reference checklist, too narrow
+a-fuelled-algorithms-verified-claim-leaks-unless-the-spec-discharges-its-own-fuel-sufficiency-precondition	DROP	single catalog-entry adversary reference, too narrow
+a-fully-framed-node-can-be-withheld-from-the-frontier-by-its-own-draft-status	DROP	Ken tracker-tooling-specific incident (gen-progress.sh)
+a-function-local-ordering-argument-is-not-the-module-level-reachability-property	DUP	CHECKS.md#2 (fan-in / resolve arm then enumerate every path)
+a-fusion-ruling-can-be-right-about-identity-and-wrong-about-locality	DROP	single-WP narrative, too incident-specific
+a-gate-can-be-written-in-the-shape-its-predecessor-already-measured-as-blind	DROP	single-WP mutation-testing narrative
+a-gate-flag-bounds-its-own-path-not-every-consumer-of-the-mechanism	DUP	CHECKS.md#6 (population placed inside a mechanism)
+a-gate-is-an-instrument-and-the-verification-method-is-the-gate	DUP	agent/memory/fleet/an-acceptance-criterion-must-name-an-observation-the-failing-configuration-does-not-also-produce.md
+a-gate-predicate-weaker-than-its-consumer-is-sound-only-when-the-accept-path-re-runs-the-fail-closed-consumer	DROP	single-PR adversary reference, too narrow
+a-gate-that-tells-you-to-distrust-node-status-can-be-the-instrument-that-is-wrong	DROP	single-WP narrative, too incident-specific
+a-git-pathspec-resolves-relative-to-cwd-so-a-persisted-cd-turns-a-filter-into-a-silent-zero	DUP	agent/memory/fleet/multi-worktree-cwd-drift-phantom-diff.md
+a-git-switch-to-a-branch-held-by-another-worktree-fails-silently-in-a-chain	DROP	single-incident narrative, narrow ops mechanic
+a-github-write-that-is-not-a-merge-has-no-owner-so-two-credentialed-seats-can-both-do-it	DROP	Ken COORDINATION §14b-specific incident
+a-glob-reexports-restricted-visibility-items-too	DROP	single Rust de-globbing incident, narrow
+a-green-build-is-weak-for-a-claim-the-compiler-does-not-check-and-conclusive-for-one-it-does	DROP	proposed for promotion, not taken: boundary note on the green-is-weak family; not selected to keep growth to tens
+a-green-test-can-be-green-by-3-percent-of-a-hidden-budget	DUP	stated-stacks skill (margin-census / stack-budget family)
+a-grep-census-of-a-types-readers-undercounts-only-the-compiler-enumerates-them	DUP	agent/memory/fleet/a-guard-added-to-a-pattern-can-consume-the-token-the-pattern-searches-for.md
+a-grep-hit-you-do-not-open-is-the-same-as-a-grep-you-never-ran	DUP	agent/memory/enclave/an-absence-claim-is-refuted-at-the-consumer-not-where-the-subject-is-defined.md
+a-grep-key-that-matches-text-cannot-distinguish-a-definition-from-a-mention-of-one	DUP	agent/memory/fleet/a-guard-added-to-a-pattern-can-consume-the-token-the-pattern-searches-for.md
+a-grep-keyed-on-one-type-prefix-undercounts-a-heterogeneous-list-and-the-number-looks-verified	DUP	agent/memory/fleet/a-type-check-cannot-distinguish-two-fields-that-share-a-type.md
+a-guard-built-to-a-ruling-that-refuses-is-the-ruling-being-refuted	DROP	single-WP narrative, too incident-specific
+a-guard-comparing-a-value-derived-from-its-own-input-cannot-fail	DROP	proposed for promotion, not taken: covered by CHECKS.md#1 (one source minted both sides)
+a-guard-on-what-the-command-says-is-not-a-guard-on-what-the-command-does	PROMOTE	new agent/memory/fleet/a-guard-on-what-the-command-says-is-not-a-guard-on-what-the-command-does.md
+a-guard-that-only-routes-to-the-fallback-cannot-fix-a-defect-the-fallback-itself-exhibits	DROP	single-WP narrative, force-off technique too incident-bound
+a-guard-you-add-may-be-shadowed-by-an-upstream-invariant-mutate-the-natural-producer-before-claiming-you-pinned-anything	DUP	mutation-prove-a-pin skill (mutate the natural producer, not the guard's own input)
+a-guards-two-producer-property-does-not-transfer-inside-its-own-branch	DROP	single-WP narrative, too incident-specific
+a-half-landed-replacement-may-move-the-failure-backwards-only-if-the-intermediate-refuses	DROP	single-WP narrative; overlaps advancing-refusal family
+a-hand-written-forbidden-character-class-reports-clean-about-only-the-characters-you-remembered	DUP	pin-a-property skill (allowed-inventory over forbidden-list)
+a-handoff-can-name-its-recipient-in-prose-and-mention-nobody	DUP	agent/memory/fleet/mention-discipline.md
+a-hazard-written-for-one-direction-of-a-symmetric-relation-reads-as-coverage-for-both	DROP	single-WP narrative, too incident-specific
+a-heading-repair-is-coupled-when-the-stale-word-is-in-the-anchor	DROP	doc-team-specific narrow incident (heading anchor citation)
+a-hedge-does-not-constrain-what-is-done-with-the-claim-it-hedges	PROMOTE	new agent/memory/fleet/a-hedge-does-not-constrain-what-is-done-with-the-claim-it-hedges.md
+a-high-effort-thinking-pane-shows-neither-working-nor-esc-to-interrupt	DROP	Ken fleet-ops pane-detection mechanic, narrow
+a-hold-that-permits-activity-cannot-be-stated-as-a-sha	DROP	single-WP narrative; overlaps pin-as-property family
+a-label-is-a-prediction-not-a-measurement	DROP	single-review narrative; near-miss promote but folds into existing sentinel/default-signature family
+a-landed-convention-is-not-a-ruling-and-a-ratified-decision-can-forbid-it	DROP	single Ken doc-program narrative
+a-landed-plane-can-have-no-production-caller	DROP	single-WP narrative, too incident-specific
+a-lane-blocked-on-a-reviewer-can-be-blocked-because-the-reviewer-seat-is-stopped	DROP	Ken fleet-ops mechanic (moot/tmux), narrow
+a-lane-only-ever-exercised-with-synthetic-fixtures-rejects-the-real-thing	DROP	single-WP narrative; overlaps reachability-precondition family
+a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable	DUP	agent/memory/fleet/a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable.md (checked-in copy current; no fold)
+a-later-refusal-is-not-evidence-about-an-earlier-gate	DROP	single-WP narrative, too incident-specific
+a-later-ruling-silently-invalidates-acs-in-frames-already-written	DROP	single-WP narrative, too incident-specific
+a-leader-taking-over-an-implementers-task-leaves-the-handoff-back-unowned	DROP	Ken fleet-ops ring-stall mechanic, narrow
+a-leaders-own-tick-concludes-no-gap-and-then-misses-the-handback	DROP	Ken fleet-ops watchdog mechanic, narrow
+a-ledgers-drift-from-head-can-be-the-designed-signal-not-a-defect	DROP	single ledger-specific narrative (SOURCE-ATTESTATIONS)
+a-lieutenant-ci-monitor-can-arm-then-fail-to-fire-verify-a-stalled-merge-via-gh-not-the-pane	DROP	Ken merge-ops mechanic, narrow
+a-line-number-is-not-a-bucket-resolve-the-enclosing-binding-before-acting-on-a-set-membership-claim	DUP	agent/memory/fleet/a-pattern-match-is-evidence-about-what-encloses-it.md
+a-line-scoped-grep-cannot-see-a-phrase-that-spans-a-wrap	DUP	agent/memory/fleet/a-line-local-operation-lies-about-hard-wrapped-text.md
+a-line-window-has-no-notion-of-where-one-record-ends	DROP	WP-specific census incident (thread-local selector defaults); scan-boundary point already covered loosely
+a-literal-pattern-lowering-to-a-bool-if-chain-is-sound-by-recheck-and-adds-no-refinement-so-the-review-is-exhaustiveness-fail-closed-plus-host-eq-equals-runtime-comparator-grouping	DROP	single-commit adversary verdict log (evt_4pzwsjye6ht0m), campaign narrative
+a-literal-test-region-strip-silently-noops-on-the-first-qualified-mod-tests	DROP	WP-specific incident (Ken cranelift_backend item 15 D2 split)
+a-live-claude-seat-can-strand-with-unsubmittable-composer-text-recover-by-clear-and-retype	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+a-live-terra-seat-wakes-to-plan-then-idles-on-a-convo-dispatch	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+a-live-wiring-slice-installs-a-producer-before-its-consumer-so-its-only-production-effect-is-an-inert-field-plus-a-new-fallible-gate-attack-both	DROP	single-commit adversary verdict log (evt_4mfzx89c4ncdj), campaign narrative
+a-liveness-detector-built-on-a-guessed-footer-string-fails-in-both-directions	DUP	agent/memory/roles/steward/a-working-idle-grep-keyed-on-one-harnesses-footer-reports-false-idle-on-the-other.md
+a-liveness-probe-that-can-match-itself-reports-done-on-a-half-written-file	DUP	agent/memory/roles/steward/a-queued-delivery-waits-on-a-next-tool-call-an-idle-seat-will-never-make.md
+a-locator-has-two-coordinates-and-re-deriving-one-is-not-evidence-about-the-other	DROP	WP-specific incident (frame locator table correction); no matching checked-in file found
+a-loud-gate-failure-and-a-silent-miscompile-can-be-two-exits-of-one-fail-open-rule	DROP	WP-specific incident (px8f_write_partition, PR #3676)
+a-matching-value-carries-no-information-when-every-candidate-would-have-matched	DROP	WP-specific incident (RT-LEXICAL-RECURSOR-CONSUMERS D2k-1c-2)
+a-measurement-can-prove-the-instrument-wrong-and-the-number-right	DROP	WP-specific incident (RT-DESCENT-RETIRE D1)
+a-measurement-candidate-and-a-landing-candidate-have-incompatible-gate-criteria	DROP	WP-specific incident (RT-DESCENT-RETIRE D2c)
+a-measurement-correct-on-one-tree-becomes-a-cross-tree-claim-only-through-a-carry-argument	PROMOTE	new agent/memory/fleet/a-measurement-correct-on-one-tree-becomes-a-cross-tree-claim-only-through-a-carry-argument.md
+a-measurement-nodes-framing-and-its-conclusions-decay-independently	DUP	agent/memory/roles/steward/a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree.md
+a-measurement-that-refutes-a-durable-claim-is-not-optional-coverage	DROP	WP-specific incident (RT-D5B-LIVE-WIRING)
+a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution	DUP	agent/memory/fleet/a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution.md (checked-in copy current; no fold)
+a-mechanism-picture-built-from-prose-needs-a-probe-not-more-reading	DROP	WP-specific incident (RT-LEXICAL-R3-FUSION-EMITTER DP)
+a-membership-test-over-a-large-namespace-answers-an-adjacent-question	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+a-merge-base-goes-stale-without-your-branch-moving	DROP	WP-specific incident (RT-LEXICAL-RECURSOR-CONSUMERS D2b); merge-base staleness covered in steward git corpus
+a-monitor-that-watches-for-the-damage-it-causes-reads-as-supervised	DUP	agent/memory/roles/steward/fetching-during-the-publisher-window-freezes-the-NEXT-publish.md
+a-move-x-before-y-fix-is-feasible-only-if-xs-inputs-exist-at-the-new-position	DROP	WP-specific incident (RT-COMPOSED-RETURN-SSA HS5)
+a-movement-instrument-built-before-the-mover-can-read-a-population-the-mover-cannot-enter	DROP	WP-specific incident (RT-LEXICAL-RECURSOR-CONSUMERS D2f)
+a-multi-clause-ac-reads-as-satisfied-when-you-discharge-the-subset-you-built-for	DUP	agent/memory/fleet/an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing.md
+a-multi-route-census-fixture-must-contain-its-probe-name-in-only-its-own-route	DROP	WP-specific incident (WP-2 LANG-MOD-STRICT-RESOLUTION D1)
+a-multi-tier-slice-frame-can-name-a-consume-dependency-on-an-unbuilt-and-misassigned-tier	DROP	WP-specific incident (RT-CHECKED-IH-CAPTURED-ENV-SCHEMA)
+a-mutation-anchor-that-does-not-match-reports-a-green-that-reads-as-a-defeated-pin	DUP	agent/memory/fleet/a-mutation-that-passes-when-it-should-fail-means-a-stale-input.md
+a-mutation-campaign-needs-a-grid-not-a-count	PROMOTE	new agent/memory/roles/adversary/a-mutation-campaign-needs-a-grid-not-a-count.md
+a-mutation-control-with-unwrap-or-exact-is-the-identity	DUP	agent/memory/roles/adversary/disable-the-mutation-mechanism-to-find-vacuous-controls.md
+a-mutation-experiment-on-a-red-baseline-is-uninterpretable-in-both-directions	DROP	WP-specific incident (D3b+D4 Architect fix)
+a-mutation-on-the-discriminator-input-measures-the-consistency-law-not-the-decision	DROP	WP-specific incident (RT-DECL-CLOSURE-PORT D4)
+a-mutation-proofs-line-numbers-are-coordinates-on-the-mutant	DROP	WP-specific incident (RT-VALUE-TOTALITY-P1); same family as this batch's locator-two-coordinates item
+a-mutation-that-does-not-redden-can-indict-your-claim-not-a-missing-control	DUP	agent/memory/roles/adversary/a-green-mutation-does-not-tell-you-which-blindness-let-it-through.md
+a-mutation-that-reddens-does-not-confirm-which-detector-caught-it	PROMOTE	new agent/memory/roles/adversary/a-mutation-that-reddens-does-not-confirm-which-detector-caught-it.md
+a-mutation-that-stays-green-can-mean-the-representation-made-the-defect-unrepresentable	DUP	agent/memory/roles/adversary/a-green-mutation-does-not-tell-you-which-blindness-let-it-through.md
+a-negative-acs-assertion-target-betrays-which-axis-it-actually-tests	DROP	WP-specific incident (RT-CHECKED-IH-CAPTURED-ENV-SCHEMA tier-1)
+a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md (checked-in copy current; no fold)
+a-negative-claim-can-cite-a-gate-whose-error-message-names-the-escape-hatch	DROP	WP-specific incident (RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT D1)
+a-negative-only-control-cannot-find-the-positive-paths-preconditions	DROP	WP-specific incident (RT-LEXICAL-RECURSOR-CONSUMERS D2g)
+a-new-route-beside-an-old-one-must-fire-only-where-the-old-cannot-serve	DROP	WP-specific incident (RT-CAPTURE-CONTEXT-FRAME-EMIT D2)
+a-new-validating-gate-is-vacuous-if-a-coarser-downstream-refusal-still-fires	DROP	WP-specific incident (RT-DYNAMIC-ARM-SCALAR-MERGE D1b-role-c1)
+a-no-op-mutation-is-indistinguishable-from-a-well-defended-one	DUP	agent/memory/fleet/a-mutation-that-passes-when-it-should-fail-means-a-stale-input.md
+a-no-retained-consumer-move-claim-must-enumerate-field-embeddings-and-delegating-wrappers	DROP	WP-specific incident (RT-EMITTER-CONTROL-JOINS-SPLIT)
+a-non-blocking-ci-job-still-blocks-the-publisher	DROP	WP-specific incident (CI-IGNORED-SWEEP PR #1714)
+a-notation-spec-review-must-run-the-spellability-check-on-every-named-spelling-not-just-the-headline-former	DROP	WP-specific incident (LANG-TRUNC-SURFACE-spec review)
+a-number-you-declare-non-binding-can-still-be-load-bearing-in-a-role-you-assigned-it-yourself	DUP	agent/memory/fleet/a-number-sound-as-a-measurement-is-not-sound-as-a-criterion.md
+a-one-arm-coverage-gap-is-not-a-finding-when-the-conditionals-other-arm-is-a-recorded-successor-carry	DROP	WP-specific incident (RT-CAPTURE-PROJECTION-GROW D1)
+a-pane-read-is-a-read-of-the-ui-not-of-the-agent-behind-it	DUP	agent/memory/roles/steward/a-stranded-delivery-is-corroborated-by-the-recipients-own-status.md
+a-pane-status-describing-progress-says-nothing-about-liveness	PROMOTE	new agent/memory/roles/steward/a-pane-status-describing-progress-says-nothing-about-liveness.md
+a-parser-admission-repair-that-adds-early-reject-guards-is-clean-when-its-can-start-guard-is-the-same-roster-the-parser-uses-and-its-exclusion-set-is-shared-with-the-app-loop	DROP	single-commit adversary verdict log (evt_4fkqdzs5a9mkv), campaign narrative
+a-partial-capability-edge-optimization-ripples-through-a-family-of-base-test-premises	DROP	WP-specific incident (RT-COMPOSED-RETURN-FORWARD-RET-EDGE)
+a-partial-widening-moves-a-refusal-instead-of-closing-it	DUP	CHECKS.md#2
+a-partially-scoped-guard-passes-a-scan-for-the-scoping-property	DROP	WP-specific incident (Ken file-split frame audit, 2026-09-18)
+a-partition-that-keeps-failing-across-reachability-refinements-may-be-keyed-on-the-wrong-axis	DROP	WP-specific incident (RT-MATERIALIZED-DEAD-JOIN-RECONCILE D1)
+a-per-arm-coverage-gap-can-be-netted-at-the-sibling-arm-because-the-gate-is-shared	DROP	WP-specific incident (SPEC-AUTH-EX)
+a-per-increment-threshold-check-never-fires-ask-it-about-the-running-total	DUP	CHECKS.md#6
+a-per-target-cargo-green-is-not-a-crate-green-and-p-crate-cannot-see-a-dependent-crate	DUP	agent/memory/teams/kernel/trust-root-reduction-change-needs-full-workspace-gate.md
+a-per-witness-reachability-control-is-blind-to-short-circuiting	DROP	WP-specific incident (RT-DECL-CLOSURE-PORT D1)
+a-perfect-discriminator-may-be-separating-your-two-test-suites	DROP	WP-specific incident (D7 1d)
+a-persisted-shell-cwd-silently-rescopes-every-later-git-query-and-reports-cleanly	DUP	agent/memory/fleet/a-git-query-answers-a-different-question-correctly-and-never-errors.md
+a-perturbation-value-picked-from-a-neighbour-can-name-a-real-key	DROP	WP-specific incident, narrow selector-control case
+a-pin-cannot-disagree-with-its-own-source	DUP	agent/memory/fleet/a-pin-cannot-disagree-with-its-own-source.md (checked-in copy current; no fold)
+a-pin-that-never-exercises-the-violating-mechanism-is-not-evidence-about-it	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-pin-you-are-asked-to-repair-may-be-cfg-any-dead-code	DROP	WP-specific incident (RT-CONTSRC-PRODUCER-LOCAL)
+a-pipeline-redirected-to-dev-null-returns-no-match-while-a-match-exists	DUP	agent/memory/fleet/a-probe-truncated-before-the-grep-is-not-a-measurement.md
+a-planned-edge-can-have-a-second-consumer-so-suppressing-it-changes-meaning-not-just-obligation	DROP	WP-specific incident (RT-CONTINUATION-CALL-DISCHARGE D2)
+a-platform-level-gate-is-not-evaded-by-swapping-model-tier-within-that-platform	DUP	merged into promoted agent/memory/roles/steward/a-fleet-outage-can-be-platform-partitioned-and-only-a-pane-census-sees-it.md
+a-playbook-can-name-a-backstop-that-does-not-exist	DROP	incident narrative (Architect playbook self-citation error, 2026-09-16/17)
+a-pointer-that-confirms-your-own-ruling-is-the-one-you-do-not-follow	DUP	agent/memory/fleet/a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution.md
+a-port-that-adds-a-new-owner-does-not-retire-the-old-owners-unit	DROP	WP-specific incident (RT-DECL-CLOSURE-PORT D5)
+a-ported-mutation-instrument-can-arrive-as-a-definition-with-no-call-site	DROP	incident narrative (port audit, 4 dead mutation instruments)
+a-ports-population-is-the-changed-set-its-blast-radius-is-the-consumer-cone	DUP	CHECKS.md#3
+a-positive-control-can-sit-on-the-lane-the-measured-run-does-not-take	DROP	single-incident finding; same-lane-control point covered loosely by positive-control family
+a-positive-control-validates-the-instruments-reach-not-its-key	DUP	agent/memory/fleet/a-guard-added-to-a-pattern-can-consume-the-token-the-pattern-searches-for.md
+a-post-is-classified-by-its-first-paragraph-because-delivery-truncates-from-the-top	DROP	single relay incident; covered loosely by mention-discipline/truncated-notification family
+a-post-that-announces-its-own-not-yet-performed-side-effect-is-false-when-written	DROP	single-incident narrative; covered loosely by staleness/not-yet-true-claim family
+a-precondition-attached-to-a-vote-is-a-claim-about-the-present-re-read-it-in-the-posting-turn	DROP	single vote incident; covered loosely by re-check-live-state-before-posting family
+a-prescribed-mechanism-can-require-an-order-the-machine-does-not-run-in	DROP	single RT node finding; mint/consume ordering too specific to that node
+a-prescribed-minimal-fix-can-admit-the-same-bad-state-one-step-sideways	DUP	agent/memory/fleet/a-fix-that-closes-the-named-counterexample-need-not-close-the-class.md
+a-preservation-claim-must-name-refs-that-survive-the-operation-it-protects-against	DUP	agent/memory/roles/steward/a-durability-claim-in-an-artifact-was-never-checked-against-origin.md
+a-private-field-newtype-at-module-scope-refuses-nothing	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-probe-built-on-a-command-that-echoes-its-failing-argument-reports-a-false-difference	DROP	single shell-idiom incident; covered loosely by rev-parse/coordinate-fragility family
+a-probe-keyed-to-the-container-hides-a-property-that-lives-on-its-members	DROP	single-incident probe-granularity finding; covered loosely by census-granularity family
+a-probe-specified-one-level-off-answers-correctly-and-selects-the-wrong-branch	DROP	single RT node finding; narrow to that recursive-descent mechanism
+a-probe-truncated-before-the-grep-is-not-a-measurement	DUP	agent/memory/fleet/a-probe-truncated-before-the-grep-is-not-a-measurement.md (checked-in copy current; no fold)
+a-procedure-step-that-says-reset-hard-has-an-unstated-clean-tree-precondition	DROP	single reset-hard mishap; covered loosely by hard-reset-destroys-uncommitted-work family
+a-process-count-matches-your-own-shell-when-the-command-embeds-the-path	PROMOTE	new agent/memory/roles/steward/a-process-count-matches-your-own-shell-when-the-command-embeds-the-path.md
+a-producer-and-its-fail-closed-boundary-cannot-be-separate-increments	DROP	single WP-slicing narrative; campaign-specific
+a-prohibition-ac-cannot-be-inherited-by-the-slice-that-performs-the-prohibited-act	DROP	single frame-authoring incident; covered loosely by stale-prohibition-carried-forward family
+a-prohibition-list-with-no-recorded-rationale-gets-read-at-its-widest	DROP	single routing incident (nine-SHA list); too specific to generalize
+a-protected-base-ref-can-have-stopped-being-an-ancestor	DROP	single incident; covered loosely by ancestry-drift family already well represented
+a-purely-additive-diff-cannot-have-updated-anything-that-already-existed	DROP	single-node multi-firing narrative; covered loosely by diff-shape/numstat family
+a-queue-position-is-not-execution-order	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+a-queued-delivery-waits-on-a-next-tool-call-an-idle-seat-will-never-make	DUP	agent/memory/roles/steward/a-queued-delivery-waits-on-a-next-tool-call-an-idle-seat-will-never-make.md (drift folded into it)
+a-re-implemented-candidate-breaks-ancestry-so-the-branch-name-keeps-pointing-at-the-dead-work	DROP	single Steward routing incident; covered loosely by ancestry/branch-name-drift family
+a-reachability-count-taken-while-the-path-is-failing-measures-the-failure	DROP	single-incident; covered loosely by vacuous-gate/zero-reachability family
+a-read-is-not-a-dependency-and-a-bound-named-as-a-coordinate-invites-refutation-by-coordinate	DROP	multi-incident narrative; covered loosely by coordinate-drift family, cites its own siblings
+a-readback-oracle-inherits-every-assumption-in-the-address-it-reads-back-on	DROP	single port-campaign incident; covered loosely by proxy/oracle family
+a-readiness-test-that-resolves-a-path-fails-in-two-opposite-guises	DROP	single Steward sweep incident; covered loosely by existence-vs-content family
+a-reading-formed-from-a-subset-of-retrieved-evidence-has-no-control	DUP	agent/memory/fleet/a-pattern-match-is-evidence-about-what-encloses-it.md
+a-reading-of-the-encoding-is-not-a-probe-of-the-encoding	DROP	single Architect incident; covered loosely by reading-vs-measuring family
+a-real-aggregate-plus-an-inherited-cause-label-is-a-false-finding	DROP	single CI-timing incident; covered loosely by attribution/proxy family
+a-reassurance-message-that-cannot-fail-is-worse-than-no-check	DROP	multi-firing compound incident log; covered loosely by vacuous-instrument/reassurance family
+a-record-audited-for-presence-and-consumed-for-content-drifts-while-the-audit-keeps-passing	DROP	single-day multi-incident narrative; covered loosely by presence-vs-content family
+a-record-with-no-consumer-is-storage-not-observation	DROP	single incident; covered loosely by reachability/consumer-census family
+a-recut-can-declare-its-new-edge-as-blocks-on-the-child-which-gen-progress-never-reads	DROP	narrow Ken tracker-tooling mechanic (blocks vs depends_on)
+a-redirect-changes-who-calls-a-unit-not-what-that-unit-does	DROP	single compiler-emitter incident; narrow to that mechanism
+a-redundant-wake-path-masks-a-mention-gap-until-both-fail-together	DROP	single incident; covered loosely by mention-discipline/coordination family
+a-redundantly-defended-repair-shows-no-single-line-mutation	DROP	single mutation-campaign incident; covered loosely by mutation-campaign family
+a-refusal-assertion-is-satisfied-by-a-fixture-that-never-reached-the-site	DROP	single incident; covered loosely by mutation/reachability-counter family
+a-refusal-attributed-to-an-arm-that-never-ran-inverts-a-partition	DUP	CHECKS.md#2
+a-refusal-law-matrix-can-carry-a-phantom-hypothesis-and-the-and-intro-tower-is-canonical-reflexivity-not-a-smuggled-non-equality	DROP	campaign-specific reference note tied to one attached-laws hunt
+a-refusal-probe-shows-the-value-not-where-it-was-born	DROP	single incident; covered loosely by probe-placement family
+a-regression-claim-is-differential-and-never-needs-an-absolute-verdict	DROP	single-node multi-firing narrative; covered loosely by differential/regression family
+a-relation-that-needs-a-forbidden-reverse-search-from-one-end-is-often-forward-from-the-other	DROP	single incident; narrow planner-mechanics finding
+a-relational-finding-needs-one-ref-an-absolute-finding-needs-the-live-head	DROP	single-afternoon narrative; covered loosely by ref-staleness/live-head family
+a-relay-is-checked-for-count-and-tone-the-property-that-drifts-is-membership	DUP	agent/memory/fleet/an-injected-finding-is-a-change-request-and-the-least-resisted-one.md
+a-release-condition-keyed-on-a-merge-event-fires-when-an-accepted-partial-lands	DUP	agent/memory/roles/adversary/a-carried-obligation-gated-on-a-merge-event-fires-on-an-accepted-partial.md
+a-release-gate-keyed-on-merged-can-never-fire-for-a-measurement-only-predecessor	DUP	agent/memory/roles/adversary/a-carried-obligation-gated-on-a-merge-event-fires-on-an-accepted-partial.md
+a-released-candidate-can-exist-on-one-local-branch-and-the-publisher-cannot-see-it	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+a-remedy-must-be-performable-in-the-frame-where-it-acts-not-the-frame-where-the-defect-was-measured	DROP	single incident; covered loosely by cross-frame-comparison family
+a-rename-sweep-inverts-the-prose-that-names-the-old-spelling-to-retire-it	DROP	single incident; covered loosely by rename-sweep/retirement-prose family
+a-replacement-object-starts-with-every-field-unset-including-the-one-that-was-already-wrong	DROP	single incident; covered loosely by correction-lands-on-artifact family
+a-reply-timestamp-does-not-measure-when-someone-read-your-post	DROP	single incident; covered loosely by delivery-vs-receipt family
+a-reported-mutation-experiment-is-not-a-committed-control	DROP	single incident; covered loosely by mutation-campaign/control-naming family
+a-representability-impossibility-can-be-an-undispatched-tier-sourcing-from-a-proxy	DUP	CHECKS.md#4
+a-representation-node-must-name-who-eliminates-it	DROP	single WP narrative; covered loosely by producer/consumer-naming family
+a-required-check-stuck-at-in-progress-despite-a-success-conclusion-blocks-the-merge	PROMOTE	extended agent/memory/fleet/a-stuck-required-check-is-not-slow-ci-and-rerunning-it-wedges-the-pr.md
+a-required-deliverable-can-transitively-require-the-frames-excluded-scope	DROP	single incident; covered loosely by frame does/does-not consistency family
+a-required-environment-of-zero-makes-every-gate-assertion-vacuous	DROP	single incident; covered loosely by vacuous-gate family
+a-required-key-member-can-be-absent-on-the-very-witness-the-design-was-measured-on	DROP	single RT node incident; narrow identity-key design decision
+a-required-parameter-proves-supply-not-consumption	DROP	single incident; covered loosely by supply-vs-consumption family
+a-requirement-that-lives-only-in-gate-rejection-prose-is-not-a-criterion	DROP	twice-measured but narrative-bound; covered loosely by frame-completeness family
+a-residual-paragraph-reads-as-honest-which-is-what-stops-anyone-auditing-it	DROP	single WP incident; covered loosely by pin-gap-auditing family
+a-resolved-decision-with-no-pr-is-invisible-to-every-instrument-i-run	DROP	single incident; covered loosely by decision-staleness/watchdog family
+a-resource-exhaustion-failure-may-be-a-deleted-guard-not-new-code	DUP	merged into promoted agent/memory/fleet/a-deleted-guard-can-be-the-only-enforcement-of-a-second-thing-nobody-named.md
+a-retired-rule-survives-in-the-boilerplate-that-gets-copied-into-new-artifacts	DUP	agent/memory/fleet/a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution.md
+a-retry-that-succeeds-after-you-changed-tools-is-confounded-by-elapsed-time	DROP	single-incident debugging narrative; general control-for-time practice
+a-reuse-this-builder-finding-is-scoped-to-the-seat-you-measured-it-at	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+a-review-request-goes-stale-the-moment-a-ruling-lands-and-qa-enforces-it-anyway	DROP	single-incident; stale-artifact-enforced-anyway covered loosely elsewhere
+a-ring-awaiting-merge-may-be-awaiting-one-that-already-happened	DUP	agent/memory/roles/steward/a-routing-queue-built-from-statuses-and-ancestry-is-four-already-landed-candidates.md
+a-route-names-a-sha-but-the-publisher-pushes-a-ref	PROMOTE	new agent/memory/roles/steward/a-route-names-a-sha-but-the-publisher-pushes-a-ref.md
+a-routing-gate-is-taken-against-one-main-and-an-in-flight-publisher-is-about-to-move-it	DUP	agent/memory/fleet/routing-a-merge-asks-what-it-does-to-ci-already-running.md
+a-rule-can-be-barred-by-the-functions-own-doc-one-level-above-your-ac	DROP	single-incident escalation narrative (kernel D-free ruling)
+a-rule-far-from-the-point-of-work-does-not-fire	DUP	agent/memory/fleet/a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution.md
+a-rule-whose-arithmetic-has-one-sign-fails-the-site-that-moves-the-other-way	DUP	agent/playbooks/tools/stated-stacks.md
+a-ruled-fixs-acceptance-contradiction-can-mean-the-premise-is-false-run-the-null-config-experiment	DROP	single-incident WP narrative (RT inc2 write-half)
+a-ruling-can-name-an-outcome-that-already-exists-in-the-tree-with-the-opposite-meaning	DROP	single-incident kernel enum-naming collision narrative
+a-ruling-can-require-a-successor-whose-base-is-absent-from-main	DUP	agent/memory/fleet/a-dependency-is-met-when-you-can-write-the-obligation.md
+a-ruling-id-in-a-code-comment-can-range-over-a-narrower-object-than-your-question	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+a-ruling-reported-unretrievable-may-only-be-missing-from-the-mcp-read	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-ruling-that-barred-content-from-a-site-does-not-travel-to-the-next-edit-of-that-site	DROP	single-incident WP narrative (PR #2381 to #2389 comment ruling)
+a-ruling-that-enumerates-sites-plus-a-faithful-implementer-hides-siblings-with-the-same-defect	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-ruling-that-names-a-code-location-has-not-named-an-output-path	DUP	agent/memory/fleet/a-capture-that-wrote-zero-bytes-is-a-failed-capture-not-a-clean-build.md
+a-rulings-causal-story-can-be-right-about-the-symptom-and-wrong-about-the-mechanism	DUP	agent/memory/roles/steward/a-hypothesis-published-in-a-routing-post-is-executed-as-an-instruction.md
+a-rulings-description-of-a-gap-outlives-the-gap-it-diagnosed	DUP	agent/memory/fleet/text-whose-truth-has-an-expiry-sits-in-an-artifact-with-no-alarm.md
+a-safety-check-modals-default-option-silently-downgrades-the-model	OPERATOR	listed for the Steward (not placed in the corpus)
+a-scoped-instrument-must-state-its-scope-with-its-result	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-scripted-lifecycle-step-silently-no-ops-on-the-state-its-pattern-does-not-cover	DUP	agent/memory/roles/steward/committed-is-not-reachable-publish-then-verify-on-main.md
+a-search-run-after-a-fix-lands-includes-the-fix	PROMOTE	new agent/memory/fleet/a-search-run-after-a-fix-lands-includes-the-fix.md
+a-seat-can-answer-its-leader-in-its-own-pane-and-never-post-to-the-channel	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+a-seat-that-compacts-between-receiving-a-request-and-acting-on-it-drops-it-silently	DUP	agent/memory/fleet/a-seat-that-compacts-on-receiving-work-loses-the-work.md
+a-seats-hold-status-records-what-it-believed-not-what-main-says	DUP	agent/memory/roles/steward/a-routing-queue-built-from-statuses-and-ancestry-is-four-already-landed-candidates.md
+a-seats-last-seen-at-skew-is-the-only-instrument-that-sees-a-dead-mcp-transport	DUP	agent/memory/fleet/pane-suggestion-text-is-not-agent-state.md
+a-seats-running-model-can-silently-differ-from-its-config-and-only-the-footer-shows-it	DUP	agent/memory/fleet/safety-check-modal-defaults-to-a-model-downgrade.md
+a-second-seat-is-a-second-tree-never-a-second-machine	DUP	agent/memory/fleet/the-agent-scratchpad-is-tmpfs-so-every-byte-you-write-there-is-ram.md
+a-section-heading-s-title-does-not-bound-the-section-the-next-heading-does	DROP	proposed for promotion, not taken: one citation-review incident; covered in spirit by roles/adversary/a-citation-that-does-not-resolve-needs-checking-against-every-tree.md
+a-self-reported-ac-line-can-discharge-one-criterion-and-refute-another	DROP	single-incident WP narrative (V3-FO-CONVERSION-LOAD-MEASURED)
+a-sentinel-inside-a-test-watches-that-compile-not-the-population	DUP	pin-a-property / mutation-prove-a-pin skills
+a-serialized-assertion-chain-under-reports-its-own-cost-from-the-first-red	DUP	agent/memory/roles/steward/a-blocking-verdict-short-circuits-the-remaining-acceptance-claims.md
+a-shared-failure-sentinel-prints-the-message-it-was-minted-for	DROP	single-incident diagnostic narrative (Ken native shim trap codes)
+a-shared-path-change-has-an-affected-closure-along-non-diff-dimensions-census-resource-cost-and-numbering-not-only-semantic-consumers	DROP	role-specific Architect campaign narrative, Ken-runtime specific
+a-shared-rendering-is-a-property-of-the-category-not-the-site-you-reclassified	DROP	single-incident WP narrative (RT-ROOT-AUTHORITY-BLAME-DOMAIN)
+a-shell-var-that-does-not-persist-makes-git-diff-fail-open	DUP	agent/memory/fleet/multi-worktree-cwd-drift-phantom-diff.md
+a-short-circuiting-probe-measures-the-first-cause-not-the-set	DUP	agent/memory/roles/steward/a-blocking-verdict-short-circuits-the-remaining-acceptance-claims.md
+a-sibling-artifact-may-already-hold-the-enumeration-your-frame-got-wrong	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+a-single-fuser-reading-cannot-tell-a-free-mutex-from-a-rapidly-cycled-one	DROP	single-incident build-lock diagnosis narrative
+a-single-slot-last-write-wins-frame-store-is-sound-iff-readers-fail-close-on-a-unique-full-key	DROP	single-incident Ken-runtime code-review verdict
+a-site-tag-read-from-an-ambient-guard-names-the-dynamic-extent-not-the-invoker	DROP	single-incident Ken-runtime diagnostic narrative
+a-skip-building-a-discarded-value-optimization-is-sound-iff-the-discard-proof-is-complete-and-its-fallible-gate-runs-unconditionally	DROP	single-incident Ken-kernel proof engineering review
+a-source-scans-region-delimiter-can-be-a-landmark-not-a-boundary	DROP	same mechanism as promoted batch-mate a-section-heading...; avoid duplicate promotion
+a-spec-sentence-is-either-normative-or-a-claim-of-fact-and-they-repair-differently	DROP	single-incident spec-routing narrative (LANG-ATOM-START), role-specific
+a-specific-sounding-instruction-resists-the-question-a-vague-one-would-invite	DROP	proposed for promotion, not taken: short reviewer heuristic; not selected
+a-squash-merged-prs-head-sha-reads-as-never-landed-forever	DUP	agent/memory/roles/steward/a-routing-queue-built-from-statuses-and-ancestry-is-four-already-landed-candidates.md
+a-squash-merged-working-branch-does-not-know-it-landed-so-the-next-cut-from-it-reproposes-landed-files	DUP	agent/memory/fleet/a-squash-merge-lands-the-diff-from-the-merge-base-not-the-diff-from-main.md
+a-squash-publish-makes-my-next-candidates-merge-base-predate-my-own-edit-so-git-unions-it	DUP	agent/memory/fleet/a-squash-merge-lands-the-diff-from-the-merge-base-not-the-diff-from-main.md
+a-stack-budget-sentinel-recalibration-needs-a-carry-proof-and-a-cliff-margin-check-a-candidate-abort-is-a-process-sigabrt	DUP	agent/playbooks/tools/stated-stacks.md
+a-stacked-candidates-base-can-be-a-mid-rebase-waypoint-that-is-absent-from-the-remote	DUP	agent/memory/fleet/a-squash-merge-lands-the-diff-from-the-merge-base-not-the-diff-from-main.md
+a-staged-compact-on-a-composer-needs-a-clear-and-retype-not-a-bare-enter	DUP	agent/memory/fleet/compaction-render-delay-escape-aborts.md
+a-stale-identifier-in-a-standing-injected-prompt-outlives-the-conversation-that-would-correct-it	DROP	single-incident; specific instance of the well-covered stale-claim family
+a-stale-line-range-citation-silently-repoints-at-unrelated-real-content	DUP	agent/memory/fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md
+a-stale-number-that-drifts-into-being-correct-cannot-be-caught-by-checking-it	PROMOTE	new agent/memory/fleet/a-stale-number-that-drifts-into-being-correct-cannot-be-caught-by-checking-it.md
+a-started-background-publisher-is-not-a-running-one-check-the-pid-and-log-mtime	DROP	single-incident infra-diagnosis narrative
+a-startup-failure-run-leaves-orphaned-queued-checks-do-not-rerun-it	DUP	agent/memory/fleet/a-stuck-required-check-is-not-slow-ci-and-rerunning-it-wedges-the-pr.md
+a-stated-gap-does-not-scope-a-universal-claim-written-above-it	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+a-static-lifetime-does-not-mean-the-data-cannot-be-per-unit-ask-where-the-existing-some-sites-get-their-storage	DROP	single-incident Ken-runtime type/design review narrative
+a-statistic-over-a-mixed-population-answers-a-question-nobody-asked	DUP	agent/memory/fleet/a-differential-over-an-aggregate-is-an-existential-not-a-universal.md
+a-status-flip-doc-route-on-a-just-merged-wp-is-superseded-by-the-ken-ci-auto-close-which-drops-your-banners	DROP	Ken-CI-bot-specific mechanical quirk, narrow tooling detail
+a-status-flip-has-a-body-text-tail	DUP	agent/memory/fleet/a-requirement-in-an-advisory-section-is-never-discharged.md
+a-stranded-hub-seat-presents-as-n-correct-looking-waits	DUP	agent/memory/roles/steward/a-queued-delivery-waits-on-a-next-tool-call-an-idle-seat-will-never-make.md
+a-structural-pin-that-enumerates-spellings-is-not-a-proof-of-the-property	DUP	agent/playbooks/tools/pin-a-property.md
+a-subagent-can-revert-your-uncommitted-edits-and-the-prescribed-verification-passes-vacuously	DUP	agent/memory/fleet/git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide.md
+a-suite-count-improvement-can-hide-a-new-red	DUP	agent/memory/fleet/no-new-red-is-measured-against-the-last-checkpoint-not-the-merge-base.md
+a-superseded-candidate-leaves-its-decision-object-behind	DUP	agent/memory/enclave/a-block-recorded-as-an-unresolved-decision-outlives-the-thing-it-blocked.md
+a-swallowed-tool-parameter-returns-the-documented-success-value	DROP	harness/tool-call XML quirk specific to one session's transport; not verifiably still reproducible
+a-sweep-by-class-name-misses-controls-that-name-the-lane	DUP	CHECKS.md#3
+a-sweep-reporting-clear-may-have-skipped-the-pane-it-cleared	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+a-sweep-that-asks-what-is-owed-to-me-is-blind-to-a-released-wp-nobody-pulled	DROP	proposed for promotion, not taken: covered by Steward playbook watchdog and roles/steward node-status lessons
+a-template-level-field-cannot-express-a-per-occurrence-relation	DROP	too specific to one component's template data model; single incident
+a-temporary-worktree-instruction-must-name-a-disk-location-because-tmp-is-ram	DUP	agent/memory/fleet/the-agent-scratchpad-is-tmpfs-so-every-byte-you-write-there-is-ram.md
+a-termination-argument-can-rest-on-compile-time-shrinking-that-a-runtime-value-destroys	DROP	narrow kernel/runtime incident tied to one landed WP's mechanism
+a-test-file-landing-whose-only-change-is-ignore-reason-strings-is-inert-check-the-ignore-attribute-not-its-text	DUP	agent/memory/fleet/a-guard-added-to-a-pattern-can-consume-the-token-the-pattern-searches-for.md
+a-test-only-sub-item-landing-whose-wp-names-a-production-behavior-verify-the-mechanism-in-the-landed-base-tree	DUP	agent/memory/fleet/a-squash-merge-lands-the-diff-from-the-merge-base-not-the-diff-from-main.md
+a-test-pinning-a-missing-port-refusal-inverts-its-signal-when-the-port-lands	DUP	agent/playbooks/build/qa-test-design.md
+a-test-that-arranges-a-property-and-never-asserts-it-is-a-coverage-gap-wearing-a-correct-name	DROP	real nuance but narrower than the batch's stronger candidates; adjacent themes covered
+a-test-that-asserts-a-stack-or-depth-property-must-pin-that-resource-at-the-site	DUP	agent/playbooks/tools/stated-stacks.md
+a-tests-doc-comment-describing-production-is-not-evidence-about-production	DUP	agent/memory/fleet/a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution.md
+a-thread-id-in-the-events-feed-is-truncated-and-404s-when-you-post-with-it	DUP	agent/memory/fleet/mootup-posting-from-agent.md
+a-threshold-rule-and-an-unconditional-rule-look-identical-at-the-moment-you-apply-the-wrong-one	DUP	agent/memory/enclave/spec-enclave-always-compact-before-new-work.md
+a-tools-silence-is-scoped-to-the-question-it-asks	DUP	agent/memory/fleet/a-tools-silence-is-scoped-to-the-question-it-asks.md (checked-in copy current; no fold)
+a-totality-ac-keyed-on-the-caller-cannot-be-total-when-the-builder-is-a-shared-callee	DUP	CHECKS.md#2
+a-transition-sentinel-that-reaches-its-boundary-must-change-class-not-be-restated	DUP	agent/playbooks/build/qa-test-design.md
+a-trap-identity-that-dedups-on-value-cannot-name-which-of-n-emitters-fired	DROP	narrow single-component (Ken PlannedTrapIdentity) debugging note
+a-trigger-parked-in-a-dormant-artifact-is-read-on-a-tree-that-has-moved	DROP	single-incident; overlaps established stale-premise theme in corpus
+a-trigger-stated-as-the-next-one-expires-when-that-count-is-consumed	DROP	single-incident; overlaps established stale-premise/derived-not-inherited theme
+a-truncated-notification-is-not-a-message	DUP	agent/memory/fleet/a-probe-truncated-before-the-grep-is-not-a-measurement.md
+a-truncation-ellipsis-in-tool-output-reads-as-a-spinner	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+a-two-authorities-cross-check-must-compare-in-a-common-frame-else-cross-frame-gives-false-negatives-and-derive-from-gives-false-positives	DROP	proposed for promotion, not taken: design-specific (native ABI plan vs consumer oracle); CHECKS.md#1 covers the derive-from half
+a-two-clause-finding-is-worth-what-you-restate-at-the-next-candidate	DUP	agent/memory/fleet/a-two-clause-finding-gets-discharged-on-whichever-clause-its-author-phrased-as-an-ask.md
+a-two-half-ruling-is-read-back-as-its-exonerating-half	DUP	agent/memory/roles/steward/the-summary-generalizes-past-the-measurement-the-artifact-stated.md
+a-two-object-commit-must-put-every-refusal-before-the-first-mutation	DROP	proposed for promotion, not taken: one runtime-design incident; a standard atomicity rule
+a-two-step-rules-first-step-shadows-its-second-so-the-perturbation-must-stay-coherent	DUP	agent/playbooks/tools/mutation-prove-a-pin.md
+a-two-way-diff-against-main-shows-a-false-delete-when-the-base-predates-a-merge	DUP	agent/memory/roles/steward/stale-base-candidate-silently-reverts-everything-landed-since.md
+a-vacuity-kill-is-that-the-wrong-answer-names-a-different-value	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+a-value-that-carries-its-own-authority-makes-the-coordinate-you-repaired-inert	DROP	narrow Ken-runtime lowering incident, single occurrence
+a-verdict-on-a-superseded-object-still-carries-on-every-defect-the-new-object-did-not-touch	DUP	agent/memory/fleet/a-two-clause-finding-gets-discharged-on-whichever-clause-its-author-phrased-as-an-ask.md
+a-verification-someone-else-performed-becomes-your-claim-when-you-repeat-it	DUP	agent/memory/fleet/agreement-is-not-corroboration-when-a-premise-was-inherited.md
+a-verified-catalog-entry-is-sound-iff-its-acceptance-test-asserts-zero-trusted-base-delta-instantiates-the-headline-laws-and-states-the-correct-full-spec	DUP	agent/memory/fleet/a-vacuous-law-has-zero-trust-delta.md
+a-verified-negative-has-an-expiry-name-what-would-falsify-it	DROP	single-incident; overlaps established stale-premise theme
+a-visibility-census-at-one-layer-is-not-a-finding-about-the-exported-surface	DUP	agent/memory/enclave/abstraction-visibility-feature-soundness-gate.md
+a-visibility-retraction-plus-tests-to-incrate-cfgtest-module-relocation-is-clean-when-test-count-is-preserved-every-moved-file-is-declared-and-the-seal-strands-no-external-consumer	DUP	agent/memory/fleet/a-squash-merge-lands-the-diff-from-the-merge-base-not-the-diff-from-main.md
+a-waiver-covers-only-the-issuers-own-gates	PROMOTE	new agent/memory/fleet/a-waiver-covers-only-the-issuers-own-gates.md
+a-waiver-reaches-only-as-far-as-what-the-waiver-holder-owns	DUP	merged into promoted agent/memory/fleet/a-waiver-covers-only-the-issuers-own-gates.md
+a-wedged-seat-queues-compact-instead-of-running-it	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+a-whole-string-replacement-hides-a-deletion-from-is-the-new-text-correct	DROP	narrow single-incident review nuance
+a-withdrawal-is-not-delivered-by-being-posted	PROMOTE	new agent/memory/fleet/a-withdrawal-is-not-delivered-by-being-posted.md
+a-withdrawn-claim-survives-in-the-leading-sentence-and-a-line-local-grep-cannot-see-it	DUP	agent/memory/fleet/a-line-local-operation-lies-about-hard-wrapped-text.md
+a-witness-can-satisfy-every-precondition-and-be-blocked-by-an-obligation-one-creates	DROP	narrow Ken-runtime incident; overlaps CHECKS#4
+a-working-footer-read-seconds-after-a-nudge-confirms-nothing	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+a-wp-emits-more-than-one-squash-so-its-subject-line-cannot-tell-code-from-paperwork	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+a-zero-hit-census-is-evidence-about-a-name-not-about-a-mechanism	DUP	CHECKS.md#3
+abstract-pub-data-must-earn-its-keep-with-a-representation-invariant-a-plain-sum-stays-transparent-strict	DUP	agent/memory/enclave/abstraction-visibility-feature-soundness-gate.md
+abstraction-visibility-feature-soundness-gate	DUP	agent/memory/enclave/abstraction-visibility-feature-soundness-gate.md (checked-in copy current; no fold)
+ac-naming-a-mechanism-transfers-its-blind-spots	DUP	agent/playbooks/tools/pin-a-property.md
+ac-not-in-the-frame	DUP	agent/memory/roles/adversary/the-operative-artifact-must-carry-the-claim-whichever-pass-wrote-it.md
+ac-taxonomy-with-no-cell-for-the-honest-answer-reads-as-complete	DUP	agent/memory/roles/adversary/pre-emptive-yield-is-at-the-gate-layer-not-the-code-layer.md
+adding-members-to-an-expected-set-is-unfalsifiable-enumerating-a-category-is-not	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+adjudicating-between-two-stale-statuses-instead-of-measuring-what-they-describe	DUP	agent/memory/roles/steward/a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree.md
+after-routing-release-the-wp-branch-a-held-name-blocks-the-ring-and-reads-as-unlanded-work	DUP	agent/memory/fleet/plumbing-commit-onto-held-branch-and-its-desync-risk.md
+after-the-first-recurrence-stop-reporting-instances-and-run-the-exhaustive-pass	DROP	incident narrative (4-SHA review correction); sweep-by-mechanism point already covered by CHECKS.md#3
+agreement-is-not-corroboration-when-a-premise-was-inherited	DUP	agent/memory/fleet/agreement-is-not-corroboration-when-a-premise-was-inherited.md (checked-in copy current; no fold)
+agreement-is-not-corroboration-when-one-seat-inherited-the-others-premise	DUP	agent/memory/fleet/agreement-is-not-corroboration-when-a-premise-was-inherited.md (also CHECKS.md#1)
+an-abandoned-pr-does-not-stay-harmless-it-ages-into-a-revert	DUP	agent/memory/roles/steward/stale-base-candidate-silently-reverts-everything-landed-since.md
+an-ablation-cannot-test-a-conjunct-the-ablation-itself-forces	DUP	agent/memory/roles/adversary/disable-the-mutation-mechanism-to-find-vacuous-controls.md
+an-absent-invariant-refutes-the-defect-claim-not-the-case-for-the-invariant	DUP	agent/memory/fleet/a-pattern-match-is-evidence-about-what-encloses-it.md (also CHECKS.md#2)
+an-abstract-export-review-must-check-public-operation-usability-not-just-the-abstraction	DROP	proposed for promotion, not taken: narrow catalog-review point; conformance-validator seat-local
+an-ac-can-be-satisfied-exactly-while-its-purpose-fails-because-it-named-the-wrong-location	DUP	agent/memory/fleet/an-acceptance-criterion-must-name-an-observation-the-failing-configuration-does-not-also-produce.md (also CHECKS.md#8)
+an-ac-can-list-a-comparator-whose-documented-role-is-the-opposite-disposition	DUP	agent/memory/fleet/an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing.md
+an-ac-can-pin-against-a-census-that-cannot-see-the-deliverable	DUP	agent/memory/fleet/a-tools-silence-is-scoped-to-the-question-it-asks.md
+an-ac-naming-a-line-number-cannot-express-a-property-over-a-file	DUP	agent/memory/roles/adversary/a-citation-that-does-not-resolve-needs-checking-against-every-tree.md
+an-ac-that-mandates-a-collapse-is-a-capability-removal-audit-its-consumers	DUP	agent/memory/fleet/an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing.md
+an-ac-whose-premise-is-empty-cannot-be-failed-so-restate-it-rather-than-confirm-it	DUP	agent/memory/enclave/a-ruling-constraint-that-never-becomes-an-ac-cannot-be-failed.md
+an-ac-with-zero-controls-is-invisible-to-a-review-that-examines-controls	DROP	proposed for promotion, not taken: covered by qa-test-design skill and CHECKS.md#8
+an-acceptance-criterion-phrased-as-must-not-say-x-is-tripped-by-the-correct-text	DUP	agent/memory/fleet/an-oracle-that-greps-a-name-fires-on-prose-that-denies-it.md
+an-accepted-partial-leaves-the-nodes-remaining-work-prose-a-claim-about-the-past	DUP	agent/memory/roles/steward/my-own-tracker-capability-landed-line-can-be-stale.md
+an-acs-counts-can-belong-to-a-different-fixture-than-the-one-under-test	DUP	agent/memory/build/a-controls-fixture-must-instantiate-the-quantifier-its-claim-ranges-over.md
+an-active-node-with-landed-partials-can-have-zero-dispatchable-increments	DUP	agent/memory/roles/steward/a-node-status-can-be-right-about-the-edge-and-wrong-about-the-seat.md
+an-additive-candidates-deletion-count-must-be-zero	DUP	agent/memory/roles/steward/stale-base-candidate-silently-reverts-everything-landed-since.md
+an-additive-point-fix-framing-undersells-a-reusable-capability-in-a-funding-escalation	OPERATOR	listed for the Steward (not placed in the corpus)
+an-advancing-increment-can-reach-a-closeout-arm-that-has-never-been-evaluated	DROP	narrow compiler match-arm-reachability incident; overlaps existing exhaustiveness/reachability lesson family
+an-advancing-refusal-is-the-evidence-a-blocked-increment-worked	DROP	narrow compiler A/B debugging incident, too specific to generalize further
+an-affine-ledger-orders-your-passes-and-it-looks-like-a-free-choice	DROP	narrow compiler pass-ordering incident specific to one lowering file
+an-aggregate-health-check-over-two-lanes-is-green-while-one-lane-is-dead	DUP	agent/memory/roles/steward/a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree.md
+an-aggregate-length-shortfall-does-not-say-which-segment-is-short	DROP	narrow compiler debugging incident; measurement-attribution family already saturated
+an-ambient-context-field-can-disagree-with-the-actual-enclosing-emission	DROP	narrow compiler debugging incident about one carrier field
+an-ambient-floor-prelude-fork-routes-by-kind-and-the-operator-ambient-principle-already-equals-the-existing-internal-provision-witness-arm	DROP	specific Architect design-review incident; general point duplicates docs/PRINCIPLES.md subsume-dont-proliferate charter
+an-ancestry-test-against-a-squash-merging-repo-returns-not-landed-for-everything	DUP	agent/memory/roles/steward/a-routing-queue-built-from-statuses-and-ancestry-is-four-already-landed-candidates.md
+an-announced-intent-cannot-deconflict-an-action-already-in-flight	PROMOTE	extended agent/memory/fleet/terminal-gate-resolve-race-resolving-on-cast.md
+an-approval-message-can-claim-to-resolve-while-the-object-stays-proposed	DUP	agent/COORDINATION.md §7a
+an-argument-that-justifies-one-side-may-be-category-independent	DROP	specific parser-scoping incident; general point covered by COORDINATION §7 ground-every-premise discipline
+an-armed-interval-holds-its-own-copy-so-editing-the-source-file-reaches-nothing	DUP	agent/COORDINATION.md §13
+an-artifact-level-ab-must-not-share-a-cargo-target-directory	DUP	agent/memory/fleet/a-p-scoped-run-and-cis-workspace-run-compile-different-feature-sets.md
+an-assertion-message-can-state-a-general-law-the-mechanism-never-had	DUP	agent/memory/fleet/an-assertion-whose-expected-value-is-computed-from-the-thing-under-test-is-a-theorem.md
+an-assertions-needle-must-not-be-caller-supplied	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+an-atomicity-argument-can-stop-one-seam-short-and-the-tell-is-a-nothing-becomes-green-ac	DUP	agent/memory/fleet/an-acceptance-property-listing-forbidden-verbs-permits-losing-the-thing.md
+an-authored-mechanism-spec-can-be-empirically-insufficient-at-the-conditional-its-author-flagged	DROP	narrow compiler-implementation incident (RT-COMPOSED-RETURN-FORWARD-RET-EDGE)
+an-authority-key-names-the-emission-producer-context-not-the-semantic-origin-and-a-shared-enumeration-proxy-can-undercover-a-new-emission-model	DROP	narrow compiler-internal incident (RT-CHECKED-IH M6); wrong-axis-key family already represented elsewhere
+an-auto-compaction-marker-is-a-mode-label-not-evidence-any-bound-was-enforced	DROP	narrow instrumentation UI detail; enabled-vs-fired family already saturated in corpus
+an-automated-heuristic-inherits-its-defect-and-adds-authority	DUP	agent/memory/fleet/a-pattern-match-is-evidence-about-what-encloses-it.md
+an-availability-gate-enforced-on-the-native-path-but-not-the-interpreter-path-makes-the-two-executors-diverge-on-the-same-source-and-the-ac-verifies-the-marking-not-enforcement-on-every-path	DUP	agent/memory/fleet/repairing-a-census-completeness-does-not-re-aim-its-subject.md
+an-edit-to-a-definition-re-evaluates-every-claim-that-quantifies-over-it	DROP	proposed for promotion, not taken: covered by fleet/a-new-criterion-is-applied-forward-and-never-swept-backward-over-the-document-that-states-it.md and CHECKS.md#3
+an-elaboration-time-kernel-view-that-expands-the-query-context-with-extra-binders-is-sound-by-the-declaration-recheck-backstop	DUP	agent/memory/enclave/kernel-rejects-is-completeness-fix-is-where-soundness-converts.md
+an-elaborator-that-synthesizes-transport-proof-terms-varying-one-index-is-sound-by-recheck-and-the-review-is-atomicity-route-gating-cumulative	DUP	agent/memory/enclave/kernel-rejects-is-completeness-fix-is-where-soundness-converts.md
+an-empty-intersection-is-not-disjointness-when-the-two-sets-name-opposite-ends-of-one-relation	DROP	narrow compiler debugging incident; measurement-misattribution family already saturated
+an-equality-between-two-counters-holds-vacuously-at-zero	DUP	agent/memory/roles/adversary/rank-a-controls-assertions-by-what-survives-a-redundancy-trim.md
+an-error-safe-unwind-refactor-via-closure-or-helper-adds-a-recursive-path-frame-census-stack-depth	DUP	agent/memory/fleet/exact-and-single-threaded-do-not-give-a-test-more-stack-libtest-always-spawns.md
+an-event-id-recalled-from-memory-can-serve-two-different-rulings	DUP	agent/COORDINATION.md §7a
+an-exhaustive-split-over-one-variable-is-not-exhaustive-over-the-thing-you-care-about	DROP	specific incident; quantifier-shift fallacy overlaps existing population-vs-matching lesson family
+an-exhaustiveness-census-is-blind-to-exactly-the-wildcard-sites-it-is-meant-to-certify-absence-of	DUP	agent/memory/fleet/exhaustiveness-comes-from-an-unguarded-arm-not-from-the-match.md
+an-existence-check-is-the-one-that-feels-like-a-content-check	DUP	agent/memory/roles/steward/my-own-tracker-capability-landed-line-can-be-stale.md
+an-existence-check-passes-on-the-state-flip-defect-it-looks-like-it-catches	DUP	agent/playbooks/federation/steward/release-and-handoff.md
+an-explanation-that-assigns-fault-to-no-one-present-is-not-the-neutral-option	DUP	agent/memory/fleet/agreement-is-not-corroboration-when-a-premise-was-inherited.md
+an-explanation-that-costs-nobody-anything-is-not-the-neutral-option	DUP	agent/memory/fleet/agreement-is-not-corroboration-when-a-premise-was-inherited.md
+an-idempotency-guard-with-a-fixed-lookback-window-false-positives-on-the-neighbour-you-just-wrote	DROP	narrow one-off annotation-script incident, script likely no longer in use
+an-idle-team-is-not-always-framing-debt-check-why-it-is-idle	DROP	Steward-specific operational note; area (lanes.md) under active maintenance, generalizable point overlaps node-status-is-a-claim family
+an-impossibility-dichotomy-may-omit-the-convoy-third-representation	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+an-inconsistently-applied-convention-is-a-controlled-experiment-go-find-the-deviant-instance	DUP	agent/memory/roles/adversary/a-citation-that-does-not-resolve-needs-checking-against-every-tree.md
+an-index-keyed-per-x-can-be-populated-per-y	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+an-inert-artifact-can-carry-a-decision-not-just-a-representation	DUP	agent/memory/fleet/a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution.md
+an-inherited-cannot-be-measured-claim-licenses-every-empty-cell-under-it	DUP	agent/memory/roles/steward/brief-settled-input-enabler-must-be-probed.md (also CHECKS.md#4)
+an-inline-test-deliverable-can-trip-an-exact-count-pin-over-the-file-it-lands-in	DROP	narrow incident tied to one specific pin, already self-corrected within the file (pin protects a compiled-out census)
+an-instruction-not-to-recheck-is-what-makes-a-false-negative-durable	PROMOTE	new agent/memory/fleet/an-instruction-not-to-recheck-is-what-makes-a-false-negative-durable.md
+an-instruction-to-close-is-not-evidence-the-work-behind-it-is-done	PROMOTE	new agent/memory/fleet/an-instruction-to-close-is-not-evidence-the-work-behind-it-is-done.md
+an-instrument-at-one-consumer-of-a-mechanism-is-blind-to-its-other-consumers	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+an-instrument-that-recomputes-the-decision-compares-itself	DUP	agent/memory/fleet/an-assertion-whose-expected-value-is-computed-from-the-thing-under-test-is-a-theorem.md
+an-instrument-that-reports-a-verdict-cannot-distinguish-inapplicable-from-false	PROMOTE	new agent/memory/fleet/an-instrument-that-reports-a-verdict-cannot-distinguish-inapplicable-from-false.md
+an-instrument-that-reports-counts-catches-its-own-wrong-question-failures	DROP	same mechanism as preceding file (verdict-vs-counts), already proposed for promotion there
+an-instrument-that-shares-a-substrate-with-you-reads-you-back	DUP	agent/memory/roles/steward/steward-work-is-stale-immediately-after-every-publish.md
+an-inventory-is-bounded-by-an-unwritten-notion-of-the-surface	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+an-inversion-lemmas-polarity-comes-from-its-consumer-not-from-what-it-is-built-from	DUP	agent/memory/fleet/grep-the-producer-not-the-cited-proxy.md
+an-items-node-tag-names-who-required-it-not-who-landed-it	DROP	narrow doc-tag provenance technique; general count-staleness-on-delta already covered broadly elsewhere
+an-mcp-read-of-a-durable-store-is-not-exhaustive	DUP	agent/memory/fleet/a-capped-list-is-a-sound-presence-oracle-and-a-broken-absence-oracle.md
+an-obligation-can-outlive-its-mechanism-and-the-self-dated-as-of-is-the-tell	DUP	agent/memory/fleet/deleting-a-check-has-a-text-surface-and-it-outlives-the-check.md
+an-observation-entailed-by-what-it-is-offered-to-confirm-carries-no-information	DUP	CHECKS.md#1
+an-oracle-you-can-silence-with-an-attribute-is-not-an-oracle	DUP	CHECKS.md#8
+an-ordering-rule-written-loudly-reads-as-sufficient-so-gate-instruction-artifacts-on-emphasis	DUP	CHECKS.md (preamble: apply a check, do not merely recall it)
+an-over-approximation-is-only-safe-when-the-consumers-failure-is-one-sided	DROP	proposed for promotion, not taken: one design ruling; not selected
+an-over-specified-requirement-fails-by-being-satisfiable	DUP	CHECKS.md#8
+an-over-tight-reviewer-constraint-is-obeyed-by-deleting-good-work	DROP	proposed for promotion, not taken: reviewer-voice incident; not selected
+an-oversized-mcp-result-is-saved-to-a-file-so-grep-it	DROP	described tool-results path does not match this session's observed harness behavior; stale detail
+an-owner-comparison-cannot-see-the-same-identity-in-a-second-function	DUP	CHECKS.md#2
+an-sct-arity-widening-is-sound-iff-the-newly-admitted-params-cannot-reach-the-single-source-of-a-strict-decrease	DUP	agent/memory/teams/kernel/sct-completeness-fix-conservative-construction.md
+an-unclassified-residue-is-a-reading-on-your-classifier	DUP	agent/memory/fleet/a-projection-partial-in-the-direction-of-its-own-blind-spot-cannot-report-its-miss.md
+an-unexpectedly-wide-mutation-redden-usually-means-the-artifact-stopped-building	DROP	narrow mutation-campaign observation; general verification discipline covered by mutation-prove-a-pin skill
+an-unlabelled-estimate-in-a-handoff-becomes-a-sequencing-input	DUP	agent/memory/roles/steward/dont-publish-derived-code-measurements-state-the-property-let-the-ring-measure.md
+an-unmentioned-thread-reply-does-not-wake-the-target-seat-atmention-when-you-need-action	DUP	agent/memory/fleet/mention-discipline.md
+an-unqualified-path-inherits-the-qualification-of-its-neighbour	DUP	agent/memory/roles/adversary/a-citation-that-does-not-resolve-needs-checking-against-every-tree.md
+an-unresolvable-citation-gets-silently-repaired-by-the-reader-and-the-defect-vanishes	DUP	agent/memory/roles/adversary/a-citation-that-does-not-resolve-needs-checking-against-every-tree.md
+an-unsuffixed-wp-branch-named-after-the-node-can-be-already-landed	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+an-untrusted-elaborator-transport-is-sound-iff-every-emission-hits-an-unconditional-admission-kernel-check-and-no-trusted-surface-changed	DUP	agent/memory/enclave/kernel-rejects-is-completeness-fix-is-where-soundness-converts.md
+an-upstream-deletion-rewrites-downstream-acceptance-in-two-opposite-directions	DUP	agent/memory/roles/steward/closing-a-node-strands-sequencing-prose-that-no-edge-check-sees.md
+an-urgent-stop-is-where-you-mint-a-general-rule-from-an-unchecked-case	DROP	single incident narrative; over-generalization-under-pressure caution not clearly absent from corpus
+anchor-merge-diff-scope-on-the-commits-own-parent	DUP	agent/memory/fleet/a-review-range-of-sha-caret-to-sha-reads-only-the-last-commit-and-the-scope-check-agrees.md
+announce-before-you-move-a-candidate-that-has-a-live-approval-on-it	DUP	agent/memory/fleet/live-review-candidate-goes-stale-reanchor-sha.md
+appending-a-correction-is-not-making-one	DUP	agent/memory/fleet/a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable.md
+architect-gate-can-be-skipped-review-on-main	DUP	agent/memory/roles/architect/architect-gate-can-be-skipped-review-on-main.md (checked-in copy current; no fold)
+architect-verify-leader-actor-ids	DUP	agent/memory/roles/architect/architect-verify-leader-actor-ids.md (checked-in copy current; no fold)
+architect-worktree-stale-read-surface-semantics-from-main	DUP	agent/memory/fleet/check-main-via-git-object-store-not-find.md
+artifact-over-proxy	DUP	CHECKS.md#8
+ask-what-the-laziest-artifact-satisfying-your-criterion-looks-like	DUP	CHECKS.md#8
+ask-whether-a-load-bearing-premise-was-derived-or-merely-inherited	DROP	proposed for promotion, not taken: covered by fleet/agreement-is-not-corroboration-when-a-premise-was-inherited.md and CHECKS.md#4
+assert-specific-error-variant-not-is-err	DUP	agent/memory/build/assert-specific-error-variant-not-is-err.md (checked-in copy current; no fold)
+asserting-single-site-enumeration-is-not-implementing-it	DUP	agent/memory/roles/adversary/a-corrections-sweep-population-is-its-own-diff-scope.md
+atomic-capstone-freeze-excludes-concurrent-work-on-frozen-artifact	DUP	agent/memory/roles/steward/atomic-capstone-freeze-excludes-concurrent-work-on-frozen-artifact.md (checked-in copy current; no fold)
+attribute-a-suite-arm-reject-before-calling-it-a-gap	DUP	agent/memory/enclave/attribute-a-suite-arm-reject-before-calling-it-a-gap.md (checked-in copy current; no fold)
+attribute-every-grep-hit-to-its-cfg-profile-before-counting-it	DUP	CHECKS.md#3
+attribution-can-be-decidable-structurally-when-the-log-is-only-an-aggregate	DUP	CHECKS.md#6
+audit-a-detector-against-the-case-whose-answer-you-already-know	DUP	agent/memory/roles/steward/audit-a-detector-against-the-case-whose-answer-you-already-know.md (checked-in copy current; no fold)
+audit-your-own-new-lines-for-the-defect-class-you-just-diagnosed	DROP	narrow self-audit reflex; adjacent to existing outward-audit-bias lesson, not distinct enough
+auditing-a-new-conversion-checker-congruence-arm-for-over-accept	DUP	agent/memory/teams/kernel/kernel-completeness-gap-shapes.md
+awk-length-miscounts-multibyte-wrap-check	DUP	agent/memory/roles/steward/awk-length-miscounts-multibyte-wrap-check.md (checked-in copy current; no fold)
+bash-cd-main-repo-vs-steward-worktree	DUP	agent/memory/roles/steward/bash-cd-main-repo-vs-steward-worktree.md (checked-in copy current; no fold)
+batched-plan-needs-explicit-self-continue-autonomy	DUP	agent/memory/build/leaders/batched-plan-needs-explicit-self-continue-autonomy.md (checked-in copy current; no fold)
+before-arguing-which-knob-governs-a-phase-verify-the-run-reached-that-phase	DUP	agent/memory/fleet/before-arguing-which-knob-governs-a-phase-verify-the-run-reached-that-phase.md (checked-in copy current; no fold)
+before-declaring-a-citation-unresolvable-check-that-your-instrument-could-have-produced-a-hit	DROP	proposed for promotion, not taken: covered by fleet/a-line-local-operation-lies-about-hard-wrapped-text.md and roles/adversary/a-citation-that-does-not-resolve-needs-checking-against-every-tree.md
+before-escalating-a-blocked-seat-check-whether-you-are-also-in-the-chain	DUP	agent/memory/enclave/a-block-recorded-as-an-unresolved-decision-outlives-the-thing-it-blocked.md
+before-ruling-a-requirement-unmotivated-search-the-spec-for-it	DROP	proposed for promotion, not taken: enclave review habit; covered by CHECKS.md#4
+brief-settled-input-enabler-must-be-probed	DUP	agent/memory/roles/steward/brief-settled-input-enabler-must-be-probed.md (checked-in copy current; no fold)
+build-and-feature-topology-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+buildability-claim-ground-every-axis	DUP	July migration: agent/memory/enclave/buildability-ruling-must-ground-every-axis.md
+buildability-classify-every-capability-axis	DUP	July migration: agent/memory/enclave/buildability-ruling-must-ground-every-axis.md
+buildability-ruling-must-ground-every-axis	DUP	agent/memory/enclave/buildability-ruling-must-ground-every-axis.md (checked-in copy current; no fold)
+builtins-campaign-architect-design-lead	DROP	July migration already dropped it: stale/superseded -- long BUILTINS campaign narrative (WP-status, evt_ ids, per-row verdict
+builtins-tcb-audit-disciplines	DUP	agent/memory/roles/conformance-validator/builtins-tcb-audit-disciplines.md (checked-in copy current; no fold)
+bundled-changes-need-per-mechanism-isolation-flip	DUP	agent/memory/build/qa/bundled-changes-need-per-mechanism-isolation-flip.md (checked-in copy current; no fold)
+bundled-frame-doc-goes-stale-when-mechanism-flips	DUP	agent/memory/roles/steward/bundled-frame-doc-goes-stale-when-mechanism-flips.md (checked-in copy current; no fold)
+busy-detector-regex-must-match-the-minutes-elapsed-format	DUP	agent/memory/roles/steward/a-working-idle-grep-keyed-on-one-harnesses-footer-reports-false-idle-on-the-other.md
+cancel-watchdog-cron-when-fleet-quiescent	OPERATOR	listed for the Steward (not placed in the corpus)
+canonicalizer-determinism-needs-explicit-convergence-direction	DUP	agent/memory/fleet/freezing-a-canonical-form-name-the-ambiguity-that-would-have-stopped-you.md
+canonizing-a-ruling-freezes-it-so-check-currency-before-you-make-it-durable	DUP	agent/memory/enclave/enclave-ruling-in-thread-is-not-a-durable-deliverable.md
+capability-gate-three-state-lifecycle	DUP	agent/memory/enclave/capability-gate-three-state-lifecycle.md (checked-in copy current; no fold)
+capitalized-identifiers-never-scope-check	DUP	agent/memory/teams/language/capitalized-identifiers-never-scope-check.md (checked-in copy current; no fold)
+cargo-captures-test-stderr-so-an-eprintln-census-counts-only-failures	DUP	agent/memory/fleet/attributing-interleaved-output-to-the-adjacent-test-is-not-a-measurement.md
+cargo-check-does-not-compile-cfg-test-so-a-green-check-says-nothing-about-the-test-surface	DUP	agent/memory/fleet/a-surface-that-names-its-own-status-is-not-a-measurement-of-that-status.md
+cargo-check-reports-zero-while-cfg-test-sites-remain	PROMOTE	new agent/memory/build/cargo-check-and-cargo-test-compile-different-code.md
+cargo-replays-cached-diagnostics-so-log-size-cannot-detect-a-no-op-build	DROP	covered loosely by no-error-in-the-output-passes-when-there-is-no-output.md
+carrier-canonicity-axis-for-lawful-class-laws	DUP	agent/memory/enclave/carrier-canonicity-axis-for-lawful-class-laws.md (checked-in copy current; no fold)
+cast-direction-test-at-nondegenerate-endpoints	DUP	agent/memory/teams/kernel/cast-direction-test-at-nondegenerate-endpoints.md (checked-in copy current; no fold)
+cat2-five-fork-rulings-wire-attested-abstractg-rowvar	DROP	July migration already dropped it: in-spec -- CAT-2 design rulings landed in spec chapters ~55-58; reusable reasoning nuggets
+cat3-three-fork-rulings-perm-optic-name	DROP	July migration already dropped it: in-spec -- CAT-3 design rulings landed in spec chapters ~55-58; reusable nugget independen
+cat4-three-fork-rulings-union-closure-relation	DROP	July migration already dropped it: in-spec -- CAT-4 design rulings landed in spec chapters ~55-58; reusable nuggets independe
+catalog-factoring-review-standard-gap	OPERATOR	listed for the Steward (not placed in the corpus)
+catalog-import-change-closure-includes-inventory-hardcoding-test-fixtures	DROP	WP-scoping fallout of the operator ruling in file 8, not standalone
+catalog-modules-must-elaborate-from-own-declared-imports	OPERATOR	listed for the Steward (not placed in the corpus)
+catalog-sources-are-literate-ken-md-not-ken	DUP	agent/memory/fleet/catalog-sources-are-literate-ken-md-not-ken.md (checked-in copy current; no fold)
+cbv-eliminator-method-laziness	DUP	agent/memory/enclave/cbv-eliminator-method-laziness.md (checked-in copy current; no fold)
+cfg-test-build-asymmetry-is-bidirectional	DUP	merged into promoted agent/memory/build/cargo-check-and-cargo-test-compile-different-code.md
+check-compiler-capability-reachable-from-ken-source-before-funding-a-fix	OPERATOR	listed for the Steward (not placed in the corpus)
+check-main-via-git-object-store-not-find	DUP	agent/memory/fleet/check-main-via-git-object-store-not-find.md (checked-in copy current; no fold)
+check-silently-and-post-only-what-survives	DROP	personal-discipline reflection, covered loosely by negative-check/positive-control family
+check-which-commit-introduced-an-ac-before-ruling-on-its-disposition	DROP	narrow Steward procedural nuance, covered loosely by scope/authority lessons
+ci-history-answers-does-it-pass-on-main-for-free-but-read-the-job-conclusion-not-the-runs	DUP	agent/memory/fleet/a-workflow-green-can-mean-the-jobs-that-matter-were-skipped-not-that-they-passed.md
+cited-ac-test-must-exercise-the-changed-shape	DUP	CHECKS.md#8
+citing-a-private-lesson-to-another-seat-is-the-promotion-signal	DUP	agent/memory/fleet/citing-a-private-lesson-to-another-seat-is-the-promotion-signal.md (drift folded into it)
+citing-a-private-lesson-to-someone-else-is-the-promotion-signal	DUP	agent/memory/fleet/citing-a-private-lesson-to-another-seat-is-the-promotion-signal.md
+class-dict-explicit-vs-implicit-abstract-tyvar	DUP	agent/memory/enclave/class-dict-explicit-vs-implicit-abstract-tyvar.md (checked-in copy current; no fold)
+classify-failures-by-the-error-production-raised-not-by-test-name	DROP	covered loosely by adversary classify-by-attribute family
+classify-production-vs-test-by-the-items-attribute-not-its-file	DUP	agent/memory/roles/adversary/a-confirming-first-instance-is-when-the-sample-size-matters-most.md
+claude-pane-seats-get-mention-pushes-on-a-backend-that-never-reaches-the-session	DROP	narrow infra incident (--fork-session flag), superseded by mootup fixes
+claudex-luna-build-seat-wiring	DROP	infra wiring detail, stale/superseded proxy setup
+cleanroom-is-role-discipline-not-host	DUP	agent/memory/fleet/cleanroom-is-role-discipline-not-host.md (checked-in copy current; no fold)
+close-reopen-is-the-only-ci-retrigger-that-keeps-the-sha	DUP	agent/memory/fleet/a-stuck-required-check-is-not-slow-ci-and-rerunning-it-wedges-the-pr.md
+codex-remote-compact-can-503-with-an-open-circuit-breaker	DROP	narrow infra incident, one-off provider outage
+codex-safety-check-modal-blocks-t1-seat-defaults-to-downgrade	DROP	superseded: checked-in file now says do nothing, contradicts this file's "select keep waiting"
+codex-seat-model-at-capacity-ends-turn-silently	DROP	narrow infra incident, covered loosely by ping-first/pane-ambiguity family
+codex-seats-do-wake-real-gap-is-reply-to-eventid	DUP	agent/memory/fleet/codex-seats-do-wake-real-gap-is-reply-to-eventid.md (checked-in copy current; no fold)
+codex-seats-keep-turn-active-through-completion	DROP	already codified in agent/playbooks/build/implementer.md and leader.md
+codex-seats-strand-on-convo-mention-send-bare-enter	DUP	agent/memory/roles/steward/a-stranded-delivery-is-corroborated-by-the-recipients-own-status.md
+coexist-over-subsume-when-trust-levels-differ	DUP	agent/memory/enclave/coexist-over-subsume-when-trust-levels-differ.md (checked-in copy current; no fold)
+collapsing-two-steps-into-one-strands-the-contract-describing-the-seam	DROP	one-incident, covered loosely by stale-comment-after-restructuring family
+commit-before-announcing-a-worktree-edit-is-not-a-deliverable	DUP	agent/memory/roles/steward/committed-is-not-reachable-publish-then-verify-on-main.md
+commit-before-launching-a-worktree-sharing-subagent	DUP	agent/memory/fleet/git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide.md
+commit-docs-before-any-worktree-reverting-op	DUP	agent/memory/fleet/git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide.md
+commit-markdown-edits-before-delegating-wrap-md-80-subagent	DUP	agent/memory/fleet/git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide.md
+commit-real-fix-before-any-mutation-proof-reset	PROMOTE	new agent/memory/fleet/a-mutation-revert-restores-the-last-commit-not-the-pre-mutation-file.md
+committed-is-not-reachable-publish-then-verify-on-main	DUP	agent/memory/roles/steward/committed-is-not-reachable-publish-then-verify-on-main.md (checked-in copy current; no fold)
+committing-before-a-mutation-campaign-does-not-protect-work-added-during-it	DUP	merged into promoted agent/memory/fleet/a-mutation-revert-restores-the-last-commit-not-the-pre-mutation-file.md
+compact-verify-survey-can-eat-the-compact-command	DUP	agent/memory/fleet/compact-verify-survey-can-eat-the-compact-command.md (drift folded into it)
+compact-wiped-memory-reflog-first	DUP	agent/memory/fleet/compact-wiped-memory-reflog-first.md (checked-in copy current; no fold)
+compaction-is-manual-no-clean-seam	DUP	agent/memory/fleet/compaction-is-manual-no-clean-seam.md (checked-in copy current; no fold)
+compaction-render-delay-escape-aborts	DUP	agent/memory/fleet/compaction-render-delay-escape-aborts.md (checked-in copy current; no fold)
+compaction-verify-on-the-compacted-marker-not-the-ctx-footer	DUP	agent/memory/fleet/compaction-render-delay-escape-aborts.md
+comparing-two-values-for-equality-presupposes-there-are-two-values	DUP	CHECKS.md#1
+compile-fail-doctest-error-code-annotation-is-not-enforced	DUP	agent/memory/roles/adversary/attack-an-impossibility-claim-at-module-scope-not-only-the-signature.md
+compiler-enumeration-is-blind-to-the-wildcard-site	DUP	agent/memory/fleet/exhaustiveness-comes-from-an-unguarded-arm-not-from-the-match.md
+compiler-internal-repair-leaving-observe-fence-is-not-a-section3-operator-escalation	OPERATOR	listed for the Steward (not placed in the corpus)
+compiles-today-under-the-lane-being-retired-is-not-evidence-the-program-is-well-formed	DROP	narrow retirement-campaign incident
+completeness-gate-must-be-bidirectional-exact-set-closure	DUP	agent/memory/roles/adversary/line-closure-check-must-compare-whole-files-not-diff-hunks.md
+composer-placeholder-text-is-indistinguishable-from-a-stranded-instruction	DUP	agent/memory/roles/steward/a-stranded-delivery-is-corroborated-by-the-recipients-own-status.md
+composer-placeholder-vs-stranded-text-is-decided-by-the-dim-attribute	DUP	agent/memory/roles/steward/a-stranded-delivery-is-corroborated-by-the-recipients-own-status.md
+composition-wp-real-producer-may-be-deferred-engine	DUP	agent/memory/build/qa/composition-wp-real-producer-may-be-deferred-engine.md (checked-in copy current; no fold)
+conformance-and-spec-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+conformance-assert-at-locked-granularity	DUP	agent/memory/enclave/conformance-assert-at-locked-granularity.md (checked-in copy current; no fold)
+conformance-hand-feeds-the-deliverable	DUP	agent/memory/build/qa/conformance-hand-feeds-the-deliverable.md (checked-in copy current; no fold)
+conformance-oracle-grounding-fallback	DUP	agent/memory/roles/conformance-validator/conformance-oracle-grounding-fallback.md (checked-in copy current; no fold)
+conformance-reconcile-inherits-spec-metatheory-bugs	DUP	agent/memory/enclave/conformance-reconcile-inherits-spec-metatheory-bugs.md (checked-in copy current; no fold)
+conformance-validator-casts-spec-review-vote	DUP	agent/memory/roles/conformance-validator/conformance-validator-casts-spec-review-vote.md (checked-in copy current; no fold)
+cons-vs-cons-abstract-element-needs-cong-not-tt-refl	DROP	proposed for promotion, not taken: Ken proof idiom; write-ken skill and CHECKS.md#11 territory
+contract-expressibility-audit	DUP	agent/memory/fleet/never-pin-a-shape-that-cannot-state-its-own-contract.md
+contract-spec-defer-spelling-not-concept	DUP	agent/memory/enclave/contract-spec-defer-spelling-not-concept.md (drift folded into it)
+conv-reduction-arm-gate-needs-termination-stress	DUP	agent/memory/teams/kernel/conv-reduction-arm-gate-needs-termination-stress.md (checked-in copy current; no fold)
+convo-mention-id-must-be-grepped-not-typed	DUP	July migration: agent/memory/fleet/mention-discipline.md
+convo-message-type-is-closed-enum-invalid-drops-silently	DUP	agent/memory/fleet/mootup-posting-from-agent.md
+convo-posting-mcp-can-be-down-while-channel-stays-up	DUP	agent/memory/roles/steward/steward-coldstart-infra-checks.md
+coordination-fleet-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+copying-a-neighbours-formatting-is-how-a-repo-rule-gets-broken-by-someone-who-read-it	DROP	proposed for promotion, not taken: the no-icons rule and its "copy the current rule" clause are already in CLAUDE.md
+corpus-property-gate-only-as-strong-as-the-corpus	DUP	agent/memory/fleet/corpus-property-gate-only-as-strong-as-the-corpus.md (checked-in copy current; no fold)
+corpus-wide-semantic-gate-fail-closed-filter-plus-real-checker	DUP	agent/playbooks/tools/pin-a-property.md (SS1 and SS4)
+correct-semantics-vs-missing-port-is-decided-by-denotation-versus-bookkeeping	DROP	narrow Ken-runtime-retirement incident
+correct-the-value-and-you-will-leave-the-unit-unexamined	DROP	rich but single-incident; unit-of-measurement point covered loosely elsewhere
+correcting-a-claim-requires-sweeping-instructions-built-on-it	DUP	agent/memory/fleet/correcting-scope-must-sweep-whole-doc.md
+correcting-scope-must-sweep-whole-doc	DUP	agent/memory/fleet/correcting-scope-must-sweep-whole-doc.md (checked-in copy current; no fold)
+costing-a-change-in-time-when-the-binding-resource-is-stack	DUP	agent/playbooks/tools/stated-stacks.md
+count-the-property-not-the-construct-in-front-of-you	DUP	agent/memory/roles/adversary/line-closure-check-must-compare-whole-files-not-diff-hunks.md
+crate-wide-fmt-plus-git-add-A-smuggles-unrelated-files-into-a-scoped-diff	PROMOTE	new agent/memory/build/crate-wide-fmt-plus-git-add-A-smuggles-unrelated-files-into-a-scoped-diff.md
+credit-window-reserve-opus-for-t1	OPERATOR	operator ruling; July migration dropped it (listed for the Steward)
+cross-crate-declaration-text-oracle-is-invisible-to-targeted-builds	DUP	agent/memory/fleet/deliverability-is-part-of-mechanism-selection.md
+crossed-instructions-arrival-order-is-not-authorship-order	DROP	narrow coordination incident, principle already pervasive in coordination corpus
+ctx-percentage-is-not-evidence-of-stale-context	DUP	agent/memory/roles/steward/a-ctx-scan-greps-your-own-report-of-another-seats-ctx.md
+cut-each-corpus-branch-from-a-freshly-reset-main-never-atop-your-own-in-flight-route	DUP	agent/memory/fleet/multi-worktree-cwd-drift-phantom-diff.md
+d2f-emitter-mechanism-ruled-and-held-until-the-abi-partial-publishes	DROP	stale WP/node state; the file itself says the hold is discharged
+dead-code-warnings-are-a-free-production-consumer-oracle	DUP	agent/memory/roles/adversary/a-single-site-claim-is-checkable-by-counting-the-operation-it-names.md
+deceq-on-noncanonical-carrier-inhabits-bottom	DUP	July migration kept it; folded into agent/memory/enclave/carrier-canonicity-axis-for-lawful-class-laws.md in the 2026-07-28 corpus audit
+declining-a-resource-handed-to-you-by-name-is-not-releasing-it	DUP	agent/memory/fleet/mention-discipline.md
+declref-lowering-change-needs-elaborator-integration-tests	DUP	agent/memory/fleet/a-p-scoped-run-and-cis-workspace-run-compile-different-feature-sets.md
+delegate-digest-not-authoring-for-oversized-file-conversion	DROP	one-off technique for a single large-file conversion task, not recurring
+deliberate-and-unbuilt-are-opposite-instructions-to-a-future-reader	DROP	narrow single-incident scope-labeling, overlaps absent-invariant lessons
+deliverability-is-part-of-mechanism-selection-not-a-post-review-discovery	DUP	agent/memory/fleet/deliverability-is-part-of-mechanism-selection.md
+deliverable-labels-are-wp-local-so-d3-alone-names-nothing	DROP	narrow single-incident WP-label mixup
+delivery-contract-op-list-can-overscope	DUP	agent/memory/roles/conformance-validator/delivery-contract-op-list-can-overscope.md (checked-in copy current; no fold)
+dependency-bearing-catalog-pkg-needs-ordered-shared-env-harness	DROP	narrow catalog-build guidance tied to a specific WP naming scheme
+dependent-match-construction-fails-closed-via-infer-elim	DUP	agent/memory/teams/kernel/dependent-match-construction-fails-closed-via-infer-elim.md (checked-in copy current; no fold)
+dependent-match-context-telescope-convoy-debruijn-pitfalls	DROP	landed WP-specific elaborator-internals debugging narrative
+dependent-match-motive-index-rebasing-must-be-gated-on-scrutinee-occurrence	DROP	landed WP-specific elaborator-internals debugging narrative
+design-rulings-and-ac-scoping-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+detector-side-and-population-side-mutations-are-not-interchangeable	DUP	agent/memory/fleet/mutation-proof-injection-point-is-a-reachability-tell.md
+devcontainer-disk-topology-and-safe-reclaim	DROP	stale self-correcting incident log; superseded by worktree-proliferation/full-disk lessons
+diagnosing-a-seat-from-a-tail-window-can-report-false-idle	DUP	agent/memory/roles/steward/audit-a-detector-against-the-case-whose-answer-you-already-know.md
+differential-oracle-is-blind-to-a-shared-premise	DUP	agent/memory/roles/adversary/differential-oracle-is-blind-to-a-shared-premise.md (checked-in copy current; no fold)
+differential-verify-which-mechanism-is-the-net	DUP	agent/memory/enclave/differential-verify-which-mechanism-is-the-net.md (checked-in copy current; no fold)
+disclaimed-framing-still-binds-your-own-companion-artifact	DUP	agent/memory/enclave/disclaimed-framing-still-binds-your-own-companion-artifact.md (checked-in copy current; no fold)
+discounting-evidence-weight-is-not-declining-to-assert-it	DUP	merged into promoted agent/memory/fleet/a-hedge-does-not-constrain-what-is-done-with-the-claim-it-hedges.md
+discriminating-axis-vacuous-until-capability-lands	DUP	agent/memory/enclave/discriminating-axis-vacuous-until-capability-lands.md (checked-in copy current; no fold)
+discriminating-conformance-verdict-must-flip	DUP	agent/memory/enclave/discriminating-conformance-verdict-must-flip.md (checked-in copy current; no fold)
+discriminating-flip-must-be-checked-per-test	DUP	agent/memory/build/qa/discriminating-flip-must-be-checked-per-test.md (checked-in copy current; no fold)
+discriminator-negative-arm-must-be-expressible-and-reaching	DUP	agent/memory/build/qa/discriminator-negative-arm-must-be-expressible-and-reaching.md (checked-in copy current; no fold)
+do-not-build-on-an-unmerged-commit	DUP	agent/memory/fleet/do-not-build-on-an-unmerged-commit.md (checked-in copy current; no fold)
+do-not-fetch-while-the-publisher-holds-its-window-a-lost-ref-cas-reads-as-unverified	DUP	agent/memory/roles/steward/fetching-during-the-publisher-window-freezes-the-NEXT-publish.md
+do-not-gate-an-instruction-on-a-condition-the-recipient-cannot-observe	DUP	agent/COORDINATION.md §1a
+doc-only-publish-may-have-already-merged-before-interrupt	DROP	narrow --doc-only script incident, overlaps existing publisher lessons
+doc-track-concurrency-exception-is-doc-only-not-a-contention-free-rule	DUP	CLAUDE.md (doc-track concurrency-exception clause)
+does-it-touch-the-forbidden-file-is-answered-by-a-field-probe-not-a-grep	DROP	narrow single-incident scope-probing technique
+dont-ask-operator-to-confirm-a-well-documented-sequencing-release	OPERATOR	listed for the Steward (not placed in the corpus)
+dont-assign-a-duty-to-a-seat-that-cannot-perform-it	DUP	agent/memory/fleet/deliverability-is-part-of-mechanism-selection.md
+dont-flip-a-just-sent-ruling-without-checking-for-crossed-reply	DROP	narrow single-incident Architect ruling oscillation
+dont-gate-a-trusted-base-change-qa-only	DROP	cites a COORDINATION §14 that now names a different topic; stale
+dont-issue-an-instruction-that-embeds-a-state-claim	DROP	stale-embedded-state theme extensively covered elsewhere
+dont-preempt-technical-fork-with-sequencing	DUP	agent/memory/enclave/dont-preempt-technical-fork-with-sequencing.md (checked-in copy current; no fold)
+dont-publish-derived-code-measurements-state-the-property-let-the-ring-measure	DUP	agent/memory/roles/steward/dont-publish-derived-code-measurements-state-the-property-let-the-ring-measure.md (checked-in copy current; no fold)
+dropping-a-measurements-scope-always-makes-the-claim-stronger	DROP	proposed for promotion, not taken: covered by fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+durable-checkpoint-becomes-a-source-of-stale-claims	DROP	same stale-state-claim family as above, already covered
+dynamic-effect-lowering-needs-consumed-reply-reachability-ledger	DROP	narrow technical fixture-design requirement for one WP class
+editing-a-cited-source-moves-its-oid-even-for-locator-only-changes	DUP	agent/memory/teams/doc/a-currency-finding-can-be-a-ledger-dependency.md
+editing-an-artifact-the-checker-produces-instead-of-producing-it	DROP	closely related to existing producer-vs-proxy verification themes
+effect-row-polymorphism-machinery-landed-gap-is-surface	DUP	agent/memory/teams/language/effect-row-polymorphism-machinery-landed-gap-is-surface.md (checked-in copy current; no fold)
+elaborator-internals-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+elapsed-silence-is-not-a-work-progress-signal-check-the-branch	DUP	agent/memory/roles/steward/a-working-idle-grep-keyed-on-one-harnesses-footer-reports-false-idle-on-the-other.md
+eliminator-termination-finiteness-not-stuckness	DUP	agent/memory/enclave/eliminator-termination-finiteness-not-stuckness.md (checked-in copy current; no fold)
+enclave-does-not-pull-in-build-leads	DUP	July migration: agent/memory/enclave/enclave-elaborates-autonomously-no-build-team-pulls.md
+enclave-elaborates-autonomously-no-build-team-pulls	DUP	agent/memory/enclave/enclave-elaborates-autonomously-no-build-team-pulls.md (checked-in copy current; no fold)
+enclave-ruling-in-thread-is-not-a-durable-deliverable	DUP	agent/memory/enclave/enclave-ruling-in-thread-is-not-a-durable-deliverable.md (checked-in copy current; no fold)
+enriching-opaque-former-kind-is-kernel-clean	DUP	agent/memory/teams/kernel/enriching-opaque-former-kind-is-kernel-clean.md (checked-in copy current; no fold)
+eq-congruence-gap-same-literal-spelling-workaround	DROP	self-flagged STALE-CORRECTED; capability landed, historical
+es4-ac3-omega-elimination-kernel-blocker	DROP	July migration already dropped it: stale -- RESOLVED historical WP narrative (K4), fix landed in kernel + spec; superseded by
+escalating-a-mechanism-question-your-own-ac-already-answers-by-forbidding-it	DROP	narrow single-incident WP ownership-boundary lesson
+eval-only-harness-cant-detect-phantom-arg-staleness	DUP	agent/memory/build/qa/eval-only-harness-cant-detect-phantom-arg-staleness.md (checked-in copy current; no fold)
+eval-reifier-change-needs-full-ken-interp-suite	DUP	agent/memory/fleet/a-p-scoped-run-and-cis-workspace-run-compile-different-feature-sets.md
+eval-store-resync-recurring-trap	DUP	agent/memory/build/implementers/eval-store-resync-recurring-trap.md (checked-in copy current; no fold)
+every-experiment-agreeing-can-mean-they-all-measured-one-stale-artifact	DROP	proposed for promotion, not taken: covered by fleet/a-mutation-that-passes-when-it-should-fail-means-a-stale-input.md and build/failed-post-condition-probe-suspect-the-probe-first.md
+exact-text-oracle-pins-what-not-whether-good	DUP	agent/memory/fleet/deriving-from-the-contract-cannot-detect-a-defective-contract.md
+exhaustiveness-claim-vs-defect-claim-route-differently	DROP	narrow single-incident adversary-escalation routing lesson
+exported-name-migration-needs-whole-harness-consumer-inventory	DUP	agent/memory/roles/steward/exported-name-migration-needs-whole-harness-consumer-inventory.md (checked-in copy current; no fold)
+expose-dispatch-in-motive-leave-scrutinee-folded	DUP	CHECKS.md#11
+failed-post-condition-probe-suspect-the-probe-first	DUP	agent/memory/build/failed-post-condition-probe-suspect-the-probe-first.md (drift folded into it)
+falsify-the-sweep-instrument-before-believing-either-a-hit-or-a-miss	DUP	agent/memory/roles/steward/audit-a-detector-against-the-case-whose-answer-you-already-know.md
+fence-extraction-regex-must-be-line-anchored	DROP	narrow tooling-specific regex bug, one-off
+filing-a-program-issues-node-requires-regenerating-implementation-progress-in-the-same-pr	PROMOTE	new agent/memory/roles/steward/filing-a-program-issues-node-requires-regenerating-implementation-progress-in-the-same-pr.md
+final-topology-forecast-says-nothing-about-the-transitional-graph	DROP	narrow single-incident module-visibility-ordering lesson
+find-newermt-silently-fails-in-agent-worktrees	DUP	agent/memory/roles/steward/audit-a-detector-against-the-case-whose-answer-you-already-know.md
+finding-one-defect-in-a-paragraph-is-not-auditing-the-paragraph	DROP	proposed for promotion, not taken: covered by fleet/a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution.md
+fingerprint-oracle-must-key-on-position-independent-identity	DROP	narrow technical Ken-kernel GlobalId oracle-design pitfall
+fleet-model-rollout-stagger-restarts	DUP	agent/memory/roles/steward/fleet-model-rollout-stagger-restarts.md (checked-in copy current; no fold)
+fold-in-doc-only-conditions-while-holding-branch	DUP	agent/memory/build/qa/fold-in-doc-only-conditions-while-holding-branch.md (checked-in copy current; no fold)
+forcing-a-guard-requires-precision-about-where-it-is-and-nothing-about-why-it-exists	DUP	agent/memory/fleet/before-running-an-instrument-write-down-the-observation-that-would-end-it.md
+formatter-canonicalization-mass-renames-identifiers-colliding-with-metavar-glyphs	DROP	narrow single-WP formatter-glyph incident, likely resolved
+formatter-fixed-point-proves-stability-not-preservation	DUP	agent/memory/fleet/formatter-soundness-gates-are-blind-to-layout-conformance.md
+frame-ac-cannot-require-process-local-seam-to-drive-cross-exec-child	DROP	narrow single-WP (PX16) frame-authoring technical lesson
+frame-ac-pins-observe-real-failure-and-forbids-the-only-mechanism	DROP	narrow single-WP (PX7-R) frame-authoring technical lesson
+frame-amendment-not-on-a-fetchable-ref-has-not-happened	DROP	cites a since-changed publishing constraint (steward/work push no longer available)
+frame-error-variant-negative-arm-must-be-reachable-under-frames-own-inventory	DROP	narrow single-WP (PX7-R) frame-authoring technical lesson
+frame-pinned-preservation-oracle-is-a-discharged-one-shot-proof	DUP	agent/memory/fleet/frame-pinned-preservation-oracle-is-a-discharged-one-shot-proof.md (checked-in copy current; no fold)
+frame-pseudocode-diverges-from-landed-mechanism	DUP	agent/memory/fleet/frame-pseudocode-diverges-from-landed-mechanism.md (checked-in copy current; no fold)
+frames-wps-and-review-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+freeing-a-wp-branch-at-a-hard-stop-inverts-the-resume-precondition	DROP	narrow git-workflow footnote, overlaps branch-hygiene corpus
+freeing-your-wp-branch-means-your-next-turn-starts-on-the-wrong-one	DROP	narrow git-workflow footnote, overlaps branch-hygiene corpus
+frozen-ctx-with-work-owed-has-a-third-reading-delivered-and-unwoken	DROP	Steward-specific idle-detection nuance, thematically saturated by existing corpus
+fusing-two-stages-must-not-materialize-the-intermediate	DROP	narrow technical Ken-runtime fusion-lowering lesson tied to one WP
+gate-widening-exposes-latent-bugs-in-newly-reachable-code	DUP	agent/memory/teams/kernel/gate-widening-exposes-latent-bugs-in-newly-reachable-code.md (checked-in copy current; no fold)
+gating-instruction-must-lead-the-message-notifications-truncate	DROP	overlaps existing mention/truncation-discipline themes
+general-fix-can-conflate-similar-shaped-different-cases	DUP	agent/memory/build/general-fix-can-conflate-similar-shaped-different-cases.md (checked-in copy current; no fold)
+get-transcript-limit-does-not-bound-the-response	DUP	CLAUDE.md (NEVER call get_transcript section)
+git-author-not-per-agent	DUP	agent/memory/fleet/git-author-not-per-agent.md (checked-in copy current; no fold)
+git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide	DUP	agent/memory/fleet/git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide.md (checked-in copy current; no fold)
+git-diff-check-on-a-clean-worktree-compares-nothing-and-passes-vacuously	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+git-diff-stat-always-exits-0-use-quiet-for-an-emptiness-test	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+git-diff-stat-on-an-unstaged-tree-omits-untracked-files-read-the-stat-off-the-commit	DROP	overlaps existing git-instrument-measures-wrong-object family
+git-request-sha-must-be-verified-on-origin-before-publishing	DUP	agent/memory/fleet/scripted-publisher-target-is-head-branch-never-main.md
+git-rev-parse-sha-colon-path-fails-open-on-a-wrong-path	DROP	proposed for promotion, not taken: false as stated: rev-parse exits 128 on a bad path (it echoes the argument, not the commit SHA); the cat-file -e advice is ordinary
+git-show-is-parent-relative-but-a-squash-lands-the-merge-base-diff	DUP	agent/memory/fleet/a-git-query-answers-a-different-question-correctly-and-never-errors.md
+git-stash-stack-is-shared-across-every-worktree	DUP	agent/COORDINATION.md §12a
+green-vs-green-does-not-confirm-a-fix	DUP	agent/memory/build/green-vs-green-does-not-confirm-a-fix.md (checked-in copy current; no fold)
+grep-ken-sources-misses-rust-emitted-prelude	DUP	July migration: agent/memory/fleet/grep-rust-prelude-emission-for-landedness.md
+grep-ledger-is-blind-downstream-of-an-import	DROP	narrow single-incident, overlaps aliasing-blind-grep themes
+grep-the-producer-not-the-cited-proxy	DUP	agent/memory/fleet/grep-the-producer-not-the-cited-proxy.md (checked-in copy current; no fold)
+grepping-a-seats-pane-for-the-kickoff-text-is-not-a-delivery-detector	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+grounding-a-fabricated-citation-two-failure-modes	DUP	agent/memory/enclave/grounding-a-fabricated-citation-two-failure-modes.md (checked-in copy current; no fold)
+guard-a-closed-roster-in-the-direction-that-fails-open	DUP	agent/memory/fleet/a-type-check-cannot-distinguish-two-fields-that-share-a-type.md
+hand-a-predicate-not-an-enumeration-a-list-cannot-report-being-incomplete	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+hand-built-elim-motive-and-method-gotchas	DUP	agent/memory/teams/kernel/hand-built-elim-motive-and-method-gotchas.md (checked-in copy current; no fold)
+handoff-gate-hard-reset-destroys-uncommitted-seat-work	DUP	agent/memory/roles/steward/steward-work-is-stale-immediately-after-every-publish.md
+handoff-is-not-done-review-loop-on-my-spec	DUP	agent/memory/roles/spec-author/handoff-is-not-done-review-loop-on-my-spec.md (checked-in copy current; no fold)
+handoff-scope-count-must-match-full-thread	DUP	agent/memory/fleet/handoff-scope-count-must-match-full-thread.md (checked-in copy current; no fold)
+held-branch-scaffolding-is-load-bearing-evidence	DUP	agent/memory/fleet/held-branch-scaffolding-is-load-bearing-evidence.md (checked-in copy current; no fold)
+held-wp-unfreeze-is-a-semantic-rebase-rederive-anchors	DROP	narrow WP-unfreeze/frozen-hash procedure specific to one campaign
+higher-kinded-class-param-and-funext-definitional	DUP	agent/memory/enclave/higher-kinded-class-param-and-funext-definitional.md (checked-in copy current; no fold)
+holds-reasoning-and-verdicts-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+honour-a-falsifier-in-the-case-where-nobody-would-have-caught-you	DROP	single-incident self-falsifier narrative, too specific to generalize
+how-many-of-n-is-worthless-until-you-know-the-n-are-independent	DROP	proposed for promotion, not taken: covered by CHECKS.md#6 and enclave/count-the-population-before-you-place-it-inside-a-mechanism.md
+i-can-read-it-is-not-it-is-released-shared-object-db-defeats-every-local-check	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+i-carried-unbounded-as-a-fact-about-a-file-i-never-opened	DROP	single-incident checkpoint-carrying narrative, not generalizable
+i-enumerated-the-statements-of-a-rule-and-missed-the-enforcements-of-it	DROP	proposed for promotion, not taken: covered by CHECKS.md#3 (sweep by mechanism as well as by name)
+i-flagged-a-defect-shape-four-times-then-reasoned-from-an-instance-of-it	DUP	agent/memory/CHECKS.md (run-the-check-not-recall-it preamble)
+i-let-a-regex-define-the-population-and-it-excluded-digits	DUP	agent/memory/roles/adversary/anchor-a-claim-census-to-position-and-validate-it-against-a-reference-count.md
+i-named-the-mechanism-and-prescribed-a-comment-when-the-remedy-was-a-mutation	DUP	agent/memory/roles/adversary/disable-the-mutation-mechanism-to-find-vacuous-controls.md
+i-ordered-a-name-to-settle-an-identity-question-when-the-system-already-carried-the-identity	DROP	single-incident identity/naming narrative
+i-reach-for-a-decorative-glyph-exactly-when-i-most-want-to-be-read	DROP	rule already fully stated in CLAUDE.md itself
+i-refused-to-guess-between-two-arms-while-assuming-the-premise-they-shared	DUP	agent/memory/roles/adversary/differential-oracle-is-blind-to-a-shared-premise.md
+i-said-routed-when-i-had-only-posted	DUP	agent/memory/enclave/enclave-ruling-in-thread-is-not-a-durable-deliverable.md
+i-strengthened-an-ac-to-close-a-vacuity-class-and-the-strengthened-form-was-still-vacuous	DUP	agent/memory/roles/adversary/disable-the-mutation-mechanism-to-find-vacuous-controls.md
+i-used-an-established-name-for-a-different-object	DROP	single-incident naming-collision narrative in one tracked node
+i-verified-the-coordinates-twice-and-never-the-predicate	DROP	single-incident citation-verification narrative
+identical-effect-traces-with-different-exit-status-localize-a-defect-to-the-terminal-step	DROP	narrow native/interp debugging technique tied to one incident
+identifiers-are-claim-artifacts-and-go-stale-like-prose	DROP	single-incident naming/staleness narrative
+idle-claude-pane-prompt-line-can-be-suggestion-ghost-text	DUP	agent/memory/fleet/pane-suggestion-text-is-not-agent-state.md
+idle-pane-cannot-distinguish-handed-off-from-stalled	DUP	agent/memory/fleet/re-read-latest-events-immediately-before-a-stall-nudge.md
+if-it-ever-fires-it-is-a-finding-is-an-unreachability-claim-and-a-green-suite-is-the-wrong-warrant	DUP	agent/memory/CHECKS.md#8
+ignore-label-names-blocking-defect-not-reified-value-ground-value-and-path-before-wiring-a-closure-dependency	DROP	single-incident campaign-specific row triage (PX8)
+ignored-test-difficulty-is-the-signal-not-evidence-the-objective-is-unreachable	OPERATOR	listed for the Steward (not placed in the corpus)
+in-an-ab-mutation-proof-the-informative-side-is-the-one-that-greens	DUP	agent/memory/build/green-vs-green-does-not-confirm-a-fix.md
+inserting-a-test-before-an-existing-one-silently-splits-its-doc-comment	PROMOTE	new agent/memory/build/rust-comments-and-attributes-are-not-inert.md
+instance-keying-one-side-of-a-chain-leaves-the-other-side-fail-open	DROP	single-incident chain-identity-keying narrative
+instruction-to-resume-finished-work-is-a-stale-read-signature	DUP	agent/memory/fleet/re-read-latest-events-immediately-before-a-stall-nudge.md
+instrument-and-coordinate-failures-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+instruments-and-the-defect-can-share-a-common-cause	DUP	agent/memory/CHECKS.md#1
+integrator-seat-retired-never-reseat	OPERATOR	listed for the Steward (not placed in the corpus)
+intersection-test-self-fires-when-run-against-post-merge-main	DUP	agent/memory/roles/steward/stale-base-candidate-silently-reverts-everything-landed-since.md
+invention-in-costume-hunt-verify-denotation-matches-the-reference-by-coinciding-normal-forms	DROP	campaign-specific historical record, narrow future applicability
+isolate-executed-vs-present-before-naming-perf-cause	DUP	agent/memory/build/qa/isolate-executed-vs-present-before-naming-perf-cause.md (checked-in copy current; no fold)
+isolate-mechanism-from-orthogonal-fail-closed-gates	DUP	agent/memory/build/qa/isolate-mechanism-from-orthogonal-fail-closed-gates.md (checked-in copy current; no fold)
+item-enumerator-omitting-impl-misclassifies-production-as-test	DUP	agent/memory/roles/adversary/anchor-a-claim-census-to-position-and-validate-it-against-a-reference-count.md
+judgment-log-is-autonomous-window-discipline	OPERATOR	listed for the Steward (not placed in the corpus)
+k5-top-bottom-intro-elim-kernel-gap	DUP	July migration: agent/memory/teams/kernel/kernel-completeness-gap-shapes.md (+ trust-root-reduction-change-needs-full-workspace-gate.md for K7's review-discipline finding) (July target, since retired or merged)
+k6-conv-struct-eq-congruence-gap	DUP	July migration: agent/memory/teams/kernel/kernel-completeness-gap-shapes.md (+ trust-root-reduction-change-needs-full-workspace-gate.md for K7's review-discipline finding) (July target, since retired or merged)
+k7-eq-at-inductive-operand-whnf-gap	DUP	July migration: agent/memory/teams/kernel/kernel-completeness-gap-shapes.md (+ trust-root-reduction-change-needs-full-workspace-gate.md for K7's review-discipline finding) (July target, since retired or merged)
+ken-cargo-workspace-does-not-match-ci-locked-for-rejection-changes	DROP	superseded by current no-full-local-workspace-test operator policy
+ken-closed-equal-eq-goal-whnfs-to-top-use-proved-not-refl	DUP	agent/memory/enclave/tt-vs-refl-endpoint-rule-for-inductive-equal-law-bases.md
+ken-dependent-inversion-put-hypothesis-in-return-type-pi	DROP	narrow single-idiom Ken proof-authoring technique
+ken-module-pub-data-is-abstract-export-only-constructors-hidden-and-the-defining-module-must-stay-transparent	DROP	bug report tied to specific line numbers, may already be fixed
+ken-publication-pub-proof-needs-pub-fn-and-attached-proofs-travel-with-the-function-selector	DROP	narrow Ken-publication technical finding, one mechanism
+ken-record-index-sigma-decomposition-comes-from-synthesis-not-whnf-of-a-raw-data-eq	DROP	single-incident, tied to specific line numbers likely to drift
+ken-recursive-result-for-is-former-nested-ih-not-direct-recursion	DROP	narrow single-idiom Ken proof-authoring confusion
+kernel-backed-claim-grep-the-emission-not-the-name	DUP	agent/memory/enclave/kernel-backed-claim-grep-the-emission-not-the-name.md (checked-in copy current; no fold)
+kernel-backed-obligation-certificate-vs-discrimination	DUP	agent/memory/enclave/kernel-backed-obligation-certificate-vs-discrimination.md (checked-in copy current; no fold)
+kernel-conv-arm-reachability-is-the-reducer-guard-not-the-neutral-rebuild-arm	DROP	narrow kernel-review method, adjacent to existing K5-7 shapes lesson
+kernel-rejects-is-completeness-fix-is-where-soundness-converts	DUP	agent/memory/enclave/kernel-rejects-is-completeness-fix-is-where-soundness-converts.md (checked-in copy current; no fold)
+kernel-soundness-and-proof-construction-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+kernel-term-variant-gate-check-bespoke-non-enum-surfaces	DROP	adjacent to exhaustive-term-traversals.md, not independently generalizing
+keyword-purity-agreement-fn-proc	OPERATOR	operator ruling; July migration dropped it (listed for the Steward)
+kick-each-wp-as-standalone-mention-led-message	DROP	single-incident coordination narrative, genre covered by mention-discipline.md
+kick-the-team-on-the-landed-sha-never-the-routed-one	DUP	agent/memory/roles/steward/a-durability-claim-in-an-artifact-was-never-checked-against-origin.md
+label-which-numbers-you-chose-and-which-you-measured	DUP	agent/memory/fleet/a-number-sound-as-a-measurement-is-not-sound-as-a-criterion.md
+landing-a-config-change-on-main-does-not-apply-it-the-consumer-reads-a-working-tree	PROMOTE	new agent/memory/fleet/landing-a-config-change-on-main-does-not-apply-it-the-consumer-reads-a-working-tree.md
+lane2-fo-checker-soundness-then-language-surface-syntax	DROP	stale campaign log, superseded per own header note (roster authority is lanes.md)
+laundered-citation-authority	DUP	agent/memory/enclave/laundered-citation-authority.md (checked-in copy current; no fold)
+lawful-class-instances-must-carry-law-proofs	DROP	July migration already dropped it: superseded -- long ES4-lawproofs/lawful-classes campaign narrative; durable findings indep
+layer-dependent-pin-at-unconditional-layer	DUP	agent/memory/enclave/layer-dependent-pin-at-unconditional-layer.md (checked-in copy current; no fold)
+leader-relays-frame-citations-must-reverify-too	DUP	agent/memory/roles/spec-leader/leader-relays-frame-citations-must-reverify-too.md (checked-in copy current; no fold)
+leader-since-window-blindness-on-decision-votes	DUP	agent/memory/build/leaders/leader-since-window-blindness-on-decision-votes.md (checked-in copy current; no fold)
+libtest-reports-ok-for-zero-executed-tests-so-a-green-probe-may-have-run-nothing	DUP	agent/memory/fleet/no-error-in-the-output-passes-when-there-is-no-output.md
+line-closure-check-must-compare-whole-files-not-diff-hunks	DUP	agent/memory/roles/adversary/line-closure-check-must-compare-whole-files-not-diff-hunks.md (checked-in copy current; no fold)
+live-review-candidate-goes-stale-reanchor-sha	DUP	agent/memory/fleet/live-review-candidate-goes-stale-reanchor-sha.md (drift folded into it)
+llm-proxy-is-build-tier-only-anthropic-runs-direct	DUP	agent/memory/roles/steward/llm-proxy-is-build-tier-only-anthropic-runs-direct.md (checked-in copy current; no fold)
+local-gates-need-umask-022-on-this-box	DROP	real devcontainer env quirk, narrow, single-box; staying conservative
+locked-conformance-row-needs-full-absolute-matrix-not-a-discriminator	DROP	proposed for promotion, not taken: conformance-validator seat-local; conformance playbook covers locked rows
+loud-fail-guard-only-closes-the-enumerated-namespace	DROP	distinct but narrow completeness-gate nuance; not promoting
+m0-ps-publisher-check-is-blind-to-the-lieutenants-publisher-pid-namespace	DROP	narrow Steward-tactical infra fact, marginal post-lieutenant go-live
+m1-read-resolved-decision-direct-by-id	DROP	tactical mootup API mechanics, narrow, staleness risk
+m8b-landing-post-must-mention-owning-team-leader	DROP	likely folded into lieutenant playbook at go-live already
+markdown-80col-reflow-gotchas	DUP	July migration: agent/memory/fleet/markdown-80col-reflow.md
+mcp-stdio-can-die-mid-session-while-the-health-check-reports-connected	DROP	loosely covered by CLAUDE.md MCP-transport guidance + sibling family
+measure-a-seats-state-yourself-before-ruling-on-it	DROP	covered loosely, extensive measurement-before-ruling family
+measure-the-population-before-you-write-the-row	DUP	agent/memory/CHECKS.md#6
+measure-the-route-not-taken-to-prove-a-design-choice-was-load-bearing	DROP	covered loosely, counterfactual/measurement family
+mechanism-citation-needs-own-empirical-probe	DUP	agent/memory/fleet/mechanism-citation-needs-own-empirical-probe.md (checked-in copy current; no fold)
+membership-in-a-run-of-unique-values-is-satisfied-by-every-permutation	DROP	covered loosely, weakened-assertion family already extensive
+mention-iff-question-or-action-no-ack-mentions	DUP	July migration: agent/memory/fleet/mention-discipline.md
+mention-only-for-question-or-action	DUP	July migration: agent/memory/fleet/mention-discipline.md
+mentions-field-needs-literal-mention-text-too	DUP	July migration: agent/memory/fleet/mention-discipline.md
+merge-ready-sent-is-a-race-boundary	DUP	agent/memory/roles/spec-leader/merge-ready-sent-is-a-race-boundary.md (checked-in copy current; no fold)
+merge-timing-is-mine-not-the-architects-and-completeness-is-immaterial	OPERATOR	listed for the Steward (not placed in the corpus)
+migration-sweep-glob-must-enumerate-every-ken-source-root	DUP	agent/memory/roles/steward/migration-sweep-glob-must-enumerate-every-ken-source-root.md (checked-in copy current; no fold)
+moot-compact-codex-seat-then-rouse-must-forbid-self-compact	DROP	narrow addition to existing lesson; not promoting
+moot-down-orphans-its-adapters-and-they-exhaust-the-convo-websocket-cap	DROP	real but narrow one-off infra incident; not promoting
+moot-exec-must-run-from-project-root-not-a-worktree	DUP	agent/memory/roles/steward/bash-cd-main-repo-vs-steward-worktree.md
+moot-init-participant-placeholders-wake-nobody	DROP	real but narrow infra fact; not promoting
+mootup-posting-from-agent	DUP	agent/memory/fleet/mootup-posting-from-agent.md (checked-in copy current; no fold)
+moved-symbol-widened-to-match-a-sibling-level-is-over-wide-when-consumers-stay-in-the-parent-subtree	DROP	narrow single-incident Rust visibility case
+moving-a-branch-under-review-detaches-an-exact-sha-verdict-rather-than-invalidating-it	DROP	real but narrow reviewer technique; not promoting
+moving-an-item-across-a-scope-boundary-changes-identifier-resolution	DROP	proposed for promotion, not taken: one Rust incident; rustc warns on the irrefutable binding
+multi-piece-erratum-landing-integrity	DUP	July migration: merged into roles/integrator lesson, retired with the integrator seat; merge verification now in agent/memory/roles/steward/an-out-of-band-merge-leaves-your-branch-on-a-reverting-base.md
+multi-worktree-cwd-drift-phantom-diff	DUP	agent/memory/fleet/multi-worktree-cwd-drift-phantom-diff.md (checked-in copy current; no fold)
+multipiece-erratum-verify-all-on-main	DUP	July migration: merged into roles/integrator lesson, retired with the integrator seat; merge verification now in agent/memory/roles/steward/an-out-of-band-merge-leaves-your-branch-on-a-reverting-base.md
+mutation-campaigns-and-measurement-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+mutation-proof-injection-point-is-a-reachability-tell	DUP	agent/memory/fleet/mutation-proof-injection-point-is-a-reachability-tell.md (checked-in copy current; no fold)
+my-code-holds-up-and-my-comments-overclaim-their-scope	DROP	covered loosely, extensive existing prose-overclaim family
+my-own-doc-publishes-recut-an-in-flight-docs-candidate	DROP	narrow; structural fix (PROG-TRACKER-MERGE-DRIVER) already applied
+my-own-refutation-inherited-the-sole-reader-claim-i-was-refuting	DROP	covered loosely, quantifier-inheritance family already extensive
+my-own-tracker-capability-landed-line-can-be-stale	DUP	agent/memory/roles/steward/my-own-tracker-capability-landed-line-can-be-stale.md (checked-in copy current; no fold)
+my-publisher-self-match-filter-excludes-my-own-background-publisher	DROP	fix already applied directly to procedures per file's own text
+name-a-mutation-by-its-injection-point-not-by-its-effect-two-sites-share-one-english-description	DROP	covered loosely, mutation-testing family already extensive
+name-context-depth-as-the-reason-you-stopped-rather-than-manufacturing-a-boundary	DROP	covered loosely, honest-reporting family already extensive
+name-the-base-each-side-of-a-before-after-was-measured-on	DROP	covered loosely, measurement-timing family already extensive
+named-floor-must-be-grepped-not-assumed	DUP	agent/memory/build/named-floor-must-be-grepped-not-assumed.md (checked-in copy current; no fold)
+naming-the-operand-in-the-ac-is-not-enough-the-code-seam-names-one-too	DROP	covered loosely, AC/mutation family and CHECKS#8
+narrowing-an-over-broad-mechanism-for-liveness-can-reopen-a-soundness-hole-it-was-silently-carrying	DROP	proposed for promotion, not taken: covered by the deleted-guard lesson now promoted and CHECKS.md#2
+narrowing-an-overclaimed-premise-without-regrounding-the-conclusion-makes-it-worse	DROP	covered loosely, quantifier-narrowing family already extensive
+need-not-is-not-must-not-and-presence-is-not-consumption	DROP	narrow single-incident WP-specific reading
+negative-landed-claim-grep-the-rust-prelude-emission	DUP	July migration: agent/memory/fleet/grep-rust-prelude-emission-for-landedness.md
+nested-frame-discriminator-needs-both-reaching-opposites-distinct-identities	DUP	agent/memory/build/qa/discriminator-negative-arm-must-be-expressible-and-reaching.md
+never-commit-doc-only-work-while-checked-out-on-a-scratch-rebase-branch	DROP	real but narrow git-hygiene incident; not promoting
+never-complete-an-abbreviated-sha-cite-rev-parse	PROMOTE	new agent/memory/fleet/never-complete-an-abbreviated-sha-cite-rev-parse.md
+never-git-stash-in-a-shared-multi-worktree-repo	DUP	agent/memory/fleet/git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide.md
+never-infer-a-seats-tier-from-its-role	DUP	agent/MODELS.md
+never-put-another-seats-pending-state-in-your-own-status-line	DROP	covered loosely, status-line honesty family already extensive
+never-reached-does-not-mean-a-step-is-missing	DROP	covered loosely, attribution family already extensive
+never-reached-is-two-different-facts-and-only-instrumenting-every-route-tells-them-apart	DUP	agent/memory/CHECKS.md#2
+no-full-local-cargo-builds-targeted-only	OPERATOR	listed for the Steward (not placed in the corpus)
+no-wp-token-identifiers-in-production-source	OPERATOR	listed for the Steward (not placed in the corpus)
+nocapture-output-from-parallel-tests-interleaves-and-manufactures-phantom-sequences	DROP	covered loosely, measurement-methodology family already extensive
+node-throughput-is-not-objective-throughput	DROP	narrow single-incident Steward coordination metric
+non-total-is-established-uncloseable-is-not-when-the-closing-deliverable-was-never-attempted	DROP	narrow single-incident frame/AC nuance
+nothing-pushed-is-not-a-safety-property-it-is-a-durability-hazard	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+notify-adversary-on-every-code-merge	OPERATOR	listed for the Steward (not placed in the corpus)
+obligation-must-descend-into-structure	DUP	agent/memory/enclave/obligation-must-descend-into-structure.md (checked-in copy current; no fold)
+obligations-route-to-ward-not-into-ken	OPERATOR	listed for the Steward (not placed in the corpus)
+occasional-red-ci-beats-full-local-tests	OPERATOR	listed for the Steward (not placed in the corpus)
+omega-type-partition-axis-is-codomain-class-pi-into-omega-impredicative	DUP	agent/memory/enclave/sigma-sort-pi-vs-sigma-over-equating.md
+on-an-unlanded-candidate-there-is-no-cheap-follow-up-non-blocking-answers-risk-not-cost	DROP	covered loosely, fold/track timing family already extensive
+one-snapshot-regrepped-is-not-three-checks	DUP	agent/memory/CHECKS.md#1
+one-term-naming-two-artifacts-makes-a-satisfied-criterion-and-an-unsatisfied-one-look-like-the-same-check	DROP	covered loosely, ambiguous-terminology family already extensive
+only-one-of-several-producers-may-be-armed-so-a-reordering-repair-does-nothing	DROP	covered loosely, CHECKS#6 population-before-mechanism family
+opaque-primitive-constructible-not-destructible-format-gap	DUP	agent/memory/fleet/opaque-primitive-constructible-not-destructible-format-gap.md (checked-in copy current; no fold)
+opaque-primitive-key-needs-one-extensionality-anchor	DROP	real but narrow/deep enclave-specific gap; not promoting
+operator-directed-work-reported-by-an-agent-is-trustworthy	OPERATOR	listed for the Steward (not placed in the corpus)
+operator-queued-l1-hs15-escalation-2026-09-12	OPERATOR	operator task state (resolved; listed for the Steward)
+operator-queued-l2-exhausted-2026-09-12	OPERATOR	operator task state (resolved; listed for the Steward)
+operator-return-two-decisions-2026-09-01	OPERATOR	operator task state (resolved; listed for the Steward)
+operator-task-lieutenant-coord-and-main-repo-sync	OPERATOR	operator task state (resolved; listed for the Steward)
+operator-task-memory-and-ci-program-2026-09-26	OPERATOR	listed for the Steward (not placed in the corpus)
+operator-timezone-pdt	OPERATOR	operator identity (July: excluded-personal)
+opus-enclave-authors-shovel-ready-wps	OPERATOR	operator ruling; July migration dropped it (listed for the Steward)
+origin-main-moves-under-you-mid-turn-because-a-sibling-worktree-fetched	DUP	agent/memory/fleet/a-squash-merge-lands-the-diff-from-the-merge-base-not-the-diff-from-main.md
+orphan-watchdog-timer-record-id	DUP	agent/memory/roles/steward/orphan-watchdog-timer-record-id.md (checked-in copy current; no fold)
+orphaned-background-task-loops-leak-cpu	DUP	agent/memory/fleet/orphaned-background-task-loops-leak-cpu.md (checked-in copy current; no fold)
+overclaimed-justification-check-the-consumed-property	DUP	agent/memory/fleet/grep-the-producer-not-the-cited-proxy.md
+package-ecosystem-comprehensive-standard-small-contrib	DUP	agent/memory/enclave/package-ecosystem-comprehensive-standard-small-contrib.md (checked-in copy current; no fold)
+pane-suggestion-text-is-not-agent-state	DUP	agent/memory/fleet/pane-suggestion-text-is-not-agent-state.md (checked-in copy current; no fold)
+parameterise-safety-controls-over-every-rendering-shape-not-the-one-you-saw	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+parent-equals-main-passes-against-the-main-that-existed-when-you-cut-it	DUP	agent/memory/fleet/a-squash-merge-lands-the-diff-from-the-merge-base-not-the-diff-from-main.md
+partial-oracle-wp-needs-conformance-fold-in-the-exact-merged-sha	DUP	agent/memory/build/mid-review-fix-inline-escalate-or-track.md
+participant-status-timestamps-have-no-date-so-a-dead-seat-manufactures-a-loop	DROP	proposed for promotion, not taken: covered by the platform-partitioned pane-census lesson now promoted (convo status is last-set)
+path-intersection-empty-is-not-publishable	DUP	agent/playbooks/federation/steward/merge-procedure.md
+pending-ci-jobs-can-mask-a-run-startup-failure	DUP	agent/memory/fleet/a-stuck-required-check-is-not-slow-ci-and-rerunning-it-wedges-the-pr.md
+per-compile-ids-collide-across-fixtures-so-a-census-undercounts	DUP	agent/memory/CHECKS.md#6
+perf-primitive-vs-fix-the-evaluator-fork	DUP	agent/memory/enclave/perf-primitive-vs-fix-the-evaluator-fork.md (checked-in copy current; no fold)
+pgrep-c-without-f-reports-zero-while-the-publisher-is-running	DUP	agent/memory/roles/steward/fetching-during-the-publisher-window-freezes-the-NEXT-publish.md
+pi-codex-seats-have-a-272k-window-compact-late-not-early	OPERATOR	listed for the Steward (not placed in the corpus)
+pi-seat-ctx-spikes-during-reads-reseat-not-compact-to-reduce	DROP	pi/moot-specific remediation tactic from one session, no shown recurrence
+pick-the-reading-whose-error-is-cheapest-to-discover-not-the-one-that-costs-you	DROP	proposed for promotion, not taken: decision heuristic; not selected
+piecemeal-continuation-authority-import-is-ownership-inversion-rule-a-single-static-owner-of-the-whole-subtree	DUP	agent/memory/fleet/hard-stop-chain-escalate-to-research-advisory.md
+pin-a-transport-orientation-answer-semantically-never-by-a-k-m-letter	DROP	one exchange (D2b HS18); enclave transport/endpoint corpus already dense
+pins-detectors-and-evidence-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+placement-edge-is-the-direct-use-not-the-transitive-caller-chain	DROP	specific to one WP's module-placement dispute
+playbooks-state-mechanism-not-intent	DUP	agent/memory/roles/steward/playbooks-state-mechanism-not-intent.md (checked-in copy current; no fold)
+plumbing-commit-onto-held-branch-and-its-desync-risk	DUP	agent/memory/fleet/plumbing-commit-onto-held-branch-and-its-desync-risk.md (checked-in copy current; no fold)
+population-and-matching-are-two-joints-and-a-headline-can-name-nobody	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+postcompact-resume-watcher-false-positives-on-a-compaction-discussion-heavy-pane	DUP	agent/memory/fleet/compaction-is-manual-no-clean-seam.md
+prefer-a-structural-answer-over-a-sampled-one	DUP	agent/memory/roles/adversary/the-demonstration-instance-can-be-the-extremal-one.md
+prefer-an-instrument-that-fails-loudly-over-one-that-fails-silently	DUP	agent/memory/roles/architect/read-the-candidate-shas-ci-history-before-voting.md
+prefer-the-number-the-producer-already-emits-over-one-you-count-yourself	PROMOTE	new agent/memory/fleet/prefer-the-number-the-producer-already-emits-over-one-you-count-yourself.md
+prior-art-failure-modes-of-controls-that-pin-a-population-an-upstream-classifier-can-empty-vacuous-control-delegation-rot-subsumed-guard	DUP	agent/memory/CHECKS.md#8
+probe-elaboration-ordering-resolve-and-elab-are-separate-phases	DUP	agent/memory/build/declaration-order-claim-needs-three-probe-net.md
+probe-recursion-depth-before-writing-the-real-test	DUP	agent/memory/build/probe-recursion-depth-before-writing-the-real-test.md (checked-in copy current; no fold)
+produce-the-analysis-a-flawed-instrument-is-a-caveat-not-a-prerequisite	OPERATOR	listed for the Steward (not placed in the corpus)
+proof-attachment-encodes-membership-not-role	DROP	ruling landed verbatim in spec/30-surface/33-declarations.md; narrative superseded
+proof-carrying-mechanism-mutation-reddens-at-elaboration-not-assertion	DUP	agent/memory/fleet/mutation-proof-injection-point-is-a-reachability-tell.md
+proof-relevant-inductive-cannot-be-declared-at-omega	DUP	agent/memory/enclave/proof-relevant-inductive-cannot-be-declared-at-omega.md (checked-in copy current; no fold)
+prove-the-fixture-enters-the-route-before-asserting-on-it	DUP	agent/memory/CHECKS.md#9
+provider-content-refusal-is-a-distinct-stall-class	PROMOTE	new agent/memory/fleet/provider-content-refusal-is-a-distinct-stall-class.md
+publish-and-git-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+publisher-ci-red-is-accepted-operational-cost	OPERATOR	listed for the Steward (not placed in the corpus)
+publisher-delete-stales-lease-prune-before-next-publish	DUP	agent/memory/roles/steward/consecutive-publishes-need-fetch-prune-branch-is-deleted-on-merge.md
+publisher-force-pushes-stale-local-branch-not-target-sha	DUP	agent/memory/fleet/scripted-publisher-target-is-head-branch-never-main.md
+publisher-landed-tree-log-line-is-not-the-squash-sha	DROP	narrow one-script log-line technicality; verify-independently theme already saturated in publisher corpus
+publisher-output-through-grep-pipe-block-buffers-poll-lines	DROP	narrow shell-buffering gotcha; not independently confirmed still-current practice
+publishing-a-measurement-means-publishing-its-extraction-and-selection	DROP	proposed for promotion, not taken: covered by fleet/publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read.md and CHECKS.md#1
+push-head-main-from-scratch-branch-lands-voided-ancestor-chain	DUP	agent/memory/fleet/a-merge-is-two-seats-the-router-and-the-executor-and-only-one-owns-each-merge.md
+px16-home-path-libc-nss-sanctioned	OPERATOR	listed for the Steward (not placed in the corpus)
+px7-resource-bracket-strategy-not-held	OPERATOR	listed for the Steward (not placed in the corpus)
+qualifying-an-ac-to-match-what-you-measured-is-the-scope-cut	DUP	agent/memory/enclave/a-stated-impossibility-carries-a-qualifier-and-the-qualifier-is-the-escape.md
+quoting-mutable-text-is-an-untracked-read-dependency	DUP	agent/memory/fleet/text-whose-truth-has-an-expiry-sits-in-an-artifact-with-no-alarm.md
+re-pinning-a-frame-catches-a-moved-blob-but-the-finding-is-the-new-adjacency	DROP	specific WP re-pin incident; overlaps existing counting-callers family
+re-read-latest-events-immediately-before-a-stall-nudge	DUP	agent/memory/fleet/re-read-latest-events-immediately-before-a-stall-nudge.md (checked-in copy current; no fold)
+reachability-is-not-controllability	DUP	agent/memory/CHECKS.md#9
+reaching-a-component-is-not-failing-at-it	DROP	real QA distinction but adjacent to existing failure-attribution/positive-control family; conservative cut
+read-a-frames-outcome-menu-before-its-criteria	DROP	WP frame-reading discipline; narrower instance of existing criteria-vs-answer-shape family; conservative cut
+read-a-register-at-origin-main-never-in-your-worktree	DUP	agent/memory/fleet/the-law-you-re-orient-against-is-your-branch-s-base-not-main.md
+read-own-ctx-percent-via-capture-pane-before-self-compacting	DROP	architect-seat tooling footnote; narrow extend candidate; conservative cut
+read-steward-lanes-md-three-lanes-never-collapse-to-one	DUP	agent/playbooks/federation/steward/lanes.md
+read-the-candidate-shas-ci-history-before-voting	DUP	agent/memory/roles/architect/read-the-candidate-shas-ci-history-before-voting.md (checked-in copy current; no fold)
+read-the-intern-function-to-decide-whether-a-read-back-is-an-independent-authority	DUP	agent/memory/CHECKS.md#1
+read-the-participant-id-at-post-time-never-from-memory	DUP	agent/memory/roles/architect/architect-verify-leader-actor-ids.md
+read-the-producer-before-writing-a-predicate-over-its-value	DUP	agent/memory/fleet/grep-the-producer-not-the-cited-proxy.md
+reading-a-flags-value-is-not-reading-its-extent	DUP	agent/memory/fleet/mutation-proof-injection-point-is-a-reachability-tell.md
+reason-in-agent-team-hours-not-human-days	DUP	agent/memory/fleet/reason-in-agent-team-hours-not-human-days.md (checked-in copy current; no fold)
+reclassifying-an-arm-fails-loudly-at-matches-and-silently-at-filters	DUP	agent/memory/fleet/exhaustiveness-comes-from-an-unguarded-arm-not-from-the-match.md
+reconcile-binds-a-co-reviewers-plausible-reading-too	DUP	agent/memory/enclave/reconcile-binds-a-co-reviewers-plausible-reading-too.md (checked-in copy current; no fold)
+reconcile-own-over-claim-then-grep-coupled	DUP	agent/memory/enclave/reconcile-own-over-claim-then-grep-coupled.md (checked-in copy current; no fold)
+reconcile-proof-rides-elaboration-merge-not-build-phase	DUP	agent/memory/enclave/reconcile-proof-rides-elaboration-merge-not-build-phase.md (checked-in copy current; no fold)
+recursive-omega-proof-soundness-sct-plus-irrelevance	DROP	settled kernel design ruling (SCT-guarded proof recursion) landed in spec/40-runtime/43-termination.md
+red-ci-is-a-priority-to-fix-not-a-merge-past-to-normalize	OPERATOR	listed for the Steward (not placed in the corpus)
+reference-derived-corroboration-must-not-become-a-frames-cited-rationale	PROMOTE	new agent/memory/enclave/reference-derived-corroboration-must-not-become-a-frames-cited-rationale.md
+reformat-gate-checks-meaning-not-layout-conformance	DUP	agent/memory/fleet/formatter-soundness-gates-are-blind-to-layout-conformance.md
+refusal-behaviour-changes-gate-on-whole-consumer-crates	DUP	agent/memory/CHECKS.md#3
+relaying-a-fix-at-a-different-layer-than-proposed-makes-it-unbuildable	DROP	specific relay-fidelity incident; adjacent to existing corroboration/citation-fidelity family
+releasing-work-without-the-before-work-compaction-gate-spends-the-seats-turn	DUP	agent/memory/roles/steward/dont-gate-pipeline-fill-on-credit-cost.md
+remove-temp-bundle-worktree-right-after-publisher-push	DROP	narrow one-incident steward procedural note; covered by publisher-window/worktree hygiene family
+removing-a-capability-by-deleting-one-impl-leaves-every-other-spelling-of-it	DUP	agent/memory/CHECKS.md#3
+repeated-defeats-of-one-checker-mean-the-default-branch-is-wrong	DUP	agent/memory/fleet/mutation-proof-injection-point-is-a-reachability-tell.md
+repeated-rejects-mean-mis-sized-only-if-the-accepted-surface-is-flat	DROP	specific coordination-judgment nuance, too narrow to generalize
+reply-to-errors-on-speaker-id-use-post-response-with-thread-id	DUP	agent/memory/fleet/mootup-posting-from-agent.md
+reply_to-speaker_id-error-use-post_response	DUP	agent/memory/fleet/mootup-posting-from-agent.md
+repointing-a-sentinel-needs-a-direction-argument	DROP	specific mutation/sentinel-authoring nuance, no exact hit, too narrow
+reporting-an-inner-layers-visibility-makes-the-fleet-instruct-you-to-widen-it	DUP	agent/memory/CHECKS.md#1
+reread-latest-events-before-acting-on-a-green-light	DUP	agent/memory/fleet/re-read-latest-events-immediately-before-a-stall-nudge.md
+reseat-foundation-ring-to-pi-after-cat-gcd	OPERATOR	listed for the Steward (not placed in the corpus)
+reseating-a-ring-is-the-stewards-job-to-execute-never-operator-run	OPERATOR	listed for the Steward (not placed in the corpus)
+resolve-branch-can-pick-up-a-stale-shared-local-ref-from-another-worktree	PROMOTE	extended agent/memory/fleet/scripted-publisher-target-is-head-branch-never-main.md
+resolve-the-decision-first-then-post-once	DUP	agent/memory/roles/architect/architect-gate-can-be-skipped-review-on-main.md
+resolving-terminal-decision-drops-steward-merge-signal	DUP	agent/memory/roles/architect/architect-gate-can-be-skipped-review-on-main.md
+resource-blowup-on-small-code-is-a-checker-bug	DUP	agent/memory/enclave/resource-blowup-on-small-code-is-a-checker-bug.md (checked-in copy current; no fold)
+restructuring-a-mechanism-updates-the-nearest-comment-and-strands-the-leading-one	DUP	agent/memory/build/mid-branch-correction-regrep-whole-branch-for-stale-claims.md
+retiring-a-criterion-leaves-live-dispatches-quoting-it-sweep-the-instructions-not-just-the-document	DUP	agent/memory/roles/steward/a-hypothesis-published-in-a-routing-post-is-executed-as-an-instruction.md
+retiring-a-false-premise-can-delete-a-real-cost-it-was-standing-in-for	DROP	proposed for promotion, not taken: one ruling incident; not selected
+reuse-declare-postulate-for-fail-closed-hardening	DROP	single-incident kernel example; already covered by docs/PRINCIPLES.md reflect-don't-extend charter
+reused-wp-branch-name-frame-then-code-stale-ref-push-reject	DUP	agent/memory/roles/steward/consecutive-publishes-need-fetch-prune-branch-is-deleted-on-merge.md
+reverting-a-probe-mid-run-turns-missing-evidence-into-a-finding	DUP	agent/memory/fleet/a-capture-that-wrote-zero-bytes-is-a-failed-capture-not-a-clean-build.md
+review-a-correction-candidate-against-the-file-not-its-diff	DUP	agent/memory/build/mid-branch-correction-regrep-whole-branch-for-stale-claims.md
+reviewer-independence-derives-from-context-not-model	OPERATOR	listed for the Steward (not placed in the corpus)
+reviewers-review-branches-not-prs	DUP	agent/memory/fleet/reviewers-review-branches-not-prs.md (checked-in copy current; no fold)
+reviewing-a-new-sum-type-constructor-requires-censusing-consumer-enumerators-not-just-producer-projections	DUP	CHECKS.md#3
+route-a-steward-authored-branch-requires-pushing-the-ref-to-origin-first	DROP	codified in agent/playbooks/federation/steward/merge-procedure.md and tools/gh-access.md
+rt-ssa-specialized-owner-kmatch-homed-out-of-source-continuation-chain-and-captures-absent-at-inlinenocall	DROP	resolved single-incident WP narrative (RT-COMPOSED-RETURN), no longer live
+ruled-rows-are-fixed-points-not-rederivable-by-a-classifier	DROP	single incident; marginal beyond existing delegation-review lessons
+run-the-discriminating-grid-before-asserting-a-causal-predicate	DUP	CHECKS.md#9 (agent/memory/fleet/a-green-pilot-is-not-evidence-for-a-shape-it-never-produced.md)
+running-a-repo-script-from-the-wrong-worktree-reports-published-work-as-missing	DUP	agent/memory/roles/steward/bash-cd-main-repo-vs-steward-worktree.md
+runtime-lane-is-the-linux-abi-completion-program	OPERATOR	listed for the Steward (not placed in the corpus)
+rustdoc-symbol-dump-cannot-see-trait-impls	DUP	agent/memory/roles/adversary/line-closure-check-must-compare-whole-files-not-diff-hunks.md
+rustfmt-formats-the-module-tree-not-the-file-you-named	DROP	single incident; narrow gotcha, marginal beyond existing diff-audit lessons
+safe-facade-needs-complete-upstream-unsafe-contract	DROP	single validated incident (self-flagged); case resolved, unsafe call removed
+safe-reflow-space-substitution-only	DUP	July migration: agent/memory/fleet/markdown-80col-reflow.md
+safe-to-start-against-is-a-claim-about-an-answer-you-do-not-have	DUP	agent/memory/roles/steward/a-hypothesis-published-in-a-routing-post-is-executed-as-an-instruction.md
+same-class-migration-can-be-inexpressible-in-the-target-mechanism	DUP	agent/memory/fleet/never-pin-a-shape-that-cannot-state-its-own-contract.md
+same-word-two-concepts-one-landed-is-a-scoping-trap	DUP	agent/memory/roles/adversary/rank-subclaims-by-load-bearing-not-by-checkability.md
+sanctioned-model-stack	OPERATOR	listed for the Steward (not placed in the corpus)
+scc-condensation-order-probe-nonentry-member-external-dep	DROP	fixed bug; correct mechanism now documented in frame-pseudocode-diverges-from-landed-mechanism.md
+scope-review-vote-to-my-lane	DUP	agent/memory/enclave/scope-review-vote-to-my-lane.md (checked-in copy current; no fold)
+scope-wrap-md-80-narrowly-not-whole-file	DROP	root cause already fixed by current wrap-md-80 skill's minimal-touch design
+scoping-a-deliverable-out-can-strand-the-acs-defined-on-it	DROP	single incident; marginal beyond existing AC/frame lessons
+scratchpad-is-tmpfs-not-disk	DUP	agent/memory/fleet/the-agent-scratchpad-is-tmpfs-so-every-byte-you-write-there-is-ram.md
+scripted-publisher-target-is-head-branch-never-main	DUP	agent/memory/fleet/scripted-publisher-target-is-head-branch-never-main.md (checked-in copy current; no fold)
+sct-completeness-fix-conservative-construction	DUP	agent/memory/teams/kernel/sct-completeness-fix-conservative-construction.md (checked-in copy current; no fold)
+sct-unapplied-self-reference-over-accepts	DUP	agent/memory/teams/kernel/sct-unapplied-self-reference-over-accepts.md (checked-in copy current; no fold)
+sealed-carrier-check-the-sibling-carrier-for-an-ungated-premise	DROP	single resolved incident; covered by CHECKS.md#2 fan-in discipline
+sealed-catalog-closed-means-one-authoritative-not-frozen-cardinality	DROP	single-incident PX8 ruling; catalog-versioning specifics likely stale
+search-for-the-name-the-producer-uses-not-the-consumer	DROP	single-session incident; marginal beyond existing producer/consumer grep lessons
+search-your-own-durable-rulings-before-ruling-again	DROP	single-session incident; marginal beyond enclave-ruling-in-thread-is-not-a-durable-deliverable family
+seat-on-invalid-model-string-400s-every-turn	DROP	narrow infra incident; looks-idle-but-stalled family already covered elsewhere
+seat-work-branches-hold-local-only-commits-and-branch-r-contains-lies	DROP	self-retracted remedy; core point covered by durability/reachability lesson family
+second-occurrence-of-idiom-is-a-language-feature-signal	OPERATOR	listed for the Steward (not placed in the corpus)
+self-compact-at-33-percent-a-recurring-event-is-never-a-reason-to-defer	OPERATOR	listed for the Steward (not placed in the corpus)
+self-compacting-right-after-resolving-swallows-the-announcement	DUP	agent/memory/roles/architect/architect-gate-can-be-skipped-review-on-main.md
+separate-judgment-from-action-scripts-gather-facts-i-decide	OPERATOR	listed for the Steward (not placed in the corpus)
+separate-the-conclusion-from-the-warrant-when-a-citation-is-narrowed	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+settled-operator-approval-is-a-fixed-input-never-re-ask	OPERATOR	listed for the Steward (not placed in the corpus)
+shared-tmpdir-exhaustion-reads-as-a-growing-regression	DUP	agent/memory/fleet/a-full-disk-presents-as-a-test-regression-and-df-slash-cannot-see-it.md
+sigma-sort-pi-vs-sigma-over-equating	DUP	agent/memory/enclave/sigma-sort-pi-vs-sigma-over-equating.md (checked-in copy current; no fold)
+silence-duration-anchor-on-actual-clock-not-last-event	DROP	narrow instance of reconcile-against-full-state rule already covered
+silence-from-an-instrument-means-wrong-instrument-until-you-prove-otherwise	DUP	agent/memory/fleet/no-error-in-the-output-passes-when-there-is-no-output.md
+since-cursor-poll-misses-owed-items-that-predate-the-cursor-pane-probe-catches-them	DUP	agent/memory/fleet/re-read-latest-events-immediately-before-a-stall-nudge.md
+sizing-a-subsume-fix-enumerate-every-piece	DUP	agent/memory/enclave/sizing-a-subsume-fix-enumerate-every-piece.md (checked-in copy current; no fold)
+sole-net-prefer-structural-self-evidence-over-positional-scalar	DUP	agent/memory/enclave/sole-net-prefer-structural-self-evidence-over-positional-scalar.md (checked-in copy current; no fold)
+sole-verifier-wp-architect-runs-consumer-suite	DUP	agent/memory/build/qa/conformance-hand-feeds-the-deliverable.md
+soundness-AC-static-vs-runtime-face	DUP	agent/memory/enclave/soundness-AC-static-vs-runtime-face.md (checked-in copy current; no fold)
+spec-claim-kernel-admittance-vs-staging	DUP	agent/memory/enclave/spec-claim-kernel-admittance-vs-staging.md (checked-in copy current; no fold)
+spec-conv-omega-shortcut-trap	DUP	agent/memory/enclave/spec-conv-omega-shortcut-trap.md (checked-in copy current; no fold)
+spec-enclave-always-compact-before-new-work	DUP	agent/memory/enclave/spec-enclave-always-compact-before-new-work.md (checked-in copy current; no fold)
+spec-example-must-satisfy-its-own-rules	DUP	agent/memory/enclave/spec-example-must-satisfy-its-own-rules.md (checked-in copy current; no fold)
+specifying-an-interface-one-clause-at-a-time-produces-a-stop-per-clause	DROP	single incident; marginal beyond existing hard-stop-chain lessons
+spelling-currency-sweep-separate-from-vacuity	DUP	agent/memory/enclave/spelling-currency-sweep-separate-from-vacuity.md (checked-in copy current; no fold)
+spinner-glyph-appears-in-both-active-and-finished-footers-use-the-verb-form	DUP	agent/memory/roles/steward/a-working-idle-grep-keyed-on-one-harnesses-footer-reports-false-idle-on-the-other.md
+spinner-verb-is-randomized-detect-esc-to-interrupt-not-the-word	DUP	agent/memory/roles/steward/a-working-idle-grep-keyed-on-one-harnesses-footer-reports-false-idle-on-the-other.md
+split-an-authored-test-expectation-into-semantic-which-must-be-lifted-and-structural-which-is-free	DROP	single incident; marginal beyond existing authored-detector lessons
+stale-base-candidate-silently-reverts-everything-landed-since	DUP	agent/memory/roles/steward/stale-base-candidate-silently-reverts-everything-landed-since.md (checked-in copy current; no fold)
+state-a-diff-claim-against-the-anchor-your-reader-holds	DUP	agent/memory/fleet/a-claim-accurate-about-something-narrower-than-its-reader-infers.md
+state-a-premise-in-its-weakest-sufficient-form	DROP	proposed for promotion, not taken: style advice; not selected
+state-the-DIRECTION-of-a-weakness-over-strict-or-unsound	DUP	CHECKS.md#1 (agent/memory/fleet/a-pin-cannot-disagree-with-its-own-source.md)
+state-the-split-not-the-sum-a-measurement-is-not-a-criterion	DUP	agent/memory/fleet/a-number-sound-as-a-measurement-is-not-sound-as-a-criterion.md
+static-export-governing-dynamic-correlation-must-serialize-the-binder-descriptor	DROP	single resolved WP finding (PX7-T, merged); not generalized elsewhere
+stating-a-limit-honestly-is-not-the-same-as-stating-what-the-evidence-can-rule-out	DUP	CHECKS.md#8 (agent/memory/fleet/an-acceptance-criterion-must-name-an-observation-the-failing-configuration-does-not-also-produce.md)
+steward-coldstart-infra-checks	DUP	agent/memory/roles/steward/steward-coldstart-infra-checks.md (drift folded into it)
+steward-publish-invalidates-in-flight-merge-decisions	DROP	superseded by COORDINATION.md's current content-intersection-only stale-base rule
+steward-restores-codex-seat-tier-via-tmux-model-selector	DUP	agent/memory/fleet/safety-check-modal-defaults-to-a-model-downgrade.md
+steward-work-is-stale-immediately-after-every-publish	DUP	agent/memory/roles/steward/steward-work-is-stale-immediately-after-every-publish.md (checked-in copy current; no fold)
+strand-detector-pattern-cannot-match-the-real-composer-text	DUP	agent/memory/roles/steward/a-stranded-delivery-is-corroborated-by-the-recipients-own-status.md
+striking-a-row-from-a-record-whose-ordinals-carry-scheduling-meaning-moves-the-schedule	DROP	proposed for promotion, not taken: one ledger incident; not selected
+structural-predicate-beats-snapshot-predicate-for-merge-forecasts	DUP	agent/memory/roles/adversary/forecasting-a-merge-is-not-evidence-about-it.md
+structural-reachability-beats-empirical-probe-for-dead-code-fix	DUP	agent/memory/build/qa/structural-reachability-beats-empirical-probe-for-dead-code-fix.md (checked-in copy current; no fold)
+subsume-idiom-generality-grounds-on-near-path-types	DUP	agent/memory/enclave/sizing-a-subsume-fix-enumerate-every-piece.md
+surface-enum-expansion-breaks-checked-program-exhaustiveness-consumers	DUP	agent/memory/fleet/exhaustiveness-comes-from-an-unguarded-arm-not-from-the-match.md
+surface-form-migration-trips-two-oracle-classes	DUP	agent/memory/roles/steward/exported-name-migration-needs-whole-harness-consumer-inventory.md
+surface-glyph-migration-is-semantic-not-textual	DUP	agent/memory/roles/steward/migration-sweep-glob-must-enumerate-every-ken-source-root.md
+surface-reconcile-run-fixture-in-context-frame-may-name-one-axis	DROP	single-incident tt->Proved errata; verdict-flip-each-axis discipline covered by CHECKS#7
+surface-the-seam-need-not-your-preferred-mechanism	DUP	agent/memory/fleet/surface-the-seam-need-not-your-preferred-mechanism.md (checked-in copy current; no fold)
+swapfree-is-not-a-distress-instrument-memory-pressure-is	DROP	single-incident memory-diagnosis narrative; overlaps existing tmpfs/disk-instrument-blindness lesson
+sweep-a-retired-model-by-its-arithmetic-not-by-its-phrasing	DUP	agent/memory/build/rename-wp-needs-whole-workspace-basename-sweep.md
+sweep-wedged-panes-misses-stacked-paste-form-capture-architect-directly	DUP	agent/memory/fleet/verify-a-tmux-rouse-actually-submitted.md
+systems-os-kernel-interface-first-party	DUP	agent/memory/enclave/systems-os-kernel-interface-first-party.md (checked-in copy current; no fold)
+taint-axis-orientation-needs-distinguishing-pair	DUP	agent/memory/build/qa/taint-axis-orientation-needs-distinguishing-pair.md (checked-in copy current; no fold)
+temp-worktree-holds-wp-branch-remove-before-kicking-team	DUP	agent/memory/build/wp-branch-handoff-deadlock-leader-holds.md
+terminal-gate-resolve-race-resolving-on-cast	DUP	agent/memory/fleet/terminal-gate-resolve-race-resolving-on-cast.md (checked-in copy current; no fold)
+tested-not-trusted-posture-needs-reachability-precondition	DUP	agent/memory/enclave/tested-not-trusted-posture-needs-reachability-precondition.md (checked-in copy current; no fold)
+the-ac-named-witness-may-be-unable-to-carry-the-mechanisms-required-input	DROP	single-incident Ken lexical-recursor debugging; covered by CHECKS#4 spirit
+the-ac-whose-evidence-you-must-manufacture-is-the-one-you-silently-skip	DUP	agent/memory/fleet/a-two-clause-finding-gets-discharged-on-whichever-clause-its-author-phrased-as-an-ask.md
+the-adversary-must-not-git-fetch-per-hunt-only-the-publisher-path-has-github-credentials-and-the-merge-notification-guarantees-the-squash-is-already-in-the-shared-object-store	DUP	agent/memory/fleet/check-main-via-git-object-store-not-find.md
+the-assertion-that-names-the-cause-can-be-the-next-line-and-never-run	DROP	single-incident CI-failure diagnosis narrative; assertion-ordering practice not a new mechanism
+the-branch-you-are-parked-on-can-itself-be-a-routed-deliverable	DROP	single-incident git-hygiene finding; overlaps existing worktree/branch-check lessons
+the-case-a-rule-was-written-for-is-the-one-it-is-never-tested-against	PROMOTE	new agent/memory/fleet/the-case-a-rule-was-written-for-is-the-one-it-is-never-tested-against.md
+the-defect-is-a-missing-enforcement-edge-not-missing-information	DROP	well-formed but overlaps CHECKS#8 proxy/enforcement spirit
+the-easy-half-of-a-frame-is-the-one-with-the-largest-adjacency-surface	DROP	novel framing heuristic; overlaps adversary adjacent-arms lessons
+the-events-api-projects-mentions-as-empty-so-it-cannot-audit-a-mention	DROP	API-quirk claim likely superseded by 2026-08-09 mootup upgrade; unverifiable now
+the-false-zero-that-agrees-with-you-is-the-one-that-is-never-caught	DUP	agent/memory/fleet/a-line-local-operation-lies-about-hard-wrapped-text.md
+the-frame-named-the-instrument-and-i-built-against-the-neighbouring-one	DROP	single-incident; overlaps CHECKS#4 (resolve named enabler before building)
+the-independent-side-of-an-emission-gate-is-the-finished-ir	DROP	single-incident Cranelift-specific compiler design narrative
+the-instruments-domain-silently-becomes-the-repairs-domain	DUP	agent/memory/enclave/count-the-population-before-you-place-it-inside-a-mechanism.md
+the-linux-abi-is-what-makes-ken-not-a-toy	OPERATOR	listed for the Steward (not placed in the corpus)
+the-only-production-writer-is-not-evidence-it-wrote-this-instance	DROP	single-incident; overlaps existing producer-tracing/enumeration lessons
+the-operator-can-hold-grounds-that-defeat-an-unachievable-verdict-you-measured	DROP	generalizes from CLEAN-ROOM.md's already-stated prior-art role restriction
+the-option-a-backend-vs-option-b-tcb-boundary-turns-on-whether-a-value-crosses-a-function-return	DROP	specific Architect TCB/ABI ruling narrative; not a generalizable lesson
+the-ownership-of-a-refusal-site-is-not-the-ownership-of-the-defect	DUP	agent/memory/fleet/a-pattern-match-is-evidence-about-what-encloses-it.md
+the-plan-cannot-corroborate-the-plan	DUP	agent/memory/fleet/a-pin-cannot-disagree-with-its-own-source.md
+the-property-that-defines-your-control-can-be-what-the-classifier-uses-to-exclude-it	DUP	agent/memory/enclave/buildability-ruling-must-ground-every-axis.md
+the-publisher-exits-0-after-a-transient-api-error-without-merging	DUP	agent/memory/roles/steward/publisher-flags-are-description-not-body-and-failure-is-silent.md
+the-same-command-on-two-branches-differs-by-a-pr-you-did-not-check-for	DUP	agent/memory/fleet/a-guard-on-what-the-command-says-is-not-a-guard-on-what-the-command-does.md
+the-satisfying-act-of-a-gate-must-be-the-write-not-a-post	DUP	agent/memory/fleet/text-whose-truth-has-an-expiry-sits-in-an-artifact-with-no-alarm.md
+thin-flow-directive-dont-cc-the-room	DUP	agent/memory/fleet/thin-flow-directive-dont-cc-the-room.md (checked-in copy current; no fold)
+threaded-reply-does-not-wake-no-poll-asker	DUP	agent/memory/fleet/mention-discipline.md
+three-in-scope-lessons-missing-on-one-node-is-a-reading-on-retrieval-not-on-the-seats	DROP	proposed for promotion, not taken: its finding is the premise of the 2026-09-25 audit and CHECKS.md itself
+three-proposed-repairs-that-are-each-the-identity-at-the-site-mean-the-defect-is-between-producers-not-views	DROP	single-incident; overlaps sibling lessons cited within it
+tier-table-is-a-default-runtime-seats-t1-implementer	DUP	agent/memory/fleet/use-tier-labels-never-model-names.md
+timeout-does-not-kill-grandchild-cargo-test	DUP	agent/memory/build/timeout-does-not-kill-grandchild-cargo-test.md (drift folded into it)
+total-over-nodes-is-not-closed-under-parent-child-reachability	DROP	single-incident Ken runtime planner debugging; overlaps CHECKS#6
+transcribe-before-deleting-scratch-harness	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+transcription-moves-contract-requires-three-part-reconcile	DUP	agent/memory/enclave/transcription-moves-contract-requires-three-part-reconcile.md (checked-in copy current; no fold)
+transferring-a-divergence-fix-from-an-admission-gate-to-a-builder-flips-the-occurrence-check-soundness-direction	DROP	single-incident kernel positivity/soundness ruling; too specific to generalize
+transport-schema-degenerate-endpoint-trap	DUP	agent/memory/enclave/transport-schema-degenerate-endpoint-trap.md (checked-in copy current; no fold)
+truncated-refinement-predicate-is-dropped-so-reassociation-observable-is-ambiguity-rejection-not-typecheck	DROP	single-incident Ken elaborator technical fact
+trust-level-claim-grep-per-check-both-directions	DUP	July migration kept it; merged away in the 2026-07-28 corpus audit (enclave trust-level lessons)
+trust-level-prose-vs-locked-adr-crosscheck	DUP	agent/memory/enclave/trust-level-prose-vs-locked-adr-crosscheck.md (checked-in copy current; no fold)
+trust-root-test-coverage-discipline	DUP	agent/memory/teams/kernel/trust-root-test-coverage-discipline.md (checked-in copy current; no fold)
+trusted-by-typing-guarantee-is-not-kernel-proved-Q	DUP	agent/memory/enclave/trusted-by-typing-guarantee-is-not-kernel-proved-Q.md (checked-in copy current; no fold)
+trusted-primitive-refinement-codomain-witness	DUP	agent/memory/enclave/trusted-primitive-refinement-codomain-witness.md (checked-in copy current; no fold)
+tt-vs-refl-endpoint-rule-for-inductive-equal-law-bases	DUP	agent/memory/enclave/tt-vs-refl-endpoint-rule-for-inductive-equal-law-bases.md (checked-in copy current; no fold)
+two-accepted-findings-on-one-site-can-prescribe-opposite-remedies	DROP	single-incident; overlaps existing two-node-defect-ownership lessons
+two-arity-authorities-that-disagree-may-count-different-objects-explicit-vs-environment	DROP	single-incident Ken closure-conversion arity debugging; too specific to generalize
+two-arm-producer-needs-a-case-per-arm	DUP	agent/memory/build/qa/two-arm-producer-needs-a-case-per-arm.md (checked-in copy current; no fold)
+two-questions-a-durable-artifact-must-survive	DROP	single-incident; citation/restatement/deletion triage overlaps existing durable-artifact lessons
+two-relations-can-each-name-a-different-occurrence-and-a-ruling-can-swap-their-roles	DROP	single-incident Ken planner debugging; too specific to generalize
+un-ignoring-a-deferred-test-with-a-retargeted-assertion-audit-the-expected-values-producer-legitimate-iff-an-independent-stage-tautological-iff-echoed-from-the-run-or-fixture-input	DUP	agent/memory/fleet/an-assertion-whose-expected-value-is-computed-from-the-thing-under-test-is-a-theorem.md
+unblocking-one-of-several-blockers-restores-nothing-price-the-remedy-against-the-throughput-not-the-blocker	PROMOTE	new agent/memory/roles/steward/unblocking-one-of-several-blockers-restores-nothing-price-the-remedy-against-the-throughput-not-the-blocker.md
+unmintable-is-not-unobtainable-check-whether-a-fixture-enumerates-one	DUP	agent/memory/fleet/a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control.md
+until-condition-with-exit-1-kills-the-whole-poll-script	DROP	true and useful bash gotcha but narrow single mechanical pattern
+untrusted-layer-backstop-hole-for-omissions	DUP	agent/memory/enclave/untrusted-layer-backstop-hole-for-omissions.md (checked-in copy current; no fold)
+use-the-previous-variant-addition-as-the-control-population	DROP	overlaps existing catch-all-absorption lessons (exhaustiveness-comes-from-an-unguarded-arm, exhaustive-term-traversals)
+use-tier-labels-never-model-names	DUP	agent/memory/fleet/use-tier-labels-never-model-names.md (checked-in copy current; no fold)
+varying-the-enclosure-is-not-varying-the-position	DROP	single-incident; measure-every-named-position already covered by cited sibling lesson
+verbatim-relay-still-exercises-authorship-through-selection	DUP	agent/memory/roles/adversary/verbatim-is-not-faithful-when-selection-is-wrong.md
+verdict-mapping-silence-is-a-latent-conformance-bug	DUP	agent/memory/enclave/verdict-mapping-silence-is-a-latent-conformance-bug.md (checked-in copy current; no fold)
+verified-showcase-predicate-must-be-defined-not-postulated	DUP	agent/memory/enclave/verified-showcase-predicate-must-be-defined-not-postulated.md (checked-in copy current; no fold)
+verify-a-classification-membership-from-the-criterion-function-not-the-values-semantics	DUP	agent/memory/enclave/buildability-ruling-must-ground-every-axis.md
+verify-a-kill-by-the-resource-it-held-not-by-the-name-you-killed-it-with	DROP	single-incident process-management narrative; overlaps build/timeout-does-not-kill-grandchild-cargo-test.md
+verify-a-ruling-has-not-already-landed-before-firing-an-architect-blocked-finding	DUP	agent/memory/fleet/re-read-latest-events-immediately-before-a-stall-nudge.md
+verify-branch-after-checkout-away-and-back	DUP	agent/memory/build/wp-branch-handoff-deadlock-leader-holds.md
+verify-field-order-arity-against-declaration-not-prose	DUP	agent/memory/fleet/verify-field-order-arity-against-declaration-not-prose.md (checked-in copy current; no fold)
+verify-generalization-per-category-and-regrounded-doc-full-pass	DUP	agent/memory/enclave/buildability-ruling-must-ground-every-axis.md
+verify-proposed-fix-excludes-the-counterexample	DUP	agent/memory/enclave/verify-proposed-fix-excludes-the-counterexample.md (checked-in copy current; no fold)
+verify-symbol-exposure-not-just-call-site-safety	DUP	agent/memory/enclave/verify-symbol-exposure-not-just-call-site-safety.md (checked-in copy current; no fold)
+verify-the-mechanism-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+verifying-the-pins-a-frame-enumerates-is-not-verifying-the-pins-that-exist	DUP	agent/memory/roles/steward/exported-name-migration-needs-whole-harness-consumer-inventory.md
+visibility-partition-proves-a-search-bound-a-grep-only-hopes-for	DUP	agent/memory/fleet/an-enumeration-needs-a-proven-closure-not-a-better-grep.md
+visibility-surface-deny-marker-conditional-and-source-root-tested	DROP	single-incident Ken export-mechanism finding (L4-export, already landed)
+wc-l-answers-how-big-never-whether-it-is-new	DUP	agent/memory/roles/steward/dont-publish-derived-code-measurements-state-the-property-let-the-ring-measure.md
+when-a-lesson-prescribes-more-care-look-for-the-position-based-version	DROP	meta-lesson on lesson-authoring; overlaps care-vs-structural theme in cited sibling
+when-a-repair-lands-ask-which-copy-it-repaired	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+when-a-reviewer-hands-you-a-generalization-re-audit-the-whole-candidate-against-it-not-just-the-instance-they-found	DUP	agent/memory/fleet/a-new-criterion-is-applied-forward-and-never-swept-backward-over-the-document-that-states-it.md
+when-compliance-costs-less-than-the-exception-there-is-no-exception	DROP	single-incident; overlaps CHECKS#8 proxy-criterion spirit
+when-ruling-a-catalog-authoring-spelling-ground-it-against-the-nearest-landed-precedent-not-spec-prose	DROP	Architect-specific catalog-spelling narrative; too specific to generalize
+when-several-repairs-in-a-row-miss-ask-whether-they-all-assumed-one-traversal	DROP	single-incident; same shared-premise meta-pattern as sibling files in this batch
+when-successive-measurement-errors-all-favour-the-same-verdict-the-errors-are-the-evidence	DROP	proposed for promotion, not taken: reviewer-pull heuristic; not selected
+when-the-defect-bearing-population-cannot-reach-the-branch-measure-the-route-not-the-kind	DROP	single-incident Ken planner debugging; too specific to generalize
+when-you-reverse-a-ruling-cancel-its-derived-assignments-by-name	DROP	proposed for promotion, not taken: covered by fleet/a-new-criterion-is-applied-forward-and-never-swept-backward-over-the-document-that-states-it.md and the withdrawal lesson now promoted
+which-role-an-artifact-occupies-is-set-by-what-you-are-trying-to-establish	DROP	proposed for promotion, not taken: covered by the classification lesson now promoted
+withdrawing-a-cell-and-relocating-it-test-different-properties	DUP	agent/memory/fleet/withdraw-and-relocate-test-different-properties.md
+withdrawing-an-ac-leaves-its-demands-in-every-other-operative-section	DUP	agent/memory/fleet/a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable.md
+witnesses-in-the-intersection-of-two-guards-cannot-show-either-is-redundant	DROP	single-incident Ken guard-redundancy debugging; too specific to generalize
+worktree-and-infra-hygiene-index	DROP	index file (injected MEMORY.md or a sub-index); no lesson content
+worktrees-share-one-object-db-so-every-check-passes-on-a-candidate-that-was-never-pushed	DUP	agent/memory/fleet/every-verification-instrument-passes-on-a-candidate-that-was-never-pushed.md
+wp-branch-handoff-deadlock-leader-holds	DUP	agent/memory/build/wp-branch-handoff-deadlock-leader-holds.md (checked-in copy current; no fold)
+wp-contention-has-a-ledger-axis-not-just-shared-files	DUP	agent/memory/teams/doc/a-currency-finding-can-be-a-ledger-dependency.md
+wp-frame-stale-vs-landed-kernel	DUP	agent/memory/enclave/wp-frame-stale-vs-landed-kernel.md (checked-in copy current; no fold)
+wp-release-process-steward-spec-build	OPERATOR	operator ruling; July migration dropped it (listed for the Steward)
+wp-split-leaves-parent-brief-downstream-stale	DUP	agent/memory/roles/steward/bundled-frame-doc-goes-stale-when-mechanism-flips.md
+write-the-measurement-base-and-the-candidate-base-as-two-fields-from-the-start	DUP	agent/memory/fleet/a-correction-on-main-does-not-reach-a-candidate-cut-before-it.md
+ws-sec-build-owned-by-verify	OPERATOR	operator ruling; July migration dropped it (listed for the Steward)
+you-file-a-caught-error-under-whoever-published-the-correction-not-whoever-found-it	DROP	proposed for promotion, not taken: attribution etiquette; not selected
+you-may-be-editing-an-artifact-the-checker-produces-instead-of-producing-it	DROP	proposed for promotion, not taken: covered by fleet/grep-the-producer-not-the-cited-proxy.md
+your-conservative-fork-option-may-be-a-scope-cut-you-cannot-authorize	DUP	agent/memory/roles/steward/a-fleet-derived-design-constraint-is-not-an-operator-boundary.md
+your-own-doc-comment-can-name-the-consumers-you-failed-to-repair	DUP	CHECKS.md#3
+your-role-playbook-is-served-from-your-worktree-so-it-is-stale-by-your-branchs-lag	DUP	agent/memory/fleet/the-law-you-re-orient-against-is-your-branch-s-base-not-main.md
+zero-executions-and-never-called-are-two-facts-one-number	DUP	merged into promoted agent/memory/fleet/an-instrument-that-reports-a-verdict-cannot-distinguish-inapplicable-from-false.md
+zonk_term-must-be-exhaustive-over-term-variants	DUP	July migration: agent/memory/teams/kernel/exhaustive-term-traversals.md

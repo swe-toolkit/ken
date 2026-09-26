@@ -93,3 +93,15 @@ claims. A ruling gets read and applied; it does not get re-derived on the way.
 **The trigger that covers both:** re-measure a claim when you are about to make
 it load-bearing — **by republishing it OR by acting on it.** Still a single
 observable moment, still nothing to notice across time.
+
+## A zero-hit slug is not a missing lesson
+
+Promotion rewrites a lesson, and rewriting renames it, so a citation of the
+old slug dangles the moment the promotion succeeds. A `0` from a slug search
+therefore has at least three causes with three different remedies: the lesson
+exists under a new name (repoint the citation), it exists only on an unlanded
+candidate branch (a merge-ordering question), or it is genuinely absent (write
+it). Before authoring a lesson to satisfy a dangling link, search the corpus
+by the lesson's subject and mechanism terms (`scripts/memory-search`), and
+check open candidates with `git ls-tree -r --name-only <cand> agent/memory/`.
+A near-duplicate file is the expensive failure here, not the broken link.

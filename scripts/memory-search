@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Search the fleet's lesson corpus (agent/memory/) with SQLite FTS5.
+
+    scripts/memory-search [--role ROLE | --all] [-n N] [--any] TERM...
+
+Each TERM must appear in a lesson; quote a multi-word TERM to match it as a
+phrase. `--any` matches lessons with any TERM. With no match for all terms, the
+command shows the any-term matches and says so. Results are ranked by BM25,
+weighting the title over the body.
+
+Scopes: `--role steward` searches that role's scopes (the table in AGENTS.md).
+Without `--role`, every lesson is searched. Search for the mechanism term as
+well as the subject name: "wrap grep" finds more than "SESSION-SCOPE".
+
+Matching ignores line wraps, so a phrase split across two lines is found,
+unlike with grep. The index is built in memory on each run, so it never goes
+stale.
+
+Every query is appended to a shared log (KEN_MEMORY_SEARCH_LOG, default
+/workspaces/ken/tmp/memory-search/queries.jsonl). The log records which
+lessons seats actually look up; it decides which lessons become cards (R2 in
+research/fleet-memory-curation-and-retrieval.md).
+"""
+
+import argparse
+import datetime
+import json
+import os
+import pathlib
+import re
+import sqlite3
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+MEMORY = ROOT / "agent" / "memory"
+SKIP = {"README.md", "MIGRATION-LOG.md", "CHECKS.md"}
+DEFAULT_LOG = "/workspaces/ken/tmp/memory-search/queries.jsonl"
+
+TEAMS = ("kernel", "verify", "language", "runtime", "ergo", "foundation", "doc")
+
+
+def role_scopes(role):
+    """Directories (relative to agent/memory) a role searches, per AGENTS.md."""
+    if role in ("steward", "architect", "research", "adversary", "spec-leader",
+                "spec-author", "conformance-validator"):
+        return ["fleet", "enclave", f"roles/{role}"]
+    if role == "lieutenant":
+        return ["fleet", "build"]
+    if role == "librarian":
+        return ["fleet", "roles/librarian", "teams/doc"]
+    m = re.fullmatch(r"([a-z]+)-(leader|implementer|qa)", role)
+    if m and m.group(1) in TEAMS:
+        team, kind = m.groups()
+        sub = {"leader": "leaders", "implementer": "implementers", "qa": "qa"}
+        return ["fleet", "build", f"build/{sub[kind]}", f"teams/{team}"]
+    sys.exit(f"memory-search: unknown role {role!r}; use --all")
+
+
+def unwrap(text):
+    """Join wrapped lines into paragraphs, leaving code fences and tables."""
+    out, para, fence = [], [], False
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            fence = not fence
+        structural = (fence or not stripped or stripped.startswith(("|", "#"))
+                      or re.match(r"^\s*([-*]|\d+\.)\s", line))
+        if structural:
+            if para:
+                out.append(" ".join(para))
+                para = []
+            if stripped.startswith(("-", "*")) or re.match(r"^\d+\.\s", stripped):
+                para = [stripped]
+            elif stripped:
+                out.append(line)
+        else:
+            para.append(stripped)
+    if para:
+        out.append(" ".join(para))
+    return "\n".join(out)
+
+
+def parse(path):
+    text = path.read_text(encoding="utf-8", errors="replace")
+    front = ""
+    if text.startswith("---\n"):
+        end = text.find("\n---", 4)
+        if end != -1:
+            front, text = text[4:end], text[end + 4:]
+    title = ""
+    m = re.search(r"^#\s+(.+)$", text, re.M)
+    if m:
+        title = m.group(1).strip()
+        text = text[:m.start()] + text[m.end():]
+    desc = ""
+    m = re.search(r"^description:\s*(.+)$", front, re.M)
+    if m:
+        desc = m.group(1).strip().strip('"')
+    return title or path.stem.replace("-", " "), desc, unwrap(text)
+
+
+def build_index(scopes):
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE VIRTUAL TABLE lesson USING fts5("
+               "path UNINDEXED, title, description, body, "
+               "tokenize='porter unicode61')")
+    for path in sorted(MEMORY.rglob("*.md")):
+        if path.name in SKIP:
+            continue
+        rel = path.relative_to(MEMORY)
+        if scopes is not None and str(rel.parent) not in scopes:
+            continue
+        db.execute("INSERT INTO lesson VALUES (?, ?, ?, ?)",
+                   (str(path.relative_to(ROOT)), *parse(path)))
+    return db
+
+
+def fts_query(terms, any_term):
+    quoted = ['"' + t.replace('"', '""') + '"' for t in terms if t.strip()]
+    return (" OR " if any_term else " AND ").join(quoted)
+
+
+def search(db, query, limit):
+    return db.execute(
+        "SELECT path, title, snippet(lesson, 3, '[', ']', ' ... ', 24), "
+        "bm25(lesson, 0, 8.0, 4.0, 1.0) AS rank FROM lesson "
+        "WHERE lesson MATCH ? ORDER BY rank LIMIT ?", (query, limit)).fetchall()
+
+
+def current_role():
+    try:
+        branch = subprocess.run(["git", "-C", str(ROOT), "branch",
+                                 "--show-current"], capture_output=True,
+                                text=True).stdout.strip()
+    except OSError:
+        return ""
+    return branch.split("/", 1)[0] if "/" in branch else branch
+
+
+def log_query(entry):
+    path = pathlib.Path(os.environ.get("KEN_MEMORY_SEARCH_LOG", DEFAULT_LOG))
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass  # the log is advisory; never fail a search over it
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Search agent/memory lessons (FTS5, BM25).")
+    ap.add_argument("terms", nargs="+", help="terms; quote a phrase")
+    scope = ap.add_mutually_exclusive_group()
+    scope.add_argument("--role", help="search this role's scopes only")
+    scope.add_argument("--all", action="store_true",
+                       help="search every lesson (the default)")
+    ap.add_argument("-n", type=int, default=10, help="results (default 10)")
+    ap.add_argument("--any", action="store_true", help="match any term")
+    args = ap.parse_args()
+
+    scopes = role_scopes(args.role) if args.role else None
+    db = build_index(scopes)
+    mode = "any" if args.any else "all"
+    rows = search(db, fts_query(args.terms, args.any), args.n)
+    if not rows and not args.any:
+        rows = search(db, fts_query(args.terms, True), args.n)
+        mode = "any-fallback"
+        if rows:
+            print("No lesson has every term; showing lessons with any term.\n")
+
+    for path, title, snip, _ in rows:
+        print(f"{path}\n  {title}\n  {snip}\n")
+    if not rows:
+        print("No match. Try the mechanism term, a synonym, or --any.")
+
+    log_query({
+        "ts": datetime.datetime.now(datetime.timezone.utc)
+              .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "role": args.role or current_role(),
+        "scopes": scopes or "all",
+        "terms": args.terms,
+        "mode": mode,
+        "hits": [r[0] for r in rows],
+    })
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -9,8 +9,8 @@ scope: federation
 # Steward
 
 Read `../../COORDINATION.md`, `../../MODELS.md`,
-`../../../docs/PRINCIPLES.md`, and `steward/lanes.md` at session start and after
-compaction.
+`../../OPERATOR-RULINGS.md`, `../../../docs/PRINCIPLES.md`, and
+`steward/lanes.md` at session start and after compaction.
 
 ## §0. Entry point: move the product
 

@@ -10,7 +10,10 @@ Codex next (which loads `AGENTS.md` + skills, not a tool-specific memory file).
 The migration from the private store is complete; `MIGRATION-LOG.md` is the
 coverage audit — every source lesson from the old store appears there exactly
 once, with its disposition (kept, merged into a kept file, dropped, or excluded
-as personal) and the reasoning.
+as personal) and the reasoning. The store regrew and was triaged a second time
+on 2026-09-26 (`migration-2026-09-26.tsv`); Claude Code's automatic memory is
+now off for this project (`autoMemoryEnabled: false` in
+`.claude/settings.json`), so a lesson has no home but this corpus.
 
 ## Two layers: checks and reference
 
@@ -18,8 +21,10 @@ as personal) and the reasoning.
   after compaction, and applies each check when its trigger fires. Hard limit:
   12 checks, 100 lines.
 - **Everything else is reference, searched on demand.** No seat bulk-reads a
-  scope directory. A seat greps its scopes (the table in `AGENTS.md`) by
-  mechanism term when a decision touches a known hazard.
+  scope directory. A seat searches its scopes (the table in `AGENTS.md`) by
+  mechanism term when a decision touches a known hazard, with
+  `scripts/memory-search --role <role> <terms>`. Its query log shows which
+  lessons are actually looked up.
 
 Why: the 2026-09-25 audit of the 20 latest advancing hard stops found a lesson
 naming the cause for 16 of them. Ten sat in the responsible seat's required
@@ -30,7 +35,7 @@ of decision is what the corpus is for.
 
 ## Adding a lesson (growth rules)
 
-1. **Search first.** If a lesson already covers the mechanism, extend it:
+1. **Search first** (`scripts/memory-search --all <terms>`). If a lesson already covers the mechanism, extend it:
    add the new instance or sharpen the rule. Do not add a sibling file.
 2. **A recurring cause goes to `CHECKS.md`.** When a cause has produced a
    hard stop more than once, merge it into an existing check or replace the
@@ -57,8 +62,7 @@ of decision is what the corpus is for.
   not here.
 - **Operator/personal identity** — who the operator is, their timezone, personal
   preferences. This stays **out of git** (a clone shouldn't carry it); it lives
-  in the operator's personal, non-repo memory (`~/.codex/AGENTS.md` / Claude
-  Code's private store), never in the tracked corpus.
+  in the operator's personal, non-repo memory, never in the tracked corpus.
 - **Short always-applies *rules*** — those fold directly into `AGENTS.md` or the
   relevant skill prose; only the indexed *lessons* live here.
 

@@ -93,3 +93,11 @@ to the user.
 - Any kernel, `trusted_base()` or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. Admission refused on a syntactic property of the continuation (does it
+   contain a Vis) instead of the delivery identity (does the called owner own
+   the leaf's effect), placed ahead of existing refusals -- keyed on
+   continuation contents (Architect `evt_26wqwj479dqy0`, stop 1; R1' replaces
+   R1 at the admission seat).

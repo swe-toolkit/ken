@@ -49,6 +49,15 @@ message was *sent*, never that the model *received* it. Only the pane sees it.
 (*"press esc to interrupt and send immediately"*). It flushes the queue and the
 seat transitions to `Working` within seconds.
 
+**Confirm the turn ran, by ctx delta, before recording the rouse.** Escape
+does not always deliver. Measured 2026-09-17 on an idle seat holding a
+tmux-typed rouse in the "Press up to edit queued messages" state: Escape left
+a clean composer at unchanged ctx and nothing ran, so the queued message died
+with the queue; re-sending the same text (`send-keys -l`, then Enter) ran the
+turn. A clean, idle composer after Escape looks exactly like a seat that was
+never messaged. If ctx did not move and no `Working` footer appeared, re-send
+the content.
+
 - **`Enter` is a no-op here.** There is nothing in the composer to submit; the
   message is in a queue, not in the input line. Sending `Enter` and seeing
   nothing change is *not* evidence the seat is fine.

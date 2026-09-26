@@ -175,3 +175,113 @@ appears exactly once below.
 | `wp-release-process-steward-spec-build` | project | dropped (reason: superseded -- Steward-frame to spec-leader-elaboration to build-team release pipeline now documented in CLAUDE.md, agent/COORDINATION.md, and agent/playbooks/federation/integrator.md + agent/playbooks/spec/leader.md) |
 | `ws-sec-build-owned-by-verify` | project | dropped (reason: superseded (FLAG for operator review) -- 2026-06-30 memory says WS-Sec build routes solely to Team Verify, but current agent/README.md documents security as cross-cutting across Language+Foundation+Kernel with Architect review, Verify owning only the WS-B behavioral seam; org-chart appears to have evolved and the two sources now conflict) |
 | `zonk_term-must-be-exhaustive-over-term-variants` | project | kept &rarr; `agent/memory/teams/kernel/exhaustive-term-traversals.md` |
+
+## 2026-09-26: the regrown private store, triaged once (R4)
+
+The operator adopted research recommendation R4 (2026-09-26): retire the
+private Claude Code store as a second corpus. The July migration above left
+it as the single home for nothing, but it had regrown to 1,262 files
+(8.1 MB) written by every Claude Code seat on the machine, unreviewed and
+invisible to pi and Codex seats. Two changes land together:
+
+- `.claude/settings.json` sets `"autoMemoryEnabled": false`, so Claude Code
+  no longer loads or writes the private store for this project.
+- Every file in the store was triaged exactly once. The per-file list
+  (source, disposition, target or reason) is
+  `agent/memory/migration-2026-09-26.tsv`. The store itself was not edited;
+  the Steward archives it after this lands.
+
+**Summary:** 719 DUP &middot; 35 PROMOTE &middot; 45 OPERATOR &middot; 463
+DROP &middot; 1,262 total sources.
+
+Method. Each non-index file was read in full and matched against the
+checked-in corpus by mechanism (`scripts/memory-search`, plus a text
+similarity pass), not by filename, because promotion renames a lesson. The
+169 files sharing a filename with a checked-in lesson were word-diffed
+against it. The 31 other July sources still present kept their July
+disposition (19 DUP, 6 DROP), except five operator rulings the July pass
+dropped, which are now listed as OPERATOR beside the July-excluded identity
+file.
+
+- **DUP (719).** The lesson already exists in `agent/memory/` under some
+  name, or is one of the `CHECKS.md` checks (87 files). This includes the
+  169 same-name copies, 19 July sources, and 10 files merged into a promoted
+  lesson below. Drift that still held a true, general point missing from the
+  checked-in copy was folded into it (8 files, listed below); the other 161
+  same-name copies differed only by the depersonalizing and formatting edits
+  the checked-in copies had already received.
+- **PROMOTE (35).** 32 new lessons, and 3 extensions of existing ones.
+  Selection kept only mechanisms that no lesson or check covers, that name
+  only things that still exist, and that generalize. The first preference was
+  lessons already cited by a checked-in file under the private slug, which
+  were dangling links. Sibling private files on one mechanism were merged
+  into one lesson.
+- **OPERATOR (45).** Operator rulings, standing instructions, identity, and
+  operator task state. None were placed in the corpus; they were listed for
+  the Steward with the operator's words, date, and whether each looks in
+  force.
+- **DROP (463).** The 15 index files (`MEMORY.md` and 14 sub-indexes);
+  campaign, node and incident narratives whose general point is covered
+  loosely or not at all; stale live state; and 46 lessons proposed for
+  promotion during triage and declined at selection, each with its reason in
+  the TSV. One declined lesson was false as stated
+  (`git rev-parse <sha>:<bad path>` exits 128; it does not print the commit
+  SHA).
+
+New lessons:
+
+| Lesson | Merged sources |
+|---|---|
+| `fleet/a-boundary-claim-needs-a-measurement-at-every-position-it-names.md` | |
+| `fleet/a-classification-that-relieves-you-of-an-obligation-gets-more-scrutiny-not-less.md` | |
+| `fleet/a-credential-in-your-own-home-directory-can-belong-to-someone-else.md` | |
+| `fleet/a-deleted-guard-can-be-the-only-enforcement-of-a-second-thing-nobody-named.md` | `a-resource-exhaustion-failure-may-be-a-deleted-guard-not-new-code` |
+| `fleet/a-guard-on-what-the-command-says-is-not-a-guard-on-what-the-command-does.md` | |
+| `fleet/a-hedge-does-not-constrain-what-is-done-with-the-claim-it-hedges.md` | `discounting-evidence-weight-is-not-declining-to-assert-it` |
+| `fleet/a-measurement-correct-on-one-tree-becomes-a-cross-tree-claim-only-through-a-carry-argument.md` | |
+| `fleet/a-mutation-revert-restores-the-last-commit-not-the-pre-mutation-file.md` | `commit-real-fix-before-any-mutation-proof-reset`, `committing-before-a-mutation-campaign-does-not-protect-work-added-during-it` |
+| `fleet/a-search-run-after-a-fix-lands-includes-the-fix.md` | |
+| `fleet/a-stale-number-that-drifts-into-being-correct-cannot-be-caught-by-checking-it.md` | |
+| `fleet/a-waiver-covers-only-the-issuers-own-gates.md` | `a-waiver-reaches-only-as-far-as-what-the-waiver-holder-owns` |
+| `fleet/a-withdrawal-is-not-delivered-by-being-posted.md` | |
+| `fleet/an-instruction-not-to-recheck-is-what-makes-a-false-negative-durable.md` | |
+| `fleet/an-instruction-to-close-is-not-evidence-the-work-behind-it-is-done.md` | |
+| `fleet/an-instrument-that-reports-a-verdict-cannot-distinguish-inapplicable-from-false.md` | `zero-executions-and-never-called-are-two-facts-one-number` |
+| `fleet/landing-a-config-change-on-main-does-not-apply-it-the-consumer-reads-a-working-tree.md` | |
+| `fleet/never-complete-an-abbreviated-sha-cite-rev-parse.md` | |
+| `fleet/prefer-the-number-the-producer-already-emits-over-one-you-count-yourself.md` | |
+| `fleet/provider-content-refusal-is-a-distinct-stall-class.md` | |
+| `fleet/the-case-a-rule-was-written-for-is-the-one-it-is-never-tested-against.md` | |
+| `build/cargo-check-and-cargo-test-compile-different-code.md` | `cargo-check-reports-zero-while-cfg-test-sites-remain`, `cfg-test-build-asymmetry-is-bidirectional`, `a-cfg-test-reexport-is-a-production-only-red-the-test-profile-cannot-see` |
+| `build/crate-wide-fmt-plus-git-add-A-smuggles-unrelated-files-into-a-scoped-diff.md` | |
+| `build/rust-comments-and-attributes-are-not-inert.md` | `inserting-a-test-before-an-existing-one-silently-splits-its-doc-comment`, `a-comment-only-diff-is-not-a-safe-diff-doc-comments-compile`, `a-doc-comment-is-not-inert-an-indented-block-inside-a-module-header-is-a-compiled-doctest` |
+| `enclave/reference-derived-corroboration-must-not-become-a-frames-cited-rationale.md` | |
+| `roles/adversary/a-mutation-campaign-needs-a-grid-not-a-count.md` | |
+| `roles/adversary/a-mutation-that-reddens-does-not-confirm-which-detector-caught-it.md` | |
+| `roles/steward/a-fleet-outage-can-be-platform-partitioned-and-only-a-pane-census-sees-it.md` | `a-platform-level-gate-is-not-evaded-by-swapping-model-tier-within-that-platform` |
+| `roles/steward/a-pane-status-describing-progress-says-nothing-about-liveness.md` | |
+| `roles/steward/a-process-count-matches-your-own-shell-when-the-command-embeds-the-path.md` | |
+| `roles/steward/a-route-names-a-sha-but-the-publisher-pushes-a-ref.md` | |
+| `roles/steward/filing-a-program-issues-node-requires-regenerating-implementation-progress-in-the-same-pr.md` | |
+| `roles/steward/unblocking-one-of-several-blockers-restores-nothing-price-the-remedy-against-the-throughput-not-the-blocker.md` | |
+
+Extended with a private lesson:
+
+| Checked-in lesson | Source | What was added |
+|---|---|---|
+| `fleet/a-stuck-required-check-is-not-slow-ci-and-rerunning-it-wedges-the-pr.md` | `a-required-check-stuck-at-in-progress-despite-a-success-conclusion-blocks-the-merge` | the passed-but-frozen state, where a whole-run rerun is the right repair |
+| `fleet/scripted-publisher-target-is-head-branch-never-main.md` | `resolve-branch-can-pick-up-a-stale-shared-local-ref-from-another-worktree` | a branch-name target resolves the shared local ref first |
+| `fleet/terminal-gate-resolve-race-resolving-on-cast.md` | `an-announced-intent-cannot-deconflict-an-action-already-in-flight` | read `list_decisions` before writing; resolve both duplicates |
+
+Drift folded back into the same-name checked-in lesson:
+
+| Checked-in lesson | What was folded |
+|---|---|
+| `fleet/compact-verify-survey-can-eat-the-compact-command.md` | the slash menu can fail to open and the model answers `/compact` in prose |
+| `build/failed-post-condition-probe-suspect-the-probe-first.md` | sweeping `RUST_MIN_STACK` throttles `rustc` too |
+| `fleet/live-review-candidate-goes-stale-reanchor-sha.md` | the author publishes the old-to-new SHA map on every rebase under review |
+| `roles/steward/steward-coldstart-infra-checks.md` | a logged-out `gh` is the resting state; the publisher mints its own token |
+| `roles/steward/a-queued-delivery-waits-on-a-next-tool-call-an-idle-seat-will-never-make.md` | Escape can discard the queued message; confirm by ctx delta and re-send |
+| `fleet/citing-a-private-lesson-to-another-seat-is-the-promotion-signal.md` | a zero-hit slug has three causes; search by subject first |
+| `enclave/contract-spec-defer-spelling-not-concept.md` | unspellable is not unclosable: locate the obstruction's layer |
+| `build/timeout-does-not-kill-grandchild-cargo-test.md` | correction: the orphaned binary cannot hold the `ken-cargo` lock (fd 9 is closed before exec) |

@@ -63,18 +63,19 @@ pending-call. it has to be addressed."). Spec serves BYTES D2.
 **2026-09-26** ("concur with rec."): the three `l1_acceptance` ignored rows
 go to L2 and `ds5b` to L1; TCB growth they need still returns to the operator.
 **2026-09-26:** "CI is now at 28 minutes. schedule work to bring that down
-under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`.
+under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`. Memory
+program R1-R5, R7 (research report `7b545fbb1`): "You may update skills,
+coordination.md, and scripts as necessary." R2 waits on the search log.
 
 ## Current state
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-PENDING-ROUTE-CONTINUATION-DROP` (Adversary F1/F2 on `912c44cf4`: native drops a selected arm's continuation; refusal surfaces as an ICE); Architect rules the repair at D0 | `RT-COMPMATCH-TREE-SCRUTINEE` (AC-0 table of 9 CLI rows plus `ds5b` in flight; Architect rules the group) | Finish the COMPMATCH AC-0 table, then the regression repair before any COMPMATCH build. Bracket tree PARKED on `RT-BRACKET-SOURCE-EDGE` D0 STOP (`evt_72p4vjyzr71gb`). Held refs `4b4c8565c`, `21c039918`, `7f1a04a40` never moved or landed |
-| L2 | language | One resolution mode: strict admits only the minimal prelude, legacy passthrough deleted, binding a prelude name anywhere (incl. local binders) is an error (operator 2026-09-25) | `LANG-SESSION-SCOPE` recut RELEASED (one provenance-tagged session map, R1-R5; Architect `evt_1gz54y177tm3c`; frame section), built from current main; stop count 4 | `LANG-EXPRESSION-SIGMA`: Spec route (a) renamed export (`fn and` + `export and as And`); Spec and CV turns at `b38deb752` (`evt_bq5st60jz2j5`); Language fixture turn held until SESSION-SCOPE lands, then Architect test-delta review and CV exact-tip vote; then floor additions for ledger-witnessed keyed names (operator 2026-09-25: an ever-present intrinsic's name is reserved; no intrinsic module; `Prod`/`zip` disposition belongs here), then flip and enforce | Language ring on the SESSION-SCOPE respin, then the Sigma fixture turn. Flip frame carries the Architect's SESSION-SCOPE carries (`evt_74ac7bpmpcd0c`: remaining `globals` writes, px8p harness write, raw-over-import `session_ids`, `owner_member` AC) |
+| L2 | language | One resolution mode: strict admits only the minimal prelude, legacy passthrough deleted, binding a prelude name anywhere (incl. local binders) is an error (operator 2026-09-25) | `LANG-SESSION-SCOPE` recut RELEASED (one provenance-tagged session map, R1-R5; Architect `evt_1gz54y177tm3c`; frame section), built from current main; stop count 5 (Map-private harness door, `evt_7sqyq6xbj7fqb`) | `LANG-EXPRESSION-SIGMA`: Spec route (a) renamed export (`fn and` + `export and as And`); Spec and CV turns at `b38deb752` (`evt_bq5st60jz2j5`); Language fixture turn held until SESSION-SCOPE lands, then Architect test-delta review and CV exact-tip vote; then floor additions for ledger-witnessed keyed names (operator 2026-09-25: an ever-present intrinsic's name is reserved; no intrinsic module; `Prod`/`zip` disposition belongs here), then flip and enforce | Language ring on the SESSION-SCOPE respin, then the Sigma fixture turn. Flip frame carries the Architect's SESSION-SCOPE carries (`evt_74ac7bpmpcd0c`: remaining `globals` writes, px8p harness write, raw-over-import `session_ids`, `owner_member` AC) |
 | L3 | foundation | Move definable prelude conveniences into packages and remove collisions (minimal fixed prelude, operator 2026-09-25), then resume proof backfill | `CAT-AND-SORTED-PRELUDE-MOVE` -- `ready`, M, T1; waits on `LANG-EXPRESSION-SIGMA` (list_map subsumption landed `3a2b30628`) | `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 | Kick the And move when Sigma lands. `Prod`/`zip` stay (runtime and ABI keyed; L2 floor question); `fold` is a separate removal |
 
 ## Update rule
 
-One value per table field; an update deletes the old one. Link the WP issue or
-thread rather than copying detail. Verify a row against its issue file and
-`origin/main` before acting; never publish a standalone currency commit.
+One value per field; an update deletes the old one. Link, never copy. Verify a
+row against its issue file and `origin/main`; no standalone currency commits.
