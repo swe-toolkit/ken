@@ -1948,7 +1948,7 @@ impl<'a> Lowering<'a> {
             builder.seal_block(continued);
         }
 
-        fn issue_selected_call_ticket(
+        pub(super) fn issue_selected_call_ticket(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             target: &units::DeclaredUnitCall,
@@ -1982,13 +1982,23 @@ impl<'a> Lowering<'a> {
             ticket: cranelift_codegen::ir::Value,
             target: &units::DeclaredUnitCall,
         ) -> Result<(), CraneliftBackendError> {
+            let (body, callee) = Self::selected_call_target_words(builder, target)?;
+            self.consume_selected_call_ticket_expected(builder, ticket, body, callee)
+        }
+
+        fn consume_selected_call_ticket_expected(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            ticket: cranelift_codegen::ir::Value,
+            body: cranelift_codegen::ir::Value,
+            callee: cranelift_codegen::ir::Value,
+        ) -> Result<(), CraneliftBackendError> {
             let services = self.function_local.services_pointer.ok_or_else(|| {
                 backend_module("selected gate has no published activation services".to_string())
             })?;
             let consume = self.function_local.selected_call_consume.ok_or_else(|| {
                 backend_module("selected gate has no checked consuming helper".to_string())
             })?;
-            let (body, callee) = Self::selected_call_target_words(builder, target)?;
             #[cfg(test)]
             let callee = if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
                 == SelectedTicketGateMutation::WrongTarget
@@ -2017,6 +2027,126 @@ impl<'a> Lowering<'a> {
                 Self::branch_on_selected_call_status(builder, status);
             }
             Ok(())
+        }
+
+        /// Consume one arm-local pending call at the declared D2 gate. The
+        /// copied body word selects only among statically declared candidates;
+        /// D2 authenticates that choice before reading any package member.
+        pub(super) fn call_selected_pending_package(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            package: PendingCallPackage,
+            args: Vec<LoweringOperand>,
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
+            if Some(package.function) != self.defining_function_id {
+                return Err(backend_module(
+                    "a pending call carried SSA values from another defining function".to_string(),
+                ));
+            }
+            let plan = self.static_transition_plan.admitted_pending_call(package.plan)?.clone();
+            if plan.width != package.members.len()
+                || self.defining_emission_owner
+                    != Some(ContinuationEmissionOwner::Predeclared(plan.route.defining_function))
+            {
+                return Err(backend_module(
+                    "the pending call's member width or emission owner disagrees with its plan".to_string(),
+                ));
+            }
+            let mut targets = Vec::with_capacity(plan.candidates.len());
+            for candidate in &plan.candidates {
+                let construct = candidate.construct;
+                let units = self.static_transition_plan.continuation_units()?;
+                let mut declared = self.function_local.continuation_calls.iter().filter(
+                    |(identity, _target)| {
+                        identity.producer_result_origin() == plan.producer
+                            && identity.producer_construct_origin() == construct
+                            && units.iter().any(|unit| {
+                                unit.id() == identity.target()
+                                    && unit.worker_body_origin() == candidate.body
+                            })
+                    },
+                );
+                let (identity, target) = declared.next().ok_or_else(|| {
+                    backend_module("a pending gate candidate has no locally declared call".to_string())
+                })?;
+                if declared.next().is_some() {
+                    return Err(backend_module(
+                        "a pending gate candidate has multiple declared calls".to_string(),
+                    ));
+                }
+                targets.push((target.origin, identity.clone(), target.clone()));
+            }
+            if targets.len() < 2 {
+                return Err(backend_module("a pending gate has fewer than two candidate targets".to_string()));
+            }
+            let mut inputs = args;
+            inputs.extend(package.members.iter().map(|word| {
+                LoweringOperand::Carried(CarriedBoundaryWord { word: *word })
+            }));
+            let merge = builder.create_block();
+            builder.append_block_param(merge, types::I64);
+            let pointer_type = builder.func.dfg.value_type(
+                self.function_local.services_pointer.ok_or_else(|| {
+                    backend_module("a pending gate has no activation services".to_string())
+                })?,
+            );
+            for (body, identity, target) in targets {
+                let selected = builder.create_block();
+                let next = builder.create_block();
+                let selected_body = builder.ins().iconst(types::I64, i64::from(body.ticket_body_ordinal()));
+                let matches = builder.ins().icmp(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    package.ticket[3],
+                    selected_body,
+                );
+                builder.ins().brif(matches, selected, &[], next, &[]);
+                builder.switch_to_block(selected);
+                let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    std::mem::size_of::<crate::invocation_tickets::SelectedCallTicketV1>() as u32,
+                    3,
+                ));
+                let ptr = builder.ins().stack_addr(pointer_type, slot, 0);
+                for (index, value) in package.ticket.iter().enumerate() {
+                    builder.ins().store(MemFlags::trusted(), *value, ptr, (index * 8) as i32);
+                }
+                let (result, call) = self.call_declared_unit_target(
+                    builder,
+                    target,
+                    &inputs,
+                    Some(ptr),
+                    #[cfg(test)]
+                    None,
+                )?;
+                self.function_local.pending_call_emissions.push((plan.producer, identity, call));
+                let LoweringOperand::Carried(result) = result else {
+                    return Err(backend_module("a selected pending unit returned no carried word".to_string()));
+                };
+                builder.ins().jump(merge, &[result.word.into()]);
+                builder.seal_block(selected);
+                builder.switch_to_block(next);
+                builder.seal_block(next);
+            }
+            // No static candidate agrees with the copied tag. D2 consumes
+            // against the impossible target {0,0}, yielding WrongTarget.
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                std::mem::size_of::<crate::invocation_tickets::SelectedCallTicketV1>() as u32,
+                3,
+            ));
+            let ptr = builder.ins().stack_addr(pointer_type, slot, 0);
+            for (index, value) in package.ticket.iter().enumerate() {
+                builder.ins().store(MemFlags::trusted(), *value, ptr, (index * 8) as i32);
+            }
+            let zero = builder.ins().iconst(types::I64, 0);
+            self.consume_selected_call_ticket_expected(builder, ptr, zero, zero)?;
+            let invalid = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[invalid]);
+            builder.switch_to_block(merge);
+            builder.seal_block(merge);
+            Ok(LoweringOperand::Carried(CarriedBoundaryWord {
+                word: builder.block_params(merge)[0],
+            }))
         }
 
         /// Emit the direct call to a declared unit target.

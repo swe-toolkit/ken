@@ -213,6 +213,7 @@ pub(super) use static_transition::{
 // are deliberately NOT re-exported: the emitter reads a unit, and can neither
 // construct the plane nor reach the pre-emission validator to bypass it.
 pub(super) use static_transition::{
+    PendingMember,
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
     AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
     expected_capture_slot, EmittableCallKind, PredeclaredFunctionId,

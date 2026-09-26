@@ -135,6 +135,7 @@ fn run_checked_bounded_nat_fixture(
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
+            pending_call_emissions: Vec::new(),
             pending_composed_discharges: Vec::new(),
             composed_discharges: BTreeMap::new(),
             declaration_calls: BTreeMap::new(),

@@ -275,7 +275,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     ContinuationSpecializationId, DeferredResponseRow,
     ContinuationUnitView, DirectOuterProjection, CheckedIhPostCallConsumer,
     CheckedIhPostCallConsumerStep, EmittableCallKind,
-    FieldIdentity, JoinPlanToken,
+    FieldIdentity, JoinPlanToken, PendingMember,
     CaseEmissionStatus, PlannedReferentLifetime,
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
@@ -982,6 +982,7 @@ impl ArtifactHelpers<'_> {
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
+            pending_call_emissions: Vec::new(),
             pending_composed_discharges: Vec::new(),
             composed_discharges: BTreeMap::new(),
             declaration_calls: BTreeMap::new(),
@@ -1305,6 +1306,9 @@ struct FunctionLocalRefs {
     /// exclusive runtime branches emit the same source occurrence.
     checked_ih_transport_emissions:
         Vec<(CheckedIhEnvironmentTransport, cranelift_codegen::ir::Inst)>,
+    /// One record per pending gate's actual declared call, separate from the
+    /// causal-token map: multiple mutually exclusive gates may name one unit.
+    pending_call_emissions: Vec<(StaticOriginId, ContinuationCallIdentity, cranelift_codegen::ir::Inst)>,
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8j`** — composed discharges this function
     /// has CLAIMED but not yet verified.
     ///
@@ -1850,6 +1854,7 @@ pub(in crate::cranelift_backend) fn d4a_describe_binding(
     match binding {
         None => "none".to_string(),
         Some(LoweringEnvironmentBinding::StaticWorker(..)) => "worker".to_string(),
+        Some(LoweringEnvironmentBinding::PendingValue { .. }) => "pending".to_string(),
         Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
             format!("carried({:?})", word.word)
         }
@@ -3996,6 +4001,12 @@ enum LoweringEnvironmentBinding {
     /// An ordinary bound value. Every binder that existed before this node
     /// installs this arm, and the outer spine forwards it unchanged.
     Value(LoweringOperand),
+    /// A pending ITree word and its parallel, activation-owned call authority.
+    /// Neither the operand nor the carrier word is widened with this metadata.
+    PendingValue {
+        operand: LoweringOperand,
+        package: PendingCallPackage,
+    },
     /// A statically-bound worker: a lexical callable whose body is a declared
     /// static-body unit. Its sole admissible use is as the callee of a `Call`
     /// with an exact `Var` callee; every value-producing position rejects it.
@@ -4521,6 +4532,10 @@ impl LoweringEnvironmentBinding {
     fn value_at(&self, edge: &'static str) -> Result<&LoweringOperand, CraneliftBackendError> {
         match self {
             LoweringEnvironmentBinding::Value(operand) => Ok(operand),
+            LoweringEnvironmentBinding::PendingValue { .. } => Err(unsupported(
+                "PendingCallPackage",
+                format!("{edge} would discard a pending call's companion; only a routed binding read may consume it"),
+            )),
             LoweringEnvironmentBinding::StaticWorker(_) => Err(unsupported(
                 "StaticWorkerBinding",
                 format!(
@@ -4529,6 +4544,19 @@ impl LoweringEnvironmentBinding {
                      with an exact Var callee"
                 ),
             )),
+        }
+    }
+
+    fn routed_at(&self, edge: &'static str) -> Result<RoutedAnswer, CraneliftBackendError> {
+        match self {
+            Self::Value(operand) => Ok(RoutedAnswer::direct(operand.clone())),
+            Self::PendingValue { operand, package } => {
+                Ok(RoutedAnswer::direct(operand.clone()).with_pending(package.clone()))
+            }
+            Self::StaticWorker(_) => {
+                self.value_at(edge)?;
+                unreachable!("static worker value read must refuse")
+            }
         }
     }
 }
@@ -6800,7 +6828,8 @@ pub(in crate::cranelift_backend) fn record_r3_run_worker_members(
         .enumerate()
         .filter_map(|(slot, binding)| match binding {
             LoweringEnvironmentBinding::StaticWorker(worker) => Some((slot, worker.transport)),
-            LoweringEnvironmentBinding::Value(_) => None,
+            LoweringEnvironmentBinding::Value(_)
+            | LoweringEnvironmentBinding::PendingValue { .. } => None,
         })
         .collect();
     R3_RUN_WORKER_MEMBERS.with(|cell| cell.borrow_mut().push(row));
@@ -7426,6 +7455,35 @@ impl<'a> Lowering<'a> {
                 return Err(backend_module(
                     "a checked-IH transport instruction calls a different specialization than its source endpoint"
                         .to_string(),
+                ));
+            }
+            *expected_by_callee.entry(planned).or_default() += 1;
+        }
+
+        for (producer, identity, inst) in &self.function_local.pending_call_emissions {
+            let package = self.static_transition_plan.admitted_pending_call(*producer)?;
+            let units = self.static_transition_plan.continuation_units()?;
+            if !package.candidates.iter().any(|candidate| {
+                candidate.construct == identity.producer_construct_origin()
+                    && units.iter().any(|unit| {
+                        unit.id() == identity.target()
+                            && unit.worker_body_origin() == candidate.body
+                    })
+            }) {
+                return Err(backend_module(
+                    "a recorded pending call is not in its producer's admitted candidate set".to_string(),
+                ));
+            }
+            if !func.layout.blocks().any(|block| func.layout.block_insts(block).any(|actual| actual == *inst)) {
+                return Err(backend_module("a recorded pending gate call is absent from finished CLIF".to_string()));
+            }
+            let planned = units::resolved_continuation_call_target(
+                &self.static_transition_plan, bundle, identity,
+            )?;
+            let emitted = Self::decode_direct_callee(func, *inst)?;
+            if emitted != planned {
+                return Err(backend_module(
+                    "an emitted pending gate target differs from its planned candidate".to_string(),
                 ));
             }
             *expected_by_callee.entry(planned).or_default() += 1;
@@ -10740,9 +10798,21 @@ enum EliminatorRole {
     AnswerAfterComputationalFrame { continuation_origin: StaticOriginId },
 }
 
+/// The static producer is the plan identity; all words are SSA in `function`.
+/// A ticket pointer never escapes its issuing block. The gate rechecks both
+/// identities before spilling the ticket to its own local slot.
+#[derive(Clone)]
+struct PendingCallPackage {
+    plan: StaticOriginId,
+    function: FuncId,
+    ticket: [cranelift_codegen::ir::Value; 5],
+    members: Vec<cranelift_codegen::ir::Value>,
+}
+
 #[derive(Clone)]
 struct RoutedAnswer {
     value: LoweringOperand,
+    pending: Option<PendingCallPackage>,
     route: SourceComputationalAnswerRoute,
     /// `D3` — the eliminator-role axis. `Scrutinee` on every constructor except
     /// the one Inner composition seat.
@@ -10754,6 +10824,7 @@ impl RoutedAnswer {
     fn direct(value: LoweringOperand) -> Self {
         Self {
             value,
+            pending: None,
             route: SourceComputationalAnswerRoute::DirectScrutinee,
             role: EliminatorRole::Scrutinee,
         }
@@ -10770,6 +10841,7 @@ impl RoutedAnswer {
     fn checked(value: LoweringOperand) -> Self {
         Self {
             value,
+            pending: None,
             route: SourceComputationalAnswerRoute::CheckedSelectedRecursor,
             role: EliminatorRole::Scrutinee,
         }
@@ -10782,6 +10854,7 @@ impl RoutedAnswer {
     fn composed_answer(value: LoweringOperand, continuation_origin: StaticOriginId) -> Self {
         Self {
             value,
+            pending: None,
             route: SourceComputationalAnswerRoute::CheckedSelectedRecursor,
             role: EliminatorRole::AnswerAfterComputationalFrame { continuation_origin },
         }
@@ -10793,7 +10866,12 @@ impl RoutedAnswer {
         route: SourceComputationalAnswerRoute,
         role: EliminatorRole,
     ) -> Self {
-        Self { value, route, role }
+        Self { value, pending: None, route, role }
+    }
+
+    fn with_pending(mut self, package: PendingCallPackage) -> Self {
+        self.pending = Some(package);
+        self
     }
 
     /// Raise a frame's starting route with this predecessor's, never lower it.
@@ -10889,7 +10967,7 @@ fn source_case_has_no_checked_control_markers(expr: &RuntimeExpr) -> bool {
 enum SourceCallee {
     /// The pre-existing route: a lowered callee consumed by
     /// `source_call_state`.
-    Value(LoweringOperand),
+    Value(RoutedAnswer),
     /// **`D8e`** — an exact `Var` that resolved to a `D8d` target-derived
     /// binding. ⛔ Resolved once, at the `Call` occurrence, before the callee
     /// would otherwise have been evaluated as a value; there is no second
@@ -11307,8 +11385,13 @@ fn reaches_environment_computational_recursor(
             let is_recursor = match binding {
                 LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                     Lowered::ComputationalRecursorClosure { .. },
-                )) => true,
-                LoweringEnvironmentBinding::Value(_) => false,
+                ))
+                | LoweringEnvironmentBinding::PendingValue {
+                    operand: LoweringOperand::Specialized(Lowered::ComputationalRecursorClosure { .. }),
+                    ..
+                } => true,
+                LoweringEnvironmentBinding::Value(_)
+                | LoweringEnvironmentBinding::PendingValue { .. } => false,
                 LoweringEnvironmentBinding::StaticWorker(_) => false,
             };
             is_recursor.then_some(index + introduced_binders)

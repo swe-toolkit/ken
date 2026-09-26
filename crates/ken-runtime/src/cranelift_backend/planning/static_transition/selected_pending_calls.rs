@@ -1,9 +1,8 @@
 //! Read-only admission for a pending recursive child selected by a source Match.
 //!
-//! This is a pre-emission decision. The emitter does not read this plane in
-//! increment 1: in particular, no ticket is issued and no extra word is moved.
-//! A later increment may consume only a `Planned` record, never infer admission
-//! from an arm's position or from a partially emitted context frame.
+//! Admission is resolved before emission. An emitter may consume only a
+//! `Planned` record; a source Match with differing declared pending body units
+//! and no admission is a planner invariant error, not `NotApplicable`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,7 +15,7 @@ use crate::cranelift_backend::lowering::core::agreeing_recursive_body_unit;
 use crate::{CheckedComputationalIHInvocationKind, OrientedSubcontinuationPlanV1};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum PendingMember {
+pub(in crate::cranelift_backend) enum PendingMember {
     WorkerCapture {
         ordinal: u32,
         source: StaticOriginId,
@@ -28,10 +27,12 @@ pub(super) enum PendingMember {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct PendingCandidate {
-    pub(super) arm: usize,
-    pub(super) body: StaticOriginId,
-    pub(super) members: Vec<PendingMember>,
+pub(in crate::cranelift_backend) struct PendingCandidate {
+    pub(in crate::cranelift_backend) arm: usize,
+    /// The actual selected leaf, possibly beneath nested source Match arms.
+    pub(in crate::cranelift_backend) construct: StaticOriginId,
+    pub(in crate::cranelift_backend) body: StaticOriginId,
+    pub(in crate::cranelift_backend) members: Vec<PendingMember>,
 }
 
 /// A transport decision for one visited static origin. Local means evaluating
@@ -96,8 +97,8 @@ pub(super) struct PendingGateBinderPair {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct PendingCallRoute {
-    pub(super) defining_function: PredeclaredFunctionId,
+pub(in crate::cranelift_backend) struct PendingCallRoute {
+    pub(in crate::cranelift_backend) defining_function: PredeclaredFunctionId,
     /// The set of static origins the checked route walker actually visited.
     /// The emitter must assert membership before carrying a companion there.
     pub(super) visited: Vec<PendingRouteVisit>,
@@ -111,11 +112,11 @@ pub(super) struct PendingCallRoute {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct PendingCallPackagePlan {
-    pub(super) producer: StaticOriginId,
-    pub(super) candidates: Vec<PendingCandidate>,
-    pub(super) width: usize,
-    pub(super) route: PendingCallRoute,
+pub(in crate::cranelift_backend) struct PendingCallPackagePlan {
+    pub(in crate::cranelift_backend) producer: StaticOriginId,
+    pub(in crate::cranelift_backend) candidates: Vec<PendingCandidate>,
+    pub(in crate::cranelift_backend) width: usize,
+    pub(in crate::cranelift_backend) route: PendingCallRoute,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -191,9 +192,15 @@ fn plan_selected_pending_calls(
         let mut eligible = source_arms.len() >= 2;
         let mut candidate_refusal = None;
         for (arm, case) in source_arms.iter().enumerate() {
-            let RuntimeExpr::Construct { constructor, args } = &case.body else {
+            let arm_origin = plan.semantic.child_origin(producer, arm + 1)?;
+            let mut leaves = Vec::new();
+            if !pending_source_leaves(plan, arm_origin, &case.body, &mut leaves)? {
                 eligible = false;
                 break;
+            }
+            for (construct_origin, leaf) in leaves {
+            let RuntimeExpr::Construct { constructor, args } = leaf else {
+                unreachable!("the leaf walker returns only constructors")
             };
             // L2's selected-constructor bucket: an arm constructing some
             // other value cannot produce the recursive child in this case.
@@ -204,7 +211,6 @@ fn plan_selected_pending_calls(
                 candidate_refusal = Some(PendingRefusal::UnsupportedRouteEdge);
                 break;
             }
-            let construct_origin = plan.semantic.child_origin(producer, arm + 1)?;
             let mut matching = units.iter().filter(|unit| {
                 unit.producer_result_origin() == producer
                     && unit.producer_construct_origin() == construct_origin
@@ -227,9 +233,11 @@ fn plan_selected_pending_calls(
                 break;
             };
             if owning_contexts.next().is_some() {
-                return Err(planner_error(
-                    "one pending recursive body belongs to multiple generated contexts",
-                ));
+                // The ordinary capture gate also refuses ambiguous contexts.
+                // Treat this as an excluded arm, not a planner-wide ICE: the
+                // pending preflight must agree with that existing refusal.
+                candidate_refusal = Some(PendingRefusal::MissingDeclaredMembers);
+                break;
             }
             let mut members = Vec::new();
             for capture in unit.worker_captures() {
@@ -258,9 +266,14 @@ fn plan_selected_pending_calls(
             declared_bodies.push(unit.worker_body_origin());
             candidates.push(PendingCandidate {
                 arm,
+                construct: construct_origin,
                 body: unit.worker_body_origin(),
                 members,
             });
+            }
+            if candidate_refusal.is_some() {
+                break;
+            }
         }
         if let Some(reason) = candidate_refusal {
             by_producer.insert(producer, PendingCallAdmission::Refused(reason));
@@ -372,6 +385,91 @@ fn plan_selected_pending_calls(
         }
     }
     Ok(by_producer)
+}
+
+impl StaticTransitionPlan<'_> {
+    /// An emission site may read an admission only for its own selected arm.
+    /// Differing declared units make the producer a pending population even
+    /// when its admission row is accidentally absent or misclassified.
+    pub(in crate::cranelift_backend) fn admitted_pending_call(
+        &self,
+        producer: StaticOriginId,
+    ) -> Result<&PendingCallPackagePlan, CraneliftBackendError> {
+        match self.selected_pending_calls.get(&producer) {
+            Some(PendingCallAdmission::Planned(package)) => Ok(package),
+            Some(PendingCallAdmission::Refused(_)) => Err(planner_error(
+                "a refused pending call was delivered to an emitting gate",
+            )),
+            Some(PendingCallAdmission::NotApplicable) => Err(planner_error(
+                "a pending call was delivered to a NotApplicable gate",
+            )),
+            None => Err(planner_error("an emitting pending call has no admission entry")),
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn pending_call_candidate_at(
+        &self,
+        producer: StaticOriginId,
+        construct: StaticOriginId,
+    ) -> Result<Option<(&PendingCallPackagePlan, &PendingCandidate)>, CraneliftBackendError> {
+        let units = self.continuation_units()?;
+        let bodies: BTreeSet<_> = units
+            .iter()
+            .filter(|unit| unit.producer_result_origin() == producer)
+            .map(|unit| unit.worker_body_origin())
+            .collect();
+        if bodies.len() < 2 {
+            return Ok(None);
+        }
+        let admission = self.selected_pending_calls.get(&producer).ok_or_else(|| {
+            planner_error("a producer with differing pending units has no admission entry")
+        })?;
+        match admission {
+            PendingCallAdmission::NotApplicable => Err(planner_error(
+                "a producer with differing pending units fell through to NotApplicable",
+            )),
+            PendingCallAdmission::Refused(_) => Ok(None),
+            PendingCallAdmission::Planned(package) => {
+                let mut selected = package.candidates.iter().filter(|candidate| {
+                    candidate.construct == construct
+                });
+                let candidate = selected.next().ok_or_else(|| {
+                    planner_error("an admitted pending constructor has no matching arm candidate")
+                })?;
+                if selected.next().is_some() || package.producer != producer {
+                    return Err(planner_error("a pending constructor has ambiguous arm candidates"));
+                }
+                Ok(Some((package, candidate)))
+            }
+        }
+    }
+}
+
+/// Leaf-only source producer census: a nested Match chooses exactly one
+/// constructor, and no inference from its outer arm number chooses the leaf.
+/// Unsupported edges refuse admission rather than guessing a unit body.
+fn pending_source_leaves<'a>(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    expr: &'a RuntimeExpr,
+    leaves: &mut Vec<(StaticOriginId, &'a RuntimeExpr)>,
+) -> Result<bool, CraneliftBackendError> {
+    match expr {
+        RuntimeExpr::Construct { .. } => {
+            leaves.push((origin, expr));
+            Ok(true)
+        }
+        RuntimeExpr::Match { cases, .. } => {
+            for (index, case) in cases.iter().enumerate() {
+                let child = plan.semantic.child_origin(origin, index + 1)?;
+                if !pending_source_leaves(plan, child, &case.body, leaves)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
 }
 
 fn agreed_unit_nonpackage(
@@ -977,6 +1075,7 @@ mod tests {
             .enumerate()
             .map(|(arm, body)| PendingCandidate {
                 arm,
+                construct: StaticOriginId::for_test(if arm == 0 { 352 } else { 339 }),
                 body: StaticOriginId::for_test(body),
                 members: vec![PendingMember::WorkerCapture {
                     ordinal: 0,

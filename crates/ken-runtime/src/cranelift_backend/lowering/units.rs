@@ -2688,7 +2688,8 @@ pub(super) fn lower_continuation_selected_case_body(
                     LoweringEnvironmentBinding::StaticWorker(worker) => {
                         Some((position, worker.route, worker.body_origin))
                     }
-                    LoweringEnvironmentBinding::Value(_) => None,
+                    LoweringEnvironmentBinding::Value(_)
+                    | LoweringEnvironmentBinding::PendingValue { .. } => None,
                 })
                 .collect(),
         },
@@ -2725,6 +2726,7 @@ pub(super) fn lower_continuation_selected_case_body(
                     "Carried",
                 LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
                     "Specialized",
+                LoweringEnvironmentBinding::PendingValue { .. } => "Pending",
             })
             .collect::<Vec<_>>()
             .join(", ")

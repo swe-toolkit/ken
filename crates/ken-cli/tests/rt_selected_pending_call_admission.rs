@@ -1,5 +1,5 @@
-// AC-1 increment 1: checked-source planner admission only. Nothing in this
-// test expects a package to have been emitted or a ticket to have been issued.
+// Checked-source admission and native artifact emission. The planner rows
+// below are not a proxy for execution or for consumption at the D2 gate.
 
 const PX7L: &str = r#"program capabilities FS APartial
 proc selected_body (terminal : Bool) (message : String)
@@ -64,8 +64,7 @@ fn selected_pending_call_planner_checked_source_baseline_probe() {
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
-    let error = outcome.expect_err("increment 1 does not change emission's first refusal");
-    assert!(format!("{error:?}").contains("BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1"), "{error:?}");
+    outcome.expect("the selected pending package must emit a native artifact");
     let planned: Vec<_> = rows
         .iter()
         .filter_map(|row| match &row.outcome {

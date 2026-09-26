@@ -21,6 +21,7 @@ mod joins_traps;
 mod occurrences;
 mod responses;
 mod selected_pending_calls;
+pub(in crate::cranelift_backend) use selected_pending_calls::PendingMember;
 #[cfg(feature = "px8-ds-test-support")]
 pub use selected_pending_calls::{
     with_selected_pending_call_admissions, PendingRefusal,

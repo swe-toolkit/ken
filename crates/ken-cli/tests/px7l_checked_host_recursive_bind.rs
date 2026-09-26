@@ -160,7 +160,7 @@ fn contains_recursive_bind_ir(expr: &ken_runtime::RuntimeExpr) -> bool {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "NO LIVE OWNER for this row's follow-on representation work; RT-CONTEXT-CAPTURE-CLAIM-ABSENCE established B at clean 1f33e45d8: PredeclaredFunctionId(3) ProducerLocal binding/environment origins 358/356 return Ok(None) from predeclared_entry_frame_slot. Under the current ABI there is no truthful predeclared-entry context-capture claim for this mid-body value. Depth-3 diagnostic stack: L1 recursive_position_captures_all_planner_recoverable -> L2 agreeing_recursive_body_unit -> L3 resolve_context_capture_claim. The unforced baseline stops at L1 with the correct BoundaryCarrier arity refusal; L2 and L3 were reached only by the prior temporary diagnostic forcings, not by this unforced test. L3 is the terminal claim-absence refusal for the current predeclared-entry route, not proof that every future authenticated representation is impossible. All refusal guards and gather_cannot_serve route selection remain unchanged; this row stays ignored."]
+// Selected pending-call package now reaches the native D2 consuming gate.
 fn delayed_capturing_generic_bind_agrees_across_real_executors() {
     let dir = output_dir("agreement");
     let output = ken_cli::build_native_program(
@@ -239,7 +239,7 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "NO LIVE OWNER for this row's follow-on representation work; RT-CONTEXT-CAPTURE-CLAIM-ABSENCE established B at clean 1f33e45d8: PredeclaredFunctionId(3) ProducerLocal binding/environment origins 377/375 return Ok(None) from predeclared_entry_frame_slot. Under the current ABI there is no truthful predeclared-entry context-capture claim for this mid-body value. Depth-3 diagnostic stack: L1 recursive_position_captures_all_planner_recoverable -> L2 agreeing_recursive_body_unit -> L3 resolve_context_capture_claim. The unforced baseline stops at L1 with the correct BoundaryCarrier arity refusal; L2 and L3 were reached only by the prior temporary diagnostic forcings, not by this unforced test. L3 is the terminal claim-absence refusal for the current predeclared-entry route, not proof that every future authenticated representation is impossible. All refusal guards and gather_cannot_serve route selection remain unchanged; this row stays ignored."]
+// Selected pending-call package now reaches the native D2 consuming gate.
 fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
     let dir = output_dir("consumed-response");
     let output = ken_cli::build_native_program(

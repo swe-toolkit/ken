@@ -160,7 +160,7 @@ fn assert_agreement(
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "NO LIVE OWNER for this row's follow-on representation work; RT-CONTEXT-CAPTURE-CLAIM-ABSENCE established B at clean 1f33e45d8: PredeclaredFunctionId(5) ProducerLocal binding/environment origins 395/391 return Ok(None) from predeclared_entry_frame_slot. Under the current ABI there is no truthful predeclared-entry context-capture claim for this mid-body value. Depth-3 diagnostic stack: L1 recursive_position_captures_all_planner_recoverable -> L2 agreeing_recursive_body_unit -> L3 resolve_context_capture_claim. The unforced baseline stops at L1 with the correct BoundaryCarrier arity refusal; L2 and L3 were reached only by the prior temporary diagnostic forcings, not by this unforced test. L3 is the terminal claim-absence refusal for the current predeclared-entry route, not proof that every future authenticated representation is impossible. All refusal guards and gather_cannot_serve route selection remain unchanged; this row stays ignored."]
+// Selected pending-call package now reaches the native D2 consuming gate.
 fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
     assert_agreement(
         OK_PROGRAM,
@@ -203,7 +203,7 @@ fn dynamic_ok_payload_selects_a_multistep_tree_across_real_executors() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "NO LIVE OWNER for this row's follow-on representation work; RT-CONTEXT-CAPTURE-CLAIM-ABSENCE established B at clean 1f33e45d8: PredeclaredFunctionId(5) ProducerLocal binding/environment origins 409/405 and 410/410 return Ok(None) from predeclared_entry_frame_slot. Under the current ABI there is no truthful predeclared-entry context-capture claim for this mid-body value. Depth-3 diagnostic stack: L1 recursive_position_captures_all_planner_recoverable -> L2 agreeing_recursive_body_unit -> L3 resolve_context_capture_claim. The unforced baseline stops at L1 with the correct BoundaryCarrier arity refusal; L2 and L3 were reached only by the prior temporary diagnostic forcings, not by this unforced test. L3 is the terminal claim-absence refusal for the current predeclared-entry route, not proof that every future authenticated representation is impossible. All refusal guards and gather_cannot_serve route selection remain unchanged; this row stays ignored."]
+#[ignore = "RT-SELECTED-PENDING-CALL-BUILD increment 2 emits the selected package but this row still refuses at ObjectEmission: function 5 leaves planned source join 393 (the Option path in failed_path) neither emitted nor statically unselected. This is not the former BoundaryCarrier first refusal; no native execution or gate consumption is claimed for this row pending a join-owner ruling."]
 fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
     assert_agreement(
         ERR_PROGRAM,
