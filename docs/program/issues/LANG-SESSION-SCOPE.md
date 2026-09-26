@@ -116,6 +116,45 @@ objective; size M, tier T1.
   `914d7f616` rows and the `07f62fe6a` pair controls. Stop if any retained
   pin needs a changed expectation rather than a changed mechanism.
 
+## Stop-6 amendment: no door; one disposition per name (Architect `evt_76m3hykd9h4tz`)
+
+Rescoped in place. This supersedes the stop-5 door (inventory line 5).
+
+- **Door withdrawn.** Delete `bind_session_module_private_alias` and the
+  `expose_module_private` wrappers. A test's direct `globals.insert` /
+  `globals.extend` that lets Ken source resolve a name is the same bypass
+  and gets the same treatment.
+- **One class per name.** Every P row, door user and source-visible direct
+  writer is exactly one of:
+  - **E**, a missing export: add `pub` in the provider;
+  - **I**, internal: rewrite the probe against the public surface, or move
+    the law into the provider. A constructor of an abstractly exported type
+    is always I;
+  - **H**, a host flat read: key the Rust lookup on the qualified identity.
+
+  The class defaults are in the ruling.
+- **Scope added.** `catalog/` `pub` edits for E names land as commit 1, a
+  straight-ancestor prefix that may be cut and landed alone (Architect gate).
+  They must be green at base on the targets they touch. Commit 2 onward, in
+  `crates/`: delete the door, migrate the I and H rows, and point export
+  assertions at the module interface (`file_export_ids`).
+- **Disposition table:** one row per name, giving its class and a
+  one-phrase citation. The Architect reviews it with the `catalog/` diff.
+- **R rows** (ds4, es4, lang_qualified_constructors, map_build,
+  px8f_buffer_io_surface): for each, a first-cause diagnosis (which
+  spelling resolved to which identity, at base and at the candidate), then
+  a repair under the settled rule. A row returns to the Architect only if
+  its repair needs a design choice.
+- **Retained expectations** change only for I-class export assertions and
+  door-routed probes. This narrows the "changed expectation" stop above; it
+  does not remove it.
+- **Acceptance:**
+  - a grep over `crates/` for the door's names returns nothing;
+  - every export assertion reads the interface;
+  - the 11 P targets are green;
+  - the 5 R rows are diagnosed;
+  - direct-writer neuter controls are recorded (candidate acceptance).
+
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change, or a changed census row.
@@ -168,15 +207,13 @@ are the same predicate from the reader side. The recut above closes it.
    resolves only the defining module's own members and writes `Alias`
    provenance; `bind_session_name` stays public-exports only.
 
-6. Retained CC2/CC3/CC4/CAT5 acceptance fixtures (plus the cc6a
-   `globals.extend` writer) reach other modules' non-pub members:
-   `MkSourceId` (a private constructor of an abstract exported type),
-   `compare_char` (a private fn), and `span_to_byte_range_faithful`
-   (asserted as exported, but declared without `pub`). Keyed on the
-   pre-recut session leak of every module's non-pub names (Architect,
-   `evt_1wgwkd3tdsy0b`, stop 6).
+6. The leak masked three classes (missing export in the provider,
+   internal probe, host flat read), plus 5 independent resolution
+   regressions. Closure: withdraw the door and give each name one
+   disposition by rule (Architect `evt_1wgwkd3tdsy0b` stop 6, ruled
+   `evt_76m3hykd9h4tz`; census `evt_1rbv3tktxzb78`, `evt_7xjvddha9cg0v`).
 
-**Carry, not this WP (Foundation):** Map's public surface cannot be used by
-a client. `OrderedKeyMembership` is exported, but `Tree`'s constructors,
-`empty` and `Ordered` are private, so no client can build the carrier that
-`∈` is admitted for (`evt_7sqyq6xbj7fqb`).
+**Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
+`Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
+question about a public route to a type (for example `SourceId`) goes to
+the Steward as a Foundation API question.
