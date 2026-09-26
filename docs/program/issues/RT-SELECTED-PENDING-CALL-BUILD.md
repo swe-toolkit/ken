@@ -219,3 +219,9 @@ Positive native px7m err depends on it.
 4. HS3 ownership clause refused px7l's lawful Specialized relocation,
    because it was keyed on owner identity, which the emitter never tests
    (Architect `evt_2nn9ta5ywrkyh`).
+5. Pending package issued but never consumed: `RoutedAnswer.with_pending`
+   is consumed only at `source.rs:5008` (the Carried-base recursor branch)
+   and dropped silently on every other path -- keyed on a consumer edge
+   admission never names (Architect `evt_3ha2wfda16hbq`, HS5: linear
+   package ledger L1, consuming-edge witness L2; outcome (i) at M6 stops
+   for a Steward scope call).
