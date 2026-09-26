@@ -80,3 +80,11 @@ chosen first refusal, with no other row changing colour.
   and land the group that one repair clears.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. BufferFreeze span start/length arrive carried from prelude spanBytes but
+   the per-seat Avail was specialized-only -- keyed on seat phase
+   availability. Two-part repair e1b0e2897 clears it; behind it r2 traps -1
+   at runtime (site unattributed) and sp_a hits the response-owner coverage
+   gate (units.rs:6823; selected caller has no candidate disposition).
