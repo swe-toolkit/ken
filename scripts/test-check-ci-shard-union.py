@@ -52,6 +52,20 @@ class Fixtures(unittest.TestCase):
             for arm in sorted(REQUIRED_RT_PARITY_ARMS)
         ]
         rows = ordinary + native
+        parity_rows = [
+            ("fixture::rt_parity_native", f"parity_test_{index}")
+            for index in range(1, 13)
+        ]
+        parity_root = Path(temporary.name) / "realized-rt-parity"
+        for index in range(1, 7):
+            artifact = parity_root / f"rt-parity-shard-{index}"
+            artifact.mkdir(parents=True)
+            selected = set(parity_rows[(index - 1) * 2 : index * 2])
+            for filename, matches in (
+                ("inventory.json", set(parity_rows)),
+                (f"selected-{index}.json", selected),
+            ):
+                (artifact / filename).write_text(json.dumps(listing(parity_rows, matches)))
         assignments = list(ordinary)
         for index in range(1, 9):
             identity = None if index == empty_index else assignments.pop(0)
@@ -73,6 +87,39 @@ class Fixtures(unittest.TestCase):
             result = self.run_fixture(temporary)
         self.assertEqual(result.returncode, 2)
         self.assertIn(message, result.stderr)
+
+    def test_rt_parity_runner_sets_partition_the_full_suite(self):
+        with self.fixture() as temporary:
+            result = self.run_fixture(temporary)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("12 rt_parity_native identities across six shards", result.stdout)
+
+    def test_rt_parity_empty_shard_reds(self):
+        def empty_shard(root):
+            path = root.parent / "realized-rt-parity" / "rt-parity-shard-6" / "selected-6.json"
+            value = json.loads(path.read_text())
+            for suite in value["rust-suites"].values():
+                for metadata in suite["testcases"].values():
+                    metadata["filter-match"]["status"] = "mismatch"
+            path.write_text(json.dumps(value))
+        self.assert_red(empty_shard, "rt_parity_native shard selection is empty")
+
+    def test_rt_parity_overlap_and_omission_red(self):
+        def overlap(root):
+            path = root.parent / "realized-rt-parity" / "rt-parity-shard-2" / "selected-2.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-0"]["testcases"]["parity_test_1"]["filter-match"]["status"] = "matches"
+            path.write_text(json.dumps(value))
+        self.assert_red(overlap, "rt_parity_native shard selections overlap")
+
+        def omission(root):
+            path = root.parent / "realized-rt-parity" / "rt-parity-shard-6" / "selected-6.json"
+            value = json.loads(path.read_text())
+            for suite in value["rust-suites"].values():
+                if "parity_test_11" in suite["testcases"]:
+                    suite["testcases"]["parity_test_11"]["filter-match"]["status"] = "mismatch"
+            path.write_text(json.dumps(value))
+        self.assert_red(omission, "rt_parity_native shard union differs from full suite")
 
     def test_success(self):
         with self.fixture() as temporary:

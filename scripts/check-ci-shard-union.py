@@ -9,7 +9,9 @@ import sys
 
 
 SHARD_COUNT = 8
+RT_PARITY_SHARD_COUNT = 6
 ROOT = Path("realized-shards")
+RT_PARITY_ROOT = Path("realized-rt-parity")
 EXCLUDED_BINARIES = {
     "rt_parity_native",
     "px8f_buffer_native",
@@ -181,6 +183,41 @@ def artifact_paths(root: Path) -> list[tuple[Path, Path, Path]]:
     return paths
 
 
+def check_rt_parity_shards() -> int:
+    expected = {f"rt-parity-shard-{index}" for index in range(1, RT_PARITY_SHARD_COUNT + 1)}
+    artifacts = {path.name: path for path in RT_PARITY_ROOT.iterdir() if path.is_dir()} if RT_PARITY_ROOT.is_dir() else {}
+    if set(artifacts) != expected:
+        raise ShardCheckError("expected exactly six rt_parity_native shard artifacts")
+
+    inventories = []
+    selections = []
+    for index in range(1, RT_PARITY_SHARD_COUNT + 1):
+        artifact = artifacts[f"rt-parity-shard-{index}"]
+        inventory_path = artifact / "inventory.json"
+        selected_path = artifact / f"selected-{index}.json"
+        if not inventory_path.is_file() or not selected_path.is_file():
+            raise ShardCheckError(f"{artifact}: required rt_parity shard member is missing")
+        inventories.append(read_listing(inventory_path))
+        selections.append(read_listing(selected_path))
+
+    authority_discovered, authority_live, _, _ = inventories[0]
+    for discovered, live, _, _ in inventories[1:]:
+        if discovered != authority_discovered or live != authority_live:
+            raise ShardCheckError("rt_parity_native shard inventories differ")
+    union: set[tuple[str, str]] = set()
+    for discovered, selected, _, _ in selections:
+        if discovered != authority_discovered:
+            raise ShardCheckError("rt_parity_native selected listing differs from inventory")
+        if not selected:
+            raise ShardCheckError("rt_parity_native shard selection is empty")
+        if union & selected:
+            raise ShardCheckError("rt_parity_native shard selections overlap")
+        union |= selected
+    if union != authority_live:
+        raise ShardCheckError("rt_parity_native shard union differs from full suite")
+    return len(union)
+
+
 def main() -> int:
     try:
         artifacts = artifact_paths(ROOT)
@@ -229,12 +266,19 @@ def main() -> int:
                 "inventory (a decomposed grid silently dropped an arm): "
                 + ", ".join(sorted(missing_arms))
             )
+        rt_parity_count = (
+            check_rt_parity_shards() if RT_PARITY_ROOT.exists() else None
+        )
     except ShardCheckError as error:
         print(f"realized-shard check failed: {error}", file=sys.stderr)
         return 2
     print(
         f"realized shard partition verified: {len(union)} canonical test identities; "
         f"{len(REQUIRED_RT_PARITY_ARMS)} required rt_parity control arms present"
+        + (
+            f"; {rt_parity_count} rt_parity_native identities across six shards"
+            if rt_parity_count is not None else ""
+        )
     )
     return 0
 

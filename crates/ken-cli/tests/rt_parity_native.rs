@@ -1935,7 +1935,7 @@ static_response_context_demand_test!(
 // write plane selects distinct owners for them. CLAIMED:
 // context interning cannot launder a malformed producer/K row or an incomplete
 // explicit input run. THE GAP: exact duplicate context demand reuse is separately
-// pinned by static_response_context_demand_controls_reach_and_restore; these
+// pinned by static_response_context_demand_duplicate_is_idempotent; these
 // controls move producer rows and each element of their typed population instead.
 
 // DRY compile step for the decomposed full-demand controls -- a macro (not a fn)
@@ -5815,7 +5815,7 @@ fn assert_d1_route_control_child() {
 //   - DENOTATION, every mode: the child body's specialized-route native==interpreter
 //     parity (assert_d1_route_control_child `_` arm), asserted via child success.
 //   - STATIC ROUTE FORMATION fail-closed, replacing each perturbed runtime word:
-//       drop-read (active checked->direct word)      -> composed_return_forward_ret_authority_controls_refuse
+//       drop-read (active checked->direct word)      -> composed_return_forward_ret_projection_disagreement_refuses + composed_return_forward_ret_wrong_member_refuses
 //                                                        ProjectionDisagreement + WrongMember
 //       unknown-read (active checked->unknown word)  -> WrongMember + WrongSource
 //       ordinary-read (initial direct->unknown word) -> WrongMember + WrongSource
