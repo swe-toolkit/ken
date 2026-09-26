@@ -2067,12 +2067,7 @@ impl<'a> Lowering<'a> {
                 // dead or delete origin 25. The repair is to stop asserting a
                 // deadness that was never true.
                 let owner_ret_only = self.static_transition_plan
-                    .owner_fed_match_population(
-                        match_origin,
-                        self.defining_emission_owner.ok_or_else(|| backend_module(
-                            "a Match join closeout has no defining emission owner".to_string(),
-                        ))?,
-                    )?;
+                    .owner_fed_match_population(match_origin, self.defining_emission_owner)?;
                 // P2: mutate only the closeout consumer to an ordinary answer.
                 // The C2 emitter still traps Vis, so an undisposed Vis join is
                 // attributable to the missing owner-specific S2 disposition.

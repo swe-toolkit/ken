@@ -464,11 +464,14 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn owner_fed_match_population(
         &self,
         origin: StaticOriginId,
-        emission_owner: ContinuationEmissionOwner,
+        emission_owner: Option<ContinuationEmissionOwner>,
     ) -> Result<Option<usize>, CraneliftBackendError> {
         if !self.pending_result_validated_owner(origin)? {
             return Ok(None);
         }
+        let emission_owner = emission_owner.ok_or_else(|| planner_error(
+            "a validated pending-owner Match has no defining emission owner",
+        ))?;
         let producer = self.semantic.child_origin(origin, 0)?;
         let Some(PendingCallAdmission::ValidatedResponseOwner(witness)) =
             self.selected_pending_calls.get(&producer)

@@ -2737,7 +2737,7 @@ pub(super) fn lower_continuation_selected_case_body(
         if compiler.static_transition_plan
             .pending_match_has_reentering_calls(frame_occurrence.static_origin, owner)?
             && compiler.static_transition_plan
-                .owner_fed_match_population(frame_occurrence.static_origin, owner)?
+                .owner_fed_match_population(frame_occurrence.static_origin, Some(owner))?
                 .is_none()
         {
             crate::cranelift_backend::planning::record_selected_pending_match_emission(
