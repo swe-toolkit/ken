@@ -185,12 +185,46 @@ natively. Any row that stays ignored gets a measured reason in its
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
+## Increment 2, recut: relocation cut (Architect `evt_6sgcr232abwn0`)
+
+This replaces increment 2's package work: the AC-1a L1 ledger and L2
+consuming-edge clause, and the parked WIP `a2697c91a`. It stays inside this
+WP. Size M, tier T1. Kept as already proved: increment 1, the (A)/(B)
+environment synthesis, and clause (E).
+
+- **R1, one partition producer.** `emission_source_origins` (joins_traps.rs)
+  gains a relocation-cut boundary: an operation whose
+  `response_disposition_at_effect` is Specialized and whose owner is another
+  emission. The walk stops at a cut. A join is included when any
+  predecessor is included. `required_join_origins` consumes the same set.
+- **R2, lowering consumes that set.** Lowering an origin outside it is
+  Internal. Where the cut sits comes from M8, as pre-ruled: at the
+  placeholder if (b) passes; after the handoff call if (b) traps and (c)
+  passes. Either way the cut edge ends in a RelocatedContinuation trap
+  terminator.
+- **R3, the handoff.** The live-across set is the only cross-emission
+  obligation, and (E) checks it.
+- **R4, the Planned pending package.** Delete it only on evidence. Trap
+  `call_selected_pending_package` and run every pending-call target. If
+  none executes it, delete its producers (core.rs:7360, :7403, mod.rs:4554
+  `with_pending`) and its consumer (source.rs:5008).
+- **R5, pins.**
+  - A mutation that makes `required_join_origins` ignore cuts turns px7l
+    red at the join closeout.
+  - A graph unit pin with one cut arm and one uncut sibling shows the
+    merge join in both the issuer's set and the owner's set.
+  - Both px7l rows and px7m ok run natively green with zero Planned
+    packages issued, asserted by a counter; they are un-ignored.
+  - px7m err stays Refused at E.
+- **Stops.** Any row executes the package under the R4 trap. Or M8 (c)
+  traps, meaning the issuer continues after the owner returns.
+
 ## Shared predicate
 
-Pending-call admission decides Planned from facts the emitter re-derives
-elsewhere. AC-1a closes the class: the emitter consumes the admission
-witness, and each clause evaluates an emitter condition the census names.
-Relocating a `Specialized` response to its owner is a lawful handoff that
+The issuing emission is held responsible for work that Specialized
+relocation moved to the owner (inventory lines 3, 5 and 6; Architect
+`evt_6sgcr232abwn0`). The closure is one reachability partition that both
+the join closeout and lowering consume (R1, R2). Relocating a `Specialized` response to its owner is a lawful handoff that
 px7l already uses; it is not a future capability.
 
 The next capability, a future WP (Architect `evt_2spyd3965e84m`): the
