@@ -1707,27 +1707,16 @@ fn selected_response_owner_target(
     bundle: &UnitBundle,
     identity: &ContinuationCallIdentity,
 ) -> Result<Option<FuncId>, CraneliftBackendError> {
-    let owners = plan
-        .static_response_owner_specializations()?
-        .map_err(|infeasible| {
-            backend_module(format!(
-                "compile-time response specialization is infeasible at {:?}: {}",
-                infeasible.vis_origin(),
-                infeasible.reason(),
+    match plan.resolved_continuation_callee(identity)? {
+        ResolvedContinuationCallee::StaticResponseOwner(owner) => bundle
+            .response(owner)
+            .ok_or_else(|| backend_module(
+                "a selected response caller names an owner that was never forward-declared"
+                    .to_string(),
             ))
-        })?;
-    owners
-        .iter()
-        .find(|owner| owner.selected_caller() == identity)
-        .map(|owner| {
-            bundle.response(owner.id()).ok_or_else(|| {
-                backend_module(
-                    "a selected response caller names an owner that was never forward-declared"
-                        .to_string(),
-                )
-            })
-        })
-        .transpose()
+            .map(Some),
+        ResolvedContinuationCallee::OrdinarySpecialization(_) => Ok(None),
+    }
 }
 
 pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
@@ -2689,7 +2678,7 @@ pub(super) fn lower_continuation_selected_case_body(
                         Some((position, worker.route, worker.body_origin))
                     }
                     LoweringEnvironmentBinding::Value(_)
-                    | LoweringEnvironmentBinding::PendingValue { .. } => None,
+                    => None,
                 })
                 .collect(),
         },
@@ -2726,7 +2715,6 @@ pub(super) fn lower_continuation_selected_case_body(
                     "Carried",
                 LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
                     "Specialized",
-                LoweringEnvironmentBinding::PendingValue { .. } => "Pending",
             })
             .collect::<Vec<_>>()
             .join(", ")

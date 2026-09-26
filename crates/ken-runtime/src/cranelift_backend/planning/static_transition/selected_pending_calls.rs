@@ -1,8 +1,9 @@
 //! Read-only admission for a pending recursive child selected by a source Match.
 //!
-//! Admission is resolved before emission. An emitter may consume only a
-//! `Planned` record; a source Match with differing declared pending body units
-//! and no admission is a planner invariant error, not `NotApplicable`.
+//! Admission is resolved before emission. A source Match with differing
+//! declared pending body units and no admission is a planner invariant error,
+//! not `NotApplicable`. A validated response owner guarantees Ret on success;
+//! no recursive call package is issued for that selected return.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,30 +11,19 @@ use super::{
     occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_error,
     CheckedCaseBinderLayout, CheckedCaseBinderRole, ContinuationEmissionOwner,
     ContinuationSourceCoordinate, CraneliftBackendError, PredeclaredFunctionId,
-    ResponseDisposition, RuntimeExpr, StaticOriginId, StaticTransitionPlan,
+    ResolvedContinuationCallee, ResponseDisposition, RuntimeExpr, StaticOriginId,
+    StaticTransitionPlan,
 };
 use crate::cranelift_backend::lowering::core::agreeing_recursive_body_unit;
 use crate::{CheckedComputationalIHInvocationKind, OrientedSubcontinuationPlanV1};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) enum PendingMember {
-    WorkerCapture {
-        ordinal: u32,
-        source: StaticOriginId,
-    },
-    ContextCapture {
-        ordinal: u32,
-        coordinate: ContinuationSourceCoordinate,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingCandidate {
-    pub(in crate::cranelift_backend) arm: usize,
+    arm: usize,
     /// The actual selected leaf, possibly beneath nested source Match arms.
-    pub(in crate::cranelift_backend) construct: StaticOriginId,
-    pub(in crate::cranelift_backend) body: StaticOriginId,
-    pub(in crate::cranelift_backend) members: Vec<PendingMember>,
+    construct: StaticOriginId,
+    body: StaticOriginId,
+    callee: ResolvedContinuationCallee,
 }
 
 /// A transport decision for one visited static origin. Local means evaluating
@@ -112,14 +102,6 @@ pub(in crate::cranelift_backend) struct PendingCallRoute {
     pub(super) gate_binder_pairs: Vec<PendingGateBinderPair>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) struct PendingCallPackagePlan {
-    pub(in crate::cranelift_backend) producer: StaticOriginId,
-    pub(in crate::cranelift_backend) candidates: Vec<PendingCandidate>,
-    pub(in crate::cranelift_backend) width: usize,
-    pub(in crate::cranelift_backend) route: PendingCallRoute,
-}
-
 /// Response work reachable from a selected leaf, including the worker body
 /// named by its recursive unit. `None` is an actual no-response disposition,
 /// never an unknown owner represented by a missing row.
@@ -159,36 +141,36 @@ impl SelectedPendingLeafResponse {
 /// operation fields and its reconstructed K environment, not the owner's
 /// entire frame. A Planned route cannot rely on a field absent at those calls.
 ///
-/// The package's `members` are the per-member backing provenance: each worker
-/// names its checked lexical source and each context member its authenticated
-/// producer-local/entry-ABI coordinate. Its route binds those sources to the
-/// defining function and keeps the checked marker's binder coordinates. Pointee
-/// lifetime follows route confinement; no pointee class is guessed from a name.
+/// A successful response-owner call validates Ret before publishing the
+/// returned word. The route and response facts retain the admission refusals;
+/// neither is a runtime package or an instruction to issue a second call.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct SelectedPendingRouteWitness {
     owner: ContinuationEmissionOwner,
-    package: PendingCallPackagePlan,
+    producer: StaticOriginId,
+    candidates: Vec<PendingCandidate>,
+    route: PendingCallRoute,
     responses: Vec<SelectedPendingLeafResponse>,
 }
 
 impl SelectedPendingRouteWitness {
     fn new(
-        package: PendingCallPackagePlan,
+        producer: StaticOriginId,
+        candidates: Vec<PendingCandidate>,
+        route: PendingCallRoute,
         responses: Vec<SelectedPendingLeafResponse>,
     ) -> Self {
         Self {
-            owner: ContinuationEmissionOwner::Predeclared(package.route.defining_function),
-            package,
+            owner: ContinuationEmissionOwner::Predeclared(route.defining_function),
+            producer,
+            candidates,
+            route,
             responses,
         }
     }
 
     pub(in crate::cranelift_backend) fn owner(&self) -> ContinuationEmissionOwner {
         self.owner
-    }
-
-    pub(in crate::cranelift_backend) fn package(&self) -> &PendingCallPackagePlan {
-        &self.package
     }
 
     pub(in crate::cranelift_backend) fn responses(&self) -> &[SelectedPendingLeafResponse] {
@@ -205,11 +187,12 @@ pub enum PendingRefusal {
     RelocatedWorkMissingLoweringBinding,
     SelectedPendingLeafRelocatesUnaccountedJoins,
     DeferredResponseLoweredOutsideHandlerOwner,
+    PendingResultNotValidatedByResponseOwner,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum PendingCallAdmission {
-    Planned(SelectedPendingRouteWitness),
+    ValidatedResponseOwner(SelectedPendingRouteWitness),
     Refused(PendingRefusal),
     NotApplicable,
 }
@@ -319,36 +302,25 @@ fn plan_selected_pending_calls(
                 candidate_refusal = Some(PendingRefusal::MissingDeclaredMembers);
                 break;
             }
-            let mut members = Vec::new();
-            for capture in unit.worker_captures() {
-                let super::ContinuationWorkerCaptureSource::Lexical(source) = capture.source()
-                else {
-                    candidate_refusal = Some(PendingRefusal::MissingDeclaredMembers);
-                    break;
-                };
-                members.push(PendingMember::WorkerCapture {
-                    ordinal: capture.ordinal(),
-                    source,
-                });
-            }
-            for input in context.captures()? {
-                members.push(PendingMember::ContextCapture {
-                    ordinal: input.ordinal,
-                    coordinate: input.coordinate,
-                });
-            }
-            if candidate_refusal.is_some()
-                || members.len() != unit.worker_capture_count() + context.captures()?.len()
-            {
+            if unit.worker_captures().iter().any(|capture| !matches!(
+                capture.source(), super::ContinuationWorkerCaptureSource::Lexical(_)
+            )) || context.captures()?.is_empty() && unit.worker_capture_count() == 0 {
                 candidate_refusal = Some(PendingRefusal::MissingDeclaredMembers);
                 break;
             }
+            let identity = plan.continuation_call_binding_for(
+                unit.producer_construct_origin(), unit.continuation_origin(),
+                unit.producer_alternative(), unit.recursive_position(),
+            )?.ok_or_else(|| planner_error(
+                "a selected pending leaf has no typed direct continuation-call binding",
+            ))?;
+            let callee = plan.resolved_continuation_callee(&identity)?;
             declared_bodies.push(unit.worker_body_origin());
             candidates.push(PendingCandidate {
                 arm,
                 construct: construct_origin,
                 body: unit.worker_body_origin(),
-                members,
+                callee,
             });
             }
             if candidate_refusal.is_some() {
@@ -371,18 +343,6 @@ fn plan_selected_pending_calls(
             continue;
         }
         let owner = occurrence_authority(plan, producer)?.owner;
-        let width = candidates
-            .iter()
-            .map(|candidate| candidate.members.len())
-            .max()
-            .unwrap_or(0);
-        if width == 0 {
-            by_producer.insert(
-                producer,
-                PendingCallAdmission::Refused(PendingRefusal::MissingDeclaredMembers),
-            );
-            continue;
-        }
         // The checked case layout is the authority for the IH's initial
         // runtime de Bruijn slot. The single recursive position has slot 0;
         // nested Let/Match binders shift it as the walker descends.
@@ -443,19 +403,16 @@ fn plan_selected_pending_calls(
         );
         let admission = match result {
             Ok((paths, gates, visited, gate_binder_pairs)) => {
-                let package = PendingCallPackagePlan {
-                    producer,
-                    candidates,
-                    width,
-                    route: PendingCallRoute {
-                        defining_function: owner,
-                        visited,
-                        gates,
-                        gate_binder_pairs,
-                    },
+                let route = PendingCallRoute {
+                    defining_function: owner,
+                    visited,
+                    gates,
+                    gate_binder_pairs,
                 };
-                match selected_leaf_response_witness(plan, &package)? {
-                    Ok(responses) => admit_routed_package(package, responses, paths),
+                match selected_leaf_response_witness(plan, &candidates, owner)? {
+                    Ok(responses) => admit_validated_owner(
+                        producer, candidates, route, responses, paths,
+                    ),
                     Err(reason) => PendingCallAdmission::Refused(reason),
                 }
             }
@@ -471,26 +428,44 @@ fn plan_selected_pending_calls(
 }
 
 impl StaticTransitionPlan<'_> {
-    /// An emission site may read an admission only for its own selected arm.
-    /// Differing declared units make the producer a pending population even
-    /// when its admission row is accidentally absent or misclassified.
-    pub(in crate::cranelift_backend) fn admitted_pending_call(
+    /// The emitter rechecks the typed direct callee at the selected frame.
+    /// This is the same classifier the admission consumed, not an inference
+    /// from the carrier word or from a nominal specialization target.
+    pub(in crate::cranelift_backend) fn pending_result_validated_owner(
         &self,
-        producer: StaticOriginId,
-    ) -> Result<&SelectedPendingRouteWitness, CraneliftBackendError> {
+        frame: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        let producer = self.semantic.child_origin(frame, 0)?;
         match self.selected_pending_calls.get(&producer) {
-            Some(PendingCallAdmission::Planned(package)) => Ok(package),
+            Some(PendingCallAdmission::ValidatedResponseOwner(witness)) => {
+                if witness.producer != producer || witness.candidates.is_empty() {
+                    return Err(planner_error("a pending owner admission lost its selected leaves"));
+                }
+                let units = self.continuation_units()?;
+                for candidate in &witness.candidates {
+                    let unit = units.iter()
+                        .find(|unit| unit.producer_construct_origin() == candidate.construct
+                            && unit.worker_body_origin() == candidate.body)
+                        .ok_or_else(|| planner_error("a pending owner leaf lost its continuation unit"))?;
+                    let identity = self.continuation_call_binding_for(
+                        unit.producer_construct_origin(), unit.continuation_origin(),
+                        unit.producer_alternative(), unit.recursive_position(),
+                    )?.ok_or_else(|| planner_error("a pending owner leaf lost its direct call identity"))?;
+                    let actual = self.resolved_continuation_callee(&identity)?;
+                    if actual != candidate.callee || !matches!(actual, ResolvedContinuationCallee::StaticResponseOwner(_)) {
+                        return Err(planner_error("an emitted pending owner leaf has a different direct callee than admission"));
+                    }
+                }
+                Ok(true)
+            }
             Some(PendingCallAdmission::Refused(_)) => Err(planner_error(
-                "a refused pending call was delivered to an emitting gate",
+                "a refused pending call was delivered to an emitting frame",
             )),
-            Some(PendingCallAdmission::NotApplicable) => Err(planner_error(
-                "a pending call was delivered to a NotApplicable gate",
-            )),
-            None => Err(planner_error("an emitting pending call has no admission entry")),
+            Some(PendingCallAdmission::NotApplicable) | None => Ok(false),
         }
     }
 
-    /// A response drive may consult an admitted package's immutable owner
+    /// A response drive may consult an admitted pending route's immutable owner
     /// evidence, without recomputing the source-to-emission relation locally.
     /// An ordinary response with no pending witness retains its existing plan.
     pub(in crate::cranelift_backend) fn selected_pending_response_at_vis(
@@ -499,7 +474,7 @@ impl StaticTransitionPlan<'_> {
     ) -> Result<Option<&SelectedPendingLeafResponse>, CraneliftBackendError> {
         let mut found = None;
         for admission in self.selected_pending_calls.values() {
-            let PendingCallAdmission::Planned(witness) = admission else {
+            let PendingCallAdmission::ValidatedResponseOwner(witness) = admission else {
                 continue;
             };
             for response in witness.responses().iter().filter(|row| row.vis == vis) {
@@ -514,42 +489,6 @@ impl StaticTransitionPlan<'_> {
         Ok(found)
     }
 
-    pub(in crate::cranelift_backend) fn pending_call_candidate_at(
-        &self,
-        producer: StaticOriginId,
-        construct: StaticOriginId,
-    ) -> Result<Option<(&SelectedPendingRouteWitness, &PendingCandidate)>, CraneliftBackendError> {
-        let units = self.continuation_units()?;
-        let bodies: BTreeSet<_> = units
-            .iter()
-            .filter(|unit| unit.producer_result_origin() == producer)
-            .map(|unit| unit.worker_body_origin())
-            .collect();
-        if bodies.len() < 2 {
-            return Ok(None);
-        }
-        let admission = self.selected_pending_calls.get(&producer).ok_or_else(|| {
-            planner_error("a producer with differing pending units has no admission entry")
-        })?;
-        match admission {
-            PendingCallAdmission::NotApplicable => Err(planner_error(
-                "a producer with differing pending units fell through to NotApplicable",
-            )),
-            PendingCallAdmission::Refused(_) => Ok(None),
-            PendingCallAdmission::Planned(witness) => {
-                let mut selected = witness.package.candidates.iter().filter(|candidate| {
-                    candidate.construct == construct
-                });
-                let candidate = selected.next().ok_or_else(|| {
-                    planner_error("an admitted pending constructor has no matching arm candidate")
-                })?;
-                if selected.next().is_some() || witness.package.producer != producer {
-                    return Err(planner_error("a pending constructor has ambiguous arm candidates"));
-                }
-                Ok(Some((witness, candidate)))
-            }
-        }
-    }
 }
 
 /// Leaf-only source producer census: a nested Match chooses exactly one
@@ -598,21 +537,28 @@ fn marked_pending_read(
         && call_slot == Some(selected_slot)
 }
 
-fn admit_routed_package(
-    package: PendingCallPackagePlan,
+fn admit_validated_owner(
+    producer: StaticOriginId,
+    candidates: Vec<PendingCandidate>,
+    route: PendingCallRoute,
     responses: Vec<SelectedPendingLeafResponse>,
     paths: Vec<PendingPathCounts>,
 ) -> PendingCallAdmission {
-    // Marked pending calls consume at their own gate; a second gate is
-    // refused at that call. A raw IH occurrence is refused by the walker.
-    // This final check establishes must-reach on every ordinary exit.
+    // Keep every route refusal: an unreachable consuming gate does not justify
+    // broadening admission or skipping the checked IH identity proof.
     if paths.is_empty()
-        || package.route.gates.is_empty()
+        || route.gates.is_empty()
         || paths.iter().any(|path| path.consuming_gates != 1)
     {
         PendingCallAdmission::Refused(PendingRefusal::NotLinearOrMustReach)
+    } else if candidates.iter().any(|candidate| matches!(
+        candidate.callee, ResolvedContinuationCallee::OrdinarySpecialization(_)
+    )) {
+        PendingCallAdmission::Refused(PendingRefusal::PendingResultNotValidatedByResponseOwner)
     } else {
-        PendingCallAdmission::Planned(SelectedPendingRouteWitness::new(package, responses))
+        PendingCallAdmission::ValidatedResponseOwner(SelectedPendingRouteWitness::new(
+            producer, candidates, route, responses,
+        ))
     }
 }
 
@@ -623,13 +569,14 @@ fn admit_routed_package(
 /// Specialized operation skips when its emitter returns a placeholder.
 fn selected_leaf_response_witness(
     plan: &StaticTransitionPlan<'_>,
-    package: &PendingCallPackagePlan,
+    candidates: &[PendingCandidate],
+    defining_function: PredeclaredFunctionId,
 ) -> Result<Result<Vec<SelectedPendingLeafResponse>, PendingRefusal>, CraneliftBackendError> {
-    let owner = ContinuationEmissionOwner::Predeclared(package.route.defining_function);
+    let owner = ContinuationEmissionOwner::Predeclared(defining_function);
     let mut responses = Vec::new();
     let mut environment_closed = true;
     let mut unaccounted_joins = false;
-    for candidate in &package.candidates {
+    for candidate in candidates {
         let mut seen = BTreeSet::new();
         for occurrence in plan.source_occurrences.iter().flatten() {
             let RuntimeExpr::Construct { constructor, args } = occurrence.expr else {
@@ -1206,23 +1153,21 @@ fn walk_to_gate(
 pub struct SelectedPendingCallCandidateObservation {
     pub arm: usize,
     pub body: u32,
-    pub worker_captures: usize,
-    pub context_sources: Vec<SelectedPendingCallCaptureObservation>,
+    pub callee: SelectedPendingCalleeObservation,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SelectedPendingCallCaptureObservation {
-    EntryAbi { ordinal: u32, slot: u32 },
-    ProducerLocal { ordinal: u32 },
+pub enum SelectedPendingCalleeObservation {
+    StaticResponseOwner(u32),
+    OrdinarySpecialization(u32),
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SelectedPendingCallOutcomeObservation {
-    Planned {
+    ValidatedResponseOwner {
         candidates: Vec<SelectedPendingCallCandidateObservation>,
-        width: usize,
         defining_function: u32,
         visited: Vec<(u32, &'static str)>,
         traversed_families: Vec<&'static str>,
@@ -1277,47 +1222,43 @@ pub(super) fn record_selected_pending_call_admissions(plan: &StaticTransitionPla
             let outcome = match admission {
                 PendingCallAdmission::NotApplicable => SelectedPendingCallOutcomeObservation::NotApplicable,
                 PendingCallAdmission::Refused(reason) => SelectedPendingCallOutcomeObservation::Refused(*reason),
-                PendingCallAdmission::Planned(witness) => {
-                    let package = witness.package();
-                    SelectedPendingCallOutcomeObservation::Planned {
-                    candidates: package.candidates.iter().map(|candidate| {
-                        SelectedPendingCallCandidateObservation {
-                            arm: candidate.arm,
-                            body: candidate.body.observation_ordinal(),
-                            worker_captures: candidate.members.iter().filter(|member| matches!(member, PendingMember::WorkerCapture { .. })).count(),
-                            context_sources: candidate.members.iter().filter_map(|member| match member {
-                                PendingMember::WorkerCapture { .. } => None,
-                                PendingMember::ContextCapture { ordinal, coordinate } => Some(match coordinate {
-                                    ContinuationSourceCoordinate::EntryAbi { source_abi_position, .. } => SelectedPendingCallCaptureObservation::EntryAbi { ordinal: *ordinal, slot: *source_abi_position },
-                                    ContinuationSourceCoordinate::ProducerLocal { .. } => SelectedPendingCallCaptureObservation::ProducerLocal { ordinal: *ordinal },
-                                }),
-                            }).collect(),
-                        }
-                    }).collect(),
-                    width: package.width,
-                    defining_function: package.route.defining_function.observation_ordinal(),
-                    visited: package.route.visited.iter().map(|visit| {
-                        (visit.origin.observation_ordinal(), match visit.kind {
-                            PendingRouteKind::Local => "Local",
-                            PendingRouteKind::SelectedArm => "F1",
-                            PendingRouteKind::Join => "F2",
-                            PendingRouteKind::Binding => "F3",
-                            PendingRouteKind::CarriedResidual => "F4",
-                        })
-                    }).collect(),
-                    traversed_families: package.route.visited.iter().filter_map(|visit| match visit.kind {
-                        PendingRouteKind::Local => None,
-                        PendingRouteKind::SelectedArm => Some("F1"),
-                        PendingRouteKind::Join => Some("F2"),
-                        PendingRouteKind::Binding => Some("F3"),
-                        PendingRouteKind::CarriedResidual => Some("F4"),
-                    }).collect::<BTreeSet<_>>().into_iter().collect(),
-                    gates: package.route.gates.iter().map(|gate| gate.observation_ordinal()).collect(),
-                    gate_binder_pairs: package.route.gate_binder_pairs.iter().map(|pair| {
-                        (pair.origin.observation_ordinal(), pair.walker_index, pair.morphism_index)
-                    }).collect(),
+                PendingCallAdmission::ValidatedResponseOwner(witness) => {
+                    SelectedPendingCallOutcomeObservation::ValidatedResponseOwner {
+                        candidates: witness.candidates.iter().map(|candidate| {
+                            SelectedPendingCallCandidateObservation {
+                                arm: candidate.arm,
+                                body: candidate.body.observation_ordinal(),
+                                callee: match candidate.callee {
+                                    ResolvedContinuationCallee::StaticResponseOwner(id) =>
+                                        SelectedPendingCalleeObservation::StaticResponseOwner(id.ordinal()),
+                                    ResolvedContinuationCallee::OrdinarySpecialization(id) =>
+                                        SelectedPendingCalleeObservation::OrdinarySpecialization(id.observation_ordinal()),
+                                },
+                            }
+                        }).collect(),
+                        defining_function: witness.route.defining_function.observation_ordinal(),
+                        visited: witness.route.visited.iter().map(|visit| {
+                            (visit.origin.observation_ordinal(), match visit.kind {
+                                PendingRouteKind::Local => "Local",
+                                PendingRouteKind::SelectedArm => "F1",
+                                PendingRouteKind::Join => "F2",
+                                PendingRouteKind::Binding => "F3",
+                                PendingRouteKind::CarriedResidual => "F4",
+                            })
+                        }).collect(),
+                        traversed_families: witness.route.visited.iter().filter_map(|visit| match visit.kind {
+                            PendingRouteKind::Local => None,
+                            PendingRouteKind::SelectedArm => Some("F1"),
+                            PendingRouteKind::Join => Some("F2"),
+                            PendingRouteKind::Binding => Some("F3"),
+                            PendingRouteKind::CarriedResidual => Some("F4"),
+                        }).collect::<BTreeSet<_>>().into_iter().collect(),
+                        gates: witness.route.gates.iter().map(|gate| gate.observation_ordinal()).collect(),
+                        gate_binder_pairs: witness.route.gate_binder_pairs.iter().map(|pair| {
+                            (pair.origin.observation_ordinal(), pair.walker_index, pair.morphism_index)
+                        }).collect(),
+                    }
                 }
-                },
             };
             SelectedPendingCallAdmissionObservation { producer: producer.observation_ordinal(), outcome }
         }));

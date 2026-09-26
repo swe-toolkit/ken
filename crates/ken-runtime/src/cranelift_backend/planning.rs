@@ -35,7 +35,7 @@ pub use static_transition::{
     with_composed_return_forward_edge_collapsibility_observations,
     with_selected_pending_call_admissions, PendingRefusal,
     SelectedPendingCallAdmissionObservation, SelectedPendingCallCandidateObservation,
-    SelectedPendingCallCaptureObservation, SelectedPendingCallOutcomeObservation,
+    SelectedPendingCalleeObservation, SelectedPendingCallOutcomeObservation,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
@@ -145,6 +145,7 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
 pub(super) use static_transition::{
     ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
+    ResolvedContinuationCallee,
     ContinuationConsumingOccurrence, ContinuationEmissionOwner,
     ContinuationInputView, RequiredConsumerProjection, DirectOuterProjection,
     CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep,
@@ -213,7 +214,6 @@ pub(super) use static_transition::{
 // are deliberately NOT re-exported: the emitter reads a unit, and can neither
 // construct the plane nor reach the pre-emission validator to bypass it.
 pub(super) use static_transition::{
-    PendingMember,
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
     AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
     expected_capture_slot, EmittableCallKind, PredeclaredFunctionId,

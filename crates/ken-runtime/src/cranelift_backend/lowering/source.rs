@@ -1282,7 +1282,6 @@ impl<'a> Lowering<'a> {
                     // answer quietly takes the closed default.
                     let RoutedAnswer {
                         value,
-                        pending: incoming_pending,
                         route: incoming_route,
                         role: incoming_role,
                     } = value;
@@ -1337,7 +1336,7 @@ impl<'a> Lowering<'a> {
                                     },
                                 )),
                             };
-                            SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::Terminal(SourceContinuationTerminal::ResumeOuter {
                             expected,
@@ -1374,7 +1373,7 @@ impl<'a> Lowering<'a> {
                                 let mut prefix = edge.target.terminal_active_prefix;
                                 prefix.push(EliminatorFrame::InvocationReturn);
                                 self.lower_computational_match_value_composed(
-                                    builder, RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, &prefix,
+                                    builder, RoutedAnswer { value, route: incoming_route, role: incoming_role }, &prefix,
                                 )?
                             };
                             match edge.target.join_plan.representation {
@@ -1484,21 +1483,11 @@ impl<'a> Lowering<'a> {
                                 self.disposition_statically_unselected_source_subtree(
                                     body.static_origin,
                                 )?;
-                                SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
-                                SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else {
-                                let body_env = match incoming_pending {
-                                    Some(package) => {
-                                        let mut body_env = vec![LoweringEnvironmentBinding::PendingValue {
-                                            operand: value,
-                                            package,
-                                        }];
-                                        body_env.extend(env);
-                                        body_env
-                                    }
-                                    None => env_with_operands([value], &env),
-                                };
+                                let body_env = env_with_operands([value], &env);
                                 SourceMachineState::Eval {
                                     expr: body,
                                     env: body_env,
@@ -1509,7 +1498,7 @@ impl<'a> Lowering<'a> {
                         SourceContinuation::CheckedRecursiveInvocationReturn { instance, next } => {
                             self.leave_checked_recursive_invocation(instance)?;
                             control.continuation = *next;
-                            SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::CheckedComputationalIHInvocationReturn {
                             call_template_id,
@@ -1526,7 +1515,7 @@ impl<'a> Lowering<'a> {
                             }
                             let value = self.finish_checked_computational_ih_marker(value)?;
                             control.continuation = *next;
-                            SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::ReturnFromSelectedCase { delimiter, next } => {
                             let scope =
@@ -1555,7 +1544,7 @@ impl<'a> Lowering<'a> {
                             })?;
                             control.selected = previous;
                             control.continuation = *next;
-                            SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::ApplyRecursorSelection { layer, next } => {
                             #[cfg(test)]
@@ -1596,7 +1585,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     answer_route,
                                     next,
                                 };
-                            SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::UnwindRecursorSegment {
                             mut stack,
@@ -1645,10 +1634,10 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                             next,
                                         }),
                                     };
-                                SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else {
                                 control.continuation = *next;
-                                SourceMachineState::Value { value: RoutedAnswer { value, pending: incoming_pending.clone(), route: incoming_route, role: incoming_role }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             }
                         }
                         SourceContinuation::ConstructArgument {
@@ -1667,7 +1656,6 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 SourceMachineState::Value {
                                     value: RoutedAnswer {
                                         value,
-                                        pending: incoming_pending.clone(),
                                         route: incoming_route,
                                         role: incoming_role,
                                     },
@@ -2123,7 +2111,6 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     break 'computational_scrutinee SourceMachineState::Value {
                                         value: RoutedAnswer {
                                             value,
-                                            pending: incoming_pending.clone(),
                                             route: incoming_route,
                                             role: EliminatorRole::Scrutinee,
                                         },
@@ -2166,7 +2153,6 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 break 'computational_scrutinee SourceMachineState::Value {
                                     value: RoutedAnswer {
                                         value,
-                                        pending: incoming_pending.clone(),
                                         route: incoming_route,
                                         role: EliminatorRole::Scrutinee,
                                     },
@@ -2231,7 +2217,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     // is precisely the drop measured at `ae45e804`.
                                     answer_route: RoutedAnswer {
                                         value: LoweringOperand::Carried(word),
-                                        pending: None,
                                         route: incoming_route,
                                         role: EliminatorRole::Scrutinee,
                                     }
@@ -2602,7 +2587,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             if args.is_empty() {
                                 match self.source_call_state(
                                     builder,
-                                    RoutedAnswer { value, pending: incoming_pending, route: incoming_route, role: incoming_role },
+                                    RoutedAnswer { value, route: incoming_route, role: incoming_role },
                                     Vec::new(),
                                     env,
                                     control,
@@ -2613,7 +2598,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             } else {
                                 let first = args.remove(0);
                                 control.continuation = SourceContinuation::CallArgument {
-                                    callee: SourceCallee::Value(RoutedAnswer { value, pending: incoming_pending, route: incoming_route, role: incoming_role }),
+                                    callee: SourceCallee::Value(RoutedAnswer { value, route: incoming_route, role: incoming_role }),
                                     remaining: args,
                                     lowered: Vec::new(),
                                     env: env.clone(),
@@ -4402,16 +4387,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         // occurrence. A carried boundary word carries none of those and cannot
         // acquire them (`§2g`: the carrier holds the SSA word and nothing else),
         // so this is a specialized-only surface. ⛔ Fails closed.
-        let pending_package = callee.pending;
         let callee = callee.value.specialized_at("a source-machine call's callee")?;
-        if pending_package.is_some()
-            && !matches!(callee, Lowered::ComputationalRecursorClosure { .. })
-        {
-            return Err(unsupported(
-                "PendingCallPackage",
-                "a pending call's companion reached a non-recursor callee",
-            ));
-        }
         match callee {
             Lowered::Closure {
                 captures,
@@ -5005,13 +4981,6 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                         recursive_unit_body,
                         rt_continuation_kinds(&suspended.continuation),
                     ));
-                    if let Some(package) = pending_package {
-                        let called = self.call_selected_pending_package(builder, package, args)?;
-                        return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                            value: RoutedAnswer::direct(called),
-                            control: suspended,
-                        }));
-                    }
                     if let Some(body) = recursive_unit_body {
                         let coordinates = carried_coordinates;
                         let args = self.carry_source_call_inputs(builder, body, args)?;

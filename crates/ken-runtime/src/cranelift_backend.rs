@@ -143,7 +143,7 @@ pub use planning::{
     with_composed_return_forward_edge_collapsibility_observations,
     with_selected_pending_call_admissions, PendingRefusal,
     SelectedPendingCallAdmissionObservation, SelectedPendingCallCandidateObservation,
-    SelectedPendingCallCaptureObservation, SelectedPendingCallOutcomeObservation,
+    SelectedPendingCalleeObservation, SelectedPendingCallOutcomeObservation,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,

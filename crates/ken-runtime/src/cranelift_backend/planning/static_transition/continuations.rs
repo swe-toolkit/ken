@@ -21,6 +21,7 @@ use super::abi::{
     AbiStorageOwner, AbiUnitDefinition,
 };
 use super::occurrences::{occurrence_authority, origin_of, StaticOriginId};
+use super::responses::StaticResponseOwnerId;
 use super::semantic_ir::{RuntimeExprShape, SemanticSourceKind};
 use super::units::{EmittableCallEdge, EmittableCallKind};
 use super::{
@@ -1515,6 +1516,32 @@ impl ContinuationCallIdentity {
 
     pub(in crate::cranelift_backend) fn producer_construct_origin(&self) -> StaticOriginId {
         self.token.producer_construct_origin
+    }
+}
+
+/// The direct callee selected by the response-owner resolver, shared by
+/// pending-call admission and the ordinary direct-call emitter. A continuation
+/// identity's nominal K target alone does not decide which function executes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum ResolvedContinuationCallee {
+    StaticResponseOwner(StaticResponseOwnerId),
+    OrdinarySpecialization(ContinuationSpecializationId),
+}
+
+impl StaticTransitionPlan<'_> {
+    pub(in crate::cranelift_backend) fn resolved_continuation_callee(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<ResolvedContinuationCallee, CraneliftBackendError> {
+        let owners = self.static_response_owner_specializations()?
+            .map_err(|infeasible| planner_error(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            )))?;
+        match owners.iter().find(|owner| owner.selected_caller() == identity) {
+            Some(owner) => Ok(ResolvedContinuationCallee::StaticResponseOwner(owner.id())),
+            None => Ok(ResolvedContinuationCallee::OrdinarySpecialization(identity.target())),
+        }
     }
 }
 

@@ -4174,7 +4174,6 @@ impl<'a> Lowering<'a> {
                 let remaining = &eliminators[1..];
                 let cleared = RoutedAnswer {
                     value: scrutinee.value,
-                    pending: scrutinee.pending,
                     route: scrutinee.route,
                     role: EliminatorRole::Scrutinee,
                 };
@@ -4186,7 +4185,6 @@ impl<'a> Lowering<'a> {
             }
         }
         let incoming_route = scrutinee.route;
-        let incoming_pending = scrutinee.pending;
         let scrutinee = scrutinee.value;
         let Some(eliminator) = eliminators.first().copied() else {
             return Err(unsupported(
@@ -4413,7 +4411,6 @@ impl<'a> Lowering<'a> {
                     let frame_field = frame.answer_route;
                     frame.answer_route = RoutedAnswer {
                         value: LoweringOperand::Carried(word),
-                        pending: None,
                         route: incoming_route,
                         role: EliminatorRole::Scrutinee,
                     }
@@ -4431,8 +4428,8 @@ impl<'a> Lowering<'a> {
                         frame_field,
                         joined: frame.answer_route,
                     });
-                    self.lower_carried_computational_match_pending(
-                        builder, word, frame, &eliminators[1..], incoming_pending,
+                    self.lower_carried_computational_match(
+                        builder, word, frame, &eliminators[1..],
                     )
                     .map(ProducerTrampolineStep::ordinary)
                 }
@@ -5076,12 +5073,6 @@ impl<'a> Lowering<'a> {
                                 ..rebound.clone()
                             })
                         }
-                        LoweringEnvironmentBinding::PendingValue { .. } => {
-                            return Err(unsupported(
-                                "PendingCallPackage",
-                                "a pending package appeared inside a constructor field instead of beside its selected ITree word",
-                            ));
-                        }
                         LoweringEnvironmentBinding::Value(operand) => {
                             // The ordinary pre-worker population, unchanged. It
                             // reads the field through the same one binder authority
@@ -5120,24 +5111,7 @@ impl<'a> Lowering<'a> {
                             LoweringEnvironmentBinding::Value(induction_hypothesis)
                         }
                     };
-                    induction_hypotheses.push(match (incoming_pending.as_ref(), binder) {
-                        (Some(package), LoweringEnvironmentBinding::Value(operand)) => {
-                            LoweringEnvironmentBinding::PendingValue {
-                                operand,
-                                package: package.clone(),
-                            }
-                        }
-                        (Some(_), LoweringEnvironmentBinding::StaticWorker(_)) => {
-                            return Err(unsupported(
-                                "PendingCallPackage",
-                                "a pending selected IH became a static worker without a carried package",
-                            ));
-                        }
-                        (Some(_), LoweringEnvironmentBinding::PendingValue { .. }) => {
-                            return Err(unsupported("PendingCallPackage", "a selected IH already carries a package"));
-                        }
-                        (None, binder) => binder,
-                    });
+                    induction_hypotheses.push(binder);
                 }
                 let mut case_env = induction_hypotheses;
                 #[cfg(test)]
@@ -7233,21 +7207,6 @@ impl<'a> Lowering<'a> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let pending_package = match selected_computational.as_ref() {
-            Some((frame_origin, case_index, positions)) if positions.len() == 1 => {
-                self.emit_selected_pending_package(
-                    builder,
-                    static_origin,
-                    *frame_origin,
-                    *case_index,
-                    positions[0],
-                    &lowered_args,
-                    producer_env,
-                )?
-            }
-            _ => None,
-        };
-
         // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE.
         //
         // Fields are lowered; nothing has been transferred into a
@@ -7356,11 +7315,7 @@ impl<'a> Lowering<'a> {
                     ));
                 }
             }
-            let answer = match pending_package {
-                Some(package) => claimed.answer.with_pending(package),
-                None => claimed.answer,
-            };
-            return Ok(self.continue_composed_value(answer, eliminators));
+            return Ok(self.continue_composed_value(claimed.answer, eliminators));
         }
 
         let produced = if lowered_args
@@ -7399,147 +7354,7 @@ impl<'a> Lowering<'a> {
         // consumer: a site that hard-codes `DirectScrutinee` on a path an
         // exact call result reaches would erase the fact being transported.
         let answer = RoutedAnswer::direct(produced);
-        let answer = match pending_package {
-            Some(package) => answer.with_pending(package),
-            None => answer,
-        };
         Ok(self.continue_composed_value(answer, eliminators))
-    }
-
-    /// Materialize only the executed arm's admitted S/C run. The assembler
-    /// verifies the selected closure and resolves C0 at this lexical seat;
-    /// its result is never borrowed from the sibling's constructed frame.
-    fn emit_selected_pending_package(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        construct: StaticOriginId,
-        frame: StaticOriginId,
-        case_index: usize,
-        position: usize,
-        fields: &[LoweringOperand],
-        producer_env: &[LoweringEnvironmentBinding],
-    ) -> Result<Option<PendingCallPackage>, CraneliftBackendError> {
-        let producer = self.static_transition_plan.child_static_origin(frame, 0)?;
-        let Some((witness, candidate)) = self
-            .static_transition_plan
-            .pending_call_candidate_at(producer, construct)?
-            .map(|(witness, candidate)| (witness.clone(), candidate.clone()))
-        else {
-            return Ok(None);
-        };
-        let plan = witness.package();
-        if self.defining_emission_owner != Some(witness.owner())
-        {
-            return Err(backend(BackendFailure::PlannerInvariant(
-                "a pending call is not being built in its selected arm's defining function"
-                    .to_string(),
-            )));
-        }
-        let function = self.defining_function_id.ok_or_else(|| {
-            backend_module("a pending call has no defining Cranelift function".to_string())
-        })?;
-        let identity = self
-            .static_transition_plan
-            .continuation_call_binding_for(
-                construct,
-                frame,
-                u32::try_from(case_index).map_err(|_| backend_module("pending case overflow".to_string()))?,
-                u32::try_from(position).map_err(|_| backend_module("pending position overflow".to_string()))?,
-            )?
-            .ok_or_else(|| {
-                backend(BackendFailure::PlannerInvariant(
-                    "a planned pending arm has no causal continuation identity".to_string(),
-                ))
-            })?;
-        let target = self.function_local.continuation_calls.get(&identity).cloned().ok_or_else(|| {
-            backend(BackendFailure::PlannerInvariant(
-                "a planned pending arm has no locally declared call target".to_string(),
-            ))
-        })?;
-        let unit = self.static_transition_plan.continuation_units()?
-            .into_iter().find(|unit| unit.id() == identity.target()).ok_or_else(|| {
-                backend_module("a pending arm's continuation unit is absent".to_string())
-            })?;
-        if unit.worker_body_origin() != candidate.body {
-            return Err(backend(BackendFailure::PlannerInvariant(
-                "the pending arm's continuation unit disagrees with its selected worker body".to_string(),
-            )));
-        }
-        let assembled = self.assemble_continuation_call_operands(
-            &identity,
-            fields,
-            position,
-            producer_env,
-            plan.route.defining_function,
-            witness.owner(),
-            ContinuationOperandEnvironment::DirectEmission,
-        )?;
-        let mut worker = Vec::new();
-        for (role, value) in assembled.envelope.iter().zip(&assembled.ordinary) {
-            if let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
-                ordinal,
-                source: ContinuationWorkerCaptureSource::Lexical(source),
-                ..
-            } = role
-            {
-                worker.push((*ordinal, *source, value));
-            }
-        }
-        if assembled.envelope.len() != assembled.ordinary.len() {
-            return Err(backend_module("a pending worker envelope lost an ordinary operand".to_string()));
-        }
-        let mut members = Vec::with_capacity(plan.width);
-        let mut worker_index = 0usize;
-        let mut context_index = 0usize;
-        for member in &candidate.members {
-            let (origin, operand) = match member {
-                PendingMember::WorkerCapture { ordinal, source } => {
-                    let (actual_ordinal, actual_source, operand) = worker.get(worker_index)
-                        .copied().ok_or_else(|| backend_module("a pending worker capture is missing".to_string()))?;
-                    worker_index += 1;
-                    if (*ordinal, *source) != (actual_ordinal, actual_source) {
-                        return Err(backend_module("a pending worker capture disagrees with its declared ordinal/source".to_string()));
-                    }
-                    (*source, operand)
-                }
-                PendingMember::ContextCapture { ordinal, .. } => {
-                    let operand = assembled.continuation_inputs.get(context_index).ok_or_else(|| {
-                        backend_module("a pending context capture is missing".to_string())
-                    })?;
-                    if *ordinal as usize != context_index {
-                        return Err(backend_module("a pending context capture is out of declared order".to_string()));
-                    }
-                    context_index += 1;
-                    (construct, operand)
-                }
-            };
-            let word = match operand {
-                LoweringOperand::Carried(word) => word.word,
-                LoweringOperand::Specialized(value) => {
-                    self.transfer_into_carrier(builder, origin, value)?.word
-                }
-            };
-            members.push(word);
-        }
-        if worker_index != worker.len()
-            || context_index != assembled.continuation_inputs.len()
-            || members.len() > plan.width
-        {
-            return Err(backend_module("a pending package did not exhaust its declared S/C runs".to_string()));
-        }
-        members.resize_with(plan.width, || builder.ins().iconst(types::I64, 0));
-        // D2 issues only after the selected arm's brif edge. Load all five
-        // ticket words into this Function's SSA before leaving the arm block.
-        let issued = self.issue_selected_call_ticket(builder, &target)?;
-        let ticket = std::array::from_fn(|index| {
-            builder.ins().load(types::I64, MemFlags::trusted(), issued, (index * 8) as i32)
-        });
-        Ok(Some(PendingCallPackage {
-            plan: producer,
-            function,
-            ticket,
-            members,
-        }))
     }
 
     fn lower_bounded_nat_computational(
@@ -8782,7 +8597,7 @@ impl<'a> Lowering<'a> {
                 self.emit_checked_ih_captured_environment(builder, worker)
             }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
-            | Some(LoweringEnvironmentBinding::PendingValue { .. })
+            
             | None => {
                 Err(unsupported(
                     "CheckedIhCapturedEnvironment",
@@ -8892,7 +8707,7 @@ impl<'a> Lowering<'a> {
                 ));
             }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
-            | Some(LoweringEnvironmentBinding::PendingValue { .. })
+            
             | None => {
                 return Err(unsupported(
                     "CheckedIhApplicationResult",
@@ -9285,7 +9100,7 @@ impl<'a> Lowering<'a> {
                 return Ok(LoweringOperand::Carried(*word));
             }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
-            | Some(LoweringEnvironmentBinding::PendingValue { .. })
+            
             | None => {
                 return Err(unsupported(
                     "CheckedIhEnvironmentTransport",
@@ -13169,7 +12984,7 @@ impl<'a> Lowering<'a> {
                         Some(binding.clone())
                     }
                     Some(LoweringEnvironmentBinding::Value(_))
-                    | Some(LoweringEnvironmentBinding::PendingValue { .. })
+                    
                     | None => None,
                 }
             })
@@ -14363,19 +14178,6 @@ impl<'a> Lowering<'a> {
         eliminator: ComputationalEliminatorFrame<'_>,
         remaining_eliminators: &[EliminatorFrame<'_>],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
-        self.lower_carried_computational_match_pending(
-            builder, scrutinee, eliminator, remaining_eliminators, None,
-        )
-    }
-
-    fn lower_carried_computational_match_pending(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        scrutinee: CarriedBoundaryWord,
-        eliminator: ComputationalEliminatorFrame<'_>,
-        remaining_eliminators: &[EliminatorFrame<'_>],
-        pending: Option<PendingCallPackage>,
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
         // ⛔⛔ TERMINATION — refused BEFORE any block is created, so a hang can
         // never be half-emitted. See
         // `Lowering::active_carried_computational_eliminations` for why inlining
@@ -14419,26 +14221,7 @@ impl<'a> Lowering<'a> {
                 eliminator.answer_route,
             );
             let route_control = builder.ins().iconst(types::I64, route_control_word);
-            let header_width = builder.block_params(header).len();
-            let mut arguments = vec![scrutinee.word, route_control];
-            match pending {
-                Some(package) if header_width == package.members.len() + 7 => {
-                    arguments.extend(package.ticket.into_iter().chain(package.members));
-                }
-                None if header_width >= 2 => {
-                    // A completed recursive call produces a fresh answer, not
-                    // another ticket. The zero copy cannot authenticate if it
-                    // unexpectedly becomes callable on a later loop edge.
-                    arguments.extend(
-                        (2..header_width).map(|_| builder.ins().iconst(types::I64, 0)),
-                    );
-                }
-                _ => return Err(unsupported(
-                    "PendingCallPackage",
-                    "a recursive header cannot change its pending companion width",
-                )),
-            }
-            builder.ins().jump(header, &arguments);
+            builder.ins().jump(header, &[scrutinee.word, route_control]);
             let unreachable = builder.create_block();
             builder.switch_to_block(unreachable);
             return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
@@ -14447,35 +14230,18 @@ impl<'a> Lowering<'a> {
         let header = builder.create_block();
         builder.append_block_param(header, types::I64);
         builder.append_block_param(header, types::I64);
-        if let Some(package) = &pending {
-            for _ in 0..5 + package.members.len() {
-                builder.append_block_param(header, types::I64);
-            }
-        }
         let route_control_word = carried_computational_loop_control_word(
             eliminator.checked_frame_id,
             CarriedComputationalLoopEdge::Initial,
             eliminator.answer_route,
         );
         let route_control = builder.ins().iconst(types::I64, route_control_word);
-        let mut header_args = vec![scrutinee.word, route_control];
-        if let Some(package) = &pending {
-            header_args.extend(package.ticket.iter().chain(&package.members).copied());
-        }
-        builder.ins().jump(header, &header_args);
+        builder.ins().jump(header, &[scrutinee.word, route_control]);
         builder.switch_to_block(header);
         let scrutinee = CarriedBoundaryWord {
             word: builder.block_params(header)[0],
         };
         let route_control = builder.block_params(header)[1];
-        let pending = pending.map(|package| {
-            let words = &builder.block_params(header)[2..];
-            PendingCallPackage {
-                ticket: words[..5].try_into().expect("planned ticket width"),
-                members: words[5..].to_vec(),
-                ..package
-            }
-        });
         self.active_carried_computational_eliminations.push(
             ActiveCarriedComputationalElimination {
                 active_frame_origin: eliminator.static_origin,
@@ -14489,7 +14255,6 @@ impl<'a> Lowering<'a> {
             route_control,
             eliminator,
             remaining_eliminators,
-            pending,
         );
         let popped = self.active_carried_computational_eliminations.pop();
         debug_assert_eq!(
@@ -14547,7 +14312,6 @@ impl<'a> Lowering<'a> {
             route_control,
             eliminator,
             remaining_eliminators,
-            None,
         );
         let popped = self.active_carried_computational_eliminations.pop();
         debug_assert_eq!(
@@ -14565,7 +14329,6 @@ impl<'a> Lowering<'a> {
         route_control: cranelift_codegen::ir::Value,
         eliminator: ComputationalEliminatorFrame<'_>,
         remaining_eliminators: &[EliminatorFrame<'_>],
-        pending: Option<PendingCallPackage>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         #[cfg(test)]
         record_d6a_route_event(D6aRouteEvent::CarriedEliminationEntered {
@@ -14642,6 +14405,8 @@ impl<'a> Lowering<'a> {
             None
         };
 
+        let pending_owner_ret_only = self.static_transition_plan
+            .pending_result_validated_owner(eliminator.static_origin)?;
         for (index, case) in eliminator.cases.iter().enumerate() {
             // ⛔ Malformed recursive positions are rejected before any code is
             // emitted for this case, exactly as the specialized composed path
@@ -14676,6 +14441,16 @@ impl<'a> Lowering<'a> {
             builder.ins().brif(matched, selected, &[], next, &[]);
 
             builder.switch_to_block(selected);
+            if pending_owner_ret_only && case.constructor.ends_with("::ITree::Vis") {
+                // Internal: returned carrier is not Ret after a validated
+                // response owner. The owner checks exact Ret identity and
+                // arity before storing Result, so native success cannot reach
+                // this terminator. The unique user trap code identifies this
+                // compiler invariant on a test-only owner-check bypass.
+                builder.ins().trap(cranelift_codegen::ir::TrapCode::unwrap_user(73));
+                builder.switch_to_block(next);
+                continue;
+            }
             let binders = i64::try_from(case.argument_binders).map_err(|_| {
                 unsupported(
                     "BoundaryCarrier",
@@ -14753,9 +14528,9 @@ impl<'a> Lowering<'a> {
                         .and_then(|index| ih_slots[index]);
                     // ⭐ Clause 1 — the CARRIED arm passes its projected operand
                     // **directly**. ⛔ No wrap, no `specialized_at`, no template.
-                    let selected_body = if pending.is_some() {
-                        // This declared body is selected by the pending ticket
-                        // at the gate, not by L2's one-body predicate.
+                    let selected_body = if pending_owner_ret_only {
+                        // This IH is not consumed by the reachable Ret arm;
+                        // the Vis arm terminates above before any IH is built.
                         None
                     } else {
                         self.recursive_position_unit_body(
@@ -14784,13 +14559,9 @@ impl<'a> Lowering<'a> {
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
-                    induction_hypotheses.push(match &pending {
-                        Some(package) => LoweringEnvironmentBinding::PendingValue {
-                            operand: induction_hypothesis,
-                            package: package.clone(),
-                        },
-                        None => LoweringEnvironmentBinding::Value(induction_hypothesis),
-                    });
+                    induction_hypotheses.push(LoweringEnvironmentBinding::Value(
+                        induction_hypothesis,
+                    ));
                 }
                 active_scope = Some((activation, cursor, producer_origin, splice_caller));
             }
