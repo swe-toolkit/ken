@@ -158,3 +158,17 @@ as a non-`globals` carry, or left to the flip.
 session scope is written by paths that do not own it, and readers cannot
 tell an entry's provenance, so current-unit rules apply to it. Lines 1 and 2
 are the same predicate from the reader side. The recut above closes it.
+
+5. Retained membership fixtures construct Map-private carriers and proofs
+   through harness session exposure -- keyed on a defining-module privilege
+   the harness took implicitly through the public-alias door (Architect
+   `evt_7sqyq6xbj7fqb`, stop 5). Same predicate as lines 3-4: a writer
+   that does not own what it writes. Closure: a named harness door,
+   `bind_session_module_private_alias` plus `expose_module_private`, that
+   resolves only the defining module's own members and writes `Alias`
+   provenance; `bind_session_name` stays public-exports only.
+
+**Carry, not this WP (Foundation):** Map's public surface cannot be used by
+a client. `OrderedKeyMembership` is exported, but `Tree`'s constructors,
+`empty` and `Ordered` are private, so no client can build the carrier that
+`∈` is admitted for (`evt_7sqyq6xbj7fqb`).
