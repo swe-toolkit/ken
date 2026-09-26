@@ -1,7 +1,7 @@
 ---
 id: CI-UNDER-TWENTY-MINUTES
 title: "Bring Full CI wall time under 20 minutes by splitting the longest multi-case rt_parity_native tests and balancing the native-parity runners by measured duration, with every test and assertion preserved"
-status: ready
+status: active
 owner: verify
 size: M
 gate: architect
