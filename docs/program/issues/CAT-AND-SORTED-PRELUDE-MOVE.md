@@ -27,10 +27,17 @@ through the prelude fall-through.
   - `and_intro`, `and_fst` and `and_snd` are the Σ intro/elim helpers at
     `:957-1015`.
   - `is_sorted` is at `:1266-1289` and uses `And` in its cons-cons case.
-- **`And` needs expression-position Σ** (`LANG-EXPRESSION-SIGMA`). The body
-  `fn And (a : Omega) (b : Omega) : Omega = (x : a) × b` must be convertible
-  with the prelude's `And`. The Sigma migration evidence (its AC-1a)
-  already measures that conversion.
+- **`And` needs expression-position Σ** (`LANG-EXPRESSION-SIGMA`). A `fn`
+  head must be a lowercase `value_name` (32 §1), so the catalog declares
+  `pub fn and (a : Omega) (b : Omega) : Omega = (x : a) × b` and republishes
+  it with `export and as And`. A renamed export mints no new `GlobalId`, so
+  importers' `And a b` is the same checked identity (Architect
+  `evt_5ertv6rf0hefy`; Spec route (a), seed `seed-expression-sigma.md`).
+  The body must be convertible with the prelude's `And`; the Sigma
+  migration evidence (its AC-1a) already measures that conversion through
+  the renamed export.
+- **Carried pin.** Re-key `lang_expression_sigma.rs`'s `globals["And"]` pin
+  to the catalog identity in this move (Architect carry).
 - **Home.** These names move together into the L3 collections slice, and
   there is no `Core.Logic.And` (`CAT-LOGIC-PRELUDE-MOVE` settled inputs).
   The Architect names the exact module at D0.
