@@ -215,26 +215,31 @@ T1. Build on `8d604670e` rebased to current `origin/main`, never on
   no admitted consumer remains. Keep admission's refusals and the witness
   facts C1-C3 consume. `a2697c91a` is abandoned and not resumed.
 - **Join disposition (HS8/HS9 ruling `evt_3224sr4992fx0`; replaces R1-R4).**
-  - **S1.** One planner query, `owner_fed_match_population(origin)`, next
-    to `pending_result_validated_owner`: `Some(ret)` iff the owner
-    admission holds and every continuation call re-entering `origin` is a
-    witness candidate. A re-entering call outside the witness is a planner
-    error, never a widening.
-  - **S2.** `close_statically_unselected_match_cases` takes `{ret}` from S1
-    where it is `Some`, and refuses if a non-Ret case join was consumed.
+  - **S1' (HS10 ruling `evt_514pcf3xrh6qf`).** One planner query,
+    `owner_fed_match_population(origin, emission_owner)`, next to
+    `pending_result_validated_owner`, counting only calls re-entering
+    `origin` in that emission owner: all witness candidates gives
+    `Some(ret)`; none gives `None` (ordinary lowering, no trap, no
+    package); mixed is a planner error, never a widening.
+  - **S2.** `close_statically_unselected_match_cases` takes `{ret}` from S1'
+    for the current emission owner where it is `Some`, and refuses if a
+    non-Ret case join was consumed.
   - **S3.** The C2 trap guard and the IH `selected_body = None` branch read
-    S1, so the trap and the disposition never disagree.
+    S1' for the same (origin, emission owner), so a copy traps iff its
+    function's ledger dispositions Vis.
   - **S4.** Delete R1 (the core.rs record from `c1aa15d34`). The core.rs
     Vis record and the predecessor union stay; S2 overrides them only
-    where S1 is `Some`.
+    where S1' is `Some`.
   - **Pins.** P1: both px7l rows and px7m ok green natively with zero
-    packages. P2: S1 forced to `None` at closure reproduces the "neither
-    emitted nor statically unselected" refusal for StaticOriginId(19). P3:
-    force-consuming a Vis-subtree join trips "an owner-fed Match emitted a
-    non-Ret case body". P4: a re-entering call outside the witness fails
-    S1's coverage check (say whether synthesized). C4's detector still
-    traps.
-  - **Stop** if S1's coverage error fires on any existing row, or any row
+    packages. P2: S1' forced to `None` for the funcid44 owner only
+    reproduces the join-19 refusal on px7l. P3: force-consuming a
+    Vis-subtree join trips "an owner-fed Match emitted a non-Ret case
+    body". P4a: on px7m ok, a test-visible event shows the C2 trap in the
+    owner-fed emission owner and the Vis body lowered in K0 and K1. P4b: a
+    synthesized mixed owner hits the mixed-arm planner error. C4's detector
+    still traps.
+  - **Stop** if the mixed-arm error fires on any row, if lowering the Vis
+    body in K0 or K1 reddens (never restore the package), or if any row
     outside the expected set changes colour.
 - **Stop** if a deletion reddens any row or pin, meaning a consumer
   exists; report the row.
@@ -257,7 +262,8 @@ admits a case as reachable on grounds other than emission (the C2 trap; the
 static-selection Vis record; the recursive-predecessor union's "a carried
 return has no template" premise). All were true only while something
 emitted the Vis body, and C2 removed its only emitter. Line 7 is not in
-this predicate.
+this predicate. Line 10 is in the same family: deadness keyed coarser
+than the emitted instance, (emission owner, origin) (`evt_514pcf3xrh6qf`).
 Relocating a `Specialized` response to its owner is a lawful handoff that
 px7l already uses; it is not a future capability.
 
