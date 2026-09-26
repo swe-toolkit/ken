@@ -3830,14 +3830,8 @@ fn run_buffer_freeze_pair_fixture(
 /// coordinate law and the InvalidBounds result, not particular source origins.
 #[test]
 fn buffer_freeze_carried_start_and_length_dispatch_or_invalid_bounds() {
-    for ordinal in [1, 2] {
-        let (_, need, avail) = host_effect_seat_contract_of(
-            ken_host::HostOpV1::BufferFreeze, EffectSeatSlot::Argument(ordinal),
-        ).expect("BufferFreeze coordinate has a planned contract");
-        assert_eq!(need, EffectSeatNeed::ExactIntU64);
-        assert!(avail.admits(EffectSeatPhase::SpecializedTemplate));
-        assert!(avail.admits(EffectSeatPhase::CarriedWord));
-    }
+    // Exercise the reader before inspecting its advertised availability: a
+    // contract-only assertion would redden on an uncompiled dead fixture.
     let value = |n: i64| RuntimeExpr::Value(RuntimeValue::Int(n.into()));
     let (code, probe) = run_buffer_freeze_pair_fixture(value(2), value(4))
         .expect("in-range carried start and length compile and run");
@@ -3849,6 +3843,15 @@ fn buffer_freeze_carried_start_and_length_dispatch_or_invalid_bounds() {
     assert_eq!(code, 71, "negative start must select InvalidBounds");
     assert_eq!(probe.allocations, 1);
     assert_eq!(probe.freezes, 0, "InvalidBounds must precede host dispatch");
+
+    for ordinal in [1, 2] {
+        let (_, need, avail) = host_effect_seat_contract_of(
+            ken_host::HostOpV1::BufferFreeze, EffectSeatSlot::Argument(ordinal),
+        ).expect("BufferFreeze coordinate has a planned contract");
+        assert_eq!(need, EffectSeatNeed::ExactIntU64);
+        assert!(avail.admits(EffectSeatPhase::SpecializedTemplate));
+        assert!(avail.admits(EffectSeatPhase::CarriedWord));
+    }
 }
 
 fn compile_resource_token_seat_probe() -> (JITModule, *const u8) {
