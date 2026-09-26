@@ -1637,3 +1637,10 @@ The parser dependency must populate both header projections from source before
 declared binding. The N4 admission reader remains unchanged. Tests that insert
 either projection directly, mint a `Cap` outside the runner path, or exercise a
 raw authority-polymorphic I-3 producer do not discharge §G.
+
+## Clean-room provenance
+
+The constructor-export cases and expected outcomes were derived from the
+candidate specification and first principles. No `local/refs/` implementation,
+permissive reference, copyleft reference, or excluded prototype was consulted
+for this clarification. An originality scan is not applicable.
