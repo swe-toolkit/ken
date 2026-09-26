@@ -190,8 +190,14 @@ natively. Any row that stays ignored gets a measured reason in its
 Pending-call admission decides Planned from facts the emitter re-derives
 elsewhere. AC-1a closes the class: the emitter consumes the admission
 witness, and each clause evaluates an emitter condition the census names.
-The predicate for inventory lines 3, 5 and 6 is open again (Architect
-HS7 `evt_6m1pamme41q09`); M9 decides the package's consuming edge by arm.
+**Named predicate for inventory lines 3, 5, 6 and 7** (Architect M9 ruling
+`evt_1093kv89xyen7`): the pending package's only consumer sits on the Vis
+arm of the dispatch over the continuation-specialization result, and no
+measured row reaches that arm. Each line is a locally correct observation
+of a consumer that never executes. The fix is not another admission clause:
+settle whether the consumer is reachable (M10), then build only against a
+row that reaches it, or remove it. The parked L2 WIP `a2697c91a` is not
+resumed as written.
 Relocating a `Specialized` response to its owner is a lawful handoff that
 px7l already uses; it is not a future capability.
 
