@@ -138,6 +138,16 @@ Rescoped in place. This supersedes the stop-5 door (inventory line 5).
   They must be green at base on the targets they touch. Commit 2 onward, in
   `crates/`: delete the door, migrate the I and H rows, and point export
   assertions at the module interface (`file_export_ids`).
+- **Prefix topology** (Steward, 2026-09-26): the prefix is its own branch,
+  `wp/LANG-SESSION-SCOPE-catalog-prefix`, cut from `origin/main`. It is an
+  atomic pair: the catalog/ E edits plus, under crates/, only the
+  expected-set additions for those names in exact public-interface
+  inventory tests (`published_module_surfaces` callers and any similar
+  helper). The additions are bounded by the Architect's conditions
+  (`evt_tz8x9csmx18t`): additions only, exactly the E set, exactness kept,
+  the CLAIMED lines stay true. After the prefix lands, the crates/
+  remainder is replayed onto a fresh branch from main, and `2f5577e7f`
+  stays as history.
 - **Disposition table:** one row per name, giving its class and a
   one-phrase citation. The Architect reviews it with the `catalog/` diff.
 - **R rows** (ds4, es4, lang_qualified_constructors, map_build,
