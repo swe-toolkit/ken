@@ -20,7 +20,7 @@ fn raw_postulate_over_imported_alias_preserves_write_and_import_selection() {
     let provider = env.globals["Provider.item"];
     let nat = env.globals["Nat"];
     let raw = env
-        .declare_postulate_raw("item", Term::const_(nat, vec![]))
+        .declare_postulate_raw("item", Term::indformer(nat, vec![]))
         .expect("raw API succeeds on imported alias, as on base");
     assert_ne!(
         provider, raw,

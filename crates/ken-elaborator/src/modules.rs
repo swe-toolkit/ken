@@ -5632,7 +5632,7 @@ mod namespace_effect_tests {
         let provider = env.globals["Provider.item"];
         let nat = env.globals["Nat"];
         let raw = env
-            .declare_postulate_raw("item", ken_kernel::Term::const_(nat, vec![]))
+            .declare_postulate_raw("item", ken_kernel::Term::indformer(nat, vec![]))
             .expect("raw declaration preserves base admission");
         let scope = &env.module_state.session_scope;
         assert_ne!(raw, provider);
