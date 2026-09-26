@@ -2044,7 +2044,12 @@ impl<'a> Lowering<'a> {
                 // deadness that was never true.
                 let final_reachable: BTreeSet<usize> =
                     if let Some(ret) = self.static_transition_plan
-                        .owner_fed_match_population(match_origin)?
+                        .owner_fed_match_population(
+                            match_origin,
+                            self.defining_emission_owner.ok_or_else(|| backend_module(
+                                "a Match join closeout has no defining emission owner".to_string(),
+                            ))?,
+                        )?
                     {
                         // Every re-entering edge is in the owner witness. A
                         // claimed-dead case whose join was emitted must refuse

@@ -465,12 +465,13 @@ impl StaticTransitionPlan<'_> {
         }
     }
 
-    /// The only owner-fed Match population authority, shared by the trap and
-    /// the join closeout. Every causal re-entry must belong to the same owner
-    /// witness; otherwise Ret-only deadness cannot be asserted for this origin.
+    /// The owner-fed population of one emitted Match instance, keyed by its
+    /// emission owner as well as source origin. Only its own return edges may
+    /// justify a Ret-only trap and Vis-subtree disposition in that function.
     pub(in crate::cranelift_backend) fn owner_fed_match_population(
         &self,
         origin: StaticOriginId,
+        emission_owner: ContinuationEmissionOwner,
     ) -> Result<Option<usize>, CraneliftBackendError> {
         if !self.pending_result_validated_owner(origin)? {
             return Ok(None);
@@ -484,17 +485,21 @@ impl StaticTransitionPlan<'_> {
         let units = self.continuation_units()?;
         let mut incoming = Vec::new();
         for call in self.continuation_calls()? {
-            if call.continuation_origin() != origin {
+            if call.continuation_origin() != origin
+                || call.emission_owner() != emission_owner
+            {
                 continue;
             }
             let unit = units.iter().find(|unit| unit.id() == call.target())
                 .ok_or_else(|| planner_error("a re-entering call lost its unit"))?;
             incoming.push((unit.producer_construct_origin(), unit.worker_body_origin()));
         }
-        owner_covers_reentering_calls(
+        if !owner_reentries_exclusive(
             witness.candidates.iter().map(|candidate| (candidate.construct, candidate.body)),
             incoming,
-        )?;
+        )? {
+            return Ok(None);
+        }
 
         let occurrence = self.source_occurrences.get(origin.0 as usize)
             .and_then(Option::as_ref)
@@ -539,21 +544,28 @@ impl StaticTransitionPlan<'_> {
 
 }
 
-/// Exact coverage of the return edges re-entering a Ret-only owner-fed Match.
-/// The candidate coordinates are the planner's witness, not emitter observations.
-fn owner_covers_reentering_calls(
+/// Classify the return edges in ONE emission against the planner's candidate
+/// coordinates. Mixed edges refuse; zero owner edges keep ordinary lowering.
+fn owner_reentries_exclusive(
     candidates: impl IntoIterator<Item = (StaticOriginId, StaticOriginId)>,
     incoming: impl IntoIterator<Item = (StaticOriginId, StaticOriginId)>,
-) -> Result<(), CraneliftBackendError> {
+) -> Result<bool, CraneliftBackendError> {
     let admitted = candidates.into_iter().collect::<BTreeSet<_>>();
+    let (mut owned, mut ordinary) = (0usize, 0usize);
     for call in incoming {
-        if !admitted.contains(&call) {
-            return Err(planner_error(
-                "a continuation call re-enters an owner-fed Match outside the owner witness",
-            ));
+        if admitted.contains(&call) {
+            owned += 1;
+        } else {
+            ordinary += 1;
         }
     }
-    Ok(())
+    match (owned, ordinary) {
+        (0, _) => Ok(false),
+        (_, 0) => Ok(true),
+        _ => Err(planner_error(
+            "owner-fed and ordinary returns re-enter one Match in one emission owner",
+        )),
+    }
 }
 
 /// Leaf-only source producer census: a nested Match chooses exactly one

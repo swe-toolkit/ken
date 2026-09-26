@@ -14406,7 +14406,12 @@ impl<'a> Lowering<'a> {
         };
 
         let pending_owner_ret_only = self.static_transition_plan
-            .owner_fed_match_population(eliminator.static_origin)?.is_some();
+            .owner_fed_match_population(
+                eliminator.static_origin,
+                self.defining_emission_owner.ok_or_else(|| backend_module(
+                    "a carried Match has no defining emission owner".to_string(),
+                ))?,
+            )?.is_some();
         for (index, case) in eliminator.cases.iter().enumerate() {
             // ⛔ Malformed recursive positions are rejected before any code is
             // emitted for this case, exactly as the specialized composed path
