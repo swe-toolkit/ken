@@ -2813,22 +2813,31 @@ impl<'a> Lowering<'a> {
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         // Recut §7 total match (AC-2) over the response classify verdict. No
         // catch-all: adding a ResponseDisposition variant reddens the build here.
-        use crate::cranelift_backend::planning::ResponseDisposition;
+        use crate::cranelift_backend::planning::{ResponseDisposition, StaticResponseSite};
         match self
             .static_transition_plan
             .response_disposition_at_effect(static_origin)
         {
-            // A Specialized response's host effect lowered OUTSIDE its owner is
-            // compiler control: emit the placeholder, consumed when the caller is
-            // retargeted to the owner.
+            // A shared handler Effect is compiler control only in a function
+            // whose incoming callers are all retargeted to its response owner.
+            // Row existence alone does not license a deferred placeholder.
             Some(ResponseDisposition::Specialized)
                 if self.function_local.static_response_owner.is_none()
                     && self.function_local.driven_deferred_response_effect
                         != Some(static_origin) =>
             {
-                return Ok(LoweringOperand::Specialized(
-                    Lowered::StaticResponseDeferred,
-                ));
+                let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
+                    backend_module("a response host effect is lowered outside a defined function scope".to_string())
+                })?;
+                let site = StaticResponseSite::Effect(static_origin);
+                if self.static_transition_plan
+                    .static_response_placeholder_licensed(site, scope)? {
+                    return Ok(LoweringOperand::Specialized(
+                        Lowered::StaticResponseDeferred,
+                    ));
+                }
+                // Unlicensed: an edge no owner replaces enters this function
+                // natively, so the effect lowers ordinarily below.
             }
             // Deferred (R3): the residual falls through to the ordinary host-effect
             // lowering below -- main's pre-WP path (4a088d8aa), no placeholder/owner.

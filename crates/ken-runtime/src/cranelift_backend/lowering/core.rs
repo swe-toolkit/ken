@@ -13154,8 +13154,23 @@ impl<'a> Lowering<'a> {
         // both checks are pure, take no coordinate, and are exactly the two
         // `transfer_into_carrier` runs on the same value one step later. What
         // moves is *when*, and nothing else.
-        for argument in args {
+        for (position, argument) in args.iter().enumerate() {
             if let LoweringOperand::Specialized(value) = argument {
+                // A specialized Vis with a raw lexical K has escaped its
+                // response owner. Its K is a closure, but reporting only the
+                // generic closure-transfer error hides the earlier ownership
+                // violation. Other raw closures retain their ordinary refusal.
+                if position == 1
+                    && matches!(value, Lowered::Closure { .. } | Lowered::DeclarationClosure { .. })
+                    && !value.contains_boundary_closure_environment()?
+                    && self.function_local.static_response_owner.is_none()
+                    && self.static_transition_plan.specialized_response_at_vis(origin)
+                {
+                    return Err(unsupported(
+                        "StaticResponseDeferred",
+                        "a deferred host response is compiler control and can only enter its exact response owner",
+                    ));
+                }
                 if value.contains_boundary_closure_environment()? {
                     self.represented_boundary_admissibility(value)?;
                 } else {
@@ -15536,20 +15551,29 @@ impl<'a> Lowering<'a> {
                 // Recut §7 total match (AC-2) over the response classify verdict.
                 // No catch-all: adding a ResponseDisposition variant reddens the
                 // build here.
-                use crate::cranelift_backend::planning::ResponseDisposition;
+                use crate::cranelift_backend::planning::{ResponseDisposition, StaticResponseSite};
                 match self
                     .static_transition_plan
                     .response_disposition_at_operation_root(static_origin)
                 {
-                    // A Specialized response's operation root lowered OUTSIDE its
-                    // owner is compiler control: emit the placeholder, consumed
-                    // when the caller is retargeted to the owner.
+                    // A response root is compiler control only in a function
+                    // whose incoming callers are all retargeted to its owner.
+                    // A row at this root alone does not license the placeholder.
                     Some(ResponseDisposition::Specialized)
                         if self.function_local.static_response_owner.is_none() =>
                     {
-                        return Ok(LoweringOperand::Specialized(
-                            Lowered::StaticResponseDeferred,
-                        ));
+                        let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
+                            backend_module("a response operation root is lowered outside a defined function scope".to_string())
+                        })?;
+                        let site = StaticResponseSite::OperationRoot(static_origin);
+                        if self.static_transition_plan
+                            .static_response_placeholder_licensed(site, scope)? {
+                            return Ok(LoweringOperand::Specialized(
+                                Lowered::StaticResponseDeferred,
+                            ));
+                        }
+                        // Unlicensed: the root lowers ordinarily rather than
+                        // supplying a placeholder without an owner retarget.
                     }
                     // Deferred (R3): the residual falls through to the ordinary
                     // Construct arm below -- main's pre-WP lowering, the exact path
