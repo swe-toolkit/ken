@@ -265,6 +265,7 @@ impl<'src> Planner<'src> {
         };
         let mut planner = Self {
             plan: StaticTransitionPlan {
+                selected_pending_calls: BTreeMap::new(),
                 checked_ih_post_call_consumers: Vec::new(),
                 entries: Vec::new(),
                 planned_entry_bodies: Vec::new(),
