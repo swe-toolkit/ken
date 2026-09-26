@@ -8597,7 +8597,7 @@ impl<'a> Lowering<'a> {
                 self.emit_checked_ih_captured_environment(builder, worker)
             }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
-            
+
             | None => {
                 Err(unsupported(
                     "CheckedIhCapturedEnvironment",
@@ -8707,7 +8707,7 @@ impl<'a> Lowering<'a> {
                 ));
             }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
-            
+
             | None => {
                 return Err(unsupported(
                     "CheckedIhApplicationResult",
@@ -9100,7 +9100,7 @@ impl<'a> Lowering<'a> {
                 return Ok(LoweringOperand::Carried(*word));
             }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
-            
+
             | None => {
                 return Err(unsupported(
                     "CheckedIhEnvironmentTransport",
@@ -12984,7 +12984,7 @@ impl<'a> Lowering<'a> {
                         Some(binding.clone())
                     }
                     Some(LoweringEnvironmentBinding::Value(_))
-                    
+
                     | None => None,
                 }
             })
