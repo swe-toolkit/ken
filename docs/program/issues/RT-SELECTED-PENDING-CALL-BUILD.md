@@ -185,6 +185,38 @@ natively. Any row that stays ignored gets a measured reason in its
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
+## Increment 2, released shape (Architect `evt_a8csxz1hcj46`)
+
+This supersedes AC-1a's L1/L2 package work for increment 2. Size M, tier
+T1. Build on `8d604670e` rebased to current `origin/main`, never on
+`a2697c91a`.
+
+- **C1.** One classifier of the direct callee feeding the returned-carrier
+  dispatch: StaticResponseOwner or OrdinarySpecialization. It reads the
+  resolved-callee fact the emitter uses (units.rs:1705-1796). Admission and
+  emission both consume it.
+- **C2.** A StaticResponseOwner-fed pending leaf lowers the Vis arm to a
+  named Internal trap terminator ("returned carrier is not Ret after a
+  validated response owner") and issues no package. Both px7l rows and
+  px7m ok run natively green and are un-ignored.
+- **C3.** An OrdinarySpecialization-fed pending leaf is Refused at admission
+  ("pending continuation result is not validated by a response owner").
+  Positive support is a future WP that starts from a row reaching the Vis
+  arm natively.
+- **C4, pins.**
+  - A test-only mutation that bypasses the owner's Ret check traps natively
+    at the C2 terminator, and the Ret rows are its positive control.
+  - A classifier pair shows the same leaf shape gets no package (C2) or
+    Refused (C3); say whether it is a surface or a synthesized unit test.
+  - The three native rows and the flipped row stay green. px7m err stays
+    Refused at E.
+- **C5, retirement (Steward: delete in this increment).** Delete the
+  Planned package, its producers and `call_selected_pending_package`, since
+  no admitted consumer remains. Keep admission's refusals and the witness
+  facts C1-C3 consume. `a2697c91a` is abandoned and not resumed.
+- **Stop** if a deletion reddens any row or pin, meaning a consumer
+  exists; report the row.
+
 ## Shared predicate
 
 Pending-call admission decides Planned from facts the emitter re-derives
