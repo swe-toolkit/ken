@@ -1,7 +1,7 @@
 ---
 id: LANG-SESSION-SCOPE
 title: "Give the incremental entry points (elaborate_decl, the REPL, harness declare_postulate_raw and tests' globals.insert) a per-session scope that resolution reads as locals, separate from the prelude's root scope, so no source-visible name depends on the flat globals table outside the prelude; L2-2 of the minimal-prelude program"
-status: ready
+status: active
 owner: language
 size: M
 gate: architect
