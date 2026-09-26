@@ -115,8 +115,18 @@ class DurationShardControls(unittest.TestCase):
             sum(shard["seconds"] for shard in plan["bins"]),
             610.0,
         )
-        assigned = [name for shard in plan["bins"] for _, name in shard["tests"]]
-        self.assertCountEqual(assigned, ["known", "unseen"])
+        assigned = {
+            tuple(identity): shard["bin"]
+            for shard in plan["bins"]
+            for identity in shard["tests"]
+        }
+        self.assertEqual(
+            assigned,
+            {
+                ("fixture::ordinary", "unseen"): 1,
+                ("fixture::ordinary", "known"): 2,
+            },
+        )
 
     def test_non_map_testcases_has_exact_error(self):
         with tempfile.TemporaryDirectory() as temporary:
