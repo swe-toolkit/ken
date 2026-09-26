@@ -624,9 +624,21 @@ impl Scope {
         name: &str,
         id: ken_kernel::GlobalId,
     ) -> Result<(), ElabError> {
-        self.bind_local(name, name, &Span::zero())?;
+        self.bind_checked_session_local_at(name, name, id)
+    }
+
+    /// A synthesized dictionary has a bare selector and a separate canonical
+    /// coordinate. Preserve the prebound coordinate when recording its ID;
+    /// converting it into a new bare local would invent an import collision.
+    fn bind_checked_session_local_at(
+        &mut self,
+        name: &str,
+        canonical: &str,
+        id: ken_kernel::GlobalId,
+    ) -> Result<(), ElabError> {
+        self.bind_local(name, canonical, &Span::zero())?;
         self.current_local_names.insert(name.to_string());
-        record_checked_local(self, name, name, id);
+        record_checked_local(self, name, canonical, id);
         self.current_local_names.remove(name);
         self.session_ids.insert(name.to_string(), id);
         Ok(())
@@ -748,7 +760,7 @@ fn capture_checked_root_result(
     result: &crate::elab::ElabResult,
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
-    checked: &mut HashMap<String, ken_kernel::GlobalId>,
+    checked: &mut HashMap<String, (String, ken_kernel::GlobalId)>,
 ) -> Result<(), ElabError> {
     match decl {
         Decl::Pub(inner) => capture_checked_root_result(inner, result, scope, exports, checked)?,
@@ -769,10 +781,11 @@ fn capture_checked_root_result(
                     result.name
                 )));
             }
-            checked.insert(name.clone(), result.def_id);
+            checked.insert(name.clone(), (name.clone(), result.def_id));
         }
         Decl::AttachedProofDecl { subject, proof_name, .. } => {
-            checked.insert(format!("{subject}::{proof_name}"), result.def_id);
+            let selected = format!("{subject}::{proof_name}");
+            checked.insert(selected.clone(), (selected, result.def_id));
         }
         Decl::PropDecl { name, intros, .. } => {
             if result.name != *name || result.prop_intro_ids.len() != intros.len() {
@@ -780,18 +793,19 @@ fn capture_checked_root_result(
                     "prop `{name}` returned incomplete checked intro identities"
                 )));
             }
-            checked.insert(name.clone(), result.def_id);
+            checked.insert(name.clone(), (name.clone(), result.def_id));
             for intro in intros {
                 let id = result.prop_intro_ids.iter()
                     .find_map(|(produced, id)| (produced == &intro.name).then_some(*id))
                     .ok_or_else(|| ElabError::Internal(format!(
                         "prop `{name}` intro `{}` has no checked ID", intro.name
                     )))?;
-                checked.insert(format!("{name}.{}", intro.name), id);
+                let selected = format!("{name}.{}", intro.name);
+                checked.insert(selected.clone(), (selected, id));
             }
         }
         Decl::DataDecl { name, ctors, .. } => {
-            checked.insert(name.clone(), result.def_id);
+            checked.insert(name.clone(), (name.clone(), result.def_id));
             let members = scope.constructor_members.get(&result.def_id).ok_or_else(|| {
                 ElabError::Internal(format!("checked data `{name}` has no constructor family"))
             })?;
@@ -799,11 +813,11 @@ fn capture_checked_root_result(
                 let id = members.get(&ctor.name).copied().ok_or_else(|| {
                     ElabError::Internal(format!("checked data `{name}` lacks `{}`", ctor.name))
                 })?;
-                checked.insert(ctor.name.clone(), id);
+                checked.insert(ctor.name.clone(), (ctor.name.clone(), id));
             }
         }
         Decl::ExplicitDataDecl { name, ctors, .. } => {
-            checked.insert(name.clone(), result.def_id);
+            checked.insert(name.clone(), (name.clone(), result.def_id));
             let members = scope.constructor_members.get(&result.def_id).ok_or_else(|| {
                 ElabError::Internal(format!("checked data `{name}` has no constructor family"))
             })?;
@@ -815,23 +829,23 @@ fn capture_checked_root_result(
                 let id = members.get(leaf).copied().ok_or_else(|| {
                     ElabError::Internal(format!("checked data `{name}` lacks `{leaf}`"))
                 })?;
-                checked.insert(leaf.clone(), id);
+                checked.insert(leaf.clone(), (leaf.clone(), id));
             }
         }
         Decl::InstanceDecl { class_name, head_type, span, .. } => {
             if let Some(head) = named_type_head(head_type) {
                 let name = synthesized_dictionary_name(scope, exports, class_name, head, span)?;
-                checked.insert(name.surface, result.def_id);
+                checked.insert(name.surface, (name.canonical, result.def_id));
             }
         }
         Decl::DeriveDecl { class_name, data_name, span } => {
             let name = synthesized_dictionary_name(scope, exports, class_name, data_name, span)?;
-            checked.insert(name.surface, result.def_id);
+            checked.insert(name.surface, (name.canonical, result.def_id));
         }
         Decl::SpaceDecl { .. } => {
             // A space emits multiple checked definitions: the state and each
             // operation. Every result name is the actual emitted selector.
-            checked.insert(result.name.clone(), result.def_id);
+            checked.insert(result.name.clone(), (result.name.clone(), result.def_id));
         }
         Decl::BoundaryDecl { .. }
         | Decl::FixityDecl { .. }
@@ -4832,10 +4846,10 @@ fn expand_scope(
         // All producers above use the same total capture. Prelude bootstrap
         // retains checked IDs for the seal; later calls also bind the newly
         // checked selectors into the one incremental session ledger.
-        for (name, id) in unit_checked {
+        for (name, (canonical, id)) in unit_checked {
             scope.checked_local_ids.insert(name.clone(), id);
             if elab.module_state.prelude_sealed {
-                scope.bind_checked_session_local(&name, id)?;
+                scope.bind_checked_session_local_at(&name, &canonical, id)?;
             }
         }
     }
@@ -7532,6 +7546,15 @@ mod namespace_effect_tests {
             .expect("file derive uses file providers");
         env.elaborate_file("import A (Marker,Target)\nderive Marker for Target")
             .expect("memory derive uses memory providers");
+        let memory_derive = env.class_env.instances_by_id[&(
+            memory_class, crate::classes::InstanceHeadKey::Global(memory_head),
+        )].instance_id;
+        let derived = "Marker_instance_Target";
+        let scope = &env.module_state.session_scope;
+        assert_eq!(scope.bindings[derived], "Marker_instance_A.Target",
+            "recording a checked session ID must preserve the prebound canonical coordinate");
+        assert_eq!(scope.session_ids.get(derived), Some(&memory_derive),
+            "the later memory derivation must own the session identity");
         for (class_id, head_id) in [(file_class, file_head), (memory_class, memory_head)] {
             let info = env.class_env.instances_by_id.get(&(
                 class_id, crate::classes::InstanceHeadKey::Global(head_id)
