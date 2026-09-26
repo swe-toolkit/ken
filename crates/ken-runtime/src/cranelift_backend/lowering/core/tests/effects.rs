@@ -3545,16 +3545,22 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
     }
 }
 
-/// **`D7` — the full seat is the key, so equal structural kinds with different
-/// operations, ordinals or needs stay distinct records.**
+/// **`D7` — seat contracts separate equal structural kinds by ordinal,
+/// capability position and need; seat IDENTITY is `(effect_origin, slot)`.**
 ///
-/// ⭐ The four pairs below are chosen so that each ISOLATES one axis. Every one
-/// of them is a structurally identical seat -- an operand at a position of a
-/// host effect -- and the only reason each pair must not collapse is the axis
-/// under test. A pair differing on two axes at once would be discriminated by
-/// either, and would prove nothing about the one it was chosen for.
+/// ⭐ The ORDINAL, CAPABILITY and NEED pairs below are chosen so that each
+/// ISOLATES one axis. Every one of them is a structurally identical seat -- an
+/// operand at a position of a host effect -- and the only reason each pair's
+/// contracts must not collapse is the axis under test. A pair differing on two
+/// axes at once would be discriminated by either, and would prove nothing about
+/// the one it was chosen for.
+///
+/// OPERATION is deliberately not such an axis. The operation is read from the
+/// `Effect` at `effect_origin`, so it is carried by the seat's identity rather
+/// than by its contract, and the OPERATION block asserts the converse: two
+/// operations may share one contract.
 #[test]
-fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() {
+fn seat_contracts_differ_on_ordinal_capability_and_need_not_operation() {
     let contract = |operation, slot| {
         host_effect_seat_contract_of(operation, slot)
             .unwrap_or_else(|| panic!("{operation:?} {slot:?} has no contract"))
