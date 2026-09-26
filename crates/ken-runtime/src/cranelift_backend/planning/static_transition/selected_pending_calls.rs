@@ -465,6 +465,54 @@ impl StaticTransitionPlan<'_> {
         }
     }
 
+    /// The only owner-fed Match population authority, shared by the trap and
+    /// the join closeout. Every causal re-entry must belong to the same owner
+    /// witness; otherwise Ret-only deadness cannot be asserted for this origin.
+    pub(in crate::cranelift_backend) fn owner_fed_match_population(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<Option<usize>, CraneliftBackendError> {
+        if !self.pending_result_validated_owner(origin)? {
+            return Ok(None);
+        }
+        let producer = self.semantic.child_origin(origin, 0)?;
+        let Some(PendingCallAdmission::ValidatedResponseOwner(witness)) =
+            self.selected_pending_calls.get(&producer)
+        else {
+            return Err(planner_error("a validated pending owner lost its witness"));
+        };
+        let units = self.continuation_units()?;
+        let mut incoming = Vec::new();
+        for call in self.continuation_calls()? {
+            if call.continuation_origin() != origin {
+                continue;
+            }
+            let unit = units.iter().find(|unit| unit.id() == call.target())
+                .ok_or_else(|| planner_error("a re-entering call lost its unit"))?;
+            incoming.push((unit.producer_construct_origin(), unit.worker_body_origin()));
+        }
+        owner_covers_reentering_calls(
+            witness.candidates.iter().map(|candidate| (candidate.construct, candidate.body)),
+            incoming,
+        )?;
+
+        let occurrence = self.source_occurrences.get(origin.0 as usize)
+            .and_then(Option::as_ref)
+            .ok_or_else(|| planner_error("an owner-fed Match has no planned occurrence"))?;
+        let RuntimeExpr::ComputationalMatch { cases, .. } = occurrence.expr else {
+            return Err(planner_error("an owner-fed Match is not computational"));
+        };
+        let mut returns = cases.iter().enumerate()
+            .filter(|(_, case)| case.constructor.ends_with("::ITree::Ret"));
+        let (index, ret) = returns.next().ok_or_else(|| {
+            planner_error("an owner-fed Match has no ITree::Ret case")
+        })?;
+        if ret.argument_binders != 1 || returns.next().is_some() {
+            return Err(planner_error("an owner-fed Match has no unique unary ITree::Ret case"));
+        }
+        Ok(Some(index))
+    }
+
     /// A response drive may consult an admitted pending route's immutable owner
     /// evidence, without recomputing the source-to-emission relation locally.
     /// An ordinary response with no pending witness retains its existing plan.
@@ -489,6 +537,23 @@ impl StaticTransitionPlan<'_> {
         Ok(found)
     }
 
+}
+
+/// Exact coverage of the return edges re-entering a Ret-only owner-fed Match.
+/// The candidate coordinates are the planner's witness, not emitter observations.
+fn owner_covers_reentering_calls(
+    candidates: impl IntoIterator<Item = (StaticOriginId, StaticOriginId)>,
+    incoming: impl IntoIterator<Item = (StaticOriginId, StaticOriginId)>,
+) -> Result<(), CraneliftBackendError> {
+    let admitted = candidates.into_iter().collect::<BTreeSet<_>>();
+    for call in incoming {
+        if !admitted.contains(&call) {
+            return Err(planner_error(
+                "a continuation call re-enters an owner-fed Match outside the owner witness",
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Leaf-only source producer census: a nested Match chooses exactly one

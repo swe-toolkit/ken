@@ -14406,25 +14406,7 @@ impl<'a> Lowering<'a> {
         };
 
         let pending_owner_ret_only = self.static_transition_plan
-            .pending_result_validated_owner(eliminator.static_origin)?;
-        if pending_owner_ret_only {
-            let mut returns = eliminator.cases.iter().enumerate()
-                .filter(|(_, case)| case.constructor.ends_with("::ITree::Ret"));
-            let (ret_index, _) = returns.next().ok_or_else(|| {
-                backend_module("a validated response-owner return has no Ret case".to_string())
-            })?;
-            if returns.next().is_some() {
-                return Err(backend_module(
-                    "a validated response-owner return has ambiguous Ret cases".to_string(),
-                ));
-            }
-            // C1's owner classification makes only Ret reachable on success.
-            // Record its exact case index in the existing join partition; the
-            // Vis body is replaced by the C2 trap and must not be emitted.
-            self.disposition_statically_unselected_match_cases(
-                eliminator.static_origin, Some(ret_index),
-            )?;
-        }
+            .owner_fed_match_population(eliminator.static_origin)?.is_some();
         for (index, case) in eliminator.cases.iter().enumerate() {
             // ⛔ Malformed recursive positions are rejected before any code is
             // emitted for this case, exactly as the specialized composed path

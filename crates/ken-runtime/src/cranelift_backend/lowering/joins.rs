@@ -2043,7 +2043,28 @@ impl<'a> Lowering<'a> {
                 // dead or delete origin 25. The repair is to stop asserting a
                 // deadness that was never true.
                 let final_reachable: BTreeSet<usize> =
-                    if recursive_predecessors.contains(&match_origin) {
+                    if let Some(ret) = self.static_transition_plan
+                        .owner_fed_match_population(match_origin)?
+                    {
+                        // Every re-entering edge is in the owner witness. A
+                        // claimed-dead case whose join was emitted must refuse
+                        // before the consumed-skip in subtree disposition.
+                        for (index, root) in case_bodies.iter().copied().enumerate() {
+                            if index == ret {
+                                continue;
+                            }
+                            for join in self.static_transition_plan
+                                .source_join_origins_in_owner_subtree(root)?
+                            {
+                                if self.function_local.consumed_join_origins.contains(&join) {
+                                    return Err(backend_module(
+                                        "an owner-fed Match emitted a non-Ret case body".to_string(),
+                                    ));
+                                }
+                            }
+                        }
+                        BTreeSet::from([ret])
+                    } else if recursive_predecessors.contains(&match_origin) {
                         (0..case_bodies.len()).collect()
                     } else {
                         reached_cases
