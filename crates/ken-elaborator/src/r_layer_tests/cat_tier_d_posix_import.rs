@@ -286,7 +286,7 @@ fn filesystem_path_posix_imports_are_exact_canonical_and_internals_private() {
                 LAWFUL.to_owned(),
                 names(&["DecEq", "bool_and", "uint8_deceq_eq"]),
             ),
-            (DERIVED.to_owned(), names(&["list_append"])),
+            (DERIVED.to_owned(), names(&["list_append", "map"])),
         ])
     );
 
@@ -312,6 +312,7 @@ fn filesystem_path_posix_imports_are_exact_canonical_and_internals_private() {
             "list_append",
             "list_append::assoc",
             "list_append::right_unit",
+            "map",
         ])
     );
 

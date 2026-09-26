@@ -48,7 +48,7 @@ import Capability.Parsing.Decoder
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, map)
 
 import Data.Collections.NonEmpty
   (NonEmpty,

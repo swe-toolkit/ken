@@ -1,6 +1,6 @@
 //! CAT-DERIVED-PUB-EXPORT acceptance controls.
 //!
-//! Promise class: durable invariants. The eight public collection operations
+//! Promise class: durable invariants. The ten public collection operations
 //! retain their `Data.Collections.Derived` identities. The two `nth` bound
 //! proofs, three `list_append` monoid-law attached proofs
 //! (`list_append::{left_unit, assoc, right_unit}`), and the checked
@@ -57,14 +57,16 @@ fn assert_transparent_body_mentions(env: &ElabEnv, wrapper: &str, provider: Glob
     );
 }
 
-/// MEASURED: one real selective import accepts all eight public operations, and
+/// MEASURED: one real selective import accepts all ten public operations, and
 /// each consumer wrapper retains the corresponding fully-qualified provider
 /// identity. CLAIMED: visibility changes only the interface, never identity or
 /// computation. THE GAP: existing package tests own the operations' behavior.
 #[test]
-fn derived_exports_all_eight_operation_identities() {
+fn derived_exports_all_ten_operation_identities() {
     let mut env = load_derived();
     let providers = [
+        ("map", "cat_derived_pub_map"),
+        ("filter", "cat_derived_pub_filter"),
         ("list_append", "cat_derived_pub_list_append"),
         ("nth", "cat_derived_pub_nth"),
         ("length", "cat_derived_pub_length"),
@@ -86,7 +88,11 @@ fn derived_exports_all_eight_operation_identities() {
 
     env.elaborate_file(
         "import Data.Collections.Derived \
-           (list_append, nth, length, reverse, concat_map, eq_from_ord, count, bytes_nat_length)\n\
+           (map, filter, list_append, nth, length, reverse, concat_map, eq_from_ord, count, bytes_nat_length)\n\
+         fn cat_derived_pub_map (xs : List Bool) : List Bool = \
+           map Bool Bool (\\x. x) xs\n\
+         fn cat_derived_pub_filter (xs : List Bool) : List Bool = \
+           filter Bool (\\x. x) xs\n\
          fn cat_derived_pub_list_append (xs : List Bool) (ys : List Bool) : List Bool = \
            list_append Bool xs ys\n\
          fn cat_derived_pub_nth (n : Nat) (xs : List Bool) : Option Bool = nth Bool n xs\n\
@@ -103,7 +109,7 @@ fn derived_exports_all_eight_operation_identities() {
            count Bool cat_derived_pub_eq x xs\n\
          fn cat_derived_pub_bytes_nat_length (bs : Bytes) : Nat = bytes_nat_length bs",
     )
-    .expect("all eight Derived operations must be selectively importable together");
+    .expect("all ten Derived operations must be selectively importable together");
 
     for (provider, wrapper) in providers {
         assert_transparent_body_mentions(&env, wrapper, provider);
@@ -196,7 +202,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// publishable top-level definition is visible, including attached proofs via
 /// their imported subjects; the successful set is compared with an independent
 /// literal contract set. CLAIMED: Derived's complete loader-visible export
-/// surface is exactly the eight authorized operations, two `nth` bound
+/// surface is exactly the ten authorized operations, two `nth` bound
 /// proofs, three `list_append` monoid-law attached proofs, and the one
 /// `reverse::involutive` attached proof. THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
@@ -237,11 +243,13 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "concat_map".to_owned(),
             "count".to_owned(),
             "eq_from_ord".to_owned(),
+            "filter".to_owned(),
             "length".to_owned(),
             "list_append".to_owned(),
             "list_append::assoc".to_owned(),
             "list_append::left_unit".to_owned(),
             "list_append::right_unit".to_owned(),
+            "map".to_owned(),
             "nth".to_owned(),
             "nth::at_or_beyond_is_none".to_owned(),
             "nth::some_below_length".to_owned(),
@@ -249,6 +257,6 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "reverse::involutive".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         eight operations, two nth proofs, three list_append proofs and reverse::involutive"
+         ten operations, two nth proofs, three list_append proofs and reverse::involutive"
     );
 }

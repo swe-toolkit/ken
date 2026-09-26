@@ -12,7 +12,7 @@ import Core.Logic.Compare (list_eq)
 
 import Core.Classes.LawfulClasses (DecEq, bool_and, uint8_deceq_eq)
 
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, map)
 
 data Path = MkPath {path_absolute : Bool, path_segments : List (List UInt8)}
 

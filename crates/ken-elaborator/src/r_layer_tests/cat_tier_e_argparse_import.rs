@@ -355,7 +355,7 @@ fn argparse_selective_import_ledger_is_exact() {
         ),
         (
             "Data.Collections.Derived".to_owned(),
-            names(&["list_append"]),
+            names(&["list_append", "map"]),
         ),
         (
             "Data.Collections.NonEmpty".to_owned(),
@@ -442,7 +442,7 @@ import Application.CommandLine.ArgParse
     CommandSpec, MkCommandSpec, command_schema, argparse_option_schema_field,
     argparse_positional_schema_field)
 import Application.Input.Schema (SchemaField, schema_fields)
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, map)
 
 const flag : OptionSpec = MkOptionSpec "verbose" (None String) FlagOption "report more"
 const input : PositionalSpec = MkPositionalSpec "file" True
@@ -605,6 +605,7 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Capability.Parsing.Decoder.decoder_pure",
         "Capability.Parsing.Decoder.decoder_satisfy",
         "Data.Collections.Derived.list_append",
+        "Data.Collections.Derived.map",
         "Data.Collections.NonEmpty.NonEmpty",
         "Data.Collections.NonEmpty.nonempty_append::list_view",
         "Data.Collections.NonEmpty.nonempty_cons",

@@ -7,8 +7,8 @@
 //! equality), AC6 (verified `sort` emits the conjoined `is_sorted ∧ Perm`
 //! obligation). Spec: `spec/30-surface/37-strings-collections.md`.
 //!
-//! `map`/`fold`/`zip`/`filter` moved to the prelude
-//! (LANG-PRELUDE-COLLECTIONS); `unfoldUpTo` / `sort` views remain declared
+//! `fold`/`zip` remain in the prelude; `map`/`filter` belong to Derived.
+//! `unfoldUpTo` / `sort` views remain declared
 //! here (driving the recursive-view-through-SCT wiring in `elab.rs`), since
 //! `unfoldUpTo` is the no-coinduction infinitude idiom rather than a
 //! combinator and `sort` emits an undischarged obligation that must not
@@ -301,7 +301,15 @@ fn string_is_not_list_char_but_convertible() {
 #[test]
 fn functor_law_emits_obligation_cross_decl_resolves() {
     let mut env = mk_env();
-    setup_combinators(&mut env); // `map` now comes from the prelude (`mk_env`)
+    assert!(!env.globals.contains_key("map"));
+    let catalog_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[catalog_root], "Data.Collections.Derived")
+        .expect("Derived map must roots-load");
+    let derived_map = env.globals["Data.Collections.Derived.map"];
+    env.globals.insert("map".to_owned(), derived_map);
+    setup_combinators(&mut env);
 
     // `map_id : map id xs ≡ xs`, stated in a declaration SEPARATE from `map`.
     // The cross-declaration lowercase reference `map` resolves via the landed
@@ -324,11 +332,10 @@ fn functor_law_emits_obligation_cross_decl_resolves() {
     );
     // (c) The obligation references the REAL `map` (cross-decl resolved) + the
     // `Equal` (≡) constant — not a synthetic/hand-fed obligation.
-    let map_id = env.globals["map"];
     let equal_id = env.globals["Equal"];
     assert!(
-        term_mentions_const(&obl.goal_closed, map_id),
-        "obligation must reference the real `map` combinator"
+        term_mentions_const(&obl.goal_closed, derived_map),
+        "obligation must reference the exact Derived.map combinator"
     );
     assert!(
         term_mentions_const(&obl.goal_closed, equal_id),

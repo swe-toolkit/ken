@@ -19,13 +19,17 @@ fn reference_count(term: &Term, target: GlobalId) -> usize {
 
 fn load() -> (ElabEnv, GlobalId) {
     let mut env = ElabEnv::new().expect("base environment");
-    let prelude_filter = env.globals["filter"];
+    assert!(
+        !env.globals.contains_key("filter"),
+        "filter is not a prelude name"
+    );
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
         .expect("Derived must load its real provider closure");
+    let derived_filter = env.globals["Data.Collections.Derived.filter"];
     for (module, names) in [
         (
             "Data.Collections.Derived",
-            &["mem", "mem_filter", "mem_filter_sound"][..],
+            &["filter", "mem", "mem_filter", "mem_filter_sound"][..],
         ),
         ("Core.Classes.LawfulClasses", &["IsTrue", "bool_and"][..]),
     ] {
@@ -34,16 +38,16 @@ fn load() -> (ElabEnv, GlobalId) {
             env.globals.insert((*name).to_owned(), id);
         }
     }
-    assert_eq!(env.globals["filter"], prelude_filter);
-    (env, prelude_filter)
+    assert_eq!(env.globals["filter"], derived_filter);
+    (env, derived_filter)
 }
 
 /// Promise class: durable checked contract. The raw types, not documentation
-/// spellings, cite the installed prelude filter; generic consumer applications
+/// spellings, cite the checked Derived.filter identity; generic applications
 /// verify the two complete binder lists and their distinct conclusions.
 #[test]
-fn private_law_statements_resolve_the_installed_filter() {
-    let (mut env, installed_filter) = load();
+fn private_law_statements_resolve_the_derived_filter() {
+    let (mut env, derived_filter) = load();
     for name in ["mem_filter", "mem_filter_sound"] {
         let id = env.globals[&format!("Data.Collections.Derived.{name}")];
         let ty = match env.env.lookup(id) {
@@ -51,11 +55,14 @@ fn private_law_statements_resolve_the_installed_filter() {
             other => panic!("{name} must remain a checked transparent theorem: {other:?}"),
         };
         assert!(
-            reference_count(ty, installed_filter) > 0,
-            "{name}'s raw type must use installed prelude filter"
+            reference_count(ty, derived_filter) > 0,
+            "{name}'s raw type must use checked Derived.filter"
         );
     }
-    assert!(!env.globals.contains_key("Data.Collections.Derived.filter"));
+    assert_eq!(
+        env.globals["filter"],
+        env.globals["Data.Collections.Derived.filter"]
+    );
     env.elaborate_decl(
         "theorem filter_membership_generic_consumer \
          (a : Type) (eqf : a → a → Bool) (p : a → Bool) (x : a) \

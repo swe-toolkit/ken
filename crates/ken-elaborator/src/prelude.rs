@@ -493,19 +493,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.elaborate_decl("data Prod a b = MkProd a b")
         .map_err(|e| ElabError::Internal(format!("prelude Prod failed: {}", e)))?;
 
-    // `List` combinators (`37 §9`, WS-L). Declaration text for `map`/`fold`/
-    // `zip` is lifted byte-for-byte from `tests/l3a_acceptance.rs`'s former
-    // `setup_combinators` (LANG-PRELUDE-COLLECTIONS D1) -- unchanged, since
-    // the L3a suite already proved these strings elaborate against a real
-    // `ElabEnv` on every run; moving them is a placement change, not a
-    // re-derivation. `filter` (D2) is newly written in the same recursive
-    // shape as `map`, matching on the predicate's `Bool` result -- `Bool` is
-    // ordinary matchable data (`data Bool = True | False`), so this needs no
-    // `if` primitive and has no double-evaluation question. `sort` and
-    // `unfoldUpTo` are deliberately not here: `sort`'s `is_sorted ∧ Perm`
-    // obligation would enter the prelude as an undischarged postulate (a
-    // trusted-base change), and `unfoldUpTo` is the no-coinduction
-    // infinitude idiom rather than a combinator -- both stay test-local.
+    // `List` combinators (`37 §9`, WS-L). Declaration text for `fold`/`zip`
+    // came from `tests/l3a_acceptance.rs`'s `setup_combinators` and elaborates
+    // against a real `ElabEnv`. `sort` and `unfoldUpTo` stay test-local:
+    // `sort`'s `is_sorted ∧ Perm` obligation would add an undischarged
+    // postulate, and `unfoldUpTo` is the no-coinduction infinitude idiom.
     //
     // LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D2: bracket the declarations
     // between here and the matching `combinator_trusted_after` snapshot
@@ -519,16 +511,10 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // LANG-REFINED-FALLBACK-COLDNESS-CLAIM D6: the bracket's population is
     // POSITIONAL, not nominal -- it covers whatever `elaborate_decl` calls
     // lie between this snapshot and the matching one below, today exactly
-    // map/fold/zip/filter. Inserting a declaration between the two
-    // snapshots silently enrols it in the delta check; moving one outside
-    // them silently drops it.
+    // fold/zip. Inserting a declaration between the two snapshots silently
+    // enrols it in the delta check; moving one outside drops it.
     let combinator_trusted_before: std::collections::BTreeSet<GlobalId> =
         elab.env.trusted_base().into_iter().collect();
-    elab.elaborate_decl(
-        "fn map (a b : Type) (f : a → b) (xs : List a) : List b = \
-         match xs { Nil |-> Nil b ; Cons h t |-> Cons b (f h) (map a b f t) }",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude map failed: {}", e)))?;
     elab.elaborate_decl(
         "fn fold (a b : Type) (f : a → b → b) (z : b) (xs : List a) : b = \
          match xs { Nil |-> z ; Cons h t |-> f h (fold a b f z t) }",
@@ -539,11 +525,6 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
          match xs { Nil |-> Nil (Prod a b) ; Cons h t |-> match ys { Nil |-> Nil (Prod a b) ; Cons k u |-> Cons (Prod a b) (MkProd a b h k) (zip a b t u) } }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude zip failed: {}", e)))?;
-    elab.elaborate_decl(
-        "fn filter (a : Type) (p : a → Bool) (xs : List a) : List a = \
-         match xs { Nil |-> Nil a ; Cons h t |-> match p h { True |-> Cons a h (filter a p t) ; False |-> filter a p t } }",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude filter failed: {}", e)))?;
     let combinator_trusted_after: std::collections::BTreeSet<GlobalId> =
         elab.env.trusted_base().into_iter().collect();
     let combinator_actual_delta: std::collections::BTreeSet<GlobalId> = combinator_trusted_after

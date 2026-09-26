@@ -212,25 +212,19 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
 
 /// Promise class: durable invariant.
 ///
-/// AC-RECURSIVE-UNSHADOW-MIGRATION's durable candidate-side guard.
-///
-/// MEASURED: the installed prelude `map` and `filter` identities are recorded
-/// before roots-loading Derived. After the real roots load, neither
-/// `Data.Collections.Derived.map` nor `.filter` exists, unqualified wrappers
-/// resolve to the unchanged installed identities, `map_length` retains the
-/// installed `map` identity, the named dependent surfaces elaborate, and
-/// nondegenerate Nil/Cons computations produce the expected values. CLAIMED:
-/// Derived leaves the ambient recursive providers unshadowed while retaining
-/// its dependent behavior. THE GAP / EXPLICIT RESIDUAL: this candidate-side
-/// guard does not mechanically prohibit a future differently named,
-/// behaviorally isomorphic recursive helper. Separately declared recursive
-/// globals are distinct rigid heads, so that residual remains review- and
-/// census-enforced rather than kernel-definitional-equality-backed.
+/// MEASURED: the bare prelude lacks `map`/`filter`. Real roots loading makes
+/// both checked Derived identities available, and the fixture's flat aliases,
+/// `map_length` and generic wrappers reference exactly those identities.
+/// Nondegenerate Nil/Cons examples establish both recursive operations.
+/// CLAIMED: Derived supplies the unique structural List map/filter pair with
+/// zero new trust. THE GAP: a differently named, behaviorally isomorphic
+/// helper is outside this identity pin; the complete catalog census and
+/// reviewed declaration inventory own that residual.
 #[test]
-fn derived_unshadows_installed_prelude_map_and_filter() {
+fn derived_owns_checked_map_and_filter_identities() {
     let mut env = ElabEnv::new().expect("base env");
-    let installed_map = env.globals["map"];
-    let installed_filter = env.globals["filter"];
+    assert!(!env.globals.contains_key("map"));
+    assert!(!env.globals.contains_key("filter"));
 
     catalog_or::load_core_logic_compare(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
@@ -238,16 +232,21 @@ fn derived_unshadows_installed_prelude_map_and_filter() {
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     catalog_or::load_derived_fixture(&mut env);
 
-    assert_eq!(
-        env.globals["map"], installed_map,
-        "Derived must leave unqualified map bound directly to installed P.map"
-    );
-    assert_eq!(
-        env.globals["filter"], installed_filter,
-        "Derived must leave unqualified filter bound directly to installed P.filter"
-    );
-    assert!(!env.globals.contains_key("Data.Collections.Derived.map"));
-    assert!(!env.globals.contains_key("Data.Collections.Derived.filter"));
+    let derived_map = env.globals["Data.Collections.Derived.map"];
+    let derived_filter = env.globals["Data.Collections.Derived.filter"];
+    assert_ne!(derived_map, derived_filter);
+    assert_eq!(env.globals["map"], derived_map);
+    assert_eq!(env.globals["filter"], derived_filter);
+    for (name, id) in [("map", derived_map), ("filter", derived_filter)] {
+        assert!(
+            env.env.transparent_body(id).is_some(),
+            "Derived.{name} must be a checked transparent definition"
+        );
+        assert!(
+            !env.env.trusted_base().contains(&id),
+            "Derived.{name} must not add an assumption"
+        );
+    }
 
     let map_length = env.globals["Data.Collections.Derived.map_length"];
     let (map_length_ty, map_length_body) = match env.env.lookup(map_length) {
@@ -255,26 +254,26 @@ fn derived_unshadows_installed_prelude_map_and_filter() {
         other => panic!("map_length must remain transparent, got {other:?}"),
     };
     assert!(
-        term_reference_count(map_length_ty, installed_map) > 0,
-        "map_length's retained statement must resolve map to installed P.map"
+        term_reference_count(map_length_ty, derived_map) > 0,
+        "map_length's statement must resolve the checked Derived.map identity"
     );
     assert!(
-        term_reference_count(map_length_body, installed_map) > 0,
-        "map_length's retained proof must resolve map to installed P.map"
+        term_reference_count(map_length_body, derived_map) > 0,
+        "map_length's proof must resolve the checked Derived.map identity"
     );
 
     env.elaborate_file(
-        "fn cat_prelude_map_wrapper \
+        "fn cat_derived_map_wrapper \
            (a : Type) (b : Type) (f : a → b) (xs : List a) : List b = \
            map a b f xs\n\
-         fn cat_prelude_filter_wrapper \
+         fn cat_derived_filter_wrapper \
            (a : Type) (p : a → Bool) (xs : List a) : List a = \
            filter a p xs",
     )
-    .expect("unqualified wrappers must elaborate through installed providers");
+    .expect("unqualified fixture wrappers must elaborate through Derived");
     for (wrapper, provider) in [
-        ("cat_prelude_map_wrapper", installed_map),
-        ("cat_prelude_filter_wrapper", installed_filter),
+        ("cat_derived_map_wrapper", derived_map),
+        ("cat_derived_filter_wrapper", derived_filter),
     ] {
         let id = env.globals[wrapper];
         let body = match env.env.lookup(id) {
@@ -284,7 +283,7 @@ fn derived_unshadows_installed_prelude_map_and_filter() {
         assert_eq!(
             term_reference_count(body, provider),
             1,
-            "{wrapper} must retain exactly the installed provider identity"
+            "{wrapper} must retain exactly the Derived provider identity"
         );
     }
 
@@ -308,29 +307,29 @@ fn derived_unshadows_installed_prelude_map_and_filter() {
     }
 
     env.elaborate_file(
-        "fn cat_prelude_flip (x : Bool) : Bool = \
+        "fn cat_derived_flip (x : Bool) : Bool = \
            match x { False ↦ True; True ↦ False }\n\
-         fn cat_prelude_keep_true (x : Bool) : Bool = x\n\
-         const cat_prelude_map_nil : List Bool = \
-           map Bool Bool cat_prelude_flip (Nil Bool)\n\
-         const cat_prelude_map_recursive_cons : List Bool = \
-           map Bool Bool cat_prelude_flip \
+         fn cat_derived_keep_true (x : Bool) : Bool = x\n\
+         const cat_derived_map_nil : List Bool = \
+           map Bool Bool cat_derived_flip (Nil Bool)\n\
+         const cat_derived_map_recursive_cons : List Bool = \
+           map Bool Bool cat_derived_flip \
              (Cons Bool True (Cons Bool False (Nil Bool)))\n\
-         const cat_prelude_filter_nil : List Bool = \
-           filter Bool cat_prelude_keep_true (Nil Bool)\n\
-         const cat_prelude_filter_recursive_cons_both_outcomes : List Bool = \
-           filter Bool cat_prelude_keep_true \
+         const cat_derived_filter_nil : List Bool = \
+           filter Bool cat_derived_keep_true (Nil Bool)\n\
+         const cat_derived_filter_recursive_cons_both_outcomes : List Bool = \
+           filter Bool cat_derived_keep_true \
              (Cons Bool False (Cons Bool True (Cons Bool False (Nil Bool))))",
     )
-    .expect("installed map/filter must retain nondegenerate Nil/Cons behavior");
+    .expect("Derived map/filter must retain nondegenerate Nil/Cons behavior");
 
     let mut store = make_store(&env);
     for (name, expected) in [
-        ("cat_prelude_map_nil", vec![]),
-        ("cat_prelude_map_recursive_cons", vec![false, true]),
-        ("cat_prelude_filter_nil", vec![]),
+        ("cat_derived_map_nil", vec![]),
+        ("cat_derived_map_recursive_cons", vec![false, true]),
+        ("cat_derived_filter_nil", vec![]),
         (
-            "cat_prelude_filter_recursive_cons_both_outcomes",
+            "cat_derived_filter_recursive_cons_both_outcomes",
             vec![true],
         ),
     ] {
@@ -338,7 +337,7 @@ fn derived_unshadows_installed_prelude_map_and_filter() {
         assert_eq!(
             boolean_list(&env, value),
             expected,
-            "{name} must preserve the installed provider's recursive behavior"
+            "{name} must preserve the Derived provider's recursive behavior"
         );
     }
 }

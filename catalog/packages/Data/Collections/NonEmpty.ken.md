@@ -34,7 +34,7 @@ import Core.Classes.LawfulFunctors (Semigroup)
 
 import Core.Logic.Transport (cong)
 
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, map)
 
 pub data NonEmpty a = NonEmptyCons a (List a)
 
