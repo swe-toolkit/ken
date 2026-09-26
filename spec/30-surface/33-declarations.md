@@ -347,10 +347,8 @@ publish `C` or any other constructor by implication. The same rule holds for
 the explicit family form (`34 §2`). Constructors have no separate `pub` prefix
 inside either data production (`32 §1`); the defining module publishes a
 constructor by explicitly listing its name in an in-scope `export C`
-declaration (`§3.2`). A private type cannot become a public constructor
-family merely by exporting a constructor: clients need the parent type in scope
-for its constructor to be usable. Within the defining module, both the type
-and its constructors remain available regardless of their export status.
+declaration (`§3.2`). Within the defining module, both the type and its
+constructors remain available regardless of their export status.
 
 **The default is private — settled (was `OQ-syntax`).** Rationale:
 private-by-default is the **least-surface, information-hiding-forward** choice —
@@ -434,10 +432,12 @@ an abstract type therefore republishes the same opaque constant while its
 constructors remain hidden: exporting the **type alone** at another module
 cannot publish any of its constructors. An explicit constructor export by the
 defining module (`§4.1`) is a separate public name, which a facade may then
-re-export without changing its canonical identity. For
-a locally defined name, `export foo` has the same interface effect as declaring
-`pub foo`, without creating a second identity. `pub` on the local definition
-remains the idiomatic spelling.
+re-export without changing its canonical identity. A module other than the
+defining one cannot publish a constructor its defining module did not export:
+the hidden constructor is not in scope there (`§4.2`), so no `export` can name
+it. For a locally defined name, `export foo` has the same interface effect as
+declaring `pub foo`, without creating a second identity. `pub` on the local
+definition remains the idiomatic spelling.
 
 ## 5. Constraints — typeclasses as subobjects of the universe
 
