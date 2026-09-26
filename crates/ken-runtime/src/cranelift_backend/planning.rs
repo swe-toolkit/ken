@@ -164,7 +164,7 @@ pub(super) use static_transition::{
     ContinuationSpecializationId, DeferredResponseRow, DeferredResponseSubCase,
     ResponseDisposition, StaticResponseContinuation, StaticResponseEffectInput,
     StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
-    StaticResponseOwnerSpecialization,
+    StaticResponseOwnerSpecialization, StaticResponseSite,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
     // lowering's test targets so its control can compare the authority against
     // the prefix production actually assembled, rather than against its own

@@ -1,14 +1,15 @@
 //! Read-only admission for a pending recursive child selected by a source Match.
 //!
 //! Admission is resolved before emission. A source Match with differing
-//! declared pending body units and no admission is a planner invariant error,
-//! not `NotApplicable`. A validated response owner guarantees Ret on success;
+//! declared pending body units and no recorded admission is a planner invariant
+//! error, not `NotApplicable`. A recorded refusal is classified to the caller.
+//! A validated response owner guarantees Ret on success;
 //! no recursive call package is issued for that selected return.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_error,
+    occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_error, unsupported,
     CheckedCaseBinderLayout, CheckedCaseBinderRole, ContinuationEmissionOwner,
     CraneliftBackendError, PredeclaredFunctionId,
     ResolvedContinuationCallee, ResponseDisposition, RuntimeExpr, StaticOriginId,
@@ -451,8 +452,8 @@ impl StaticTransitionPlan<'_> {
                 }
                 Ok(true)
             }
-            Some(PendingCallAdmission::Refused(_)) => Err(planner_error(
-                "a refused pending call was delivered to an emitting frame",
+            Some(PendingCallAdmission::Refused(reason)) => Err(unsupported(
+                "PendingCallAdmission", format!("refused pending call: {reason:?}"),
             )),
             Some(PendingCallAdmission::NotApplicable) | None => Ok(false),
         }
