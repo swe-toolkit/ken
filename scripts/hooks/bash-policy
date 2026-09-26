@@ -38,14 +38,33 @@ def strip_heredocs(command):
     return "\n".join(out)
 
 
+OPERATOR_CHARS = set(";&|()\n")
+
+
 def segments(command):
-    for part in SEPARATORS.split(strip_heredocs(command)):
-        try:
-            words = shlex.split(part, posix=True)
-        except ValueError:
-            words = part.split()
-        if words:
-            yield words
+    """Yield the words of each simple command, splitting on operators outside
+    quotes: a `|` inside a quoted grep pattern is not a pipe."""
+    lexer = shlex.shlex(strip_heredocs(command), posix=True,
+                        punctuation_chars=";&|()<>\n")
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    words = []
+    try:
+        for token in lexer:
+            if token and set(token) <= OPERATOR_CHARS:
+                if words:
+                    yield words
+                words = []
+            else:
+                words.append(token)
+    except ValueError:
+        # Unbalanced quotes: fall back to a plain split so a rule still fires.
+        for part in SEPARATORS.split(command):
+            if part.split():
+                yield part.split()
+        return
+    if words:
+        yield words
 
 
 def strip_prefix(words):
