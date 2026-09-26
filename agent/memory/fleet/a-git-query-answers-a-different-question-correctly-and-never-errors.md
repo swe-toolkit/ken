@@ -52,6 +52,25 @@ query comes back thin, suspect the ref before you conclude the history is thin â
 "I found nothing" and "I looked in the wrong tree" are indistinguishable at the
 output.
 
+## 3. A ref-less `git grep` / `sed` / `Read` measures your worktree
+
+Measured 2026-08-14 hunting `b233ba68` (`LANG-TRIVIA-KIND-MAPPING-PIN`). A
+census by `git grep TriviaKind -- crates/` and a `sed` of the file, both
+ref-less, read the Adversary's own worktree: twenty-eight memory commits deep
+and never rebased onto the tree being hunted. The answer: `TriviaKind` has two
+variants and there is no `From<CommentKind>` impl. A coherent, confident, false
+picture, one sentence from being filed as "the node's cited mechanism does not
+exist". Caught only because a merge notification quoted `lossless.rs:45-54`
+against a file whose line 45 was a struct field.
+
+â‡’ **The subject of a hunt or review is a landed SHA; the working tree is the
+seat's own, the one tree guaranteed not to be the subject.** Write the ref in
+the command every time (`git grep <pat> <sha> -- <path>`, `git show
+<sha>:<file>`), or rebase before measuring. This was that seat's third instance
+(a ref-less `git log -S`, an abbreviated SHA completed by hand, then this), and
+all three were caught by implausibility. A stale tree usually returns something
+merely older, which reads as fine.
+
 ## The shared shape, which is the part worth carrying
 
 **Neither query failed.** Each answered a well-formed question that was not the
@@ -63,7 +82,8 @@ So when a git answer surprises you, check *which question you asked* before you
 believe the surprise. And when it does **not** surprise you, that is not
 evidence either.
 
-See also [[a-review-range-of-sha-caret-to-sha-reads-only-the-last-commit-and-the-scope-check-agrees]],
+See also
+[[a-review-range-of-sha-caret-to-sha-reads-only-the-last-commit-and-the-scope-check-agrees]],
 [[a-declared-commit-count-that-undercounts-makes-a-whole-deliverable-absent-from-review]],
 [[multi-worktree-cwd-drift-phantom-diff]], and
 [[a-tools-silence-is-scoped-to-the-question-it-asks]].

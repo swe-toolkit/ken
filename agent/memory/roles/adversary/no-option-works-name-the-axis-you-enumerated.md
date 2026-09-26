@@ -71,3 +71,13 @@ correct and useful — the cross-boundary call set was complete, the exposure wa
 real, and surfacing it early is what got it ruled before slice 6 rediscovered it
 mid-cut. **The evidence was sound; the verdict on top of it was not.** Report
 the measurement with confidence and the verdict with the axis attached.
+
+## It recurred on instrument selection, three axes in one arc
+
+2026-08-14/15 (`60b78c95`, `225876a4`, `301b7af20`): "no instrument exists"
+was concluded over forms that all varied **time** (frozen count, live
+differential) when the answer varied **completeness** (full enumeration from a
+bare env); then over the **env** when a **block**-level bracket had the missing
+"before"; and a refused **field** was read as refusing an arrival counter. The
+consolidated lesson, with the rules for instrument-existence claims, is
+[[no-instrument-exists-is-a-claim-about-the-space-you-enumerated]].

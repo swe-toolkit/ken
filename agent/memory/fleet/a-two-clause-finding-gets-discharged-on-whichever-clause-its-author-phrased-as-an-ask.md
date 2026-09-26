@@ -5,8 +5,9 @@ metadata:
   type: feedback
 ---
 
-**Measured 2026-08-14 on `RT-DYNAMIC-ARM-SCALAR-MERGE` `c3`, and the frame was
-the Steward's.** The Architect's finding had two clauses joined by "and":
+**Measured 2026-08-14 on `RT-DYNAMIC-ARM-SCALAR-MERGE` `c3` (the closing slice,
+`6b3b5b40`), and the frame was the Steward's.** The Architect's finding had two
+clauses joined by "and":
 
 > **heading (evidence):** *"The gating is asymmetric with its sibling, in the
 > direction that makes an identity control MORE necessary, and it is the one
@@ -61,6 +62,44 @@ files and the only test-side one *used* the observation.
 and the node reads COMPLETE. It was caught by an adversarial census after
 closure, not by the review that approved it — reviewers check the deliverables
 against the frame, and the frame is where the clause went missing.
+
+## The reporter's side: give every clause its own ask
+
+The Adversary's post-closure census of the same node found **no identity
+control, and no deliverable, AC or residual anywhere carrying the gap** (three
+files mention the feature; the only test-side one *uses* it). The heading is
+not protection: here the heading named the surviving clause and it still did not
+travel, because deliverables are written from the paragraph that says *what is
+missing*, not from the title.
+
+- **As the reporter, give every clause its own ask, in its own sentence, in the
+  imperative.** A finding that says *"X is true and what is missing is Y"* will
+  close on Y with X on the record.
+- **When a finding's two halves are a choice and a control, ask whether the
+  choice changes the price of the control.** A reason paragraph entirely sound
+  about its own question can leave the neighbouring one strictly worse off
+  without mentioning it.
+- **Name the read that separates "expensive" from "blocked."** The off
+  configuration was still reachable from a crate without the dev-dependency, so
+  the control is writable by the sibling's own route driven from elsewhere. That
+  was not run, because an artifact-level A/B needs its own target directory on a
+  box that had filled seven times; saying so is what keeps it a priced option
+  rather than an assumed impossibility.
+
+## A residual that overstates its condition is harder to discharge
+
+The same slice carried a residual saying a flag *"must not flip between the two
+reads."* Only one direction is harmful; the other records nothing, exactly as
+before. **Stating the exact direction halves what a future reader has to rule
+out.** Separate, too, what the residual is *about*: both reads are of one
+thread-local, so a cross-thread lowering would silently record nothing, but
+that was already true before the slice. It belongs beside the residual rather
+than inside it, or *"not believed reachable"* gets read as a threading claim
+when it is a scope-lifetime claim.
+
+⇒ **Verifying a residual is worth a pass even when it is sound**: two of the
+three things worth saying about this one were about its wording, and wording is
+what the next person inherits when they try to close it.
 
 See [[a-claim-accurate-about-something-narrower-than-its-reader-infers]] for the
 sibling failure where the *bound* rather than the *clause* is what gets lost,

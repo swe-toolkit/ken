@@ -11,7 +11,9 @@ The migration from the private store is complete; `MIGRATION-LOG.md` is the
 coverage audit — every source lesson from the old store appears there exactly
 once, with its disposition (kept, merged into a kept file, dropped, or excluded
 as personal) and the reasoning. The store regrew and was triaged a second time
-on 2026-09-26 (`migration-2026-09-26.tsv`); Claude Code's automatic memory is
+on 2026-09-26 (`migration-2026-09-26.tsv`), and the Adversary's branch-local
+lessons were curated onto main the same day (`adversary-curation-2026-09-26.tsv`,
+one row per source lesson); Claude Code's automatic memory is
 now off for this project (`autoMemoryEnabled: false` in
 `.claude/settings.json`), so a lesson has no home but this corpus.
 
@@ -35,8 +37,9 @@ of decision is what the corpus is for.
 
 ## Adding a lesson (growth rules)
 
-1. **Search first** (`scripts/memory-search --all <terms>`). If a lesson already covers the mechanism, extend it:
-   add the new instance or sharpen the rule. Do not add a sibling file.
+1. **Search first** (`scripts/memory-search --all <terms>`). If a lesson already
+   covers the mechanism, extend it: add the new instance or sharpen the rule. Do
+   not add a sibling file.
 2. **A recurring cause goes to `CHECKS.md`.** When a cause has produced a
    hard stop more than once, merge it into an existing check or replace the
    weakest check. Never append past the limit.

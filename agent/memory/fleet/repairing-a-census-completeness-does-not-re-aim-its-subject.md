@@ -8,7 +8,7 @@ metadata:
 # Repairing a census's completeness does not re-aim its subject
 
 **Measured 2026-09-16 on `RT-D5B-HOST-FILE-ACQUISITION-SURFACE`, and named by
-the Architect against his own earlier finding.**
+the Architect against its own earlier finding.**
 
 Earlier the same day, `AC-AVAIL` was repaired from an **enumeration** of
 availability sites to a **membership rule**, because the enumeration could
@@ -52,6 +52,32 @@ including the Architect, twice.
   report.** Same arc: a `122 passed / 0 failed` carried nothing either way
   about the one test in it that was unsound.
 
+## Second instance: a shared shape checked for the closure, inherited by the repair
+
+Measured 2026-08-16. A closure rested on a measurement taken through a
+test-support entry point, with the four production sites re-checked by hand
+and reported as sharing the refusal shape; the merge flagged that it "stands on
+my recheck, not on the run as delivered". An independent read held: all four
+are `let compiled = <compile>(…)?;`, and the `?` propagates before any artifact
+or report literal, so a refusal cannot reach the lane. Reading them
+independently turned one recheck into two, worth three minutes when a complete
+negative result closes a node.
+
+But the summary flattened a split: two sites construct a native artifact, two a
+run report. **Immaterial to the negative result, decisive for the successor**
+that must bind an artifact on refusal: the two report sites fall outside it or
+need different treatment. *"They share the shape"* is always relative to a
+question. Ask which question the shape was checked against, then whether the
+next question is the same one; a sizing that inherits a summary written for the
+closure will under- or over-count the repair.
+
+Same arc, a smaller habit: an acceptance criterion required a failure
+**message** to be verified by running the mutation and reading the printed
+text. Do that yourself. The concern behind it was behavioural (an author
+reading a red as obsolete and deleting it), so the remedy is text, and text is
+only verified by being printed; an assertion can be correct while its message
+is useless.
+
 ## The pattern that produced it is worth keeping
 
 The hazard came from a good, twice-approved pattern: **land a surface
@@ -80,3 +106,8 @@ here it was not) and of
 rather than an elaboration of this file. Here the census's SUBJECT is the wrong
 question; there a hit's SCOPE is unresolved. This lesson's detector ("what do
 all my members have in common?") is what caught that one's first instance.
+
+**When the repair is a test enforcing one instance of a general criterion,**
+record it as a bound, not a defect, and say which members remain and whether
+they share the shape, so the bound is on the record: item 5 of
+[[a-filter-or-list-keyed-on-todays-members-expires-when-the-kind-widens]].

@@ -1,6 +1,6 @@
 ---
 name: differential-oracle-is-blind-to-a-shared-premise
-description: "A differential test between two implementations is a RELATIVE oracle: it cannot detect a defect both sides share. When a WP's gate is a differential, the residual risk IS the shared premise — check each side against the spec, not against each other."
+description: "A differential test between two implementations is a RELATIVE oracle: it cannot detect a defect both sides share. When a WP's gate is a differential, the residual risk IS the shared premise — check each side against the spec, not against each other. A shared serializer is the shared premise: enumerate its axes, since a uniform relabeling passes every structural comparison."
 metadata:
   type: feedback
 ---
@@ -50,3 +50,44 @@ compute `remaining` from the reply's `effective_request`, and the spec's
 partition table reads consistently. The bug is closed; the **method** —
 audit the shared premise, not just the agreement — is the durable lesson and
 still applies to any future differential gate.
+
+## The shared serializer is the shared premise: probe every axis of it
+
+**Measured 2026-08-16 on `de5ab0f04..c4df92d31`.** A differential's
+serializer was named as its **single shared trust point**, with its field
+order described as "exercised incidentally, not by design" and protected by
+two properties of the corpus. Mutating it:
+
+| axis | result |
+|---|---|
+| the two list fields swapped | **red**: that protection holds |
+| the rule's two index fields swapped | **passes**: the named protection does not hold |
+| bound-variable vs parameter constructor swapped | **passes**: nobody named this axis |
+
+**When a component is named as the shared trust point, enumerate its axes
+rather than checking the ones offered.** A stated protection is a hypothesis;
+one of two was false and had been offered as measured, and the unmentioned
+axis was the more interesting one.
+
+**A uniform relabeling is invisible to a structural comparison.** The
+constructor swap survives because it is a bijection applied uniformly, and
+the comparison functions are purely structural, so every equality is
+preserved and the mirrored side checks a different formula to the same
+verdict. The only function that could catch it is the one that is not
+structural (here a freshness check that looks specifically for the parameter
+class); that it passed means the corpus never makes the distinction
+load-bearing. So the pin is not "add a case" but "add the case where the
+distinction is semantic": an eigenparameter number colliding with a live
+bound index, so a relabel changes a verdict rather than renaming everything
+consistently.
+
+**Name the severity as control-validity when the artifact is fine.** The
+checker under test was untouched and correct. A broken serializer weakens the
+differential's own claim: "the two agree on these N cases" silently becomes a
+statement about a different N cases. Say that, or the finding reads as an
+attack on the code it defends.
+
+**Count the recurrences out loud.** This was the fourth instance on one node
+of a property holding because of what the corpus happens to contain, with
+nothing making it hold. A tally makes a pattern arguable where four separate
+notes read as four separate nits.

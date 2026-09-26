@@ -53,6 +53,38 @@ not weaker" only because I had grepped `E0423` repo-wide and read the struct;
 otherwise it is the reassurance failure of
 [[an-error-in-the-safe-direction-is-a-claim-about-what-you-did-not-measure]].
 
+## "Cannot" is the cheapest claim to test: write the impossible thing
+
+Measured 2026-08-14 on `f807d7c3` (`LANG-PRELUDE-ELABORATION-DEPTH`). A comment
+justified a cross-file coupling with *"its own file … cannot re-derive this
+fixture."* Measured false in twenty-five lines: append the neighbouring test
+with one character changed (the block-comment row with a `--` opener), run the
+transposition it is supposed to catch (`left: Leading right: Trailing`), and
+the in-file pin reds. The coupling was a scope decision, not an impossibility.
+
+⇒ **When a justification rests on an impossibility, write the thing it says is
+impossible.** It reads as a conclusion someone already reached, which is why it
+goes untested; the template was one function up.
+
+**A true impossibility next door is what lets the false one survive.** The
+mapping's input type is `pub(crate)`, so that file genuinely cannot assert the
+map directly, and no behavioral row can separate a within-class pair. True of
+the map, false of the arm's behavioral pin; the sentence as a whole felt earned.
+
+**And an instrument with the right name can still be inapplicable.** Chasing
+a "separately impossible" live differential, a public `trusted_base_delta`
+helper turned up with ten sibling tests
+(`trusted_base_delta_is_empty_across_the_*`) doing exactly the set-before,
+elaborate, set-after differential. One step from filing the claim as refuted,
+the constructor read `pub fn new() -> … { Self::empty() }`: the two names are
+one function, there is no prelude-free environment, and the siblings get their
+differential by elaborating an external file, not by bootstrapping. Name and
+usage are evidence about the population the idiom was used on; only the entry
+point says whether that is your population. **When you refute your own
+finding, say what the refutation leaves true**: here the instrument is
+unavailable because of where the definitions were put (hard-coded in the
+bootstrap), not because of anything about the property.
+
 ## Say plainly that you did not execute
 
 Every check here was structural. **A structural pass is the right instrument for

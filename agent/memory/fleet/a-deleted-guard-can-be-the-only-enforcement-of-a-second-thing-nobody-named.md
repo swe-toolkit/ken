@@ -4,7 +4,9 @@ audience: (see scope README)
 source: private memory
   `a-deleted-guard-can-be-the-only-enforcement-of-a-second-thing-nobody-named`,
   `a-resource-exhaustion-failure-may-be-a-deleted-guard-not-new-code` (R4
-  triage, 2026-09-26)
+  triage, 2026-09-26); Adversary lesson
+  `dropping-a-conjunct-from-a-gate-un-gates-a-downstream-assertion-whose-comment-names-the-dropped-precondition`
+  (2026-08-26, curated 2026-09-26)
 ---
 
 # A deleted guard can be the only enforcement of a second thing nobody named
@@ -49,6 +51,80 @@ of around it. Both fail the same review: enumerate every claim a unit
 carries, mark each refuted or untouched, and carry the untouched ones forward
 explicitly — if the unit is too big to do that, split it before correcting.
 
+## The partial-deletion variant: dropping one conjunct from a gate
+
+A gate widened by removing one conjunct (`A && B` becomes `A`) deletes part of
+a guard. Downstream of it, an `expect`, `unwrap`, `panic!` or `Some`-access
+whose safety `B` guaranteed is now reachable on the `!B` values the widening
+admits.
+
+**Measured 2026-08-26 on the landed squash `21d621303`** (RT-ITREE D1,
+Adversary post-merge hunt; cranelift carried-computational-match lowering, own
+delta 6 files +458/-63; verdict: findings around a sound core; reported
+evt_wxfvb470pxh1, lieutenant M8 thread thr_6fe6wp65996a8). The checked-answer
+fallback selector went from
+`answer_route == CheckedSelectedRecursor && px8tr_deforested_answer_route_enabled()`
+to just `px8tr_deforested_answer_route_enabled()` (`core.rs:12546` at that SHA).
+The dropped conjunct guaranteed `checked_frame_id` is `Some`; downstream,
+`eliminator.checked_frame_id.expect("checked answer routes carry exact frame ids")`
+(`core.rs:12599`, `#[cfg(test)]` only; on current `main` the expect lives in
+`lowering/source.rs`). An ordinary `DirectScrutinee` match with
+`checked_frame_id: None` (built by non-bridge `ComputationalMatch` lowering at
+`core.rs:3049-3082` and 3334/3572/3877, where `checked.id` reads `None` with no
+active subcontinuation frame, `mod.rs:11150-11157`) and ITree `Ret`/`Vis`
+topology now reaches the `expect` and panics in test builds.
+
+**The tell: the assertion's justification comment names the dropped conjunct.**
+*"checked answer routes carry exact frame ids"* is exactly the precondition the
+widened gate removed. When a gate loses a term, read every downstream
+`expect`/`unwrap` message that asserts a property and ask whether the removed
+term established it.
+
+**Bound the impact by venue and by direction, and keep unproven legs
+unproven.** Venue: the `expect` is `#[cfg(test)]`, so the confirmed impact is a
+test-build panic, not a shipped crash. Direction: at runtime the widened path is
+fail-closed and exit-preserving (for a Direct frame `route_control` is the
+compile-time constant `0`, so the program still takes the default trap, exit
+1): no miscompile, rank it leak-or-gap. The unproven leg: the return-case body
+is lowered a second time unconditionally in production too
+(`core.rs:12601-12645`) under `case_env = [Carried(scrutinee)] ++ env`; if that
+can `Err`, an ITree interpreter that compiled before now fails to compile. It
+was reported as a real unconditional path whose failure is unproven, naming the
+fixture that would settle it.
+
+**A witness must clear the upstream guards first.** The first-pass witnesses,
+the D8m bridge arms (`core.rs:6069`/`6170`), genuinely set
+`checked_frame_id: None` and `answer_route: DirectScrutinee` — and are refuted:
+both set `deferred_constructor_case: Some(&deferred)`, and `_inner` refuses
+unconditionally on that field at `core.rs:12293-12299`, a pre-existing guard,
+before control reaches the widened gate. The adversarial refute pass caught the
+over-attribution and the reachable witness was the adjacent ordinary-match
+family (`deferred_constructor_case: None`). ⇒ **A construction site that sets
+the field your target reads is not a witness until you chain the whole path and
+confirm no upstream guard refuses it first.** A refutable witness sinks an
+otherwise-real finding. Siblings:
+[[a-narrowed-check-lands-on-the-node-not-on-the-value-that-reaches-it]],
+[[an-unreachability-argument-covers-one-route-and-the-catch-all-covers-another]].
+
+**Anchoring detail from the same hunt.** The dispatch range base `5272a68d4` was
+stale by one intervening doc commit (the squash's real parent is `e3a31614f`),
+so the dispatched range unioned an extra file. The hunt target is the squash's
+own delta `21d621303^..21d621303`, and `git diff 7b1820194 21d621303 -- <the six
+files>` came back empty, proving landed equals reviewed; per-file delta sizes
+differed only because the two candidates had different parents.
+
+**Secondary: a missing discriminating pair.** The one fixture built for opposite
+per-edge routes (`d6a_mixed_route_predecessors_at_one_origin_stay_separate`,
+`specialization_binding.rs`) never asserts `header_controls()`, and the three
+tests that pin per-edge control words are all uniform-route, so a swap between
+the two `carried_computational_loop_control_word` call sites (`core.rs:12216` vs
+`12232`) is invisible
+([[a-non-degenerate-pair-fails-to-fail-if-the-assertion-cannot-tell-the-halves-apart]]).
+Widening leaves old checks green over the current population in general: see
+[[a-filter-or-list-keyed-on-todays-members-expires-when-the-kind-widens]],
+[[a-filter-or-list-keyed-on-todays-members-expires-when-the-kind-widens]] and
+[[a-green-census-proves-its-classifier-total-over-the-current-population-not-total]].
+
 ## The resource-exhaustion diagnostic
 
 CI can fail with a resource signature — stack overflow, OOM, timeout, fd
@@ -63,10 +139,11 @@ Guard tokens worth trying: `stack_size`, `RUST_MIN_STACK`, `timeout`, `limit`,
 `reserve`, `with_capacity`. This command still runs against a real incident in
 this repo:
 
-    git log --oneline -S'stack_size' -- crates/ken-cli/tests/abi_s6_mapping_surface_native.rs
-    1c48b6c5c  fix stack-overflow regression      (adds .stack_size(...) at two sites)
-    d8bbef963  ABI-S6 D5a-surface Path-B: ...      (removes both, subject unrelated)
-    5fe2b9bd4  restore deleted 32MiB stack guard   (later restoration)
+    git log --oneline -S'stack_size' --
+    crates/ken-cli/tests/abi_s6_mapping_surface_native.rs 1c48b6c5c fix
+    stack-overflow regression (adds .stack_size(...) at two sites) d8bbef963
+    ABI-S6 D5a-surface Path-B: ... (removes both, subject unrelated) 5fe2b9bd4
+    restore deleted 32MiB stack guard (later restoration)
 
 The removing commit's subject was about mapping-surface alignment, not stack
 size — that is *why* the revert was invisible, not a reason to doubt the
@@ -91,6 +168,11 @@ satisfied by any story that covers the observed set.
   is now satisfied. Trace every path that reached it. Look hardest when it sat
   above a fork: a guard in shared code upstream of two backends is, by
   position, the only thing enforcing anything uniformly.
+- When a diff widens a gate by dropping a conjunct, name the dropped conjunct,
+  find every assertion or `unwrap` downstream that it silently protected (the
+  assertion's own message often names it), chain a witness past every upstream
+  guard, and bound the result by venue (`cfg(test)` or production) and
+  direction (fail-closed or miscompile).
 - Before rewriting or retracting a multi-claim sentence or paragraph,
   enumerate its claims and carry every untouched one forward explicitly.
 - On a resource-signature CI failure, run `git log -S'<guard token>' --

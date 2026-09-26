@@ -59,6 +59,67 @@ increase in coverage.
   whose condition restates, in different words, something the constructor or
   the recomputation already guarantees.
 
+## The same shape in a ledger checker: the outer failure hides the inner one
+
+**Measured 2026-08-14 on `57bf1721`, from a Steward hand-off that said outright
+*"I have not investigated how long it has been that way or whether other rows
+share the shape."*** One row of a 135-row content-attestation ledger was known
+stale. **The sweep found fifteen**, three of them `spec/` files, the worst 25
+commits past its attested state. And the checker validates two things in order:
+(1) the ledger's path set equals the manifest-cited source set, (2) each row's
+blob still matches the tree. **Twelve cited sources have no row at all, so gate
+1 exits 1 and gate 2 never runs.**
+
+⇒ ***When a checker validates on more than one axis, find out which axis fails
+first, because the later ones are unreachable while it does.*** Someone running
+the check sees the twelve and would reasonably conclude that is the whole
+problem. The fifteen are not merely undetected; they are undetectable through
+the intended instrument until an unrelated failure is cleared. **The tell is a
+checker with early `exit 1`s and a list-building loop after them.** Read the
+control flow before trusting a green or a red: a red says the earliest gate
+fired and nothing about the rest.
+
+The same review turned up four further lessons worth keeping:
+
+- **Two files that must agree, written by different commits.** The ledger was
+  last written on one day; the manifest that defines its required contents on a
+  later one, and the later commit added the citations now missing. Both were
+  correct when written, no single commit is wrong, and the invariant is
+  violated. Look for pairs with an exact-agreement invariant and separate
+  authorship: a generated file and its input, a ledger and a manifest, a
+  lockfile and a manifest, an index and a corpus. **Report the decay rate**
+  (here, twelve days after a correct-at-write ledger, 11% of rows drifted and
+  twelve citations unattested); a rate makes a disposition arguable in a way a
+  snapshot does not.
+- **"Last matched at commit C" is about the PATH, not the ledger.** Several
+  drifted rows' last-matching commit predated the ledger's own last write by
+  weeks, which suggested the ledger had been written already stale. It is a good
+  story and wrong: **measured at the ledger's own commit, all fifteen matched.**
+  A path may simply not have been touched between its last edit and the
+  attestation. One `git rev-parse <ledger-commit>:<path>` per row settles it.
+  Same family as
+  [[a-census-is-a-number-a-scope-a-predicate-and-a-tree]],
+  inverted: there the count was right and the scope was doubted; here the dates
+  were right and the wrong subject was inferred from them.
+- **The correct template is often in the same file as the defect.** A recorded
+  residual: an observation feature enabled unconditionally on a dev-dependency,
+  so feature unification puts it into every crate's test build, with no
+  artifact-identity control unlike its sibling. The sibling's correct shape (an
+  optional feature that forwards) was seventeen lines above it in the same
+  `Cargo.toml`. When a residual reads as a design question, check whether the
+  tree already holds the answer next to the defect; it turns *"decide what to
+  do"* into *"match the line above."*
+- **Say compile-time or run-time when you say "outside the guard."** Work said
+  to sit *"outside the observation guard"* was inside a
+  `#[cfg(any(test, feature = …))]` **compile-time** gate and outside the
+  **runtime** `Cell<bool>`, which is read only inside the recording function
+  after the value is built. Those give different blast radii (absent from
+  production entirely, versus paid on every merge in every test build) and only
+  the second was true. "Outside the guard" with two guards present is ambiguous
+  in the direction that sounds worse. Check the repair is writable while there:
+  hoisting the runtime read to the call site is one `if`, established by the
+  three existing bare `.get()`/`.set()` uses of the same thread-local.
+
 Siblings: [[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]]
 — there the check fires for the wrong reason; here it cannot fire at all.
 [[close-a-class-partition-the-declared-population]] is the method that makes

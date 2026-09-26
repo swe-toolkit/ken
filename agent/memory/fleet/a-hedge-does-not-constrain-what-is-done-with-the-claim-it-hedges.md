@@ -61,6 +61,33 @@ claim is about. The harm of asserting someone's conduct does not scale with
 how load-bearing the claim was to your point — an aside repeated as fact
 convicts exactly as hard as a premise.
 
+## A format that signals completion outruns any hedge placed outside it
+
+**Measured 2026-08-17.** A frame's table cell asserted a mutation result while
+prose twenty lines above said that mutation was *"still owed and still unrun."*
+Both sentences were in the artifact; only one was hedged, and the table won.
+
+⇒ ***A table cell reads as measured; that is what the format is for.*** Past
+tables: any format that signals completion (a cell, a checkbox, a status
+column, a MEASURED heading) outruns a qualifier placed outside it. **An unrun
+mutation does not get a table cell.**
+
+**The same gap pointed the other way in the same candidate.** Its rustdoc,
+immediately after a mutation narrative, read *"No second observation is
+needed"*, while the process had taken **two** independent observations. The
+intended sense was *"no second **instrument**"*, which is correct and lives in
+the cost census below it.
+
+⇒ ***Over-claiming and under-recording are one defect: the artifact and the
+evidence disagree.*** Hunt both directions. The second is easier to miss because
+it is modest, and it is worse in one way: a durable artifact documenting a
+weaker standard than was practised becomes precedent for the next author.
+**Read a sentence in the position it occupies, not the section it belongs
+to**: a clause whose subject lives one paragraph down is read against the
+paragraph it is in. (The same candidate's 30-line doc insertion also needed an
+attachment check; see
+[[a-helper-inserted-between-a-doc-block-and-its-fn-steals-the-doc]].)
+
 ## The forbidden act, named directly
 
 **Name the act the hedge or the discount forbids, not the uncertainty it

@@ -155,3 +155,85 @@ Every existing control asks whether the measurement was right, and it was.
 
 **A comment's enclosing item is the comment**, not the line your grep landed
 on. Read from the item's first line, not from the hit.
+
+## An earlier instance: a line number read as a set membership
+
+**2026-08-29, CAT-DERIVED-REUSE-CONSUMERS D2 (`510c857e0`).** A reviewer read
+`Capability.Parsing.Parsing` at line 695 of `lang_mod_strict_resolution_d0.rs`
+as a member of `expected_clean` and filed a predicted CI-red on it. The
+enclosing `let` said otherwise: `expected_clean` closed at :682 and
+`expected_residuals` opened at :683. Two readers cited the same line and reached
+opposite buckets; the wrong one voided a valid merge authorization. **For any "X
+is in set S" claim, open the binding the line sits under.** The full case is in
+[[classify-a-reuse-migrations-ambient-census-case-before-filing-a-missing-or-wrong-row]].
+
+## A line-oriented probe cannot see the header that governs the line
+
+**Measured 2026-08-13, the Adversary correcting its own `evt_qq5h94eq504j`; the
+Steward caught it before it entered a durable doc.** The probe was
+
+```sh
+git grep -n "ken-runtime" <sha> -- '*.toml' | grep -i "features"
+```
+
+It returned `crates/ken-cli/Cargo.toml:25`, and the finding said: *"a normal
+`[dependencies]` edge, not dev — so resolver unification applies unconditionally
+… compiled into the shipped CLI today."* **Line 25 is under
+`[dev-dependencies]`, which opens at line 24.** The plain `[dependencies]` entry
+is line 22 and carries no features, so the feature is not in the shipped binary.
+
+Three layers, and the third is the one that travels:
+
+1. **The probe returned a LINE.** In TOML the line's meaning is set by the
+   table header above it, which a line-matching grep cannot see.
+2. **The claim asserted the complement of what was measured.** The grep
+   established *"line 25 enables the feature"*, nothing about which table it is
+   in, and the sentence said *"not dev"*, the half the instrument could not reach.
+3. **Then it amplified** into *"compiled into the shipped CLI today"*, a claim
+   about a shipped artifact resting on a table header nobody read.
+
+⇒ ***For any format where an enclosing header governs the line, a
+line-matching probe returns the line and not its governor.*** TOML tables, YAML
+blocks, `match` arms, `impl` blocks, `#[cfg]` scopes, Markdown sections. Read
+the span, or anchor the probe to the section (`sed -n 'A,Bp'`, or grep the
+header and the line together). Same family as a `grep -A 30` that began at an
+`enum` declaration and cut off the doc summary classifying its variants:
+context flags and line filters both hide the thing that assigns meaning.
+
+**The tell is a negative in the conclusion.** *"not dev"*, *"outside the
+guard"*, *"not in the `cfg(test)` block"*: a grep that matches a line can
+confirm presence and can almost never confirm which enclosing scope it is absent
+from. If a sentence contains a negative about structure, ask which command
+established it.
+
+**Having the lesson did not prevent it.** The Adversary's own corpus already
+named the distinction
+([[a-pin-built-from-your-finding-inherits-your-enumeration]]: *"no sibling
+workspace member enabling the feature on a NORMAL `[dependencies]` edge;
+resolver 2 withholds unification for dev edges only"*). ***A lesson that names a
+distinction does not supply an instrument that can measure it.*** When a lesson
+makes an axis load-bearing, the next question is which command resolves it; if
+the answer is *"the one I just ran, plus an assumption"*, it is not resolved.
+
+**A false fact is worst in the artifact you asked someone to create.** This was
+the second amplifying-direction error in a week (the first was *"the only
+in-tree record"* from a `-- crates/`-scoped grep,
+[[my-reporting-scope-silently-became-my-measurement-scope]]): a correct narrow
+measurement, a conclusion one size larger, and the larger version is what makes
+the finding feel worth acting on. Here the finding's own repair asked for the
+sentence to be written into the feature's doc, where it would read as measured
+and be quoted for months. **Audit the evidence in a finding whose repair is
+"write this down" at a higher bar than one whose repair is "change this code"**;
+code gets tested and prose does not.
+
+**Salvage the true narrower claim rather than dropping the point.** A
+dev-dependency enabling a feature does unify it across the whole `cargo test`
+build graph, so any test build including that crate compiles the dependency with
+the feature on. That is why the identity control needs `--no-default-features`
+and two separate target directories: feature-on and feature-off artifacts cannot
+coexist in one compilation
+([[a-p-scoped-run-and-cis-workspace-run-compile-different-feature-sets]]). The
+precedent worth citing is that a test-support feature already leaks across this
+workspace's TEST graph, not that one ships. The correction killed the sentence,
+not the observation, and a retraction that abandons both is worse than one that
+reports the real scope.

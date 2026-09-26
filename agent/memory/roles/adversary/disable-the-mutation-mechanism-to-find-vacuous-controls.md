@@ -46,3 +46,49 @@ fixture. Related:
 [[a-measured-property-can-be-true-and-not-entail-what-the-mechanism-needs]],
 [[a-differential-over-an-aggregate-passes-while-one-of-n-contributors-defects]],
 [[a-green-mutation-does-not-tell-you-which-blindness-let-it-through]].
+
+## A hit counter must count the change, not the failure
+
+Merged 2026-09-26 from the Adversary lesson measured 2026-08-15 on
+`ad47054a5...1cd9947cf`: the degenerate-to-identity mutation again, this time
+hidden in the hit counter.
+
+```rust
+let position = if mutated { usize::MAX } else { 0 };
+match plan.child_static_origin(entry, position) {
+    Ok(body)          => Body(body),
+    Err(_) if mutated => { note_hit(); MissingBodyChild { entry } }
+    Err(_)            => Entry(entry),
+}
+```
+
+At one route the unmutated lookup already fails (a sibling control in the same
+candidate asserts that a declared-unit scheduling entry with no child zero must
+state its level). Arming the mutation there changes no outcome and still counts
+a hit. Redirecting an input to something impossible makes the operation fail;
+that is not evidence its result moved. **Where the unmutated result is
+computable (here literally `position = 0`), the counter must compare against
+it.**
+
+- **Diff the new instance against its older siblings.** Both neighbouring
+  mutations in the file stated and enforced it: *"The hit is counted only when
+  the coordinate actually CHANGES"*, and `assert_ne!(passed_in, used, "the
+  substitution returned the coordinate it was given, so this row is a no-op
+  wearing a hit count")`. A house style documented but not factored into a
+  helper gets re-derived correctly twice and dropped the third time.
+- **Say where it is masked and what unmasks it.** In its own control the weight
+  was carried by a discriminating tag flip, so `assert!(hits > 0)` beside it
+  was redundant and green for a good reason; but the counter is global across
+  all six routes. The report: "this control does not depend on the broken part,
+  and the next one written to the `hits > 0` shape will." A redundant
+  assertion is where a defect hides.
+- **Group by cause.** A second symptom, `MissingBodyChild` returned for an
+  unmutated `Err` without a hit at the sibling resolver, conflates "the
+  mutation removed it" with "the plan has none". Same root: neither resolver
+  compares against its own unmutated outcome; one repair covers both.
+- **Say when an exclusion is simply right.** Five production
+  `child_static_origin(...)?` calls were excluded from the repair population
+  and flagged as not independently controlled. A production `?` behaves
+  identically in both profiles, so it cannot produce the test-profile-only
+  divergence the node exists to close. When the criterion is the argument,
+  asking for a control is asking for ceremony.
