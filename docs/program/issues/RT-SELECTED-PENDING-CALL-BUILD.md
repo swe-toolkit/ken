@@ -319,3 +319,8 @@ Positive native px7m err depends on it.
    HS9: shares one predicate with line 8 -- the join partition is keyed on
    the source origin within an emission, but C2's deadness belongs to one
    visit of that origin; research triggered, ruling held).
+10. px7m-ok: a continuation call re-enters the owner-fed Match outside the
+    owner witness -- keyed on witness coverage of the re-entering edges
+    (Architect `evt_1xhb4d2bgavzq`, HS10: S1's premise that every
+    re-entering edge is owner-fed is false on an existing row; M12 probe
+    held; research triggers at 12).
