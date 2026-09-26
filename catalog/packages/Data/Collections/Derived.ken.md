@@ -1875,7 +1875,8 @@ reference implementation.
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
 2. **Public API.** `OrdResult`, `list_append`, `nth`, `take`, `drop`,
    `sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
-   `filter`, `mem`, `length`, `min`, `take_drop_decomposition`,
+   `map::id`, `map::fusion`, `filter`, `mem`, `length`, `min`,
+   `take_drop_decomposition`,
    `map_length`, `length_take_min` (CAT-3 D1); `nth::some_below_length`,
    `nth::at_or_beyond_is_none` (the two lookup bounds); `reverse`,
    `reverse::involutive`,
@@ -1912,9 +1913,11 @@ reference implementation.
    The generic sort proofs consume an explicit totality premise only for
    sortedness; they neither add an axiom nor invoke the inherited `Ord Int`
    assumptions.
-6. **Proof families.** `§4.1`/`§4.2`: structural induction + `cong`/`trans`
-   lifting the tail IH under the head constructor; private `mem_filter`
-   and `mem_filter_sound` split named predicate/comparator outcomes and use
+6. **Proof families.** `map::id` and `map::fusion` induct over `List`,
+   lifting the tail proof under `Cons` with `cong`; `§4.1`/`§4.2` also use
+   structural induction + `cong`/`trans` under the head constructor. Private
+   `mem_filter` and `mem_filter_sound` split named predicate/comparator
+   outcomes and use
    `cong` over this module's `filter` branch, with compatibility needed only
    for the first law. Private `concat_map_append` lifts the IH under
    `list_append` and uses
@@ -1932,7 +1935,9 @@ reference implementation.
 7. **Consumers.** `Application.CommandLine.ArgParse`,
    `Capability.Filesystem.Path.Posix`, `Data.Binary.BytesPrimitiveContracts`,
    `Data.Collections.NonEmpty`, and `Tooling.Testing.Property` import the
-   checked `map`; the module's `map_length` and filter-membership laws use
+   checked `map`; `Core.Classes.LawfulFunctors` uses `map` and both laws in
+   `Functor List`, and `Core.Classes.EffectfulClasses` cites them through a
+   qualified alias. The module's `map_length` and filter-membership laws use
    its structural operations locally. `Application.Configuration.Decoder`
    imports this module wholesale. `catalog/packages/Data/Collections/Map.ken`
    (the proved `Map`/`Set` BST) depends on its `list_append`.
