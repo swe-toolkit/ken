@@ -79,33 +79,49 @@ natively. Any row that stays ignored gets a measured reason in its
       leaves its defining function (Architect `evt_327ykvk4cv8bq`: route
       confinement discharges the backing question; the AC-0 member classes
       stay evidence and nothing branches on them).
-- **AC-1a (admission witness, Architect `evt_46vm0djbs20k5`).**
+- **AC-1a (admission witness; Architect `evt_46vm0djbs20k5`, clauses per
+  `evt_2nn9ta5ywrkyh`).**
   - Admission returns a `SelectedPendingRouteWitness`, constructible only in
-    `planning/static_transition/selected_pending_calls.rs`. It carries the
-    package emission owner; per selected leaf, each `Vis`'s response
-    disposition and owner (from the plan functions at `responses.rs:3389`
-    and `:3548`); per-member backing; and binder coordinates.
-  - A route with any `Specialized` or `Deferred` `Vis` whose owner is not
-    the package emission owner is REFUSED at admission, reason "selected
-    pending leaf crosses a response owner", at the granularity admission
-    already refuses at. No per-leaf fallback.
-  - The emitter reads owner, dispositions, backing and coordinates from the
-    witness. Its one ownership check is an internal invariant assertion at
-    package entry (`defining_emission_owner == witness.owner`).
+    `planning/static_transition/selected_pending_calls.rs`. The emitter reads
+    its facts from the witness and does not re-derive them. Its one
+    ownership check is an internal assertion at package entry, over the
+    package owner only.
+  - **Census first, clauses second.** Every witness clause is the
+    planner-side evaluation of one emitter condition in the census below. No
+    clause is written from a model of the route.
+  - **Measure first** (a probe, removed after), on px7l and px7m err:
+    - M1: `R(leaf)`, the planned joins in the operation subtree of each
+      `Specialized` `Vis` the package lowers but does not own;
+    - M2: for each join in `R`, the emission that consumes it, or none;
+    - M3: for rows 341 and 378, the owner of the emission that lowers them,
+      compared with their handler owners.
+  - **(J) join partition.** If every join in `R` is consumed by the
+    response-owner emission (J-a), the witness carries `R`, and the
+    package's required set subtracts it on witnessed pending routes only.
+    The owning emission closes over exactly `R`. px7m err may then go
+    native, and is pinned native if it does. If some join in `R` is
+    consumed nowhere (J-b), admission refuses with "selected pending leaf
+    relocates planned joins no emission lowers". Report whether a
+    non-pending route can reach the same shape.
+  - **(D) Deferred drive.** For each `Deferred` row on the route, its
+    handler owner equals the owner of the emission that lowers it.
+    Otherwise it is refused with "Deferred response lowered outside its
+    handler owner".
   - **Closure census.** Every `unsupported(...)` and `backend_module(...)`
     refusal reachable from the pending-route emission path, including the
     `ObjectEmission` join closeout (`joins.rs:2234`), is classified in the
     handoff as a witness clause, an asserted invariant, or unreachable on a
     witnessed route, with the reason. An unclassified row is a finding.
-  - **Pins.** Each of px7l ×2, px7m ok and px7m err is reported Planned or
-    Refused. px7m err is Refused with the owner-crossing reason, asserted by
-    reason. A leaf whose `Vis` owner equals the package owner stays Planned
-    beside a crossing leaf that refuses. Dropping the ownership clause
-    returns px7m err to the join-393 refusal. No Planned row fails at
-    emission. If px7m ok shares px7m err's package, report both refused;
-    do not split the route per leaf.
+  - **Pins.** The pair control is px7l (`R` empty, Planned, native) against
+    px7m err. Each of px7l ×2, px7m ok and px7m err is reported Planned or
+    Refused, a refusal asserted by reason. Dropping (J) returns px7m err to
+    the join-393 closeout. Dropping (D) reddens if any M3 row mismatches;
+    if none does, (D) is reported unexercised, not claimed. No Planned row
+    fails at emission.
+  - **Stop** if `R` is not empty on px7l, or if one join is consumed by two
+    emissions.
   - Forbidden: dispositioning join 393 as unselected, forcing the
-    placeholder across the owner boundary, or claiming the err row native.
+    placeholder, or claiming px7m err native without the (J-a) accounting.
 - **AC-2 (proof, D1 item 6).**
   - **Positive.** Run the px7l fixture natively and assert:
     - the selected arm's host effect happens once;
@@ -158,15 +174,32 @@ natively. Any row that stays ignored gets a measured reason in its
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
-## Shared predicate (Architect `evt_46vm0djbs20k5`, third stop)
+## Shared predicate
 
-Three advancing stops had one cause: pending-call admission decided Planned
-from facts the emitter re-derives elsewhere. Those facts were per-member
-backing (`evt_327ykvk4cv8bq`), the IH binder coordinate
-(`evt_3yce3vzbddvk0`), and response ownership (`evt_3engggxek84h8`). AC-1a
-closes the class: the emitter consumes the admission witness instead of
-re-deriving.
+Pending-call admission decides Planned from facts the emitter re-derives
+elsewhere. AC-1a closes the class: the emitter consumes the admission
+witness, and each clause evaluates an emitter condition the census names.
+Relocating a `Specialized` response to its owner is a lawful handoff that
+px7l already uses; it is not a future capability.
 
-Positive support for an owner-crossing pending leaf (retargeting the
-response owner's resumption into the package, or calling the specialization
-from the arm) is a new capability and a future WP, not part of this one.
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. AC-1's per-member backing refusal has no planner-plane authority:
+   `AbiSlot` is uniformly `ValueWord`/`OwnedByFrame` and the plane is
+   names-only (`abi.rs:55-60`) -- keyed on the per-value pointee type the
+   plane deliberately does not carry. Discharged by route confinement (no
+   F5/F6 crossing) for increments 1-2 (Architect `evt_327ykvk4cv8bq`).
+2. The pending IH's runtime position has two derivations that disagree at
+   px7l origin 47 (IR binding structure 4, erasure-minted morphism and
+   callee `Var` 3): one `Match` case binder on the host-response dispatch
+   path has no group in erasure's `BranchBinderRemap` -- keyed on a runtime
+   binder that erasure's coordinate map does not record (Architect
+   `evt_3yce3vzbddvk0`).
+3. A selected pending arm's operation field is `StaticResponseDeferred`, so
+   its argument join (px7m dynamic-err origin 393, owner
+   `PredeclaredFunctionId(5)`) has no evaluating seat on the pending route
+   -- keyed on which emission owns relocated deferred-response work, which
+   pending-call admission never consults (Architect `evt_3engggxek84h8`).
+4. HS3 ownership clause refused px7l's lawful Specialized relocation,
+   because it was keyed on owner identity, which the emitter never tests
+   (Architect `evt_2nn9ta5ywrkyh`).
