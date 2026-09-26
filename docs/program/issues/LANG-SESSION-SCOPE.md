@@ -102,12 +102,16 @@ objective; size M, tier T1.
   resolves, a non-pub `M.x` and an unimported source-unit `M.x` do not;
   mutation: drop the export fallback); fence isolation (mutation: reassign
   `session_scope`); and a failed unit leaves the session map byte-equal.
-- **Census.** Grep every write to `session` and `session_prefixes`. Run the
-  full `scripts/ken-cargo test -p ken-elaborator` with R5 alone, and name
-  and migrate every red or report it as a stop.
-- **Handoff evidence.** Full `scripts/ken-cargo test -p ken-elaborator` and
-  `-p ken-interp --test px8p_checked_buffer` on the rebased tip, with the
-  absolute result at the candidate and at its merge-base.
+- **Census.** Grep every write to `session` and `session_prefixes`. Name
+  and migrate every red R5 causes in the targeted suites, or report it as a
+  stop.
+- **Handoff evidence (targeted suites only; operator 2026-09-26: no full
+  local runs, CI is the whole-repo gate).** The suites the pins live in,
+  the five suites of the two CI reds (`purity_keywords`,
+  `cat_map_bool_and_owner`, `lang_instance_search_second_path`,
+  `lang_membership_operator_surface`, `v3_fo_embedding_adequacy_d1`),
+  `lang_session_scope`, and `-p ken-interp --test px8p_checked_buffer`, each
+  with the absolute result at the candidate and at its merge-base.
 - **Retained:** C1-C3, the D0 pins, the attached-proof rows, the three
   `914d7f616` rows and the `07f62fe6a` pair controls. Stop if any retained
   pin needs a changed expectation rather than a changed mechanism.

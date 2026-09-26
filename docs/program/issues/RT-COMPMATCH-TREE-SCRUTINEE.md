@@ -68,8 +68,10 @@ chosen first refusal, with no other row changing colour.
   un-ignored row with its AC-0 refusal, then is restored.
 - **AC-3.** Rows outside the group keep their AC-0 refusal; relabel any
   whose label AC-0 showed to be stale, with the base SHA.
-- **AC-4.** Targeted builds only, through `scripts/ken-cargo`; include
-  `-p ken-runtime --lib` in full. No-regression means green in CI.
+- **AC-4.** Targeted builds and suites only, through `scripts/ken-cargo`:
+  the rows' suites and the unit tests of the module the repair touches.
+  No-regression means green in CI (operator 2026-09-26: no full local
+  runs).
 
 ## Stop conditions
 
