@@ -155,6 +155,13 @@ Rescoped in place. This supersedes the stop-5 door (inventory line 5).
   spelling resolved to which identity, at base and at the candidate), then
   a repair under the settled rule. A row returns to the Architect only if
   its repair needs a design choice.
+- **Remainder scope** (Steward `evt_6222gyxzjgv1g`): `catalog/` edits are
+  allowed only to move an I-class law into its own provider as an
+  unexported theorem: no new `pub`, no interface widening, no TCB change.
+  The Architect rules the remedy per row (`evt_31hre3qw20sk`). The
+  remainder lands as straight-ancestor increments on one branch, each
+  migrating one provider group off the door while the door exists; the
+  last deletes the door.
 - **Retained expectations** change only for I-class export assertions and
   door-routed probes. This narrows the "changed expectation" stop above; it
   does not remove it.
@@ -228,6 +235,21 @@ are the same predicate from the reader side. The recut above closes it.
    Vector and Deque rows become I; sweep by mechanism).
 8. durable exact-inventory guard omits a publication route (`ExportDecl`)
    that its own claim covers — keyed on declaration form.
+9. provider-side remedy (unexported theorems) conflicts with
+   owned-declaration inventory pins the ruling did not enumerate — keyed on
+   per-provider test pins of mixed promise class.
+
+**Predicate for lines 7-9** (Architect `evt_byvjqbge371e`, stop 9): a
+provider's contract lives in scattered per-provider test pins of mixed
+property (public set, exports, owned set, privacy probes, trust, body
+populations) and promise class (durable, transition sentinel, snapshot),
+and each ruling was issued before the affected provider's pins were
+enumerated. Closure: before any further remedy ruling, one mechanical pin
+census for every provider the remaining increments touch (provider,
+test::fn and file:line, property, quoted promise class, routes queried),
+grepped over every root and by mechanism; the Architect rules remedies
+against that table. The census is the first step of the next increment,
+not a separate node.
 
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
