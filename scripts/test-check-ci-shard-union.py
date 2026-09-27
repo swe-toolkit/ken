@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -82,10 +83,48 @@ class Fixtures(unittest.TestCase):
                 value = listing(rows, matches)
                 value["rust-suites"]["empty"] = {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}
                 (artifact / name).write_text(json.dumps(value))
+            terminal_records = [
+                {"test_id": f"{binary_id} {testcase}", "seconds": 1.0, "result": "PASS"}
+                for binary_id, testcase in sorted(selected)
+            ]
+            (artifact / "workspace-timings.json").write_text(json.dumps({
+                "run_id": 123,
+                "shard": index,
+                "shard_count": SHARD_COUNT,
+                "unit": "seconds",
+                "records": terminal_records,
+                "fallbacks": [],
+            }))
         return temporary
 
     def run_fixture(self, temporary):
-        return subprocess.run([sys.executable, str(SCRIPT)], cwd=temporary, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        return subprocess.run(
+            [sys.executable, str(SCRIPT)], cwd=temporary, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            env={**os.environ, "GITHUB_RUN_ID": "123"},
+        )
+
+    def refresh_timing(self, root, shard):
+        selected_path = root / f"realized-shard-{shard}" / f"selected-{shard}.json"
+        listing = json.loads(selected_path.read_text())
+        records = sorted(
+            f"{suite['binary-id']} {name}"
+            for suite in listing["rust-suites"].values()
+            for name, metadata in suite["testcases"].items()
+            if metadata["filter-match"]["status"] == "matches"
+        )
+        artifact = {
+            "run_id": 123,
+            "shard": shard,
+            "shard_count": SHARD_COUNT,
+            "unit": "seconds",
+            "records": [
+                {"test_id": test_id, "seconds": 1.0, "result": "PASS"}
+                for test_id in records
+            ],
+            "fallbacks": [],
+        }
+        (selected_path.parent / "workspace-timings.json").write_text(json.dumps(artifact))
 
     def assert_red(self, mutate, message, empty_index=None):
         with self.fixture(empty_index=empty_index) as temporary:
@@ -133,6 +172,87 @@ class Fixtures(unittest.TestCase):
             path.write_text(json.dumps(value))
         self.assert_red(omission, "rt_parity_native shard union differs from full suite")
 
+    def test_workspace_timing_artifacts_fail_closed(self):
+        def mutate_artifact(change):
+            def mutate(root):
+                path = root / "realized-shard-1" / "workspace-timings.json"
+                value = json.loads(path.read_text())
+                change(value)
+                path.write_text(json.dumps(value))
+            return mutate
+
+        self.assert_red(
+            mutate_artifact(lambda value: value.update(run_id=124)),
+            "run_id does not match this run",
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value.update(shard=2)),
+            "shard does not match its artifact",
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value.update(shard_count=6)),
+            "invalid shard provenance",
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value.update(unit="milliseconds")),
+            'unit must be "seconds"',
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value["records"].append(dict(value["records"][0]))),
+            "duplicate terminal identity",
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value["records"].clear()),
+            "terminal identities differ from selected inventory",
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value["records"][0].update(result="SLOW")),
+            "invalid terminal result",
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value["records"][0].update(seconds=float("nan"))),
+            "invalid seconds",
+        )
+        self.assert_red(
+            mutate_artifact(lambda value: value["records"][0].pop("result")),
+            "invalid fields",
+        )
+
+        def fallback_disagreement(root):
+            path = root / "realized-shard-2" / "workspace-timings.json"
+            value = json.loads(path.read_text())
+            value["fallbacks"] = [
+                {
+                    "test_id": "fixture::bin test_1",
+                    "seconds": 1.0,
+                    "method": "binary-median",
+                }
+            ]
+            path.write_text(json.dumps(value))
+
+        self.assert_red(
+            fallback_disagreement,
+            "workspace timing artifacts disagree on fallback identities",
+        )
+
+        def unknown_fallback(root):
+            for shard in range(1, SHARD_COUNT + 1):
+                path = root / f"realized-shard-{shard}" / "workspace-timings.json"
+                value = json.loads(path.read_text())
+                value["fallbacks"] = [
+                    {
+                        "test_id": "fixture::bin not_live",
+                        "seconds": 1.0,
+                        "method": "global-median",
+                    }
+                ]
+                path.write_text(json.dumps(value))
+
+        self.assert_red(
+            unknown_fallback,
+            "workspace fallback identity is absent from the live inventory",
+        )
+
     def test_success(self):
         with self.fixture() as temporary:
             result = self.run_fixture(temporary)
@@ -156,12 +276,14 @@ class Fixtures(unittest.TestCase):
             del value["rust-suites"][f"suite-{SHARD_COUNT - 1}"]
             value["test-count"] -= 1
             path.write_text(json.dumps(value))
+            self.refresh_timing(root, target)
         self.assert_red(selected_truncation, "selected listing differs from unfiltered authority", empty)
         def empty_match(root):
             path = root / f"realized-shard-{target}" / f"selected-{target}.json"
             value = json.loads(path.read_text())
             value["rust-suites"]["suite-0"]["testcases"]["test_1"]["filter-match"]["status"] = "matches"
             path.write_text(json.dumps(value))
+            self.refresh_timing(root, target)
         self.assert_red(empty_match, "realized shard selections overlap", empty)
         def sibling_loss(root):
             path = root / f"realized-shard-{target}" / f"selected-{target}.json"
@@ -170,6 +292,7 @@ class Fixtures(unittest.TestCase):
                 for metadata in suite["testcases"].values():
                     metadata["filter-match"]["status"] = "mismatch"
             path.write_text(json.dumps(value))
+            self.refresh_timing(root, target)
         self.assert_red(sibling_loss, "union differs", empty)
         def authority_truncation(root):
             path = root / f"realized-shard-{target}" / "unfiltered-inventory.json"
@@ -186,6 +309,7 @@ class Fixtures(unittest.TestCase):
                     metadata["filter-match"]["status"] = "mismatch"
             value["rust-suites"]["suite-0"]["testcases"]["test_1"]["filter-match"]["status"] = "matches"
             path.write_text(json.dumps(value))
+            self.refresh_timing(root, SHARD_COUNT)
         self.assert_red(sibling_overlap, "realized shard selections overlap", empty)
 
     def test_missing_or_extra_artifact_and_member_red(self):
@@ -276,6 +400,7 @@ class Fixtures(unittest.TestCase):
             del value["rust-suites"]["suite-8"]
             value["test-count"] -= 1
             path.write_text(json.dumps(value))
+            self.refresh_timing(root, 1)
         self.assert_red(selected_subset, "selected listing differs from unfiltered authority")
 
     def test_overlap_and_union_missing_extra_red(self):
@@ -285,10 +410,12 @@ class Fixtures(unittest.TestCase):
                 if suite["testcases"]:
                     suite["testcases"][next(iter(suite["testcases"]))]["filter-match"]["status"] = "mismatch"
             next(iter(value["rust-suites"].values()))["testcases"]["test_1"]["filter-match"]["status"] = "matches"; path.write_text(json.dumps(value))
+            self.refresh_timing(root, 2)
         self.assert_red(overlap, "selections overlap")
         target = SHARD_COUNT
         def union_extra(root):
             path = root / f"realized-shard-{target}" / f"selected-{target}.json"; value = json.loads(path.read_text()); suite = next(iter(value["rust-suites"].values())); suite["testcases"] = {"extra": {"filter-match": {"status": "matches"}}}; path.write_text(json.dumps(value))
+            self.refresh_timing(root, target)
         self.assert_red(union_extra, "selected listing differs from unfiltered authority")
         def union_loss(root):
             path = root / f"realized-shard-{target}" / f"selected-{target}.json"
@@ -297,12 +424,14 @@ class Fixtures(unittest.TestCase):
                 for metadata in suite["testcases"].values():
                     metadata["filter-match"]["status"] = "mismatch"
             path.write_text(json.dumps(value))
+            self.refresh_timing(root, target)
         self.assert_red(union_loss, "union differs")
         def union_extra_native(root):
             path = root / f"realized-shard-{target}" / f"selected-{target}.json"
             value = json.loads(path.read_text())
             value["rust-suites"][f"suite-{SHARD_COUNT}"]["testcases"]["native_test"]["filter-match"]["status"] = "matches"
             path.write_text(json.dumps(value))
+            self.refresh_timing(root, target)
         self.assert_red(union_extra_native, "union differs")
 
     def test_dropped_rt_parity_arm_reds(self):
@@ -318,7 +447,7 @@ class Fixtures(unittest.TestCase):
                 if not artifact.is_dir():
                     continue
                 for member in sorted(artifact.iterdir()):
-                    if member.suffix != ".json":
+                    if member.suffix != ".json" or member.name == "workspace-timings.json":
                         continue
                     value = json.loads(member.read_text())
                     suites = value["rust-suites"]

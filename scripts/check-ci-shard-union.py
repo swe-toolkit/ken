@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
+
+import ci_workspace_timings
 
 
 SHARD_COUNT = 7
@@ -164,7 +167,7 @@ def read_listing(path: Path) -> tuple[set[tuple[str, str]], set[tuple[str, str]]
     return discovered, selected, excluded, classifications
 
 
-def artifact_paths(root: Path) -> list[tuple[Path, Path, Path]]:
+def artifact_paths(root: Path) -> list[tuple[Path, Path, Path, Path]]:
     expected = {f"realized-shard-{index}" for index in range(1, SHARD_COUNT + 1)}
     artifacts = {path.name: path for path in root.iterdir() if path.is_dir()} if root.is_dir() else {}
     if set(artifacts) != expected:
@@ -176,6 +179,7 @@ def artifact_paths(root: Path) -> list[tuple[Path, Path, Path]]:
             artifact / "unfiltered-inventory.json",
             artifact / "inventory.json",
             artifact / f"selected-{index}.json",
+            artifact / "workspace-timings.json",
         )
         if not all(member.is_file() for member in members):
             raise ShardCheckError(f"{artifact}: required artifact member is missing")
@@ -250,6 +254,47 @@ def main() -> int:
             union |= selected
         if union != population:
             raise ShardCheckError("realized shard union differs from filtered inventory")
+        timing_artifacts = []
+        fallback_population = None
+        configured_run_id = os.environ.get("GITHUB_RUN_ID")
+        expected_run_id = None
+        if configured_run_id is not None:
+            try:
+                expected_run_id = int(configured_run_id)
+            except ValueError as error:
+                raise ShardCheckError("GITHUB_RUN_ID is not an integer") from error
+            if expected_run_id <= 0:
+                raise ShardCheckError("GITHUB_RUN_ID must be positive")
+        for shard, paths in enumerate(artifacts, 1):
+            selected_ids = {
+                f"{binary_id} {testcase}"
+                for binary_id, testcase in selections[shard - 1][1]
+            }
+            try:
+                timing_artifact = ci_workspace_timings.load_artifact(paths[3])
+                ci_workspace_timings.validate_artifact(
+                    timing_artifact,
+                    expected_run_id=expected_run_id,
+                    expected_shard=shard,
+                    expected_ids=selected_ids,
+                )
+            except ci_workspace_timings.TimingArtifactError as error:
+                raise ShardCheckError(f"{paths[3]}: {error}") from error
+            if fallback_population is None:
+                fallback_population = timing_artifact["fallbacks"]
+            elif timing_artifact["fallbacks"] != fallback_population:
+                raise ShardCheckError("workspace timing artifacts disagree on fallback identities")
+            for fallback in timing_artifact["fallbacks"]:
+                binary_id, _, testcase = fallback["test_id"].partition(" ")
+                if (binary_id, testcase) not in population:
+                    raise ShardCheckError(
+                        "workspace fallback identity is absent from the live inventory: "
+                        + fallback["test_id"]
+                    )
+            timing_artifacts.append(timing_artifact)
+        run_ids = {artifact["run_id"] for artifact in timing_artifacts}
+        if len(run_ids) != 1:
+            raise ShardCheckError("workspace timing artifacts belong to different runs")
         # AC-NO-FALSE-GREEN: every decomposed rt_parity control arm must be present
         # in the authority inventory. rt_parity_native is excluded from the shard
         # partition (own job) but still discovered, so this catches a silently

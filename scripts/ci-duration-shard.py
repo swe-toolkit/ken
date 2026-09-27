@@ -2,18 +2,19 @@
 """Assign a filtered live nextest inventory to deterministic duration bins."""
 import heapq
 import json
+import math
 import os
 import re
+import statistics
 import sys
 import warnings
 
+import ci_workspace_timings
+
 
 N = 7
-# Run 36295180542's largest workspace test was 591.502s; keep a round
-# 600s estimate for new tests until measured rather than the smaller median.
-# With --balance-with, plan against both the multi-run upper envelope and the
-# latest per-test source; report each assigned sum separately.
-DEFAULT_DURATION_SECONDS = 600.0
+# Use the latest complete full-CI per-test source for LPT. Missing tests use
+# their binary's measured median, or the global measured median for unseen bins.
 NEXTTEST_TIMING_ROW = re.compile(
     r"^(?P<shard>\d+)\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
     r"\s+\(\s*\d+/\d+\)\s+(?P<test_id>.+)$"
@@ -108,6 +109,8 @@ def read_durations(paths):
     if not paths:
         raise SystemExit("duration evidence has no input files")
     durations = {}
+    run_test_shards = {}
+    run_fallbacks = {}
     for path in paths:
         observed = {}
         if path.endswith(".tsv"):
@@ -126,27 +129,77 @@ def read_durations(paths):
                 if test_id in observed:
                     raise SystemExit(f"{path}:{line_number}: duplicate timing row {test_id}")
                 seconds = float((match or tsv_match).group("seconds"))
-                if seconds <= 0:
-                    raise SystemExit(f"{path}:{line_number}: duration must be positive")
+                if not math.isfinite(seconds) or seconds <= 0:
+                    raise SystemExit(f"{path}:{line_number}: duration must be positive and finite")
                 observed[test_id] = seconds
         else:
-            evidence = json.load(open(path))
-            records = evidence.get("records")
-            if not isinstance(records, list) or not records:
-                raise SystemExit(f"{path}: duration evidence has no records")
+            try:
+                with open(path, encoding="utf-8") as source:
+                    evidence = json.load(source)
+                artifact = ci_workspace_timings.validate_artifact(evidence)
+            except (OSError, json.JSONDecodeError, ci_workspace_timings.TimingArtifactError) as error:
+                raise SystemExit(f"{path}: invalid duration artifact: {error}") from error
+            prior_fallbacks = run_fallbacks.setdefault(artifact["run_id"], artifact["fallbacks"])
+            if prior_fallbacks != artifact["fallbacks"]:
+                raise SystemExit(
+                    f"{path}: fallback identities differ within run {artifact['run_id']}"
+                )
+            records = artifact["records"]
             for row in records:
                 test_id = row.get("test_id")
                 seconds = row.get("seconds")
                 if not isinstance(test_id, str) or not test_id:
                     raise SystemExit(f"{path}: duration evidence has an invalid test_id")
-                if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+                if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds < 0:
                     raise SystemExit(f"{path}: duration evidence has an invalid duration for {test_id}")
+                provenance = (artifact["run_id"], test_id)
+                if provenance in run_test_shards:
+                    prior_shard = run_test_shards[provenance]
+                    raise SystemExit(
+                        f"{path}: duplicate terminal identity in run {artifact['run_id']} "
+                        f"shards {prior_shard} and {artifact['shard']}: {test_id}"
+                    )
+                run_test_shards[provenance] = artifact["shard"]
                 if test_id in observed:
                     raise SystemExit(f"{path}: duration evidence has duplicate row {test_id}")
+                if row["result"] == "FAIL":
+                    # Keep failed terminals validated and provenance-checked, but
+                    # do not treat potentially early-aborted work as a full-test
+                    # timing. The planner assigns this identity a median fallback.
+                    continue
                 observed[test_id] = float(seconds)
         for test_id, seconds in observed.items():
             durations[test_id] = max(durations.get(test_id, seconds), seconds)
     return durations
+
+
+def resolve_durations(live, measured):
+    """Fill missing live identities from per-binary then global medians."""
+    by_binary = {}
+    measured_live = {}
+    for rendered, binary_id, _ in live:
+        if rendered in measured:
+            duration = measured[rendered]
+            measured_live[rendered] = duration
+            by_binary.setdefault(binary_id, []).append(duration)
+    if not measured_live:
+        raise SystemExit("cannot estimate unmeasured tests without any live timing rows")
+
+    global_median = statistics.median(measured_live.values())
+    binary_medians = {
+        binary_id: statistics.median(values)
+        for binary_id, values in by_binary.items()
+    }
+    resolved = dict(measured_live)
+    fallbacks = []
+    for rendered, binary_id, _ in live:
+        if rendered in resolved:
+            continue
+        method = "binary-median" if binary_id in binary_medians else "global-median"
+        seconds = binary_medians.get(binary_id, global_median)
+        resolved[rendered] = seconds
+        fallbacks.append({"test_id": rendered, "seconds": seconds, "method": method})
+    return resolved, fallbacks
 
 
 def validate_plan(assignment_path, shard, selected_path):
@@ -175,27 +228,18 @@ def main():
         return
     arguments = sys.argv[1:]
     output = None
-    balance_path = None
     if "--output-dir" in arguments:
         option = arguments.index("--output-dir")
         if option != len(arguments) - 2 or option < 2:
             raise SystemExit("--output-dir must follow at least one timing file")
         output = arguments[-1]
         arguments = arguments[:-2]
-    if "--balance-with" in arguments:
-        option = arguments.index("--balance-with")
-        if option != len(arguments) - 2 or option < 2:
-            raise SystemExit("--balance-with must follow at least one timing file")
-        balance_path = arguments[-1]
-        arguments = arguments[:-2]
     if len(arguments) < 2:
         raise SystemExit(
-            "usage: ci-duration-shard.py INVENTORY TIMING... "
-            "[--balance-with TIMING] [--output-dir DIR]"
+            "usage: ci-duration-shard.py INVENTORY TIMING... [--output-dir DIR]"
         )
     inventory = json.load(open(arguments[0]))
     durations = read_durations(arguments[1:])
-    balance_durations = read_durations(balance_path) if balance_path else None
     live = sorted((f"{binary_id} {name}", binary_id, name) for binary_id, name in tests(inventory))
     if not live:
         raise SystemExit("filtered live inventory selected zero testcases")
@@ -210,105 +254,38 @@ def main():
             RuntimeWarning,
             stacklevel=2,
         )
-    missing = sorted(live_ids - set(durations))
-    if missing:
+    planned_durations, fallbacks = resolve_durations(live, durations)
+    if fallbacks:
+        binary_fallbacks = sum(
+            fallback["method"] == "binary-median" for fallback in fallbacks
+        )
+        global_fallbacks = len(fallbacks) - binary_fallbacks
         warnings.warn(
-            f"using {DEFAULT_DURATION_SECONDS}s default for {len(missing)} unmeasured workspace tests",
+            f"using per-binary median for {binary_fallbacks} and global median "
+            f"for {global_fallbacks} of {len(fallbacks)} unmeasured workspace tests",
             RuntimeWarning,
             stacklevel=2,
         )
-    if balance_durations is not None:
-        stale_balance = sorted(set(balance_durations) - live_ids)
-        if stale_balance:
-            warnings.warn(
-                "dropping balance timing rows absent from current inventory: "
-                + ", ".join(stale_balance),
-                RuntimeWarning,
-                stacklevel=2,
-            )
-        missing_balance = set(live_ids) - set(balance_durations)
-        additional_missing = sorted(missing_balance - set(missing))
-        if additional_missing:
-            warnings.warn(
-                f"using {DEFAULT_DURATION_SECONDS}s default for "
-                f"{len(additional_missing)} workspace tests absent from balance timings",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-
-    planned_bins = []
-    if balance_durations is None:
-        bins = [(0.0, index, []) for index in range(N)]
-        heapq.heapify(bins)
-        for rendered, binary_id, name in sorted(
-            live, key=lambda row: (-durations.get(row[0], DEFAULT_DURATION_SECONDS), row[0])
-        ):
-            total, index, selected = heapq.heappop(bins)
-            selected.append((binary_id, name))
-            heapq.heappush(
-                bins,
-                (total + durations.get(rendered, DEFAULT_DURATION_SECONDS), index, selected),
-            )
-        for total, index, selected in sorted(bins, key=lambda x: x[1]):
-            planned_bins.append((total, None, index, selected))
-    else:
-        # Choose by the worst normalized load across the two timing views;
-        # then break ties by their combined normalized load and bin index.
-        upper_average = sum(
-            durations.get(rendered, DEFAULT_DURATION_SECONDS) for rendered, _, _ in live
-        ) / N
-        balance_average = sum(
-            balance_durations.get(rendered, DEFAULT_DURATION_SECONDS)
-            for rendered, _, _ in live
-        ) / N
-        ordered = sorted(
-            live,
-            key=lambda row: (
-                -max(
-                    durations.get(row[0], DEFAULT_DURATION_SECONDS) / upper_average,
-                    balance_durations.get(row[0], DEFAULT_DURATION_SECONDS) / balance_average,
-                ),
-                row[0],
-            ),
+    bins = [(0.0, index, []) for index in range(N)]
+    heapq.heapify(bins)
+    ordered = sorted(live, key=lambda row: (-planned_durations[row[0]], row[0]))
+    for rendered, binary_id, name in ordered:
+        total, index, selected = heapq.heappop(bins)
+        selected.append((binary_id, name))
+        heapq.heappush(
+            bins,
+            (total + planned_durations[rendered], index, selected),
         )
-        upper_loads = [0.0] * N
-        balance_loads = [0.0] * N
-        selected = [[] for _ in range(N)]
-        for rendered, binary_id, name in ordered:
-            upper = durations.get(rendered, DEFAULT_DURATION_SECONDS)
-            balance = balance_durations.get(rendered, DEFAULT_DURATION_SECONDS)
-            index = min(
-                range(N),
-                key=lambda candidate: (
-                    max(
-                        (upper_loads[candidate] + upper) / upper_average,
-                        (balance_loads[candidate] + balance) / balance_average,
-                    ),
-                    (upper_loads[candidate] + upper) / upper_average
-                    + (balance_loads[candidate] + balance) / balance_average,
-                    candidate,
-                ),
-            )
-            upper_loads[index] += upper
-            balance_loads[index] += balance
-            selected[index].append((binary_id, name))
-        for index in range(N):
-            planned_bins.append(
-                (upper_loads[index], balance_loads[index], index, selected[index])
-            )
 
     result = []
-    for total, balance_total, index, selected in planned_bins:
+    for total, index, selected in sorted(bins, key=lambda item: item[1]):
         terms = [f"(binary_id(={binary}) & test(={name}))" for binary, name in selected]
-        item = {
+        result.append({
             "bin": index + 1,
             "seconds": round(total, 3),
             "tests": selected,
             "filter": " | ".join(terms),
-        }
-        if balance_total is not None:
-            item["balance_seconds"] = round(balance_total, 3)
-        result.append(item)
+        })
     if output:
         os.makedirs(output, exist_ok=True)
         limit = os.sysconf("SC_ARG_MAX") // 4
@@ -318,7 +295,7 @@ def main():
                 raise SystemExit(f"bin {item['bin']} filter exceeds argv guard {limit}")
             with open(os.path.join(output, f"bin-{item['bin']}.expr"), "w") as file:
                 file.write(expression)
-    assignment = {"bins": result}
+    assignment = {"bins": result, "fallbacks": fallbacks}
     if output:
         with open(os.path.join(output, "assignments.json"), "w") as file:
             json.dump(assignment, file)
