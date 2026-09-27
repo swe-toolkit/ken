@@ -1,0 +1,27 @@
+job_id	job_name	started_at	completed_at	status	conclusion
+108552603320	classify changed paths	2026-09-27T04:44:29Z	2026-09-27T04:44:38Z	completed	success
+108552627545	native-slow (px8f auxiliary controls)	2026-09-27T04:44:40Z	2026-09-27T04:54:02Z	completed	success
+108552627577	optional z3 process adapter	2026-09-27T04:44:40Z	2026-09-27T04:56:02Z	completed	success
+108552627584	work-item tracker and ignored-row sweep	2026-09-27T04:44:40Z	2026-09-27T04:49:40Z	completed	success
+108552627603	test shard 2/7	2026-09-27T04:44:40Z	2026-09-27T04:57:34Z	completed	success
+108552627608	test shard 1/7	2026-09-27T04:44:40Z	2026-09-27T05:04:47Z	completed	success
+108552627622	test shard 7/7	2026-09-27T04:44:40Z	2026-09-27T04:56:12Z	completed	success
+108552627626	test shard 3/7	2026-09-27T04:44:40Z	2026-09-27T04:58:19Z	completed	success
+108552627636	native-slow (rt_parity_native) 3/10	2026-09-27T04:44:40Z	2026-09-27T04:57:03Z	completed	success
+108552627640	native-slow (rt_parity_native) 8/10	2026-09-27T04:44:40Z	2026-09-27T04:59:28Z	completed	success
+108552627643	test shard 6/7	2026-09-27T04:44:40Z	2026-09-27T04:54:49Z	completed	success
+108552627646	native-slow (rt_parity_native) 10/10	2026-09-27T04:44:40Z	2026-09-27T04:53:18Z	completed	success
+108552627665	native-slow (rt_parity_native) 6/10	2026-09-27T04:44:40Z	2026-09-27T04:59:58Z	completed	success
+108552627674	native-slow (rt_parity_native) 9/10	2026-09-27T04:44:40Z	2026-09-27T04:52:21Z	completed	success
+108552627675	native-slow (rt_parity_native) 1/10	2026-09-27T04:44:40Z	2026-09-27T04:59:00Z	completed	success
+108552627680	native-slow (rt_parity_native) 7/10	2026-09-27T04:44:40Z	2026-09-27T04:59:55Z	completed	success
+108552627692	native-slow (rt_parity_native) 5/10	2026-09-27T04:44:40Z	2026-09-27T04:59:14Z	completed	success
+108552627700	test shard 4/7	2026-09-27T04:44:40Z	2026-09-27T05:00:36Z	completed	success
+108552627630	test shard 5/7	2026-09-27T04:44:41Z	2026-09-27T05:01:21Z	completed	success
+108552627632	native-slow (rt_parity_native) 4/10	2026-09-27T04:44:41Z	2026-09-27T04:58:45Z	completed	success
+108552627657	native-slow (rt_parity_native) 2/10	2026-09-27T04:44:41Z	2026-09-27T04:58:50Z	completed	success
+108555267381	verify-realized-shard-union	2026-09-27T05:04:51Z	2026-09-27T05:05:02Z	completed	success
+108555301790	clean-room provenance check	2026-09-27T05:05:04Z	2026-09-27T05:05:07Z	completed	success
+108555301769	conformance suite	2026-09-27T05:05:05Z	2026-09-27T05:05:09Z	completed	success
+108555301884	path-guard	2026-09-27T05:05:05Z	2026-09-27T05:05:08Z	completed	success
+108555317196	build + test	2026-09-27T05:05:11Z	2026-09-27T05:05:14Z	completed	success

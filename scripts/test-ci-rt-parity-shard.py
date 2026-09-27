@@ -152,6 +152,48 @@ class DurationPlanTests(unittest.TestCase):
         self.assertEqual(summary_counts, {shard: count for shard, (count, _) in expected.items()})
         self.assertEqual(auxiliary_passes, 7)
 
+    def test_ten_shard_source_reconciles_and_excludes_auxiliary_rows(self):
+        path = Path("docs/program/evidence/ci-rt-parity-timings-36295180542.tsv")
+        rows = [line.split("\t") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 192)
+        parity = [row for row in rows if row[2] == "ken-cli::rt_parity_native"]
+        auxiliary = [row for row in rows if row[0] == "px8f-auxiliary-controls"]
+        self.assertEqual(len(parity), 185)
+        self.assertEqual(len({row[3] for row in parity}), 185)
+        self.assertEqual(len(auxiliary), 7)
+        expected = {
+            1: (18, 2543.098), 2: (19, 2730.011),
+            3: (19, 2072.710), 4: (18, 2722.716),
+            5: (18, 2720.972), 6: (19, 2653.108),
+            7: (18, 2632.172), 8: (18, 2683.425),
+            9: (20, 1331.125), 10: (18, 1426.959),
+        }
+        for shard, (count, seconds) in expected.items():
+            shard_rows = [row for row in parity if int(row[0]) == shard]
+            self.assertEqual(len(shard_rows), count)
+            self.assertAlmostEqual(sum(float(row[1]) for row in shard_rows), seconds)
+        self.assertAlmostEqual(sum(float(row[1]) for row in auxiliary), 982.761)
+        self.assertEqual(len(_SHARD.read_timings([path])), 185)
+
+        summaries = Path(
+            "docs/program/evidence/ci-nextest-summaries-36295180542.tsv"
+        ).read_text(encoding="utf-8").splitlines()
+        summary_counts = {}
+        auxiliary_passes = 0
+        for line in summaries:
+            job, summary = line.split("\t", 1)
+            match = re.fullmatch(r"native-slow \(rt_parity_native\) (\d+)/10", job)
+            if match or job == "native-slow (px8f auxiliary controls)":
+                count_match = re.search(r"(\d+) tests? run: (\d+) passed", summary)
+                self.assertIsNotNone(count_match, summary)
+                self.assertEqual(count_match.group(1), count_match.group(2))
+                if match:
+                    summary_counts[int(match.group(1))] = int(count_match.group(1))
+                else:
+                    auxiliary_passes += int(count_match.group(1))
+        self.assertEqual(summary_counts, {shard: count for shard, (count, _) in expected.items()})
+        self.assertEqual(auxiliary_passes, 7)
+
     def test_tsv_fail_status_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "timings.tsv"
@@ -166,13 +208,14 @@ class DurationPlanTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "malformed parity timing row"):
                 _SHARD.read_timings([path])
 
-    def test_five_run_envelope_handles_timing_noise(self):
+    def test_six_run_envelope_handles_timing_noise(self):
         paths = [
             Path("docs/program/evidence/ci-rt-parity-timings-36260020054.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36265192923.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36276921102.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36279697268.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36285524404.tsv"),
+            Path("docs/program/evidence/ci-rt-parity-timings-36295180542.tsv"),
         ]
         timings = _SHARD.read_timings(paths)
         self.assertEqual(len(timings), 185)
@@ -189,7 +232,7 @@ class DurationPlanTests(unittest.TestCase):
             timings,
             [
                 "36260020054", "36265192923", "36276921102",
-                "36279697268", "36285524404",
+                "36279697268", "36285524404", "36295180542",
             ],
         )
         assigned = [name for shard in plan["bins"] for _, name in shard["tests"]]
@@ -199,10 +242,11 @@ class DurationPlanTests(unittest.TestCase):
             plan["timing_sources"],
             [
                 "36260020054", "36265192923", "36276921102",
-                "36279697268", "36285524404",
+                "36279697268", "36285524404", "36295180542",
             ],
         )
-        self.assertAlmostEqual(max(shard["seconds"] for shard in plan["bins"]), 2756.377)
+        loads = [shard["seconds"] for shard in plan["bins"]]
+        self.assertLess(max(loads) - min(loads), 35.0)
 
 
 if __name__ == "__main__":

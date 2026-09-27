@@ -1,0 +1,20 @@
+native-slow (px8f auxiliary controls)	Summary [  32.544s] 1 test run: 1 passed, 0 skipped
+native-slow (px8f auxiliary controls)	Summary [ 398.550s] 6 tests run: 6 passed (5 slow), 0 skipped
+work-item tracker and ignored-row sweep	Summary [  79.308s] 11 tests run: 0 passed, 11 failed, 4352 skipped
+test shard 2/7	Summary [ 497.561s] 593 tests run: 593 passed (7 slow), 3031 skipped
+test shard 1/7	Summary [ 891.048s] 592 tests run: 592 passed (9 slow), 3018 skipped
+test shard 7/7	Summary [ 440.570s] 593 tests run: 593 passed (6 slow), 2910 skipped
+test shard 3/7	Summary [ 562.133s] 593 tests run: 593 passed (11 slow), 2950 skipped
+test shard 5/7	Summary [ 671.037s] 594 tests run: 594 passed (12 slow), 2982 skipped
+native-slow (rt_parity_native) 4/10	Summary [ 693.321s] 18 tests run: 18 passed (18 slow), 167 skipped
+native-slow (rt_parity_native) 3/10	Summary [ 620.103s] 19 tests run: 19 passed (18 slow), 166 skipped
+native-slow (rt_parity_native) 8/10	Summary [ 729.189s] 18 tests run: 18 passed (18 slow), 167 skipped
+test shard 6/7	Summary [ 389.298s] 593 tests run: 593 passed (5 slow), 2940 skipped
+native-slow (rt_parity_native) 10/10	Summary [ 396.890s] 18 tests run: 18 passed (9 slow), 167 skipped
+native-slow (rt_parity_native) 2/10	Summary [ 691.264s] 19 tests run: 19 passed (19 slow), 166 skipped
+native-slow (rt_parity_native) 6/10	Summary [ 763.180s] 19 tests run: 19 passed (18 slow), 166 skipped
+native-slow (rt_parity_native) 9/10	Summary [ 353.224s] 20 tests run: 20 passed (9 slow), 165 skipped
+native-slow (rt_parity_native) 1/10	Summary [ 697.724s] 18 tests run: 18 passed (18 slow), 167 skipped
+native-slow (rt_parity_native) 7/10	Summary [ 760.688s] 18 tests run: 18 passed (18 slow), 167 skipped
+native-slow (rt_parity_native) 5/10	Summary [ 723.724s] 18 tests run: 18 passed (18 slow), 167 skipped
+test shard 4/7	Summary [ 649.099s] 594 tests run: 594 passed (8 slow), 2909 skipped

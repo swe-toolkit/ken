@@ -9,8 +9,8 @@ import warnings
 
 
 N = 7
-# Run 36265192923's largest workspace test was 549.960s; use 600s for
-# unseen tests until measured rather than the much smaller suite median.
+# Run 36295180542's largest workspace test was 591.502s; keep a round
+# 600s estimate for new tests until measured rather than the smaller median.
 DEFAULT_DURATION_SECONDS = 600.0
 NEXTTEST_TIMING_ROW = re.compile(
     r"^(?P<shard>\d+)\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
