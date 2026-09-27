@@ -69,3 +69,13 @@ import-cycle constraint.
 - Any kernel, `trusted_base()` or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. Anti-duplication criterion (c) was prescribed as "a well-formed local
+   copy reddens the pin" without checking the equivalence plane; kernel
+   conversion does not identify distinct recursive declarations, so a
+   renamed self-recursive copy passes. Keyed on definitional (not
+   structural) equivalence (evt_401q33apra6qw, ruled evt_ntwgkpzk0hga:
+   disclosed as THE GAP in the pin; factoring review is the backstop).
+   Next trigger 3.
