@@ -251,6 +251,16 @@ grepped over every root and by mechanism; the Architect rules remedies
 against that table. The census is the first step of the next increment,
 not a separate node.
 
+**Stop-9 ruling** (Architect `evt_677gx0f0xb6jc`, on Research
+`evt_rh4mcmpk097x`): a catalog provider's contract is its public surface,
+exports, loader-visible inventory and trust closure; every pin asserting
+those stays byte-identical, and moving one is a stop. Owned-set and
+all-owned-body population pins may move by addition only, in the increment
+that adds the unexported provider theorems, with the prescribed doc-comment
+sentence. Named-list body pins do not move; an id- or position-keyed pin
+that would move is a stop. The census goes to the Architect for one-pass
+confirmation before any provider edit.
+
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
 question about a public route to a type (for example `SourceId`) goes to
