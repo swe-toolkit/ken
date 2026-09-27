@@ -35,6 +35,10 @@ can clear.
   - `rt_span_prov_native.rs:356` `sp_a_foreign_span_freeze_...` (the
     response-owner coverage gate, `units.rs:6823`: the selected caller has
     no candidate disposition).
+  - `crates/ken-elaborator/src/compiler_driver.rs:5409`
+    `gate_4a_preparation_and_full_build_are_one_transaction` ("no green
+    fixture: recursive source stops at RT-CLOSURE-BOUNDARY-LANE"). Its named
+    node is merged, so the row has no other owner; re-measure it here.
 - **Out of scope:** the three Ret-tag rows (`RT-OWNER-VIS-RETURN-PROTOCOL`),
   `px7m` dynamic err (Architect `evt_2spyd3965e84m`), the parked `px8ta`
   bracket row, and `px8ds`, which is ignored by design.
