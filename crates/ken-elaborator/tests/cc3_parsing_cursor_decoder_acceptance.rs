@@ -9,15 +9,22 @@ use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
-fn dependency_env() -> ElabEnv {
+struct Cc3ProviderOwned {
+    derived: Vec<GlobalId>,
+    arithmetic: Vec<GlobalId>,
+    nat_order: Vec<GlobalId>,
+}
+
+fn dependency_env_with_provider_owned() -> (ElabEnv, Cc3ProviderOwned) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append", "length"]);
-    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let (lawful_owned, derived_owned) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append", "length"]);
+    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env, &lawful_owned);
+    let arithmetic = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+    let nat_order = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
@@ -34,7 +41,11 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
-    env
+    (env, Cc3ProviderOwned { derived: derived_owned, arithmetic, nat_order })
+}
+
+fn dependency_env() -> ElabEnv {
+    dependency_env_with_provider_owned().0
 }
 
 fn load_cursor_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
@@ -274,10 +285,10 @@ fn neutralize_fixture_proofs(env: &ElabEnv, store: &mut EvalStore, names: &[&str
 /// complete affected closure own the distinct population obligations.
 #[test]
 fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
-    let mut env = dependency_env();
+    let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let before_globals: BTreeSet<_> = env.globals.values().copied().collect();
     let before_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    load_cursor_module(&mut env);
+    let cursor_owned: Vec<_> = load_cursor_module(&mut env).into_iter().collect();
     let after_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let new_trust_names: BTreeSet<_> = after_trust
         .difference(&before_trust)
@@ -301,8 +312,12 @@ fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
         !env.globals.contains_key("cursor_list_length"),
         "the retired package-local cursor_list_length declaration must be absent"
     );
-    let provider = env.globals["Data.Collections.Derived.length"];
-    let normalizer = env.globals["arg_cursor_normalize"];
+    let provider = catalog_or::provider_owned_id(
+        &env, &provider_owned.derived, "Data.Collections.Derived", "length",
+    ).expect("Derived must own canonical length");
+    let normalizer = catalog_or::provider_owned_id(
+        &env, &cursor_owned, "Capability.Parsing.Cursor", "arg_cursor_normalize",
+    ).expect("Cursor must own checked normalizer");
     assert_eq!(
         transparent_cursor_bodies_routing_length_to_normalizer_remaining(
             &env,
@@ -475,7 +490,7 @@ fn cc3_checked_identity_closure_and_trust_are_structural() {
 /// Nat providers directly and add no trust or local replacement operation.
 #[test]
 fn cursor_reuses_canonical_nat_operations_with_zero_trust_delta() {
-    let mut env = dependency_env();
+    let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let owned = load_cursor_module(&mut env).into_iter().collect::<Vec<_>>();
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
@@ -488,8 +503,12 @@ fn cursor_reuses_canonical_nat_operations_with_zero_trust_delta() {
         );
     }
 
-    let add = env.globals["Data.Numeric.Nat.Arithmetic.add"];
-    let sub = env.globals["Data.Numeric.Nat.Order.sub"];
+    let add = catalog_or::provider_owned_id(
+        &env, &provider_owned.arithmetic, "Data.Numeric.Nat.Arithmetic", "add",
+    ).expect("Nat.Arithmetic must own checked add");
+    let sub = catalog_or::provider_owned_id(
+        &env, &provider_owned.nat_order, "Data.Numeric.Nat.Order", "sub",
+    ).expect("Nat.Order must own checked sub");
     assert!(env.env.transparent_body(add).is_some());
     assert!(env.env.transparent_body(sub).is_some());
 

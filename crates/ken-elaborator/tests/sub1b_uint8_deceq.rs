@@ -14,8 +14,8 @@ const BYTES_KEYS: &str =
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("LawfulClasses provider must roots-load");
     catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");

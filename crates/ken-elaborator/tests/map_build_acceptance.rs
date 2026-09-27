@@ -141,11 +141,18 @@ fn module_transparent_kernel_equivalents(
         .collect()
 }
 
-fn mk_map_dependency_env() -> ElabEnv {
+struct MapDependenciesOwned {
+    lawful: Vec<GlobalId>,
+    arithmetic: Vec<GlobalId>,
+    sums: Vec<GlobalId>,
+    core_or: Vec<GlobalId>,
+}
+
+fn mk_map_dependency_env_with_provider_owned() -> (ElabEnv, MapDependenciesOwned) {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
-    env.elaborate_module_from_roots(
+    let (_, core_or) = catalog_or::load_core_logic_compare_with_or_owned(&mut env);
+    let (lawful, _) = catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    let arithmetic = env.elaborate_module_from_roots(
         &[catalog_or::catalog_root()],
         "Data.Numeric.Nat.Arithmetic",
     )
@@ -182,7 +189,7 @@ fn mk_map_dependency_env() -> ElabEnv {
             "Map's LC fixture must withhold selectively imported `{imported}`"
         );
     }
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
+    let sums = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
         .expect("Map's canonical Option-combinator provider must roots-load");
     assert!(
         env.globals.contains_key("Data.Sums.Combinators.is_some"),
@@ -192,15 +199,25 @@ fn mk_map_dependency_env() -> ElabEnv {
         !env.globals.contains_key("is_some"),
         "the dependency fixture must not prebind an unqualified is_some alias"
     );
-    env
+    (env, MapDependenciesOwned { lawful, arithmetic, sums, core_or })
+}
+
+fn mk_map_dependency_env() -> ElabEnv {
+    mk_map_dependency_env_with_provider_owned().0
+}
+
+fn mk_env_with_provider_owned() -> (ElabEnv, MapDependenciesOwned) {
+    let (mut env, dependencies) = mk_map_dependency_env_with_provider_owned();
+    env.elaborate_ken_md_file(MAP_KEN_MD)
+        .expect("catalog/packages/Data/Collections/Map.ken.md must elaborate");
+    catalog_or::assert_transparent_result_uses_core_logic_or(
+        &env, &dependencies.core_or, "bool_dichotomy",
+    );
+    (env, dependencies)
 }
 
 fn mk_env() -> ElabEnv {
-    let mut env = mk_map_dependency_env();
-    env.elaborate_ken_md_file(MAP_KEN_MD)
-        .expect("catalog/packages/Data/Collections/Map.ken.md must elaborate");
-    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "bool_dichotomy");
-    env
+    mk_env_with_provider_owned().0
 }
 
 /// Promise class: durable invariant.
@@ -217,8 +234,10 @@ fn mk_env() -> ElabEnv {
 /// computation.
 #[test]
 fn cat_bool_reuse_d2_resolves_exact_is_some_provider_without_equivalent_local() {
-    let mut env = mk_map_dependency_env();
-    let provider = env.globals["Data.Sums.Combinators.is_some"];
+    let (mut env, dependencies) = mk_map_dependency_env_with_provider_owned();
+    let provider = catalog_or::provider_owned_id(
+        &env, &dependencies.sums, "Data.Sums.Combinators", "is_some",
+    ).expect("Sums must own checked is_some");
     assert!(matches!(
         env.env.lookup(provider),
         Some(Decl::Transparent { .. })
@@ -1140,7 +1159,7 @@ fn map_total_leq_nat_preserves_proof_relevant_or_tags() {
 
 #[test]
 fn cat4_new_api_is_derived_and_axiom_free() {
-    let env = mk_env();
+    let (env, dependencies) = mk_env_with_provider_owned();
     let (mut checked, owned) = checked_map_env();
     let forged = checked.globals["Data.Sums.Combinators.is_some"];
     checked.globals.insert("succ".to_owned(), forged);
@@ -1380,7 +1399,12 @@ fn cat4_new_api_is_derived_and_axiom_free() {
                 name == "bool_and" || name.starts_with("bool_and::"),
                 "only the imported LC bool_and family may lack a Map-owned identity"
             );
-            (&env, env.globals[&format!("Core.Classes.LawfulClasses.{name}")])
+            (
+                &env,
+                catalog_or::provider_owned_id(
+                    &env, &dependencies.lawful, "Core.Classes.LawfulClasses", name,
+                ).unwrap_or_else(|error| panic!("LC owner {name}: {error}")),
+            )
         };
         assert!(
             matches!(owner.env.lookup(id), Some(Decl::Transparent { .. })),
@@ -1691,11 +1715,12 @@ fn cat4_relations_compose_and_converse_over_adjacency_maps() {
 /// `Ordered` and lawful-comparator premises required for closure correspondence.
 #[test]
 fn cat_rel_public_api_is_usable_while_tree_constructors_stay_private() {
-    let mut env = mk_map_dependency_env();
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map")
+    let (mut env, dependencies) = mk_map_dependency_env_with_provider_owned();
+    let map_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map")
         .expect("Map must roots-load before its public closure interface is consumed");
 
-    let tree = env.globals["Data.Collections.Map.Tree"];
+    let tree = catalog_or::provider_owned_id(&env, &map_owned, "Data.Collections.Map", "Tree")
+        .expect("Map must own its checked Tree carrier");
     assert!(
         matches!(env.env.lookup(tree), Some(Decl::Inductive { .. })),
         "public Tree must remain the existing checked inductive carrier"
@@ -1713,7 +1738,18 @@ fn cat_rel_public_api_is_usable_while_tree_constructors_stay_private() {
         "Data.Collections.Map.reachable_plus",
     ]
     .into_iter()
-    .map(|name| (name, env.globals[name]))
+    .map(|name| {
+        let (module, local) = name.rsplit_once('.').expect("qualified provider name");
+        let owned = if module == "Data.Collections.Map" {
+            &map_owned
+        } else {
+            assert_eq!(module, "Data.Numeric.Nat.Arithmetic");
+            &dependencies.arithmetic
+        };
+        let id = catalog_or::provider_owned_id(&env, owned, module, local)
+            .unwrap_or_else(|error| panic!("public provider {name}: {error}"));
+        (name, id)
+    })
     .collect();
 
     env.elaborate_file(
