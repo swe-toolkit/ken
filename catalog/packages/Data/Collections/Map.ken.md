@@ -85,7 +85,9 @@ and closes with `Proved` — the same non-inductive shape as
 immediate since `empty = Leaf`. Neither needs induction or a comparison.
 
 ```ken
-import Core.Classes.LawfulClasses (bool_and, leq_nat)
+import Core.Classes.LawfulClasses (bool_and)
+
+import Core.Classes.LawfulClasses (leq_nat)
 
 import Core.Classes.LawfulClasses (Ord)
 
