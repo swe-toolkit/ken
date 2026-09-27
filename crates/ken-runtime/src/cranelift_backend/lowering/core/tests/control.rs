@@ -2893,6 +2893,15 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        Census {
+            file: "planning/static_transition/returned_vis.rs",
+            source: include_str!("../../../planning/static_transition/returned_vis.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         // `RT-SELECTED-PENDING-CALL-BUILD` increment 1: read-only admission.
         // The complete file has zero emission sites for all five needles.
         Census {
