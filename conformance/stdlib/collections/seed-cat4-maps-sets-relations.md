@@ -32,8 +32,9 @@ provenance, not substitutes for the current producers):
   bridges. **Zero `Axiom`, zero `trusted_base` delta throughout.** Permutation
   is the one Map law still deferred (proof-relevant, C5).
 - **The D0–D4 producer has a split evidence boundary.** The canonical D0 basis
-  is supplied by `Core.Classes.LawfulClasses`; Map's amended target contains
-  `delete`, `union`, `intersection`, `difference`, `keys`, `values`, `compose`,
+  is supplied by `Core.Classes.LawfulClasses`; Map's amended target contains no
+  D0 declaration or export and contains `delete`, `union`, `intersection`,
+  `difference`, `keys`, `values`, `compose`,
   `converse`, the relation predicates, and the public closure computation
   `size`/`dom`/`reachable_within`/`reachable_plus`. Map contains the D1–D2
   general proof corpus and D3 projection/ascending proofs. The D4 operation,
@@ -278,13 +279,15 @@ pub fn reachable_plus (k : Type) (leq : k -> k -> Bool)
   `IsTrue (bool_or (leq_nat x y) (leq_nat y x))` result; it does not export or
   replace the private Or-valued helper. The canonical identities are owned by
   `LawfulClasses`, not Map; a same-spelling flat alias or Map-local lookalike
-  does not satisfy the owner-identity assertion. A client can resolve the
-  public identities but cannot import or reference `total_leq_nat`. Unlike
-  primitive `Int`, `Nat` supplies the eliminator that makes these results
-  derivable. **The flip:** stub any result with `Axiom` → the cone walk reports
-  a non-empty delta → rejected; use a different owner's same-spelling identity
-  → the owner check fails; the real provider results leave the delta empty and
-  pass the identity check.
+  does not satisfy the owner-identity assertion. Map's public interface has no
+  D0 comparator, order-proof, or totality entry: it neither defines nor
+  re-exports this family. A client can resolve the provider's public identities
+  but cannot import or reference `total_leq_nat`. Unlike primitive `Int`,
+  `Nat` supplies the eliminator that makes these results derivable. **The flip:**
+  stub any result with `Axiom` → the cone walk reports a non-empty delta →
+  rejected; use a different owner's same-spelling identity → the owner check
+  fails; add a Map re-export → the public-interface inventory fails; the real
+  provider results leave the delta empty and pass the identity check.
 - why: the carrier prerequisite that makes the proved CAT-4 discriminators
   **non-vacuous** — see the standing carrier discriminator below.
   **`(soundness)`** — an `Axiom`-holed `leq_nat` would make every proved
