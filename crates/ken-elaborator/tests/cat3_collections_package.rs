@@ -196,9 +196,9 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
     ] {
         let id = env
             .globals
-            .get(&format!("Data.Collections.Derived.{name}"))
+            .get(name)
             .copied()
-            .unwrap_or_else(|| panic!("{name} must be checked by Derived.ken"));
+            .unwrap_or_else(|| panic!("{name} should be exported by Derived.ken"));
         match env.env.lookup(id) {
             Some(Decl::Transparent { .. }) => {}
             other => panic!("{name} must be a transparent checked record type, got {other:?}"),
