@@ -284,6 +284,19 @@ third instance means the closure was bypassed. The forged-alias pins forge
 both the flat and the qualified key. The cross-unit inline-path clash is
 `SPEC-MODULE-PATH-SINGLE-OWNER`, not this WP.
 
+12. ruled provider-theorem remedy form not checkable: closed map/zip
+    propositions need a type-position lambda (parse error) and `= Refl` fails
+    on a Top-collapsed Bool goal — keyed on the ruling's prescribed proof
+    syntax and terminal.
+
+**Predicate for lines 10-12 and closure** (Architect `evt_7gjadvjt4bsgw`,
+stop 12): each ruled remedy prescribed a form or plane in words that was
+never written and checked in the code's own vocabulary first (Check 4 on the
+ruling side). Closure for the rest of this WP: the Architect rules only on
+implementer-supplied, checked text, meaning the exact declaration or test plus
+the targeted command that elaborates it, green or with its exact error. The
+stop-12 ruling waits on a Research advisory.
+
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
 question about a public route to a type (for example `SourceId`) goes to
