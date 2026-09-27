@@ -29,14 +29,25 @@ fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
-fn catalog_env() -> ElabEnv {
+fn catalog_env_with_owned() -> (ElabEnv, Vec<GlobalId>, Vec<GlobalId>, Vec<GlobalId>) {
     let root = catalog_root();
     let mut env = ElabEnv::new().expect("base environment");
-    for module in [ORDERED_SEARCH, MAP, STANDARD] {
-        env.elaborate_module_from_roots(std::slice::from_ref(&root), module)
-            .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
-    }
-    env
+    let ordered_owned = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), ORDERED_SEARCH)
+        .expect("OrderedSearch must roots-load");
+    let map_owned = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), MAP)
+        .expect("Map must roots-load");
+    env.elaborate_module_from_roots(std::slice::from_ref(&root), STANDARD)
+        .expect("Standard must roots-load");
+    let membership_owned = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), MEMBERSHIP)
+        .expect("Membership defining provider must roots-load");
+    (env, ordered_owned, map_owned, membership_owned)
+}
+
+fn catalog_env() -> ElabEnv {
+    catalog_env_with_owned().0
 }
 
 fn transparent_body(env: &ElabEnv, name: &str) -> Term {
@@ -65,258 +76,117 @@ fn const_head(term: &Term) -> Option<GlobalId> {
     }
 }
 
-fn completed_dictionary(env: &ElabEnv, name: &str) -> GlobalId {
+fn completed_dictionary(
+    env: &ElabEnv,
+    name: &str,
+    membership_binding: GlobalId,
+    carrier: GlobalId,
+) -> GlobalId {
     let body = transparent_body(env, name);
-    let (head, args) = application_spine(&body);
+    let mut observation = &body;
+    while let Term::Lam(_, inner) = observation {
+        observation = inner.as_ref();
+    }
+    let (head, args) = application_spine(observation);
     assert_eq!(
         head,
-        &Term::const_(
-            env.globals["Core.Classes.Membership.membership_member_at"],
-            vec![]
-        ),
-        "`{name}` must elaborate through the one catalog membership binding"
+        &Term::const_(membership_binding, vec![]),
+        "`{name}` must elaborate through the authenticated membership binding"
     );
     assert_eq!(
         args.len(),
         4,
         "membership completion supplies carrier and dictionary before the two written operands"
     );
+    let (carrier_head, _) = application_spine(args[0]);
+    assert!(
+        matches!(carrier_head, Term::IndFormer { id, .. } if *id == carrier),
+        "`{name}` must select the provider for its checked nominal carrier"
+    );
     const_head(args[1]).expect("the completed dictionary must have a constant head")
 }
 
 fn membership_fixture() -> &'static str {
-    r#"
-import Algorithm.Searching.OrderedSearch (ListMembership, MkListMembership)
-import Data.Collections.Map
-  (Tree, OrderedKeyMembership, MkOrderedKeyMembership,
-   RelationEdgeMembership, MkRelationEdgeMembership)
-import Core.Classes.LawfulClasses (Ord, leq_nat)
+    r#"import Algorithm.Searching.OrderedSearch (ListMembership)
+import Data.Collections.Map (Tree, OrderedKeyMembership, RelationEdgeMembership)
 import Core.Operators.Standard (∈)
 
-fn down_leq (x : Nat) (y : Nat) : Bool = leq_nat y x
-
-fn down_below_zero (k2 : Nat) : Prop = Equal Bool (down_leq k2 Zero) True
-fn down_above_zero (k2 : Nat) : Prop = Equal Bool (down_leq Zero k2) True
-fn down_below_suc (k2 : Nat) : Prop = Equal Bool (down_leq k2 (Suc Zero)) True
-fn down_above_suc (k2 : Nat) : Prop = Equal Bool (down_leq (Suc Zero) k2) True
-
-const down_ord : Ord Nat = {
-  leq = down_leq,
-  refl = λx.(Ord_instance_Nat).refl x,
-  antisym = λx.λy.λxy.λyx.(Ord_instance_Nat).antisym x y yx xy,
-  trans = λx.λy.λz.λxy.λyz.(Ord_instance_Nat).trans z y x yz xy,
-  total = λx.λy.(Ord_instance_Nat).total y x
-}
-
-const list_view : ListMembership Nat =
-  MkListMembership Nat Ord_instance_Nat (Cons Nat Zero (Nil Nat))
-
-const empty_key_view : OrderedKeyMembership Nat Unit =
-  MkOrderedKeyMembership Nat Unit Ord_instance_Nat (Leaf Nat Unit) Proved
-
-const down_left : Tree Nat Unit =
-  Node Nat Unit (Leaf Nat Unit) (Suc Zero) MkUnit (Leaf Nat Unit)
-
-const down_tree : Tree Nat Unit =
-  Node Nat Unit down_left Zero MkUnit (Leaf Nat Unit)
-
-theorem down_left_ordered : Ordered Nat Unit down_leq down_left =
-  and_intro
-    (all_keys Nat Unit down_below_suc (Leaf Nat Unit))
-    (And
-      (all_keys Nat Unit down_above_suc (Leaf Nat Unit))
-      (And
-        (Ordered Nat Unit down_leq (Leaf Nat Unit))
-        (Ordered Nat Unit down_leq (Leaf Nat Unit))))
-    Proved
-    (and_intro
-      (all_keys Nat Unit down_above_suc (Leaf Nat Unit))
-      (And
-        (Ordered Nat Unit down_leq (Leaf Nat Unit))
-        (Ordered Nat Unit down_leq (Leaf Nat Unit)))
-      Proved
-      (and_intro
-        (Ordered Nat Unit down_leq (Leaf Nat Unit))
-        (Ordered Nat Unit down_leq (Leaf Nat Unit))
-        Proved
-        Proved))
-
-theorem down_left_below_root
-    : all_keys Nat Unit down_below_zero down_left =
-  and_intro
-    (Equal Bool (down_leq (Suc Zero) Zero) True)
-    (And
-      (all_keys Nat Unit down_below_zero (Leaf Nat Unit))
-      (all_keys Nat Unit down_below_zero (Leaf Nat Unit)))
-    Proved
-    (and_intro
-      (all_keys Nat Unit down_below_zero (Leaf Nat Unit))
-      (all_keys Nat Unit down_below_zero (Leaf Nat Unit))
-      Proved
-      Proved)
-
-theorem down_tree_ordered : Ordered Nat Unit down_leq down_tree =
-  and_intro
-    (all_keys Nat Unit down_below_zero down_left)
-    (And
-      (all_keys Nat Unit down_above_zero (Leaf Nat Unit))
-      (And
-        (Ordered Nat Unit down_leq down_left)
-        (Ordered Nat Unit down_leq (Leaf Nat Unit))))
-    down_left_below_root
-    (and_intro
-      (all_keys Nat Unit down_above_zero (Leaf Nat Unit))
-      (And
-        (Ordered Nat Unit down_leq down_left)
-        (Ordered Nat Unit down_leq (Leaf Nat Unit)))
-      Proved
-      (and_intro
-        (Ordered Nat Unit down_leq down_left)
-        (Ordered Nat Unit down_leq (Leaf Nat Unit))
-        down_left_ordered
-        Proved))
-
-const down_key_view : OrderedKeyMembership Nat Unit =
-  MkOrderedKeyMembership Nat Unit down_ord down_tree down_tree_ordered
-
-const down_adjacency : Tree Nat (Tree Nat Unit) =
-  Node
-    Nat
-    (Tree Nat Unit)
-    (Leaf Nat (Tree Nat Unit))
-    Zero
-    down_tree
-    (Leaf Nat (Tree Nat Unit))
-
-theorem down_adjacency_ordered
-    : Ordered Nat (Tree Nat Unit) down_leq down_adjacency =
-  and_intro
-    (all_keys Nat (Tree Nat Unit) down_below_zero (Leaf Nat (Tree Nat Unit)))
-    (And
-      (all_keys Nat (Tree Nat Unit) down_above_zero (Leaf Nat (Tree Nat Unit)))
-      (And
-        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
-        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))))
-    Proved
-    (and_intro
-      (all_keys Nat (Tree Nat Unit) down_above_zero (Leaf Nat (Tree Nat Unit)))
-      (And
-        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
-        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit))))
-      Proved
-      (and_intro
-        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
-        (Ordered Nat (Tree Nat Unit) down_leq (Leaf Nat (Tree Nat Unit)))
-        Proved
-        Proved))
-
-theorem down_successors_ordered
-    : successors_ordered Nat down_ord down_adjacency =
-  and_intro
-    (ordered_by Nat Unit down_ord down_tree)
-    (And
-      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit)))
-      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit))))
-    down_tree_ordered
-    (and_intro
-      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit)))
-      (successors_ordered Nat down_ord (Leaf Nat (Tree Nat Unit)))
-      Proved
-      Proved)
-
-const down_relation_view : RelationEdgeMembership Nat =
-  MkRelationEdgeMembership
-    Nat
-    down_ord
-    down_adjacency
-    down_adjacency_ordered
-    down_successors_ordered
-
-const list_observed : Bool = Zero ∈ list_view
-const key_observed : Bool = Zero ∈ empty_key_view
-const relation_observed : Bool =
-  mk_pair Nat Nat Zero (Suc Zero) ∈ down_relation_view
-const comparator_observed : Bool = Suc Zero ∈ down_key_view
-const comparator_absent_observed : Bool = Suc (Suc Zero) ∈ down_key_view
-const relation_absent_source_observed : Bool =
-  mk_pair Nat Nat (Suc (Suc Zero)) (Suc Zero) ∈ down_relation_view
-const relation_absent_target_observed : Bool =
-  mk_pair Nat Nat Zero (Suc (Suc Zero)) ∈ down_relation_view
-
-const wrong_comparator_observed : Bool =
-  member Nat Unit (Ord_instance_Nat).leq (Suc Zero) down_tree
-
-const wrong_relation_comparator_observed : Bool =
-  set_member
-    Nat
-    (Ord_instance_Nat).leq
-    (Suc Zero)
-    (succ Nat (Ord_instance_Nat).leq Zero down_adjacency)
-
-theorem stored_comparator_finds_the_key
-    : Equal Bool comparator_observed True = Proved
-
-theorem fresh_canonical_comparator_misses_the_same_key
-    : Equal Bool wrong_comparator_observed False = Proved
-
-theorem stored_comparator_rejects_an_absent_key
-    : Equal Bool comparator_absent_observed False = Proved
-
-theorem stored_relation_comparator_rejects_an_absent_source
-    : Equal Bool relation_absent_source_observed False = Proved
-
-theorem stored_relation_comparator_rejects_an_absent_target
-    : Equal Bool relation_absent_target_observed False = Proved
-
-theorem stored_relation_comparator_finds_the_edge
-    : Equal Bool relation_observed True = Proved
-
-theorem fresh_canonical_comparator_misses_the_same_edge
-    : Equal Bool wrong_relation_comparator_observed False = Proved
+fn list_observed (view : ListMembership Nat) : Bool = Zero ∈ view
+fn key_observed (view : OrderedKeyMembership Nat Unit) : Bool = Zero ∈ view
+fn relation_observed (view : RelationEdgeMembership Nat) : Bool =
+  mk_pair Nat Nat Zero (Suc Zero) ∈ view
+fn comparator_observed (view : OrderedKeyMembership Nat Unit) : Bool = Suc Zero ∈ view
+fn comparator_absent_observed (view : OrderedKeyMembership Nat Unit) : Bool =
+  Suc (Suc Zero) ∈ view
+fn relation_absent_source_observed (view : RelationEdgeMembership Nat) : Bool =
+  mk_pair Nat Nat (Suc (Suc Zero)) (Suc Zero) ∈ view
+fn relation_absent_target_observed (view : RelationEdgeMembership Nat) : Bool =
+  mk_pair Nat Nat Zero (Suc (Suc Zero)) ∈ view
 "#
 }
 
 /// Promise class: durable invariant.
 ///
-/// The three nominal provider heads select three different dictionary
-/// identities through the shared resolver. The list and ordered-key rows both
-/// use `Nat` queries, so their distinct result is the carrier-first
-/// discriminator: choosing from the query cannot distinguish them.
-///
-/// The comparator theorems form non-degenerate pairs. A lawful descending
-/// dictionary is stored in both ordered views while the canonical ascending
-/// `Ord Nat` remains available. The stored comparator finds a present key and
-/// edge, rejects an absent key, source, and target, and disagrees with fresh
-/// canonical lookups on the same trees. The relation witness recursively proves its
-/// stored successor tree ordered under that same dictionary.
+/// MEASURED: seven ordinary public-import `∈` wrappers elaborate through
+/// the one authenticated Membership binding; the checked carrier head picks
+/// one of three different dictionaries from the real providers' owned ID
+/// populations. List and ordered-key views share query `Nat`, so their
+/// distinct selection cannot be keyed on the query alone. CLAIMED: the
+/// operator admits each public view and chooses by carrier, not query.
+/// THE GAP: Map's closed stored-vs-fresh comparator and edge witnesses live
+/// in its checked provider-local examples, not in this abstract client.
 #[test]
-fn three_named_providers_are_carrier_first_and_retain_their_own_comparator() {
-    let mut env = catalog_env();
-    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
-    catalog_or::expose_module(&mut env, "Core.Logic.Or");
-    catalog_or::expose_module(&mut env, MAP);
+fn three_named_providers_are_carrier_first_on_public_views() {
+    let (mut env, ordered_owned, map_owned, membership_owned) = catalog_env_with_owned();
+    let binding =
+        catalog_or::provider_owned_id(&env, &membership_owned, MEMBERSHIP, "membership_member_at")
+            .expect("Membership must own the checked operator binding");
+    let list_carrier =
+        catalog_or::provider_owned_id(&env, &ordered_owned, ORDERED_SEARCH, "ListMembership")
+            .expect("OrderedSearch must own the public list view");
+    let key_carrier = catalog_or::provider_owned_id(&env, &map_owned, MAP, "OrderedKeyMembership")
+        .expect("Map must own the public key view");
+    let relation_carrier =
+        catalog_or::provider_owned_id(&env, &map_owned, MAP, "RelationEdgeMembership")
+            .expect("Map must own the public relation view");
     env.elaborate_file(membership_fixture())
-        .expect("all three production providers and the comparator control must elaborate");
+        .expect("all three public nominal views must elaborate without private aliases");
 
-    let list = completed_dictionary(&env, "list_observed");
-    let key = completed_dictionary(&env, "key_observed");
-    let relation = completed_dictionary(&env, "relation_observed");
-    let comparator = completed_dictionary(&env, "comparator_observed");
-    assert_eq!(
-        list,
-        env.globals["Membership_instance_Algorithm.Searching.OrderedSearch.ListMembership"]
+    let list = completed_dictionary(&env, "list_observed", binding, list_carrier);
+    let key = completed_dictionary(&env, "key_observed", binding, key_carrier);
+    let relation = completed_dictionary(&env, "relation_observed", binding, relation_carrier);
+    assert!(
+        ordered_owned.contains(&list),
+        "list instance must belong to OrderedSearch"
     );
-    assert_eq!(
-        key,
-        env.globals["Membership_instance_Data.Collections.Map.OrderedKeyMembership"]
+    assert!(map_owned.contains(&key), "key instance must belong to Map");
+    assert!(
+        map_owned.contains(&relation),
+        "edge instance must belong to Map"
     );
-    assert_eq!(
-        relation,
-        env.globals["Membership_instance_Data.Collections.Map.RelationEdgeMembership"]
-    );
-    assert_eq!(comparator, key, "both ordered-key values use one provider");
     assert_ne!(list, key, "same Query Nat must not select by the query");
-
+    assert_ne!(list, relation);
+    assert_ne!(
+        key, relation,
+        "distinct Map carriers need distinct instances"
+    );
+    for name in ["comparator_observed", "comparator_absent_observed"] {
+        assert_eq!(
+            completed_dictionary(&env, name, binding, key_carrier),
+            key,
+            "both abstract ordered-key uses must choose Map's key instance"
+        );
+    }
+    for name in [
+        "relation_absent_source_observed",
+        "relation_absent_target_observed",
+    ] {
+        assert_eq!(
+            completed_dictionary(&env, name, binding, relation_carrier),
+            relation,
+            "all abstract edge uses must choose Map's edge instance"
+        );
+    }
     for name in [
         "list_observed",
         "key_observed",
@@ -325,14 +195,15 @@ fn three_named_providers_are_carrier_first_and_retain_their_own_comparator() {
         "comparator_absent_observed",
         "relation_absent_source_observed",
         "relation_absent_target_observed",
-        "wrong_comparator_observed",
-        "wrong_relation_comparator_observed",
     ] {
         let id = env.globals[name];
-        let ty = match env.env.lookup(id).expect("declared result") {
+        let mut ty = match env.env.lookup(id).expect("declared result") {
             Decl::Transparent { ty, .. } => ty,
             other => panic!("{name} must be transparent, got {other:?}"),
         };
+        while let Term::Pi(_, result) = ty {
+            ty = result.as_ref();
+        }
         assert!(
             matches!(ty, Term::IndFormer { id, .. } if *id == env.numeric_env.bool_id),
             "{name} must return Bool, got {ty:?}"
@@ -414,28 +285,29 @@ fn removing_the_catalog_role_fails_required_certification_naming_member() {
 
 /// Promise class: durable invariant.
 ///
-/// Raw `Tree` has no canonical membership meaning. The ordered-key view over
-/// the same representation is the positive control, so this cannot pass by
-/// refusing every tree-backed carrier.
+/// Raw `Tree` has no canonical membership meaning, while a public nominal
+/// ordered-key parameter admits the same query through `∈`. Both forms use
+/// only ordinary public imports; Map's private constructor/value witnesses
+/// are checked in the provider's own example fence.
 #[test]
 fn raw_tree_is_refused_while_the_ordered_key_view_is_admitted() {
-    let mut env = catalog_env();
-    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
-    catalog_or::expose_module(&mut env, MAP);
+    let (mut env, _, map_owned, _) = catalog_env_with_owned();
+    for name in ["Tree", "OrderedKeyMembership"] {
+        catalog_or::provider_owned_id(&env, &map_owned, MAP, name)
+            .unwrap_or_else(|error| panic!("Map carrier {name}: {error}"));
+    }
     env.elaborate_file(
-        "import Data.Collections.Map \
-           (Tree, OrderedKeyMembership, MkOrderedKeyMembership) \
+        "import Data.Collections.Map (OrderedKeyMembership) \
          import Core.Operators.Standard (∈) \
-         const admitted : OrderedKeyMembership Nat Unit = \
-           MkOrderedKeyMembership Nat Unit Ord_instance_Nat (Leaf Nat Unit) Proved \
-         const positive : Bool = Zero ∈ admitted",
+         fn public_key_member (view : OrderedKeyMembership Nat Unit) : Bool = \
+           Suc Zero ∈ view",
     )
-    .expect("the witness-bound ordered-key view must be admitted");
+    .expect("the public ordered-key parameter must admit the operator");
 
     let result = env.elaborate_file(
         "import Data.Collections.Map (Tree) \
          import Core.Operators.Standard (∈) \
-         const forbidden : Bool = Zero ∈ (Leaf Nat Unit)",
+         fn raw_tree_member (tree : Tree Nat Unit) : Bool = Zero ∈ tree",
     );
     assert!(
         matches!(
