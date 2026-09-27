@@ -406,8 +406,8 @@ attention"; usually a stalled ring is being reported as fine. Incidents:
 load-bearing.** Tooling and process defects are found by the ring that trips
 over them in product work, or they wait. The permitted traffic, in full:
 
-1. The lieutenant **notifies** the adversary on a code merge (M8; operator,
-   2026-09-26).
+1. The lieutenant **compacts, then notifies** the adversary on a code merge
+   (M8; operator, 2026-09-26 and 2026-09-27).
 2. The Steward **may receive** reports.
 3. **Nothing else.**
 
@@ -743,10 +743,12 @@ Each WP starts with a clean, minimal context. Who compacts is fixed (operator,
   (it races the live turn). Never use `request_context_reset`: it is broken
   here, and the `convo-<role>` its error names is the bug, not a target.
   Details: `playbooks/federation/steward.md` (self-compact).
-- **The Steward compacts the Adversary at the merge notification** (operator,
-  2026-08-17): `merge-procedure.md` **M8a**, just before the M8b code-merge
-  notification, then a pane rouse (a mention does not wake a compacted no-poll
-  seat). **Never notify it without offering a compaction first.**
+- **The lieutenant compacts the Adversary at the merge notification**
+  (operator, 2026-08-17; owner clarified 2026-09-27): `merge-procedure.md`
+  **M8a**, just before the M8b code-merge notification, with
+  `moot compact adversary`, then a pane rouse (a mention does not wake a
+  compacted no-poll seat). It is part of M8, so it is the lieutenant's step,
+  not the Steward's. **Never notify it without a compaction first.**
 - **Never mid-reasoning.** Compact only at a clean boundary.
 - **Start new work from current `origin/main`** (operator, 2026-06-29):
   leaders cut `git branch wp/<ID>-<slug> origin/main`, and every member runs

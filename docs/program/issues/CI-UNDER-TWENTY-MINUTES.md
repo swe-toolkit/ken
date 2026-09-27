@@ -61,6 +61,11 @@ critical path under 20 minutes with margin.
   after it lands, each finish under 20 minutes; post both timelines. (Main
   push runs are path-classified and short, so they do not measure this.) A
   run within a minute of the limit is a stop to re-balance, not a pass.
+- **AC-2a (operator 2026-09-27).** Keep the account's 20-concurrent-job
+  cap and fit the first wave under it; a run with a queued job does not
+  count. If under 20 minutes proves impossible within 20 jobs, the
+  deliverable becomes a workload balanced across the 20 jobs, shown by the
+  per-job timeline; report that finding rather than adding jobs.
 - **AC-3.** Targeted local checks only, through `scripts/ken-cargo`; CI is
   the measurement.
 
