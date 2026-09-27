@@ -372,12 +372,15 @@ fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
 #[test]
 fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
+    let (transport_owned, or_owned) =
+        catalog_or::load_core_logic_compare_with_or_owned(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     catalog_or::load_derived_fixture(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
-    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "compare_bool_cases");
+    catalog_or::assert_transparent_result_uses_core_logic_or(
+        &env, &or_owned, "compare_bool_cases",
+    );
     assert!(
         env.globals.contains_key("DecEq_instance_Bool"),
         "the landed package's own DecEq_instance_Bool must be a real registered global"
