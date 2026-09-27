@@ -14,19 +14,23 @@ use ken_elaborator::ElabEnv;
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 
-fn base_env() -> ElabEnv {
+fn base_env_with_derived_owned() -> (ElabEnv, Vec<ken_kernel::GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("canonical Nat order provider must elaborate");
-    catalog_or::load_derived_fixture(&mut env);
-    env
+    let owned = catalog_or::load_derived_fixture(&mut env);
+    (env, owned)
+}
+
+fn base_env() -> ElabEnv {
+    base_env_with_derived_owned().0
 }
 
 #[test]
 fn all_five_combinators_and_their_laws_are_real_globals() {
-    let env = base_env();
+    let (env, owned) = base_env_with_derived_owned();
     for name in [
         "reverse",
         "reverse_snoc",
@@ -41,11 +45,8 @@ fn all_five_combinators_and_their_laws_are_real_globals() {
         "range_length",
         "foldl",
     ] {
-        assert!(
-            env.globals.contains_key(&format!("Data.Collections.Derived.{name}")),
-            "`{}` must be a real registered global after elaborating Derived.ken",
-            name
-        );
+        catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", name)
+            .unwrap_or_else(|error| panic!("{name} must be owned by Derived: {error}"));
     }
 }
 

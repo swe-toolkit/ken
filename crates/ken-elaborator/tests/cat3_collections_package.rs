@@ -173,11 +173,8 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
         "bool_pair_index_project",
         "id_bool::respects",
     ] {
-        let id = env
-            .globals
-            .get(&format!("Data.Collections.Derived.{name}"))
-            .copied()
-            .unwrap_or_else(|| panic!("{name} must be checked by Derived.ken"));
+        let id = catalog_or::provider_owned_id(&env, &derived_owned, "Data.Collections.Derived", name)
+            .unwrap_or_else(|error| panic!("{name} must be checked by Derived.ken: {error}"));
         match env.env.lookup(id) {
             Some(Decl::Transparent { .. }) => {}
             other => panic!("{name} must be a transparent checked definition, got {other:?}"),
@@ -242,10 +239,11 @@ fn derived_owns_checked_map_and_filter_identities() {
     let provider_state = catalog_or::core_logic_or_module_state(&env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
-    catalog_or::load_derived_fixture(&mut env);
-
-    let derived_map = env.globals["Data.Collections.Derived.map"];
-    let derived_filter = env.globals["Data.Collections.Derived.filter"];
+    let owned = catalog_or::load_derived_fixture(&mut env);
+    let derived_map = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", "map")
+        .expect("Derived must own checked map");
+    let derived_filter = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", "filter")
+        .expect("Derived must own checked filter");
     assert_ne!(derived_map, derived_filter);
     assert_eq!(env.globals["map"], derived_map);
     assert_eq!(env.globals["filter"], derived_filter);
@@ -260,7 +258,8 @@ fn derived_owns_checked_map_and_filter_identities() {
         );
     }
 
-    let map_length = env.globals["Data.Collections.Derived.map_length"];
+    let map_length = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", "map_length")
+        .expect("Derived must own checked map_length");
     let (map_length_ty, map_length_body) = match env.env.lookup(map_length) {
         Some(Decl::Transparent { ty, body, .. }) => (ty, body),
         other => panic!("map_length must remain transparent, got {other:?}"),
@@ -310,11 +309,11 @@ fn derived_owns_checked_map_and_filter_identities() {
         "compare",
         "bytes_nat_length",
     ] {
-        let qualified = format!("Data.Collections.Derived.{name}");
-        let id = env.globals[&qualified];
+        let id = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", name)
+            .unwrap_or_else(|error| panic!("Derived dependent {name}: {error}"));
         assert!(
             env.env.transparent_body(id).is_some(),
-            "{qualified} must elaborate as a retained transparent dependent"
+            "Data.Collections.Derived.{name} must elaborate as a retained transparent dependent"
         );
     }
 
@@ -369,7 +368,7 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("canonical Nat order provider must roots-load");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    catalog_or::load_derived_fixture(&mut env);
+    let owned = catalog_or::load_derived_fixture(&mut env);
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Derived reuse must add zero trust");
 
@@ -394,7 +393,8 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
     }
 
     for law in ["length_take_min", "zip_length"] {
-        let id = env.globals[&format!("Data.Collections.Derived.{law}")];
+        let id = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", law)
+            .unwrap_or_else(|error| panic!("Derived law {law}: {error}"));
         let ty = match env.env.lookup(id) {
             Some(Decl::Transparent { ty, .. }) => ty,
             other => panic!("{law} must be transparent, got {other:?}"),
@@ -406,7 +406,8 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
         );
     }
 
-    let slice = env.globals["Data.Collections.Derived.slice"];
+    let slice = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", "slice")
+        .expect("Derived must own checked slice");
     let body = match env.env.lookup(slice) {
         Some(Decl::Transparent { body, .. }) => body,
         other => panic!("slice must be transparent, got {other:?}"),

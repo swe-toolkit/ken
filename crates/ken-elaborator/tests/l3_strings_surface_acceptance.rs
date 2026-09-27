@@ -27,15 +27,19 @@ use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 
-fn mk_env() -> ElabEnv {
+fn mk_env_with_derived_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    let owned = catalog_or::load_derived_fixture(&mut env);
     let canonical_sub = env.globals["Data.Numeric.Nat.Order.sub"];
     env.globals
         .insert("l3_canonical_nat_sub".to_owned(), canonical_sub);
-    env
+    (env, owned)
+}
+
+fn mk_env() -> ElabEnv {
+    mk_env_with_derived_owned().0
 }
 
 fn make_store(env: &ElabEnv) -> EvalStore {
@@ -120,7 +124,7 @@ fn run_with_big_stack<F: FnOnce() + Send + 'static>(f: F) {
 
 #[test]
 fn list_combinator_floor_derived_over_real_elim() {
-    let env = mk_env();
+    let (env, derived_owned) = mk_env_with_derived_owned();
 
     // The 7 floor combinators + `compare_char` are all Transparent (SCT
     // accepted, `declare_def`-upgraded) and their `match` lowers to the real
@@ -139,7 +143,12 @@ fn list_combinator_floor_derived_over_real_elim() {
         } else {
             "Data.Collections.Derived"
         };
-        let id = env.globals[&format!("{module}.{name}")];
+        let id = if module == "Data.Collections.Derived" {
+            catalog_or::provider_owned_id(&env, &derived_owned, module, name)
+                .unwrap_or_else(|error| panic!("{name} must be Derived-owned: {error}"))
+        } else {
+            env.globals[&format!("{module}.{name}")]
+        };
         let (_, body) = env
             .env
             .transparent_body(id)
@@ -175,7 +184,8 @@ fn list_combinator_floor_derived_over_real_elim() {
         }
     }
     for name in nat_outer {
-        let id = env.globals[&format!("Data.Collections.Derived.{name}")];
+        let id = catalog_or::provider_owned_id(&env, &derived_owned, "Data.Collections.Derived", name)
+            .unwrap_or_else(|error| panic!("{name} must be Derived-owned: {error}"));
         let (_, body) = env
             .env
             .transparent_body(id)
@@ -196,7 +206,8 @@ fn list_combinator_floor_derived_over_real_elim() {
     // shaped — it's checked separately: just confirm it's Transparent and not
     // an opaque postulate stand-in.
     assert!(
-        env.env.transparent_body(env.globals["Data.Collections.Derived.compare_char"]).is_some(),
+        env.env.transparent_body(catalog_or::provider_owned_id(&env, &derived_owned, "Data.Collections.Derived", "compare_char")
+            .expect("Derived must own compare_char")).is_some(),
         "compare_char must be a real (checked) def"
     );
 
@@ -226,7 +237,12 @@ fn list_combinator_floor_derived_over_real_elim() {
         } else {
             "Data.Collections.Derived."
         };
-        let id = env.globals[&format!("{module}{name}")];
+        let id = if module == "Data.Collections.Derived." {
+            catalog_or::provider_owned_id(&env, &derived_owned, "Data.Collections.Derived", name)
+                .unwrap_or_else(|error| panic!("{name} must be Derived-owned: {error}"))
+        } else {
+            env.globals[&format!("{module}{name}")]
+        };
         let delta = trusted_base_delta(&env.env, id);
         assert!(
             delta.is_empty(),

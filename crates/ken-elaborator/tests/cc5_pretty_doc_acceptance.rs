@@ -34,15 +34,42 @@ fn full_env() -> ElabEnv {
     env
 }
 
+fn checked_render_id(env: &ElabEnv, owned: &[GlobalId]) -> GlobalId {
+    catalog_or::provider_owned_id(env, owned, "Capability.Formatting.Doc", "render")
+        .expect("Formatting.Doc must own its checked render")
+}
+
 fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
+    let rooted_render = names.contains(&"render").then(|| {
+        let mut rooted = ElabEnv::new().expect("base environment");
+        let owned = rooted
+            .elaborate_module_from_roots(
+                &[catalog_or::catalog_root()],
+                "Capability.Formatting.Doc",
+            )
+            .expect("Formatting.Doc must load through its real roots closure");
+        (rooted, owned)
+    });
     for name in names {
-        let id = *env
-            .globals
-            .get(*name)
-            .unwrap_or_else(|| panic!("expected checked global `{name}`"));
+        let (owner, identity) = if *name == "render" {
+            (
+                &rooted_render.as_ref().expect("render roots load").0,
+                "Capability.Formatting.Doc.render",
+            )
+        } else {
+            (env, *name)
+        };
+        let id = if *name == "render" {
+            checked_render_id(owner, &rooted_render.as_ref().expect("render roots load").1)
+        } else {
+            *owner
+                .globals
+                .get(identity)
+                .unwrap_or_else(|| panic!("expected checked global `{identity}`"))
+        };
         assert!(
-            env.env.transparent_body(id).is_some(),
-            "`{name}` must be a real transparent, kernel-checked term"
+            owner.env.transparent_body(id).is_some(),
+            "`{identity}` must be a real transparent, kernel-checked term"
         );
     }
 }
@@ -262,6 +289,31 @@ fn add_law_probes(env: &mut ElabEnv) {
         "#,
     )
     .expect("proof-consumption probes must elaborate");
+}
+
+/// Promise class: durable checked-identity invariant.
+/// MEASURED: a forged flat `render` alias leaves the checked Doc-owned identity
+/// unchanged. CLAIMED: host probes bind to provider provenance, not the mutable
+/// fixture table. THE GAP: loader visibility is pinned by the exact CC5 surface.
+#[test]
+fn render_host_read_ignores_forged_flat_fixture_alias() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let owned = env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Formatting.Doc",
+    )
+    .expect("Formatting.Doc must roots-load");
+    let canonical = checked_render_id(&env, &owned);
+    let forged = env.globals["Data.Collections.Derived.length"];
+    assert_ne!(canonical, forged);
+    env.globals.insert("render".to_owned(), forged);
+    assert_eq!(checked_render_id(&env, &owned), canonical);
+    env.globals
+        .insert("Capability.Formatting.Doc.render".to_owned(), forged);
+    assert!(
+        catalog_or::provider_owned_id(&env, &owned, "Capability.Formatting.Doc", "render").is_err(),
+        "forged qualified Doc.render must not pass ownership"
+    );
 }
 
 #[test]

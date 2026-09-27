@@ -10,6 +10,27 @@ pub fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
+/// Promise class: durable checked-identity invariant. Qualified spelling
+/// locates a candidate in the mutable host table; the real loader's owned-ID
+/// population, captured in this same environment, authenticates its provider.
+pub fn provider_owned_id(
+    env: &ElabEnv,
+    owned: &[GlobalId],
+    provider: &str,
+    name: &str,
+) -> Result<GlobalId, String> {
+    let qualified = format!("{provider}.{name}");
+    let id = *env
+        .globals
+        .get(&qualified)
+        .ok_or_else(|| format!("missing `{qualified}` global"))?;
+    if owned.contains(&id) {
+        Ok(id)
+    } else {
+        Err(format!("`{qualified}` resolves to {id:?}, which {provider} does not own"))
+    }
+}
+
 fn collect_references(term: &Term, references: &mut BTreeSet<GlobalId>) {
     match term {
         Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. } => {

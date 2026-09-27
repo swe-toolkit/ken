@@ -44,7 +44,7 @@ import Application.CommandLine.ArgParse
 "#;
 const EXAMPLE_KEN_MD: &str = include_str!("../../../catalog/examples/CommandLine/Forge.ken.md");
 
-fn dependency_env() -> ElabEnv {
+fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
@@ -99,18 +99,22 @@ fn dependency_env() -> ElabEnv {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
     }
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+    let doc_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
         .expect("Capability.Formatting.Doc must roots-load in dependency order");
     catalog_or::expose_module(&mut env, "Capability.Formatting.Doc");
-    env
+    (env, doc_owned)
+}
+
+fn dependency_env() -> ElabEnv {
+    dependency_env_with_doc_owned().0
 }
 
 fn importing_client(source: &str, imports: &str) -> String {
     source.replacen("```ken\n", &format!("```ken\n{imports}\n"), 1)
 }
 
-fn full_env() -> ElabEnv {
-    let mut env = dependency_env();
+fn full_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
+    let (mut env, doc_owned) = dependency_env_with_doc_owned();
     env.elaborate_module_from_roots(
         &[catalog_or::catalog_root()],
         "Capability.Diagnostics.Render",
@@ -123,7 +127,11 @@ fn full_env() -> ElabEnv {
     env.elaborate_ken_md_file(&importing_client(EXAMPLE_KEN_MD, FORGE_ARGPARSE_IMPORT))
         .expect("the separate Forge client must consume ArgParse's public surface");
     env.module_state = before_forge;
-    env
+    (env, doc_owned)
+}
+
+fn full_env() -> ElabEnv {
+    full_env_with_doc_owned().0
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -158,7 +166,7 @@ fn global_id(env: &ElabEnv, name: &str) -> GlobalId {
     let qualified = if name.contains('.') || name.starts_with("forge_") || name.starts_with("cc7_") {
         name.to_owned()
     } else if name == "render" {
-        format!("Capability.Formatting.Doc.{name}")
+        panic!("render host reads require the Doc-owned ID population")
     } else if name == "diagnostic_to_doc" {
         format!("Capability.Diagnostics.Render.{name}")
     } else if ["MkDiagnostic", "ArgumentOrigin", "MkByteRange"].contains(&name) {
@@ -208,6 +216,19 @@ fn call_global(
     arguments: impl IntoIterator<Item = EvalVal>,
 ) -> EvalVal {
     let function = eval_global(env, store, name);
+    apply_values(env, store, function, arguments)
+}
+
+fn call_doc_render(
+    env: &ElabEnv,
+    doc_owned: &[GlobalId],
+    store: &mut EvalStore,
+    arguments: impl IntoIterator<Item = EvalVal>,
+) -> EvalVal {
+    let id = catalog_or::provider_owned_id(env, doc_owned, "Capability.Formatting.Doc", "render")
+        .expect("Doc must own the renderer selected by the host");
+    let (_, body) = env.env.transparent_body(id).expect("Doc.render must be checked");
+    let function = eval(&[], &body, &env.env, store);
     apply_values(env, store, function, arguments)
 }
 
@@ -329,16 +350,28 @@ fn invalid_diagnostics<'a>(env: &ElabEnv, result: &'a EvalVal) -> Vec<&'a EvalVa
     result
 }
 
-/// Promise class: durable invariant. A mutable flat host alias cannot change
-/// which checked provider the renderer observation uses.
+/// Promise class: durable invariant.
+/// MEASURED: real Doc loader ownership survives a forged flat `render` alias;
+/// a forged qualified key to ArgParse's checked operation fails that ownership
+/// check. CLAIMED: renderer evaluation uses the checked Doc provider, not a
+/// mutable spelling. THE GAP: other provider routes have their own contracts.
 #[test]
-fn render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias() {
-    let mut env = full_env();
-    let render = env.globals["Capability.Formatting.Doc.render"];
+fn render_host_identity_checks_flat_and_qualified_alias_forgery() {
+    let (mut env, doc_owned) = full_env_with_doc_owned();
+    let render = catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render")
+        .expect("Doc must own checked render");
     let other = env.globals["Application.CommandLine.ArgParse.argparse_run"];
     assert_ne!(render, other, "the forged host aliases must be distinct");
     env.globals.insert("render".to_owned(), other);
-    assert_eq!(global_id(&env, "render"), render);
+    assert_eq!(
+        catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render"),
+        Ok(render),
+    );
+    env.globals.insert("Capability.Formatting.Doc.render".to_owned(), other);
+    assert!(
+        catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render").is_err(),
+        "forged qualified Doc.render must fail its loader-owned ID check"
+    );
 }
 
 #[test]
@@ -366,7 +399,7 @@ fn ordered_closure_elaborates_the_renderer_specialization_and_multifile_client()
 
 #[test]
 fn forge_parses_flags_raw_values_and_positionals_and_renders_derived_help() {
-    let mut env = full_env();
+    let (mut env, doc_owned) = full_env_with_doc_owned();
     add_argument_fixtures(&mut env);
     let mut store = make_store(&env);
     neutralize_fixture_proofs(&env, &mut store);
@@ -408,13 +441,13 @@ fn forge_parses_flags_raw_values_and_positionals_and_renders_derived_help() {
 
     let width = nat_value(&env, &mut store, 0);
     let root_help = eval_global(&env, &mut store, "forge_help");
-    let root_rendered = call_global(&env, &mut store, "render", [width.clone(), root_help]);
+    let root_rendered = call_doc_render(&env, &doc_owned, &mut store, [width.clone(), root_help]);
     let root_text = list_char_text(&env, &root_rendered);
     assert!(root_text.contains("build"));
     assert!(root_text.contains("inspect"));
     let build_spec = eval_global(&env, &mut store, "forge_build_spec");
     let build_help = call_global(&env, &mut store, "command_help", [build_spec]);
-    let build_rendered = call_global(&env, &mut store, "render", [width, build_help]);
+    let build_rendered = call_doc_render(&env, &doc_owned, &mut store, [width, build_help]);
     let build_text = list_char_text(&env, &build_rendered);
     assert!(build_text.contains("--verbose"));
     assert!(build_text.contains("--output <value>"));
@@ -423,7 +456,7 @@ fn forge_parses_flags_raw_values_and_positionals_and_renders_derived_help() {
 
 #[test]
 fn two_independent_bad_arguments_accumulate_exact_nonzero_locations() {
-    let mut env = full_env();
+    let (mut env, doc_owned) = full_env_with_doc_owned();
     add_argument_fixtures(&mut env);
     let mut store = make_store(&env);
     neutralize_fixture_proofs(&env, &mut store);
@@ -450,7 +483,7 @@ fn two_independent_bad_arguments_accumulate_exact_nonzero_locations() {
         [diagnostics[0].clone()],
     );
     let zero = nat_value(&env, &mut store, 0);
-    let rendered = call_global(&env, &mut store, "render", [zero, first_doc]);
+    let rendered = call_doc_render(&env, &doc_owned, &mut store, [zero, first_doc]);
     let rendered = list_char_text(&env, &rendered);
     assert!(rendered.contains("argument"));
     assert!(rendered.contains("unknown-option"));
