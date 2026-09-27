@@ -1,7 +1,7 @@
 ---
 id: RT-IH-BACKEDGE-FAIL-CLOSED
 title: "Refuse at compile time, never lower to RecursiveBackedge, a functional-IH value in a non-tail position such as a Vis K constructor field, closing a latent miscompile that takes the recursive transfer without the response"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: architect
