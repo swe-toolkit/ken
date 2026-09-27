@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: architect
 tier: T1
-depends_on: [RT-OWNER-VIS-RETURN-PROTOCOL]
+depends_on: [RT-OWNER-VIS-RETURN-PROTOCOL, RT-IH-BACKEDGE-FAIL-CLOSED]
 blocks: []
 github: null
 origin: "Architect 2026-09-27 (evt_1j5qaw2d9sqe7): r2 descoped from RT-OWNER-VIS-RETURN-PROTOCOL under its second-independent-repair clause; successor requested with this evidence. Operator L1 directive 2026-09-17 (clear the ignored tests). Steward-filed per COORDINATION section 2."
@@ -49,6 +49,10 @@ Architect, that lets owner 1298 join the return protocol and un-ignores r2.
   reachable at runtime on this route. If it is, show whether the jump runs
   the recursion without the response `r`. If it is unsound and reachable, stop
   to the Architect: that is a correctness repair ahead of the representation.
+  **Answered** (Architect `evt_2b0dwgwyb0tvc`): a soundness stop, confirmed
+  without a reachability probe. The fail-closed repair is its own node,
+  `RT-IH-BACKEDGE-FAIL-CLOSED`, which lands before this node's
+  representation work.
 - **AC-0b (D0).** The ring proposes the relay K value. The Architect rules
   before any build.
 - **AC-1.** r2 runs green, un-ignored, with the full 42 §6.4 envelope and the
