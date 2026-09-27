@@ -293,11 +293,24 @@ pub fn reachable_plus (k : Type) (leq : k -> k -> Bool)
   **`(soundness)`** — an `Axiom`-holed `leq_nat` would make every proved
   `Map Nat` law's accept-arm vacuous. Structural owner-identity and
   zero-delta flips. (soundness; canonical provider + zero-delta.)
-- staging: the provider-owned D0 inventory and absence of a Map-local copy are
-  **RED UNTIL held increment 2** retires the pre-amendment Map declarations.
-  The existing `cat4_new_api_is_derived_and_axiom_free` implementation test's
-  Map-owned inventory on main is not evidence that the amended target has
-  landed.
+- staging: two parts, discharged separately. (1) Absence of a Map-local D0
+  copy is **RED UNTIL held increment 2**, whose
+  `cat_map_retires_leq_nat_family_and_totality_name` rejects Map bindings named
+  `leq_nat`, `leq_nat::refl`/`trans`/`antisym`, or `total_leq_nat`. (2) The
+  provider-owned identity and zero-delta oracle already has tests on main:
+  `class_owner_provider_loader_visible_inventories_are_exact`
+  (`crates/ken-elaborator/src/r_layer_tests/cat_bool_pub_export.rs:478`)
+  checks the exact public LawfulClasses inventory, including `leq_nat::total`;
+  `lawful_totality_bridge_remains_a_private_transparent_provider_artifact`
+  (`crates/ken-elaborator/src/r_layer_tests/cat_order_pub_export.rs:107–116`)
+  checks the private `total_leq_nat` by provider-owned identity and that it is
+  not importable; `totality_source_and_public_relation_behavior_survive_the_move`
+  and `trusted_base_delta_is_empty_across_the_entry`
+  (`crates/ken-elaborator/tests/ds2_ord_nat_acceptance.rs:72–76, 92`) check the
+  Or identity and zero delta. The Map re-export flip has no executed mutation
+  yet and remains an unexecuted obligation. The existing
+  `cat4_new_api_is_derived_and_axiom_free` Map-owned inventory on main is not
+  evidence that the amended target has landed.
 
 ---
 
@@ -765,16 +778,14 @@ neighboring behavior that must flip.
 - why: the carrier-vacuity guard **promoted to a standing discriminator** so the
   build cannot silently pick an Axiom-holed carrier and ship a vacuous green
   (exactly CAT-3's `verified-sort-proved-carrier-is-lawful-bool`, one carrier up
-  — Nat here because relations need ≥3 keys). The current
-  The existing `cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local`
-  implementation pin checks the comparator's `LawfulClasses` identity with the
-  flat alias withheld. This seed's D0 oracle extends owner identity to all
-  provider results; the `cat4_new_api_is_derived_and_axiom_free` implementation
-  test on main still inventories the pre-amendment Map-owned declarations and
-  must be updated by held increment 2. Neither test's current result is evidence
-  that the amended producer has landed. The carrier test does not execute every
-  proof-flip's carrier choice; the cross-case inventory below keeps that
-  separate structural obligation explicit. **`(soundness)`** —
+  — Nat here because relations need ≥3 keys). The implementation pin
+  `cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local` (renamed
+  by held increment 2 to `cat_map_retires_leq_nat_family_and_totality_name`)
+  checks, with the flat alias withheld, that the comparator's `LawfulClasses`
+  identity is not Map-owned; after increment 2 it also rejects any Map binding
+  named `leq_nat`, its three selectors, or `total_leq_nat`. The carrier test
+  does not execute every proof-flip's carrier choice; the cross-case inventory
+  below keeps that separate structural obligation explicit. **`(soundness)`** —
   verdict-independent structural (which carrier + whether its order basis cites
   an `Axiom`). (soundness; landed order-basis evidence; cross-case carrier-use
   obligation retained.)
