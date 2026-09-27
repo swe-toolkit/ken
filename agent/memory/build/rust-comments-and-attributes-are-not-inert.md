@@ -5,7 +5,9 @@ source: private memory
   `inserting-a-test-before-an-existing-one-silently-splits-its-doc-comment`,
   `a-comment-only-diff-is-not-a-safe-diff-doc-comments-compile`,
   `a-doc-comment-is-not-inert-an-indented-block-inside-a-module-header-is-a-compiled-doctest`
-  (R4 triage, 2026-09-26)
+  (R4 triage, 2026-09-26); fleet lesson
+  `a-helper-inserted-between-a-doc-block-and-its-fn-steals-the-doc` (merged
+  2026-09-27)
 ---
 
 # Rust comments and attributes are not inert — both compile, and both can be stolen by a nearby edit
@@ -64,6 +66,31 @@ item instead of the original:
   gated item loses its `#[cfg(test)]` and begins compiling into production,
   while its own re-export and consumers stay test-gated — a new, unused
   production item that survived a full review pass.
+
+**A plain `//` comment does not stop the theft.** Measured 2026-09-24 on
+KERNEL-LITERAL-ROLLBACK-PURGE, squash
+`ad96424560aff7095292b290710383f1248cf8d2`, reported at `evt_41h58vpcdz56x`
+(thread `thr_54wc1rh7th2ev`); a smell only, the soundness fix was clean.
+`rollback_literal_decl` was added at elab.rs:13627, directly after the 33-line
+`///` block for `elaborate_recursive_view` and before its `fn`. The helper
+opened with a `//` comment. A `//` comment does not end an outer doc comment,
+so rustdoc attached the whole block to the helper and
+`elaborate_recursive_view` was left with no doc at all. A three-line rustdoc
+probe confirmed it: rustdoc a scratch file holding `/// A`, `// B`,
+`fn x(){}`, `fn y(){}`, and "A" lands on `x`. The tell in a diff is a `+fn`
+hunk whose leading context is `///` lines: the insertion point is inside a
+doc attachment, so read the next item after the hunk. File it as a smell; the
+fix is to move the helper, which is the owning team's call.
+
+**The same check applies to a doc block that is inserted, not appended.** An
+earlier instance (2026-08-17, a 30-line rustdoc insertion beside a mutation
+narrative) is the other direction: a long `///` block inserted mid-file is
+exactly where attachment drifts to the wrong item. Confirm which `fn` follows
+the block, and confirm no added `///` line opens a fence, since rustdoc runs
+fenced examples as doctests and a comment-only diff can add compiled,
+executed code that way. Both are one command, and in that instance both were
+claimed rather than obvious. The prose half of that instance is in
+[[a-hedge-does-not-constrain-what-is-done-with-the-claim-it-hedges]].
 
 **The test profile is structurally blind to a lost `cfg(test)` gate.** Under
 `--profile test` both the stolen-gate item and its consumers compile and are

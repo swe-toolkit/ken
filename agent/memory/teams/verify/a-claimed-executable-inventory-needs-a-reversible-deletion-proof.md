@@ -61,7 +61,7 @@ binding instead of arguing for it.
 - **The mutation must be injected where the thing is really produced.** If a
   break is caught upstream and can never reach the registry, the proof is dead
   and its pass means nothing — see
-  [[a-mutation-that-passes-when-it-should-fail-means-a-stale-input]].
+  [[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]].
 
 ## Ladder status
 

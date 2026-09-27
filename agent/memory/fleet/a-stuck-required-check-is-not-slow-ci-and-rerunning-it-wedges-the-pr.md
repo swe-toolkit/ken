@@ -47,6 +47,12 @@ Two repairs that work, in order of preference:
 
 ## A fourth state: a passed check frozen at `in_progress`, where a rerun is right
 
+**Current law overrides the recovery step below:** COORDINATION §12a
+refuses `gh run rerun` mechanically for every seat. A flake rerun is a
+publish-path close/reopen (`merge-procedure.md`). The diagnosis of which
+state you are in still holds; the `rerun` commands are a record of what
+worked before the refusal existed.
+
 Measured 2026-08-20 (PR #2664): `mergeable: MERGEABLE` but
 `mergeStateStatus: BLOCKED`, because one required check-run had
 `conclusion: success` and `completed_at` set on a `completed` run while its own

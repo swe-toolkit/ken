@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: build
 audience: (see scope README)
 source: private memory `held-branch-scaffolding-is-load-bearing-evidence`
 ---

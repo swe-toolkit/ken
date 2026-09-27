@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: enclave
 audience: (see scope README)
 source: private memory `reason-in-agent-team-hours-not-human-days`
 ---

@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: build/qa
 audience: (see scope README)
 source: private memory `verify-field-order-arity-against-declaration-not-prose`
 ---

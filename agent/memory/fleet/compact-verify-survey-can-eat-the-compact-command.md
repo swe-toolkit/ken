@@ -1,10 +1,14 @@
 ---
 scope: fleet
 audience: (see scope README)
-source: private memory `compact-verify-survey-can-eat-the-compact-command`
+source: private memory `compact-verify-survey-can-eat-the-compact-command`;
+  merged in 2026-09-27: fleet lesson `compaction-render-delay-escape-aborts`
+  (private memory of the same name, CAT-3 kickoff gate)
 ---
 
-# A Claude Code survey prompt can eat a `/compact` command
+# A tmux `/compact` can be eaten, delayed, or aborted — verify the live pane
+
+## A Claude Code survey prompt can eat a `/compact` command
 
 When I run the build-team compaction handoff gate
 (`tmux send-keys -t moot-<role> "/compact"` → Enter, per member), a Claude Code
@@ -54,3 +58,41 @@ non-negotiable:**
 Sibling of the compaction discipline in re read latest events immediately before
 a stall nudge — same theme: the surface signal (sent / idle box / stale ctx)
 lies; verify the underlying state.
+
+## `/compact` has a render delay; Escape aborts it, so never send Escape
+
+Running the §2c compact-gate (send `tmux send-keys /compact` + a separate
+`Enter` to each enclave/team seat, then verify the ctx drop), there is a **real
+render delay of several seconds** between the `Enter` and the
+`✻ Compacting conversation…` progress bar appearing. So a capture taken
+immediately after `Enter` shows an **empty prompt + unchanged ctx% + no
+Compacting marker** — which looks identical to a swallowed/no-op command **even
+when compaction is about to start**.
+
+**The trap (CAT-3 kickoff gate):** on that ambiguous read the compacting seat
+reflexively sent **Escape to "clear state" and re-typed `/compact`** — and
+**Escape aborts an in-flight compaction** (`AbortError: Compaction canceled.`
+appeared 3× in CV's scrollback; each retry started compaction, then the next
+Escape killed it). About 4 cycles were burned fighting a compaction that was
+firing fine each time.
+
+**Fix / procedure:**
+1. After `/compact`+`Enter`, **wait a full tool round-trip** (re-capture is
+   enough delay) and **re-capture the FULL pane** (`tail -14`, not `tail -6`)
+   before concluding anything — look for `Compacting conversation…` OR the
+   `AbortError`/scrollback history.
+2. **Never send Escape as a reset** during the gate — Escape = abort-compaction.
+   If a seat truly didn't fire, just re-send `/compact`+`Enter` (a second
+   `Enter` if the autocomplete palette ate the first), no Escape.
+3. **Read the LIVE bottom `ctx N%` line specifically.**
+   `grep 'Compacting' | head -1` catches a **stale scrollback** Compacting frame
+   (top-to-bottom order); `grep 'ctx N%' | tail -1` can catch the
+   mid-compaction status line (ctx doesn't update until compaction completes).
+   Confirm with `tail -6` of the live pane.
+4. A Sonnet seat (e.g. spec-leader) with the full playbook loaded has a
+   **post-compaction floor ~16%**, not 0% — it still counts as compacted if it
+   visibly ran the bar; don't chase it to 0.
+
+Both halves of this lesson are "the send-keys didn't do what the pane's first
+frame suggests"; verify by re-reading the live pane, not by assuming and
+re-sending destructively.

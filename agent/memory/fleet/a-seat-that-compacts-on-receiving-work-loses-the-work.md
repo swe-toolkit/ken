@@ -77,5 +77,5 @@ notification. Tell it to recover full text with
 
 Related: [[a-seat-can-stop-receiving-deliveries-with-a-clean-composer]] (a clean
 composer with no compaction — different cause, same blind instruments),
-[[compaction-render-delay-escape-aborts]] (an EXTERNALLY aborted compaction;
+[[compact-verify-survey-can-eat-the-compact-command]] (an EXTERNALLY aborted compaction;
 here nothing external touched it).

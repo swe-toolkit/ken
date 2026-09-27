@@ -88,5 +88,5 @@ For an OVER-accept gate specifically, an omitted arm can only UNDER-accept
 the Steward/Architect will ask whether the omission is a soundness-relevant
 COMPLETENESS gap, and steps 1-4 answer that at the reducer rather than by
 assertion. Sibling of
-[[a-fail-closed-over-accept-gate-can-have-correct-production-code-but-an-untested-safety-net-negative-arm]]
+[[two-arm-producer-needs-a-case-per-arm]]
 and of the inc-1 clean-congruence approve.
