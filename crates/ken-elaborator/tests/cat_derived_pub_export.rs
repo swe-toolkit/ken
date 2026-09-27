@@ -11,7 +11,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{parser, Decl, ElabEnv, ElabError};
+use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
 use ken_kernel::{GlobalId, Term};
 
 const DERIVED: &str = "Data.Collections.Derived";
@@ -141,6 +141,20 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 
     for declaration in declarations {
         let declaration = declaration.unwrap_pub();
+        if let Decl::ExportDecl { form, .. } = declaration {
+            let items = match form {
+                ExportForm::Facade { items, .. } | ExportForm::InScope { items } => items,
+            };
+            for item in items {
+                let name = item.rename.as_deref().unwrap_or(&item.name);
+                queries.push(PublicationQuery {
+                    surface: name.to_owned(),
+                    source: format!("import {DERIVED} ({name})"),
+                    unpublished_names: BTreeSet::from([format!("{DERIVED}.{name}")]),
+                });
+            }
+            continue;
+        }
         let direct_name = match declaration {
             Decl::ViewDecl { .. }
             | Decl::LetDecl { .. }
@@ -209,9 +223,9 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 }
 
 /// MEASURED: the real roots loader is asked whether every mechanically parsed,
-/// publishable top-level definition is visible, including attached proofs via
-/// their imported subjects; the successful set is compared with an independent
-/// literal contract set. CLAIMED: Derived's complete loader-visible export
+/// publishable top-level definition and every `export` re-export item is visible,
+/// including attached proofs via their imported subjects; the successful set is
+/// compared with an independent literal contract set. CLAIMED: Derived's complete loader-visible export
 /// surface is exactly the ten authorized operations, two `nth` bound
 /// proofs, three `list_append` monoid-law attached proofs, and the one
 /// `map::{id, fusion}` proofs and `reverse::involutive` attached proof.
