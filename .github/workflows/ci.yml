@@ -43,28 +43,28 @@ jobs:
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
-  # The nine workspace and eight parity runners replace the 8+6 matrices.
-  # Three pairs of existing jobs are coalesced, keeping the post-classification
-  # first wave at 23 simultaneous jobs, below the observed 25-job ceiling.
+  # The ten workspace and nine parity runners replace the 9+8 matrices.
+  # Six additional jobs make the 25-job first wave, within the no-queue
+  # observation from run 36265192923. Run 36276921102's 23-job first wave
+  # started within 11s; run 36265192923 measured 25 starts within 24s.
   #
-  # Run 36265192923 measured 4,148 passing test rows, with 2,591s of summed
-  # time on its heaviest shard. Reassigning its timings into nine bins yields
-  # 1,785s per bin; the two slow-shard wall/sum ratios project about 15.4m
-  # for the new maximum. Timing is noisy under concurrency, so this remains a
-  # planning estimate, not an AC-2 claim.
+  # Available workspace measurements cover 4,151 passing rows in run
+  # 36276921102. The current two-run envelope gives a 1,792.321s maximum bin
+  # over ten shards. These inputs are provisional: fold in the L2 prefix
+  # Full-CI timings before release. Assigned work is not an AC-2 wall claim.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
-  # slowest crate (`ken-cli` holds the heaviest binaries). Nine runners x 4
-  # vCPU retain 36 effective cores while spreading the workspace workload.
+  # slowest crate (`ken-cli` holds the heaviest binaries). Ten runners x 4
+  # vCPU retain 40 effective cores while spreading the workspace workload.
   #
-  # This trades ~9x total compute for ~9x wall clock. Actions minutes are
+  # This trades ~10x total compute for ~10x wall clock. Actions minutes are
   # free on public repos, so the trade is worth it — but it IS a real
   # increase in compute, not a free win.
   # See docs/program/11-test-suite-and-ci-remediation.md §1/§3.
   test-shard:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: test shard ${{ matrix.shard }}/9
+    name: test shard ${{ matrix.shard }}/10
     runs-on: ubuntu-latest
     strategy:
       # Do not cancel siblings on first failure — a full picture of which
@@ -72,7 +72,7 @@ jobs:
       # independent.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@v4
       # NO dependency cache, deliberately. `Swatinem/rust-cache` was removed
@@ -128,27 +128,18 @@ jobs:
       # duplicated or silently dropped — and a dropped test still shows a
       # green gate.
       #
-      # `rt_parity_native` was given its own job to serve as a differential
-      # (interp-vs-native) oracle rather than as CI hygiene. It carries NO
-      # such differential at this candidate: its six `assert_narrowed_alike`
-      # rows are ignored and the one row still running is not a differential.
-      # The exclusion below is still correct — see `native-rt-parity` below
-      # for which nodes re-arm it, and
-      # docs/program/issues/CI-SKIPPED-NATIVE-TESTS.md. Measured 7 tests /
-      # 266.7s wall / 470.6s CPU as one binary, where
-      # `fs_write_at_malformed_offset_narrows_to_invalid_offset` alone takes
-      # ~250s against ~35s for its near-identical sibling. That test is the
-      # only one of the 7 that opens two nested resource brackets where
-      # every sibling opens one — load-bearing to the property under test,
-      # not a simplification target — and the two are correlated, but
-      # nothing here isolates the topology as the CAUSE of the timing; see
-      # docs/program/11-test-suite-and-ci-remediation.md §1f for the
-      # unisolated-hypothesis framing.
+      # `rt_parity_native` stays in its own measured-duration matrix. Run
+      # 36276921102 recorded 185 parity tests there; the seven px8f controls
+      # ran in the auxiliary job. The independent arm roster and realized
+      # union are checked by scripts/check-ci-shard-union.py.
       - name: Select duration-balanced shard
         run: |
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
-          python3 scripts/ci-duration-shard.py inventory.json docs/program/evidence/ci-workspace-timings-36265192923.tsv duration-filters
+          python3 scripts/ci-duration-shard.py inventory.json \
+            docs/program/evidence/ci-workspace-timings-36265192923.tsv \
+            docs/program/evidence/ci-workspace-timings-36276921102.tsv \
+            --output-dir duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
             python3 scripts/ci-duration-shard.py project-empty inventory.json "selected-${{ matrix.shard }}.json"
@@ -178,12 +169,11 @@ jobs:
 
   # ── Slow native binaries, restored to the gate ─────────────────────────
   #
-  # The two px8f controls are currently empty: each has one ignored test, so
-  # their no-tests=pass invocations share an auxiliary job and build. The
-  # native parity binary was decomposed from one 42-build test into independent
-  # arms; it runs as an eight-way duration-balanced matrix. Keeping parity
-  # separate preserves its differential role and realized-arm coverage roster
-  # (scripts/check-ci-shard-union.py, AC-NO-FALSE-GREEN).
+  # The two px8f targets share an auxiliary job and build. Run 36276921102
+  # measured one write-partition test and six buffer tests; their seven timing
+  # rows are kept out of the parity planner. The parity target runs as an
+  # independent nine-way duration-balanced matrix, with its realized-arm
+  # roster checked by scripts/check-ci-shard-union.py.
   #
   # These native targets stay scoped to `-p <crate> --test <name>`, not
   # `--workspace`: a workspace-scoped nextest run measured 390s against 266s
@@ -192,7 +182,7 @@ jobs:
   native-write-partition:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: native-slow (empty auxiliary controls)
+    name: native-slow (px8f auxiliary controls)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -218,54 +208,19 @@ jobs:
         uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: nextest
-      # THIS JOB CURRENTLY SELECTS ZERO TESTS, and `--no-tests=pass` is what
-      # keeps that from being an error.
-      #
-      # px8f_write_partition.rs has exactly one `#[test]`, at :354,
-      # `checked_write_all_reaches_full_short_zero_progress_flip_and_error_prefixes`,
-      # and it is `#[ignore]`d pending RT-CARRIED-RESOURCE-SCALAR. nextest's
-      # `--no-tests` default is `auto`, which fails on an empty selection
-      # (exit 4, "no tests to run"), so without this flag the job hard-fails
-      # and takes the aggregator with it.
-      #
-      # Read the green here correctly: this job is green because it is EMPTY,
-      # not because anything passed. It carries no signal about the write
-      # partition while that row is ignored.
-      #
-      # RT-CARRIED-RESOURCE-SCALAR re-arms it: when that node un-ignores :354
-      # the job selects a real test again and this comment stops being true.
-      # `--no-tests=pass` suppresses only the empty-selection error, never a
-      # failing test, so the flag can stay when the row returns.
+      # Run 36276921102 selected the live write-partition control here and six
+      # buffer controls in the next step. The `--no-tests=pass` flags retain
+      # the tracked empty-state behavior; they never suppress a failing test.
       - name: Test write partition
         run: cargo nextest run --locked -p ken-verify --test px8f_write_partition --no-tests=pass
       - name: Test buffer partition
         run: cargo nextest run --locked -p ken-cli --test px8f_buffer_native --no-tests=pass
 
-  # ~266.7s wall measured as one binary (7 tests).
-  #
-  # ITS DIFFERENTIAL IS CURRENTLY DARK. This binary was restored here to be
-  # the interp/native RT-PARITY differential oracle
-  # (`assert_narrowed_alike`, `crates/ken-cli/tests/rt_parity_native.rs`),
-  # because while it was excluded a green CI carried no information about
-  # whether native and interp agreed on these narrowing cases. That is the
-  # condition it was built to end, and at this tip the condition is true
-  # again: all six `assert_narrowed_alike` rows — :498, :527, :554, :599,
-  # :652, :692 — are `#[ignore]`d.
-  #
-  # The job still runs and still reports green, on the one live row left at
-  # :786. That row calls `elaborates()`, a source-scope negative check, and
-  # is NOT a differential. So a green here means the source still elaborates;
-  # it does not mean the two lanes agree.
-  #
-  # Two nodes re-arm it, and it takes both: RT-CARRIER-BYTESPAN-OBSERVE owns
-  # five of the six rows, and RT-CLOSURE-BOUNDARY-LANE owns :652. Un-ignoring
-  # only one node's rows leaves the differential partly dark.
-  #
-  # Run 36265192923 measured 21,413s of total parity-test time. LPT over the
-  # maximum per-test durations from runs 36260020054 and 36265192923 assigns
-  # 24,845s total with a 3,114s maximum bin. At the observed 3.7-3.9x runner
-  # parallelism, the max-bin estimate is about 14m before build overhead.
-  # This is a noise-tolerant planning estimate, not an AC-2 claim.
+  # Available run 36276921102 measured 185 parity tests in eight source
+  # shards, plus seven auxiliary-control rows excluded from this planner.
+  # The current three-run envelope gives a 2,955.313s maximum bin over nine
+  # shards. Fold in the L2 prefix Full-CI timings before release. Assigned
+  # work is not a wall-time forecast; Full CI remains the AC-2 measurement.
   #
   # This job deliberately does NOT take `--no-tests=pass`, unlike its two
   # px8f siblings above. It still selects a live test, so an empty selection
@@ -274,12 +229,12 @@ jobs:
   native-rt-parity:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: native-slow (rt_parity_native) ${{ matrix.shard }}/8
+    name: native-slow (rt_parity_native) ${{ matrix.shard }}/9
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -314,6 +269,7 @@ jobs:
             rt-parity-artifact/inventory.json \
             docs/program/evidence/ci-rt-parity-timings-36260020054.tsv \
             docs/program/evidence/ci-rt-parity-timings-36265192923.tsv \
+            docs/program/evidence/ci-rt-parity-timings-36276921102.tsv \
             rt-parity-artifact/plan.json
           filter=$(python3 -c 'import json,os; print(json.load(open("rt-parity-artifact/plan.json"))["bins"][int(os.environ["SHARD"])-1]["filter"])')
           cargo nextest list --locked -p ken-cli --test rt_parity_native \
@@ -356,7 +312,7 @@ jobs:
   # ⛔ DO NOT RENAME OR DELETE THIS JOB. `build + test` is a REQUIRED status
   # check in branch protection (docs/ops/github-setup.md §"Required status
   # checks"). The sharded matrix above publishes checks named `test shard
-  # N/9`, which branch protection does not know about — so if this
+  # N/10`, which branch protection does not know about — so if this
   # name-preserving aggregator were removed, the required check would never
   # report and EVERY pull request would become unmergeable until an admin
   # edited branch protection. This job exists so the workflow can be resharded

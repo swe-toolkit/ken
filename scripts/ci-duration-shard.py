@@ -8,7 +8,7 @@ import sys
 import warnings
 
 
-N = 9
+N = 10
 # Run 36265192923's largest workspace test was 549.960s; use 600s for
 # unseen tests until measured rather than the much smaller suite median.
 DEFAULT_DURATION_SECONDS = 600.0
@@ -95,38 +95,46 @@ def selected_projection(inventory, assignment_path, shard, output):
         json.dump(value, file)
 
 
-def read_durations(path):
-    if path.endswith(".tsv"):
-        durations = {}
-        with open(path, encoding="utf-8") as source:
-            rows = source.readlines()
-        for line_number, line in enumerate(rows, 1):
-            match = WORKSPACE_TIMING_ROW.fullmatch(line.rstrip("\n"))
-            if not match:
-                raise SystemExit(f"{path}:{line_number}: malformed workspace timing row")
-            test_id = match.group("test_id")
-            if test_id in durations:
-                raise SystemExit(f"{path}:{line_number}: duplicate timing row {test_id}")
-            seconds = float(match.group("seconds"))
-            if seconds <= 0:
-                raise SystemExit(f"{path}:{line_number}: duration must be positive")
-            durations[test_id] = seconds
-        return durations
-    evidence = json.load(open(path))
-    records = evidence.get("records")
-    if not isinstance(records, list) or not records:
-        raise SystemExit("duration evidence has no records")
+def read_durations(paths):
+    if isinstance(paths, (str, os.PathLike)):
+        paths = [paths]
+    paths = [os.fspath(path) for path in paths]
+    if not paths:
+        raise SystemExit("duration evidence has no input files")
     durations = {}
-    for row in records:
-        test_id = row.get("test_id")
-        seconds = row.get("seconds")
-        if not isinstance(test_id, str) or not test_id:
-            raise SystemExit("duration evidence has an invalid test_id")
-        if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
-            raise SystemExit(f"duration evidence has an invalid duration for {test_id}")
-        if test_id in durations:
-            raise SystemExit(f"duration evidence has duplicate row {test_id}")
-        durations[test_id] = float(seconds)
+    for path in paths:
+        observed = {}
+        if path.endswith(".tsv"):
+            with open(path, encoding="utf-8") as source:
+                rows = source.readlines()
+            for line_number, line in enumerate(rows, 1):
+                match = WORKSPACE_TIMING_ROW.fullmatch(line.rstrip("\n"))
+                if not match:
+                    raise SystemExit(f"{path}:{line_number}: malformed workspace timing row")
+                test_id = match.group("test_id")
+                if test_id in observed:
+                    raise SystemExit(f"{path}:{line_number}: duplicate timing row {test_id}")
+                seconds = float(match.group("seconds"))
+                if seconds <= 0:
+                    raise SystemExit(f"{path}:{line_number}: duration must be positive")
+                observed[test_id] = seconds
+        else:
+            evidence = json.load(open(path))
+            records = evidence.get("records")
+            if not isinstance(records, list) or not records:
+                raise SystemExit(f"{path}: duration evidence has no records")
+            for row in records:
+                test_id = row.get("test_id")
+                seconds = row.get("seconds")
+                if not isinstance(test_id, str) or not test_id:
+                    raise SystemExit(f"{path}: duration evidence has an invalid test_id")
+                if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+                    raise SystemExit(f"{path}: duration evidence has an invalid duration for {test_id}")
+                if test_id in observed:
+                    raise SystemExit(f"{path}: duration evidence has duplicate row {test_id}")
+                observed[test_id] = float(seconds)
+        for test_id, seconds in observed.items():
+            durations[test_id] = max(durations.get(test_id, seconds), seconds)
     return durations
 
 
@@ -154,8 +162,22 @@ def main():
     if len(sys.argv) == 5 and sys.argv[1] == "validate-plan":
         validate_plan(sys.argv[2], int(sys.argv[3]), sys.argv[4])
         return
-    inventory = json.load(open(sys.argv[1]))
-    durations = read_durations(sys.argv[2])
+    arguments = sys.argv[1:]
+    if len(arguments) < 2:
+        raise SystemExit(
+            "usage: ci-duration-shard.py INVENTORY TIMING... [--output-dir DIR]"
+        )
+    output = None
+    if "--output-dir" in arguments:
+        option = arguments.index("--output-dir")
+        if option != len(arguments) - 2 or option < 2:
+            raise SystemExit("--output-dir must follow at least one timing file")
+        output = arguments[-1]
+        timing_paths = arguments[1:option]
+    else:
+        timing_paths = arguments[1:]
+    inventory = json.load(open(arguments[0]))
+    durations = read_durations(timing_paths)
     bins = [(0.0, index, []) for index in range(N)]
     heapq.heapify(bins)
     live = sorted((f"{binary_id} {name}", binary_id, name) for binary_id, name in tests(inventory))
@@ -197,7 +219,6 @@ def main():
             "tests": selected,
             "filter": " | ".join(terms),
         })
-    output = sys.argv[3] if len(sys.argv) > 3 else None
     if output:
         os.makedirs(output, exist_ok=True)
         limit = os.sysconf("SC_ARG_MAX") // 4

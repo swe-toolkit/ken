@@ -67,14 +67,31 @@ class DurationShardControls(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stderr.strip(), "filtered live inventory selected zero testcases")
 
-    def test_current_workspace_timing_artifact_has_full_run_population(self):
-        durations = _planner.read_durations(
+    def test_workspace_timing_sources_use_the_per_test_upper_envelope(self):
+        older = _planner.read_durations(
             "docs/program/evidence/ci-workspace-timings-36265192923.tsv"
         )
-        self.assertEqual(len(durations), 4148)
-        self.assertAlmostEqual(sum(durations.values()), 16069.293)
+        latest = _planner.read_durations(
+            "docs/program/evidence/ci-workspace-timings-36276921102.tsv"
+        )
+        combined = _planner.read_durations(
+            [
+                "docs/program/evidence/ci-workspace-timings-36265192923.tsv",
+                "docs/program/evidence/ci-workspace-timings-36276921102.tsv",
+            ]
+        )
+        self.assertEqual(len(older), 4148)
+        self.assertEqual(len(latest), 4151)
+        self.assertEqual(len(combined), 4151)
+        old_faster_name = (
+            "ken-elaborator::r3_c2_source_mixed_branch "
+            "r3_4b_observation_feature_is_native_artifact_identical"
+        )
+        self.assertEqual(older[old_faster_name], 192.381)
+        self.assertEqual(latest[old_faster_name], 316.023)
+        self.assertEqual(combined[old_faster_name], 316.023)
         self.assertEqual(
-            durations[
+            combined[
                 "ken-elaborator::lang_mod_strict_resolution_d0 "
                 "catalog_ambient_passthrough_migration_census"
             ],
@@ -147,14 +164,14 @@ class DurationShardControls(unittest.TestCase):
                 suites["empty"] = {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}
                 (root / "inventory.json").write_text(json.dumps({"test-count": size, "rust-suites": suites}))
                 (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": f"fixture::ordinary test_{i}", "seconds": 1} for i in range(size)]}))
-                result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json", "out"], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+                result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json", "--output-dir", "out"], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
                 assignment = json.loads((root / "out" / "assignments.json").read_text())
             self.assertEqual(result.returncode, 0, result.stderr)
             bins = assignment["bins"]
             self.assertEqual(len(bins), SHARD_COUNT)
             self.assertEqual(sum(len(item["tests"]) for item in bins), size)
-            self.assertEqual(
-                sorted(tuple(identity) for item in bins for identity in item["tests"]),
+            self.assertCountEqual(
+                [tuple(identity) for item in bins for identity in item["tests"]],
                 [("fixture::ordinary", f"test_{i}") for i in range(size)],
             )
             self.assertEqual(sum(not item["tests"] for item in bins), max(0, SHARD_COUNT - size))

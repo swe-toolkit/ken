@@ -8,8 +8,8 @@ from pathlib import Path
 import sys
 
 
-SHARD_COUNT = 9
-RT_PARITY_SHARD_COUNT = 8
+SHARD_COUNT = 10
+RT_PARITY_SHARD_COUNT = 9
 ROOT = Path("realized-shards")
 RT_PARITY_ROOT = Path("realized-rt-parity")
 EXCLUDED_BINARIES = {
@@ -21,7 +21,7 @@ EXCLUDED_BINARIES = {
 # D2 (CI-GATE-TIME-REDUCTION) AC-NO-FALSE-GREEN: the required control arms of the
 # rt_parity_native grids that were decomposed from monolithic #[test]s into one
 # independently-schedulable #[test] per arm. rt_parity_native is excluded from the
-# 8-way partition above (it runs in its own native-slow job), but it is still
+# 9-way partition above (it runs in its own native-slow job), but it is still
 # DISCOVERED in the authority inventory, so this INDEPENDENT roster verifies every
 # decomposed arm is present: a split that silently drops an arm (a per-mutation
 # test removed at the source) reds here, because the roster cannot shrink with the

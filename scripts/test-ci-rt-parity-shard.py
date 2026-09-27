@@ -76,16 +76,37 @@ class DurationPlanTests(unittest.TestCase):
         self.assertEqual(len(timings), 185)
         self.assertAlmostEqual(sum(timings.values()), 21608.358)
 
-    def test_two_run_envelope_handles_timing_noise(self):
+    def test_eight_shard_source_excludes_seven_auxiliary_rows(self):
+        path = Path("docs/program/evidence/ci-rt-parity-timings-36276921102.tsv")
+        timings = _SHARD.read_timings([path])
+        self.assertEqual(len(timings), 185)
+        self.assertFalse(any("px8f" in name for name in timings))
+        self.assertAlmostEqual(
+            timings["composed_return_ret_sink_lookup_controls_refuse"], 516.955
+        )
+
+    def test_three_run_envelope_handles_timing_noise(self):
         paths = [
             Path("docs/program/evidence/ci-rt-parity-timings-36260020054.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36265192923.tsv"),
+            Path("docs/program/evidence/ci-rt-parity-timings-36276921102.tsv"),
         ]
         timings = _SHARD.read_timings(paths)
         self.assertEqual(len(timings), 185)
         self.assertAlmostEqual(
             timings["composed_return_ret_sink_lookup_controls_refuse"], 540.754
         )
+        plan = _SHARD.make_plan(
+            "ken-cli::rt_parity_native",
+            sorted(timings),
+            timings,
+            ["36260020054", "36265192923", "36276921102"],
+        )
+        assigned = [name for shard in plan["bins"] for _, name in shard["tests"]]
+        self.assertEqual(len(plan["bins"]), 9)
+        self.assertCountEqual(assigned, timings)
+        self.assertEqual(plan["timing_sources"], ["36260020054", "36265192923", "36276921102"])
+        self.assertAlmostEqual(max(shard["seconds"] for shard in plan["bins"]), 2955.313)
 
 
 if __name__ == "__main__":
