@@ -65,32 +65,30 @@ jobs:
   # The publisher must verify that every intended first-wave job starts within
   # about 15s of the run start; this plan alone is not a wall-time measurement.
   #
-  # Six parity sources balance 185 tests to 2,768.095s max assigned sum.
-  # Five workspace sources cover 4,152 historical tests; their upper-envelope
-  # plan max is 2,725.667s. These are assignment sums, not wall forecasts.
+  # The 10 parity / 7 workspace / 3 auxiliary first wave stays at 20 jobs.
+  # The latest complete per-test workspace source is run 36295180542, with
+  # 4,152 PASS identities. Current-main additions absent from it include the
+  # re-enabled ds5b test, H1/inline interp tests, later provider probes, and
+  # cat1 fixture probes. Each unmeasured live identity uses its binary's
+  # measured median; an unmeasured binary uses the global median. Older
+  # workspace sources and incomplete L2 rows remain evidence, not weights for
+  # this latest-run plan. `assignments.json` and each timing artifact record
+  # every fallback identity, estimate, and median source.
   #
-  # Run 36295180542 contributes 4,152 complete PASS workspace timings. L2 run
-  # 36279697268 was red: only shards 2, 4, 5 and 8 completed (1,844 rows); its
-  # partial-failure shards remain evidence but stay out of planner input. The
-  # current merge-ref has 4,160 live identities: the ds5b test re-enabled after
-  # run 362951, three H1 additions, and four new inline ken-interp tests are
-  # absent from timing sources and get the 600s default.
+  # Longest-first LPT across seven bins gives 2,079.255 to 2,079.259s of
+  # assigned test work per bin (0.004s spread) on the current live population.
+  # Applying run 362951's 891.048/2,598.135 nextest-to-test-sum ratio and
+  # 315.952s non-test wall calibrates the maximum to 1,029.048s (17.15m). This
+  # is assigned-work calibration, not wall evidence; median fallbacks are
+  # estimates. Each shard emits one provenance-bearing `workspace-timings.json`;
+  # the union checker requires its terminal identities to match that shard's
+  # selection.
+  # Publisher timelines and these per-test artifacts measure the actual run.
   #
-  # The dual-metric seven-bin plan balances the five-source envelope from
-  # 3,369.850s to 3,418.301s (48.451s spread) and latest-run work with all
-  # eight defaults from 2,754.833s to 2,765.118s (10.285s spread). The latest-
-  # work average projects to a 1,262.349s lower bound (21.04m); the balanced
-  # maximum projects to 1,264.268s (21.07m), using run 362951's
-  # 891.048/2,598.135 nextest-to-test-sum ratio and 315.952s non-test wall.
-  # Under these eight conservative defaults the model does not reach the 18m
-  # target; it remains balanced within the seven workspace bins. This is a
-  # calibration, not wall evidence: all eight actual durations remain unknown,
-  # and the publisher's timeline must measure the full 20-job workload.
-  #
-  # Among run 362951's 4,152 measured tests, shard 1's 591.502s longest is
-  # below the conservative 684s floor bound (1,000s runner-up minus all 316s
-  # of shard-1 non-test time). This does not bound any of the eight unmeasured
-  # tests or prove a floor for the current merge-ref.
+  # Among run 362951's measured tests, shard 1's 591.502s longest is below the
+  # conservative 684s floor bound (1,000s runner-up minus all 316s of shard-1
+  # non-test time). This does not bound unmeasured tests or prove a floor for
+  # the current merge-ref.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
   # slowest crate (`ken-cli` holds the heaviest binaries). Seven runners x 4
@@ -172,12 +170,7 @@ jobs:
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
           python3 scripts/ci-duration-shard.py inventory.json \
-            docs/program/evidence/ci-workspace-timings-36265192923.tsv \
-            docs/program/evidence/ci-workspace-timings-36276921102.tsv \
-            docs/program/evidence/ci-workspace-timings-36279697268-completed-shards.tsv \
-            docs/program/evidence/ci-workspace-timings-36285524404.tsv \
             docs/program/evidence/ci-workspace-timings-36295180542.tsv \
-            --balance-with docs/program/evidence/ci-workspace-timings-36295180542.tsv \
             --output-dir duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
@@ -193,6 +186,19 @@ jobs:
           scripts/run-ci-shard.sh
           "$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')"
           "$(<duration-filters/bin-${{ matrix.shard }}.expr)"
+          "workspace-nextest-${{ matrix.shard }}.log"
+      - name: Emit workspace terminal timing artifact
+        if: always()
+        env:
+          TIMING_RUN_ID: ${{ github.run_id }}
+          TIMING_SHARD: ${{ matrix.shard }}
+        run: >-
+          python3 scripts/ci-workspace-timings.py emit
+          "workspace-nextest-${{ matrix.shard }}.log"
+          "selected-${{ matrix.shard }}.json"
+          "duration-filters/assignments.json"
+          "$TIMING_RUN_ID" "$TIMING_SHARD"
+          "realized-shard-${{ matrix.shard }}/workspace-timings.json"
       # nextest does not execute rustdoc tests, so run the workspace doctest
       # population once rather than once per shard.
       - name: Upload realized shard selection

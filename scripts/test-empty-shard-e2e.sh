@@ -4,6 +4,7 @@ root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 repo=$(pwd)
 cd "$root"
+export GITHUB_RUN_ID=123
 cat > inventory.json <<'EOF'
 {"test-count":1,"rust-suites":{"empty":{"binary-id":"fixture::empty","binary-name":"ordinary","testcases":{}},"live":{"binary-id":"fixture::live","binary-name":"ordinary","testcases":{"t":{"filter-match":{"status":"matches"}}}}}}
 EOF
@@ -13,6 +14,7 @@ import json
 import pathlib
 import sys
 repo = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(repo / "scripts"))
 spec = importlib.util.spec_from_file_location("shard_check", repo / "scripts/check-ci-shard-union.py")
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
@@ -27,7 +29,7 @@ open("inventory.json", "w").write(json.dumps(raw))
 PY2
 python3 "$repo/scripts/ci-duration-shard.py" project-filtered raw.json inventory.json
 cat > evidence.json <<'EOF'
-{"records":[{"test_id":"fixture::live t","seconds":1}]}
+{"run_id":123,"shard":1,"shard_count":7,"unit":"seconds","records":[{"test_id":"fixture::live t","seconds":1,"result":"PASS"}],"fallbacks":[]}
 EOF
 python3 "$repo/scripts/ci-duration-shard.py" inventory.json evidence.json --output-dir filters >/dev/null
 python3 - <<'PY'
@@ -45,12 +47,38 @@ for n in $(seq 1 7); do
   python3 "$repo/scripts/ci-duration-shard.py" project-selected inventory.json filters/assignments.json "$n" "selected-$n.json"
   python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$n" "selected-$n.json"
   "$repo/scripts/stage-ci-shard-artifact.sh" "$n" unfiltered-inventory.json inventory.json "selected-$n.json"
+  python3 - "$n" <<'PY3'
+import json
+import sys
+from pathlib import Path
+shard = int(sys.argv[1])
+listing = json.loads(Path(f"selected-{shard}.json").read_text())
+identities = sorted(
+    f"{suite['binary-id']} {name}"
+    for suite in listing["rust-suites"].values()
+    for name, testcase in suite["testcases"].items()
+    if testcase["filter-match"]["status"] == "matches"
+)
+lines = [
+    f"PASS [ 1.000s] ({index}/{len(identities)}) {identity}"
+    for index, identity in enumerate(identities, 1)
+]
+Path(f"nextest-{shard}.log").write_text("\n".join(lines) + ("\n" if lines else ""))
+PY3
+  python3 "$repo/scripts/ci-workspace-timings.py" emit \
+    "nextest-$n.log" "selected-$n.json" "filters/assignments.json" \
+    "$GITHUB_RUN_ID" "$n" "realized-shard-$n/workspace-timings.json"
 done
 mkdir realized-shards
 mv realized-shard-* realized-shards/
 python3 "$repo/scripts/check-ci-shard-union.py"
+restore_timing_artifact() {
+  local shard=$1
+  cp "$root/realized-shards/realized-shard-$shard/workspace-timings.json" \
+    "realized-shard-$shard/workspace-timings.json"
+}
 assert_expected_command() {
-  grep -Fqx "nextest run --workspace --locked -E $1" "$2"
+  grep -Fqx "nextest run --workspace --locked --status-level none --final-status-level pass --color never -E $1" "$2"
 }
 mkdir bin
 cat > bin/cargo <<'EOF'
@@ -65,7 +93,7 @@ for n in $(seq 1 7); do
   dispatched_planned=$expected_planned
   LOG="$root/dispatch.log" PATH="$root/bin:$PATH" "$repo/scripts/run-ci-shard.sh" "$dispatched_planned" "$expected_expression"
   if [ "$expected_planned" -eq 0 ]; then
-    ! grep -Fqx "nextest run --workspace --locked -E $expected_expression" dispatch.log
+    ! grep -Fqx "nextest run --workspace --locked --status-level none --final-status-level pass --color never -E $expected_expression" dispatch.log
   else
     assert_expected_command "$expected_expression" dispatch.log
   fi
@@ -93,6 +121,7 @@ cp -a realized-shards mutation-shards/
   test "$status" -eq 2
   grep -Fx 'realized-shard check failed: realized-shards/realized-shard-1: required artifact member is missing' err
   "$repo/scripts/stage-ci-shard-artifact.sh" 1 ../unfiltered-inventory.json ../inventory.json ../selected-1.json
+  restore_timing_artifact 1
   rm -rf realized-shards/realized-shard-1
   mv realized-shard-1 realized-shards/
   python3 "$repo/scripts/check-ci-shard-union.py"
@@ -104,6 +133,7 @@ cp -a realized-shards mutation-content/
   cd mutation-content
   cp ../inventory.json unfiltered-inventory.json
   "$repo/scripts/stage-ci-shard-artifact.sh" 1 unfiltered-inventory.json ../inventory.json ../selected-1.json
+  restore_timing_artifact 1
   rm -rf realized-shards/realized-shard-1
   mv realized-shard-1 realized-shards/
   set +e
@@ -128,6 +158,7 @@ open('old/inventory.json','w').write(json.dumps(v))
 PY
   for n in $(seq 1 7); do
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json old/inventory.json ../selected-$n.json
+    restore_timing_artifact "$n"
     rm -rf realized-shards/realized-shard-$n
     mv realized-shard-$n realized-shards/
   done
@@ -138,6 +169,7 @@ PY
   for n in $(seq 1 7); do
     python3 "$repo/scripts/ci-duration-shard.py" project-filtered ../unfiltered-inventory.json fixed/inventory.json
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json fixed/inventory.json ../selected-$n.json
+    restore_timing_artifact "$n"
     rm -rf realized-shards/realized-shard-$n
     mv realized-shard-$n realized-shards/
   done
@@ -156,6 +188,7 @@ for n in range(1, 8):
 PY
   for n in $(seq 1 7); do
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json old/selected-$n.json
+    restore_timing_artifact "$n"
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/
   done
   set +e; python3 "$repo/scripts/check-ci-shard-union.py" 2>err; status=$?; set -e
@@ -164,6 +197,7 @@ PY
   for n in $(seq 1 7); do
     python3 "$repo/scripts/ci-duration-shard.py" project-selected ../inventory.json ../filters/assignments.json "$n" "selected-$n.json"
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json selected-$n.json
+    restore_timing_artifact "$n"
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/
   done
   python3 "$repo/scripts/check-ci-shard-union.py"
