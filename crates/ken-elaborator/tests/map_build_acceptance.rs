@@ -22,6 +22,36 @@ use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, KernelError, Term};
 
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
+const MAP_MODULE: &str = "Data.Collections.Map";
+
+fn checked_map_env() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], MAP_MODULE)
+        .expect("Map must load through its real roots closure");
+    env
+}
+
+fn checked_map_id(env: &ElabEnv, name: &str) -> GlobalId {
+    let qualified = format!("{MAP_MODULE}.{name}");
+    *env.globals
+        .get(&qualified)
+        .unwrap_or_else(|| panic!("missing checked Map identity `{qualified}`"))
+}
+
+/// Promise class: durable checked-identity invariant.
+/// MEASURED: a forged flat Map operation alias does not change the provider
+/// identity selected by the host. CLAIMED: H probes read checked Map ownership,
+/// not a mutable source-fixture spelling. THE GAP: selective import visibility
+/// is pinned separately by `cat_map_dom_member`.
+#[test]
+fn checked_map_host_read_ignores_forged_flat_insert_alias() {
+    let mut env = checked_map_env();
+    let canonical = env.globals[&format!("{MAP_MODULE}.insert")];
+    let forged = env.globals["Data.Sums.Combinators.is_some"];
+    assert_ne!(canonical, forged);
+    env.globals.insert("insert".to_owned(), forged);
+    assert_eq!(checked_map_id(&env, "insert"), canonical);
+}
 
 /// The stated stack for the D1 legacy-frame budget instrument. Two MiB remains
 /// the fixed boundary at base `d23a65021359741c59809ec9d24de9af6fe262e1`;
@@ -474,26 +504,31 @@ fn tree_2_1_3() -> String {
 #[test]
 fn tree_carrier_and_ops_are_not_primitive() {
     let env = mk_env();
-    // `Tree` must be a real inductive (declare_inductive), never a primitive.
-    let tree_id = env.globals["Tree"];
+    let checked = checked_map_env();
+    // The private Map carrier and operations are selected in the real provider.
+    let tree_id = checked_map_id(&checked, "Tree");
     assert!(
-        matches!(env.env.lookup(tree_id), Some(Decl::Inductive { .. })),
+        matches!(checked.env.lookup(tree_id), Some(Decl::Inductive { .. })),
         "Tree k v must be Decl::Inductive"
     );
     for name in ["empty", "to_list", "fold", "Pair", "mk_pair", "pair_fst", "pair_snd"] {
-        let id = env.globals[name];
+        let (owner, id) = if ["empty", "to_list", "fold"].contains(&name) {
+            (&checked, checked_map_id(&checked, name))
+        } else {
+            (&env, env.globals[name])
+        };
         assert!(
-            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            matches!(owner.env.lookup(id), Some(Decl::Transparent { .. })),
             "{name} must be Decl::Transparent (declare_def), not a primitive/postulate"
         );
+        if ["empty", "to_list", "fold"].contains(&name) {
+            let delta = trusted_base_delta(&owner.env, id);
+            assert!(
+                delta.is_empty(),
+                "{name} must add zero trusted_base delta, got {delta:?}"
+            );
+        }
     }
-    // Zero-NEW-delta: none of these mint a fresh trusted_base entry.
-    let delta_empty = trusted_base_delta(&env.env, env.globals["empty"]);
-    assert!(delta_empty.is_empty(), "empty must add zero trusted_base delta, got {delta_empty:?}");
-    let delta_tolist = trusted_base_delta(&env.env, env.globals["to_list"]);
-    assert!(delta_tolist.is_empty(), "to_list must add zero trusted_base delta, got {delta_tolist:?}");
-    let delta_fold = trusted_base_delta(&env.env, env.globals["fold"]);
-    assert!(delta_fold.is_empty(), "fold must add zero trusted_base delta, got {delta_fold:?}");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -566,9 +601,9 @@ fn fold_agrees_with_left_fold_over_tolist() {
 
 #[test]
 fn map_ops_full_api_not_primitive() {
-    let env = mk_env();
+    let env = checked_map_env();
     for name in ["insert", "lookup", "member", "from_list", "from_list_acc", "set_insert", "set_member", "set_to_list", "Ordered", "all_keys", "lookup_empty_is_none"] {
-        let id = env.globals[name];
+        let id = checked_map_id(&env, name);
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "{name} must be Decl::Transparent (declare_def), not a primitive/postulate"
@@ -1086,6 +1121,9 @@ fn map_total_leq_nat_preserves_proof_relevant_or_tags() {
 #[test]
 fn cat4_new_api_is_derived_and_axiom_free() {
     let env = mk_env();
+    let mut checked = checked_map_env();
+    let forged = checked.globals["Data.Sums.Combinators.is_some"];
+    checked.globals.insert("succ".to_owned(), forged);
     for name in [
         "bool_and",
         "bool_not",
@@ -1314,19 +1352,25 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "is_transitive",
         "is_equivalence",
     ] {
-        let id = env.globals.get(name).copied().unwrap_or_else(|| {
+        let qualified = format!("{MAP_MODULE}.{name}");
+        let (owner, id) = if let Some(id) = checked.globals.get(&qualified) {
+            (&checked, *id)
+        } else {
             assert!(
                 name == "bool_and" || name.starts_with("bool_and::"),
-                "only the imported LC bool_and family may lack a flat fixture alias"
+                "only the imported LC bool_and family may lack a Map-owned identity"
             );
-            env.globals[&format!("Core.Classes.LawfulClasses.{name}")]
-        });
+            (&env, env.globals[&format!("Core.Classes.LawfulClasses.{name}")])
+        };
         assert!(
-            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            matches!(owner.env.lookup(id), Some(Decl::Transparent { .. })),
             "{name} must be transparent derived Ken, not a primitive/postulate"
         );
-        let delta = trusted_base_delta(&env.env, id);
+        let delta = trusted_base_delta(&owner.env, id);
         assert!(delta.is_empty(), "{name} must add zero trusted_base delta, got {delta:?}");
+        if name == "succ" {
+            assert_ne!(id, forged, "flat alias must not spoof Map.succ");
+        }
     }
 }
 

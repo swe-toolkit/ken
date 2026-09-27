@@ -302,14 +302,16 @@ fn map_set_retired_not_prelude_primitives() {
 /// "net delta is a shrink by exactly two, zero new" must hold together.
 #[test]
 fn map_replacement_is_derived_not_primitive() {
-    let env = mk_env_with_map();
-    let tree_id = env.globals["Tree"];
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map")
+        .expect("Map replacement must load through its real roots closure");
+    let tree_id = env.globals["Data.Collections.Map.Tree"];
     assert!(
         matches!(env.env.lookup(tree_id), Some(Decl::Inductive { .. })),
         "AC1(b): the replacement carrier 'Tree' must be Decl::Inductive (declare_inductive), never a primitive"
     );
     for name in ["insert", "lookup", "member", "to_list", "from_list", "set_insert", "set_member", "set_to_list"] {
-        let id = env.globals[name];
+        let id = env.globals[&format!("Data.Collections.Map.{name}")];
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "AC1(b): '{name}' must be Decl::Transparent (declare_def), never declare_primitive/declare_postulate"

@@ -130,9 +130,16 @@ fn evaluate_boolean_list(env: &ElabEnv, name: &str) -> Vec<bool> {
     boolean_list(env, eval(&[], body, &env.env, &mut EvalStore::new()))
 }
 
+/// Promise class: durable checked-identity invariant.
+/// MEASURED: a forged flat `pushFront` alias cannot replace the owned Deque ID
+/// selected by the host. CLAIMED: host probes inspect checked Deque ownership,
+/// not a mutable flat fixture binding. THE GAP: source access is separately
+/// governed by the loader-visible closeout pin.
 #[test]
 fn entry_elaborates_and_registers_operations_and_laws() {
-    let env = loaded_env();
+    let mut env = loaded_env();
+    let forged = env.globals[&format!("{DERIVED}.reverse")];
+    env.globals.insert("pushFront".to_owned(), forged);
     for name in [
         "Deque",
         "MkDeque",
@@ -148,10 +155,23 @@ fn entry_elaborates_and_registers_operations_and_laws() {
         "popFront_pushFront",
         "popBack_pushBack",
     ] {
-        assert!(
-            env.globals.contains_key(name),
-            "`{name}` must be a real kernel-checked global"
-        );
+        let qualified = format!("{DEQUE}.{name}");
+        let id = env
+            .globals
+            .get(&qualified)
+            .copied()
+            .unwrap_or_else(|| panic!("`{qualified}` must belong to loaded Deque"));
+        let checked = if name == "MkDeque" {
+            let carrier = env.globals[&format!("{DEQUE}.Deque")];
+            matches!(env.env.lookup(carrier), Some(Decl::Inductive(decl))
+                if decl.constructors.iter().any(|ctor| ctor.id == id))
+        } else {
+            env.env.lookup(id).is_some()
+        };
+        assert!(checked, "`{qualified}` must be a real kernel-checked global");
+        if name == "pushFront" {
+            assert_ne!(id, forged, "flat alias must not spoof Deque ownership");
+        }
     }
 }
 
