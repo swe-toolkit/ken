@@ -305,6 +305,108 @@ fn cat_bool_reuse_d2_resolves_exact_is_some_provider_without_equivalent_local() 
     );
 }
 
+/// Promise class: durable checked-identity invariant.
+/// MEASURED: Map's selective import binds bare `leq_nat` to LawfulClasses'
+/// owned GlobalId, and no Map-owned transparent declaration has both a
+/// kernel-equivalent type and body. CLAIMED: Map reuses the canonical Nat
+/// comparator rather than carrying a second definition. THE GAP: A renamed,
+/// fully self-recursive copy is not kernel-convertible to the provider
+/// (conversion does not identify distinct recursive declarations), so this
+/// pin does not detect it; measured: `leq_nat_shadow` recursing on itself stays
+/// green. Factoring review is the backstop.
+#[test]
+fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
+    let (mut env, dependencies) = mk_map_dependency_env_with_provider_owned();
+    let provider = catalog_or::provider_owned_id(
+        &env,
+        &dependencies.lawful,
+        "Core.Classes.LawfulClasses",
+        "leq_nat",
+    )
+    .expect("LawfulClasses must own checked leq_nat");
+    assert!(matches!(
+        env.env.lookup(provider),
+        Some(Decl::Transparent { .. })
+    ));
+    assert_eq!(
+        env.globals.remove("leq_nat"),
+        Some(provider),
+        "withhold the existing flat canonical alias before Map's import"
+    );
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let map_ids: BTreeSet<_> = env
+        .elaborate_ken_md_file(MAP_KEN_MD)
+        .expect("Map must elaborate using its selective canonical leq_nat import")
+        .into_iter()
+        .collect();
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Map comparator reuse must add zero trust");
+    assert!(
+        !map_ids.contains(&provider),
+        "the imported canonical comparator is not Map-owned"
+    );
+    let total = env.globals["total_leq_nat"];
+    assert!(
+        map_ids.contains(&total),
+        "Map must own its local total witness"
+    );
+    let (ty, body) = match env.env.lookup(total) {
+        Some(Decl::Transparent { ty, body, .. }) => (ty, body),
+        other => panic!("Map total_leq_nat must be transparent, got {other:?}"),
+    };
+    assert!(
+        term_reference_count(ty, provider) + term_reference_count(body, provider) > 0,
+        "bare leq_nat in Map's checked total witness must bind the canonical GlobalId"
+    );
+    let map_bindings: Vec<_> = env
+        .globals
+        .iter()
+        .filter(|(_, id)| map_ids.contains(id))
+        .map(|(name, id)| (name.clone(), *id))
+        .collect();
+    let bound_ids: BTreeSet<_> = map_bindings.iter().map(|(_, id)| *id).collect();
+    let transparent_ids: BTreeSet<_> = map_ids
+        .iter()
+        .filter(|id| matches!(env.env.lookup(**id), Some(Decl::Transparent { .. })))
+        .copied()
+        .collect();
+    assert!(
+        !transparent_ids.is_empty() && transparent_ids.is_subset(&bound_ids),
+        "the real Map bindings must close over every direct transparent declaration"
+    );
+    let provider_references = map_ids
+        .iter()
+        .map(|id| match env.env.lookup(*id) {
+            Some(Decl::Transparent { ty, body, .. }) => {
+                term_reference_count(ty, provider) + term_reference_count(body, provider)
+            }
+            _ => 0,
+        })
+        .sum::<usize>();
+    assert!(
+        provider_references > 0,
+        "Map's checked direct declarations must actually use canonical leq_nat"
+    );
+    for (name, id) in map_bindings {
+        assert!(
+            ![
+                "leq_nat",
+                "leq_nat::refl",
+                "leq_nat::trans",
+                "leq_nat::antisym"
+            ]
+            .contains(&name.as_str()),
+            "Map must not retain local comparator or law {name}"
+        );
+        env.globals.insert(format!("{MAP_MODULE}.{name}"), id);
+    }
+    assert_eq!(
+        module_transparent_kernel_equivalents(&env, MAP_MODULE, provider),
+        BTreeSet::new(),
+        "Map must not define a transparent local equivalent to canonical leq_nat"
+    );
+}
+
 fn replace_exactly_once(source: &str, from: &str, to: &str) -> String {
     assert_eq!(
         source.matches(from).count(),
@@ -1177,10 +1279,6 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "bool_and::idempotent",
         "bool_and::left_identity",
         "bool_and::right_identity",
-        "leq_nat",
-        "leq_nat::refl",
-        "leq_nat::trans",
-        "leq_nat::antisym",
         "total_leq_nat",
         "order_equiv_key",
         "bool_and::intro",

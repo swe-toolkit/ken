@@ -87,6 +87,8 @@ immediate since `empty = Leaf`. Neither needs induction or a comparison.
 ```ken
 import Core.Classes.LawfulClasses (bool_and)
 
+import Core.Classes.LawfulClasses (leq_nat)
+
 import Core.Classes.LawfulClasses (Ord)
 
 import Core.Classes.Membership (Membership)
@@ -5702,10 +5704,12 @@ library.
 
 The canonical `bool_and` algebra and its laws come from
 `Core.Classes.LawfulClasses`; this package keeps only its local `bool_not` and
-`cat4_bool_or` helpers. Those Boolean operations and a `Nat` total order
-(`leq_nat` with reflexivity/transitivity/antisymmetry/totality) support later
-sections, followed by
-`order_equiv_key` — a `Bool`-valued order-equivalence test — and its
+`cat4_bool_or` helpers. The `Nat` comparator `leq_nat` and its reflexivity,
+transitivity and antisymmetry laws also come from LawfulClasses. Map keeps a
+private `total_leq_nat`, an `Or`-valued totality witness that records which
+direction holds: the provider's copy is private, and its public `total` proof
+erases that direction. The Boolean operations support later sections, followed
+by `order_equiv_key` — a `Bool`-valued order-equivalence test — and its
 correspondence lemmas to the `Prop`-valued `order_equiv` from
 [§4.6](#46-law-5--lookup_assoc_agree-dictionary-agreement-with-the-ordered-list-lookup).
 
@@ -5782,65 +5786,6 @@ proof right_identity for cat4_bool_or (a : Bool) : Equal Bool (cat4_bool_or a Fa
   match a {
     True ↦ Proved;
     False ↦ Proved
-  }
-
-fn leq_nat (m : Nat) (n : Nat) : Bool =
-  match m {
-    Zero ↦ True;
-    Suc m2 ↦
-      match n {
-        Zero ↦ False;
-        Suc n2 ↦ leq_nat m2 n2
-      }
-  }
-
-proof refl for leq_nat (x : Nat) : Equal Bool (leq_nat x x) True =
-  match x {
-    Zero ↦ Proved;
-    Suc x2 ↦ proof refl for leq_nat x2
-  }
-
-proof trans for leq_nat
-      (x : Nat)
-    : (y : Nat)
-      → (z : Nat)
-      → Equal Bool (leq_nat x y) True
-      → Equal Bool (leq_nat y z) True
-      → Equal Bool (leq_nat x z) True =
-  match x {
-    Zero ↦ λy. λz. λp. λq. Proved;
-    Suc x2 ↦
-      λy.
-        match y {
-          Zero ↦ λz. λp. λq. absurd p;
-          Suc y2 ↦
-            λz.
-              match z {
-                Zero ↦ λp. λq. absurd q;
-                Suc z2 ↦ λp. λq. proof trans for leq_nat x2 y2 z2 p q
-              }
-        }
-  }
-
-proof antisym for leq_nat
-      (x : Nat)
-    : (y : Nat)
-      → Equal Bool (leq_nat x y) True
-      → Equal Bool (leq_nat y x) True
-      → Equal Nat x y =
-  match x {
-    Zero ↦
-      λy.
-        match y {
-          Zero ↦ λp. λq. Proved;
-          Suc y2 ↦ λp. λq. absurd q
-        };
-    Suc x2 ↦
-      λy.
-        match y {
-          Zero ↦ λp. λq. absurd p;
-          Suc y2 ↦ λp. λq. cong Nat Nat x2 y2 Suc ((proof antisym for leq_nat) x2 y2 p q)
-        }
   }
 
 fn total_leq_nat
