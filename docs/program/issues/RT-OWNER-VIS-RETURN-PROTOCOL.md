@@ -79,3 +79,11 @@ Architect, and built, that un-ignores all three rows.
    CheckedComputationalIHInvocation and no response row/route/seat plan
    -- keyed on the continuation's IH-invocation form (evt_2z9rhbj5m5axc,
    ruled evt_33prgzqh3wn57).
+2. increment 2's guard-load-bearing pin (b) assumed that with the guard
+   bypassed a closure-environment K reaches
+   `transfer_bind_continuation_boundary_value`, read from the call path
+   (`mod.rs:7162-7167`); the bind route refuses on its own -- keyed on route
+   reachability from the call graph, not the per-owner bind-authorization
+   plane `boundary_bind_continuation_environment_by_record`
+   (evt_c44hkkk52q5x, ruled evt_1d9s0xdpjak13: pin (b) replaced by the two
+   measured refusals; N3 slots sized per owner chain). Next trigger 3.

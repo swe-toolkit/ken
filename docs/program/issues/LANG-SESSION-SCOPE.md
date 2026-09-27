@@ -320,6 +320,21 @@ forgery controls (E1/E2) and Derived occurrence check (H1) use checked
 owner IDs; the local exposure helper definition remains unused until the
 final door-deletion increment. No `r_layer_tests` consumer used Deque aliases.
 
+13. assigned Map's stored-vs-fresh comparator ground case to the
+    membership-operator client and ruled a public-only re-expression, without
+    checking the public surface could construct a witness. Keyed on:
+    ownership of a property read off the test file's location, not the
+    declaring module.
+
+**Stop-13 ruling** (Architect `evt_3ry3d7c5pptj9`, then `evt_4xtksh29xcm9k`):
+the ground stored-vs-fresh witnesses are Map's own instance semantics
+(`Map.ken.md:216-238`) and join the accepted 32-line slice in Map's fence;
+the client keeps only the `∈` surface facts through a public abstract
+wrapper. The accepted discriminating mutation is a fresh ascending
+comparator at the observation site. A stored ascending view of the same tree
+is kernel-refused at the lawful `Ord` record and at the `Ordered` witness, so
+the stored view cannot be falsified without trust. Next trigger 15.
+
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
 question about a public route to a type (for example `SourceId`) goes to
