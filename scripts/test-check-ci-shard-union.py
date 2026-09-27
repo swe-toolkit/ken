@@ -146,24 +146,25 @@ class Fixtures(unittest.TestCase):
 
     def test_empty_position_mutations_red(self):
         empty = SHARD_COUNT
-        self.assert_red(lambda root: (root / "realized-shard-8" / "unfiltered-inventory.json").unlink(), "member is missing", empty)
-        self.assert_red(lambda root: (root / "realized-shard-8" / "inventory.json").unlink(), "member is missing", empty)
-        self.assert_red(lambda root: (root / "realized-shard-8" / "selected-8.json").unlink(), "member is missing", empty)
+        target = SHARD_COUNT - 1
+        self.assert_red(lambda root: (root / f"realized-shard-{target}" / "unfiltered-inventory.json").unlink(), "member is missing", empty)
+        self.assert_red(lambda root: (root / f"realized-shard-{target}" / "inventory.json").unlink(), "member is missing", empty)
+        self.assert_red(lambda root: (root / f"realized-shard-{target}" / f"selected-{target}.json").unlink(), "member is missing", empty)
         def selected_truncation(root):
-            path = root / "realized-shard-8" / "selected-8.json"
+            path = root / f"realized-shard-{target}" / f"selected-{target}.json"
             value = json.loads(path.read_text())
             del value["rust-suites"][f"suite-{SHARD_COUNT - 1}"]
             value["test-count"] -= 1
             path.write_text(json.dumps(value))
         self.assert_red(selected_truncation, "selected listing differs from unfiltered authority", empty)
         def empty_match(root):
-            path = root / "realized-shard-8" / "selected-8.json"
+            path = root / f"realized-shard-{target}" / f"selected-{target}.json"
             value = json.loads(path.read_text())
             value["rust-suites"]["suite-0"]["testcases"]["test_1"]["filter-match"]["status"] = "matches"
             path.write_text(json.dumps(value))
         self.assert_red(empty_match, "realized shard selections overlap", empty)
         def sibling_loss(root):
-            path = root / "realized-shard-7" / "selected-7.json"
+            path = root / f"realized-shard-{target}" / f"selected-{target}.json"
             value = json.loads(path.read_text())
             for suite in value["rust-suites"].values():
                 for metadata in suite["testcases"].values():
@@ -171,7 +172,7 @@ class Fixtures(unittest.TestCase):
             path.write_text(json.dumps(value))
         self.assert_red(sibling_loss, "union differs", empty)
         def authority_truncation(root):
-            path = root / "realized-shard-8" / "unfiltered-inventory.json"
+            path = root / f"realized-shard-{target}" / "unfiltered-inventory.json"
             value = json.loads(path.read_text())
             del value["rust-suites"]["suite-8"]
             value["test-count"] -= 1
@@ -285,11 +286,12 @@ class Fixtures(unittest.TestCase):
                     suite["testcases"][next(iter(suite["testcases"]))]["filter-match"]["status"] = "mismatch"
             next(iter(value["rust-suites"].values()))["testcases"]["test_1"]["filter-match"]["status"] = "matches"; path.write_text(json.dumps(value))
         self.assert_red(overlap, "selections overlap")
+        target = SHARD_COUNT
         def union_extra(root):
-            path = root / "realized-shard-8" / "selected-8.json"; value = json.loads(path.read_text()); suite = next(iter(value["rust-suites"].values())); suite["testcases"] = {"extra": {"filter-match": {"status": "matches"}}}; path.write_text(json.dumps(value))
+            path = root / f"realized-shard-{target}" / f"selected-{target}.json"; value = json.loads(path.read_text()); suite = next(iter(value["rust-suites"].values())); suite["testcases"] = {"extra": {"filter-match": {"status": "matches"}}}; path.write_text(json.dumps(value))
         self.assert_red(union_extra, "selected listing differs from unfiltered authority")
         def union_loss(root):
-            path = root / "realized-shard-8" / "selected-8.json"
+            path = root / f"realized-shard-{target}" / f"selected-{target}.json"
             value = json.loads(path.read_text())
             for suite in value["rust-suites"].values():
                 for metadata in suite["testcases"].values():
@@ -297,7 +299,7 @@ class Fixtures(unittest.TestCase):
             path.write_text(json.dumps(value))
         self.assert_red(union_loss, "union differs")
         def union_extra_native(root):
-            path = root / "realized-shard-8" / "selected-8.json"
+            path = root / f"realized-shard-{target}" / f"selected-{target}.json"
             value = json.loads(path.read_text())
             value["rust-suites"][f"suite-{SHARD_COUNT}"]["testcases"]["native_test"]["filter-match"]["status"] = "matches"
             path.write_text(json.dumps(value))

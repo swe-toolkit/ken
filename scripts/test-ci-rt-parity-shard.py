@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -16,7 +17,7 @@ _SPEC.loader.exec_module(_SHARD)
 
 class DurationPlanTests(unittest.TestCase):
     def test_duration_plan_is_complete_deterministic_and_balanced(self):
-        durations = {f"test_{index}": float(index * 10) for index in range(1, 13)}
+        durations = {f"test_{index}": float(index * 10) for index in range(1, 21)}
         plan = _SHARD.make_plan("fixture::rt_parity_native", list(durations), durations)
         self.assertEqual(len(plan["bins"]), _SHARD.SHARD_COUNT)
         assigned = [name for shard in plan["bins"] for _, name in shard["tests"]]
@@ -108,6 +109,49 @@ class DurationPlanTests(unittest.TestCase):
         self.assertAlmostEqual(sum(float(row[1]) for row in auxiliary), 1247.352)
         self.assertEqual(len(_SHARD.read_timings([path])), 185)
 
+    def test_nine_shard_source_excludes_auxiliary_rows(self):
+        path = Path("docs/program/evidence/ci-rt-parity-timings-36285524404.tsv")
+        rows = [line.split("\t") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 192)
+        parity = [row for row in rows if row[2] == "ken-cli::rt_parity_native"]
+        auxiliary = [row for row in rows if row[0] == "px8f-auxiliary-controls"]
+        self.assertEqual(len(parity), 185)
+        self.assertEqual(len({row[3] for row in parity}), 185)
+        self.assertEqual(len(auxiliary), 7)
+        self.assertEqual(len({(row[2], row[3]) for row in auxiliary}), 7)
+        expected = {
+            1: (19, 2966.888), 2: (21, 2831.419),
+            3: (22, 2991.597), 4: (21, 2966.448),
+            5: (21, 2972.978), 6: (20, 1436.009),
+            7: (20, 2999.523), 8: (21, 2998.976),
+            9: (20, 2962.657),
+        }
+        for shard, (count, seconds) in expected.items():
+            shard_rows = [row for row in parity if int(row[0]) == shard]
+            self.assertEqual(len(shard_rows), count)
+            self.assertAlmostEqual(sum(float(row[1]) for row in shard_rows), seconds)
+        self.assertAlmostEqual(sum(float(row[1]) for row in auxiliary), 1282.260)
+        self.assertEqual(len(_SHARD.read_timings([path])), 185)
+
+        summaries = Path(
+            "docs/program/evidence/ci-nextest-summaries-36285524404.tsv"
+        ).read_text(encoding="utf-8").splitlines()
+        summary_counts = {}
+        auxiliary_passes = 0
+        for line in summaries:
+            job, summary = line.split("\t", 1)
+            match = re.fullmatch(r"native-slow \(rt_parity_native\) (\d+)/9", job)
+            if match or job == "native-slow (px8f auxiliary controls)":
+                count_match = re.search(r"(\d+) tests? run: (\d+) passed", summary)
+                self.assertIsNotNone(count_match, summary)
+                self.assertEqual(count_match.group(1), count_match.group(2))
+                if match:
+                    summary_counts[int(match.group(1))] = int(count_match.group(1))
+                else:
+                    auxiliary_passes += int(count_match.group(1))
+        self.assertEqual(summary_counts, {shard: count for shard, (count, _) in expected.items()})
+        self.assertEqual(auxiliary_passes, 7)
+
     def test_tsv_fail_status_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "timings.tsv"
@@ -122,12 +166,13 @@ class DurationPlanTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "malformed parity timing row"):
                 _SHARD.read_timings([path])
 
-    def test_four_run_envelope_handles_timing_noise(self):
+    def test_five_run_envelope_handles_timing_noise(self):
         paths = [
             Path("docs/program/evidence/ci-rt-parity-timings-36260020054.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36265192923.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36276921102.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36279697268.tsv"),
+            Path("docs/program/evidence/ci-rt-parity-timings-36285524404.tsv"),
         ]
         timings = _SHARD.read_timings(paths)
         self.assertEqual(len(timings), 185)
@@ -136,22 +181,28 @@ class DurationPlanTests(unittest.TestCase):
         )
         self.assertAlmostEqual(
             timings["checked_ih_inheritance_and_fresh_result_route_are_byte_inert"],
-            347.889,
+            348.624,
         )
         plan = _SHARD.make_plan(
             "ken-cli::rt_parity_native",
             sorted(timings),
             timings,
-            ["36260020054", "36265192923", "36276921102", "36279697268"],
+            [
+                "36260020054", "36265192923", "36276921102",
+                "36279697268", "36285524404",
+            ],
         )
         assigned = [name for shard in plan["bins"] for _, name in shard["tests"]]
-        self.assertEqual(len(plan["bins"]), 9)
+        self.assertEqual(len(plan["bins"]), 10)
         self.assertCountEqual(assigned, timings)
         self.assertEqual(
             plan["timing_sources"],
-            ["36260020054", "36265192923", "36276921102", "36279697268"],
+            [
+                "36260020054", "36265192923", "36276921102",
+                "36279697268", "36285524404",
+            ],
         )
-        self.assertAlmostEqual(max(shard["seconds"] for shard in plan["bins"]), 3011.177)
+        self.assertAlmostEqual(max(shard["seconds"] for shard in plan["bins"]), 2756.377)
 
 
 if __name__ == "__main__":

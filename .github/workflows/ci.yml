@@ -42,31 +42,49 @@ jobs:
             mode=doc-only
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+      # TODO(F2/Team Spec): run the black-box conformance corpus once it exists.
+      # TODO(F1/Team Foundation): scan for AGPL/license markers with the
+      # denylist/manual-review boundary described in CLEAN-ROOM.md.
+      # TODO(F1/Team Foundation): map branch team (`wp/<ID>-` or `team:*`) to
+      # allowed paths; surface violations without blocking normal cross-team
+      # edits. See docs/program/04-git-and-integration.md.
+      - name: Bundled required placeholder checks
+        run: |
+          echo "conformance suite not yet implemented (WP F2)"
+          echo "clean-room provenance scan not yet implemented (WP F1)"
+          echo "path-guard not yet implemented (WP F1)"
 
-  # The ten workspace and nine parity runners replace the 9+8 matrices.
-  # Six additional jobs make the 25-job first wave, within the no-queue
-  # observation from run 36265192923. Run 36276921102's 23-job first wave
-  # started within 11s; run 36265192923 measured 25 starts within 24s.
+  # Run 36285524404 hit the observed 20-job concurrency cap. The first 20
+  # started within 12s; three shard jobs started at 19-21s, then two more
+  # waited 427s and 499s. Those queued shards became the critical path before
+  # the final gate at 1,415s (23m35s), even though all 28 jobs succeeded.
   #
-  # Complete workspace measurements span 4,151 tests. L2 run 36279697268
-  # was red: only shards 2, 4, 5 and 8 completed (1,844 rows). Its five
-  # partial-failure shards are retained as raw evidence but excluded from the
-  # planner input and full-shard totals. The three-source upper envelope keeps
-  # the 600s default for live inventory tests lacking an observation; it is
-  # assigned-work input, not an AC-2 wall-time claim.
+  # The intended first wave is 10 parity shards, 7 workspace shards and 3
+  # auxiliary jobs: 20 jobs total. Three required placeholder checks run with
+  # classification; their required status names are relayed after test work.
+  # The publisher must verify that every intended first-wave job starts within
+  # about 15s of the run start; this plan alone is not a wall-time measurement.
+  #
+  # On the source-derived 185/4,152 test populations, 10/7 LPT maxima are
+  # 2,756.377s parity and 2,694.399s workspace. The 9/8 alternative is
+  # 3,065.840s and 2,357.600s, so the max assigned-work sum falls by 309.463s.
+  # These are load sums, not wall-time forecasts.
+  #
+  # Run 36285524404 adds 4,152 complete PASS workspace timings. L2 run
+  # 36279697268 was red: only shards 2, 4, 5 and 8 completed (1,844 rows).
+  # Its five partial-failure shards remain raw evidence but stay out of planner
+  # input and full-shard totals. The four-source workspace envelope retains
+  # the 600s default for live tests without an observation. Assigned-work sums
+  # do not establish AC-2 wall time.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
-  # slowest crate (`ken-cli` holds the heaviest binaries). Ten runners x 4
-  # vCPU retain 40 effective cores while spreading the workspace workload.
-  #
-  # This trades ~10x total compute for ~10x wall clock. Actions minutes are
-  # free on public repos, so the trade is worth it — but it IS a real
-  # increase in compute, not a free win.
+  # slowest crate (`ken-cli` holds the heaviest binaries). Seven runners x 4
+  # vCPU spread the workspace workload within the measured job cap.
   # See docs/program/11-test-suite-and-ci-remediation.md §1/§3.
   test-shard:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: test shard ${{ matrix.shard }}/10
+    name: test shard ${{ matrix.shard }}/7
     runs-on: ubuntu-latest
     strategy:
       # Do not cancel siblings on first failure — a full picture of which
@@ -74,7 +92,7 @@ jobs:
       # independent.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        shard: [1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
       # NO dependency cache, deliberately. `Swatinem/rust-cache` was removed
@@ -142,6 +160,7 @@ jobs:
             docs/program/evidence/ci-workspace-timings-36265192923.tsv \
             docs/program/evidence/ci-workspace-timings-36276921102.tsv \
             docs/program/evidence/ci-workspace-timings-36279697268-completed-shards.tsv \
+            docs/program/evidence/ci-workspace-timings-36285524404.tsv \
             --output-dir duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
@@ -175,7 +194,7 @@ jobs:
   # The two px8f targets share an auxiliary job and build. Run 36276921102
   # measured one write-partition test and six buffer tests; their seven timing
   # rows are kept out of the parity planner. The parity target runs as an
-  # independent nine-way duration-balanced matrix, with its realized-arm
+  # independent ten-way duration-balanced matrix, with its realized-arm
   # roster checked by scripts/check-ci-shard-union.py.
   #
   # These native targets stay scoped to `-p <crate> --test <name>`, not
@@ -219,11 +238,10 @@ jobs:
       - name: Test buffer partition
         run: cargo nextest run --locked -p ken-cli --test px8f_buffer_native --no-tests=pass
 
-  # L2 run 36279697268 adds a complete eight-shard parity source: 185 unique
-  # tests passed, and its seven auxiliary-control rows are excluded. The
-  # four-run upper envelope gives a 3,011.177s maximum assigned bin over nine
-  # shards. This is assigned work, not a wall-time forecast; Full CI measures
-  # AC-2.
+  # Run 36285524404 adds a complete nine-shard parity source: 185 unique
+  # tests passed, with seven auxiliary rows excluded. The five-run upper
+  # envelope gives a 2,756.377s maximum assigned bin over ten shards. This is
+  # assigned work, not a wall-time forecast; Full CI measures AC-2.
   #
   # This job deliberately does NOT take `--no-tests=pass`, unlike its two
   # px8f siblings above. It still selects a live test, so an empty selection
@@ -232,12 +250,12 @@ jobs:
   native-rt-parity:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full'
-    name: native-slow (rt_parity_native) ${{ matrix.shard }}/9
+    name: native-slow (rt_parity_native) ${{ matrix.shard }}/10
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -274,6 +292,7 @@ jobs:
             docs/program/evidence/ci-rt-parity-timings-36265192923.tsv \
             docs/program/evidence/ci-rt-parity-timings-36276921102.tsv \
             docs/program/evidence/ci-rt-parity-timings-36279697268.tsv \
+            docs/program/evidence/ci-rt-parity-timings-36285524404.tsv \
             rt-parity-artifact/plan.json
           filter=$(python3 -c 'import json,os; print(json.load(open("rt-parity-artifact/plan.json"))["bins"][int(os.environ["SHARD"])-1]["filter"])')
           cargo nextest list --locked -p ken-cli --test rt_parity_native \
@@ -316,7 +335,7 @@ jobs:
   # ⛔ DO NOT RENAME OR DELETE THIS JOB. `build + test` is a REQUIRED status
   # check in branch protection (docs/ops/github-setup.md §"Required status
   # checks"). The sharded matrix above publishes checks named `test shard
-  # N/10`, which branch protection does not know about — so if this
+  # N/7`, which branch protection does not know about — so if this
   # name-preserving aggregator were removed, the required check would never
   # report and EVERY pull request would become unmergeable until an admin
   # edited branch protection. This job exists so the workflow can be resharded
@@ -325,10 +344,10 @@ jobs:
   #
   # It is intentionally a pure gate — no checkout, no build, a few seconds.
   #
-  # ⚠ EVERY TEST-RUNNING JOB MUST BE LISTED IN `needs` AND CHECKED BELOW.
-  # This job is what branch protection actually reads, so a test job missing
-  # from here reports GREEN no matter how it failed. Add a job above, add it
-  # in both places here.
+  # Every test-running job must be listed in `needs` and checked below.
+  # Branch protection reads this aggregate plus the three named status relays;
+  # a test job missing from this gate can still report GREEN. Add a job above,
+  # add it in both places here.
   build-test:
     name: build + test
     runs-on: ubuntu-latest
@@ -340,6 +359,9 @@ jobs:
       - z3-process-adapter
       - issue-tracker
       - verify-realized-shard-union
+      - conformance
+      - clean-room
+      - path-guard
     # `always()` so this reports a definite conclusion even when a job fails
     # or is skipped. Without it, a failed dependency leaves this job *skipped*,
     # and a skipped required check blocks the PR with no useful signal.
@@ -347,21 +369,33 @@ jobs:
     steps:
       - name: All test jobs passed
         run: |
+          classify='${{ needs.classify-paths.result }}'
           shards='${{ needs.test-shard.result }}'
           write='${{ needs.native-write-partition.result }}'
+          conformance='${{ needs.conformance.result }}'
+          clean_room='${{ needs.clean-room.result }}'
+          path_guard='${{ needs.path-guard.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
           z3_adapter='${{ needs.z3-process-adapter.result }}'
           issue_tracker='${{ needs.issue-tracker.result }}'
           shard_union='${{ needs.verify-realized-shard-union.result }}'
+          echo "path classification:    $classify"
           echo "test-shard matrix:      $shards"
           echo "native auxiliary tests: $write"
+          echo "conformance check:      $conformance"
+          echo "clean-room check:       $clean_room"
+          echo "path-guard check:       $path_guard"
           echo "native-rt-parity:       $rt_parity"
           echo "z3 checks:              $z3_adapter"
           echo "issue tracker + ignored-row sweep: $issue_tracker"
           echo "realized-shard-union:   $shard_union"
           failed=0
-          for pair in "test shards:$shards" \
+          for pair in "path classification:$classify" \
+                      "test shards:$shards" \
                       "native auxiliary tests:$write" \
+                      "conformance suite:$conformance" \
+                      "clean-room provenance check:$clean_room" \
+                      "path-guard:$path_guard" \
                       "native-rt-parity:$rt_parity" \
                       "z3 checks:$z3_adapter" \
                       "issue tracker and ignored-row sweep:$issue_tracker" \
@@ -374,42 +408,71 @@ jobs:
           done
           exit "$failed"
 
+  # These three names are required status checks. Their placeholder commands
+  # run in classify-paths to leave the first wave at 20 jobs; these relay jobs
+  # wait until test work finishes, then preserve the required check contexts.
   conformance:
-    needs: classify-paths
+    needs:
+      - classify-paths
+      - test-shard
+      - native-write-partition
+      - native-rt-parity
+      - z3-process-adapter
+      - issue-tracker
+      - verify-realized-shard-union
+    if: always()
     name: conformance suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      # TODO(F2/Team Spec): run the black-box conformance corpus once it exists.
-      - name: Conformance (placeholder)
-        run: echo "conformance suite not yet implemented (WP F2)"
+      - name: Relay bundled placeholder result
+        run: |
+          if [ '${{ needs.classify-paths.result }}' != success ]; then
+            echo "conformance placeholder failed in classify-paths" >&2
+            exit 1
+          fi
+          echo "conformance placeholder passed in classify-paths"
 
   clean-room:
-    needs: classify-paths
+    needs:
+      - classify-paths
+      - test-shard
+      - native-write-partition
+      - native-rt-parity
+      - z3-process-adapter
+      - issue-tracker
+      - verify-realized-shard-union
+    if: always()
     name: clean-room provenance check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      # TODO(F1/Team Foundation): scan for AGPL license headers / known prototype
-      # source markers in implementation crates. Start as a denylist + manual
-      # review; tighten over time. See CLEAN-ROOM.md.
-      - name: Clean-room scan (placeholder)
-        run: echo "clean-room provenance scan not yet implemented (WP F1)"
+      - name: Relay bundled placeholder result
+        run: |
+          if [ '${{ needs.classify-paths.result }}' != success ]; then
+            echo "clean-room placeholder failed in classify-paths" >&2
+            exit 1
+          fi
+          echo "clean-room placeholder passed in classify-paths"
 
   path-guard:
-    needs: classify-paths
+    needs:
+      - classify-paths
+      - test-shard
+      - native-write-partition
+      - native-rt-parity
+      - z3-process-adapter
+      - issue-tracker
+      - verify-realized-shard-union
+    if: always()
     name: path-guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      # TODO(F1/Team Foundation): SOFT attribution guard — map the branch's team
-      # (from prefix `wp/<ID>-` or a `team:*` label) to its allowed paths; if it
-      # touches outside them, don't hard-fail — surface it so the owning area's
-      # reviewer is pulled onto the merge Decision (CODEOWNERS is inert in the
-      # single-publisher model). Cross-cutting edits are normal; never block them.
-      # See docs/program/04-git-and-integration.md.
-      - name: Path guard (placeholder)
-        run: echo "path-guard not yet implemented (WP F1)"
+      - name: Relay bundled placeholder result
+        run: |
+          if [ '${{ needs.classify-paths.result }}' != success ]; then
+            echo "path-guard placeholder failed in classify-paths" >&2
+            exit 1
+          fi
+          echo "path-guard placeholder passed in classify-paths"
 
   issue-tracker:
     needs: classify-paths

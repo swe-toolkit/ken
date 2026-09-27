@@ -1,0 +1,21 @@
+native-slow (px8f auxiliary controls)	Summary [  40.956s] 1 test run: 1 passed, 0 skipped
+native-slow (px8f auxiliary controls)	Summary [ 510.897s] 6 tests run: 6 passed (6 slow), 0 skipped
+native-slow (rt_parity_native) 3/9	Summary [ 887.376s] 22 tests run: 22 passed (20 slow), 163 skipped
+native-slow (rt_parity_native) 4/9	Summary [ 810.723s] 21 tests run: 21 passed (21 slow), 164 skipped
+test shard 5/10	Summary [ 550.035s] 415 tests run: 415 passed (9 slow), 2910 skipped
+test shard 9/10	Summary [ 592.826s] 415 tests run: 415 passed (9 slow), 2975 skipped
+native-slow (rt_parity_native) 5/9	Summary [ 772.757s] 21 tests run: 21 passed (21 slow), 164 skipped
+test shard 10/10	Summary [ 491.004s] 416 tests run: 416 passed (8 slow), 2944 skipped
+test shard 7/10	Summary [ 507.223s] 417 tests run: 417 passed (7 slow), 2955 skipped
+test shard 1/10	Summary [ 361.510s] 414 tests run: 414 passed (6 slow), 2899 skipped
+native-slow (rt_parity_native) 6/9	Summary [ 384.230s] 20 tests run: 20 passed (10 slow), 165 skipped
+native-slow (rt_parity_native) 9/9	Summary [ 793.021s] 20 tests run: 20 passed (20 slow), 165 skipped
+test shard 2/10	Summary [ 407.511s] 415 tests run: 415 passed (5 slow), 2979 skipped
+native-slow (rt_parity_native) 7/9	Summary [ 860.844s] 20 tests run: 20 passed (20 slow), 165 skipped
+test shard 8/10	Summary [ 513.107s] 416 tests run: 416 passed (7 slow), 2962 skipped
+test shard 4/10	Summary [ 577.143s] 414 tests run: 414 passed (6 slow), 2907 skipped
+test shard 3/10	Summary [ 298.769s] 414 tests run: 414 passed (6 slow), 2869 skipped
+native-slow (rt_parity_native) 2/9	Summary [ 779.226s] 21 tests run: 21 passed (21 slow), 164 skipped
+native-slow (rt_parity_native) 8/9	Summary [ 832.332s] 21 tests run: 21 passed (20 slow), 164 skipped
+test shard 6/10	Summary [ 546.050s] 416 tests run: 416 passed (12 slow), 2873 skipped
+native-slow (rt_parity_native) 1/9	Summary [ 808.554s] 19 tests run: 19 passed (19 slow), 166 skipped
