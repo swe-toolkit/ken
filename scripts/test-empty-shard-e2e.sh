@@ -33,14 +33,14 @@ python3 "$repo/scripts/ci-duration-shard.py" inventory.json evidence.json --outp
 python3 - <<'PY'
 import json
 plan=json.load(open('filters/assignments.json'))
-assert len(plan['bins']) == 10
+assert len(plan['bins']) == 7
 empty=next(i+1 for i,b in enumerate(plan['bins']) if not b['tests'])
 open('empty-index','w').write(str(empty))
 PY
 empty=$(<empty-index)
 python3 "$repo/scripts/ci-duration-shard.py" project-empty inventory.json "selected-$empty.json"
 python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$empty" "selected-$empty.json"
-for n in $(seq 1 10); do
+for n in $(seq 1 7); do
   planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
   python3 "$repo/scripts/ci-duration-shard.py" project-selected inventory.json filters/assignments.json "$n" "selected-$n.json"
   python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$n" "selected-$n.json"
@@ -59,7 +59,7 @@ echo "$*" >> "$LOG"
 EOF
 chmod +x bin/cargo
 : > dispatch.log
-for n in $(seq 1 10); do
+for n in $(seq 1 7); do
   expected_planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
   expected_expression=$(<"filters/bin-$n.expr")
   dispatched_planned=$expected_planned
@@ -126,7 +126,7 @@ import os
 os.mkdir('old')
 open('old/inventory.json','w').write(json.dumps(v))
 PY
-  for n in $(seq 1 10); do
+  for n in $(seq 1 7); do
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json old/inventory.json ../selected-$n.json
     rm -rf realized-shards/realized-shard-$n
     mv realized-shard-$n realized-shards/
@@ -135,7 +135,7 @@ PY
   test "$status" -eq 2
   grep -Fx 'realized-shard check failed: filtered and unfiltered discovered inventories differ' err
   mkdir fixed
-  for n in $(seq 1 10); do
+  for n in $(seq 1 7); do
     python3 "$repo/scripts/ci-duration-shard.py" project-filtered ../unfiltered-inventory.json fixed/inventory.json
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json fixed/inventory.json ../selected-$n.json
     rm -rf realized-shards/realized-shard-$n
@@ -151,17 +151,17 @@ cp -a realized-shards mutation-selected-shape/
   python3 - <<'PY'
 import json, os
 v=json.load(open('../inventory.json')); os.mkdir('old')
-for n in range(1, 11):
+for n in range(1, 8):
  v=json.load(open(f'../selected-{n}.json')); del v['rust-suites']['native']; v['test-count'] = 1; open(f'old/selected-{n}.json','w').write(json.dumps(v))
 PY
-  for n in $(seq 1 10); do
+  for n in $(seq 1 7); do
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json old/selected-$n.json
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/
   done
   set +e; python3 "$repo/scripts/check-ci-shard-union.py" 2>err; status=$?; set -e
   test "$status" -eq 2
   grep -Fx 'realized-shard check failed: selected listing differs from unfiltered authority' err
-  for n in $(seq 1 10); do
+  for n in $(seq 1 7); do
     python3 "$repo/scripts/ci-duration-shard.py" project-selected ../inventory.json ../filters/assignments.json "$n" "selected-$n.json"
     "$repo/scripts/stage-ci-shard-artifact.sh" "$n" ../unfiltered-inventory.json ../inventory.json selected-$n.json
     rm -rf realized-shards/realized-shard-$n; mv realized-shard-$n realized-shards/

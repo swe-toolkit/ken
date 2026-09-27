@@ -2,6 +2,7 @@
 """Focused controls for duration shard selection."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -77,17 +78,23 @@ class DurationShardControls(unittest.TestCase):
         l2_completed = _planner.read_durations(
             "docs/program/evidence/ci-workspace-timings-36279697268-completed-shards.tsv"
         )
+        current = _planner.read_durations(
+            "docs/program/evidence/ci-workspace-timings-36285524404.tsv"
+        )
         combined = _planner.read_durations(
             [
                 "docs/program/evidence/ci-workspace-timings-36265192923.tsv",
                 "docs/program/evidence/ci-workspace-timings-36276921102.tsv",
                 "docs/program/evidence/ci-workspace-timings-36279697268-completed-shards.tsv",
+                "docs/program/evidence/ci-workspace-timings-36285524404.tsv",
             ]
         )
         self.assertEqual(len(older), 4148)
         self.assertEqual(len(latest), 4151)
         self.assertEqual(len(l2_completed), 1844)
-        self.assertEqual(len(combined), 4151)
+        self.assertEqual(len(current), 4152)
+        self.assertEqual(len(combined), 4154)
+        self.assertEqual(len(set(combined) - set(current)), 2)
         old_faster_name = (
             "ken-elaborator::r3_c2_source_mixed_branch "
             "r3_4b_observation_feature_is_native_artifact_identical"
@@ -135,6 +142,46 @@ class DurationShardControls(unittest.TestCase):
         partial_rows = [row for row in raw_rows if int(row[0]) not in expected]
         self.assertEqual(len(partial_rows), 477)
         self.assertEqual(sum(row[4] == "FAIL" for row in partial_rows), 5)
+
+    def test_full_workspace_source_reconciles_with_nextest_summaries(self):
+        path = Path("docs/program/evidence/ci-workspace-timings-36285524404.tsv")
+        expected = {
+            1: (414, 1375.775), 2: (415, 1326.913),
+            3: (414, 1101.731), 4: (414, 1486.407),
+            5: (415, 1876.155), 6: (416, 1935.796),
+            7: (417, 1851.646), 8: (416, 1935.338),
+            9: (415, 2119.818), 10: (416, 1650.780),
+        }
+        by_shard = {}
+        identities = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            match = _planner.NEXTTEST_TIMING_ROW.fullmatch(line)
+            self.assertIsNotNone(match, line)
+            shard = int(match.group("shard"))
+            identity = match.group("test_id")
+            identities.append(identity)
+            count, seconds = by_shard.get(shard, (0, 0.0))
+            by_shard[shard] = (count + 1, seconds + float(match.group("seconds")))
+        self.assertEqual(len(identities), 4152)
+        self.assertEqual(len(set(identities)), 4152)
+        self.assertEqual(set(by_shard), set(expected))
+        for shard, (count, seconds) in expected.items():
+            self.assertEqual(by_shard[shard][0], count)
+            self.assertAlmostEqual(by_shard[shard][1], seconds)
+
+        summaries = Path(
+            "docs/program/evidence/ci-nextest-summaries-36285524404.tsv"
+        ).read_text(encoding="utf-8").splitlines()
+        summary_counts = {}
+        for line in summaries:
+            job, summary = line.split("\t", 1)
+            match = re.fullmatch(r"test shard (\d+)/10", job)
+            if match:
+                count_match = re.search(r"(\d+) tests run: (\d+) passed", summary)
+                self.assertIsNotNone(count_match, summary)
+                self.assertEqual(count_match.group(1), count_match.group(2))
+                summary_counts[int(match.group(1))] = int(count_match.group(1))
+        self.assertEqual(summary_counts, {shard: count for shard, (count, _) in expected.items()})
 
     def test_workspace_tsv_fail_status_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -8,8 +8,8 @@ from pathlib import Path
 import sys
 
 
-SHARD_COUNT = 10
-RT_PARITY_SHARD_COUNT = 9
+SHARD_COUNT = 7
+RT_PARITY_SHARD_COUNT = 10
 ROOT = Path("realized-shards")
 RT_PARITY_ROOT = Path("realized-rt-parity")
 EXCLUDED_BINARIES = {

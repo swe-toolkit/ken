@@ -8,7 +8,7 @@ import sys
 import warnings
 
 
-N = 10
+N = 7
 # Run 36265192923's largest workspace test was 549.960s; use 600s for
 # unseen tests until measured rather than the much smaller suite median.
 DEFAULT_DURATION_SECONDS = 600.0

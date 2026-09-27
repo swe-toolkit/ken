@@ -9,10 +9,10 @@ import sys
 import warnings
 from pathlib import Path
 
-SHARD_COUNT = 9
-# Measured timing sources used six and eight parity shards. The eight-shard
-# source also records seven auxiliary-control tests outside the parity matrix.
-SOURCE_SHARD_COUNTS = {6, 8}
+SHARD_COUNT = 10
+# Measured timing sources used six, eight and nine parity shards. The
+# eight- and nine-shard sources also record seven auxiliary controls.
+SOURCE_SHARD_COUNTS = {6, 8, 9}
 AUXILIARY_TIMING_ROWS = 7
 # The maximum per-test observations reduce sensitivity to timing noise. The
 # original median was 83.595s; use a round 90s estimate for unseen tests.
@@ -22,11 +22,11 @@ NEXTTEST_TIMING_ROW = re.compile(
     r"\s+\(\s*\d+/\d+\)\s+ken-cli::rt_parity_native\s+(?P<name>\S+)\s*$"
 )
 TSV_TIMING_ROW = re.compile(
-    r"^(?P<shard>[1-8])\t(?P<seconds>[0-9.]+)\t"
+    r"^(?P<shard>[1-9])\t(?P<seconds>[0-9.]+)\t"
     r"ken-cli::rt_parity_native\t(?P<name>\S+)(?:\tPASS)?$"
 )
 AUXILIARY_TIMING_ROW = re.compile(
-    r"^empty-auxiliary-controls\t(?P<seconds>[0-9.]+)\t"
+    r"^(?:empty-auxiliary-controls|px8f-auxiliary-controls)\t(?P<seconds>[0-9.]+)\t"
     r"(?P<binary_id>ken-cli::px8f_buffer_native|"
     r"ken-verify::px8f_write_partition)\t(?P<name>\S+)(?:\tPASS)?$"
 )
@@ -110,13 +110,13 @@ def read_timings(paths: list[Path]) -> dict[str, float]:
         source_shard_count = len(shard_counts)
         if source_shard_count not in SOURCE_SHARD_COUNTS:
             raise ValueError(
-                f"{path}: expected a six- or eight-shard parity source, "
+                f"{path}: expected a six-, eight- or nine-shard parity source, "
                 f"found {source_shard_count} shards"
             )
         if set(shard_counts) != set(range(1, source_shard_count + 1)):
             raise ValueError(f"{path}: source shard ids are not contiguous: {shard_counts}")
-        if auxiliary and source_shard_count != 8:
-            raise ValueError(f"{path}: auxiliary rows require an eight-shard parity source")
+        if auxiliary and source_shard_count not in {8, 9}:
+            raise ValueError(f"{path}: auxiliary rows require an eight- or nine-shard parity source")
         if auxiliary and len(auxiliary) != AUXILIARY_TIMING_ROWS:
             raise ValueError(
                 f"{path}: expected {AUXILIARY_TIMING_ROWS} auxiliary rows, found {len(auxiliary)}"
