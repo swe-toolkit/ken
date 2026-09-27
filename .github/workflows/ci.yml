@@ -51,8 +51,9 @@ jobs:
   # Complete workspace measurements span 4,151 tests. L2 run 36279697268
   # was red: only shards 2, 4, 5 and 8 completed (1,844 rows). Its five
   # partial-failure shards are retained as raw evidence but excluded from the
-  # planner input and full-shard totals. The three-source upper envelope gives
-  # a 1,821.905s maximum assigned bin over ten shards, not a wall-time claim.
+  # planner input and full-shard totals. The three-source upper envelope keeps
+  # the 600s default for live inventory tests lacking an observation; it is
+  # assigned-work input, not an AC-2 wall-time claim.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
   # slowest crate (`ken-cli` holds the heaviest binaries). Ten runners x 4
