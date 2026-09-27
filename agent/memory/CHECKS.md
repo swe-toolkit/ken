@@ -52,22 +52,38 @@ fire.
    carries that property. A names-only plane cannot classify by type,
    backing or provenance. Reading the property off another plane is a
    different claim. (`enclave/buildability-ruling-must-ground-every-axis.md`)
-6. **A population placed inside a mechanism.** Count what actually arrives
-   at the seam. Do not infer membership from behaviour, from one-pass
-   execution, or from group shape. Apply your own counting demand to your own
-   ruling. (`enclave/count-the-population-before-you-place-it-inside-a-mechanism.md`)
+6. **A population placed inside a mechanism, or a "none", "only" or
+   "cannot" claimed over one.** Count what actually arrives at the seam. Do
+   not infer membership from behaviour, from one-pass execution, or from
+   group shape. Before a closure claim, name the population you measured and
+   its membership rule: a corpus filtered by its ignore rule, one enumerated
+   axis or a permission-scoped grep is narrower than the claim. Apply your
+   own counting demand to your own ruling.
+   (`enclave/count-the-population-before-you-place-it-inside-a-mechanism.md`,
+   `fleet/no-instrument-exists-is-a-claim-about-the-space-you-enumerated.md`)
 7. **A fix ruled against a counterexample.** Re-run that exact
    counterexample against the fix as narrowed and written, not the probe
-   that motivated it. Then run the fix's criterion on the next consumer of
-   the same kind. (`enclave/verify-proposed-fix-excludes-the-counterexample.md`,
+   that motivated it. Then run the fix's criterion on every sibling of the
+   same kind: the other arms, walks and call sites that the same collector
+   or shared callee feeds, grepped at the review SHA.
+   (`enclave/verify-proposed-fix-excludes-the-counterexample.md`,
    `fleet/a-fix-that-closes-the-named-counterexample-need-not-close-the-class.md`)
 8. **A structural or proxy fact used as a gate or criterion.** Name what
    the failing configuration would produce. If it produces the same
    observation, the check is not evidence. Coverage, closure and "the
    refusal stays" are the usual proxies; a lawful repair can remove an
-   incidental refusal.
+   incidental refusal. A mutation that reddens proves only the direction,
+   field or disjunct it perturbed: name the row and assertion that must
+   fire, and confirm the population makes it fire. Two named cases:
+   - An "output-inert" change is certified by the build, not the output:
+     census every production error arm it adds.
+   - A recorder or criterion can read arrival instead of work: ask which
+     field the success path writes.
    (`fleet/an-acceptance-criterion-must-name-an-observation-the-failing-configuration-does-not-also-produce.md`,
-   `build/a-check-that-measures-a-proxy-passes-for-the-wrong-reason.md`)
+   `build/a-check-that-measures-a-proxy-passes-for-the-wrong-reason.md`,
+   `fleet/a-population-held-at-a-degenerate-value-cannot-see-that-axis.md`,
+   `fleet/a-byte-inert-plane-still-regresses-if-its-unconditional-build-can-err.md`,
+   `fleet/a-recorder-witnesses-the-line-it-sits-on-not-the-mechanism.md`)
 9. **An axis declared controlled.** Every axis you exempt needs its own
    measurement. The axis the code dispatches on (lowering path, route) often
    moves with a visible one and cannot be seen in source.
