@@ -134,7 +134,12 @@ fn list_combinator_floor_derived_over_real_elim() {
     let nat_outer = ["take", "drop"];
 
     for name in list_recursors {
-        let id = env.globals[name];
+        let module = if name == "list_eq" || name == "list_compare" {
+            "Core.Logic.Compare"
+        } else {
+            "Data.Collections.Derived"
+        };
+        let id = env.globals[&format!("{module}.{name}")];
         let (_, body) = env
             .env
             .transparent_body(id)
@@ -170,7 +175,7 @@ fn list_combinator_floor_derived_over_real_elim() {
         }
     }
     for name in nat_outer {
-        let id = env.globals[name];
+        let id = env.globals[&format!("Data.Collections.Derived.{name}")];
         let (_, body) = env
             .env
             .transparent_body(id)
@@ -191,7 +196,7 @@ fn list_combinator_floor_derived_over_real_elim() {
     // shaped — it's checked separately: just confirm it's Transparent and not
     // an opaque postulate stand-in.
     assert!(
-        env.env.transparent_body(env.globals["compare_char"]).is_some(),
+        env.env.transparent_body(env.globals["Data.Collections.Derived.compare_char"]).is_some(),
         "compare_char must be a real (checked) def"
     );
 
@@ -214,7 +219,14 @@ fn list_combinator_floor_derived_over_real_elim() {
         "list_compare",
         "compare_char",
     ] {
-        let id = env.globals[name];
+        let module = if name.contains('.') {
+            ""
+        } else if name == "list_eq" || name == "list_compare" {
+            "Core.Logic.Compare."
+        } else {
+            "Data.Collections.Derived."
+        };
+        let id = env.globals[&format!("{module}{name}")];
         let delta = trusted_base_delta(&env.env, id);
         assert!(
             delta.is_empty(),

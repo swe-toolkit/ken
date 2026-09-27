@@ -494,7 +494,7 @@ fn cursor_reuses_canonical_nat_operations_with_zero_trust_delta() {
     assert!(env.env.transparent_body(sub).is_some());
 
     for (name, add_count, sub_count) in [("arg_lengths_sum", 1, 0), ("arg_remaining_from", 1, 1)] {
-        let id = env.globals[name];
+        let id = env.globals[&format!("Capability.Parsing.Cursor.{name}")];
         let body = match env.env.lookup(id) {
             Some(Decl::Transparent { body, .. }) => body,
             other => panic!("{name} must be transparent, got {other:?}"),

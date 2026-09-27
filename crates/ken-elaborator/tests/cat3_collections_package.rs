@@ -125,20 +125,24 @@ fn boolean_list(env: &ElabEnv, value: EvalVal) -> Vec<bool> {
     }
 }
 
-fn mk_env() -> ElabEnv {
+fn mk_env_with_derived_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
-    catalog_or::load_derived_fixture(&mut env);
+    let owned = catalog_or::load_derived_fixture(&mut env);
     catalog_or::assert_transparent_result_uses_core_logic_or(&env, "pair_compare_lt_cases");
-    env
+    (env, owned)
+}
+
+fn mk_env() -> ElabEnv {
+    mk_env_with_derived_owned().0
 }
 
 #[test]
 fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
-    let env = mk_env();
+    let (env, derived_owned) = mk_env_with_derived_owned();
 
     for name in [
         "mem",
@@ -171,9 +175,9 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
     ] {
         let id = env
             .globals
-            .get(name)
+            .get(&format!("Data.Collections.Derived.{name}"))
             .copied()
-            .unwrap_or_else(|| panic!("{name} should be exported by Derived.ken"));
+            .unwrap_or_else(|| panic!("{name} must be checked by Derived.ken"));
         match env.env.lookup(id) {
             Some(Decl::Transparent { .. }) => {}
             other => panic!("{name} must be a transparent checked definition, got {other:?}"),
@@ -194,11 +198,19 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
         "IndexedView",
         "SetoidMorphism",
     ] {
-        let id = env
-            .globals
-            .get(name)
+        let matches = derived_owned
+            .iter()
             .copied()
-            .unwrap_or_else(|| panic!("{name} should be exported by Derived.ken"));
+            .filter(|id| {
+                env.class_env.class_by_id(*id).is_some_and(|class| {
+                    class.projection.owner_name == name && class.projection.type_id == *id
+                })
+            })
+            .collect::<Vec<_>>();
+        let [id] = matches.as_slice() else {
+            panic!("Derived must own exactly one checked class `{name}`, got {matches:?}")
+        };
+        let id = *id;
         match env.env.lookup(id) {
             Some(Decl::Transparent { .. }) => {}
             other => panic!("{name} must be a transparent checked record type, got {other:?}"),
@@ -382,7 +394,7 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
     }
 
     for law in ["length_take_min", "zip_length"] {
-        let id = env.globals[law];
+        let id = env.globals[&format!("Data.Collections.Derived.{law}")];
         let ty = match env.env.lookup(id) {
             Some(Decl::Transparent { ty, .. }) => ty,
             other => panic!("{law} must be transparent, got {other:?}"),
@@ -394,7 +406,7 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
         );
     }
 
-    let slice = env.globals["slice"];
+    let slice = env.globals["Data.Collections.Derived.slice"];
     let body = match env.env.lookup(slice) {
         Some(Decl::Transparent { body, .. }) => body,
         other => panic!("slice must be transparent, got {other:?}"),
