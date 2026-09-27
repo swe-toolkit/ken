@@ -47,20 +47,23 @@ import-cycle constraint.
   - every Map consumer of `leq_nat` and of its laws (Check 3).
 
   The Architect rules on the route. **Ruled** (`evt_78t51c0gc83vv`): delete
-  Map's `leq_nat` and its `refl`/`trans`/`antisym` proofs, import `leq_nat`
-  selectively from `LawfulClasses` (already a direct provider), and keep
-  Map's private `total_leq_nat` byte-unchanged over the imported comparator.
-  **Why the one local remains:** the provider's `total_leq_nat` is private
-  and pinned non-importable (`cat_order_pub_export.rs`,
-  `ds2_ord_nat_acceptance.rs`), and the public `proof total for leq_nat`
-  erases the direction that `map_total_leq_nat_preserves_proof_relevant_or_tags`
-  observes. It duplicates a private helper, not a public export.
+  Map's `leq_nat` and its `refl`/`trans`/`antisym` proofs and import
+  `leq_nat` selectively from `LawfulClasses` (already a direct provider);
+  landed `c3896b72e`. **Re-ruled post-merge** (`evt_1r2xkx93bgysg`, on
+  Adversary `evt_7yrgfmy1wwdce`): the retention of Map's private
+  `total_leq_nat` does not stand. Nothing in Map uses it, and
+  `map_total_leq_nat_preserves_proof_relevant_or_tags` resolved the flat
+  name to LawfulClasses' private copy, so it never measured Map's.
+  Increment 2 deletes `total_leq_nat`, the now-unused `leq_nat` import line
+  and that test; the `(bool_and)` and `(Ord)` import lines stay
+  byte-unchanged.
 - **AC-1.** Map's public nine-name surface, export set, `trusted_base` and
-  provider-edge set are byte-identical. Map's owned inventory, which
+  provider-edge set are byte-identical; LawfulClasses stays a direct
+  provider through `bool_and` and `Ord`. Map's owned inventory, which
   includes private names, loses exactly `leq_nat`, `leq_nat::refl`,
-  `leq_nat::trans` and `leq_nat::antisym` and gains nothing. Pins key on
-  identity through `provider_owned_id`, never on a raw GlobalId that the
-  deletion shifts.
+  `leq_nat::trans`, `leq_nat::antisym` and `total_leq_nat` and gains
+  nothing. Pins key on identity through `provider_owned_id`, never on a raw
+  GlobalId that the deletion shifts.
 - **AC-2.** The Map and catalog suites stay green (Full CI).
 
 ## Stop conditions
@@ -69,3 +72,18 @@ import-cycle constraint.
 - Any kernel, `trusted_base()` or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. Anti-duplication criterion (c) was prescribed as "a well-formed local
+   copy reddens the pin" without checking the equivalence plane; kernel
+   conversion does not identify distinct recursive declarations, so a
+   renamed self-recursive copy passes. Keyed on definitional (not
+   structural) equivalence (evt_401q33apra6qw, ruled evt_ntwgkpzk0hga:
+   disclosed as THE GAP in the pin; factoring review is the backstop).
+2. A source-text consumer (an exact-line import mutation in
+   `cat_map_bool_and_owner`) was missed because the AC-0 consumer sweep was
+   by name, not by mechanism; the combined import line removed the line the
+   control replaces. Keyed on exact source-text spelling of an edited line
+   (CI red run 36351135377, ruled evt_69sc92fjt908e: split the import, test
+   unchanged). Next trigger 3.
