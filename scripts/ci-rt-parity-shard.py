@@ -9,19 +9,26 @@ import sys
 import warnings
 from pathlib import Path
 
-SHARD_COUNT = 8
-SOURCE_SHARD_COUNT = 6
-# The maximum per-test observations from runs 36260020054 and 36265192923
-# are used to reduce sensitivity to the observed timing noise. Run 36260020054's
-# median was 83.595s; use a round 90s estimate for unseen tests until measured.
+SHARD_COUNT = 9
+# Measured timing sources used six and eight parity shards. The eight-shard
+# source also records seven auxiliary-control tests outside the parity matrix.
+SOURCE_SHARD_COUNTS = {6, 8}
+AUXILIARY_TIMING_ROWS = 7
+# The maximum per-test observations reduce sensitivity to timing noise. The
+# original median was 83.595s; use a round 90s estimate for unseen tests.
 DEFAULT_DURATION_SECONDS = 90.0
 NEXTTEST_TIMING_ROW = re.compile(
     r"^(?P<shard>[1-6])\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
     r"\s+\(\s*\d+/\d+\)\s+ken-cli::rt_parity_native\s+(?P<name>\S+)\s*$"
 )
 TSV_TIMING_ROW = re.compile(
-    r"^(?P<shard>[1-6])\t(?P<seconds>[0-9.]+)\t"
-    r"ken-cli::rt_parity_native\t(?P<name>\S+)\s*$"
+    r"^(?P<shard>[1-8])\t(?P<seconds>[0-9.]+)\t"
+    r"ken-cli::rt_parity_native\t(?P<name>\S+)(?:\tPASS)?$"
+)
+AUXILIARY_TIMING_ROW = re.compile(
+    r"^empty-auxiliary-controls\t(?P<seconds>[0-9.]+)\t"
+    r"(?P<binary_id>ken-cli::px8f_buffer_native|"
+    r"ken-verify::px8f_write_partition)\t(?P<name>\S+)(?:\tPASS)?$"
 )
 
 
@@ -71,27 +78,60 @@ def read_timings(paths: list[Path]) -> dict[str, float]:
     observations: dict[str, list[float]] = {}
     for path in paths:
         timings: dict[str, float] = {}
-        shard_counts = [0] * SOURCE_SHARD_COUNT
+        shard_counts: dict[int, int] = {}
+        auxiliary: set[tuple[str, str]] = set()
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             match = NEXTTEST_TIMING_ROW.fullmatch(line) or TSV_TIMING_ROW.fullmatch(line)
-            if not match:
-                raise ValueError(f"{path}:{line_number}: malformed parity timing row")
-            name = match.group("name")
-            shard_counts[int(match.group("shard")) - 1] += 1
-            if name in timings:
-                raise ValueError(f"{path}:{line_number}: duplicate test timing {name}")
-            seconds = float(match.group("seconds"))
-            if seconds <= 0:
-                raise ValueError(f"{path}:{line_number}: duration must be positive")
-            timings[name] = seconds
-        if sorted(shard_counts) != [30, 31, 31, 31, 31, 31]:
-            raise ValueError(f"{path}: unexpected source-shard counts: {shard_counts}")
+            if match:
+                name = match.group("name")
+                shard = int(match.group("shard"))
+                seconds = float(match.group("seconds"))
+                shard_counts[shard] = shard_counts.get(shard, 0) + 1
+                if name in timings:
+                    raise ValueError(f"{path}:{line_number}: duplicate test timing {name}")
+                if seconds <= 0:
+                    raise ValueError(f"{path}:{line_number}: duration must be positive")
+                timings[name] = seconds
+                continue
+            auxiliary_match = AUXILIARY_TIMING_ROW.fullmatch(line)
+            if auxiliary_match:
+                identity = (
+                    auxiliary_match.group("binary_id"),
+                    auxiliary_match.group("name"),
+                )
+                seconds = float(auxiliary_match.group("seconds"))
+                if seconds <= 0:
+                    raise ValueError(f"{path}:{line_number}: duration must be positive")
+                if identity in auxiliary:
+                    raise ValueError(f"{path}:{line_number}: duplicate auxiliary timing {identity}")
+                auxiliary.add(identity)
+                continue
+            raise ValueError(f"{path}:{line_number}: malformed parity timing row")
+        source_shard_count = len(shard_counts)
+        if source_shard_count not in SOURCE_SHARD_COUNTS:
+            raise ValueError(
+                f"{path}: expected a six- or eight-shard parity source, "
+                f"found {source_shard_count} shards"
+            )
+        if set(shard_counts) != set(range(1, source_shard_count + 1)):
+            raise ValueError(f"{path}: source shard ids are not contiguous: {shard_counts}")
+        if auxiliary and source_shard_count != 8:
+            raise ValueError(f"{path}: auxiliary rows require an eight-shard parity source")
+        if auxiliary and len(auxiliary) != AUXILIARY_TIMING_ROWS:
+            raise ValueError(
+                f"{path}: expected {AUXILIARY_TIMING_ROWS} auxiliary rows, found {len(auxiliary)}"
+            )
         for name, seconds in timings.items():
             observations.setdefault(name, []).append(seconds)
     return {name: max(values) for name, values in observations.items()}
 
 
-def make_plan(binary_id: str, names: list[str], timings: dict[str, float]) -> dict:
+def make_plan(
+    binary_id: str,
+    names: list[str],
+    timings: dict[str, float],
+    timing_sources: list[str] | None = None,
+) -> dict:
     inventory_names = set(names)
     stale = sorted(set(timings) - inventory_names)
     if stale:
@@ -128,7 +168,7 @@ def make_plan(binary_id: str, names: list[str], timings: dict[str, float]) -> di
             "filter": " | ".join(terms),
         })
     return {
-        "timing_sources": ["36260020054", "36265192923"],
+        "timing_sources": timing_sources or [],
         "shard_count": SHARD_COUNT,
         "bins": result,
     }
@@ -145,7 +185,8 @@ def main() -> int:
         output = Path(sys.argv[-1])
         binary_id, names = read_inventory(inventory)
         timings = read_timings(timing_files)
-        plan = make_plan(binary_id, names, timings)
+        timing_sources = [path.stem.rsplit("-", 1)[-1] for path in timing_files]
+        plan = make_plan(binary_id, names, timings, timing_sources)
         output.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(plan, indent=2))
     except (OSError, json.JSONDecodeError, ValueError) as error:

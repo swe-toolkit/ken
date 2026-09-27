@@ -76,16 +76,82 @@ class DurationPlanTests(unittest.TestCase):
         self.assertEqual(len(timings), 185)
         self.assertAlmostEqual(sum(timings.values()), 21608.358)
 
-    def test_two_run_envelope_handles_timing_noise(self):
+    def test_eight_shard_source_excludes_seven_auxiliary_rows(self):
+        path = Path("docs/program/evidence/ci-rt-parity-timings-36276921102.tsv")
+        timings = _SHARD.read_timings([path])
+        self.assertEqual(len(timings), 185)
+        self.assertFalse(any("px8f" in name for name in timings))
+        self.assertAlmostEqual(
+            timings["composed_return_ret_sink_lookup_controls_refuse"], 516.955
+        )
+
+    def test_l2_full_parity_source_reconciles_and_excludes_auxiliary_rows(self):
+        path = Path("docs/program/evidence/ci-rt-parity-timings-36279697268.tsv")
+        rows = [line.split("\t") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 192)
+        self.assertTrue(all(row[-1] == "PASS" for row in rows))
+        parity = [row for row in rows if row[2] == "ken-cli::rt_parity_native"]
+        auxiliary = [row for row in rows if row[2] != "ken-cli::rt_parity_native"]
+        self.assertEqual(len(parity), 185)
+        self.assertEqual(len({row[3] for row in parity}), 185)
+        self.assertEqual(len(auxiliary), 7)
+        expected = {
+            1: (22, 3233.455), 2: (23, 1734.407),
+            3: (23, 3338.692), 4: (23, 2673.518),
+            5: (23, 3446.208), 6: (23, 3310.331),
+            7: (25, 2519.943), 8: (23, 3370.876),
+        }
+        for shard, (count, seconds) in expected.items():
+            shard_rows = [row for row in parity if int(row[0]) == shard]
+            self.assertEqual(len(shard_rows), count)
+            self.assertAlmostEqual(sum(float(row[1]) for row in shard_rows), seconds)
+        self.assertAlmostEqual(sum(float(row[1]) for row in auxiliary), 1247.352)
+        self.assertEqual(len(_SHARD.read_timings([path])), 185)
+
+    def test_tsv_fail_status_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "timings.tsv"
+            path.write_text(
+                "".join(
+                    f"{shard}\t1.000\tken-cli::rt_parity_native\tprobe_{shard}\t"
+                    f"{'FAIL' if shard == 1 else 'PASS'}\n"
+                    for shard in range(1, 9)
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "malformed parity timing row"):
+                _SHARD.read_timings([path])
+
+    def test_four_run_envelope_handles_timing_noise(self):
         paths = [
             Path("docs/program/evidence/ci-rt-parity-timings-36260020054.tsv"),
             Path("docs/program/evidence/ci-rt-parity-timings-36265192923.tsv"),
+            Path("docs/program/evidence/ci-rt-parity-timings-36276921102.tsv"),
+            Path("docs/program/evidence/ci-rt-parity-timings-36279697268.tsv"),
         ]
         timings = _SHARD.read_timings(paths)
         self.assertEqual(len(timings), 185)
         self.assertAlmostEqual(
-            timings["composed_return_ret_sink_lookup_controls_refuse"], 540.754
+            timings["composed_return_ret_sink_lookup_controls_refuse"], 544.099
         )
+        self.assertAlmostEqual(
+            timings["checked_ih_inheritance_and_fresh_result_route_are_byte_inert"],
+            347.889,
+        )
+        plan = _SHARD.make_plan(
+            "ken-cli::rt_parity_native",
+            sorted(timings),
+            timings,
+            ["36260020054", "36265192923", "36276921102", "36279697268"],
+        )
+        assigned = [name for shard in plan["bins"] for _, name in shard["tests"]]
+        self.assertEqual(len(plan["bins"]), 9)
+        self.assertCountEqual(assigned, timings)
+        self.assertEqual(
+            plan["timing_sources"],
+            ["36260020054", "36265192923", "36276921102", "36279697268"],
+        )
+        self.assertAlmostEqual(max(shard["seconds"] for shard in plan["bins"]), 3011.177)
 
 
 if __name__ == "__main__":

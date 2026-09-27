@@ -126,9 +126,10 @@ class Fixtures(unittest.TestCase):
             shard = RT_PARITY_SHARD_COUNT
             path = root.parent / "realized-rt-parity" / f"rt-parity-shard-{shard}" / f"selected-{shard}.json"
             value = json.loads(path.read_text())
+            omitted = f"parity_test_{(shard - 1) * 2 + 1}"
             for suite in value["rust-suites"].values():
-                if "parity_test_15" in suite["testcases"]:
-                    suite["testcases"]["parity_test_15"]["filter-match"]["status"] = "mismatch"
+                if omitted in suite["testcases"]:
+                    suite["testcases"][omitted]["filter-match"]["status"] = "mismatch"
             path.write_text(json.dumps(value))
         self.assert_red(omission, "rt_parity_native shard union differs from full suite")
 
