@@ -284,18 +284,29 @@ third instance means the closure was bypassed. The forged-alias pins forge
 both the flat and the qualified key. The cross-unit inline-path clash is
 `SPEC-MODULE-PATH-SINGLE-OWNER`, not this WP.
 
-12. ruled provider-theorem remedy form not checkable: closed map/zip
-    propositions need a type-position lambda (parse error) and `= Refl` fails
-    on a Top-collapsed Bool goal — keyed on the ruling's prescribed proof
-    syntax and terminal.
+12. prescribed a theorem form and an `= Refl` terminal in words, never
+    checked; the type-position lambda does not parse, and the closed Bool
+    equality needs `Proved`. Keyed on: form not written in the code's
+    vocabulary.
 
 **Predicate for lines 10-12 and closure** (Architect `evt_7gjadvjt4bsgw`,
 stop 12): each ruled remedy prescribed a form or plane in words that was
 never written and checked in the code's own vocabulary first (Check 4 on the
 ruling side). Closure for the rest of this WP: the Architect rules only on
 implementer-supplied, checked text, meaning the exact declaration or test plus
-the targeted command that elaborates it, green or with its exact error. The
-stop-12 ruling waits on a Research advisory.
+the targeted command that elaborates it, green or with its exact error.
+
+**Stop-12 ruling** (Architect `evt_7x0ar6g90f0tp`, on Research
+`evt_676fs7226bmyp`): a closed ground-type theorem uses the terminal its
+reduced proposition needs (`Proved` for a closed Bool equality), never `Refl`
+by default. No helper `fn` enters Vector's owned inventory. Route (iii): one
+`ken example` fence in Vector.ken.md holds fence-local Bool helpers with
+distinct spellings and the closed map/zip theorems. It must (a) leave the
+owned-name and owned-id sets unchanged when measured after the fences run,
+(b) redden the closeout when one expected value changes, and (c) use no
+prelude or catalog spelling. If (iii) fails any of these, the rows fall back
+to H: they stay test-local, with no Vector provider edit, and the measured
+failure is recorded here. A (iii) failure is not a new stop.
 
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
