@@ -34,5 +34,5 @@ the existing test" has this consequence, and it is invisible unless someone
 writes it down.
 
 Related: [[withdraw-and-relocate-test-different-properties]],
-[[amending-a-frame-mid-flight-must-sweep-its-guardrails-section]],
+[[correcting-scope-must-sweep-whole-doc]],
 [[verify-the-report-is-real-before-explaining-it]].

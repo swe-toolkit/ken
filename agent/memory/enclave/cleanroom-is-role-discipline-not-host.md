@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: enclave
 audience: (see scope README)
 source: private memory `cleanroom-is-role-discipline-not-host`
 ---

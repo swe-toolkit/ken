@@ -68,7 +68,7 @@ green. The tell: **the expected term is authored by the same hand and the same
 (wrong) mental model as the reduction**, so a reduction's own round-trip test is
 worthless as a no-regression oracle for a binder bug. This is the reduction-arm
 face of
-[[an-assertion-whose-expected-value-is-computed-from-the-thing-under-test-is-a-theorem]].
+[[a-pin-cannot-disagree-with-its-own-source]].
 
 ## Grounding technique
 

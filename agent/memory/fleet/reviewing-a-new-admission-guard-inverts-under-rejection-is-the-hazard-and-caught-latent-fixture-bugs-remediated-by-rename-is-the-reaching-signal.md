@@ -76,7 +76,7 @@ DecimalPair = MkDecimalPair Int Int` -- a real silent-shadow the guard exposed
 -- and was renamed to `DecimalPairT`, the guard untouched. Always check which
 side moved: guard-weakened-to-pass is the failure mode; fixtures-fixed is the
 success mode.
-`[[a-fail-closed-over-accept-gate-can-have-correct-production-code-but-an-untested-safety-net-negative-arm]]`
+`[[two-arm-producer-needs-a-case-per-arm]]`
 is the dual (a fail-closed over-accept arm needs its own negative test);
 `[[green-vs-green-does-not-confirm-a-fix]]` is the family root.
 

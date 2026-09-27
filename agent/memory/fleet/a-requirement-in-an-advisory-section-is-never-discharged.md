@@ -55,7 +55,7 @@ answer, and is it the question I need answered?**
 Siblings — a check firing on text that denies it,
 [[an-oracle-that-greps-a-name-fires-on-prose-that-denies-it]]; a check silent
 because nothing spoke,
-[[no-error-in-the-output-passes-when-there-is-no-output]]; and
+[[a-capture-that-wrote-zero-bytes-is-a-failed-capture-not-a-clean-build]]; and
 [[a-stand-down-clause-lives-in-prose-where-no-gate-can-reach-it]] — that one is
 this lesson's mirror: there, prose carried an instruction *not* to look; here,
 prose carries an instruction *to* look. **Neither is reachable by a gate.**

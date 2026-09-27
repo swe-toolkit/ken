@@ -85,5 +85,5 @@ evidence either.
 See also
 [[a-review-range-of-sha-caret-to-sha-reads-only-the-last-commit-and-the-scope-check-agrees]],
 [[a-declared-commit-count-that-undercounts-makes-a-whole-deliverable-absent-from-review]],
-[[multi-worktree-cwd-drift-phantom-diff]], and
+[[check-main-via-git-object-store-not-find]], and
 [[a-tools-silence-is-scoped-to-the-question-it-asks]].

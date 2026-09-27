@@ -52,5 +52,5 @@ bounded by what reached `main`, and a restart re-derives every seat's behavior
 from exactly that.
 
 Related: [[compact-wiped-memory-reflog-first]],
-[[multi-worktree-cwd-drift-phantom-diff]],
+[[check-main-via-git-object-store-not-find]],
 [[preventive-findings-are-unfalsifiable-so-keep-them-cheap]].

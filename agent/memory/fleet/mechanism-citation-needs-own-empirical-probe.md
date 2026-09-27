@@ -36,6 +36,6 @@ superficially similar symptoms (both "instance doesn't declare") for
 entirely different underlying reasons. This is the error-citation sibling
 of grounding a named floor by grepping it rather than assuming it — same
 discipline, applied to *why* something fails rather than *whether* a named
-capability exists. See [[frame-pseudocode-diverges-from-landed-mechanism]]
+capability exists. See [[wp-frame-stale-vs-landed-kernel]]
 (same family: prose that describes a mechanism the code doesn't actually
 run).

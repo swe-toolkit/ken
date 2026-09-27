@@ -6,7 +6,8 @@ files, `MEMORY.md` index excluded as a source) into the checked-in
 `agent/memory/` corpus, ahead of the Codex harness switch. Every source file
 appears exactly once below.
 
-**Summary:** 135 kept &middot; 18 merged into a kept file &middot; 11 dropped &middot; 1 excluded (personal) &middot; 165 total sources.
+**Summary:** 135 kept &middot; 18 merged into a kept file &middot; 11 dropped
+&middot; 1 excluded (personal) &middot; 165 total sources.
 
 | Source (former private memory) | Type | Disposition |
 |---|---|---|
@@ -34,12 +35,12 @@ appears exactly once below.
 | `cbv-eliminator-method-laziness` | feedback | kept &rarr; `agent/memory/enclave/cbv-eliminator-method-laziness.md` |
 | `check-main-via-git-object-store-not-find` | feedback | kept &rarr; `agent/memory/fleet/check-main-via-git-object-store-not-find.md` |
 | `class-dict-explicit-vs-implicit-abstract-tyvar` | feedback | kept &rarr; `agent/memory/enclave/class-dict-explicit-vs-implicit-abstract-tyvar.md` |
-| `cleanroom-is-role-discipline-not-host` | feedback | kept &rarr; `agent/memory/fleet/cleanroom-is-role-discipline-not-host.md` |
+| `cleanroom-is-role-discipline-not-host` | feedback | kept &rarr; `agent/memory/enclave/cleanroom-is-role-discipline-not-host.md` |
 | `coexist-over-subsume-when-trust-levels-differ` | feedback | kept &rarr; `agent/memory/enclave/coexist-over-subsume-when-trust-levels-differ.md` |
 | `compact-verify-survey-can-eat-the-compact-command` | feedback | kept &rarr; `agent/memory/fleet/compact-verify-survey-can-eat-the-compact-command.md` |
 | `compact-wiped-memory-reflog-first` | feedback | kept &rarr; `agent/memory/fleet/compact-wiped-memory-reflog-first.md` |
 | `compaction-is-manual-no-clean-seam` | feedback | kept &rarr; `agent/memory/fleet/compaction-is-manual-no-clean-seam.md` |
-| `compaction-render-delay-escape-aborts` | feedback | kept &rarr; `agent/memory/fleet/compaction-render-delay-escape-aborts.md` |
+| `compaction-render-delay-escape-aborts` | feedback | kept &rarr; `agent/memory/fleet/compact-verify-survey-can-eat-the-compact-command.md` |
 | `composition-wp-real-producer-may-be-deferred-engine` | feedback | kept &rarr; `agent/memory/build/qa/composition-wp-real-producer-may-be-deferred-engine.md` |
 | `conformance-assert-at-locked-granularity` | feedback | kept &rarr; `agent/memory/enclave/conformance-assert-at-locked-granularity.md` |
 | `conformance-hand-feeds-the-deliverable` | feedback | kept &rarr; `agent/memory/build/qa/conformance-hand-feeds-the-deliverable.md` |
@@ -82,7 +83,7 @@ appears exactly once below.
 | `hand-built-elim-motive-and-method-gotchas` | project | kept &rarr; `agent/memory/teams/kernel/hand-built-elim-motive-and-method-gotchas.md` |
 | `handoff-is-not-done-review-loop-on-my-spec` | feedback | kept &rarr; `agent/memory/roles/spec-author/handoff-is-not-done-review-loop-on-my-spec.md` |
 | `handoff-scope-count-must-match-full-thread` | feedback | kept &rarr; `agent/memory/fleet/handoff-scope-count-must-match-full-thread.md` |
-| `held-branch-scaffolding-is-load-bearing-evidence` | project | kept &rarr; `agent/memory/fleet/held-branch-scaffolding-is-load-bearing-evidence.md` |
+| `held-branch-scaffolding-is-load-bearing-evidence` | project | kept &rarr; `agent/memory/build/held-branch-scaffolding-is-load-bearing-evidence.md` |
 | `higher-kinded-class-param-and-funext-definitional` | reference | kept &rarr; `agent/memory/enclave/higher-kinded-class-param-and-funext-definitional.md` |
 | `isolate-executed-vs-present-before-naming-perf-cause` | project | kept &rarr; `agent/memory/build/qa/isolate-executed-vs-present-before-naming-perf-cause.md` |
 | `isolate-mechanism-from-orthogonal-fail-closed-gates` | feedback | kept &rarr; `agent/memory/build/qa/isolate-mechanism-from-orthogonal-fail-closed-gates.md` |
@@ -108,7 +109,7 @@ appears exactly once below.
 | `merge-ready-sent-is-a-race-boundary` | feedback | kept &rarr; `agent/memory/roles/spec-leader/merge-ready-sent-is-a-race-boundary.md` |
 | `mootup-posting-from-agent` | reference | kept &rarr; `agent/memory/fleet/mootup-posting-from-agent.md` |
 | `multi-piece-erratum-landing-integrity` | feedback | merged &rarr; `agent/memory/roles/integrator/multi-piece-erratum-verify-all-on-main.md` |
-| `multi-worktree-cwd-drift-phantom-diff` | feedback | kept &rarr; `agent/memory/fleet/multi-worktree-cwd-drift-phantom-diff.md` |
+| `multi-worktree-cwd-drift-phantom-diff` | feedback | kept &rarr; `agent/memory/fleet/check-main-via-git-object-store-not-find.md` |
 | `multipiece-erratum-verify-all-on-main` | feedback | merged &rarr; `agent/memory/roles/integrator/multi-piece-erratum-verify-all-on-main.md` |
 | `my-own-tracker-capability-landed-line-can-be-stale` | feedback | kept &rarr; `agent/memory/roles/steward/my-own-tracker-capability-landed-line-can-be-stale.md` |
 | `named-floor-must-be-grepped-not-assumed` | feedback | kept &rarr; `agent/memory/build/named-floor-must-be-grepped-not-assumed.md` |
@@ -125,7 +126,7 @@ appears exactly once below.
 | `probe-recursion-depth-before-writing-the-real-test` | project | kept &rarr; `agent/memory/build/probe-recursion-depth-before-writing-the-real-test.md` |
 | `proof-relevant-inductive-cannot-be-declared-at-omega` | feedback | kept &rarr; `agent/memory/enclave/proof-relevant-inductive-cannot-be-declared-at-omega.md` |
 | `re-read-latest-events-immediately-before-a-stall-nudge` | feedback | kept &rarr; `agent/memory/fleet/re-read-latest-events-immediately-before-a-stall-nudge.md` |
-| `reason-in-agent-team-hours-not-human-days` | feedback | kept &rarr; `agent/memory/fleet/reason-in-agent-team-hours-not-human-days.md` |
+| `reason-in-agent-team-hours-not-human-days` | feedback | kept &rarr; `agent/memory/enclave/reason-in-agent-team-hours-not-human-days.md` |
 | `reconcile-binds-a-co-reviewers-plausible-reading-too` | feedback | kept &rarr; `agent/memory/enclave/reconcile-binds-a-co-reviewers-plausible-reading-too.md` |
 | `reconcile-own-over-claim-then-grep-coupled` | feedback | kept &rarr; `agent/memory/enclave/reconcile-own-over-claim-then-grep-coupled.md` |
 | `reconcile-proof-rides-elaboration-merge-not-build-phase` | feedback | kept &rarr; `agent/memory/enclave/reconcile-proof-rides-elaboration-merge-not-build-phase.md` |
@@ -147,7 +148,7 @@ appears exactly once below.
 | `steward-coldstart-infra-checks` | feedback | kept &rarr; `agent/memory/roles/steward/steward-coldstart-infra-checks.md` |
 | `steward-must-relay-merges-integrator-notifies-only-steward` | feedback | kept &rarr; `agent/memory/roles/steward/steward-must-relay-merges-integrator-notifies-only-steward.md` |
 | `structural-reachability-beats-empirical-probe-for-dead-code-fix` | feedback | kept &rarr; `agent/memory/build/qa/structural-reachability-beats-empirical-probe-for-dead-code-fix.md` |
-| `surface-the-seam-need-not-your-preferred-mechanism` | feedback | kept &rarr; `agent/memory/fleet/surface-the-seam-need-not-your-preferred-mechanism.md` |
+| `surface-the-seam-need-not-your-preferred-mechanism` | feedback | kept &rarr; `agent/memory/enclave/surface-the-seam-need-not-your-preferred-mechanism.md` |
 | `systems-os-kernel-interface-first-party` | project | kept &rarr; `agent/memory/enclave/systems-os-kernel-interface-first-party.md` |
 | `taint-axis-orientation-needs-distinguishing-pair` | feedback | kept &rarr; `agent/memory/build/qa/taint-axis-orientation-needs-distinguishing-pair.md` |
 | `terminal-gate-resolve-race-resolving-on-cast` | feedback | kept &rarr; `agent/memory/fleet/terminal-gate-resolve-race-resolving-on-cast.md` |
@@ -167,7 +168,7 @@ appears exactly once below.
 | `use-tier-labels-never-model-names` | feedback | kept &rarr; `agent/memory/fleet/use-tier-labels-never-model-names.md` |
 | `verdict-mapping-silence-is-a-latent-conformance-bug` | feedback | kept &rarr; `agent/memory/enclave/verdict-mapping-silence-is-a-latent-conformance-bug.md` |
 | `verified-showcase-predicate-must-be-defined-not-postulated` | feedback | kept &rarr; `agent/memory/enclave/verified-showcase-predicate-must-be-defined-not-postulated.md` |
-| `verify-field-order-arity-against-declaration-not-prose` | feedback | kept &rarr; `agent/memory/fleet/verify-field-order-arity-against-declaration-not-prose.md` |
+| `verify-field-order-arity-against-declaration-not-prose` | feedback | kept &rarr; `agent/memory/build/qa/verify-field-order-arity-against-declaration-not-prose.md` |
 | `verify-proposed-fix-excludes-the-counterexample` | feedback | kept &rarr; `agent/memory/enclave/verify-proposed-fix-excludes-the-counterexample.md` |
 | `verify-symbol-exposure-not-just-call-site-safety` | feedback | kept &rarr; `agent/memory/enclave/verify-symbol-exposure-not-just-call-site-safety.md` |
 | `wp-branch-handoff-deadlock-leader-holds` | project | kept &rarr; `agent/memory/build/leaders/wp-branch-handoff-deadlock-leader-holds.md` |
@@ -239,15 +240,15 @@ New lessons:
 | `fleet/a-guard-on-what-the-command-says-is-not-a-guard-on-what-the-command-does.md` | |
 | `fleet/a-hedge-does-not-constrain-what-is-done-with-the-claim-it-hedges.md` | `discounting-evidence-weight-is-not-declining-to-assert-it` |
 | `fleet/a-measurement-correct-on-one-tree-becomes-a-cross-tree-claim-only-through-a-carry-argument.md` | |
-| `fleet/a-mutation-revert-restores-the-last-commit-not-the-pre-mutation-file.md` | `commit-real-fix-before-any-mutation-proof-reset`, `committing-before-a-mutation-campaign-does-not-protect-work-added-during-it` |
+| `fleet/git-checkout-ref-dot-silently-reverts-uncommitted-edits-worktree-wide.md` | `commit-real-fix-before-any-mutation-proof-reset`, `committing-before-a-mutation-campaign-does-not-protect-work-added-during-it` |
 | `fleet/a-search-run-after-a-fix-lands-includes-the-fix.md` | |
 | `fleet/a-stale-number-that-drifts-into-being-correct-cannot-be-caught-by-checking-it.md` | |
 | `fleet/a-waiver-covers-only-the-issuers-own-gates.md` | `a-waiver-reaches-only-as-far-as-what-the-waiver-holder-owns` |
 | `fleet/a-withdrawal-is-not-delivered-by-being-posted.md` | |
-| `fleet/an-instruction-not-to-recheck-is-what-makes-a-false-negative-durable.md` | |
+| `fleet/a-stand-down-clause-lives-in-prose-where-no-gate-can-reach-it.md` | |
 | `fleet/an-instruction-to-close-is-not-evidence-the-work-behind-it-is-done.md` | |
 | `fleet/an-instrument-that-reports-a-verdict-cannot-distinguish-inapplicable-from-false.md` | `zero-executions-and-never-called-are-two-facts-one-number` |
-| `fleet/landing-a-config-change-on-main-does-not-apply-it-the-consumer-reads-a-working-tree.md` | |
+| `roles/steward/landing-a-config-change-on-main-does-not-apply-it-the-consumer-reads-a-working-tree.md` | |
 | `fleet/never-complete-an-abbreviated-sha-cite-rev-parse.md` | |
 | `fleet/prefer-the-number-the-producer-already-emits-over-one-you-count-yourself.md` | |
 | `fleet/provider-content-refusal-is-a-distinct-stall-class.md` | |

@@ -64,7 +64,7 @@ registered inside `ElabEnv::new()`, so there is no "before" environment. Ask for
 the claim to be narrowed ("these four are transparent definitions, not
 postulates"), not the test widened. Checking whether a repair is writable
 changed the ask here and twice before
-([[an-assertion-whose-expected-value-is-computed-from-the-thing-under-test-is-a-theorem]],
+([[a-pin-cannot-disagree-with-its-own-source]],
 [[a-follow-up-inherits-the-originals-scope-and-the-scope-argument-may-not-transfer]]);
 the instrument's existence is part of the finding, not a detail of the fix.
 
