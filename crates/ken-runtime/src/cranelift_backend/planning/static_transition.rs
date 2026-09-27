@@ -21,6 +21,9 @@ mod joins_traps;
 mod occurrences;
 mod responses;
 mod returned_vis;
+pub(in crate::cranelift_backend) use returned_vis::{
+    PendingVisFrameRegion, PendingVisRecordProtocol,
+};
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
 pub use selected_pending_calls::{

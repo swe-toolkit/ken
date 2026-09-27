@@ -43,6 +43,51 @@ fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
     observation
 }
 
+/// Promise class: durable invariant. The interpreter and native owner must
+/// perform the same ordered effect sequence and return the same terminal
+/// result on an identical checked program. Neither side supplies the other's
+/// expected trace; removing the pending-Vis protocol restores a native trap.
+fn run_with_interpreter(name: &str, source: &str) -> (
+    ken_runtime::EffectObservation,
+    ken_runtime::EffectObservation,
+) {
+    let dir = output_dir(name);
+    std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
+    let output = ken_cli::build_native_program(
+        source, ken_cli::SourceFormat::Ken, name, dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    ).expect("checked PX7-F program compiles to the linked native artifact");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &output.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: dir.path().to_owned(),
+            plan_hash: output.plan_transport_hash,
+        },
+    ).expect("the linked PX7-F native child runs");
+    let mut host = ken_interp::PosixHost::new_at(dir.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        source, ken_cli::SourceFormat::Ken, &[], &[],
+        dir.path().as_os_str().as_encoded_bytes(), &mut host,
+    ).expect("the PX7-F source runs in the interpreter");
+    (native, interpreted)
+}
+
+fn assert_exact_operation_and_terminal_parity(
+    native: &ken_runtime::EffectObservation,
+    interpreted: &ken_runtime::EffectObservation,
+) {
+    assert_eq!(native.effect_trace, interpreted.effect_trace,
+        "every host operation, request, outcome and its order must agree");
+    assert_eq!(native.terminal_exit, interpreted.terminal_exit,
+        "the terminal exit class must agree");
+    assert_eq!(native.terminal_error, interpreted.terminal_error,
+        "the terminal error must agree");
+    assert_eq!(native.exit_status, interpreted.exit_status,
+        "the terminal status must agree");
+}
+
 const ESCAPE_CLOSED: &str = r#"program capabilities FS AFull
 fn escape_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
@@ -440,9 +485,8 @@ fn bounded_epoch_refuses_before_the_checked_program_issues_an_effect() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that. Re-measured at 310bf4f21: owner Vis StaticOriginId(578) fails the Ret-tag check at lowering/units.rs:3663-3671."]
 fn linked_public_right_denial_preserves_exact_masks() {
-    let observation = run("right-denial", RIGHT_NOT_HELD);
+    let (observation, interpreted) = run_with_interpreter("right-denial", RIGHT_NOT_HELD);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
     assert!(observation.effect_trace.iter().any(|event| matches!(
         event.outcome,
@@ -453,6 +497,7 @@ fn linked_public_right_denial_preserves_exact_masks() {
             }
         ))
     )));
+    assert_exact_operation_and_terminal_parity(&observation, &interpreted);
 }
 
 #[cfg(target_os = "linux")]
@@ -460,9 +505,8 @@ fn linked_public_right_denial_preserves_exact_masks() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that. Re-measured at 310bf4f21: owner Vis StaticOriginId(609) fails the Ret-tag check at lowering/units.rs:3663-3671."]
 fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
-    let observation = run("double-release", DOUBLE_RELEASE);
+    let (observation, interpreted) = run_with_interpreter("double-release", DOUBLE_RELEASE);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
     assert_eq!(observation.terminal_error, None);
     let releases = observation
@@ -500,13 +544,16 @@ fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
         1,
         "the owned descriptor is actually closed exactly once"
     );
+    assert_exact_operation_and_terminal_parity(&observation, &interpreted);
 }
 
 /// Promise class: transition sentinel. This pins fixture-local planner origins
-/// until pending-Vis emission is installed. MEASURED: returned source origins,
-/// forwarded-call fixpoint, derived rows, effect seats and actual K captures.
-/// CLAIMED: both px7f owners need only static-operation successors.
-/// THE GAP: emission still must carry and resume them; ignored rows remain red.
+/// until a source occurrence changes the closed response population.
+/// MEASURED: returned source origins, forwarded-call fixpoint, derived rows,
+/// effect seats and actual K captures. CLAIMED: both px7f owners use only
+/// static-operation successors. THE GAP: this planner pin alone does not prove
+/// the emitted record, owner loop or runtime effect sequence; the two executable
+/// native/interpreter differentials and the finished-body verifier do.
 #[cfg(target_os = "linux")]
 #[test]
 fn owner_vis_return_protocol_px7f_planned_fixpoints() {

@@ -80,7 +80,7 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
 pub(in crate::cranelift_backend) use static_transition::{
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
-    FusionRegionClaimLedger,
+    FusionRegionClaimLedger, PendingVisFrameRegion, PendingVisRecordProtocol,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///
@@ -163,8 +163,8 @@ pub(super) use static_transition::{
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
     ContinuationSpecializationId, DeferredResponseRow, DeferredResponseSubCase,
-    ResponseDisposition, StaticResponseContinuation, StaticResponseEffectInput,
-    StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
+    ResponseDisposition, StaticResponseContinuation, StaticResponseContinuationId,
+    StaticResponseEffectInput, StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
     // lowering's test targets so its control can compare the authority against

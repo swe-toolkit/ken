@@ -2074,11 +2074,20 @@ impl<'a> Lowering<'a> {
             let boundary_closure = self
                 .static_transition_plan
                 .predeclared_boundary_closure_environment(target.origin)?;
+            let pending_region = self.pending_vis_record_protocol.as_ref()
+                .map(|protocol| protocol.frame_region(target.header.frame_bytes))
+                .transpose()?;
             let payload = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
-                target.header.frame_bytes,
+                pending_region.map_or(target.header.frame_bytes, |region| region.frame_bytes),
                 3,
             ));
+            if let Some(region) = pending_region {
+                // A fresh callee frame has no pending Vis until its actual
+                // construct site writes the whole record and then the member.
+                let zero = builder.ins().iconst(types::I64, 0);
+                builder.ins().stack_store(zero, payload, region.discriminant);
+            }
             let mut input = 0usize;
             let mut result_offset = None;
             let mut trap_offset = None;
@@ -2391,6 +2400,49 @@ impl<'a> Lowering<'a> {
             builder.seal_block(trap_block);
             builder.switch_to_block(result_block);
             builder.seal_block(result_block);
+            if let (Some(protocol), Some(source), Some(destination)) = (
+                self.pending_vis_record_protocol.as_ref(),
+                pending_region,
+                self.function_local.pending_vis_frame,
+            ) {
+                // Copy up only after both status and Trap checks. The callee
+                // frame is caller-owned but dies when this call site returns;
+                // no pointer into it crosses the function boundary.
+                let member = builder.ins().stack_load(types::I64, payload, source.discriminant);
+                let present = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::NotEqual, member, 0,
+                );
+                let copy = builder.create_block();
+                let ready = builder.create_block();
+                builder.ins().brif(present, copy, &[], ready, &[]);
+                builder.switch_to_block(copy);
+                let copy_words = |builder: &mut FunctionBuilder<'_>,
+                                  start: i32, end: i32, words: u32| -> Result<(), CraneliftBackendError> {
+                    for index in 0..words {
+                        let delta = i32::try_from(index.checked_mul(8)
+                            .ok_or_else(|| backend_module("pending-Vis copy offset exhausted".to_string()))?)
+                            .map_err(|_| backend_module("pending-Vis copy offset exceeds range".to_string()))?;
+                        let from = start.checked_add(delta)
+                            .ok_or_else(|| backend_module("pending-Vis source offset exhausted".to_string()))?;
+                        let to = end.checked_add(delta)
+                            .ok_or_else(|| backend_module("pending-Vis destination offset exhausted".to_string()))?;
+                        let value = builder.ins().stack_load(types::I64, payload, from);
+                        builder.ins().store(MemFlags::trusted(), value, destination.slots, to);
+                    }
+                    Ok(())
+                };
+                copy_words(builder, source.captures, destination.region.captures,
+                    protocol.max_captures)?;
+                copy_words(builder, source.continuation_inputs,
+                    destination.region.continuation_inputs,
+                    protocol.max_continuation_inputs)?;
+                builder.ins().store(MemFlags::trusted(), member,
+                    destination.slots, destination.region.discriminant);
+                builder.ins().jump(ready, &[]);
+                builder.seal_block(copy);
+                builder.switch_to_block(ready);
+                builder.seal_block(ready);
+            }
             let word = builder.ins().stack_load(types::I64, payload, result_offset);
             if let Some(environment) = boundary_closure {
                 let environment_word = CarriedBoundaryWord { word };

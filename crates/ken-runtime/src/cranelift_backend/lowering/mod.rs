@@ -283,9 +283,11 @@ pub(in crate::cranelift_backend) use super::planning::{
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
-    StaticResponseContinuation, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseContinuation, StaticResponseContinuationId,
+    StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
+    PendingVisFrameRegion, PendingVisRecordProtocol,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
@@ -972,6 +974,7 @@ impl ArtifactHelpers<'_> {
             worker_templates: BTreeMap::new(),
             context_calls: BTreeMap::new(),
             static_response_owner: None,
+            pending_vis_frame: None,
             driven_deferred_response_effect: None,
             defining_abi_operands: Vec::new(),
             #[cfg(test)]
@@ -1103,6 +1106,12 @@ struct GeneratedContextCaptures {
     operands: Vec<LoweringOperand>,
 }
 
+#[derive(Clone, Copy)]
+struct PendingVisFrame {
+    slots: cranelift_codegen::ir::Value,
+    region: PendingVisFrameRegion,
+}
+
 struct FunctionLocalRefs {
     /// Typed identity of the generated body currently being lowered. Root
     /// adapters are deliberately outside the five-family grafted-spine graph.
@@ -1215,6 +1224,9 @@ struct FunctionLocalRefs {
     /// `FuncRef` crosses a function.
     context_calls: BTreeMap<ContinuationContextId, units::DeclaredUnitCall>,
     static_response_owner: Option<StaticResponseOwnerId>,
+    /// Caller-owned activation-frame record, present only when the planner has
+    /// a closed non-relay returned-Vis protocol for this compilation.
+    pending_vis_frame: Option<PendingVisFrame>,
     /// The exact Deferred host-effect occurrence currently dispatched by the
     /// statically unrolled response-owner interpreter. This is scoped around
     /// one host dispatch and restores afterwards; it never makes a sibling
@@ -2521,6 +2533,7 @@ pub(in crate::cranelift_backend) enum GeneratedUnitCallInputCaller {
     SourceLexicalClosureArgument,
     SourceLexicalClosureCapture,
     SourceMachineDeclaredUnit,
+    PendingVisRecordCapture,
 }
 
 /// The planner level named by a generated-unit call-input diagnostic.
@@ -3024,6 +3037,7 @@ struct Lowering<'a> {
     /// pins exactly that, by requiring `CompiledModule: 'static`; give the
     /// artifact a borrowed field and the pin stops compiling.
     static_transition_plan: StaticTransitionPlan<'a>,
+    pending_vis_record_protocol: Option<PendingVisRecordProtocol>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,
@@ -7227,6 +7241,144 @@ impl<'a> Lowering<'a> {
     /// the whole-graph preflight refuses one that does not. MEASURED: forcing
     /// every source-call input to cross at the program ROOT -- the maximally
     /// wrong coordinate -- leaves the suite at its exact baseline.
+    /// A pending-Vis record stores only boundary-admissible, first-order
+    /// words. Check the entire specialized value *before* carry_call_input:
+    /// transfer_into_carrier has a separate closure-environment binding route
+    /// which can otherwise carry a constructor containing a closure field.
+    fn carry_pending_vis_capture(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        origin: StaticOriginId,
+        input: LoweringOperand,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        if let LoweringOperand::Specialized(value) = &input {
+            value.boundary_transfer_admissibility()?;
+        }
+        match self.carry_call_input(
+            builder, origin, input,
+            #[cfg(test)]
+            GeneratedUnitCallInputCaller::PendingVisRecordCapture,
+            #[cfg(test)]
+            GeneratedUnitCallInputCallee::Entry(origin),
+        )? {
+            LoweringOperand::Carried(word) => Ok(word),
+            LoweringOperand::Specialized(_) => Err(backend_module(
+                "a pending-Vis capture did not become a carried word".to_string(),
+            )),
+        }
+    }
+
+    /// Mint one producer-origin member and its bounded capture payload. The
+    /// constructor's lowered K operand is the authority for capture *class*;
+    /// the existing successor response row supplies identity, order and ABI.
+    fn record_pending_vis_construct(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        origin: StaticOriginId,
+        constructor: &str,
+        lowered: &[LoweringOperand],
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(row) = self.pending_vis_record_protocol.as_ref()
+            .and_then(|protocol| protocol.members.get(&origin)).cloned() else {
+            return Ok(());
+        };
+        if !constructor.ends_with("::ITree::Vis") || lowered.len() != 2
+            || row.vis_origin() != origin
+        {
+            return Err(backend_module(
+                "a pending-Vis member is not its planned binary Vis occurrence".to_string(),
+            ));
+        }
+        let Some(frame) = self.function_local.pending_vis_frame else {
+            return Err(backend_module(
+                "a pending-Vis construct has no caller-owned activation record".to_string(),
+            ));
+        };
+        let LoweringOperand::Specialized(Lowered::Closure {
+            captures, params, body, ..
+        }) = &lowered[1] else {
+            return Err(backend_module(
+                "a pending-Vis K is not its planned lexical closure".to_string(),
+            ));
+        };
+        if *body != row.k_body_origin() || params.len() != 1
+            || captures.len() != row.captures().len()
+        {
+            return Err(backend_module(
+                "a pending-Vis K disagrees with its exact successor row".to_string(),
+            ));
+        }
+        let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
+            backend_module("a pending-Vis construct has no generated function scope".to_string())
+        })?;
+        let GraftedSpineFunctionScope::ContinuationContext(context_id) = scope else {
+            return Err(backend_module(
+                "a pending-Vis K's continuation inputs lack a context exit".to_string(),
+            ));
+        };
+        if !self.pending_vis_record_protocol.as_ref().is_some_and(|protocol| {
+            protocol.owners.values().any(|owner| owner.contexts.iter().any(|context| {
+                context.context == context_id && context.members.iter().any(|member| member.origin == origin)
+            }))
+        }) {
+            return Err(backend_module(
+                "a pending-Vis construct disagrees with its planned K-context exit".to_string(),
+            ));
+        }
+        let context = self.static_transition_plan.continuation_contexts()?
+            .into_iter().find(|context| context.id() == context_id)
+            .ok_or_else(|| backend_module("a pending-Vis source context was not generated".to_string()))?;
+        let context_captures = context.captures()?;
+        let mut continuation_inputs = Vec::new();
+        for (_destination_ordinal, source, _destination_abi_position) in row.continuation_inputs() {
+            // These are two different ABI planes: the response-row position
+            // names the *destination* owner Capture slot, while the source
+            // coordinate locates this value in the *current* K context.
+            let matches = context_captures.iter()
+                .filter(|capture| capture.coordinate == *source).collect::<Vec<_>>();
+            let [source_capture] = matches.as_slice() else {
+                return Err(backend_module(
+                    "a pending-Vis continuation input has no unique source context capture".to_string(),
+                ));
+            };
+            let source_position = context.parameters().checked_add(source_capture.ordinal)
+                .ok_or_else(|| backend_module("pending-Vis source context position exhausted".to_string()))?;
+            let slot = context.slots().get(source_position as usize)
+                .ok_or_else(|| backend_module("a pending-Vis continuation input has no source slot".to_string()))?;
+            if slot.kind != AbiSlotKind::Capture || slot.ordinal != source_capture.ordinal {
+                return Err(backend_module(
+                    "a pending-Vis continuation input disagrees with its source context Capture slot".to_string(),
+                ));
+            }
+            let operand = self.function_local.defining_abi_operands
+                .get(source_position as usize).cloned()
+                .ok_or_else(|| backend_module("a pending-Vis context has no declared continuation input".to_string()))?;
+            continuation_inputs.push(operand);
+        }
+        let offset_at = |base: i32, index: usize| -> Result<i32, CraneliftBackendError> {
+            let delta = index.checked_mul(8)
+                .and_then(|bytes| i32::try_from(bytes).ok())
+                .ok_or_else(|| backend_module("pending-Vis record offset exhausted".to_string()))?;
+            base.checked_add(delta).ok_or_else(|| backend_module(
+                "pending-Vis record slot exceeds addressable range".to_string(),
+            ))
+        };
+        for (capture, input) in row.captures().iter().zip(captures.iter().cloned()) {
+            let word = self.carry_pending_vis_capture(builder, capture.origin(), input)?;
+            builder.ins().store(MemFlags::trusted(), word.word, frame.slots,
+                offset_at(frame.region.captures, capture.ordinal() as usize)?);
+        }
+        for (index, input) in continuation_inputs.into_iter().enumerate() {
+            let word = self.carry_pending_vis_capture(builder, origin, input)?;
+            builder.ins().store(MemFlags::trusted(), word.word, frame.slots,
+                offset_at(frame.region.continuation_inputs, index)?);
+        }
+        let member = builder.ins().iconst(types::I64, i64::from(row.id().ordinal()) + 1);
+        builder.ins().store(MemFlags::trusted(), member, frame.slots,
+            frame.region.discriminant);
+        Ok(())
+    }
+
     fn carry_call_input(
         &mut self,
         builder: &mut FunctionBuilder<'_>,

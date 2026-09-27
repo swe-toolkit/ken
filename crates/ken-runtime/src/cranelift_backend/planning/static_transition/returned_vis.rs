@@ -5,11 +5,11 @@
 //! a constructor tag is not an occurrence identity and a locally emitted Vis is
 //! not necessarily a returned Vis.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::continuations::ContinuationContextId;
 use super::occurrences::StaticOriginId;
-use super::responses::StaticResponseContinuation;
+use super::responses::{StaticResponseContinuation, StaticResponseContinuationId};
 use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit};
 use super::{planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::RuntimeExpr;
@@ -36,7 +36,108 @@ pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
     pub(in crate::cranelift_backend) excluded_by_relay: bool,
 }
 
+/// A checked, program-local pending-return domain. Each member uses the
+/// *existing response row* as its only identity/ABI/effect authority. The
+/// discriminant is the row id plus one; zero is never a Vis member. No record
+/// exists for an owner with a relay or an unknown returned-result endpoint.
+#[derive(Clone, Debug)]
+pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
+    pub(in crate::cranelift_backend) owners:
+        BTreeMap<StaticResponseContinuationId, ReturnedVisProtocol>,
+    pub(in crate::cranelift_backend) members:
+        BTreeMap<StaticOriginId, StaticResponseContinuation>,
+    pub(in crate::cranelift_backend) max_captures: u32,
+    pub(in crate::cranelift_backend) max_continuation_inputs: u32,
+}
+
+/// The tail of a caller-owned activation frame. Its shape is projected once
+/// from the closed successor population, never from a constructor tag or an
+/// emitter-local count. The caller allocates it; the callee writes it before
+/// returning and the caller copies it into its own frame before its next call.
+#[derive(Clone, Copy, Debug)]
+pub(in crate::cranelift_backend) struct PendingVisFrameRegion {
+    pub(in crate::cranelift_backend) discriminant: i32,
+    pub(in crate::cranelift_backend) captures: i32,
+    pub(in crate::cranelift_backend) continuation_inputs: i32,
+    pub(in crate::cranelift_backend) frame_bytes: u32,
+}
+
+impl PendingVisRecordProtocol {
+    pub(in crate::cranelift_backend) fn frame_region(
+        &self,
+        base_bytes: u32,
+    ) -> Result<PendingVisFrameRegion, CraneliftBackendError> {
+        let bytes = |words: u32| -> Result<u32, CraneliftBackendError> {
+            words.checked_mul(8).ok_or_else(|| planner_error("pending-Vis frame word count exhausted"))
+        };
+        let captures = base_bytes.checked_add(bytes(1)?)
+            .ok_or_else(|| planner_error("pending-Vis discriminant offset exhausted"))?;
+        let continuation_inputs = captures.checked_add(bytes(self.max_captures)?)
+            .ok_or_else(|| planner_error("pending-Vis capture offset exhausted"))?;
+        let frame_bytes = continuation_inputs.checked_add(bytes(self.max_continuation_inputs)?)
+            .ok_or_else(|| planner_error("pending-Vis frame size exhausted"))?;
+        let addressable = |offset: u32| i32::try_from(offset)
+            .map_err(|_| planner_error("pending-Vis frame offset exceeds addressable range"));
+        Ok(PendingVisFrameRegion {
+            discriminant: addressable(base_bytes)?,
+            captures: addressable(captures)?,
+            continuation_inputs: addressable(continuation_inputs)?,
+            frame_bytes,
+        })
+    }
+}
+
 impl StaticTransitionPlan<'_> {
+    /// Only a complete, non-relay closed fixpoint may activate the record.
+    /// Every other owner retains the existing Ret-only refusal; an unknown
+    /// generated endpoint never becomes an invented member of a partial set.
+    pub(in crate::cranelift_backend) fn pending_vis_record_protocol(
+        &self,
+    ) -> Result<Option<PendingVisRecordProtocol>, CraneliftBackendError> {
+        let mut owners = BTreeMap::new();
+        let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
+        let mut max_captures = 0u32;
+        let mut max_continuation_inputs = 0u32;
+        for owner in &self.static_response_continuations {
+            let Ok(protocol) = self.returned_vis_protocol(owner.vis_origin()) else {
+                // No partial protocol: the existing Ret-only owner stays intact.
+                continue;
+            };
+            if protocol.excluded_by_relay || protocol.contexts.iter().all(|ctx| ctx.members.is_empty()) {
+                continue;
+            }
+            for member in protocol.contexts.iter().flat_map(|context| &context.members) {
+                let row = member.successor.as_ref().ok_or_else(|| {
+                    planner_error("a pending-Vis member has no exact successor response row")
+                })?;
+                if member.relay {
+                    return Err(planner_error("a relay entered a non-relay pending-Vis protocol"));
+                }
+                if row.id().ordinal() == u32::MAX {
+                    return Err(planner_error("pending-Vis discriminant exhausted"));
+                }
+                max_captures = max_captures.max(u32::try_from(row.captures().len())
+                    .map_err(|_| planner_error("pending-Vis capture run exhausted"))?);
+                max_continuation_inputs = max_continuation_inputs.max(
+                    u32::try_from(row.continuation_inputs().len())
+                        .map_err(|_| planner_error("pending-Vis continuation input run exhausted"))?
+                );
+                if let Some(previous) = members.insert(member.origin, row.clone()) {
+                    if previous.id() != row.id() {
+                        return Err(planner_error("a pending-Vis occurrence has conflicting response-row identities"));
+                    }
+                }
+            }
+            owners.insert(owner.id(), protocol);
+        }
+        Ok((!owners.is_empty()).then_some(PendingVisRecordProtocol {
+            owners,
+            members,
+            max_captures,
+            max_continuation_inputs,
+        }))
+    }
+
     /// The only permitted case exclusion: the *same* planned-result traversal
     /// proves the scrutinee's COMPLETE terminal inventory to be constructors.
     /// Unknown results keep all cases live rather than inventing deadness.
