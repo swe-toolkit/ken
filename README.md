@@ -56,67 +56,58 @@ resolved by hidden convention.
 
 ## Catalog
 
-[`catalog/`](catalog/) is the public, executable guide to the language. It is
-both reference material and real Ken source checked by the toolchain.
+[`catalog/`](catalog/) contains checked package sources and compatibility
+pointers to the maintained authoring guides. The guides now live in
+[`library/guide/`](library/guide/); `catalog/guide/` is not a second maintained
+copy. The checked packages include laws, proofs, examples, and design rationale
+across core abstractions, collections, parsing, effects, and other areas. The
+[package subject index](library/reference/catalog/subjects.md) and package
+cards provide a partial, reader-oriented reference; the catalog sources remain
+the checked basis for those entries.
 
-- [`catalog/guide/`](catalog/guide/) teaches the surface language and its proof
-  techniques.
-- [`catalog/packages/`](catalog/packages/) contains standard packages with
-  their laws, proofs, examples, and design rationale.
-- Literate `.ken.md` files keep explanations next to the code while preserving
-  byte-stable prose during formatting.
-- The catalog covers core abstractions, lawful functors and classes, natural
-  ordering, sums, maps, parsing, effects, collections, and related proof
-  patterns.
-
-The catalog is a good place to begin if you want to see how Ken reads before
-diving into the normative specification.
+The catalog is a useful place to read Ken before consulting the normative
+specification.
 
 ## Interpreter and compiler
 
 Ken has two execution paths with deliberately different roles.
 
-The **reference interpreter** defines program behavior. It evaluates Ken using
-strict call-by-value semantics over the content-addressed value model and drives
+The **reference interpreter** evaluates supported Ken programs using strict
+call-by-value evaluation over the content-addressed value model and drives
 supported effects through explicit capabilities. The REPL and `ken run` use
-this path. When another execution backend disagrees with the interpreter, the
-interpreter is the semantic reference.
+this execution path. The interpreter is the reference semantics. Native
+correctness is agreement with the interpreter on the differential corpus.
 
 The **Rust bootstrap compiler** consumes kernel-admitted checked core, erases
-proof-only content, lowers executable code to Ken's runtime IR, and uses
-Cranelift to produce native artifacts for the supported closed-program subset.
-Native results are compared with the interpreter, and build artifacts carry
-provenance and trust information. The compiler is not part of the
+proof-only content, lowers executable code to Ken runtime IR, and uses
+Cranelift to emit native artifacts for a narrow Ken-only executable route.
+Compiler and runtime checks record bounded evidence about admission, lowering,
+artifacts, and selected execution comparisons. Native emission and smoke
+results are not proofs of semantic equivalence. The compiler is not part of the
 type-soundness trust root: compilation bugs must not become false proofs.
 
-The compiler and interpreter therefore complement each other. The interpreter
-provides the simple, stable meaning of a program; the compiler provides native
-execution while remaining accountable to that meaning.
+The compiler and interpreter provide distinct execution routes. The
+[compiler implementation guide](library/guide/compiler/README.md) describes
+their boundaries and current limitations.
 
 ## Command-line tools
 
-The `ken` driver currently provides:
+The `ken` driver provides `check`, `run`, `native-build`, `fmt`, `repl`,
+`version`, and `help`. The current command forms are documented in the
+[toolchain reference](library/reference/toolchain/README.md).
 
-```text
-ken check <file>
-ken run <file> [-- <arguments>...]
-ken fmt [--check] <paths...>
-ken repl
-ken version
-```
-
-`check` elaborates source and verifies literate fence expectations without
-running a program. `run` executes a Console-capable entry point through the
-reference interpreter. `fmt` canonicalizes plain and literate Ken source.
-
-Full support for building command-line tools is in progress. A full POSIX
-interface and Linux ABI support are up next. Until those surfaces land, the
-current command runner and native executable path should be read as supported
-subsets rather than a complete systems interface.
+`check` elaborates source and checks literate fence expectations without
+running a program. `run` executes an admitted `main` entry point through the
+reference interpreter. `native-build` emits a native artifact for a supported
+program and requires an output directory. `fmt` canonicalizes plain and
+literate Ken source. Native execution and host-effect support remain scoped
+subsets; the compiler guide and toolchain reference document their refusal and
+availability boundaries.
 
 ## Repository map
 
-- [`catalog/`](catalog/) — executable guide and standard packages.
+- [`catalog/`](catalog/) — checked standard packages and compatibility
+  pointers to guides.
 - [`crates/`](crates/) — the kernel, elaborator, prover-facing surface,
   interpreter, runtime/compiler support, content-addressed foundation, and CLI.
 - [`spec/`](spec/) — normative language and runtime specification.
@@ -127,13 +118,14 @@ subsets rather than a complete systems interface.
 
 ## Build
 
-Ken is implemented in Rust. To build the CLI and run the workspace tests:
+Ken is implemented in Rust. Build and run the CLI with:
 
 ```bash
-cargo build --workspace --locked
-cargo test --workspace --locked
+cargo build -p ken-cli --locked
 cargo run -p ken-cli -- help
 ```
+
+To run the CLI crate's tests, use `cargo test -p ken-cli --locked`.
 
 ## License
 
