@@ -2833,7 +2833,7 @@ impl<'a> Lowering<'a> {
                 if self.static_transition_plan
                     .static_response_placeholder_licensed(site, scope)? {
                     return Ok(LoweringOperand::Specialized(
-                        Lowered::StaticResponseDeferred,
+                        Lowered::StaticResponseDeferred { site },
                     ));
                 }
                 // Unlicensed: an edge no owner replaces enters this function

@@ -164,8 +164,14 @@ pub use planning::{
     DeferredResponseObservation, RetainedResultClosureProofMutation,
     StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
     StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
-    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
+    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation,
+    ReturnedVisMemberObservation, ReturnedVisProtocolObservation, WorkerPrefixDeferral,
 };
+
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::{with_returned_vis_capture_observations, ReturnedVisCaptureObservation};
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::calls::with_placeholder_nonowner_target_mutation;
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{

@@ -773,8 +773,42 @@ fn buffer_freeze_outcome(
 // which carries no signature of its own. The signature above is the
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
+/// Promise class: transition sentinel. The fixture's planner-issued origins
+/// are rechecked if its compiler shape changes. MEASURED: owner 1298's exact
+/// planned returned-set contains a relay and opts the whole owner out.
+/// CLAIMED: the pending-Vis protocol must never run partially on this owner.
+/// THE GAP: emission is not installed yet; the ignored native row separately
+/// preserves today's exact -1 Ret-tag failure until the successor repairs K.
 #[test]
-#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE D1: paired BufferFreeze carried start/length seat repair now passes AC-0 refusal; next first failure is a runtime -1 from response-owner Ret-tag check for Vis StaticOriginId(1298), lowering/units.rs:3663-3671. Remains ignored pending the distinct owner continuation repair; AC-0 at 310bf4f21 was BufferFreeze Argument(1) ExactIntU64 unavailable in CarriedWord"]
+fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
+    in_large_stack_thread("rt-escape-r2-protocol-exclusion", || {
+        let root = output_dir("r2-protocol-exclusion");
+        let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            ken_cli::build_native_program(
+                R2_CROSS_BUFFER_FREEZE, ken_cli::SourceFormat::Ken,
+                "rt_escape_r2_cross_buffer_freeze", root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        });
+        let _output = compiled.expect("r2 compiles to the current fail-closed artifact");
+        let protocols = diagnostics.iter().flat_map(|plan| &plan.returned_vis_protocols)
+            .filter(|protocol| protocol.owner_origin == 1298).collect::<Vec<_>>();
+        assert_eq!(protocols.len(), 1, "one r2 response owner exists");
+        let protocol = protocols[0];
+        assert!(protocol.error.is_none(), "r2 return analysis refused: {:?}", protocol.error);
+        assert!(protocol.excluded_by_relay, "r2 cannot take the partial pending-Vis route");
+        eprintln!("RT-OWNER-VIS EXCLUDED R2 {protocol:?}");
+        let members = protocol.contexts.iter().flat_map(|(_, members)| members)
+            .collect::<Vec<_>>();
+        assert!(members.iter().any(|member| member.origin == 577 && member.relay
+            && member.successor_id.is_none()), "r2's live returned relay has no K value");
+        assert!(members.iter().any(|member| member.origin == 746 && !member.relay
+            && member.successor_id.is_some()), "r2 still has an independent static successor");
+    });
+}
+
+#[test]
+#[ignore = "RT-SOURCE-IH-RELAY-K-VALUE: BufferFreeze carried-seat repair passes its earlier refusal; owner 1298 still reaches the unchanged Ret-tag trap (-1). Its Vis577 relay K is RecursiveBackedge, not a transferable value; this row stays ignored under the successor after RT-OWNER-VIS-RETURN-PROTOCOL descoped it."]
 fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds() {
     in_large_stack_thread("rt-escape-r2", || {
         // R2 reaching lane: two nested buffer resources compile and run; a span

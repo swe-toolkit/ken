@@ -2621,6 +2621,16 @@ owner_body_control_test!(
     CallBeforeHostValidation,
     "called K before host response validation completed"
 );
+// Promise class: durable invariant. A finished owner loading its declared
+// parameter-zero placeholder into K must fail at the exact finished-body
+// verifier, not at an earlier status or caller-side disposition check.
+owner_body_control_test!(
+    static_response_owner_body_placeholder_load_reds_and_restores,
+    "placeholder-load",
+    "rt_read_offset_stage",
+    LoadPlaceholderIntoK,
+    "a response owner loaded its deferred parameter-zero placeholder"
+);
 owner_body_control_test!(
     static_response_owner_body_after_answer_collapse_reds_and_restores,
     "after-answer-collapse",
