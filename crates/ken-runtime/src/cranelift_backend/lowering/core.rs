@@ -15203,12 +15203,13 @@ impl<'a> Lowering<'a> {
                 let matched_field_words = inputs
                     .iter()
                     .map(|input| match input {
-                        LoweringOperand::Carried(word) => word.word,
-                        LoweringOperand::Specialized(_) => unreachable!(
-                            "carry_call_input always returns a carried field"
-                        ),
+                        LoweringOperand::Carried(word) => Ok(word.word),
+                        LoweringOperand::Specialized(_) => Err(backend_module(
+                            "a static Match case parameter reached the observation as a compile-time operand"
+                                .to_string(),
+                        )),
                     })
-                    .collect::<Vec<_>>();
+                    .collect::<Result<Vec<_>, _>>()?;
                 inputs.extend(
                     captures
                         .iter()
