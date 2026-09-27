@@ -63,7 +63,9 @@ pending-call. it has to be addressed."). Spec serves BYTES D2.
 **2026-09-26** ("concur with rec."): the three `l1_acceptance` ignored rows
 go to L2 and `ds5b` to L1; TCB growth they need still returns to the operator.
 **2026-09-26:** "CI is now at 28 minutes. schedule work to bring that down
-under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`. Memory
+under 20." Verify ring, concurrent: `CI-UNDER-TWENTY-MINUTES`.
+**2026-09-27:** "keep the 20-job cap; fit CI under it. If 20 minutes is no
+longer possible, then keep the workload balanced across the 20 jobs." Memory
 program R1-R5, R7 (research report `7b545fbb1`): "You may update skills,
 coordination.md, and scripts as necessary." R2 waits on the search log.
 
