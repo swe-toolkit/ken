@@ -131,16 +131,15 @@ fn evaluate_boolean_list(env: &ElabEnv, name: &str) -> Vec<bool> {
 }
 
 /// Promise class: durable checked-identity invariant.
-/// MEASURED: a forged flat `pushFront` alias cannot replace the owned Deque ID
-/// selected by the host. CLAIMED: host probes inspect checked Deque ownership,
+/// MEASURED: forged flat aliases for every named Deque global cannot replace
+/// the provider-owned IDs selected by the host. CLAIMED: host probes inspect checked Deque ownership,
 /// not a mutable flat fixture binding. THE GAP: source access is separately
 /// governed by the loader-visible closeout pin.
 #[test]
 fn entry_elaborates_and_registers_operations_and_laws() {
     let mut env = loaded_env();
     let forged = env.globals[&format!("{DERIVED}.reverse")];
-    env.globals.insert("pushFront".to_owned(), forged);
-    for name in [
+    let names = [
         "Deque",
         "MkDeque",
         "empty",
@@ -154,7 +153,11 @@ fn entry_elaborates_and_registers_operations_and_laws() {
         "PopPreserves",
         "popFront_pushFront",
         "popBack_pushBack",
-    ] {
+    ];
+    for name in names {
+        env.globals.insert(name.to_owned(), forged);
+    }
+    for name in names {
         let qualified = format!("{DEQUE}.{name}");
         let id = env
             .globals
@@ -169,9 +172,7 @@ fn entry_elaborates_and_registers_operations_and_laws() {
             env.env.lookup(id).is_some()
         };
         assert!(checked, "`{qualified}` must be a real kernel-checked global");
-        if name == "pushFront" {
-            assert_ne!(id, forged, "flat alias must not spoof Deque ownership");
-        }
+        assert_ne!(id, forged, "flat alias must not spoof Deque.{name}");
     }
 }
 

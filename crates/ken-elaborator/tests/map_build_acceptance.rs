@@ -39,18 +39,30 @@ fn checked_map_id(env: &ElabEnv, name: &str) -> GlobalId {
 }
 
 /// Promise class: durable checked-identity invariant.
-/// MEASURED: a forged flat Map operation alias does not change the provider
-/// identity selected by the host. CLAIMED: H probes read checked Map ownership,
+/// MEASURED: forged flat aliases for the named Map operations and carrier
+/// do not change provider IDs selected by the host. CLAIMED: H probes read checked Map ownership,
 /// not a mutable source-fixture spelling. THE GAP: selective import visibility
 /// is pinned separately by `cat_map_dom_member`.
 #[test]
-fn checked_map_host_read_ignores_forged_flat_insert_alias() {
+fn checked_map_host_read_ignores_forged_flat_aliases() {
     let mut env = checked_map_env();
-    let canonical = env.globals[&format!("{MAP_MODULE}.insert")];
     let forged = env.globals["Data.Sums.Combinators.is_some"];
-    assert_ne!(canonical, forged);
-    env.globals.insert("insert".to_owned(), forged);
-    assert_eq!(checked_map_id(&env, "insert"), canonical);
+    let names = [
+        "Tree", "empty", "to_list", "fold", "insert", "lookup", "member",
+        "from_list", "from_list_acc", "set_insert", "set_member",
+        "set_to_list", "Ordered", "all_keys", "lookup_empty_is_none", "succ",
+    ];
+    let canonical = names
+        .iter()
+        .map(|name| (*name, checked_map_id(&env, name)))
+        .collect::<Vec<_>>();
+    for (name, id) in &canonical {
+        assert_ne!(*id, forged);
+        env.globals.insert((*name).to_owned(), forged);
+    }
+    for (name, id) in canonical {
+        assert_eq!(checked_map_id(&env, name), id);
+    }
 }
 
 /// The stated stack for the D1 legacy-frame budget instrument. Two MiB remains
