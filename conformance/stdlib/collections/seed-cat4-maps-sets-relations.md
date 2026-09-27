@@ -876,6 +876,8 @@ the exact candidate, not merely to the historical CAT-4 fork record.
 
 This CAT-MAP clarification was derived from Ken's amended specification, the
 settled Architect ruling, Ken's own producer/test artifacts, and first
-principles. No `local/refs/` implementation, permissive reference, copyleft
-reference, or excluded prototype was consulted for this amendment. An
-originality scan is not applicable.
+principles. The Research advisory also consulted prior art on library ownership
+and re-export practice from Haskell, Mathlib/Lean, Rust, and Agda; that material
+informed governance approach only, and no source expression was copied. No
+copyleft reference, `local/refs/` implementation, or excluded prototype was
+consulted. A copyleft originality scan is not applicable.
