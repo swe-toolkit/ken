@@ -86,4 +86,12 @@ Architect, and built, that un-ignores all three rows.
    reachability from the call graph, not the per-owner bind-authorization
    plane `boundary_bind_continuation_environment_by_record`
    (evt_c44hkkk52q5x, ruled evt_1d9s0xdpjak13: pin (b) replaced by the two
-   measured refusals; N3 slots sized per owner chain). Next trigger 3.
+   measured refusals; N3 slots sized per owner chain).
+3. the new pending-Vis finished-body verifier refuses the test-only
+   `BypassRetValidationAndReturnVis` owner that px7m builds to witness the
+   C2 inner Vis trap (Full CI red, run 36357595445) -- keyed on which
+   verifier arm the bypass owner reaches; the base exempts it only on the
+   Ret-only arm (evt_65v1p226dzrp; Architect evt_1pv15tg594j25: §1b, entries
+   2 and 3 share "a layer added in front of a bypass changes what the bypass
+   reaches"; closure is a measured layer matrix; Research called). Next
+   trigger 4.
