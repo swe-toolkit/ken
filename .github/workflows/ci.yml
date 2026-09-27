@@ -65,24 +65,28 @@ jobs:
   # The publisher must verify that every intended first-wave job starts within
   # about 15s of the run start; this plan alone is not a wall-time measurement.
   #
-  # Six parity timing sources give a 2,768.095s maximum assigned sum over
-  # 185 tests. Five workspace sources give a 2,725.667s maximum over 4,152
-  # tests. These upper-envelope sums balance test work; they are not wall-time
-  # forecasts.
+  # Six parity sources balance 185 tests to 2,768.095s max assigned sum.
+  # Five workspace sources cover 4,152 historical tests; their upper-envelope
+  # plan max is 2,725.667s. These are assignment sums, not wall forecasts.
   #
-  # Runs 36285524404 and 36295180542 each add 4,152 complete PASS workspace
-  # timings. L2 run 36279697268 was red: only shards 2, 4, 5 and 8 completed
-  # (1,844 rows); its five partial-failure shards remain raw evidence but stay
-  # out of planner input and full-shard totals. The five-source envelope keeps
-  # the 600s default for live tests without an observation. On the latest run,
-  # the new plan's maximum measured test-work sum is 2,256.511s, down from
-  # 2,598.135s for the old mapping. Shard 1's 591.502s longest test is below
-  # the conservative 684s floor bound (1,000s runner-up minus all 316s of
-  # shard-1 non-test time). The measured single-test gap rules out that floor.
-  # Scaling the new shard-1 sum (2,162.883s) by its run's 891.048/2,598.135
-  # nextest-to-test-sum ratio, while retaining all 315.952s non-test wall,
-  # projects about 1,058s (17.6m). This is only a calibration; Full CI must
-  # measure worker wall.
+  # Run 36295180542 contributes 4,152 complete PASS workspace timings. L2 run
+  # 36279697268 was red: only shards 2, 4, 5 and 8 completed (1,844 rows); its
+  # partial-failure shards remain evidence but stay out of planner input. Main
+  # re-enabled one ds5b test after run 36295180542, so the live inventory now
+  # has 4,153 identities; that unmeasured test receives the 600s default.
+  # The dual-metric plan balances the five-source envelope from 2,781.992s
+  # to 2,816.276s (34.284s spread); latest-run work including the default is
+  # 2,155.958s to 2,163.283s. Run 362951's original map had a 2,598.135s
+  # latest-work maximum. The prior candidate map with the live test/default
+  # reached 2,360.657s; the 4,153-identity dual plan reduces that to 2,163.283s.
+  #
+  # Among run 362951's 4,152 measured tests, shard 1's 591.502s longest is
+  # below the conservative 684s floor bound (1,000s runner-up minus all 316s
+  # of shard-1 non-test time). The newly active 4,153rd test is unmeasured;
+  # its 600s default is not evidence about its actual duration. Scaling the new
+  # latest-source max by 891.048/2,598.135 and retaining 315.952s non-test wall
+  # projects 1,057.865s (17.63m). This is a calibration, not wall evidence;
+  # Full CI must measure worker wall and the new test's duration.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
   # slowest crate (`ken-cli` holds the heaviest binaries). Seven runners x 4
@@ -169,6 +173,7 @@ jobs:
             docs/program/evidence/ci-workspace-timings-36279697268-completed-shards.tsv \
             docs/program/evidence/ci-workspace-timings-36285524404.tsv \
             docs/program/evidence/ci-workspace-timings-36295180542.tsv \
+            --balance-with docs/program/evidence/ci-workspace-timings-36295180542.tsv \
             --output-dir duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then

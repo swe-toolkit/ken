@@ -140,6 +140,17 @@ class DurationShardControls(unittest.TestCase):
             shard = int(match.group("shard"))
             count, total = by_shard.get(shard, (0, 0.0))
             by_shard[shard] = (count + 1, total + seconds)
+        # Model the merge-ref live inventory after run 362951 re-enabled ds5b.
+        active_test = (
+            "ken-elaborator::ds5b_dependent_match_refinement_acceptance",
+            "two_vector_zip_recursive_step_convoy_fixture",
+        )
+        active_suite = suites[active_test[0]]
+        self.assertNotIn(active_test[1], active_suite["testcases"])
+        self.assertNotIn(f"{active_test[0]} {active_test[1]}", latest)
+        active_suite["testcases"][active_test[1]] = {
+            "filter-match": {"status": "matches"}
+        }
         expected_shards = {
             1: (592, 2598.135), 2: (593, 1760.703),
             3: (593, 2037.521), 4: (594, 2437.975),
@@ -176,9 +187,9 @@ class DurationShardControls(unittest.TestCase):
             for suite in suites.values()
             for name in suite["testcases"]
         }
-        self.assertEqual(len(identities), 4152)
+        self.assertEqual(len(identities), 4153)
 
-        old_sources = [
+        source_paths = [
             Path("docs/program/evidence") / name
             for name in (
                 "ci-workspace-timings-36265192923.tsv",
@@ -191,71 +202,113 @@ class DurationShardControls(unittest.TestCase):
             inventory_path = Path(temporary) / "inventory.json"
             inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
 
-            def run_plan(sources):
+            def run_plan(balance_with=None):
+                output_dir = Path(temporary) / (
+                    "balanced" if balance_with is not None else "upper-only"
+                )
+                command = [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(inventory_path),
+                    *[str(path.resolve()) for path in [*source_paths, source]],
+                ]
+                if balance_with is not None:
+                    command.extend(["--balance-with", str(balance_with.resolve())])
+                command.extend(["--output-dir", str(output_dir)])
                 result = subprocess.run(
-                    [sys.executable, str(SCRIPT), str(inventory_path)]
-                    + [str(path.resolve()) for path in sources],
+                    command,
                     text=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
-                return json.loads(result.stdout)["bins"]
+                assignment = json.loads(result.stdout)
+                self.assertEqual(
+                    json.loads((output_dir / "assignments.json").read_text()),
+                    assignment,
+                )
+                return assignment["bins"], result.stderr
 
-            old_plan = run_plan(old_sources)
-            new_plan = run_plan([*old_sources, source])
+            current_plan, _ = run_plan()
+            balanced_plan, balance_stderr = run_plan(source)
 
-        old_bins = {
-            tuple(identity): shard["bin"]
-            for shard in old_plan
-            for identity in shard["tests"]
-        }
-        new_bins = {
-            tuple(identity): shard["bin"]
-            for shard in new_plan
-            for identity in shard["tests"]
-        }
-        longest = (
-            "ken-elaborator::lang_mod_strict_resolution_d0",
-            "catalog_ambient_passthrough_migration_census",
-        )
-        second = (
-            "ken-verify",
-            "scenario::tests::fs_remove_directory_real_artifact_honors_the_nontransactional_carve_out",
-        )
-        third = (
-            "ken-verify",
-            "scenario::tests::fs_remove_file_real_artifact_distinguishes_success_wrong_kind_and_missing",
-        )
-        self.assertEqual(old_bins[longest], 1)
-        self.assertEqual(new_bins[longest], 1)
-        for identity in (second, third):
-            self.assertEqual(old_bins[identity], 1)
-            self.assertNotEqual(new_bins[identity], 1)
-
-        def measured_loads(plan):
+        def assigned_bins(plan):
             planned = [
-                (binary_id, name)
+                tuple(identity)
                 for shard in plan
-                for binary_id, name in shard["tests"]
+                for identity in shard["tests"]
             ]
             self.assertEqual(len(planned), len(identities))
             self.assertEqual(len(set(planned)), len(identities))
             self.assertEqual(set(planned), identities)
+            return {
+                tuple(identity): shard["bin"]
+                for shard in plan
+                for identity in shard["tests"]
+            }
+
+        current_bins = assigned_bins(current_plan)
+        balanced_bins = assigned_bins(balanced_plan)
+        self.assertTrue(
+            any(current_bins[identity] != balanced_bins[identity] for identity in identities)
+        )
+
+        def latest_loads(plan):
             return [
-                sum(latest[f"{binary_id} {name}"] for binary_id, name in shard["tests"])
+                sum(
+                    latest.get(f"{binary_id} {name}", 600.0)
+                    for binary_id, name in shard["tests"]
+                )
                 for shard in plan
             ]
 
-        old_max = max(measured_loads(old_plan))
-        new_max = max(measured_loads(new_plan))
-        self.assertLess(new_max, old_max)
-        self.assertEqual(len(new_plan), SHARD_COUNT)
-        envelope_loads = [shard["seconds"] for shard in new_plan]
-        self.assertLess(max(envelope_loads) - min(envelope_loads), 1.0)
+        current_loads = latest_loads(current_plan)
+        balanced_loads = latest_loads(balanced_plan)
+        self.assertIn("600.0s default for 1 unmeasured workspace tests", balance_stderr)
+        self.assertAlmostEqual(sum(balanced_loads), sum(latest.values()) + 600.0)
+        self.assertLess(max(balanced_loads), max(current_loads))
+        self.assertEqual(len(balanced_plan), SHARD_COUNT)
+        for shard, expected_load in zip(balanced_plan, balanced_loads):
+            self.assertAlmostEqual(shard["balance_seconds"], expected_load)
+        envelope_loads = [shard["seconds"] for shard in balanced_plan]
+        primary_durations = _planner.read_durations([*source_paths, source])
+        active_rendered = f"{active_test[0]} {active_test[1]}"
+        self.assertNotIn(active_rendered, primary_durations)
+        expected_envelope_total = sum(
+            primary_durations.get(f"{binary_id} {name}", 600.0)
+            for binary_id, name in identities
+        )
+        self.assertAlmostEqual(sum(envelope_loads), expected_envelope_total)
+        envelope_average = sum(envelope_loads) / SHARD_COUNT
+        self.assertLess(max(envelope_loads) - min(envelope_loads), envelope_average * 0.02)
 
-    def test_queue_free_run_proves_no_single_test_floor(self):
+        with Path("docs/program/evidence/ci-job-timeline-36295180542.tsv").open(
+            encoding="utf-8"
+        ) as timeline_source:
+            timeline = list(csv.DictReader(timeline_source, delimiter="\t"))
+        shard_one = next(row for row in timeline if row["job_name"] == "test shard 1/7")
+        wall = (
+            datetime.fromisoformat(shard_one["completed_at"].replace("Z", "+00:00"))
+            - datetime.fromisoformat(shard_one["started_at"].replace("Z", "+00:00"))
+        ).total_seconds()
+        summary_by_job = dict(
+            line.split("\t", 1)
+            for line in Path(
+                "docs/program/evidence/ci-nextest-summaries-36295180542.tsv"
+            ).read_text(encoding="utf-8").splitlines()
+        )
+        summary = re.search(
+            r"Summary \[\s*([0-9.]+)s\]", summary_by_job["test shard 1/7"]
+        )
+        self.assertIsNotNone(summary)
+        non_test_wall = wall - float(summary.group(1))
+        calibration = float(summary.group(1)) / by_shard[1][1]
+        projected_wall = max(balanced_loads) * calibration + non_test_wall
+        self.assertLessEqual(projected_wall, 18 * 60)
+        self.assertIn(active_test, balanced_bins)
+
+    def test_queue_free_run_has_no_measured_test_at_floor_bound(self):
         evidence = Path("docs/program/evidence")
         with (evidence / "ci-first-wave-36295180542.tsv").open(
             encoding="utf-8"
