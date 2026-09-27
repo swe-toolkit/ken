@@ -20,6 +20,7 @@ mod immediate_bridge;
 mod joins_traps;
 mod occurrences;
 mod responses;
+mod returned_vis;
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
 pub use selected_pending_calls::{
@@ -1070,6 +1071,7 @@ pub struct DeferredResponseObservation {
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticResponseFeasibilityDiagnostic {
+    pub returned_vis_protocols: Vec<ReturnedVisProtocolObservation>,
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
@@ -1079,6 +1081,30 @@ pub struct StaticResponseFeasibilityDiagnostic {
     /// P2. Together with the Specialized rows this is the full response-Vis
     /// classification.
     pub static_response_deferred: Vec<DeferredResponseObservation>,
+}
+
+/// Planned returned-Vis origin and exact existing or candidate response row.
+/// This is a diagnostic projection of the production fixpoint, not an emitter.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReturnedVisMemberObservation {
+    pub origin: u32,
+    pub k_origin: Option<u32>,
+    pub successor_id: Option<u32>,
+    pub successor_context: Option<u32>,
+    pub effect_origin: Option<u32>,
+    pub capture_origins: Vec<u32>,
+    pub installed: bool,
+    pub relay: bool,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReturnedVisProtocolObservation {
+    pub owner_origin: u32,
+    pub contexts: Vec<(u32, Vec<ReturnedVisMemberObservation>)>,
+    pub excluded_by_relay: bool,
+    pub error: Option<String>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1214,9 +1240,46 @@ fn record_static_response_feasibility_diagnostic(
             })
         })
         .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+    let returned_vis_protocols = if STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS
+        .with(|slot| slot.borrow().is_some()) {
+        plan.static_response_continuations.iter().map(|owner| {
+            let owner_origin = owner.vis_origin().0;
+            match plan.returned_vis_protocol(owner.vis_origin()) {
+                Ok(protocol) => ReturnedVisProtocolObservation {
+                    owner_origin,
+                    contexts: protocol.contexts.into_iter().map(|context| {
+                        (context.context.0, context.members.into_iter().map(|member| {
+                            let row = member.successor.as_ref();
+                            ReturnedVisMemberObservation {
+                                origin: member.origin.0,
+                                k_origin: row.map(|row| row.k_closure_origin().0),
+                                successor_id: row.map(|row| row.id().ordinal()),
+                                successor_context: row.map(|row| row.k_context().0),
+                                effect_origin: row.map(|row| row.effect_origin().0),
+                                capture_origins: row.map(|row| row.captures().iter()
+                                    .map(|capture| capture.origin().0).collect())
+                                    .unwrap_or_default(),
+                                installed: member.installed,
+                                relay: member.relay,
+                            }
+                        }).collect())
+                    }).collect(),
+                    excluded_by_relay: protocol.excluded_by_relay,
+                    error: None,
+                },
+                Err(error) => ReturnedVisProtocolObservation {
+                    owner_origin,
+                    contexts: Vec::new(),
+                    excluded_by_relay: false,
+                    error: Some(error.to_string()),
+                },
+            }
+        }).collect()
+    } else { Vec::new() };
     STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
         if let Some(rows) = slot.borrow_mut().as_mut() {
             rows.push(StaticResponseFeasibilityDiagnostic {
+                returned_vis_protocols,
                 static_response_rows,
                 static_response_infeasible,
                 all_static_response_rows,

@@ -66,7 +66,7 @@ answer rather than an obviously broken one:**
 thing cargo just built?"** A stale artifact compiles and runs happily, so
 every positive control passes while the answer is about hours-old code.
 Fleet companion:
-[[a-mutation-that-passes-when-it-should-fail-means-a-stale-input]]
+[[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]]
 (freshness is a third axis, beside "the harness works" and "the property
 holds").
 

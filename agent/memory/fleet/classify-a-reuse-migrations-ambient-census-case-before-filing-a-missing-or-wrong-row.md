@@ -260,7 +260,7 @@ Related: [[a-pattern-match-is-evidence-about-what-encloses-it]] (the line-number
 bucket error is one of its instances),
 [[a-measurement-census-can-exactly-pin-a-partition-yet-leave-the-majority-bucket-unmeasured]]
 (the residual bucket is where this census did not measure),
-[[in-a-multi-bucket-partition-census-a-growing-per-item-vector-is-not-a-regression-until-you-locate-the-items-bucket-transition]]
+[[a-measurement-census-can-exactly-pin-a-partition-yet-leave-the-majority-bucket-unmeasured]]
 (which bucket moves are regressions on this same census), and
 [[certify-a-catalog-reuse-migration-by-body-identity-and-the-proofs-that-still-check]]
 (certifying the reuse itself on the same candidates).

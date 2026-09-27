@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: roles/steward
 audience: (see scope README)
 source: private memory
   `landing-a-config-change-on-main-does-not-apply-it-the-consumer-reads-a-working-tree`

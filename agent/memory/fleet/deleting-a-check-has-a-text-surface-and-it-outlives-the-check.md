@@ -98,7 +98,7 @@ separated, and separating them takes one grep per item.
   mechanism fires before calling it removed.**
 - [[a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution]] — why the
   surviving text cannot be caught by a test: it is in a position nothing executes.
-- [[a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable]] —
+- [[correcting-scope-must-sweep-whole-doc]] —
   the sibling: there the stale text is a superseded deliverable, here it is a
   superseded *guarantee*.
 - [[a-deferral-is-honest-a-deferral-that-reads-as-delivery-is-not]] — the

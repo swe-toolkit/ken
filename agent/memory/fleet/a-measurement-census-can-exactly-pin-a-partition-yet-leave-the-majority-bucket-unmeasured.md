@@ -1,6 +1,6 @@
 ---
 name: a-measurement-census-can-exactly-pin-a-partition-yet-leave-the-majority-bucket-unmeasured
-description: "A census that pins an exact, disjoint, exhausting N-way partition looks like total coverage, but a bucket whose membership criterion is 'the measurement did not complete here' (residual, error, skipped, baseline-red) is a hole wearing a partition's clothes. Find that bucket, size it against the whole, and check whether any downstream AC is scoped to the measured buckets only: if so it can be satisfied exactly while its purpose fails. Measured on the LANG-MOD-STRICT-RESOLUTION D0 ambient census (c64c62190): 32 of 44 entries were residuals with no measured vector."
+description: "A census that pins an exact, disjoint, exhausting N-way partition looks like total coverage, but a bucket whose membership criterion is 'the measurement did not complete here' (residual, error, skipped, baseline-red) is a hole wearing a partition's clothes. Find that bucket, size it against the whole, and check whether any downstream AC is scoped to the measured buckets only: if so it can be satisfied exactly while its purpose fails. Measured on the LANG-MOD-STRICT-RESOLUTION D0 ambient census (c64c62190): 32 of 44 entries were residuals with no measured vector. The converse: an item leaving the unmeasured bucket surfaces a vector that reads as growth; locate its bucket transition before filing a regression (residual -> ambient is Err -> Ok, only clean -> ambient loses ground; 40e7f1199)."
 metadata:
   type: feedback
 ---
@@ -79,3 +79,117 @@ Reported `evt_1e3tpt44qxjkm` (Steward side thread `thr_4g49g6pqvhq7x`). Related:
 [[a-projection-partial-in-the-direction-of-its-own-blind-spot-cannot-report-its-miss]]
 (a residual bucket reads as a classification result rather than a failure) and
 [[a-green-census-proves-its-classifier-total-over-the-current-population-not-total]].
+
+## The converse: an item leaving the unmeasured bucket reads as growth
+
+*Merged from the former fleet lesson
+`in-a-multi-bucket-partition-census-a-growing-per-item-vector-is-not-a-regression-until-you-locate-the-items-bucket-transition`
+(2026-09-27 scope pass).*
+
+Because a residual row carries no measured vector, the moment it becomes
+measurable its vector appears from nothing, and a vector-only reading files
+that as a regression. **In a multi-bucket partition census, a growing
+per-item vector is not a regression until you locate the item's bucket
+transition.**
+
+**Measured 2026-08-27 on the landed squash `40e7f1199`**
+(LANG-MOD-CANONICAL-PAIR-PACKAGE, reviewed `db3b8af78`, decision
+`dec_42y4955whef7g`; dispatch base `5b914b7bd` stale, real parent
+`72a97e1dd`; lieutenant-dispatched M8 post-merge hunt; ken-elaborator
+prelude/module bootstrap, own delta 8 files +684/-98, byte-identical to
+reviewed `db3b8af78`). Verdict: **CLEAN verified, no finding.** Two lenses;
+the first is a near-miss. Reported `evt_66bqnbkp0s04d` (lieutenant M8 thread
+`thr_3ktdqsw5rvhqg`).
+
+### What landed
+
+A "floor realization": `Pair` joins the closed prelude type floor
+(`PRELUDE_FLOOR_NAMES` grows 9->10, `modules.rs`), making it
+**unshadowable**, and three companion bindings `mk_pair`/`pair_fst`/`pair_snd`
+(`PRELUDE_COMPANION_BINDING_NAMES`) are admitted as **checked-transparent
+strict-builtins keyed to the exact `Pair` identity**.
+`capture_strict_builtin_names` went infallible->fallible (`filter_map`
+silent-skip -> `map`+`ok_or_else` hard-error), and `lib.rs:249` now
+propagates with `?`.
+
+### Lens 1 (the near-miss): find the bucket transition, not the vector delta
+
+The same census, `catalog_ambient_passthrough_migration_census`
+(`lang_mod_strict_resolution_d0.rs`), partitions every catalog leaf into
+**three buckets**: `ambient` (baseline loads + has a non-empty residual
+dependency vector), `clean` (baseline loads + empty residual), `residual`
+(baseline elaborate FAILED). It asserts each bucket by **exact set equality**
+and that `ambient U clean U residual == discovered` (exhaustion).
+
+`Data.Collections.Deque` gained `["Equal"]` and `Data.Collections.Derived`
+gained an 11-name vector. That looks like the **wrong direction**: adding
+`Pair` to the floor makes `strict_floor_env` retain `Pair`+companions, which
+can only **remove** names from a given package's residual vector, never add
+them. Reading the vector delta alone, you would file a phantom regression.
+
+**The resolution is the bucket transition, not the vector.** Both packages
+**moved**: the old file had them in `expected_residuals` (baseline FAILED) at
+lines 664-665; the new file has them in the `ambient` census map at 560/564.
+`residual -> ambient` is **`Err -> Ok`** on baseline load: the floor `Pair`
+now supplies what the (removed-over-the-9-commit-range) compatibility `Pair`
+used to, so baseline elaboration that previously failed now succeeds and
+reaches far enough to surface a residual. A widening of what compiles,
+**not** a regression. A non-empty ambient vector on a newly-arrived package is
+the *expected* shape of a `residual -> ambient` move.
+
+**The discipline:** in a multi-bucket partition census, a per-item vector
+growing is meaningless until you answer *which bucket did this item leave*.
+The only regression direction here is `clean -> ambient` (a floor-buildable
+package newly needing an ambient dep), and `expected_clean` was confirmed
+byte-identical parent->HEAD, so nothing took it. Sibling of
+[[a-nodes-status-is-a-claim-about-a-node-not-evidence-about-the-tree]] (a
+row's meaning is its position, not its text) and of "a partition that keeps
+failing across reachability refinements may be keyed on the wrong axis" (an
+earlier lesson, since retired).
+
+### Lens 2: the new Err arms were pre-source bootstrap self-checks
+
+`capture_strict_builtin_names` went infallible -> fallible, but it is called
+from exactly one site (`lib.rs:249`, `ElabEnv::empty()`) over fixed bootstrap
+`globals` before any user source loads, and the ten floor names are pinned
+always-present by `prelude_signature_inventory_is_executable_and_closed`. So
+each new `Err` arm either always passes or reds every elaborator test; no user
+program can drive it, and `filter_map` -> `map` + `ok_or_else` turns a silent
+drop into a loud error. This is the "pre-source venue" class in
+[[a-byte-inert-plane-still-regresses-if-its-unconditional-build-can-err]]:
+locate a new production `Err` arm's call site relative to user input before
+ranking it.
+
+### Why this is not the inert-plane / name-only shape
+
+Unlike the recent checked-IH planner hunts, this WP is **not output-inert**
+and **does** carry a real definitional behavioral oracle.
+`pair_floor_beta_eta_are_definitional` proves `pair_fst (mk_pair a b) = a`
+and `pair_snd = b` **by conversion** (`= Proved`), `eta` by `Refl`, each with
+negative `bad` controls (swapped terminal `Refl`/`Proved`, swapped
+`True`/`False`) that **must reject**. A projection body-swap would be caught.
+So
+[[a-catalog-pub-flip-is-inert-to-consumers-so-hunt-its-signature-closure-trust-and-prose]]'s
+name-only degradation does not apply. And `pair_providers.is_empty()`
+(`cat_ord_nat_canonical_owner.rs`) grounds that no catalog `Pair` provider
+competes, so unshadowability is collision-free.
+
+### How to apply (to a landed floor realization)
+
+For a landed **floor-realization** (a type made unshadowable + companion
+bindings admitted as strict-builtins):
+
+1. If a partition census test moves, read the **bucket transition** of every
+   changed item, not its vector delta: `residual -> ambient` is `Err -> Ok`
+   (improvement) even though the ambient vector is non-empty; only
+   `clean -> ambient` is a regression, so check the `clean` bucket is intact.
+2. For each new production `Err` arm, find its **call site relative to user
+   input**: an arm in pre-source construction (single call site, fixed
+   bootstrap `globals`) is a self-check that CI catches wholesale, not a
+   user-drivable `Ok->Err`. Rank it accordingly.
+3. Confirm the realization is collision-free (no competing provider for the
+   now-unshadowable name) and that it carries a real **definitional** oracle
+   (conversion theorems with negative controls), not name-resolution only. If
+   it does, the inert-plane and name-only concerns do not apply.
+
+Do not file a regression off a growing census vector alone.

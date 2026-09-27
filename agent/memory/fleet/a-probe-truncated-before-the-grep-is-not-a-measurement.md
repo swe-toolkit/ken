@@ -120,7 +120,7 @@ a lapse. That reaction is what keeps the next one coming.
 ## Sibling shapes
 
 Same family, different mechanism — the general form is stated in
-[[no-error-in-the-output-passes-when-there-is-no-output]]: *a check keyed to the
+[[a-capture-that-wrote-zero-bytes-is-a-failed-capture-not-a-clean-build]]: *a check keyed to the
 presence or absence of a string is answering a question about the string, never
 about the property.* There, the command **never ran**, so it emitted no failure
 token. Here, the command ran and emitted the tokens, and **the pipeline discarded

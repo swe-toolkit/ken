@@ -95,5 +95,5 @@ than the *defect*, which is where the remaining error was.
 See
 [[an-absence-claim-is-refuted-at-the-consumer-not-where-the-subject-is-defined]]
 for the census discipline this depends on, and
-[[an-assertion-whose-expected-value-is-computed-from-the-thing-under-test-is-a-theorem]]
+[[a-pin-cannot-disagree-with-its-own-source]]
 for why production could not catch the mutation in the first place.

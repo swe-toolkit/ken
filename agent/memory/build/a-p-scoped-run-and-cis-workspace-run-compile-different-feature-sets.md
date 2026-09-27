@@ -1,7 +1,7 @@
 ---
 name: a-p-scoped-run-and-cis-workspace-run-compile-different-feature-sets
 description: "A `-p <pkg>` run activates that package's DEFAULT features; CI's `--workspace` run activates the UNION every member demands, dev-dependencies included. So the mandatory targeted local run can compile a different binary than CI from the same source — and a two-ended differential built on it does not measure what CI measured."
-scope: fleet
+scope: build
 ---
 
 # A `-p` run and CI's `--workspace` run compile different binaries

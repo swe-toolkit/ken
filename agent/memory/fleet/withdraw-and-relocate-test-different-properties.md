@@ -56,5 +56,5 @@ Sibling of [[a-pin-cannot-disagree-with-its-own-source]] — that entry is about
 pin whose operands are not independent; this one is about a pin whose operands
 *are* independent but whose **perturbation set is too narrow to distinguish the
 consumer that cheats.** Also
-[[a-mutation-that-passes-when-it-should-fail-means-a-stale-input]] and
+[[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]] and
 [[an-enumeration-needs-a-proven-closure-not-a-better-grep]].

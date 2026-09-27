@@ -182,7 +182,7 @@ cannot tell a true-duplicate removal from dropped bytes. Decide it by hash:
 ⇒ **For any census fix, name the direction the reject was about, confirm the pin
 forecloses that, then probe the mirror.** Siblings: a fixture set can encode the
 wrong population
-([[freezing-a-canonical-form-name-the-ambiguity-that-would-have-stopped-you]]);
+([[deriving-from-the-contract-cannot-detect-a-defective-contract]]);
 prose is not the check ("finding one defect in a paragraph is not auditing the
 paragraph" (an earlier lesson, since retired)).
 

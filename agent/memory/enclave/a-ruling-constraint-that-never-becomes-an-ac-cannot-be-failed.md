@@ -56,4 +56,4 @@ silently satisfy the checkable remainder.**
   half is convenient, and the convenient half is the one that loses the
   distinction you just added — a `D1` still saying "report yes or no" one
   paragraph above a four-row table its own `AC-1` now requires. Same sweep
-  discipline as [[amending-a-frame-mid-flight-must-sweep-its-guardrails-section]].
+  discipline as [[correcting-scope-must-sweep-whole-doc]].

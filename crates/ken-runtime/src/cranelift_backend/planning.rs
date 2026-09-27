@@ -54,7 +54,8 @@ pub use static_transition::{
     DeferredResponseObservation, RetainedResultClosureProofMutation,
     StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
     StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
-    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
+    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation,
+    ReturnedVisMemberObservation, ReturnedVisProtocolObservation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]

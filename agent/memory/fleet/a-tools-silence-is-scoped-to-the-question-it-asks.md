@@ -71,3 +71,59 @@ Related:
 (the sibling — there a *correct* answer was promoted to a question it
 didn't ask; here a *negative* answer is accepted without asking which
 question produced it), [[grep-the-producer-not-the-cited-proxy]].
+
+## Instance: an empty discriminator population is scoped to the file swept
+
+*Merged from the former fleet lesson
+`an-empty-discriminator-population-is-scoped-to-the-file-it-was-swept`
+(2026-09-27 scope pass).* The tool here is a sweep of an existing test file,
+and its silence was promoted from "no current test discriminates" to "no
+discriminating program exists".
+
+**Measured 2026-08-15 on `f08388396`, on a gap the Steward stated honestly:
+*"the region-set-versus-positional-floor choice is behaviourally
+unwitnessed … the file-wide discriminator population is empty, reproduced
+independently."*** QA had swept the whole test file for a program
+distinguishing the shipped guard from the prohibited alternative and found
+none, so the design choice was recorded as unwitnessed.
+
+Both the implementer and QA replaced the shipped membership guard with the
+prohibited positional floor and ran the whole acceptance file: **identical
+results.** True, and reproduced twice.
+
+The design rationale states the discriminating shape in the same breath: a
+positional floor fails *"because an intervening `let`/`λ` pushes a genuine
+outer binder above the enclosing field region."* **Writing that program (the
+existing fixture plus one `let`) separates the two guards immediately:**
+
+| guard | plain fixture | with the interleaved `let` |
+|---|---|---|
+| shipped region set | `Ok` | `TypeMismatch` on the index |
+| prohibited floor | `Ok` | **`NotTerminating`: SCT loses its decreasing param** |
+
+- **A sweep of an existing file answers "does any CURRENT test
+  discriminate", never "does a discriminating program exist."** When a design
+  choice is recorded as unwitnessed, read the rationale for the shape it
+  rejects the alternative on, and write that shape. The rationale is a
+  specification for the missing witness, and it is usually one construct away
+  from a fixture already present.
+- **The direction can favour the shipped choice, and saying so matters.** Here
+  the floor did not merely diverge: it degraded a type-index failure into a
+  **termination-checking** failure, the soundness-adjacent gate. An adversary
+  who only reports gaps trains the reader to expect the witness to be
+  damaging; report it when the witness vindicates the decision.
+- **A discriminator built for one gap is often evidence for a neighbouring
+  one**, because both gaps are about the same mechanism's edges. A
+  neighbouring node was filed with *"it is not yet established that this is
+  independent of the merge above."* The same probe answers it for one
+  variant: under the shipped guard the interleaved program fails with **the
+  exact pre-remedy signature** (same head, one de Bruijn index apart), so it
+  is not independent; it is the original defect standing on a shape the remedy
+  does not cover. Run the probe against every open question on that mechanism
+  while it is in hand.
+- **Check whether your repro is the filed repro.** The new probe dies in the
+  kernel; the filed one dies earlier, in branch-goal classification. Two
+  failures at different depths may be one shape or two, and the difference
+  decides whether the node has one deliverable or two. One read of the filed
+  repro against the new one settles it; name the difference rather than
+  assuming it away.

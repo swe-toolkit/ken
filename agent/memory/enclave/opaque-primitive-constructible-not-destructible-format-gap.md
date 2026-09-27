@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: enclave
 audience: (see scope README) — anyone framing a "show"/"format"/
   "serialize"/"to-string" deliverable over an opaque primitive (`Int`,
   `String`, `Bytes`)

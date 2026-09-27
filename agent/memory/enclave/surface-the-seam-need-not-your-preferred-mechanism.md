@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: enclave
 audience: (see scope README)
 source: private memory `surface-the-seam-need-not-your-preferred-mechanism`
 ---

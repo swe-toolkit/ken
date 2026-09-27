@@ -1,6 +1,6 @@
 ---
-scope: fleet
-audience: (see scope README) — the Architect (owns the trigger), the Steward (backstops it), any implementer in a hard-stop chain, and the research agent (executes the advisory)
+scope: enclave
+audience: (see scope README) — the Architect (owns the trigger), the Steward (backstops it), and the research agent (executes the advisory)
 source: operator (Pat) directive, 2026-07-18 (established after PX8-H ran to seven hard-stops; trigger moved into the Architect after it ran past ten)
 ---
 

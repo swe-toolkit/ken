@@ -1,5 +1,5 @@
 ---
-scope: fleet
+scope: build
 audience: (see scope README) — every seat that diagnoses a stack overflow in a
   test, every seat that reaches for `--exact` to isolate one, and every seat
   that reads a suite-versus-isolated difference as a headroom difference

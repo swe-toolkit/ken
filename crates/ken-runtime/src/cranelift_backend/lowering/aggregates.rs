@@ -783,7 +783,7 @@ impl Lowered {
                 }
                 Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
-                | Lowered::StaticResponseDeferred
+                | Lowered::StaticResponseDeferred { .. }
                 | Lowered::Int { .. }
                 | Lowered::Bool { .. }
                 | Lowered::ProcessExitStatus { .. }
@@ -892,7 +892,7 @@ impl<'a> Lowering<'a> {
                 Lowered::Closure { .. }
                 | Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
-                | Lowered::StaticResponseDeferred => Ok(()),
+                | Lowered::StaticResponseDeferred { .. } => Ok(()),
 
                 // ── true leaves: no `Lowered` child position exists ───────────
                 //
@@ -1043,7 +1043,7 @@ impl<'a> Lowering<'a> {
                 }
                 | Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
-                | Lowered::StaticResponseDeferred
+                | Lowered::StaticResponseDeferred { .. }
                 | Lowered::Int { .. }
                 | Lowered::Bool { .. }
                 | Lowered::ProcessExitStatus { .. }
@@ -1126,7 +1126,7 @@ impl<'a> Lowering<'a> {
                 }
                 | Lowered::DeclarationClosure { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
-                | Lowered::StaticResponseDeferred
+                | Lowered::StaticResponseDeferred { .. }
                 | Lowered::Int { .. }
                 | Lowered::Bool { .. }
                 | Lowered::ProcessExitStatus { .. }
@@ -2110,7 +2110,7 @@ impl<'a> Lowering<'a> {
                      this arm is unreachable because the admissibility walk already \
                      refused the graph",
                 )),
-                Lowered::StaticResponseDeferred
+                Lowered::StaticResponseDeferred { .. }
                 | Lowered::RecursiveBackedge
                 | Lowered::Trap(_) => Err(unsupported(
                     lowered_value_kind(value),

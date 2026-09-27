@@ -95,7 +95,7 @@ specification now **quotes the superseded wording verbatim** beside the
 correction (`152056a3`, `…-D2k.md:730`), rather than replacing it.
 
 ⚠ Normally that is the defect —
-[[a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable]]
+[[correcting-scope-must-sweep-whole-doc]]
 says delete the stale claim from the requirement itself, because both readings
 live in the doc and the superseded one is what an implementer reads first.
 **Here the opposite is right, and the discriminator is whether the wrong version

@@ -208,7 +208,7 @@ present.
   bootstrap `globals` before any user source, so every new `Err` arm is a
   bootstrap self-check CI catches wholesale; the `filter_map` -> `map` +
   `ok_or_else` change turns a silent drop into a loud error. See
-  [[in-a-multi-bucket-partition-census-a-growing-per-item-vector-is-not-a-regression-until-you-locate-the-items-bucket-transition]].
+  [[a-measurement-census-can-exactly-pin-a-partition-yet-leave-the-majority-bucket-unmeasured]].
 
 Kin:
 [[certify-a-merge-block-unification-refactor-by-enumerating-the-environment-divergence-axes-and-proving-each-vacuous-in-tree-or-the-intended-fix]]

@@ -285,7 +285,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
     StaticResponseContinuation, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId,
-    StaticResponseOwnerSpecialization, StaticTransitionPlan,
+    StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
@@ -3483,8 +3483,9 @@ enum Lowered {
     /// Compile-only marker for source work relocated into a statically selected
     /// response owner. Generated-unit crossings write an inert zero into the
     /// operation slot, and the owner never loads that slot; no tag, selector, or
-    /// response value is encoded in it.
-    StaticResponseDeferred,
+    /// response value is encoded in it. The compile-only source site must
+    /// survive to the target-aware sole mint for exact owner validation.
+    StaticResponseDeferred { site: StaticResponseSite },
     DynamicConstructor(DynamicConstructorV1),
     Bytes(Vec<u8>),
     BorrowedNativeValue {
@@ -3971,6 +3972,39 @@ fn record_checked_ih_direct_application(observation: CheckedIhDirectApplicationO
 /// itself wearing a different name.
 // ⛔ No `Debug`: `Lowered` has none, and deriving one here would be a new,
 // second way to read a compile-time template out of an operand.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReturnedVisCaptureObservation {
+    pub closure_origin: u32,
+    pub capture_origin: u32,
+    pub capture_position: usize,
+    pub variant: String,
+    pub disposition: Option<String>,
+    pub forbidden: bool,
+    pub scope: String,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static RETURNED_VIS_CAPTURE_OBSERVATIONS: std::cell::RefCell<Option<Vec<ReturnedVisCaptureObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_returned_vis_capture_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<ReturnedVisCaptureObservation>) {
+    RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|slot| {
+        assert!(slot.borrow().is_none(), "returned-Vis capture windows cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|slot| {
+        slot.borrow_mut().take().expect("returned-Vis capture window")
+    });
+    (result, observations)
+}
+
 #[derive(Clone)]
 enum LoweringOperand {
     /// The compile-time specialization lattice — every route that existed
@@ -3979,6 +4013,44 @@ enum LoweringOperand {
     Specialized(Lowered),
     /// A runtime boundary word, eliminated only by emitted helpers.
     Carried(CarriedBoundaryWord),
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_returned_vis_lexical_captures(
+    plan: &StaticTransitionPlan<'_>,
+    closure_origin: StaticOriginId,
+    captures: &[LoweringOperand],
+    scope: Option<GraftedSpineFunctionScope>,
+) -> Result<(), CraneliftBackendError> {
+    if RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|slot| slot.borrow().is_none()) {
+        return Ok(());
+    }
+    let mut observations = Vec::new();
+    for (capture_position, capture) in captures.iter().enumerate() {
+        let capture_origin = plan.child_static_origin(closure_origin, 1 + capture_position)?;
+        let (variant, disposition, forbidden) = match capture {
+            LoweringOperand::Carried(_) => ("Carried".to_owned(), None, false),
+            LoweringOperand::Specialized(value) => {
+                let variant = value.variant();
+                let disposition = variant.boundary_disposition();
+                (format!("{variant:?}"), Some(format!("{disposition:?}")),
+                    matches!(disposition, BoundaryDisposition::FailClosedForbidden { .. }))
+            }
+        };
+        observations.push(ReturnedVisCaptureObservation {
+            closure_origin: closure_origin.ticket_body_ordinal(),
+            capture_origin: capture_origin.ticket_body_ordinal(),
+            capture_position,
+            variant,
+            disposition,
+            forbidden,
+            scope: format!("{scope:?}"),
+        });
+    }
+    RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|slot| {
+        slot.borrow_mut().as_mut().expect("returned-Vis capture window").extend(observations);
+    });
+    Ok(())
 }
 
 /// **THE ONE BINDING AUTHORITY** for a lexical environment (`RT-WORKER-BIND`
@@ -6214,7 +6286,7 @@ fn d9_collect(
         // comment above states as a boundary rather than hiding.
         Lowered::Bytes(_)
         | Lowered::String(_)
-        | Lowered::StaticResponseDeferred
+        | Lowered::StaticResponseDeferred { .. }
         | Lowered::RecursiveBackedge
         | Lowered::Trap(_) => {}
     }
@@ -7169,13 +7241,10 @@ impl<'a> Lowering<'a> {
         );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
-            LoweringOperand::Specialized(Lowered::StaticResponseDeferred) => {
-                // The selected owner reconstructs the operation solely from its
-                // typed response plan and mapped captures. This word occupies the
-                // unchanged ABI slot en route and is never inspected or decoded.
-                Ok(LoweringOperand::Carried(CarriedBoundaryWord {
-                    word: builder.ins().iconst(types::I64, 0),
-                }))
+            deferred @ LoweringOperand::Specialized(Lowered::StaticResponseDeferred { .. }) => {
+                // Keep the source site until the declared target and its slot
+                // are known. This crossing must never mint a carried zero.
+                Ok(deferred)
             }
             LoweringOperand::Specialized(value) => {
                 let value = self.unit_boundary_environment_record(value)?;
@@ -8253,7 +8322,7 @@ impl Lowered {
                 | Lowered::BorrowedNativeValue { .. }
                 | Lowered::BorrowedOption { .. }
                 | Lowered::String(_)
-                | Lowered::StaticResponseDeferred
+                | Lowered::StaticResponseDeferred { .. }
                 | Lowered::ComputationalRecursorClosure { .. }
                 | Lowered::RecursiveBackedge
                 | Lowered::Trap(_) => None,
@@ -13475,7 +13544,7 @@ impl<'a> Lowering<'a> {
             | Lowered::BoundedNat(_)
             | Lowered::StructuralNat(_)
             | Lowered::HostResult { .. }
-            | Lowered::StaticResponseDeferred
+            | Lowered::StaticResponseDeferred { .. }
             | Lowered::DynamicConstructor(_) => Err(unsupported(
                 "Result",
                 "borrowed ingress values cannot escape the native call",
@@ -13551,7 +13620,7 @@ fn lowered_value_kind(value: &Lowered) -> &'static str {
         Lowered::StructuralNat(_) => "StructuralNat",
         Lowered::ResponseBytes { .. } => "ResponseBytes",
         Lowered::HostResult { .. } => "HostResult",
-        Lowered::StaticResponseDeferred => "StaticResponseDeferred",
+        Lowered::StaticResponseDeferred { .. } => "StaticResponseDeferred",
         Lowered::DynamicConstructor(_) => "DynamicConstructor",
         Lowered::Bytes(_) => "Bytes",
         Lowered::BorrowedNativeValue { .. } => "BorrowedNativeValue",

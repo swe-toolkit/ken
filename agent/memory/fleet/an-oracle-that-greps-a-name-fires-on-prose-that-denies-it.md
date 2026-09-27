@@ -36,7 +36,7 @@ went red on a WP whose entire achievement was *removing* the `Axiom` tax.
    plain `.ken` source — no literate extractor; the entire file is checked
    code."* **The constant is `COLLECTIONS_KEN_MD`; the file is
    `Derived.ken.MD`.** It is **prose + code fences**
-   ([[catalog-sources-are-literate-ken-md-not-ken]]). **The oracle's own comment
+   ([[grep-rust-prelude-emission-for-landedness]]). **The oracle's own comment
    is factually wrong about the file it reads** — and it passed for months only
    because no prose in that file had *happened* to use the word.
 

@@ -92,6 +92,45 @@ source:**
 - If a mutation proof passes when it should fail, **suspect a stale input
   before doubting the mutation**. That is the signature.
 
+### When a mutation passes where it should fail (merged 2026-09-27)
+
+Merged from `a-mutation-that-passes-when-it-should-fail-means-a-stale-input`
+(ORACLE-VIS-CHECK, 2026-07-22). The implementer found the stale rlib in their
+own harness via their own mutation proof; QA independently reproduced it with a
+different probe rather than inheriting the finding. Design review, the positive
+control and the error-code assertion all passed it; **for this class of harness
+bug the mutation proof is the only detector that exists**, and its diagnostic
+value is highest in the failure nobody expects: the mutation did not change the
+result. The instinct is to doubt the mutation. Doubt the input first.
+
+1. **Run the mutation proof even when, especially when, the design feels
+   sound.** The temptation to skip it as a formality peaks exactly where it is
+   load-bearing.
+2. **On a pass-where-it-should-fail, check the input before the logic:** which
+   artifact was selected, when it was built, whether it postdates the edit.
+   When you order by mtime, say so in a comment, because the next reader will
+   think it is tidiness.
+3. **When a mechanism is REPLACED rather than folded, start QA over.** Proofs do
+   not transfer across a mechanism change: "compile_fail doctest with no running
+   home" and "rustc subprocess probe against a stale rlib" share no failure
+   structure, and a delta-review habit carries confidence that never
+   transferred. (QA's own carry from the same WP.)
+4. **When an implementer names "the axis I'd attack hardest" in a handoff, take
+   it literally** and run that mutation first. It is a gift, not colour.
+5. **Make the selection observable.** If a harness picks one of several
+   candidates, have it report which, and say so loudly when it is not the
+   freshest. A silent fallback re-opens the class: a loop that prefers *newest*
+   but accepts *the first that satisfies a control* has two invariants, and
+   where they conflict the safety-critical one loses silently.
+
+**Naming a trap does not inoculate you against it.** The implementer had
+written this lesson's opening rule barely an hour earlier, then over-trusted
+that control exactly as it warns, in a new harness one layer down: the fix for a
+vacuous-pass defect reproduced that defect inside itself (see
+[[a-fix-can-reproduce-its-own-bug-one-layer-up]]). A lesson protects the layer
+you are looking at, not the layer holding it up; when you harden a mechanism,
+audit its plumbing separately.
+
 ## FOURTH axis, next WP, same day: the attack was NAMED and shipped anyway
 
 A handoff listed, as attack point #1 for QA:

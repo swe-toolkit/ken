@@ -3596,6 +3596,52 @@ impl StaticTransitionPlan<'_> {
             .all(|identity| owners.iter().any(|owner| owner.selected_caller() == identity)))
     }
 
+    /// Check the SOLE placeholder-to-word mint against the exact licensed
+    /// production site, the target's declared owner specialization, and the
+    /// target slot's own ABI ordinal. The source site is retained on the
+    /// compiler-only deferred operand; a bare word could not carry it here.
+    pub(in crate::cranelift_backend) fn static_response_placeholder_mint_licensed(
+        &self,
+        site: StaticResponseSite,
+        scope: GraftedSpineFunctionScope,
+        target_origin: StaticOriginId,
+        slot: &AbiSlot,
+    ) -> Result<bool, CraneliftBackendError> {
+        if slot.kind != AbiSlotKind::Parameter || slot.ordinal != 0
+            || !self.static_response_placeholder_licensed(site, scope)? {
+            return Ok(false);
+        }
+        let GraftedSpineFunctionScope::Continuation(scope_target) = scope else {
+            return Ok(false);
+        };
+        let owners = self.static_response_owner_specializations()?
+            .map_err(|failure| planner_error(format!(
+                "placeholder owner is infeasible at {:?}: {}",
+                failure.vis_origin(), failure.reason(),
+            )))?;
+        let units = self.continuation_units()?;
+        let emittable = self.emittable_units()?;
+        let mut matches = 0;
+        for owner in &owners {
+            let selected = owner.selected_caller().target();
+            if selected != scope_target { continue; }
+            let Some(row) = self.static_response_continuations.iter()
+                .find(|row| row.id() == owner.response()) else {
+                return Err(planner_error("placeholder owner has no installed response row"));
+            };
+            if !site.matches(row.effect_origin(), row.operation_root_origin) { continue; }
+            let unit = units.iter().find(|unit| unit.id() == selected)
+                .ok_or_else(|| planner_error("placeholder owner has no K unit"))?;
+            if emittable.iter().any(|candidate| {
+                candidate.entry_origin() == target_origin
+                    && candidate.body_occurrence() == unit.worker_body_origin()
+            }) {
+                matches += 1;
+            }
+        }
+        Ok(matches == 1)
+    }
+
     /// A response-bearing `Vis` whose operation has been assigned a response
     /// owner. Used when a non-owner function tries to transfer its raw lexical
     /// continuation: that is an owner-boundary violation, not a generic closure.
@@ -3629,6 +3675,35 @@ impl StaticTransitionPlan<'_> {
         } else {
             None
         }
+    }
+
+    /// Return the exact installed rows and all response demands that can be
+    /// resolved into existing K contexts without installing a new owner. A
+    /// returned-Vis analysis may cite a derived row from this population, but
+    /// this projection does not change the owner or emission populations.
+    pub(super) fn return_protocol_candidate_rows(
+        &self,
+    ) -> Result<Vec<StaticResponseContinuation>, CraneliftBackendError> {
+        let (demands, _deferred) = self
+            .static_response_context_demands_filtered(None, false)?
+            .map_err(|failure| planner_error(format!(
+                "returned-Vis response demand is infeasible at {:?}: {}",
+                failure.vis_origin(), failure.reason(),
+            )))?;
+        let mut resolved = self.resolve_static_response_context_demands(
+            demands,
+            &self.continuation_contexts,
+            self.continuation_contexts.len(),
+        )?;
+        let mut rows = self.static_response_continuations.clone();
+        for mut row in resolved.drain(..) {
+            if rows.iter().any(|existing| existing.vis_origin() == row.vis_origin()) {
+                continue;
+            }
+            row.id = StaticResponseContinuationId::from_position(rows.len())?;
+            rows.push(row);
+        }
+        Ok(rows)
     }
 
     /// Seal every installed response row as one forward-declared response-owner

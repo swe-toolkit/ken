@@ -57,7 +57,7 @@ Here it was one command and it would have ended the question instantly.
 **A producer invoked from the wrong working directory returns a plausible, precise,
 entirely wrong answer — and nothing in the output announces it.** The tool is
 honest; the tree is the lie. Same family as
-[[multi-worktree-cwd-drift-phantom-diff]] and a stale-base diff.
+[[check-main-via-git-object-store-not-find]] and a stale-base diff.
 
 **So when you report a failure — and when you accept one — the report must carry
 `pwd`, `HEAD`, and proof the file is unmodified at that ref.** CV's corrected

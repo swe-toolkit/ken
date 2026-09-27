@@ -13,7 +13,8 @@ once, with its disposition (kept, merged into a kept file, dropped, or excluded
 as personal) and the reasoning. The store regrew and was triaged a second time
 on 2026-09-26 (`migration-2026-09-26.tsv`), and the Adversary's branch-local
 lessons were curated onto main the same day (`adversary-curation-2026-09-26.tsv`,
-one row per source lesson); Claude Code's automatic memory is
+one row per source lesson), and `fleet/` was re-scoped on 2026-09-27
+(`fleet-scope-pass-2026-09-27.tsv`); Claude Code's automatic memory is
 now off for this project (`autoMemoryEnabled: false` in
 `.claude/settings.json`), so a lesson has no home but this corpus.
 

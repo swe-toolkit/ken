@@ -4,6 +4,7 @@ import csv
 import importlib.util
 import json
 import re
+import statistics
 from datetime import datetime
 from pathlib import Path
 import subprocess
@@ -17,6 +18,20 @@ _spec = importlib.util.spec_from_file_location("ci_duration_shard", SCRIPT)
 _planner = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_planner)
 SHARD_COUNT = _planner.N
+
+
+def timing_artifact(records, shard=1, run_id=1):
+    return {
+        "run_id": run_id,
+        "shard": shard,
+        "shard_count": SHARD_COUNT,
+        "unit": "seconds",
+        "records": [
+            {**record, "result": record.get("result", "PASS")}
+            for record in records
+        ],
+        "fallbacks": [],
+    }
 
 
 class DurationShardControls(unittest.TestCase):
@@ -41,12 +56,10 @@ class DurationShardControls(unittest.TestCase):
                 for index, (binary_id, binary_name, testcase, status) in enumerate(rows)
             }
             inventory = {"test-count": len(rows), "rust-suites": suites}
-            evidence = {
-                "records": [
-                    {"test_id": f"{binary_id} {testcase}", "seconds": 1}
-                    for binary_id, _, testcase, _ in rows
-                ]
-            }
+            evidence = timing_artifact([
+                {"test_id": f"{binary_id} {testcase}", "seconds": 1}
+                for binary_id, _, testcase, _ in rows
+            ])
             (root / "inventory.json").write_text(json.dumps(inventory))
             (root / "evidence.json").write_text(json.dumps(evidence))
             result = subprocess.run(
@@ -65,7 +78,7 @@ class DurationShardControls(unittest.TestCase):
             root = Path(temporary)
             inventory = {"test-count": 1, "rust-suites": {"empty": {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}, "native": {"binary-id": "fixture::native", "binary-name": "rt_parity_native", "testcases": {"t": {"filter-match": {"status": "matches"}}}}}}
             (root / "inventory.json").write_text(json.dumps(inventory))
-            (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "fixture::native t", "seconds": 1}]}))
+            (root / "evidence.json").write_text(json.dumps(timing_artifact([{"test_id": "fixture::native t", "seconds": 1}])))
             result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, text=True, stderr=subprocess.PIPE, check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stderr.strip(), "filtered live inventory selected zero testcases")
@@ -117,7 +130,7 @@ class DurationShardControls(unittest.TestCase):
         self.assertEqual(current[long_test], 591.502)
         self.assertEqual(combined[long_test], 591.502)
 
-    def test_workspace_plan_balances_live_defaults_against_timing_sources(self):
+    def test_workspace_plan_lpt_balances_latest_live_defaults(self):
         source = Path(
             "docs/program/evidence/ci-workspace-timings-36295180542.tsv"
         ).resolve()
@@ -140,8 +153,10 @@ class DurationShardControls(unittest.TestCase):
             shard = int(match.group("shard"))
             count, total = by_shard.get(shard, (0, 0.0))
             by_shard[shard] = (count + 1, total + seconds)
-        # Model the eight current-main tests absent from run 362951: three
-        # H1 additions, the re-enabled ds5b test, and four inline interp tests.
+        # Model current-main identities absent from run 362951: the re-enabled
+        # ds5b test, three H1 tests, four inline interp tests, four later
+        # additions, and two current cat1 fixture probes. The H1 host tests
+        # were renamed on main.
         active_tests = (
             (
                 "ken-elaborator::ds5b_dependent_match_refinement_acceptance",
@@ -153,11 +168,11 @@ class DurationShardControls(unittest.TestCase):
             ),
             (
                 "ken-elaborator::cc7_argparse_acceptance",
-                "render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias",
+                "render_host_identity_checks_flat_and_qualified_alias_forgery",
             ),
             (
                 "ken-elaborator::cc8_env_config_decoder_acceptance",
-                "render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias",
+                "render_host_identity_checks_flat_and_qualified_alias_forgery",
             ),
             (
                 "ken-interp",
@@ -174,6 +189,30 @@ class DurationShardControls(unittest.TestCase):
             (
                 "ken-interp",
                 "eval::ds5b_cast_regular_tests::unknown_proof_blocks_equal_inductive_type_app_cast",
+            ),
+            (
+                "ken-elaborator::cat5_parsing_package",
+                "cat5_source_id_host_read_rejects_forged_qualified_provider_alias",
+            ),
+            (
+                "ken-elaborator::cat_deque_acceptance",
+                "deque_host_read_rejects_forged_qualified_provider_alias",
+            ),
+            (
+                "ken-elaborator::cc5_pretty_doc_acceptance",
+                "render_host_read_ignores_forged_flat_fixture_alias",
+            ),
+            (
+                "ken-elaborator::map_build_acceptance",
+                "checked_map_host_read_ignores_forged_flat_aliases",
+            ),
+            (
+                "ken-elaborator::cat1_lawful_functors_package",
+                "transport_fixture_aliases_reject_forged_qualified_provider_key",
+            ),
+            (
+                "ken-elaborator::cat1_lawful_functors_package",
+                "lawful_fixture_withhold_rejects_forged_qualified_provider_key",
             ),
         )
         for binary_id, name in active_tests:
@@ -220,33 +259,46 @@ class DurationShardControls(unittest.TestCase):
             for name in suite["testcases"]
         }
         self.assertEqual(len(identities), len(latest) + len(active_tests))
+        measured_by_binary = {}
+        for binary_id, name in identities:
+            rendered = f"{binary_id} {name}"
+            if rendered in latest:
+                measured_by_binary.setdefault(binary_id, []).append(latest[rendered])
+        global_median = statistics.median(latest.values())
+        binary_medians = {
+            binary_id: statistics.median(values)
+            for binary_id, values in measured_by_binary.items()
+        }
+        planned_durations = {}
+        expected_fallbacks = []
+        for binary_id, name in sorted(identities, key=lambda pair: f"{pair[0]} {pair[1]}"):
+            rendered = f"{binary_id} {name}"
+            if rendered in latest:
+                planned_durations[rendered] = latest[rendered]
+                continue
+            method = "binary-median" if binary_id in binary_medians else "global-median"
+            seconds = binary_medians.get(binary_id, global_median)
+            planned_durations[rendered] = seconds
+            expected_fallbacks.append({
+                "test_id": rendered,
+                "seconds": seconds,
+                "method": method,
+            })
 
-        source_paths = [
-            Path("docs/program/evidence") / name
-            for name in (
-                "ci-workspace-timings-36265192923.tsv",
-                "ci-workspace-timings-36276921102.tsv",
-                "ci-workspace-timings-36279697268-completed-shards.tsv",
-                "ci-workspace-timings-36285524404.tsv",
-            )
-        ]
         with tempfile.TemporaryDirectory() as temporary:
             inventory_path = Path(temporary) / "inventory.json"
             inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
 
-            def run_plan(balance_with=None):
-                output_dir = Path(temporary) / (
-                    "balanced" if balance_with is not None else "upper-only"
-                )
+            def run_plan():
+                output_dir = Path(temporary) / "lpt-plan"
                 command = [
                     sys.executable,
                     str(SCRIPT),
                     str(inventory_path),
-                    *[str(path.resolve()) for path in [*source_paths, source]],
+                    str(source),
+                    "--output-dir",
+                    str(output_dir),
                 ]
-                if balance_with is not None:
-                    command.extend(["--balance-with", str(balance_with.resolve())])
-                command.extend(["--output-dir", str(output_dir)])
                 result = subprocess.run(
                     command,
                     text=True,
@@ -260,10 +312,11 @@ class DurationShardControls(unittest.TestCase):
                     json.loads((output_dir / "assignments.json").read_text()),
                     assignment,
                 )
-                return assignment["bins"], result.stderr
+                return assignment, result.stderr
 
-            current_plan, _ = run_plan()
-            balanced_plan, balance_stderr = run_plan(source)
+            assignment, balance_stderr = run_plan()
+            balanced_plan = assignment["bins"]
+            self.assertEqual(assignment["fallbacks"], expected_fallbacks)
 
         def assigned_bins(plan):
             planned = [
@@ -280,45 +333,68 @@ class DurationShardControls(unittest.TestCase):
                 for identity in shard["tests"]
             }
 
-        current_bins = assigned_bins(current_plan)
         balanced_bins = assigned_bins(balanced_plan)
-        self.assertTrue(
-            any(current_bins[identity] != balanced_bins[identity] for identity in identities)
+        expected_lpt = [set() for _ in range(SHARD_COUNT)]
+        expected_lpt_loads = [0.0] * SHARD_COUNT
+        lpt_rows = sorted(
+            (
+                f"{binary_id} {name}",
+                binary_id,
+                name,
+            )
+            for binary_id, name in identities
+        )
+        lpt_rows.sort(key=lambda row: (-planned_durations[row[0]], row[0]) )
+        for rendered, binary_id, name in lpt_rows:
+            shard = min(
+                range(SHARD_COUNT),
+                key=lambda index: (expected_lpt_loads[index], index),
+            )
+            expected_lpt[shard].add((binary_id, name))
+            expected_lpt_loads[shard] += planned_durations[rendered]
+        self.assertEqual(
+            [
+                {tuple(identity) for identity in shard["tests"]}
+                for shard in balanced_plan
+            ],
+            expected_lpt,
         )
 
-        def latest_loads(plan):
+        def planned_loads(plan):
             return [
                 sum(
-                    latest.get(f"{binary_id} {name}", 600.0)
+                    planned_durations[f"{binary_id} {name}"]
                     for binary_id, name in shard["tests"]
                 )
                 for shard in plan
             ]
 
-        current_loads = latest_loads(current_plan)
-        balanced_loads = latest_loads(balanced_plan)
-        self.assertIn("600.0s default for 8 unmeasured workspace tests", balance_stderr)
-        self.assertAlmostEqual(
-            sum(balanced_loads), sum(latest.values()) + 600.0 * len(active_tests)
+        balanced_loads = planned_loads(balanced_plan)
+        binary_fallback_count = sum(
+            fallback["method"] == "binary-median" for fallback in expected_fallbacks
         )
-        self.assertLess(max(balanced_loads), max(current_loads))
+        global_fallback_count = len(expected_fallbacks) - binary_fallback_count
+        self.assertIn(
+            f"using per-binary median for {binary_fallback_count} and global median "
+            f"for {global_fallback_count} of {len(active_tests)} unmeasured workspace tests",
+            balance_stderr,
+        )
+        self.assertAlmostEqual(sum(balanced_loads), sum(planned_durations.values()))
         self.assertEqual(len(balanced_plan), SHARD_COUNT)
         for shard, expected_load in zip(balanced_plan, balanced_loads):
-            self.assertAlmostEqual(shard["balance_seconds"], expected_load)
+            self.assertAlmostEqual(shard["seconds"], expected_load, delta=0.00051)
         envelope_loads = [shard["seconds"] for shard in balanced_plan]
-        primary_durations = _planner.read_durations([*source_paths, source])
+        primary_durations = _planner.read_durations([source])
         active_rendered = {f"{binary_id} {name}" for binary_id, name in active_tests}
         for rendered in active_rendered:
             self.assertNotIn(rendered, primary_durations)
-        expected_envelope_total = sum(
-            primary_durations.get(f"{binary_id} {name}", 600.0)
-            for binary_id, name in identities
+        self.assertAlmostEqual(
+            sum(envelope_loads), sum(planned_durations.values()), delta=0.0036
         )
-        self.assertAlmostEqual(sum(envelope_loads), expected_envelope_total)
         envelope_average = sum(envelope_loads) / SHARD_COUNT
-        self.assertLess(max(envelope_loads) - min(envelope_loads), envelope_average * 0.02)
+        self.assertLess(max(envelope_loads) - min(envelope_loads), envelope_average * 0.01)
         latest_average = sum(balanced_loads) / SHARD_COUNT
-        self.assertLess(max(balanced_loads) - min(balanced_loads), latest_average * 0.01)
+        self.assertAlmostEqual(latest_average, envelope_average, delta=0.00051)
 
         with Path("docs/program/evidence/ci-job-timeline-36295180542.tsv").open(
             encoding="utf-8"
@@ -473,6 +549,76 @@ class DurationShardControls(unittest.TestCase):
                 summary_counts[int(match.group(1))] = int(count_match.group(1))
         self.assertEqual(summary_counts, {shard: count for shard, (count, _) in expected.items()})
 
+    def test_terminal_timing_json_uses_only_pass_for_planner_weights(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = timing_artifact(
+                [{"test_id": "fixture::binary slow", "seconds": 9.5, "result": "FAIL"}],
+                shard=1,
+                run_id=73,
+            )
+            second = timing_artifact(
+                [{"test_id": "fixture::binary fast", "seconds": 0.0, "result": "PASS"}],
+                shard=2,
+                run_id=73,
+            )
+            first_path = root / "shard-1.json"
+            second_path = root / "shard-2.json"
+            first_path.write_text(json.dumps(first), encoding="utf-8")
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+            durations = _planner.read_durations([first_path, second_path])
+            self.assertEqual(durations, {"fixture::binary fast": 0.0})
+
+            duplicate = timing_artifact(
+                [{"test_id": "fixture::binary slow", "seconds": 2.0}],
+                shard=2,
+                run_id=73,
+            )
+            second_path.write_text(json.dumps(duplicate), encoding="utf-8")
+            with self.assertRaisesRegex(
+                SystemExit, "duplicate terminal identity in run 73 shards 1 and 2"
+            ):
+                _planner.read_durations([first_path, second_path])
+
+            first["unit"] = "milliseconds"
+            first_path.write_text(json.dumps(first), encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "unit must be"):
+                _planner.read_durations([first_path])
+
+    def test_failed_json_timing_uses_measured_median_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "timings.json"
+            artifact = timing_artifact(
+                [
+                    {"test_id": "fixture::binary candidate", "seconds": 0.125},
+                    {"test_id": "fixture::binary peer", "seconds": 0.5},
+                ]
+            )
+            artifact["records"][0]["result"] = "PASS"
+            path.write_text(json.dumps(artifact), encoding="utf-8")
+            passing_durations = _planner.read_durations([path])
+            artifact["records"][0]["result"] = "FAIL"
+            path.write_text(json.dumps(artifact), encoding="utf-8")
+            failed_durations = _planner.read_durations([path])
+
+        live = [
+            ("fixture::binary candidate", "fixture::binary", "candidate"),
+            ("fixture::binary peer", "fixture::binary", "peer"),
+        ]
+        passing, passing_fallbacks = _planner.resolve_durations(live, passing_durations)
+        failed, failed_fallbacks = _planner.resolve_durations(live, failed_durations)
+        self.assertEqual(passing["fixture::binary candidate"], 0.125)
+        self.assertNotIn("fixture::binary candidate", {row["test_id"] for row in passing_fallbacks})
+        self.assertEqual(failed["fixture::binary candidate"], 0.5)
+        self.assertEqual(
+            failed_fallbacks,
+            [{
+                "test_id": "fixture::binary candidate",
+                "seconds": 0.5,
+                "method": "binary-median",
+            }],
+        )
+
     def test_workspace_tsv_fail_status_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "timings.tsv"
@@ -483,7 +629,7 @@ class DurationShardControls(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "malformed workspace timing row"):
                 _planner.read_durations([path])
 
-    def test_unseen_tests_use_default_and_stale_rows_warn_and_drop(self):
+    def test_unseen_tests_use_per_binary_and_global_medians(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             suites = {
@@ -492,14 +638,27 @@ class DurationShardControls(unittest.TestCase):
                     "binary-name": "ordinary",
                     "testcases": {name: {"filter-match": {"status": "matches"}}},
                 }
-                for name in ("known", "unseen")
+                for name in ("known", "middle", "slow", "unseen")
+            }
+            suites["other"] = {
+                "binary-id": "fixture::other",
+                "binary-name": "other",
+                "testcases": {"measured": {"filter-match": {"status": "matches"}}},
+            }
+            suites["global"] = {
+                "binary-id": "fixture::unmeasured",
+                "binary-name": "unmeasured",
+                "testcases": {"global": {"filter-match": {"status": "matches"}}},
             }
             (root / "inventory.json").write_text(
-                json.dumps({"test-count": 2, "rust-suites": suites})
+                json.dumps({"test-count": 6, "rust-suites": suites})
             )
             (root / "timings.tsv").write_text(
-                "1 PASS [ 10.000s] (1/1) fixture::ordinary known\n"
-                "1 PASS [ 20.000s] (1/1) fixture::ordinary retired\n"
+                "1 PASS [ 10.000s] (1/4) fixture::ordinary known\n"
+                "1 PASS [ 20.000s] (2/4) fixture::ordinary middle\n"
+                "1 PASS [100.000s] (3/4) fixture::ordinary slow\n"
+                "2 PASS [ 40.000s] (1/1) fixture::other measured\n"
+                "2 PASS [ 20.000s] (1/1) fixture::other retired\n"
             )
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "inventory.json", "timings.tsv"],
@@ -510,12 +669,27 @@ class DurationShardControls(unittest.TestCase):
                 check=False,
             )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("600.0s default for 1 unmeasured workspace tests", result.stderr)
+        self.assertIn(
+            "using per-binary median for 1 and global median for 1 of 2 unmeasured",
+            result.stderr,
+        )
         self.assertIn("dropping timing rows absent from current inventory", result.stderr)
         plan = json.loads(result.stdout)
+        self.assertEqual(sum(shard["seconds"] for shard in plan["bins"]), 220.0)
         self.assertEqual(
-            sum(shard["seconds"] for shard in plan["bins"]),
-            610.0,
+            plan["fallbacks"],
+            [
+                {
+                    "test_id": "fixture::ordinary unseen",
+                    "seconds": 20.0,
+                    "method": "binary-median",
+                },
+                {
+                    "test_id": "fixture::unmeasured global",
+                    "seconds": 30.0,
+                    "method": "global-median",
+                },
+            ],
         )
         assigned = {
             tuple(identity): shard["bin"]
@@ -525,9 +699,235 @@ class DurationShardControls(unittest.TestCase):
         self.assertEqual(
             assigned,
             {
-                ("fixture::ordinary", "unseen"): 1,
-                ("fixture::ordinary", "known"): 2,
+                ("fixture::ordinary", "slow"): 1,
+                ("fixture::other", "measured"): 2,
+                ("fixture::unmeasured", "global"): 3,
+                ("fixture::ordinary", "middle"): 4,
+                ("fixture::ordinary", "unseen"): 5,
+                ("fixture::ordinary", "known"): 6,
             },
+        )
+        with self.assertRaisesRegex(
+            SystemExit, "cannot estimate unmeasured tests without any live timing rows"
+        ):
+            _planner.resolve_durations(
+                [("fixture::never-measured test", "fixture::never-measured", "test")],
+                {},
+            )
+
+    def test_landed_workspace_wall_model_reprojects_measured_shards(self):
+        evidence = Path(
+            "docs/program/evidence/ci-workspace-run-36341523886"
+        )
+        timing_paths = [
+            evidence / f"shard-{shard}.json"
+            for shard in range(1, SHARD_COUNT + 1)
+        ]
+        calibration_path = evidence / "job-steps.tsv"
+        model = _planner.fit_workspace_wall_model(timing_paths, calibration_path)
+        self.assertEqual(model["run_id"], 36341523886)
+        self.assertLessEqual(
+            max(model["calibration_errors"].values()),
+            _planner.WALL_MODEL_TOLERANCE_SECONDS,
+        )
+
+        actual_by_shard = {}
+        binary_shards = {}
+        binary_work_by_shard = {}
+        fallbacks = []
+        run_ids = set()
+        for path in timing_paths:
+            artifact = _planner.ci_workspace_timings.load_artifact(path)
+            run_ids.add(artifact["run_id"])
+            fallbacks.append(artifact["fallbacks"])
+            actual_by_shard[artifact["shard"]] = {
+                row["test_id"]: row["seconds"] for row in artifact["records"]
+            }
+            per_binary = {}
+            for record in artifact["records"]:
+                binary_id = record["test_id"].partition(" ")[0]
+                binary_shards.setdefault(binary_id, set()).add(artifact["shard"])
+                per_binary[binary_id] = per_binary.get(binary_id, 0.0) + record["seconds"]
+            binary_work_by_shard[artifact["shard"]] = per_binary
+        # Binary aggregates are neither unique to one shard nor serial wall
+        # units here; the indivisible tail is an individual test.
+        self.assertGreater(sum(len(shards) > 1 for shards in binary_shards.values()), 0)
+        self.assertEqual(len(run_ids), 1)
+        self.assertTrue(all(rows == fallbacks[0] for rows in fallbacks))
+        self.assertEqual(
+            sum(len(rows) for rows in fallbacks),
+            SHARD_COUNT * len(fallbacks[0]),
+        )
+
+        live = sorted(
+            (identity, identity.partition(" ")[0], identity.partition(" ")[2])
+            for rows in actual_by_shard.values()
+            for identity in rows
+        )
+        old_source = _planner.read_durations(
+            "docs/program/evidence/ci-workspace-timings-36295180542.tsv"
+        )
+        old_resolved, old_fallbacks = _planner.resolve_durations(live, old_source)
+        old_fallback_map = {
+            row["test_id"]: {"seconds": row["seconds"], "method": row["method"]}
+            for row in old_fallbacks
+        }
+        recorded_fallback_map = {
+            row["test_id"]: {"seconds": row["seconds"], "method": row["method"]}
+            for row in fallbacks[0]
+        }
+        self.assertEqual(old_fallback_map, recorded_fallback_map)
+
+        measured_source = _planner.read_durations(timing_paths)
+        self.assertEqual(set(measured_source), {row[0] for row in live})
+        old_projected = {}
+        measured_terminal = {}
+        fallback_delta = {}
+        for shard, identities in actual_by_shard.items():
+            selected = set(identities)
+            old_projected[shard] = sum(old_resolved[test_id] for test_id in selected)
+            measured_terminal[shard] = sum(identities.values())
+            fallback_ids = selected & set(old_fallback_map)
+            fallback_delta[shard] = sum(
+                identities[test_id] - old_fallback_map[test_id]["seconds"]
+                for test_id in fallback_ids
+            )
+        old_projection_spread = max(old_projected.values()) - min(old_projected.values())
+        measured_terminal_spread = (
+            max(measured_terminal.values()) - min(measured_terminal.values())
+        )
+        self.assertLess(old_projection_spread, 0.01)
+        self.assertGreater(measured_terminal_spread, 1000.0)
+        total_error = sum(
+            measured_terminal[shard] - old_projected[shard]
+            for shard in actual_by_shard
+        )
+        total_fallback_error = sum(fallback_delta.values())
+        self.assertGreater(abs(total_error), abs(total_fallback_error) * 5)
+
+        with calibration_path.open(encoding="utf-8") as source:
+            calibration_rows = {
+                int(row["shard"]): row
+                for row in csv.DictReader(source, delimiter="\t")
+            }
+        self.assertTrue(
+            any(
+                max(binary_work_by_shard[shard].values())
+                > float(calibration_rows[shard]["test_step_seconds"])
+                for shard in range(1, SHARD_COUNT + 1)
+            )
+        )
+        current_projection = []
+        for shard in range(1, SHARD_COUNT + 1):
+            durations = actual_by_shard[shard]
+            work = sum(durations.values())
+            longest = max(durations.values())
+            test_wall = _planner.project_test_wall_seconds(work, longest, model)
+            steps = calibration_rows[shard]
+            measured_job_wall = float(steps["job_wall_seconds"])
+            measured_pretest = measured_job_wall - float(steps["test_step_seconds"])
+            predicted_job_wall = measured_pretest + test_wall
+            self.assertLessEqual(
+                abs(predicted_job_wall - measured_job_wall),
+                _planner.WALL_MODEL_TOLERANCE_SECONDS,
+                f"shard {shard}: predicted {predicted_job_wall}, measured {measured_job_wall}",
+            )
+            current_projection.append(predicted_job_wall)
+        self.assertEqual(len(current_projection), SHARD_COUNT)
+
+    def test_wall_model_rebalances_live_tests_and_preserves_the_union(self):
+        evidence = Path(
+            "docs/program/evidence/ci-workspace-run-36341523886"
+        )
+        timing_paths = [
+            evidence / f"shard-{shard}.json"
+            for shard in range(1, SHARD_COUNT + 1)
+        ]
+        durations = _planner.read_durations(timing_paths)
+        suites = {}
+        for identity in durations:
+            binary_id, separator, name = identity.partition(" ")
+            self.assertTrue(separator)
+            suite = suites.setdefault(
+                binary_id,
+                {
+                    "binary-id": binary_id,
+                    "binary-name": binary_id.rpartition("::")[2] or binary_id,
+                    "testcases": {},
+                },
+            )
+            self.assertNotIn(name, suite["testcases"])
+            suite["testcases"][name] = {"filter-match": {"status": "matches"}}
+        inventory = {
+            "test-count": sum(len(suite["testcases"]) for suite in suites.values()),
+            "rust-suites": {
+                str(index): suite for index, suite in enumerate(suites.values())
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "inventory.json").write_text(json.dumps(inventory))
+
+            def run_plan(wall_model):
+                output_dir = root / ("wall-plan" if wall_model else "sum-plan")
+                command = [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(root / "inventory.json"),
+                    *(str(path) for path in timing_paths),
+                ]
+                if wall_model:
+                    command.extend(
+                        ["--wall-calibration", str(evidence / "job-steps.tsv")]
+                    )
+                command.extend(["--output-dir", str(output_dir)])
+                result = subprocess.run(
+                    command,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return json.loads(result.stdout)
+
+            sum_plan = run_plan(False)
+            wall_plan = run_plan(True)
+        expected = set(durations)
+        for plan in (sum_plan, wall_plan):
+            assigned = [
+                (binary_id, name)
+                for shard in plan["bins"]
+                for binary_id, name in shard["tests"]
+            ]
+            self.assertEqual(len(assigned), len(expected))
+            self.assertEqual(
+                {f"{binary_id} {name}" for binary_id, name in assigned}, expected
+            )
+        self.assertEqual(wall_plan["fallbacks"], [])
+        wall_projection = [
+            shard["projected_job_seconds"] for shard in wall_plan["bins"]
+        ]
+        sum_projection = []
+        model = _planner.fit_workspace_wall_model(
+            timing_paths, evidence / "job-steps.tsv"
+        )
+        for shard in sum_plan["bins"]:
+            selected = [
+                durations[f"{binary_id} {name}"]
+                for binary_id, name in shard["tests"]
+            ]
+            sum_projection.append(
+                _planner.project_test_wall_seconds(sum(selected), max(selected), model)
+                + model["setup_seconds"]
+            )
+        self.assertLessEqual(
+            max(wall_projection) - min(wall_projection),
+            _planner.WALL_MODEL_TOLERANCE_SECONDS,
+        )
+        self.assertGreater(
+            max(sum_projection) - min(sum_projection),
+            _planner.WALL_MODEL_TOLERANCE_SECONDS,
         )
 
     def test_non_map_testcases_has_exact_error(self):
@@ -535,7 +935,7 @@ class DurationShardControls(unittest.TestCase):
             root = Path(temporary)
             value = {"test-count": 1, "rust-suites": {"bad": {"binary-id": "fixture::bad", "binary-name": "ordinary", "testcases": []}}}
             (root / "inventory.json").write_text(json.dumps(value))
-            (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": "x", "seconds": 1}]}))
+            (root / "evidence.json").write_text(json.dumps(timing_artifact([{"test_id": "fixture::ordinary sample", "seconds": 1}])))
             result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json"], cwd=root, text=True, stderr=subprocess.PIPE, check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stderr.strip(), "nextest rust suite has no testcase map")
@@ -548,7 +948,7 @@ class DurationShardControls(unittest.TestCase):
                 suites = {str(i): {"binary-id": binary_id, "binary-name": binary_name, "testcases": {testcase: {"filter-match": {"status": status}}}} for i, (binary_id, binary_name, testcase, status) in enumerate(rows)}
                 suites["empty"] = {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}
                 (root / "inventory.json").write_text(json.dumps({"test-count": size, "rust-suites": suites}))
-                (root / "evidence.json").write_text(json.dumps({"records": [{"test_id": f"fixture::ordinary test_{i}", "seconds": 1} for i in range(size)]}))
+                (root / "evidence.json").write_text(json.dumps(timing_artifact([{"test_id": f"fixture::ordinary test_{i}", "seconds": 1} for i in range(size)])))
                 result = subprocess.run([sys.executable, str(SCRIPT), "inventory.json", "evidence.json", "--output-dir", "out"], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
                 assignment = json.loads((root / "out" / "assignments.json").read_text())
             self.assertEqual(result.returncode, 0, result.stderr)

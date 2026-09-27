@@ -60,6 +60,12 @@ cost of holding a doc-only node for ten minutes is nothing against re-running a
 
 ## Recovery, if it has already happened
 
+**Current law overrides the recovery step below:** COORDINATION §12a
+refuses `gh run rerun` mechanically for every seat. A flake rerun is a
+publish-path close/reopen (`merge-procedure.md`). The diagnosis of which
+state you are in still holds; the `rerun` commands are a record of what
+worked before the refusal existed.
+
 **Re-run the cancelled run by id** — `gh run rerun <id>`, not `--failed`.
 
 - A re-run by id **replays the original event payload**, so

@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """Assign a filtered live nextest inventory to deterministic duration bins."""
+import csv
 import heapq
 import json
+import math
 import os
 import re
+import statistics
 import sys
 import warnings
 
+import ci_workspace_timings
+
 
 N = 7
-# Run 36295180542's largest workspace test was 591.502s; keep a round
-# 600s estimate for new tests until measured rather than the smaller median.
-# With --balance-with, plan against both the multi-run upper envelope and the
-# latest per-test source; report each assigned sum separately.
-DEFAULT_DURATION_SECONDS = 600.0
+WALL_MODEL_TOLERANCE_SECONDS = 60.0
+WALL_CALIBRATION_COLUMNS = [
+    "run_id",
+    "shard",
+    "build_seconds",
+    "selection_seconds",
+    "test_step_seconds",
+    "job_wall_seconds",
+]
+# Use the latest complete full-CI per-test source for LPT. Missing tests use
+# their binary's measured median, or the global measured median for unseen bins.
 NEXTTEST_TIMING_ROW = re.compile(
     r"^(?P<shard>\d+)\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
     r"\s+\(\s*\d+/\d+\)\s+(?P<test_id>.+)$"
@@ -108,6 +119,8 @@ def read_durations(paths):
     if not paths:
         raise SystemExit("duration evidence has no input files")
     durations = {}
+    run_test_shards = {}
+    run_fallbacks = {}
     for path in paths:
         observed = {}
         if path.endswith(".tsv"):
@@ -126,27 +139,242 @@ def read_durations(paths):
                 if test_id in observed:
                     raise SystemExit(f"{path}:{line_number}: duplicate timing row {test_id}")
                 seconds = float((match or tsv_match).group("seconds"))
-                if seconds <= 0:
-                    raise SystemExit(f"{path}:{line_number}: duration must be positive")
+                if not math.isfinite(seconds) or seconds <= 0:
+                    raise SystemExit(f"{path}:{line_number}: duration must be positive and finite")
                 observed[test_id] = seconds
         else:
-            evidence = json.load(open(path))
-            records = evidence.get("records")
-            if not isinstance(records, list) or not records:
-                raise SystemExit(f"{path}: duration evidence has no records")
+            try:
+                with open(path, encoding="utf-8") as source:
+                    evidence = json.load(source)
+                artifact = ci_workspace_timings.validate_artifact(evidence)
+            except (OSError, json.JSONDecodeError, ci_workspace_timings.TimingArtifactError) as error:
+                raise SystemExit(f"{path}: invalid duration artifact: {error}") from error
+            prior_fallbacks = run_fallbacks.setdefault(artifact["run_id"], artifact["fallbacks"])
+            if prior_fallbacks != artifact["fallbacks"]:
+                raise SystemExit(
+                    f"{path}: fallback identities differ within run {artifact['run_id']}"
+                )
+            records = artifact["records"]
             for row in records:
                 test_id = row.get("test_id")
                 seconds = row.get("seconds")
                 if not isinstance(test_id, str) or not test_id:
                     raise SystemExit(f"{path}: duration evidence has an invalid test_id")
-                if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+                if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds < 0:
                     raise SystemExit(f"{path}: duration evidence has an invalid duration for {test_id}")
+                provenance = (artifact["run_id"], test_id)
+                if provenance in run_test_shards:
+                    prior_shard = run_test_shards[provenance]
+                    raise SystemExit(
+                        f"{path}: duplicate terminal identity in run {artifact['run_id']} "
+                        f"shards {prior_shard} and {artifact['shard']}: {test_id}"
+                    )
+                run_test_shards[provenance] = artifact["shard"]
                 if test_id in observed:
                     raise SystemExit(f"{path}: duration evidence has duplicate row {test_id}")
+                if row["result"] == "FAIL":
+                    # Keep failed terminals validated and provenance-checked, but
+                    # do not treat potentially early-aborted work as a full-test
+                    # timing. The planner assigns this identity a median fallback.
+                    continue
                 observed[test_id] = float(seconds)
         for test_id, seconds in observed.items():
             durations[test_id] = max(durations.get(test_id, seconds), seconds)
     return durations
+
+
+def resolve_durations(live, measured):
+    """Fill missing live identities from per-binary then global medians."""
+    by_binary = {}
+    measured_live = {}
+    for rendered, binary_id, _ in live:
+        if rendered in measured:
+            duration = measured[rendered]
+            measured_live[rendered] = duration
+            by_binary.setdefault(binary_id, []).append(duration)
+    if not measured_live:
+        raise SystemExit("cannot estimate unmeasured tests without any live timing rows")
+
+    global_median = statistics.median(measured_live.values())
+    binary_medians = {
+        binary_id: statistics.median(values)
+        for binary_id, values in by_binary.items()
+    }
+    resolved = dict(measured_live)
+    fallbacks = []
+    for rendered, binary_id, _ in live:
+        if rendered in resolved:
+            continue
+        method = "binary-median" if binary_id in binary_medians else "global-median"
+        seconds = binary_medians.get(binary_id, global_median)
+        resolved[rendered] = seconds
+        fallbacks.append({"test_id": rendered, "seconds": seconds, "method": method})
+    return resolved, fallbacks
+
+
+def _solve_linear_system(matrix, values):
+    size = len(values)
+    augmented = [list(row) + [values[index]] for index, row in enumerate(matrix)]
+    for column in range(size):
+        pivot = max(range(column, size), key=lambda row: abs(augmented[row][column]))
+        if abs(augmented[pivot][column]) < 1e-12:
+            raise SystemExit("workspace wall calibration is singular")
+        augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
+        divisor = augmented[column][column]
+        augmented[column] = [entry / divisor for entry in augmented[column]]
+        for row in range(size):
+            if row == column:
+                continue
+            factor = augmented[row][column]
+            augmented[row] = [
+                entry - factor * pivot_entry
+                for entry, pivot_entry in zip(augmented[row], augmented[column])
+            ]
+    return [augmented[index][-1] for index in range(size)]
+
+
+def _workspace_run_workloads(timing_paths):
+    if len(timing_paths) != N:
+        raise SystemExit("workspace wall calibration requires seven timing artifacts")
+    workloads = {}
+    all_identities = set()
+    fallback_records = None
+    run_ids = set()
+    for path in timing_paths:
+        try:
+            with open(path, encoding="utf-8") as source:
+                artifact = json.load(source)
+            artifact = ci_workspace_timings.validate_artifact(artifact)
+        except (OSError, json.JSONDecodeError, ci_workspace_timings.TimingArtifactError) as error:
+            raise SystemExit(f"{path}: invalid wall-calibration timing artifact: {error}") from error
+        run_ids.add(artifact["run_id"])
+        if fallback_records is None:
+            fallback_records = artifact["fallbacks"]
+        elif artifact["fallbacks"] != fallback_records:
+            raise SystemExit("wall-calibration artifacts disagree on fallback identities")
+        shard = artifact["shard"]
+        if shard in workloads:
+            raise SystemExit(f"duplicate wall-calibration timing shard {shard}")
+        records = artifact["records"]
+        if not records or any(record["result"] != "PASS" for record in records):
+            raise SystemExit(f"wall-calibration shard {shard} needs only passing timings")
+        identities = {record["test_id"] for record in records}
+        if all_identities & identities:
+            raise SystemExit("wall-calibration timing shards have duplicate identities")
+        all_identities |= identities
+        seconds = [float(record["seconds"]) for record in records]
+        workloads[shard] = {
+            "test_sum_seconds": sum(seconds),
+            "longest_test_seconds": max(seconds),
+        }
+    if len(run_ids) != 1 or set(workloads) != set(range(1, N + 1)):
+        raise SystemExit("wall-calibration artifacts must be one complete seven-shard run")
+    return next(iter(run_ids)), workloads
+
+
+def fit_workspace_wall_model(timing_paths, calibration_path):
+    """Fit a test-wall model and enforce its per-shard reprojection tolerance."""
+    run_id, workloads = _workspace_run_workloads(timing_paths)
+    try:
+        with open(calibration_path, encoding="utf-8", newline="") as source:
+            reader = csv.DictReader(source, delimiter="\t")
+            if reader.fieldnames != WALL_CALIBRATION_COLUMNS:
+                raise SystemExit("workspace wall calibration has invalid columns")
+            rows = list(reader)
+    except OSError as error:
+        raise SystemExit(f"{calibration_path}: cannot read wall calibration: {error}") from error
+    observations = {}
+    for row in rows:
+        try:
+            row_run_id = int(row["run_id"])
+            shard = int(row["shard"])
+            build_seconds = float(row["build_seconds"])
+            selection_seconds = float(row["selection_seconds"])
+            test_seconds = float(row["test_step_seconds"])
+            job_seconds = float(row["job_wall_seconds"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise SystemExit(f"{calibration_path}: malformed wall calibration row") from error
+        numeric = (build_seconds, selection_seconds, test_seconds, job_seconds)
+        if (
+            row_run_id != run_id
+            or not 1 <= shard <= N
+            or shard in observations
+            or any(not math.isfinite(value) or value < 0 for value in numeric)
+            or test_seconds <= 0
+            or job_seconds < test_seconds
+            or build_seconds + selection_seconds > job_seconds
+        ):
+            raise SystemExit(f"{calibration_path}: invalid wall calibration row for shard {shard}")
+        observations[shard] = {
+            **workloads.get(shard, {}),
+            "build_seconds": build_seconds,
+            "selection_seconds": selection_seconds,
+            "test_step_seconds": test_seconds,
+            "job_wall_seconds": job_seconds,
+        }
+    if set(observations) != set(range(1, N + 1)):
+        raise SystemExit("workspace wall calibration must contain each shard exactly once")
+
+    # Fit the observed Test step to total work plus its indivisible slowest test.
+    # Build, selection, and other setup remain a separate measured overhead.
+    features = [
+        [1.0, row["test_sum_seconds"], row["longest_test_seconds"]]
+        for row in (observations[shard] for shard in range(1, N + 1))
+    ]
+    measured = [observations[shard]["test_step_seconds"] for shard in range(1, N + 1)]
+    size = len(features[0])
+    normal = [
+        [sum(row[left] * row[right] for row in features) for right in range(size)]
+        for left in range(size)
+    ]
+    target = [
+        sum(features[index][column] * measured[index] for index in range(N))
+        for column in range(size)
+    ]
+    intercept, sum_coefficient, longest_coefficient = _solve_linear_system(normal, target)
+    coefficients = {
+        "intercept_seconds": intercept,
+        "sum_coefficient": sum_coefficient,
+        "longest_test_coefficient": longest_coefficient,
+    }
+    if any(not math.isfinite(value) for value in coefficients.values()) or min(
+        sum_coefficient, longest_coefficient
+    ) <= 0:
+        raise SystemExit("workspace wall calibration produced invalid workload coefficients")
+
+    setup = []
+    errors = {}
+    for shard, row in observations.items():
+        pretest = row["job_wall_seconds"] - row["test_step_seconds"]
+        setup.append(pretest)
+        predicted_test = project_test_wall_seconds(
+            row["test_sum_seconds"], row["longest_test_seconds"], coefficients
+        )
+        predicted_job = pretest + predicted_test
+        error = abs(predicted_job - row["job_wall_seconds"])
+        errors[shard] = error
+        if error > WALL_MODEL_TOLERANCE_SECONDS:
+            raise SystemExit(
+                f"wall reprojection shard {shard} differs by {error:.3f}s "
+                f"(limit {WALL_MODEL_TOLERANCE_SECONDS:.0f}s)"
+            )
+    return {
+        "run_id": run_id,
+        "intercept_seconds": intercept,
+        "sum_coefficient": sum_coefficient,
+        "longest_test_coefficient": longest_coefficient,
+        "setup_seconds": statistics.median(setup),
+        "calibration_errors": errors,
+    }
+
+
+def project_test_wall_seconds(test_sum_seconds, longest_test_seconds, model):
+    predicted = (
+        model["intercept_seconds"]
+        + model["sum_coefficient"] * test_sum_seconds
+        + model["longest_test_coefficient"] * longest_test_seconds
+    )
+    return max(0.0, predicted)
 
 
 def validate_plan(assignment_path, shard, selected_path):
@@ -175,27 +403,31 @@ def main():
         return
     arguments = sys.argv[1:]
     output = None
-    balance_path = None
+    wall_calibration = None
+    if "--wall-calibration" in arguments:
+        option = arguments.index("--wall-calibration")
+        if option < 2 or option + 1 >= len(arguments):
+            raise SystemExit("--wall-calibration must follow timing files and name a TSV")
+        wall_calibration = arguments[option + 1]
+        del arguments[option : option + 2]
     if "--output-dir" in arguments:
         option = arguments.index("--output-dir")
         if option != len(arguments) - 2 or option < 2:
             raise SystemExit("--output-dir must follow at least one timing file")
         output = arguments[-1]
         arguments = arguments[:-2]
-    if "--balance-with" in arguments:
-        option = arguments.index("--balance-with")
-        if option != len(arguments) - 2 or option < 2:
-            raise SystemExit("--balance-with must follow at least one timing file")
-        balance_path = arguments[-1]
-        arguments = arguments[:-2]
     if len(arguments) < 2:
         raise SystemExit(
             "usage: ci-duration-shard.py INVENTORY TIMING... "
-            "[--balance-with TIMING] [--output-dir DIR]"
+            "[--wall-calibration TSV] [--output-dir DIR]"
         )
     inventory = json.load(open(arguments[0]))
-    durations = read_durations(arguments[1:])
-    balance_durations = read_durations(balance_path) if balance_path else None
+    timing_paths = arguments[1:]
+    durations = read_durations(timing_paths)
+    wall_model = (
+        fit_workspace_wall_model(timing_paths, wall_calibration)
+        if wall_calibration is not None else None
+    )
     live = sorted((f"{binary_id} {name}", binary_id, name) for binary_id, name in tests(inventory))
     if not live:
         raise SystemExit("filtered live inventory selected zero testcases")
@@ -210,95 +442,38 @@ def main():
             RuntimeWarning,
             stacklevel=2,
         )
-    missing = sorted(live_ids - set(durations))
-    if missing:
+    planned_durations, fallbacks = resolve_durations(live, durations)
+    if fallbacks:
+        binary_fallbacks = sum(
+            fallback["method"] == "binary-median" for fallback in fallbacks
+        )
+        global_fallbacks = len(fallbacks) - binary_fallbacks
         warnings.warn(
-            f"using {DEFAULT_DURATION_SECONDS}s default for {len(missing)} unmeasured workspace tests",
+            f"using per-binary median for {binary_fallbacks} and global median "
+            f"for {global_fallbacks} of {len(fallbacks)} unmeasured workspace tests",
             RuntimeWarning,
             stacklevel=2,
         )
-    if balance_durations is not None:
-        stale_balance = sorted(set(balance_durations) - live_ids)
-        if stale_balance:
-            warnings.warn(
-                "dropping balance timing rows absent from current inventory: "
-                + ", ".join(stale_balance),
-                RuntimeWarning,
-                stacklevel=2,
-            )
-        missing_balance = set(live_ids) - set(balance_durations)
-        additional_missing = sorted(missing_balance - set(missing))
-        if additional_missing:
-            warnings.warn(
-                f"using {DEFAULT_DURATION_SECONDS}s default for "
-                f"{len(additional_missing)} workspace tests absent from balance timings",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-
-    planned_bins = []
-    if balance_durations is None:
-        bins = [(0.0, index, []) for index in range(N)]
-        heapq.heapify(bins)
-        for rendered, binary_id, name in sorted(
-            live, key=lambda row: (-durations.get(row[0], DEFAULT_DURATION_SECONDS), row[0])
-        ):
-            total, index, selected = heapq.heappop(bins)
-            selected.append((binary_id, name))
-            heapq.heappush(
-                bins,
-                (total + durations.get(rendered, DEFAULT_DURATION_SECONDS), index, selected),
-            )
-        for total, index, selected in sorted(bins, key=lambda x: x[1]):
-            planned_bins.append((total, None, index, selected))
-    else:
-        # Choose by the worst normalized load across the two timing views;
-        # then break ties by their combined normalized load and bin index.
-        upper_average = sum(
-            durations.get(rendered, DEFAULT_DURATION_SECONDS) for rendered, _, _ in live
-        ) / N
-        balance_average = sum(
-            balance_durations.get(rendered, DEFAULT_DURATION_SECONDS)
-            for rendered, _, _ in live
-        ) / N
-        ordered = sorted(
-            live,
-            key=lambda row: (
-                -max(
-                    durations.get(row[0], DEFAULT_DURATION_SECONDS) / upper_average,
-                    balance_durations.get(row[0], DEFAULT_DURATION_SECONDS) / balance_average,
-                ),
-                row[0],
-            ),
+    bins = []
+    for index in range(N):
+        score = 0.0
+        bins.append((score, index, 0.0, 0.0, []))
+    heapq.heapify(bins)
+    ordered = sorted(live, key=lambda row: (-planned_durations[row[0]], row[0]))
+    for rendered, binary_id, name in ordered:
+        _, index, total, longest, selected = heapq.heappop(bins)
+        duration = planned_durations[rendered]
+        total += duration
+        longest = max(longest, duration)
+        selected.append((binary_id, name))
+        score = (
+            project_test_wall_seconds(total, longest, wall_model)
+            if wall_model is not None else total
         )
-        upper_loads = [0.0] * N
-        balance_loads = [0.0] * N
-        selected = [[] for _ in range(N)]
-        for rendered, binary_id, name in ordered:
-            upper = durations.get(rendered, DEFAULT_DURATION_SECONDS)
-            balance = balance_durations.get(rendered, DEFAULT_DURATION_SECONDS)
-            index = min(
-                range(N),
-                key=lambda candidate: (
-                    max(
-                        (upper_loads[candidate] + upper) / upper_average,
-                        (balance_loads[candidate] + balance) / balance_average,
-                    ),
-                    (upper_loads[candidate] + upper) / upper_average
-                    + (balance_loads[candidate] + balance) / balance_average,
-                    candidate,
-                ),
-            )
-            upper_loads[index] += upper
-            balance_loads[index] += balance
-            selected[index].append((binary_id, name))
-        for index in range(N):
-            planned_bins.append(
-                (upper_loads[index], balance_loads[index], index, selected[index])
-            )
+        heapq.heappush(bins, (score, index, total, longest, selected))
 
     result = []
-    for total, balance_total, index, selected in planned_bins:
+    for _, index, total, longest, selected in sorted(bins, key=lambda item: item[1]):
         terms = [f"(binary_id(={binary}) & test(={name}))" for binary, name in selected]
         item = {
             "bin": index + 1,
@@ -306,8 +481,15 @@ def main():
             "tests": selected,
             "filter": " | ".join(terms),
         }
-        if balance_total is not None:
-            item["balance_seconds"] = round(balance_total, 3)
+        if wall_model is not None:
+            projected_test = project_test_wall_seconds(total, longest, wall_model)
+            item.update({
+                "longest_test_seconds": round(longest, 3),
+                "projected_test_seconds": round(projected_test, 3),
+                "projected_job_seconds": round(
+                    projected_test + wall_model["setup_seconds"], 3
+                ),
+            })
         result.append(item)
     if output:
         os.makedirs(output, exist_ok=True)
@@ -318,7 +500,7 @@ def main():
                 raise SystemExit(f"bin {item['bin']} filter exceeds argv guard {limit}")
             with open(os.path.join(output, f"bin-{item['bin']}.expr"), "w") as file:
                 file.write(expression)
-    assignment = {"bins": result}
+    assignment = {"bins": result, "fallbacks": fallbacks}
     if output:
         with open(os.path.join(output, "assignments.json"), "w") as file:
             json.dump(assignment, file)

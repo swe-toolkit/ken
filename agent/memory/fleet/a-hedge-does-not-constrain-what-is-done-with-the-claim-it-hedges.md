@@ -86,7 +86,7 @@ weaker standard than was practised becomes precedent for the next author.
 to**: a clause whose subject lives one paragraph down is read against the
 paragraph it is in. (The same candidate's 30-line doc insertion also needed an
 attachment check; see
-[[a-helper-inserted-between-a-doc-block-and-its-fn-steals-the-doc]].)
+[[rust-comments-and-attributes-are-not-inert]].)
 
 ## The forbidden act, named directly
 
