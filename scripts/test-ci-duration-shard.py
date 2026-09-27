@@ -117,7 +117,7 @@ class DurationShardControls(unittest.TestCase):
         self.assertEqual(current[long_test], 591.502)
         self.assertEqual(combined[long_test], 591.502)
 
-    def test_latest_workspace_source_rebalances_measured_work(self):
+    def test_workspace_plan_balances_live_defaults_against_timing_sources(self):
         source = Path(
             "docs/program/evidence/ci-workspace-timings-36295180542.tsv"
         ).resolve()
@@ -140,17 +140,49 @@ class DurationShardControls(unittest.TestCase):
             shard = int(match.group("shard"))
             count, total = by_shard.get(shard, (0, 0.0))
             by_shard[shard] = (count + 1, total + seconds)
-        # Model the merge-ref live inventory after run 362951 re-enabled ds5b.
-        active_test = (
-            "ken-elaborator::ds5b_dependent_match_refinement_acceptance",
-            "two_vector_zip_recursive_step_convoy_fixture",
+        # Model the eight current-main tests absent from run 362951: three
+        # H1 additions, the re-enabled ds5b test, and four inline interp tests.
+        active_tests = (
+            (
+                "ken-elaborator::ds5b_dependent_match_refinement_acceptance",
+                "two_vector_zip_recursive_step_convoy_fixture",
+            ),
+            (
+                "ken-elaborator::cat_bsearch_acceptance",
+                "ordered_search_publishes_exactly_its_authorized_surface",
+            ),
+            (
+                "ken-elaborator::cc7_argparse_acceptance",
+                "render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias",
+            ),
+            (
+                "ken-elaborator::cc8_env_config_decoder_acceptance",
+                "render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias",
+            ),
+            (
+                "ken-interp",
+                "ds5b_cast_regular_tests::equal_inductive_type_app_cast_ignores_neutral_proof",
+            ),
+            (
+                "ken-interp",
+                "ds5b_cast_regular_tests::distinct_inductive_type_app_indices_do_not_cast",
+            ),
+            (
+                "ken-interp",
+                "ds5b_cast_regular_tests::neutral_inductive_type_app_index_does_not_cast",
+            ),
+            (
+                "ken-interp",
+                "ds5b_cast_regular_tests::unknown_proof_blocks_equal_inductive_type_app_cast",
+            ),
         )
-        active_suite = suites[active_test[0]]
-        self.assertNotIn(active_test[1], active_suite["testcases"])
-        self.assertNotIn(f"{active_test[0]} {active_test[1]}", latest)
-        active_suite["testcases"][active_test[1]] = {
-            "filter-match": {"status": "matches"}
-        }
+        for binary_id, name in active_tests:
+            active_suite = suites[binary_id]
+            self.assertNotIn(name, active_suite["testcases"])
+            self.assertNotIn(f"{binary_id} {name}", latest)
+            active_suite["testcases"][name] = {
+                "filter-match": {"status": "matches"}
+            }
         expected_shards = {
             1: (592, 2598.135), 2: (593, 1760.703),
             3: (593, 2037.521), 4: (594, 2437.975),
@@ -187,7 +219,7 @@ class DurationShardControls(unittest.TestCase):
             for suite in suites.values()
             for name in suite["testcases"]
         }
-        self.assertEqual(len(identities), 4153)
+        self.assertEqual(len(identities), len(latest) + len(active_tests))
 
         source_paths = [
             Path("docs/program/evidence") / name
@@ -265,16 +297,19 @@ class DurationShardControls(unittest.TestCase):
 
         current_loads = latest_loads(current_plan)
         balanced_loads = latest_loads(balanced_plan)
-        self.assertIn("600.0s default for 1 unmeasured workspace tests", balance_stderr)
-        self.assertAlmostEqual(sum(balanced_loads), sum(latest.values()) + 600.0)
+        self.assertIn("600.0s default for 8 unmeasured workspace tests", balance_stderr)
+        self.assertAlmostEqual(
+            sum(balanced_loads), sum(latest.values()) + 600.0 * len(active_tests)
+        )
         self.assertLess(max(balanced_loads), max(current_loads))
         self.assertEqual(len(balanced_plan), SHARD_COUNT)
         for shard, expected_load in zip(balanced_plan, balanced_loads):
             self.assertAlmostEqual(shard["balance_seconds"], expected_load)
         envelope_loads = [shard["seconds"] for shard in balanced_plan]
         primary_durations = _planner.read_durations([*source_paths, source])
-        active_rendered = f"{active_test[0]} {active_test[1]}"
-        self.assertNotIn(active_rendered, primary_durations)
+        active_rendered = {f"{binary_id} {name}" for binary_id, name in active_tests}
+        for rendered in active_rendered:
+            self.assertNotIn(rendered, primary_durations)
         expected_envelope_total = sum(
             primary_durations.get(f"{binary_id} {name}", 600.0)
             for binary_id, name in identities
@@ -282,6 +317,8 @@ class DurationShardControls(unittest.TestCase):
         self.assertAlmostEqual(sum(envelope_loads), expected_envelope_total)
         envelope_average = sum(envelope_loads) / SHARD_COUNT
         self.assertLess(max(envelope_loads) - min(envelope_loads), envelope_average * 0.02)
+        latest_average = sum(balanced_loads) / SHARD_COUNT
+        self.assertLess(max(balanced_loads) - min(balanced_loads), latest_average * 0.01)
 
         with Path("docs/program/evidence/ci-job-timeline-36295180542.tsv").open(
             encoding="utf-8"
@@ -305,8 +342,10 @@ class DurationShardControls(unittest.TestCase):
         non_test_wall = wall - float(summary.group(1))
         calibration = float(summary.group(1)) / by_shard[1][1]
         projected_wall = max(balanced_loads) * calibration + non_test_wall
-        self.assertLessEqual(projected_wall, 18 * 60)
-        self.assertIn(active_test, balanced_bins)
+        average_projection = latest_average * calibration + non_test_wall
+        self.assertGreaterEqual(projected_wall, average_projection)
+        self.assertLess(projected_wall - average_projection, average_projection * 0.01)
+        self.assertTrue(all(active_test in balanced_bins for active_test in active_tests))
 
     def test_queue_free_run_has_no_measured_test_at_floor_bound(self):
         evidence = Path("docs/program/evidence")
