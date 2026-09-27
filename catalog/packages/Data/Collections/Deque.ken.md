@@ -291,6 +291,85 @@ to `reverse`; `reverse::involutive` recovers the front before the
 `list_append::right_unit` step. The direct back-pop case reuses the checked
 snoc-association lemma. The implementation of `popBack` is unchanged.
 
+These checked examples instantiate both insertion and pop laws at arbitrary
+values, then exercise both direct and rebalancing paths on concrete deques.
+
+```ken example
+theorem deque_example_front_homomorphism
+      (a : Type) (x : a) (q : Deque a)
+    : Equal (List a) (toList a (pushFront a x q)) (Cons a x (toList a q)) =
+  toList_pushFront a x q
+
+theorem deque_example_back_homomorphism
+      (a : Type) (x : a) (q : Deque a)
+    : Equal
+        (List a)
+        (toList a (pushBack a x q))
+        (list_append a (toList a q) (Cons a x (Nil a))) =
+  toList_pushBack a x q
+
+fn deque_example_front_inverse
+      (a : Type) (x : a) (q : Deque a)
+    : PopPreserves a x q (popFront a (pushFront a x q)) =
+  popFront_pushFront a x q
+
+fn deque_example_back_inverse
+      (a : Type) (x : a) (q : Deque a)
+    : PopPreserves a x q (popBack a (pushBack a x q)) =
+  popBack_pushBack a x q
+
+fn deque_example_observe_pop (a : Type) (popped : Option (Pair a (Deque a))) : List a =
+  match popped {
+    None ↦ Nil a;
+    Some item ↦ Cons a (pair_fst a (Deque a) item) (toList a (pair_snd a (Deque a) item))
+  }
+
+theorem deque_example_push_order
+    : Equal
+        (List Bool)
+        (toList
+          Bool
+          (pushBack Bool False (pushFront Bool False (pushBack Bool True (empty Bool)))))
+        (Cons Bool False (Cons Bool True (Cons Bool False (Nil Bool)))) =
+  Refl
+
+theorem deque_example_front_direct_order
+    : Equal
+        (List Bool)
+        (deque_example_observe_pop
+          Bool
+          (popFront Bool (pushFront Bool False (pushBack Bool True (empty Bool)))))
+        (Cons Bool False (Cons Bool True (Nil Bool))) =
+  Refl
+
+theorem deque_example_front_rebalance_order
+    : Equal
+        (List Bool)
+        (deque_example_observe_pop
+          Bool
+          (popFront Bool (pushBack Bool False (pushBack Bool True (empty Bool)))))
+        (Cons Bool True (Cons Bool False (Nil Bool))) =
+  Refl
+
+theorem deque_example_back_direct_order
+    : Equal
+        (List Bool)
+        (deque_example_observe_pop
+          Bool
+          (popBack Bool (pushBack Bool False (pushFront Bool True (empty Bool)))))
+        (Cons Bool False (Cons Bool True (Nil Bool))) =
+  Refl
+
+theorem deque_example_back_rebalance_order
+    : Equal
+        (List Bool)
+        (deque_example_observe_pop
+          Bool
+          (popBack Bool (pushFront Bool False (pushFront Bool True (empty Bool)))))
+        (Cons Bool True (Cons Bool False (Nil Bool))) =
+  Refl
+```
+
 ## Trust and derivation
 
 `Deque` is an ordinary strictly positive inductive. Its operations reuse the
