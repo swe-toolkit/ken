@@ -324,3 +324,30 @@ final door-deletion increment. No `r_layer_tests` consumer used Deque aliases.
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
 question about a public route to a type (for example `SourceId`) goes to
 the Steward as a Foundation API question.
+
+**Map ground-witness evidence (Architect `evt_4xtksh29xcm9k`, stop 13).**
+The Map-owned example fence carries four generic laws plus a lawful
+stored-descending versus fresh-ascending comparison on one concrete tree.
+The old import-first proposal failed 0/1 with `AmbiguousReference leq_nat`:
+Map's private `leq_nat` and the imported LawfulClasses `leq_nat` collided.
+The accepted import-free replacement passed the real roots/fence test 1/1.
+
+Changing only the view dictionary's `leq` to the ascending projection
+failed 0/1 with `KernelRejected TypeMismatch` at the lawful `Ord` record;
+it never reached the named ground theorem. Changing all dictionary laws
+to the lawful ascending orientation instead failed 0/1 with
+`KernelRejected TypeMismatch` at the tree's `Ordered` witness; it also
+never reached the named ground theorem. These two earlier refusals guard
+the construction boundary, not the ground theorem's liveness. Replacing
+the stored-view observation with a fresh ascending `member` call on the
+same descending tree failed 0/1 exactly at
+`map_example_stored_comparator_finds_the_key`; restoring the observation
+made the roots/fence test pass 1/1. None of the three mutations added
+trust, widened Map's public surface, or changed its imports.
+
+**Map door-use census.** The two `expose_module` sites in
+`lang_membership_operator_surface.rs` were the only Map door users in this
+increment; both move to public abstract-parameter wrappers in the same
+candidate as the Map fence. The older `map_build_acceptance.rs::mk_env`
+fixture elaborates the complete Map source as a flat legacy unit; it is a
+separate census residual, not a third door user, and stays unchanged.

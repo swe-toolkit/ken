@@ -15543,6 +15543,253 @@ fn is_equivalence (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit))
   And (is_reflexive k leq r) (And (is_symmetric k leq r) (is_transitive k leq r))
 ```
 
+```ken example
+theorem map_example_size_node
+      (k : Type) (v : Type) (left : Tree k v) (key : k) (val : v) (right : Tree k v)
+    : Equal Nat
+        (size k v (Node k v left key val right))
+        (Suc (add (size k v left) (size k v right))) =
+  Refl
+
+theorem map_example_dom_node
+      (k : Type) (v : Type) (left : Tree k v) (key : k) (val : v) (right : Tree k v)
+    : Equal
+        (Tree k Unit)
+        (dom k v (Node k v left key val right))
+        (Node k Unit (dom k v left) key MkUnit (dom k v right)) =
+  Refl
+
+theorem map_example_empty_to_list
+      (k : Type) (v : Type)
+    : Equal (List (Pair k v)) (to_list k v (empty k v)) (Nil (Pair k v)) =
+  Proved
+
+theorem map_example_empty_ordered
+      (k : Type) (v : Type) (leq : k → k → Bool)
+    : Ordered k v leq (empty k v) =
+  ordered_empty k v leq
+
+fn map_example_down_leq (x : Nat) (y : Nat) : Bool = (Ord_instance_Nat).leq y x
+
+fn map_example_down_below_zero (k2 : Nat) : Prop =
+  Equal Bool (map_example_down_leq k2 Zero) True
+
+fn map_example_down_above_zero (k2 : Nat) : Prop =
+  Equal Bool (map_example_down_leq Zero k2) True
+
+fn map_example_down_below_suc (k2 : Nat) : Prop =
+  Equal Bool (map_example_down_leq k2 (Suc Zero)) True
+
+fn map_example_down_above_suc (k2 : Nat) : Prop =
+  Equal Bool (map_example_down_leq (Suc Zero) k2) True
+
+const map_example_down_ord : Ord Nat =
+  {leq = map_example_down_leq, refl = λx.(Ord_instance_Nat).refl
+    x, antisym = λx.λy.λxy.λyx.(Ord_instance_Nat).antisym
+    x
+    y
+    yx
+    xy, trans = λx.λy.λz.λxy.λyz.(Ord_instance_Nat).trans
+    z
+    y
+    x
+    yz
+    xy, total = λx.λy.(Ord_instance_Nat).total y x}
+
+const map_example_empty_key_view : OrderedKeyMembership Nat Unit =
+  MkOrderedKeyMembership Nat Unit Ord_instance_Nat (Leaf Nat Unit) Proved
+
+const map_example_down_left : Tree Nat Unit =
+  Node Nat Unit (Leaf Nat Unit) (Suc Zero) MkUnit (Leaf Nat Unit)
+
+const map_example_down_tree : Tree Nat Unit =
+  Node Nat Unit map_example_down_left Zero MkUnit (Leaf Nat Unit)
+
+theorem map_example_down_left_ordered
+    : Ordered Nat Unit map_example_down_leq map_example_down_left =
+  and_intro
+    (all_keys Nat Unit map_example_down_below_suc (Leaf Nat Unit))
+    (And
+      (all_keys Nat Unit map_example_down_above_suc (Leaf Nat Unit))
+      (And
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit))
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit))))
+    Proved
+    (and_intro
+      (all_keys Nat Unit map_example_down_above_suc (Leaf Nat Unit))
+      (And
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit))
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit)))
+      Proved
+      (and_intro
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit))
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit))
+        Proved
+        Proved))
+
+theorem map_example_down_left_below_root
+    : all_keys Nat Unit map_example_down_below_zero map_example_down_left =
+  and_intro
+    (Equal Bool (map_example_down_leq (Suc Zero) Zero) True)
+    (And
+      (all_keys Nat Unit map_example_down_below_zero (Leaf Nat Unit))
+      (all_keys Nat Unit map_example_down_below_zero (Leaf Nat Unit)))
+    Proved
+    (and_intro
+      (all_keys Nat Unit map_example_down_below_zero (Leaf Nat Unit))
+      (all_keys Nat Unit map_example_down_below_zero (Leaf Nat Unit))
+      Proved
+      Proved)
+
+theorem map_example_down_tree_ordered
+    : Ordered Nat Unit map_example_down_leq map_example_down_tree =
+  and_intro
+    (all_keys Nat Unit map_example_down_below_zero map_example_down_left)
+    (And
+      (all_keys Nat Unit map_example_down_above_zero (Leaf Nat Unit))
+      (And
+        (Ordered Nat Unit map_example_down_leq map_example_down_left)
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit))))
+    map_example_down_left_below_root
+    (and_intro
+      (all_keys Nat Unit map_example_down_above_zero (Leaf Nat Unit))
+      (And
+        (Ordered Nat Unit map_example_down_leq map_example_down_left)
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit)))
+      Proved
+      (and_intro
+        (Ordered Nat Unit map_example_down_leq map_example_down_left)
+        (Ordered Nat Unit map_example_down_leq (Leaf Nat Unit))
+        map_example_down_left_ordered
+        Proved))
+
+const map_example_down_key_view : OrderedKeyMembership Nat Unit =
+  MkOrderedKeyMembership
+    Nat
+    Unit
+    map_example_down_ord
+    map_example_down_tree
+    map_example_down_tree_ordered
+
+const map_example_down_adjacency : Tree Nat (Tree Nat Unit) =
+  Node
+    Nat
+    (Tree Nat Unit)
+    (Leaf Nat (Tree Nat Unit))
+    Zero
+    map_example_down_tree
+    (Leaf Nat (Tree Nat Unit))
+
+theorem map_example_down_adjacency_ordered
+    : Ordered Nat (Tree Nat Unit) map_example_down_leq map_example_down_adjacency =
+  and_intro
+    (all_keys Nat (Tree Nat Unit) map_example_down_below_zero (Leaf Nat (Tree Nat Unit)))
+    (And
+      (all_keys Nat (Tree Nat Unit) map_example_down_above_zero (Leaf Nat (Tree Nat Unit)))
+      (And
+        (Ordered Nat (Tree Nat Unit) map_example_down_leq (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) map_example_down_leq (Leaf Nat (Tree Nat Unit)))))
+    Proved
+    (and_intro
+      (all_keys Nat (Tree Nat Unit) map_example_down_above_zero (Leaf Nat (Tree Nat Unit)))
+      (And
+        (Ordered Nat (Tree Nat Unit) map_example_down_leq (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) map_example_down_leq (Leaf Nat (Tree Nat Unit))))
+      Proved
+      (and_intro
+        (Ordered Nat (Tree Nat Unit) map_example_down_leq (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) map_example_down_leq (Leaf Nat (Tree Nat Unit)))
+        Proved
+        Proved))
+
+theorem map_example_down_successors_ordered
+    : successors_ordered Nat map_example_down_ord map_example_down_adjacency =
+  and_intro
+    (ordered_by Nat Unit map_example_down_ord map_example_down_tree)
+    (And
+      (successors_ordered Nat map_example_down_ord (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat map_example_down_ord (Leaf Nat (Tree Nat Unit))))
+    map_example_down_tree_ordered
+    (and_intro
+      (successors_ordered Nat map_example_down_ord (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat map_example_down_ord (Leaf Nat (Tree Nat Unit)))
+      Proved
+      Proved)
+
+const map_example_down_relation_view : RelationEdgeMembership Nat =
+  MkRelationEdgeMembership
+    Nat
+    map_example_down_ord
+    map_example_down_adjacency
+    map_example_down_adjacency_ordered
+    map_example_down_successors_ordered
+
+const map_example_key_observed : Bool =
+  ordered_key_membership_member Nat Unit Zero map_example_empty_key_view
+
+const map_example_relation_observed : Bool =
+  relation_edge_membership_member
+    Nat
+    (mk_pair Nat Nat Zero (Suc Zero))
+    map_example_down_relation_view
+
+const map_example_comparator_observed : Bool =
+  ordered_key_membership_member Nat Unit (Suc Zero) map_example_down_key_view
+
+const map_example_comparator_absent_observed : Bool =
+  ordered_key_membership_member Nat Unit (Suc (Suc Zero)) map_example_down_key_view
+
+const map_example_relation_absent_source_observed : Bool =
+  relation_edge_membership_member
+    Nat
+    (mk_pair Nat Nat (Suc (Suc Zero)) (Suc Zero))
+    map_example_down_relation_view
+
+const map_example_relation_absent_target_observed : Bool =
+  relation_edge_membership_member
+    Nat
+    (mk_pair Nat Nat Zero (Suc (Suc Zero)))
+    map_example_down_relation_view
+
+const map_example_wrong_comparator_observed : Bool =
+  member Nat Unit (Ord_instance_Nat).leq (Suc Zero) map_example_down_tree
+
+const map_example_wrong_relation_comparator_observed : Bool =
+  set_member
+    Nat
+    (Ord_instance_Nat).leq
+    (Suc Zero)
+    (succ Nat (Ord_instance_Nat).leq Zero map_example_down_adjacency)
+
+theorem map_example_stored_comparator_finds_the_key
+    : Equal Bool map_example_comparator_observed True =
+  Proved
+
+theorem map_example_fresh_canonical_comparator_misses_the_same_key
+    : Equal Bool map_example_wrong_comparator_observed False =
+  Proved
+
+theorem map_example_stored_comparator_rejects_an_absent_key
+    : Equal Bool map_example_comparator_absent_observed False =
+  Proved
+
+theorem map_example_stored_relation_comparator_rejects_an_absent_source
+    : Equal Bool map_example_relation_absent_source_observed False =
+  Proved
+
+theorem map_example_stored_relation_comparator_rejects_an_absent_target
+    : Equal Bool map_example_relation_absent_target_observed False =
+  Proved
+
+theorem map_example_stored_relation_comparator_finds_the_edge
+    : Equal Bool map_example_relation_observed True =
+  Proved
+
+theorem map_example_fresh_canonical_comparator_misses_the_same_edge
+    : Equal Bool map_example_wrong_relation_comparator_observed False =
+  Proved
+```
+
 ## 5. Design notes
 
 **Structural induction.** Recursive proofs call themselves on the relevant

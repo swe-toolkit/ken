@@ -6,11 +6,11 @@ mod catalog_or;
 #[path = "support/catalog_publication.rs"]
 mod catalog_publication;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv};
-use ken_kernel::Decl;
+use ken_kernel::{Decl, GlobalId};
 
 const MAP: &str = "Data.Collections.Map";
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
@@ -130,5 +130,70 @@ fn map_dom_membership_law_is_checked_without_direct_trust() {
     assert!(
         trusted_base_delta(&env.env, law).is_empty(),
         "the arbitrary-tree law must add no trust"
+    );
+}
+
+fn map_qualified_bindings(env: &ElabEnv) -> BTreeMap<String, GlobalId> {
+    let prefix = format!("{MAP}.");
+    env.globals
+        .iter()
+        .filter(|(name, _)| name.starts_with(&prefix))
+        .map(|(name, id)| (name.clone(), *id))
+        .collect()
+}
+
+/// Promise class: durable checked-identity invariant.
+///
+/// MEASURED: real roots loading omits the private example declarations from
+/// Map's compiled module, then entry-fence execution checks every example
+/// while preserving every Map-qualified name and ID and the trusted-base set.
+/// CLAIMED: private Map law applications and ground comparator witnesses are
+/// kernel checked in their owner, not published or paid for with new trust.
+/// THE GAP: the exact nine-name loader-visible public interface is measured
+/// separately by `map_dom_member_public_surface_transition_sentinel`; the
+/// checked examples are intentionally not runtime observations.
+#[test]
+fn map_private_checked_examples_preserve_names_ids_and_trust() {
+    let mut env = load_map();
+    let before = map_qualified_bindings(&env);
+    let trust_before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    assert!(
+        !env.globals.contains_key("map_example_size_node"),
+        "example-only laws must not be tangled into the loaded module"
+    );
+    env.execute_loaded_entry_checked_fences(MAP)
+        .expect("Map's generic laws and ground comparator examples must check");
+    for name in [
+        "map_example_size_node",
+        "map_example_dom_node",
+        "map_example_empty_to_list",
+        "map_example_empty_ordered",
+        "map_example_empty_key_view",
+        "map_example_down_tree_ordered",
+        "map_example_down_key_view",
+        "map_example_down_relation_view",
+        "map_example_stored_comparator_finds_the_key",
+        "map_example_fresh_canonical_comparator_misses_the_same_key",
+        "map_example_stored_comparator_rejects_an_absent_key",
+        "map_example_stored_relation_comparator_rejects_an_absent_source",
+        "map_example_stored_relation_comparator_rejects_an_absent_target",
+        "map_example_stored_relation_comparator_finds_the_edge",
+        "map_example_fresh_canonical_comparator_misses_the_same_edge",
+    ] {
+        let id = env.globals[name];
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "Map checked example {name} must be a transparent declaration"
+        );
+    }
+    assert_eq!(
+        map_qualified_bindings(&env),
+        before,
+        "Map checked examples must not leak or rebind qualified identities"
+    );
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "Map checked examples must not add trusted assumptions"
     );
 }
