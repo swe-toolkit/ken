@@ -1,7 +1,7 @@
 ---
 id: RT-C5-PRIMITIVE-TYPE-ARGUMENTS
 title: "Give closed primitive type constants a comparable interpreter value, so C5 cast regularity fires on applied types with Int, String or other primitive arguments instead of returning Unknown on a closed, hole-free program"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: architect
@@ -9,7 +9,7 @@ tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Adversary advisory 2026-09-27 on M8 e41f7589e (evt_7wtyyhd1yw5m5), source mechanism confirmed by the Steward. Spec 40-runtime/42-evaluation.md §3.6 canonicity; the interpreter is the reference semantics (spec 00 §3). Outside the operator's L1 objective (ignored rows), so draft until the operator sequences it. Steward-filed per COORDINATION section 2."
+origin: "Adversary advisory 2026-09-27 on M8 e41f7589e (evt_7wtyyhd1yw5m5), source mechanism confirmed by the Steward. Spec 40-runtime/42-evaluation.md §3.6 canonicity; the interpreter is the reference semantics (spec 00 §3). Operator 2026-09-27: sequenced in L1 right after RT-OWNER-VIS-RETURN-PROTOCOL, ahead of RT-IGNORED-ROWS-NEXT-GROUP (option b). Steward-filed per COORDINATION section 2."
 ---
 
 # C5 on primitive type arguments
