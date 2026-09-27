@@ -3488,10 +3488,10 @@ impl<'a> Lowering<'a> {
                     "BufferFreeze",
                     "buffer",
                 )?;
-                let start = seats.specialized(SEAT_1)?;
-                let length = seats.specialized(SEAT_2)?;
-                let (start, start_valid) = self.narrow_native_int_u64(builder, start)?;
-                let (length, length_valid) = self.narrow_native_int_u64(builder, length)?;
+                let (start, start_valid) =
+                    self.narrow_positioned_int_seat(builder, &seats, 1, "BufferFreeze start")?;
+                let (length, length_valid) =
+                    self.narrow_positioned_int_seat(builder, &seats, 2, "BufferFreeze length")?;
                 let valid = builder.ins().band(start_valid, length_valid);
                 let invalid = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,

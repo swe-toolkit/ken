@@ -651,7 +651,7 @@ fn escape_resource_plus_plain_matches_interpreter() {
 // executing the row does not discharge the skip.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-DUPLICATED-RESPONSE-BLOCK: re-measured individually at cf4533b746 on rt_escape_escape_file_then_readat; this row still stops first at two host response cases claim one operation constructor. The collision is a false alarm over two legitimate inlined dispatcher copies, but neither occurrence-keying nor relaxation is authorized: producer_call_origin still has production USE sites, with observables flat or unreached only on this four-row population. Clause 3 was struck by Architect ruling evt_7sj5xmgcxwk5f, and response_origin has no production reader. With the construction refusal alone suppressed, this row next stops at ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor. Whether RT-CLOSURE-BOUNDARY-LANE is also a blocker remains undetermined. Stays ignored under this node."]
+#[ignore = "RT-DUPLICATED-RESPONSE-BLOCK: re-measured individually at cf4533b746 on rt_escape_escape_file_then_readat and first refusal reconfirmed at 310bf4f21; this row still stops first at two host response cases claim one operation constructor. The collision is a false alarm over two legitimate inlined dispatcher copies, but neither occurrence-keying nor relaxation is authorized: producer_call_origin still has production USE sites, with observables flat or unreached only on this four-row population. Clause 3 was struck by Architect ruling evt_7sj5xmgcxwk5f, and response_origin has no production reader. With the construction refusal alone suppressed, this row next stops at ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor. Whether RT-CLOSURE-BOUNDARY-LANE is also a blocker remains undetermined. Stays ignored under this node."]
 fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
     // Pre-fix: this panicked in `build_native_program` with
     // "checked Runtime frame marker was consumed more than once". The fork/union
@@ -682,7 +682,7 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
+#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE AC-0 at 310bf4f21: source-specific inheritances at one generated entry disagree on their typed consumer projection, including the fresh-result route; first refusal, not the older eliminated-recursive-hypothesis prediction"]
 fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
     // Closure across resource kinds: same fan-out defect with an escaped
     // `Buffer` rather than an escaped `FsHandle`. Also pre-fix "consumed more
@@ -711,7 +711,7 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-DUPLICATED-RESPONSE-BLOCK: re-measured individually at cf4533b746 on rt_escape_nat_fanout_escaped; this row still stops first at two host response cases claim one operation constructor. The collision is a false alarm over two legitimate inlined dispatcher copies, but neither occurrence-keying nor relaxation is authorized: producer_call_origin still has production USE sites, with observables flat or unreached only on this four-row population. Clause 3 was struck by Architect ruling evt_7sj5xmgcxwk5f, and response_origin has no production reader. With the construction refusal alone suppressed, this row next stops at ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor. Whether RT-CLOSURE-BOUNDARY-LANE is also a blocker remains undetermined. Stays ignored under this node."]
+#[ignore = "RT-DUPLICATED-RESPONSE-BLOCK: re-measured individually at cf4533b746 on rt_escape_nat_fanout_escaped and first refusal reconfirmed at 310bf4f21; this row still stops first at two host response cases claim one operation constructor. The collision is a false alarm over two legitimate inlined dispatcher copies, but neither occurrence-keying nor relaxation is authorized: producer_call_origin still has production USE sites, with observables flat or unreached only on this four-row population. Clause 3 was struck by Architect ruling evt_7sj5xmgcxwk5f, and response_origin has no production reader. With the construction refusal alone suppressed, this row next stops at ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor. Whether RT-CLOSURE-BOUNDARY-LANE is also a blocker remains undetermined. Stays ignored under this node."]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     // Closure across the bounded-Nat fanout lowerer: an escaped-resource checked
     // frame in the shared continuation of a `match n {Zero;Suc}` fanout. Pre-fix
@@ -774,7 +774,7 @@ fn buffer_freeze_outcome(
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-PROCESS-EXIT-STATUS: a Persistent child is held against an ownership record that planned NoReferent for that position; fails at base 21fd46dc"]
+#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE D1: paired BufferFreeze carried start/length seat repair now passes AC-0 refusal; next first failure is a runtime -1 from response-owner Ret-tag check for Vis StaticOriginId(1298), lowering/units.rs:3663-3671. Remains ignored pending the distinct owner continuation repair; AC-0 at 310bf4f21 was BufferFreeze Argument(1) ExactIntU64 unavailable in CarriedWord"]
 fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds() {
     in_large_stack_thread("rt-escape-r2", || {
         // R2 reaching lane: two nested buffer resources compile and run; a span

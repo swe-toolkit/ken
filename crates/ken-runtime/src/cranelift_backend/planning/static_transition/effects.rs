@@ -540,7 +540,12 @@ fn host_effect_seat_contract(
         | (Op::MappingReadView, 3)
         | (Op::MappingWriteView, 0)
         | (Op::MappingWriteView, 3) => Some(phase_bearing_resource),
-        (Op::BufferFreeze, 1) | (Op::BufferFreeze, 2) => Some(exact_int),
+        // RT-COMPMATCH-TREE-SCRUTINEE: the span start and length arrive from
+        // prelude `spanBytes` as carried words. Both move together, as the
+        // Mapping window family did: leaving one specialized-only makes a
+        // carried span depend on which coordinate is read first. Paired with
+        // `narrow_positioned_int_seat` in the BufferFreeze emitter arm.
+        (Op::BufferFreeze, 1) | (Op::BufferFreeze, 2) => Some(carried_exact_int),
         // ABI-S6 D5a-surface D1: the whole Mapping-window exact-`Int`
         // family can arrive through a declared ABI slot. Move the two read
         // coordinates and the write start together; leaving any one
