@@ -98,6 +98,25 @@ implicit module named by its path. Modules **nest**
 fragment**: its declarations elaborate into `Σ` in dependency order under their
 qualified names, exactly as if written flat.
 
+Each **exact qualified module path** has one owning compilation unit. A file
+unit owns its path and every inline descendant path that it declares itself;
+an in-memory unit that first declares an otherwise unowned inline path owns
+that path. A different unit cannot claim an owned path, whether through an
+inline declaration or as a file unit's implicit module. The foreign claim
+raises the hard **`ModuleOwnerClash` surface error**, naming the path and the
+two units, at the inline declaration or file load, whichever comes second.
+This holds in both load orders even if the two units define disjoint member
+names: neither a duplicate member nor a later
+use is needed to trigger it. The rejected unit contributes no checked
+declaration or public-interface entry.
+
+Ownership is **exact-path**, not prefix-based. If the owner of `P` did not
+itself declare `P.Q`, an otherwise unowned `P.Q` may be declared by another
+unit; that unit then owns `P.Q`. The file-path/leaf rules of §3.2 still apply
+to file units. A mutable implementation-global name table does not determine
+ownership or provide last-writer-wins source semantics: resolution uses the
+owning unit's scope and public interface (§3.3, §4).
+
 ### 3.2 Importing and exporting
 
 Within a module, an `import` brings another module's **exported** names (`§4`)

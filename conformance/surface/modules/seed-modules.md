@@ -906,6 +906,42 @@ already built.
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
 
+## D6. One owning unit per exact module path
+
+### surface/modules/foreign-inline-path-owner-clashes-in-both-orders
+
+- spec: `33 §3.1` (one owner per exact qualified module path), `33 §3.2`
+  (file-path identity), `39 §2.0` (loaded file-unit scopes)
+- fixture: with one catalog root, file `P.ken` declares
+  `pub const file_only : Nat = Zero`. An independent in-memory unit declares
+  `module P { pub const inline_only : Nat = Suc Zero }`. These names are
+  deliberately disjoint. In fresh elaboration runs, (a) load file `P` and
+  then elaborate the in-memory unit; (b) elaborate the in-memory unit and
+  then load file `P`. Record the checked declarations and public interfaces
+  after the first successful unit, before the second is attempted.
+- expect: the first unit succeeds in each run. The second rejects with the
+  **`ModuleOwnerClash` surface diagnostic** naming exact path `P` and both
+  owning units, at inline declaration in (a) or file load in (b). The
+  checked environment and public interfaces after rejection equal the
+  snapshot before the second unit: no `P.inline_only` in (a), no
+  `P.file_only` in (b), and no second interface entry. A duplicate-member
+  diagnostic, client-lookup failure, parser error, or kernel rejection does
+  not satisfy either arm.
+- controls: after file `P` alone, an independent in-memory unit declaring
+  `module R { pub const other : Nat = Suc Zero }` accepts. Separately, after
+  file `P` alone, `module P.Q { pub const child : Nat = Suc Zero }` accepts:
+  `P.ken` did not declare `P.Q`, so the strict child is a distinct exact
+  path with its own owner. Neither control changes `P.file_only`'s checked
+  identity or the file's public interface.
+- discriminator: both rejection arms reach the owner gate **without any
+  shared member name**, so a per-name duplicate check cannot pass. The `R`
+  control rules out blanket inline refusal; the `P.Q` control rules out a
+  prefix-based ownership check. A mutable-global last-writer implementation
+  accepts the second unit and fails both rejection arms. Assert the checked
+  environment and interface snapshots, not only the verdict, so an error
+  reported after installing the second unit also fails. **RED UNTIL the
+  Language owner gate lands**; no kernel or `trusted_base()` change is needed.
+
 ## E. Source-world program/package admission (N4; RED UNTIL LANE B)
 
 These fixtures use packages delivered from source through the N2 loader. This
@@ -1379,6 +1415,9 @@ monotone-downward and revocation management actions remain runner/host-internal
 - **N2** (cross-file path resolution + cycle hard-error + plural-ready roots):
   `cross-file-import-resolves-through-single-root-list` and
   `import-cycle-rejected-naming-closed-path`.
+- **Exact-path ownership** (`33 §3.1`):
+  `foreign-inline-path-owner-clashes-in-both-orders` (disjoint foreign
+  declarations reject in both orders; unrelated and strict-child paths accept).
 - **Module/import contract completion** (`32 §1`, `33 §3.3`, `39 §2.0`):
   `import-module-alias-and-selection-are-exclusive`,
   `pub-eligibility-rejects-enumerated-ineligible-placements`,
@@ -1455,6 +1494,12 @@ monotone-downward and revocation management actions remain runner/host-internal
 - **Prelude remains present in both prelude arms.** The reject arm conflicts
   with the fixed prelude `Bool`; the accept arm changes only the local spelling.
   No import list, `hiding` form, or prelude opt-out participates.
+- **Path ownership does not confuse a strict child with its parent.** File
+  `P` and an independently declared inline `P.Q` have distinct exact owners;
+  the failed foreign inline `P` has the same path as the file owner. Neither
+  outcome depends on a shared member spelling or the order of unrelated
+  imports. The new owner-clash case pins this separately from N2's source-leaf
+  and cycle checks.
 - **The N2 pair differs only by one import edge.** The same one-entry root
   list, `A` source, `B.value` declaration, strict bijection, and qualified use
   appear in both arms. With no `B → A` edge, `B.value` resolves and accepts;
@@ -1640,7 +1685,8 @@ raw authority-polymorphic I-3 producer do not discharge §G.
 
 ## Clean-room provenance
 
-The constructor-export cases and expected outcomes were derived from the
-candidate specification and first principles. No `local/refs/` implementation,
+The constructor-export and exact-module-path ownership cases were derived
+from Ken's specification, settled design rulings, landed code used to check
+the as-built gap, and first principles. No `local/refs/` implementation,
 permissive reference, copyleft reference, or excluded prototype was consulted
-for this clarification. An originality scan is not applicable.
+for either clarification. An originality scan is not applicable.
