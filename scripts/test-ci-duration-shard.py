@@ -161,19 +161,19 @@ class DurationShardControls(unittest.TestCase):
             ),
             (
                 "ken-interp",
-                "ds5b_cast_regular_tests::equal_inductive_type_app_cast_ignores_neutral_proof",
+                "eval::ds5b_cast_regular_tests::equal_inductive_type_app_cast_ignores_neutral_proof",
             ),
             (
                 "ken-interp",
-                "ds5b_cast_regular_tests::distinct_inductive_type_app_indices_do_not_cast",
+                "eval::ds5b_cast_regular_tests::distinct_inductive_type_app_indices_do_not_cast",
             ),
             (
                 "ken-interp",
-                "ds5b_cast_regular_tests::neutral_inductive_type_app_index_does_not_cast",
+                "eval::ds5b_cast_regular_tests::neutral_inductive_type_app_index_does_not_cast",
             ),
             (
                 "ken-interp",
-                "ds5b_cast_regular_tests::unknown_proof_blocks_equal_inductive_type_app_cast",
+                "eval::ds5b_cast_regular_tests::unknown_proof_blocks_equal_inductive_type_app_cast",
             ),
         )
         for binary_id, name in active_tests:
