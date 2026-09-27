@@ -135,7 +135,8 @@ pub fn ValidOrigin (origin : Origin) : Prop =
     ConfigKeyOrigin path ↦ ValidConfigKeyPath path
   }
 
-pub fn ValidDiagnostic (diagnostic : Diagnostic) : Prop = ValidOrigin (diagnostic_origin diagnostic)
+pub fn ValidDiagnostic (diagnostic : Diagnostic) : Prop =
+  ValidOrigin (diagnostic_origin diagnostic)
 ```
 
 ## 4. Trust and derivation
