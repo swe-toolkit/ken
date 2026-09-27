@@ -13,8 +13,12 @@ use ken_kernel::{convert_type, Context, Decl, GlobalId, Term};
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
+#[path = "support/catalog_publication.rs"]
+mod catalog_publication;
 
 const MODULE: &str = "Algorithm.Searching.OrderedSearch";
+const ORDERED_SEARCH_SOURCE: &str =
+    include_str!("../../../catalog/packages/Algorithm/Searching/OrderedSearch.ken.md");
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -81,6 +85,28 @@ fn evaluate_bool(env: &ElabEnv, name: &str) -> bool {
         EvalVal::Ctor { id, .. } if id == env.numeric_env.bool_false_id => false,
         other => panic!("expected a Boolean decision tag, got {other:?}"),
     }
+}
+
+/// Promise class: durable invariant. The exact module publication surface is
+/// independently queried through selective imports, including re-exports.
+/// MEASURED: the source declaration forms and roots loader agree on precisely
+/// these five importable names. CLAIMED: internal `elem_step` stays private and
+/// the repaired `search` operation remains public. THE GAP: the query helper
+/// covers direct declarations, attached proofs, and both re-export forms;
+/// consumers that merely read `globals` are not publication evidence.
+#[test]
+fn ordered_search_publishes_exactly_its_authorized_surface() {
+    assert_eq!(
+        catalog_publication::published_module_surfaces(
+            ORDERED_SEARCH_SOURCE,
+            MODULE,
+            "cat_bsearch_ordered_search",
+        ),
+        ["ListMembership", "MkListMembership", "elem", "search", "sorted_for_search"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>(),
+    );
 }
 
 /// Promise classes: durable provider-identity invariant; transition sentinels

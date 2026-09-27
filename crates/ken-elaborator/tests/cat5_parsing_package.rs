@@ -55,10 +55,14 @@ fn derived_fixture_retains_lawfulclasses_for_cat5_dependency_closure() {
     let _ = dependency_env();
 }
 
-fn load_parsing_module(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
-        .expect("Capability.Parsing.Parsing must roots-load");
+fn load_parsing_module(env: &mut ElabEnv) -> Vec<GlobalId> {
+    let owned = env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Parsing.Parsing",
+    )
+    .expect("Capability.Parsing.Parsing must roots-load");
     catalog_or::expose_module(env, "Capability.Parsing.Parsing");
+    owned
 }
 
 fn mk_env() -> ElabEnv {
@@ -290,7 +294,7 @@ fn transparent_parsing_bodies_with_saturated_provider_head_occurrence(
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
     let mut env = dependency_env();
     let base_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
-    load_parsing_module(&mut env);
+    let parsing_owned = load_parsing_module(&mut env);
     let after_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         base_trusted, after_trusted,
@@ -393,16 +397,24 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "BoolExpr",
         "Syntax",
     ] {
-        let owner = if name == "SourceId" {
-            "Capability.Diagnostics.Core"
+        let id = if name == "Source" {
+            let matches = parsing_owned.iter().copied().filter(|id| {
+                env.class_env.class_by_id(*id).is_some_and(|class| {
+                    class.projection.owner_name == name && class.projection.type_id == *id
+                })
+            }).collect::<Vec<_>>();
+            let [id] = matches.as_slice() else {
+                panic!("Parsing must own exactly one checked class `{name}`, got {matches:?}")
+            };
+            *id
         } else {
-            "Capability.Parsing.Parsing"
+            let owner = if name == "SourceId" {
+                "Capability.Diagnostics.Core"
+            } else {
+                "Capability.Parsing.Parsing"
+            };
+            env.globals[&format!("{owner}.{name}")]
         };
-        let id = env
-            .globals
-            .get(&format!("{owner}.{name}"))
-            .copied()
-            .unwrap_or_else(|| panic!("{name} must be checked in parsing.ken"));
         assert!(
             !env.env.trusted_base().contains(&id),
             "{name}'s type id must never enter trusted_base()"

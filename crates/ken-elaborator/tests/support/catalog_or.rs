@@ -129,11 +129,11 @@ pub fn expose_module(env: &mut ElabEnv, module: &str) {
     env.globals.extend(aliases);
 }
 
-pub fn load_derived_fixture(env: &mut ElabEnv) {
+pub fn load_derived_fixture(env: &mut ElabEnv) -> Vec<GlobalId> {
     env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Derived's canonical Nat-order dependency must roots-load");
     let provider_state = env.module_state.clone();
-    env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+    let owned = env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
 
     // These legacy fixture suites append declarations in a synthetic flat
@@ -144,6 +144,7 @@ pub fn load_derived_fixture(env: &mut ElabEnv) {
     expose_module(env, "Core.Classes.LawfulClasses");
     expose_module(env, "Data.Collections.Derived");
     env.module_state = provider_state;
+    owned
 }
 
 /// Retain Derived's module record while withholding selected legacy flat aliases.
