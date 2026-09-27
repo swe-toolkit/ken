@@ -6,7 +6,7 @@ owner: foundation
 size: S
 gate: architect
 tier: T2
-depends_on: [LANG-SESSION-SCOPE]
+depends_on: []
 blocks: []
 github: null
 origin: "Architect ruling 2026-09-27 (evt_4xtksh29xcm9k, LANG-SESSION-SCOPE Map stop 13): Map defines its own private leq_nat alongside Core.Classes.LawfulClasses.leq_nat, a candidate redundant reimplementation under catalog factoring; the Language diagnostic surfaced it as an AmbiguousReference. Steward-filed per COORDINATION section 2."
@@ -27,8 +27,10 @@ Map uses the one canonical `leq_nat`, or the frame records why it cannot.
   `pub fn leq_nat` with the same signature.
 - Importing the canonical one into a Map `ken example` fence fails with
   `AmbiguousReference { name: "leq_nat" }` (Language, `evt_6rnzmys0s2nff`).
-- **Sequencing.** `LANG-SESSION-SCOPE` is editing `Map.ken.md` now, so this
-  waits for that WP's Map increment to land.
+- **Sequencing.** `LANG-SESSION-SCOPE`'s Map increment landed at
+  `b6402c71c`. Its Map-owned example fence (`Map.ken.md:15546`) is
+  import-free because of this collision and does not use `leq_nat`; the
+  private definition is still at `:5787`.
 
 ## Deliverable
 

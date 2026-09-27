@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-27 16:29:56Z — from 764 issue file(s) in `docs/program/issues/`.
+2026-09-27 19:44:28Z — from 764 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -801,6 +801,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-S6-HS18-D5B-SUBSTRATE-PORT` — Port the D5b prefix's PRODUCTION residue onto main so ABI-S6-HS18-MAIN-BASED-CLOSURE increment A has a substrate to stand on. Increment A was decomposed as a diff between two points on the preserved line, which measures what it ADDED to the checkpoint rather than what it NEEDS on main; the four prefix commits below it never landed. Scope is the ~117-item prefix-minus-main gap NARROWED to its production cluster (generated-context-result authority, checked-IH post-call/detached, recursive-position calls, source dynamic match, the absent acceptance test), not the raw +10472/-5307. Excludes the refused MappingAcquireFile arm BY CONSTRUCTION -- it is RT-D5B-MAPPING-AVAILABILITY-FLIP's, deliberately held.
+- `CAT-MAP-CANONICAL-LEQ-NAT` — Replace Map's private leq_nat reimplementation with the canonical Core.Classes.LawfulClasses.leq_nat, if Map can import it without changing its public surface, trust closure or pinned provider edges
 - `CI-MAIN-RUNS-CANCEL-EACH-OTHER` — Every push to main shares one concurrency group with cancel-in-progress, so each merge kills the CI still running for the previous merge; post-merge runs on main are a record of a specific tree, not a superseded attempt at the same one, and the fix is to stop cancelling them
 - `CI-WRITE-PARTITION-JOB-COMMENT-STALE` — ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
@@ -847,7 +848,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `BYTES-CONCAT-AND-ENCODE-CONTRACTS` blocked by `LANG-KENFMT-AXIOM-CLOSING-PAREN` (status: ready)
 - `CAT-AND-SORTED-PRELUDE-MOVE` blocked by `LANG-EXPRESSION-SIGMA` (status: active)
-- `CAT-MAP-CANONICAL-LEQ-NAT` blocked by `LANG-SESSION-SCOPE` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-CLASS-IDENTITY-BY-CHECKED-ID` blocked by `LANG-SESSION-SCOPE` (status: active)
 - `LANG-L1-ACCEPTANCE-ROWS` blocked by `LANG-SESSION-SCOPE` (status: active)
