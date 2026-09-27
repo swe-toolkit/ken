@@ -534,6 +534,8 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
         let observed = observed[0];
         assert!(observed.error.is_none(), "{label}: {:?}", observed.error);
         assert!(!observed.excluded_by_relay, "{label}: static-operation owner excluded");
+        eprintln!("RT-OWNER-VIS FIXPOINT {label} owner={owner} contexts={:?}",
+            observed.contexts);
         let expected = expected.iter().map(|(context, members)|
             (*context, members.iter().copied().collect::<BTreeSet<_>>())
         ).collect::<BTreeMap<_, _>>();
@@ -554,6 +556,8 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
                 }).collect::<Vec<_>>();
                 assert!(!actual_captures.is_empty(),
                     "{label}: returned K closure never entered lowering: {member:?}");
+                eprintln!("RT-OWNER-VIS CAPTURES {label} vis={} row={:?} effect={:?} seat=true K={} actual={actual_captures:?}",
+                    member.origin, member.successor_id, member.effect_origin, k_origin);
                 assert!(actual_captures.iter().all(|capture| !capture.forbidden),
                     "{label}: forbidden K capture: {actual_captures:?}");
                 let actual_origins = actual_captures.iter().map(|capture| capture.capture_origin)
@@ -575,10 +579,11 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     let _output = compiled.expect("unaffected owner compiles");
     let protocols = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
         .collect::<Vec<_>>();
-    assert!(protocols.iter().any(|protocol| protocol.error.is_none()
+    let empty = protocols.iter().find(|protocol| protocol.error.is_none()
         && !protocol.excluded_by_relay && !protocol.contexts.is_empty()
-        && protocol.contexts.iter().all(|(_, members)| members.is_empty())),
-        "unaffected empty-successor owner was not exercised: {protocols:?}");
+        && protocol.contexts.iter().all(|(_, members)| members.is_empty()));
+    assert!(empty.is_some(), "unaffected empty-successor owner was not exercised: {protocols:?}");
+    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?}");
 }
 
 /// Promise class: durable invariant. MEASURED: the same licensed placeholder

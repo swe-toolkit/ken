@@ -797,6 +797,7 @@ fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
         let protocol = protocols[0];
         assert!(protocol.error.is_none(), "r2 return analysis refused: {:?}", protocol.error);
         assert!(protocol.excluded_by_relay, "r2 cannot take the partial pending-Vis route");
+        eprintln!("RT-OWNER-VIS EXCLUDED R2 {protocol:?}");
         let members = protocol.contexts.iter().flat_map(|(_, members)| members)
             .collect::<Vec<_>>();
         assert!(members.iter().any(|member| member.origin == 577 && member.relay
