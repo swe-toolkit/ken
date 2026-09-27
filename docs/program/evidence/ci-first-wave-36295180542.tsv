@@ -1,0 +1,21 @@
+lane	job_id	job_name	started_at	offset_seconds	status	conclusion
+auxiliary	108552627545	native-slow (px8f auxiliary controls)	2026-09-27T04:44:40Z	14.0	completed	success
+auxiliary	108552627577	optional z3 process adapter	2026-09-27T04:44:40Z	14.0	completed	success
+auxiliary	108552627584	work-item tracker and ignored-row sweep	2026-09-27T04:44:40Z	14.0	completed	success
+workspace	108552627603	test shard 2/7	2026-09-27T04:44:40Z	14.0	completed	success
+workspace	108552627608	test shard 1/7	2026-09-27T04:44:40Z	14.0	completed	success
+workspace	108552627622	test shard 7/7	2026-09-27T04:44:40Z	14.0	completed	success
+workspace	108552627626	test shard 3/7	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627636	native-slow (rt_parity_native) 3/10	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627640	native-slow (rt_parity_native) 8/10	2026-09-27T04:44:40Z	14.0	completed	success
+workspace	108552627643	test shard 6/7	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627646	native-slow (rt_parity_native) 10/10	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627665	native-slow (rt_parity_native) 6/10	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627674	native-slow (rt_parity_native) 9/10	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627675	native-slow (rt_parity_native) 1/10	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627680	native-slow (rt_parity_native) 7/10	2026-09-27T04:44:40Z	14.0	completed	success
+parity	108552627692	native-slow (rt_parity_native) 5/10	2026-09-27T04:44:40Z	14.0	completed	success
+workspace	108552627700	test shard 4/7	2026-09-27T04:44:40Z	14.0	completed	success
+workspace	108552627630	test shard 5/7	2026-09-27T04:44:41Z	15.0	completed	success
+parity	108552627632	native-slow (rt_parity_native) 4/10	2026-09-27T04:44:41Z	15.0	completed	success
+parity	108552627657	native-slow (rt_parity_native) 2/10	2026-09-27T04:44:41Z	15.0	completed	success
