@@ -222,6 +222,10 @@ are the same predicate from the reader side. The recut above closes it.
    regressions. Closure: withdraw the door and give each name one
    disposition by rule (Architect `evt_1wgwkd3tdsy0b` stop 6, ruled
    `evt_76m3hykd9h4tz`; census `evt_1rbv3tktxzb78`, `evt_7xjvddha9cg0v`).
+7. E defaults (empty-interface) issued over modules whose closeouts assert
+   a durable empty surface -- keyed on the consumer-used name set instead of
+   the provider's declared contract (Architect `evt_4pv21jmabcjcn`, stop 7;
+   Vector and Deque rows become I; sweep by mechanism).
 
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
