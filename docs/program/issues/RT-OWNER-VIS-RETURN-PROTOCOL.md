@@ -65,3 +65,10 @@ Architect, and built, that un-ignores all three rows.
   rows the protocol clears.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+
+1. returned-set member Vis388 (owner 578, context 0) has K =
+   CheckedComputationalIHInvocation and no response row/route/seat plan
+   -- keyed on the continuation's IH-invocation form (evt_2z9rhbj5m5axc,
+   ruled evt_33prgzqh3wn57).
