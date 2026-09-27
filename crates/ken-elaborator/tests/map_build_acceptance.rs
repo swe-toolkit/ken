@@ -54,7 +54,7 @@ fn checked_map_host_read_ignores_forged_flat_aliases() {
     ];
     let canonical = names
         .iter()
-        .map(|name| (*name, checked_map_id(&env, name)))
+        .map(|name| (*name, env.globals[&format!("{MAP_MODULE}.{name}")]))
         .collect::<Vec<_>>();
     for (name, id) in &canonical {
         assert_ne!(*id, forged);
