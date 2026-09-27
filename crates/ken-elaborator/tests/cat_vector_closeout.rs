@@ -173,10 +173,11 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 /// Vector declaration extension; this inventory is not a permanent API promise.
 /// MEASURED: ordinary isolated roots loading installs these seventeen checked
 /// Vector identities, returns only identities from that population, and
-/// executes every checked fence. Provider-closure trust is unchanged by Vector.
-/// CLAIMED: only the one private law extends the owned inventory; it adds no
-/// local trust. THE GAP: constructors are not separate loader results; the
-/// qualified environment inventory closes that part of the population.
+/// executes every checked fence, then retains the same qualified name and ID
+/// populations. Provider-closure trust is unchanged by Vector. CLAIMED: the
+/// checked examples add no module-owned declaration or local trust. THE GAP:
+/// constructors are not separate loader results; the qualified environment
+/// inventory closes that population, not bare fence-local helper globals.
 #[test]
 fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
     let mut provider_only = ElabEnv::new().expect("provider environment");
@@ -213,6 +214,16 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
     via_vector
         .execute_loaded_entry_checked_fences(VECTOR)
         .expect("Vector Definition and every checked fence must elaborate");
+    assert_eq!(
+        qualified_owned_names(&via_vector),
+        expected_owned_names(),
+        "Vector checked fences must not grow the qualified declaration inventory"
+    );
+    assert_eq!(
+        qualified_owned_ids(&via_vector),
+        owned_ids,
+        "Vector checked fences must not change owned declaration identities"
+    );
 }
 
 /// Promise class: transition sentinel for this proof-only dependency edge;
