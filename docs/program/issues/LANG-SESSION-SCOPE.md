@@ -226,6 +226,8 @@ are the same predicate from the reader side. The recut above closes it.
    a durable empty surface -- keyed on the consumer-used name set instead of
    the provider's declared contract (Architect `evt_4pv21jmabcjcn`, stop 7;
    Vector and Deque rows become I; sweep by mechanism).
+8. durable exact-inventory guard omits a publication route (`ExportDecl`)
+   that its own claim covers — keyed on declaration form.
 
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
