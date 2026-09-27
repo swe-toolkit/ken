@@ -368,9 +368,9 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
     ] {
         let id = env
             .globals
-            .get(name)
+            .get(&format!("Capability.Parsing.Parsing.{name}"))
             .copied()
-            .unwrap_or_else(|| panic!("{name} should be exported by parsing.ken"));
+            .unwrap_or_else(|| panic!("{name} must be checked in parsing.ken"));
         match env.env.lookup(id) {
             Some(Decl::Transparent { .. }) => {}
             other => panic!("{name} must be a transparent checked definition, got {other:?}"),
@@ -393,11 +393,16 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "BoolExpr",
         "Syntax",
     ] {
+        let owner = if name == "SourceId" {
+            "Capability.Diagnostics.Core"
+        } else {
+            "Capability.Parsing.Parsing"
+        };
         let id = env
             .globals
-            .get(name)
+            .get(&format!("{owner}.{name}"))
             .copied()
-            .unwrap_or_else(|| panic!("{name} should be exported by parsing.ken"));
+            .unwrap_or_else(|| panic!("{name} must be checked in parsing.ken"));
         assert!(
             !env.env.trusted_base().contains(&id),
             "{name}'s type id must never enter trusted_base()"
@@ -844,8 +849,8 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
         "ValidLocated",
     ] {
         assert!(
-            env.globals.contains_key(name),
-            "{name} must be exported by the Parsing package"
+            env.globals.contains_key(&format!("Capability.Parsing.Parsing.{name}")),
+            "{name} must be checked by the Parsing package"
         );
     }
     env.elaborate_file(

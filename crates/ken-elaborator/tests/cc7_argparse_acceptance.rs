@@ -155,15 +155,21 @@ fn make_store(env: &ElabEnv) -> EvalStore {
 }
 
 fn global_id(env: &ElabEnv, name: &str) -> GlobalId {
+    let qualified = if name.contains('.') || name.starts_with("forge_") || name.starts_with("cc7_") {
+        name.to_owned()
+    } else if name == "render" {
+        format!("Capability.Formatting.Doc.{name}")
+    } else if name == "diagnostic_to_doc" {
+        format!("Capability.Diagnostics.Render.{name}")
+    } else if ["MkDiagnostic", "ArgumentOrigin", "MkByteRange"].contains(&name) {
+        format!("Capability.Diagnostics.Core.{name}")
+    } else {
+        format!("{ARGPARSE_MODULE}.{name}")
+    };
     env.globals
-        .get(name)
+        .get(&qualified)
         .copied()
-        .or_else(|| {
-            env.globals
-                .get(&format!("{ARGPARSE_MODULE}.{name}"))
-                .copied()
-        })
-        .unwrap_or_else(|| panic!("missing `{name}` global"))
+        .unwrap_or_else(|| panic!("missing `{qualified}` global"))
 }
 
 fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
@@ -321,6 +327,18 @@ fn invalid_diagnostics<'a>(env: &ElabEnv, result: &'a EvalVal) -> Vec<&'a EvalVa
     let mut result = vec![&nonempty[1]];
     result.extend(list_elements(env, &nonempty[2]));
     result
+}
+
+/// Promise class: durable invariant. A mutable flat host alias cannot change
+/// which checked provider the renderer observation uses.
+#[test]
+fn render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias() {
+    let mut env = full_env();
+    let render = env.globals["Capability.Formatting.Doc.render"];
+    let other = env.globals["Application.CommandLine.ArgParse.argparse_run"];
+    assert_ne!(render, other, "the forged host aliases must be distinct");
+    env.globals.insert("render".to_owned(), other);
+    assert_eq!(global_id(&env, "render"), render);
 }
 
 #[test]

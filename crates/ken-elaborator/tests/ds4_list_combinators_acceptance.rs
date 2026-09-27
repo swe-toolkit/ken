@@ -42,7 +42,7 @@ fn all_five_combinators_and_their_laws_are_real_globals() {
         "foldl",
     ] {
         assert!(
-            env.globals.contains_key(name),
+            env.globals.contains_key(&format!("Data.Collections.Derived.{name}")),
             "`{}` must be a real registered global after elaborating Derived.ken",
             name
         );

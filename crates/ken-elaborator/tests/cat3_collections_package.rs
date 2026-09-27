@@ -171,9 +171,9 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
     ] {
         let id = env
             .globals
-            .get(name)
+            .get(&format!("Data.Collections.Derived.{name}"))
             .copied()
-            .unwrap_or_else(|| panic!("{name} should be exported by Derived.ken"));
+            .unwrap_or_else(|| panic!("{name} must be checked by Derived.ken"));
         match env.env.lookup(id) {
             Some(Decl::Transparent { .. }) => {}
             other => panic!("{name} must be a transparent checked definition, got {other:?}"),
@@ -196,9 +196,9 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
     ] {
         let id = env
             .globals
-            .get(name)
+            .get(&format!("Data.Collections.Derived.{name}"))
             .copied()
-            .unwrap_or_else(|| panic!("{name} should be exported by Derived.ken"));
+            .unwrap_or_else(|| panic!("{name} must be checked by Derived.ken"));
         match env.env.lookup(id) {
             Some(Decl::Transparent { .. }) => {}
             other => panic!("{name} must be a transparent checked record type, got {other:?}"),
@@ -382,7 +382,7 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
     }
 
     for law in ["length_take_min", "zip_length"] {
-        let id = env.globals[law];
+        let id = env.globals[&format!("Data.Collections.Derived.{law}")];
         let ty = match env.env.lookup(id) {
             Some(Decl::Transparent { ty, .. }) => ty,
             other => panic!("{law} must be transparent, got {other:?}"),
@@ -394,7 +394,7 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
         );
     }
 
-    let slice = env.globals["slice"];
+    let slice = env.globals["Data.Collections.Derived.slice"];
     let body = match env.env.lookup(slice) {
         Some(Decl::Transparent { body, .. }) => body,
         other => panic!("slice must be transparent, got {other:?}"),

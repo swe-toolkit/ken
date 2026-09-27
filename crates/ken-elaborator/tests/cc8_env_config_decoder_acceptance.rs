@@ -171,20 +171,23 @@ fn make_store(env: &ElabEnv) -> EvalStore {
 }
 
 fn global_id(env: &ElabEnv, name: &str) -> GlobalId {
+    let qualified = if name.contains('.') || name.starts_with("cc8_") {
+        name.to_owned()
+    } else if name == "render" {
+        format!("Capability.Formatting.Doc.{name}")
+    } else if name == "command_schema" || name == "command_help" || name.starts_with("argparse_") {
+        format!("{ARGPARSE_MODULE}.{name}")
+    } else if ["MkDiagnostic", "EnvironmentOrigin", "ConfigKeyOrigin"].contains(&name) {
+        format!("Capability.Diagnostics.Core.{name}")
+    } else if name == "schema_validate" || name == "schema_help" {
+        format!("{SCHEMA_MODULE}.{name}")
+    } else {
+        format!("{CONFIG_DECODER_MODULE}.{name}")
+    };
     env.globals
-        .get(name)
+        .get(&qualified)
         .copied()
-        .or_else(|| {
-            env.globals
-                .get(&format!("{ARGPARSE_MODULE}.{name}"))
-                .copied()
-        })
-        .or_else(|| {
-            env.globals
-                .get(&format!("{CONFIG_DECODER_MODULE}.{name}"))
-                .copied()
-        })
-        .unwrap_or_else(|| panic!("missing `{name}` global"))
+        .unwrap_or_else(|| panic!("missing `{qualified}` global"))
 }
 
 fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
@@ -349,6 +352,18 @@ fn add_schema_fixtures(env: &mut ElabEnv) {
         "#,
     )
     .expect("CC8 behavioral fixtures must elaborate");
+}
+
+/// Promise class: durable invariant. The host renderer observation selects
+/// the checked Doc identity, not a same-spelling mutable flat alias.
+#[test]
+fn render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias() {
+    let mut env = full_env();
+    let render = env.globals["Capability.Formatting.Doc.render"];
+    let other = env.globals["Application.Configuration.Decoder.env_config_help"];
+    assert_ne!(render, other, "the forged host aliases must be distinct");
+    env.globals.insert("render".to_owned(), other);
+    assert_eq!(global_id(&env, "render"), render);
 }
 
 #[test]
