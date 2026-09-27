@@ -2,14 +2,14 @@
 id: LANG-KENFMT-AXIOM-CLOSING-PAREN
 title: "Formatter repair: ken fmt must print a valid axiom declaration whose type ends in a parenthesized application without dropping the final closing parenthesis, so formatting is parse-preserving and idempotent on every axiom shape"
 status: ready
-owner: language
+owner: foundation
 size: S
 gate: architect
 tier: T2
 depends_on: [LANG-IMPORT-LOAD-ORDER-INDEPENDENCE]
 blocks: [BYTES-CONCAT-AND-ENCODE-CONTRACTS]
 github: null
-origin: "BYTES-CONCAT-AND-ENCODE-CONTRACTS D2 full-CI red (run 36012146849) and its frame-authorized formatter STOP (spec-leader evt_8hpd13pfaetv). The language ring owns kenfmt (crates/ken-elaborator/src/layout.rs). Serves L3; sequenced after the L2 landing because both touch ken-elaborator. Steward-filed per COORDINATION section 2."
+origin: "BYTES-CONCAT-AND-ENCODE-CONTRACTS D2 full-CI red (run 36012146849) and its frame-authorized formatter STOP (spec-leader evt_8hpd13pfaetv). The language ring owns kenfmt (crates/ken-elaborator/src/layout.rs). Serves L3; sequenced after the L2 landing because both touch ken-elaborator. Steward-filed per COORDINATION section 2. Re-owned to foundation 2026-09-27 by the Steward: it is the only blocker on Foundation's own BYTES D3, the Language ring is on LANG-SESSION-SCOPE, and that WP does not touch layout.rs."
 ---
 
 # `ken fmt` drops an axiom's last parenthesis
