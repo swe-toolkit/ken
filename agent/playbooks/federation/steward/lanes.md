@@ -62,11 +62,11 @@ BYTES K3/F4'/four postulates ("concur with rec."), the L1 bracket redesign
 pending-call. it has to be addressed."). Spec serves BYTES D2.
 **2026-09-26** ("concur with rec."): the three `l1_acceptance` ignored rows
 go to L2 and `ds5b` to L1; TCB growth they need still returns to the operator.
-**2026-09-26/27, CI (Verify, `CI-UNDER-TWENTY-MINUTES`):** "bring that down
-under 20"; then "keep the 20-job cap; fit CI under it. If 20 minutes is no
-longer possible, then keep the workload balanced across the 20 jobs." Memory
-program R1-R5, R7 (`7b545fbb1`): "You may update skills, coordination.md, and
-scripts as necessary."
+**2026-09-26/27, CI (`CI-UNDER-TWENTY-MINUTES`):** "bring that down under 20";
+then "keep the 20-job cap; fit CI under it. If 20 minutes is no longer possible,
+then keep the workload balanced across the 20 jobs." Memory R1-R5, R7
+(`7b545fbb1`): "You may update skills, coordination.md, and scripts as
+necessary."
 
 ## Current state
 
@@ -77,6 +77,5 @@ scripts as necessary."
 | L3 | foundation | Move definable prelude conveniences into packages and remove collisions (minimal fixed prelude, operator 2026-09-25), then resume proof backfill | `CAT-AND-SORTED-PRELUDE-MOVE` -- `ready`, M, T1; waits on `LANG-EXPRESSION-SIGMA` (list_map subsumption landed `3a2b30628`) | `BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 | Kick the And move when Sigma lands. `Prod`/`zip` stay (runtime and ABI keyed; L2 floor question); `fold` is a separate removal |
 
 ## Update rule
-
 One value per field; an update deletes the old one. Link, never copy. Verify a
 row against its issue file and `origin/main`; no standalone currency commits.
