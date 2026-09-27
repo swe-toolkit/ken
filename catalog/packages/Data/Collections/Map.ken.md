@@ -87,8 +87,6 @@ immediate since `empty = Leaf`. Neither needs induction or a comparison.
 ```ken
 import Core.Classes.LawfulClasses (bool_and)
 
-import Core.Classes.LawfulClasses (leq_nat)
-
 import Core.Classes.LawfulClasses (Ord)
 
 import Core.Classes.Membership (Membership)
@@ -5704,12 +5702,11 @@ library.
 
 The canonical `bool_and` algebra and its laws come from
 `Core.Classes.LawfulClasses`; this package keeps only its local `bool_not` and
-`cat4_bool_or` helpers. The `Nat` comparator `leq_nat` and its reflexivity,
-transitivity and antisymmetry laws also come from LawfulClasses. Map keeps a
-private `total_leq_nat`, an `Or`-valued totality witness that records which
-direction holds: the provider's copy is private, and its public `total` proof
-erases that direction. The Boolean operations support later sections, followed
-by `order_equiv_key` — a `Bool`-valued order-equivalence test — and its
+`cat4_bool_or` helpers. The `Nat` comparator `leq_nat` and its laws belong to
+`Core.Classes.LawfulClasses`; clients needing a Nat order import them there.
+Map defines no Nat comparator or totality witness. The Boolean operations
+support later sections, followed by `order_equiv_key` — a `Bool`-valued
+order-equivalence test — and its
 correspondence lemmas to the `Prop`-valued `order_equiv` from
 [§4.6](#46-law-5--lookup_assoc_agree-dictionary-agreement-with-the-ordered-list-lookup).
 
@@ -5786,34 +5783,6 @@ proof right_identity for cat4_bool_or (a : Bool) : Equal Bool (cat4_bool_or a Fa
   match a {
     True ↦ Proved;
     False ↦ Proved
-  }
-
-fn total_leq_nat
-      (x : Nat) (y : Nat)
-    : Or (Equal Bool (leq_nat x y) True) (Equal Bool (leq_nat y x) True) =
-  match x {
-    Zero ↦ Inl (Equal Bool (leq_nat Zero y) True) (Equal Bool (leq_nat y Zero) True) Proved;
-    Suc x2 ↦
-      match y {
-        Zero ↦
-          Inr
-            (Equal Bool (leq_nat (Suc x2) Zero) True)
-            (Equal Bool (leq_nat Zero (Suc x2)) True)
-            Proved;
-        Suc y2 ↦
-          match total_leq_nat x2 y2 {
-            Inl h ↦
-              Inl
-                (Equal Bool (leq_nat (Suc x2) (Suc y2)) True)
-                (Equal Bool (leq_nat (Suc y2) (Suc x2)) True)
-                h;
-            Inr h ↦
-              Inr
-                (Equal Bool (leq_nat (Suc x2) (Suc y2)) True)
-                (Equal Bool (leq_nat (Suc y2) (Suc x2)) True)
-                h
-          }
-      }
   }
 
 fn order_equiv_key (k : Type) (leq : k → k → Bool) (a : k) (b : k) : Bool =
