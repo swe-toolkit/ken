@@ -76,6 +76,92 @@ class WorkspaceTimingControls(unittest.TestCase):
         self.assertEqual(len(artifact["records"]), 1)
         self.assertEqual(artifact["fallbacks"], plan["fallbacks"])
 
+    def test_captured_nextest_090140_skip_and_slow_terminal_rows(self):
+        # Captured from run 36332810682, shard 1 Test stdout, input line 3681.
+        skipped = (
+            "        SKIP [         ] (───────) ken-cli "
+            "entrypoint_tests::anone_readfile_reaches_named_denial_before_capture_host_syscall"
+        )
+        passed = (
+            "        PASS [   0.474s] (  1/594) ken-cli "
+            "entrypoint_tests::apartial_cannot_apply_afull_writefile_wrapper"
+        )
+        slow = (
+            "        SLOW [ 100.525s] (130/594) "
+            "ken-cli::rt_selected_pending_call_admission "
+            "selected_pending_write_arm_controls_agree_across_executors"
+        )
+        slow_event = (
+            "SLOW [> 60.000s] (───) ken-cli::rt_selected_pending_call_admission "
+            "selected_pending_write_arm_controls_agree_across_executors"
+        )
+        slow_identity = (
+            "ken-cli::rt_selected_pending_call_admission",
+            "selected_pending_write_arm_controls_agree_across_executors",
+        )
+        listing = self.listing(
+            [
+                (
+                    "ken-cli",
+                    "entrypoint_tests::anone_readfile_reaches_named_denial_before_capture_host_syscall",
+                ),
+                ("ken-cli", "entrypoint_tests::apartial_cannot_apply_afull_writefile_wrapper"),
+                slow_identity,
+            ],
+            selected={
+                ("ken-cli", "entrypoint_tests::apartial_cannot_apply_afull_writefile_wrapper"),
+                slow_identity,
+            },
+        )
+        artifact = timings.emit_artifact(
+            "\n".join((skipped, passed, slow_event, slow)), listing, 987, 1
+        )
+        self.assertEqual(
+            artifact["records"],
+            [
+                {
+                    "test_id": "ken-cli entrypoint_tests::apartial_cannot_apply_afull_writefile_wrapper",
+                    "seconds": 0.474,
+                    "result": "PASS",
+                },
+                {
+                    "test_id": "ken-cli::rt_selected_pending_call_admission "
+                    "selected_pending_write_arm_controls_agree_across_executors",
+                    "seconds": 100.525,
+                    "result": "PASS",
+                },
+            ],
+        )
+
+    def test_selected_unknown_and_malformed_skip_rows_fail_closed(self):
+        real_skip_shape = (
+            "SKIP [         ] (───────) fixture::binary test"
+        )
+        selected = self.listing([("fixture::binary", "test")])
+        with self.assertRaisesRegex(
+            timings.TimingArtifactError, "selected identity was skipped"
+        ):
+            timings.emit_artifact(real_skip_shape, selected, 1, 1)
+
+        unselected = self.listing(
+            [("fixture::binary", "test")], selected=set()
+        )
+        with self.assertRaisesRegex(
+            timings.TimingArtifactError, "unknown skipped identity"
+        ):
+            timings.emit_artifact(
+                "SKIP [         ] (───────) unknown::binary test",
+                unselected,
+                1,
+                1,
+            )
+        with self.assertRaisesRegex(
+            timings.TimingArtifactError, "malformed skipped result"
+        ):
+            timings.emit_artifact(
+                "SKIP [ 1.000s] (1/1) fixture::binary test", selected, 1, 1
+            )
+
     def test_duplicate_terminal_identity_fails_closed(self):
         selected = self.listing([("fixture::binary", "test")])
         duplicate = "PASS [ 1.000s] (1/1) fixture::binary test\nPASS [ 1.000s] (1/1) fixture::binary test"
@@ -101,7 +187,7 @@ class WorkspaceTimingControls(unittest.TestCase):
             timings.emit_artifact("PASS [bad] (1/1) fixture::binary test", selected, 1, 1)
         with self.assertRaisesRegex(timings.TimingArtifactError, "invalid terminal ordinal"):
             timings.emit_artifact("PASS [ 1.000s] (0/0) fixture::binary test", selected, 1, 1)
-        with self.assertRaisesRegex(timings.TimingArtifactError, "unsupported status SKIP"):
+        with self.assertRaisesRegex(timings.TimingArtifactError, "malformed skipped result"):
             timings.emit_artifact("SKIP [ 1.000s] (1/1) fixture::binary test", selected, 1, 1)
 
     def test_empty_shard_emits_a_valid_empty_terminal_set(self):

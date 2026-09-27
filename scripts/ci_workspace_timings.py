@@ -12,13 +12,21 @@ from typing import Any
 
 SHARD_COUNT = 7
 TERMINAL_LINE = re.compile(
-    r"^\s*(?P<status>PASS|FAIL)\s+\[\s*"
+    r"^\s*(?P<status>PASS|FAIL|SLOW)\s+\[\s*"
     r"(?P<seconds>(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))s\s*\]"
     r"\s+\(\s*(?P<index>[0-9]+)/(?P<count>[0-9]+)\s*\)"
     r"\s+(?P<test_id>\S.+?)\s*$"
 )
+SKIP_LINE = re.compile(
+    r"^\s*SKIP \[         \] \(───────\) (?P<test_id>\S.+?)\s*$"
+)
+SLOW_EVENT_LINE = re.compile(
+    r"^\s*SLOW\s+\[\s*>\s*"
+    r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)s\s*\]"
+    r"\s+\(───\)\s+\S.+?\s*$"
+)
 STATUS_LINE = re.compile(r"^\s*(?P<status>[A-Z][A-Z0-9_-]*)\s+\[")
-NONTERMINAL_STATUSES = {"RETRY", "RUN", "SLOW", "START"}
+NONTERMINAL_STATUSES = {"RETRY", "RUN", "START"}
 ARTIFACT_KEYS = {"run_id", "shard", "shard_count", "unit", "records", "fallbacks"}
 RECORD_KEYS = {"test_id", "seconds", "result"}
 FALLBACK_KEYS = {"test_id", "seconds", "method"}
@@ -35,7 +43,7 @@ def _positive_int(value: Any, name: str) -> int:
     return value
 
 
-def selected_identities(listing: Any) -> set[str]:
+def listed_identities(listing: Any) -> tuple[set[str], set[str]]:
     if not isinstance(listing, dict):
         raise TimingArtifactError("selected nextest listing must be an object")
     count = listing.get("test-count")
@@ -46,6 +54,7 @@ def selected_identities(listing: Any) -> set[str]:
         raise TimingArtifactError("selected listing rust-suites must be a non-empty map")
 
     discovered: set[tuple[str, str]] = set()
+    all_ids: set[str] = set()
     selected: set[str] = set()
     for suite in suites.values():
         if not isinstance(suite, dict):
@@ -76,30 +85,64 @@ def selected_identities(listing: Any) -> set[str]:
                     f"selected listing has duplicate identity {binary_id} {name}"
                 )
             discovered.add(identity)
+            rendered = f"{binary_id} {name}"
+            all_ids.add(rendered)
             if status == "matches":
-                selected.add(f"{binary_id} {name}")
+                selected.add(rendered)
     if len(discovered) != count:
         raise TimingArtifactError(
             f"selected listing test-count {count} differs from {len(discovered)} discovered"
         )
-    return selected
+    return all_ids, selected
 
 
-def parse_terminal_log(log_text: str, expected_ids: set[str]) -> list[dict[str, Any]]:
-    """Keep final PASS/FAIL rows, ignore status events, and reject duplicates."""
+def selected_identities(listing: Any) -> set[str]:
+    return listed_identities(listing)[1]
+
+
+def parse_terminal_log(
+    log_text: str, expected_ids: set[str], known_ids: set[str] | None = None
+) -> list[dict[str, Any]]:
+    """Keep selected terminal rows; validate and ignore unselected SKIP rows."""
+    known_ids = expected_ids if known_ids is None else known_ids
     terminal: dict[str, dict[str, Any]] = {}
     for line_number, line in enumerate(log_text.splitlines(), 1):
         prefix = STATUS_LINE.match(line)
         if prefix is None:
             continue
         status = prefix.group("status")
+        if status == "SKIP":
+            match = SKIP_LINE.fullmatch(line)
+            if match is None:
+                raise TimingArtifactError(
+                    f"nextest output line {line_number}: malformed skipped result"
+                )
+            test_id = match.group("test_id")
+            if test_id not in known_ids:
+                raise TimingArtifactError(
+                    f"nextest output line {line_number}: unknown skipped identity {test_id}"
+                )
+            if test_id in expected_ids:
+                raise TimingArtifactError(
+                    f"nextest output line {line_number}: selected identity was skipped {test_id}"
+                )
+            continue
+        match = None
+        if status in {"PASS", "FAIL", "SLOW"}:
+            match = TERMINAL_LINE.fullmatch(line)
+        if status == "SLOW" and match is None:
+            # A threshold notification has dashes; an ordinal marks a terminal result.
+            if SLOW_EVENT_LINE.fullmatch(line):
+                continue
+            raise TimingArtifactError(
+                f"nextest output line {line_number}: malformed slow result"
+            )
         if status in NONTERMINAL_STATUSES:
             continue
-        if status not in {"PASS", "FAIL"}:
+        if status not in {"PASS", "FAIL", "SLOW"}:
             raise TimingArtifactError(
                 f"nextest output line {line_number}: unsupported status {status}"
             )
-        match = TERMINAL_LINE.fullmatch(line)
         if match is None:
             raise TimingArtifactError(
                 f"nextest output line {line_number}: malformed terminal result"
@@ -112,7 +155,14 @@ def parse_terminal_log(log_text: str, expected_ids: set[str]) -> list[dict[str, 
             )
         test_id = match.group("test_id").strip()
         binary_id, separator, test_name = test_id.partition(" ")
-        if not separator or not binary_id or not test_name.strip():
+        if (
+            not separator
+            or not binary_id
+            or binary_id != binary_id.strip()
+            or any(character.isspace() for character in binary_id)
+            or not test_name.strip()
+            or test_name != test_name.strip()
+        ):
             raise TimingArtifactError(
                 f"nextest output line {line_number}: malformed canonical test_id"
             )
@@ -132,7 +182,7 @@ def parse_terminal_log(log_text: str, expected_ids: set[str]) -> list[dict[str, 
         terminal[test_id] = {
             "test_id": test_id,
             "seconds": seconds,
-            "result": status,
+            "result": "PASS" if status == "SLOW" else status,
         }
     missing = sorted(expected_ids - set(terminal))
     if missing:
@@ -257,7 +307,7 @@ def emit_artifact(
     shard = _positive_int(shard, "shard")
     if shard > SHARD_COUNT:
         raise TimingArtifactError("shard must be between 1 and 7")
-    expected = selected_identities(listing)
+    known_ids, expected = listed_identities(listing)
     fallback_records = []
     if plan is not None:
         if not isinstance(plan, dict) or set(plan) != {"bins", "fallbacks"}:
@@ -327,7 +377,7 @@ def emit_artifact(
         "shard": shard,
         "shard_count": SHARD_COUNT,
         "unit": "seconds",
-        "records": parse_terminal_log(log_text, expected),
+        "records": parse_terminal_log(log_text, expected, known_ids),
         "fallbacks": fallback_records,
     }
     return validate_artifact(
