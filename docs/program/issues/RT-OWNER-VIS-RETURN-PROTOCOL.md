@@ -38,6 +38,13 @@ Clear the three L1 rows that stop at the response-owner Ret-tag check.
   allocation-free word erases either the `Vis` or its K. The persistent
   closure lane stays withheld (`dec_21aa95jbsznfh`, `dec_6xffebwj4s347`).
 
+**Rescoped** (Architect `evt_1j5qaw2d9sqe7`, under the second-repair stop
+clause): r2 (owner 1298) moves to `RT-SOURCE-IH-RELAY-K-VALUE`. Its relay K
+lowers as `RecursiveBackedge` on the source-machine route, so it has no
+value to carry. This WP clears the two px7f rows. An owner whose fixpoint
+holds a relay member fails closed to today's Ret-tag trap, and AC-3 pins
+r2's exact current failure.
+
 ## Deliverable
 
 A return protocol for generated response owners, designed at D0, ruled by the
