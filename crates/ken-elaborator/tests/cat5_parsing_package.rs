@@ -16,7 +16,7 @@ use std::collections::{BTreeSet, HashSet};
 const PARSING_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
 
-fn dependency_env() -> ElabEnv {
+fn dependency_env_with_diagnostics_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
@@ -38,7 +38,8 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+    let diagnostics_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
@@ -47,7 +48,11 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
         .expect("Capability.Parsing.Decoder must roots-load sixth");
     catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
-    env
+    (env, diagnostics_owned)
+}
+
+fn dependency_env() -> ElabEnv {
+    dependency_env_with_diagnostics_owned().0
 }
 
 #[test]
@@ -292,7 +297,7 @@ fn transparent_parsing_bodies_with_saturated_provider_head_occurrence(
 
 #[test]
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
-    let mut env = dependency_env();
+    let (mut env, diagnostics_owned) = dependency_env_with_diagnostics_owned();
     let base_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
     let parsing_owned = load_parsing_module(&mut env);
     let after_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
@@ -408,7 +413,13 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
             };
             *id
         } else if name == "SourceId" {
-            env.globals["Capability.Diagnostics.Core.SourceId"]
+            catalog_or::provider_owned_id(
+                &env,
+                &diagnostics_owned,
+                "Capability.Diagnostics.Core",
+                name,
+            )
+            .unwrap_or_else(|error| panic!("Diagnostics.Core owner {name}: {error}"))
         } else {
             catalog_or::provider_owned_id(&env, &parsing_owned, "Capability.Parsing.Parsing", name)
                 .unwrap_or_else(|error| panic!("Parsing owner {name}: {error}"))
@@ -418,6 +429,40 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
             "{name}'s type id must never enter trusted_base()"
         );
     }
+}
+
+/// Promise class: durable checked-provider identity invariant.
+/// MEASURED: the real Diagnostics.Core loader owns SourceId; a forged flat
+/// alias leaves the owner read intact, while a forged qualified key pointing
+/// to a checked Parsing declaration is rejected by the owner membership check.
+/// CLAIMED: the CAT5 host SourceId observation requires Diagnostics.Core
+/// ownership, not a mutable spelling alone. THE GAP: this checks provider
+/// membership, not the identities of every other CAT5 declaration.
+#[test]
+fn cat5_source_id_host_read_rejects_forged_qualified_provider_alias() {
+    let (mut env, diagnostics_owned) = dependency_env_with_diagnostics_owned();
+    let parsing_owned = load_parsing_module(&mut env);
+    let provider = "Capability.Diagnostics.Core";
+    let canonical = catalog_or::provider_owned_id(&env, &diagnostics_owned, provider, "SourceId")
+        .expect("Diagnostics.Core must own checked SourceId");
+    let forged = catalog_or::provider_owned_id(
+        &env,
+        &parsing_owned,
+        "Capability.Parsing.Parsing",
+        "ParseError",
+    )
+    .expect("Parsing must own checked ParseError");
+    assert_ne!(canonical, forged, "the two provider IDs must differ");
+    env.globals.insert("SourceId".to_owned(), forged);
+    assert_eq!(
+        catalog_or::provider_owned_id(&env, &diagnostics_owned, provider, "SourceId"),
+        Ok(canonical),
+    );
+    env.globals.insert(format!("{provider}.SourceId"), forged);
+    assert!(
+        catalog_or::provider_owned_id(&env, &diagnostics_owned, provider, "SourceId").is_err(),
+        "forged qualified SourceId must not pass Diagnostics.Core ownership"
+    );
 }
 
 /// MEASURED: roots-loaded transparent Parsing bodies containing at least one
