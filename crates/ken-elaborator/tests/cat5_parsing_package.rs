@@ -407,13 +407,11 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
                 panic!("Parsing must own exactly one checked class `{name}`, got {matches:?}")
             };
             *id
+        } else if name == "SourceId" {
+            env.globals["Capability.Diagnostics.Core.SourceId"]
         } else {
-            let owner = if name == "SourceId" {
-                "Capability.Diagnostics.Core"
-            } else {
-                "Capability.Parsing.Parsing"
-            };
-            env.globals[&format!("{owner}.{name}")]
+            catalog_or::provider_owned_id(&env, &parsing_owned, "Capability.Parsing.Parsing", name)
+                .unwrap_or_else(|error| panic!("Parsing owner {name}: {error}"))
         };
         assert!(
             !env.env.trusted_base().contains(&id),

@@ -24,18 +24,16 @@ use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, KernelError, Te
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
 const MAP_MODULE: &str = "Data.Collections.Map";
 
-fn checked_map_env() -> ElabEnv {
+fn checked_map_env() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], MAP_MODULE)
+    let owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], MAP_MODULE)
         .expect("Map must load through its real roots closure");
-    env
+    (env, owned)
 }
 
-fn checked_map_id(env: &ElabEnv, name: &str) -> GlobalId {
-    let qualified = format!("{MAP_MODULE}.{name}");
-    *env.globals
-        .get(&qualified)
-        .unwrap_or_else(|| panic!("missing checked Map identity `{qualified}`"))
+fn checked_map_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
+    catalog_or::provider_owned_id(env, owned, MAP_MODULE, name)
+        .unwrap_or_else(|error| panic!("Map operation {name}: {error}"))
 }
 
 /// Promise class: durable checked-identity invariant.
@@ -45,7 +43,7 @@ fn checked_map_id(env: &ElabEnv, name: &str) -> GlobalId {
 /// is pinned separately by `cat_map_dom_member`.
 #[test]
 fn checked_map_host_read_ignores_forged_flat_aliases() {
-    let mut env = checked_map_env();
+    let (mut env, owned) = checked_map_env();
     let forged = env.globals["Data.Sums.Combinators.is_some"];
     let names = [
         "Tree", "empty", "to_list", "fold", "insert", "lookup", "member",
@@ -54,14 +52,24 @@ fn checked_map_host_read_ignores_forged_flat_aliases() {
     ];
     let canonical = names
         .iter()
-        .map(|name| (*name, env.globals[&format!("{MAP_MODULE}.{name}")]))
+        .map(|name| {
+            (*name, catalog_or::provider_owned_id(&env, &owned, MAP_MODULE, name)
+                .unwrap_or_else(|error| panic!("Map owner {name}: {error}")))
+        })
         .collect::<Vec<_>>();
     for (name, id) in &canonical {
         assert_ne!(*id, forged);
         env.globals.insert((*name).to_owned(), forged);
     }
     for (name, id) in canonical {
-        assert_eq!(checked_map_id(&env, name), id);
+        assert_eq!(checked_map_id(&env, &owned, name), id);
+        let qualified = format!("{MAP_MODULE}.{name}");
+        env.globals.insert(qualified.clone(), forged);
+        assert!(
+            catalog_or::provider_owned_id(&env, &owned, MAP_MODULE, name).is_err(),
+            "forged qualified {qualified} must not pass Map ownership"
+        );
+        env.globals.insert(qualified, id);
     }
 }
 
@@ -516,16 +524,16 @@ fn tree_2_1_3() -> String {
 #[test]
 fn tree_carrier_and_ops_are_not_primitive() {
     let env = mk_env();
-    let checked = checked_map_env();
+    let (checked, owned) = checked_map_env();
     // The private Map carrier and operations are selected in the real provider.
-    let tree_id = checked_map_id(&checked, "Tree");
+    let tree_id = checked_map_id(&checked, &owned, "Tree");
     assert!(
         matches!(checked.env.lookup(tree_id), Some(Decl::Inductive { .. })),
         "Tree k v must be Decl::Inductive"
     );
     for name in ["empty", "to_list", "fold", "Pair", "mk_pair", "pair_fst", "pair_snd"] {
         let (owner, id) = if ["empty", "to_list", "fold"].contains(&name) {
-            (&checked, checked_map_id(&checked, name))
+            (&checked, checked_map_id(&checked, &owned, name))
         } else {
             (&env, env.globals[name])
         };
@@ -613,9 +621,9 @@ fn fold_agrees_with_left_fold_over_tolist() {
 
 #[test]
 fn map_ops_full_api_not_primitive() {
-    let env = checked_map_env();
+    let (env, owned) = checked_map_env();
     for name in ["insert", "lookup", "member", "from_list", "from_list_acc", "set_insert", "set_member", "set_to_list", "Ordered", "all_keys", "lookup_empty_is_none"] {
-        let id = checked_map_id(&env, name);
+        let id = checked_map_id(&env, &owned, name);
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "{name} must be Decl::Transparent (declare_def), not a primitive/postulate"
@@ -1133,7 +1141,7 @@ fn map_total_leq_nat_preserves_proof_relevant_or_tags() {
 #[test]
 fn cat4_new_api_is_derived_and_axiom_free() {
     let env = mk_env();
-    let mut checked = checked_map_env();
+    let (mut checked, owned) = checked_map_env();
     let forged = checked.globals["Data.Sums.Combinators.is_some"];
     checked.globals.insert("succ".to_owned(), forged);
     for name in [
@@ -1365,8 +1373,8 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "is_equivalence",
     ] {
         let qualified = format!("{MAP_MODULE}.{name}");
-        let (owner, id) = if let Some(id) = checked.globals.get(&qualified) {
-            (&checked, *id)
+        let (owner, id) = if checked.globals.contains_key(&qualified) {
+            (&checked, checked_map_id(&checked, &owned, name))
         } else {
             assert!(
                 name == "bool_and" || name.starts_with("bool_and::"),

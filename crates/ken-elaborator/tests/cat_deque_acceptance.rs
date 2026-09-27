@@ -6,6 +6,9 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Term};
@@ -36,12 +39,16 @@ fn expose_module(env: &mut ElabEnv, module: &str) {
     env.globals.extend(aliases);
 }
 
-fn loaded_env() -> ElabEnv {
+fn loaded_env_with_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = base_env();
-    env.elaborate_module_from_roots(&[catalog_root()], DEQUE)
+    let owned = env.elaborate_module_from_roots(&[catalog_root()], DEQUE)
         .expect("Data.Collections.Deque must roots-load with its real provider closure");
     expose_module(&mut env, DEQUE);
-    env
+    (env, owned)
+}
+
+fn loaded_env() -> ElabEnv {
+    loaded_env_with_owned().0
 }
 
 fn leading_pi_count(term: &Term) -> usize {
@@ -137,7 +144,7 @@ fn evaluate_boolean_list(env: &ElabEnv, name: &str) -> Vec<bool> {
 /// governed by the loader-visible closeout pin.
 #[test]
 fn entry_elaborates_and_registers_operations_and_laws() {
-    let mut env = loaded_env();
+    let (mut env, owned) = loaded_env_with_owned();
     let forged = env.globals[&format!("{DERIVED}.reverse")];
     let names = [
         "Deque",
@@ -159,21 +166,46 @@ fn entry_elaborates_and_registers_operations_and_laws() {
     }
     for name in names {
         let qualified = format!("{DEQUE}.{name}");
-        let id = env
-            .globals
-            .get(&qualified)
-            .copied()
-            .unwrap_or_else(|| panic!("`{qualified}` must belong to loaded Deque"));
-        let checked = if name == "MkDeque" {
-            let carrier = env.globals[&format!("{DEQUE}.Deque")];
-            matches!(env.env.lookup(carrier), Some(Decl::Inductive(decl))
-                if decl.constructors.iter().any(|ctor| ctor.id == id))
+        let id = if name == "MkDeque" {
+            // Constructor IDs are inside the loader-owned inductive, not
+            // separate results of elaborate_module_from_roots.
+            let carrier = catalog_or::provider_owned_id(&env, &owned, DEQUE, "Deque")
+                .expect("Deque must own its checked carrier");
+            let candidate = env.globals[&qualified];
+            assert!(
+                matches!(env.env.lookup(carrier), Some(Decl::Inductive(decl))
+                    if decl.constructors.iter().any(|ctor| ctor.id == candidate)),
+                "`{qualified}` must be a constructor of the owned Deque carrier"
+            );
+            candidate
         } else {
-            env.env.lookup(id).is_some()
+            catalog_or::provider_owned_id(&env, &owned, DEQUE, name)
+                .unwrap_or_else(|error| panic!("`{qualified}` must be Deque-owned: {error}"))
         };
-        assert!(checked, "`{qualified}` must be a real kernel-checked global");
+        if name != "MkDeque" {
+            assert!(env.env.lookup(id).is_some(), "`{qualified}` must be checked");
+        }
         assert_ne!(id, forged, "flat alias must not spoof Deque.{name}");
     }
+}
+
+/// Promise class: durable checked-identity invariant.
+/// MEASURED: a forged qualified key for an otherwise checked Deque function
+/// fails ownership despite naming a valid transparent Derived declaration.
+/// CLAIMED: the host read authenticates loader ownership, not just spelling.
+/// THE GAP: the per-name host census above supplies the positive owner set.
+#[test]
+fn deque_host_read_rejects_forged_qualified_provider_alias() {
+    let (mut env, owned) = loaded_env_with_owned();
+    let canonical = catalog_or::provider_owned_id(&env, &owned, DEQUE, "pushFront")
+        .expect("Deque must own pushFront");
+    let forged = env.globals[&format!("{DERIVED}.reverse")];
+    assert_ne!(canonical, forged);
+    env.globals.insert(format!("{DEQUE}.pushFront"), forged);
+    assert!(
+        catalog_or::provider_owned_id(&env, &owned, DEQUE, "pushFront").is_err(),
+        "qualified key must not grant Derived.reverse Deque ownership"
+    );
 }
 
 #[test]

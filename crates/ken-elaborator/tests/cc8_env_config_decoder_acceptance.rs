@@ -46,7 +46,7 @@ const CONFIG_DECODER: &str =
     include_str!("../../../catalog/packages/Application/Configuration/Decoder.ken.md");
 const EXAMPLE: &str = include_str!("../../../catalog/examples/CommandLine/Forge.ken.md");
 
-fn dependency_env() -> ElabEnv {
+fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env);
@@ -107,7 +107,7 @@ fn dependency_env() -> ElabEnv {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
     }
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+    let doc_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
         .expect("Capability.Formatting.Doc must roots-load in dependency order");
     catalog_or::expose_module(&mut env, "Capability.Formatting.Doc");
     env.elaborate_module_from_roots(
@@ -116,15 +116,19 @@ fn dependency_env() -> ElabEnv {
     )
     .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
-    env
+    (env, doc_owned)
+}
+
+fn dependency_env() -> ElabEnv {
+    dependency_env_with_doc_owned().0
 }
 
 fn importing_client(source: &str, imports: &str) -> String {
     source.replacen("```ken\n", &format!("```ken\n{imports}\n"), 1)
 }
 
-fn full_env() -> ElabEnv {
-    let mut env = dependency_env();
+fn full_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
+    let (mut env, doc_owned) = dependency_env_with_doc_owned();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], SCHEMA_MODULE)
         .expect("Schema must roots-load through its declared providers");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], ARGPARSE_MODULE)
@@ -140,7 +144,11 @@ fn full_env() -> ElabEnv {
             .unwrap_or_else(|err| panic!("{label} must consume its public providers: {err:?}"));
         env.module_state = before_validation_clients.clone();
     }
-    env
+    (env, doc_owned)
+}
+
+fn full_env() -> ElabEnv {
+    full_env_with_doc_owned().0
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -174,7 +182,7 @@ fn global_id(env: &ElabEnv, name: &str) -> GlobalId {
     let qualified = if name.contains('.') || name.starts_with("cc8_") {
         name.to_owned()
     } else if name == "render" {
-        format!("Capability.Formatting.Doc.{name}")
+        panic!("render host reads require the Doc-owned ID population")
     } else if name == "command_schema" || name == "command_help" || name.starts_with("argparse_") {
         format!("{ARGPARSE_MODULE}.{name}")
     } else if ["MkDiagnostic", "EnvironmentOrigin", "ConfigKeyOrigin"].contains(&name) {
@@ -217,6 +225,19 @@ fn call_global(
     arguments: impl IntoIterator<Item = EvalVal>,
 ) -> EvalVal {
     let function = eval_global(env, store, name);
+    apply_values(env, store, function, arguments)
+}
+
+fn call_doc_render(
+    env: &ElabEnv,
+    doc_owned: &[GlobalId],
+    store: &mut EvalStore,
+    arguments: impl IntoIterator<Item = EvalVal>,
+) -> EvalVal {
+    let id = catalog_or::provider_owned_id(env, doc_owned, "Capability.Formatting.Doc", "render")
+        .expect("Doc must own the renderer selected by the host");
+    let (_, body) = env.env.transparent_body(id).expect("Doc.render must be checked");
+    let function = eval(&[], &body, &env.env, store);
     apply_values(env, store, function, arguments)
 }
 
@@ -354,16 +375,28 @@ fn add_schema_fixtures(env: &mut ElabEnv) {
     .expect("CC8 behavioral fixtures must elaborate");
 }
 
-/// Promise class: durable invariant. The host renderer observation selects
-/// the checked Doc identity, not a same-spelling mutable flat alias.
+/// Promise class: durable invariant.
+/// MEASURED: real Doc loader ownership survives a forged flat `render` alias;
+/// a forged qualified key to ConfigDecoder's checked operation fails that
+/// ownership check. CLAIMED: renderer evaluation uses the checked Doc provider,
+/// not a mutable spelling. THE GAP: other provider routes have their own contracts.
 #[test]
-fn render_host_read_uses_qualified_provider_even_with_a_forged_flat_alias() {
-    let mut env = full_env();
-    let render = env.globals["Capability.Formatting.Doc.render"];
+fn render_host_identity_checks_flat_and_qualified_alias_forgery() {
+    let (mut env, doc_owned) = full_env_with_doc_owned();
+    let render = catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render")
+        .expect("Doc must own checked render");
     let other = env.globals["Application.Configuration.Decoder.env_config_help"];
     assert_ne!(render, other, "the forged host aliases must be distinct");
     env.globals.insert("render".to_owned(), other);
-    assert_eq!(global_id(&env, "render"), render);
+    assert_eq!(
+        catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render"),
+        Ok(render),
+    );
+    env.globals.insert("Capability.Formatting.Doc.render".to_owned(), other);
+    assert!(
+        catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render").is_err(),
+        "forged qualified Doc.render must fail its loader-owned ID check"
+    );
 }
 
 #[test]
@@ -388,7 +421,7 @@ fn ordered_closure_elaborates_schema_before_both_clients() {
 
 #[test]
 fn schema_help_growth_reaches_both_clients_behaviorally() {
-    let mut env = full_env();
+    let (mut env, doc_owned) = full_env_with_doc_owned();
     add_schema_fixtures(&mut env);
     let mut store = make_store(&env);
 
@@ -399,11 +432,11 @@ fn schema_help_growth_reaches_both_clients_behaviorally() {
     let grown_doc = call_global(&env, &mut store, "env_config_help", [grown]);
     let base_text = list_char_text(
         &env,
-        &call_global(&env, &mut store, "render", [width.clone(), base_doc]),
+        &call_doc_render(&env, &doc_owned, &mut store, [width.clone(), base_doc]),
     );
     let grown_text = list_char_text(
         &env,
-        &call_global(&env, &mut store, "render", [width.clone(), grown_doc]),
+        &call_doc_render(&env, &doc_owned, &mut store, [width.clone(), grown_doc]),
     );
     assert!(!base_text.contains("COLOR"));
     assert!(grown_text.contains("COLOR"));
@@ -414,11 +447,11 @@ fn schema_help_growth_reaches_both_clients_behaviorally() {
     let after_doc = call_global(&env, &mut store, "command_help", [after]);
     let before_text = list_char_text(
         &env,
-        &call_global(&env, &mut store, "render", [width.clone(), before_doc]),
+        &call_doc_render(&env, &doc_owned, &mut store, [width.clone(), before_doc]),
     );
     let after_text = list_char_text(
         &env,
-        &call_global(&env, &mut store, "render", [width, after_doc]),
+        &call_doc_render(&env, &doc_owned, &mut store, [width, after_doc]),
     );
     assert!(!before_text.contains("--color"));
     assert!(after_text.contains("--color"));

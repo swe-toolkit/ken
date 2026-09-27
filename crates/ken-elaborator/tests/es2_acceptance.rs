@@ -303,7 +303,7 @@ fn map_set_retired_not_prelude_primitives() {
 #[test]
 fn map_replacement_is_derived_not_primitive() {
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map")
+    let owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map")
         .expect("Map replacement must load through its real roots closure");
     let forged = env.globals["Data.Sums.Combinators.is_some"];
     let forged_tree = env.globals["Nat"];
@@ -311,14 +311,16 @@ fn map_replacement_is_derived_not_primitive() {
     for name in ["insert", "lookup", "member", "to_list", "from_list", "set_insert", "set_member", "set_to_list"] {
         env.globals.insert(name.to_owned(), forged);
     }
-    let tree_id = env.globals["Data.Collections.Map.Tree"];
+    let tree_id = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Map", "Tree")
+        .expect("Map must own its checked Tree");
     assert_ne!(tree_id, forged_tree, "flat Tree alias must not spoof Map ownership");
     assert!(
         matches!(env.env.lookup(tree_id), Some(Decl::Inductive { .. })),
         "AC1(b): the replacement carrier 'Tree' must be Decl::Inductive (declare_inductive), never a primitive"
     );
     for name in ["insert", "lookup", "member", "to_list", "from_list", "set_insert", "set_member", "set_to_list"] {
-        let id = env.globals[&format!("Data.Collections.Map.{name}")];
+        let id = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Map", name)
+            .unwrap_or_else(|error| panic!("Map operation {name}: {error}"));
         assert_ne!(id, forged, "flat {name} alias must not spoof Map ownership");
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),

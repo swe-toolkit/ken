@@ -477,7 +477,7 @@ fn cc3_checked_identity_closure_and_trust_are_structural() {
 fn cursor_reuses_canonical_nat_operations_with_zero_trust_delta() {
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    load_cursor_module(&mut env);
+    let owned = load_cursor_module(&mut env).into_iter().collect::<Vec<_>>();
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Cursor reuse must add zero trust");
 
@@ -494,7 +494,8 @@ fn cursor_reuses_canonical_nat_operations_with_zero_trust_delta() {
     assert!(env.env.transparent_body(sub).is_some());
 
     for (name, add_count, sub_count) in [("arg_lengths_sum", 1, 0), ("arg_remaining_from", 1, 1)] {
-        let id = env.globals[&format!("Capability.Parsing.Cursor.{name}")];
+        let id = catalog_or::provider_owned_id(&env, &owned, "Capability.Parsing.Cursor", name)
+            .unwrap_or_else(|error| panic!("Cursor operation {name}: {error}"));
         let body = match env.env.lookup(id) {
             Some(Decl::Transparent { body, .. }) => body,
             other => panic!("{name} must be transparent, got {other:?}"),
