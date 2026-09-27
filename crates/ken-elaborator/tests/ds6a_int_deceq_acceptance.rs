@@ -19,8 +19,8 @@ use ken_kernel::{check, whnf, KernelError};
 
 fn mk_env_with_package() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     catalog_or::load_derived_fixture(&mut env);
     env
 }

@@ -221,11 +221,11 @@ fn ac2_trusted_base_delta_is_exactly_the_named_pair_and_propositions() {
 #[test]
 fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_compare(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Derived's canonical Nat-order dependency must roots-load");
     let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     catalog_or::load_derived_fixture(&mut env);
     let trust_after_package: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(

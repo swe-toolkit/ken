@@ -16,15 +16,23 @@ use std::collections::{BTreeSet, HashSet};
 const PARSING_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
 
-fn dependency_env_with_diagnostics_owned() -> (ElabEnv, Vec<GlobalId>) {
+struct Cat5ProviderOwned {
+    diagnostics: Vec<GlobalId>,
+    derived: Vec<GlobalId>,
+    lawful: Vec<GlobalId>,
+    nat_order: Vec<GlobalId>,
+}
+
+fn dependency_env_with_provider_owned() -> (ElabEnv, Cat5ProviderOwned) {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append", "length"]);
-    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let (lawful, derived) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append", "length"]);
+    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env, &lawful);
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+    let nat_order = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
@@ -48,11 +56,11 @@ fn dependency_env_with_diagnostics_owned() -> (ElabEnv, Vec<GlobalId>) {
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
         .expect("Capability.Parsing.Decoder must roots-load sixth");
     catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
-    (env, diagnostics_owned)
+    (env, Cat5ProviderOwned { diagnostics: diagnostics_owned, derived, lawful, nat_order })
 }
 
 fn dependency_env() -> ElabEnv {
-    dependency_env_with_diagnostics_owned().0
+    dependency_env_with_provider_owned().0
 }
 
 #[test]
@@ -297,7 +305,7 @@ fn transparent_parsing_bodies_with_saturated_provider_head_occurrence(
 
 #[test]
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
-    let (mut env, diagnostics_owned) = dependency_env_with_diagnostics_owned();
+    let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let base_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
     let parsing_owned = load_parsing_module(&mut env);
     let after_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
@@ -415,7 +423,7 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         } else if name == "SourceId" {
             catalog_or::provider_owned_id(
                 &env,
-                &diagnostics_owned,
+                &provider_owned.diagnostics,
                 "Capability.Diagnostics.Core",
                 name,
             )
@@ -440,10 +448,10 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
 /// membership, not the identities of every other CAT5 declaration.
 #[test]
 fn cat5_source_id_host_read_rejects_forged_qualified_provider_alias() {
-    let (mut env, diagnostics_owned) = dependency_env_with_diagnostics_owned();
+    let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let parsing_owned = load_parsing_module(&mut env);
     let provider = "Capability.Diagnostics.Core";
-    let canonical = catalog_or::provider_owned_id(&env, &diagnostics_owned, provider, "SourceId")
+    let canonical = catalog_or::provider_owned_id(&env, &provider_owned.diagnostics, provider, "SourceId")
         .expect("Diagnostics.Core must own checked SourceId");
     let forged = catalog_or::provider_owned_id(
         &env,
@@ -455,12 +463,12 @@ fn cat5_source_id_host_read_rejects_forged_qualified_provider_alias() {
     assert_ne!(canonical, forged, "the two provider IDs must differ");
     env.globals.insert("SourceId".to_owned(), forged);
     assert_eq!(
-        catalog_or::provider_owned_id(&env, &diagnostics_owned, provider, "SourceId"),
+        catalog_or::provider_owned_id(&env, &provider_owned.diagnostics, provider, "SourceId"),
         Ok(canonical),
     );
     env.globals.insert(format!("{provider}.SourceId"), forged);
     assert!(
-        catalog_or::provider_owned_id(&env, &diagnostics_owned, provider, "SourceId").is_err(),
+        catalog_or::provider_owned_id(&env, &provider_owned.diagnostics, provider, "SourceId").is_err(),
         "forged qualified SourceId must not pass Diagnostics.Core ownership"
     );
 }
@@ -479,7 +487,7 @@ fn cat5_source_id_host_read_rejects_forged_qualified_provider_alias() {
 /// the remaining migration obligations.
 #[test]
 fn parsing_append_occurrence_population_and_migration_shape_are_pinned() {
-    let mut env = dependency_env();
+    let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
         .expect("Capability.Parsing.Parsing must roots-load with its selective import");
@@ -491,7 +499,9 @@ fn parsing_append_occurrence_population_and_migration_shape_are_pinned() {
             .contains_key("Capability.Parsing.Parsing.list_append"),
         "the retired package-local list_append must be absent"
     );
-    let provider = env.globals["Data.Collections.Derived.list_append"];
+    let provider = catalog_or::provider_owned_id(
+        &env, &provider_owned.derived, "Data.Collections.Derived", "list_append",
+    ).expect("Derived must own canonical list_append");
     assert_eq!(
         transparent_parsing_bodies_with_saturated_provider_head_occurrence(&env, provider),
         BTreeSet::from(["syntax_node_binary".to_owned()]),
@@ -534,14 +544,16 @@ fn parsing_append_occurrence_population_and_migration_shape_are_pinned() {
 /// trust.
 #[test]
 fn parsing_reuses_the_canonical_nat_providers() {
-    let mut env = dependency_env();
+    let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let before: HashSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+    let parsing_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
         .expect("Capability.Parsing.Parsing must roots-load over its dependency fixture");
     let after: HashSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Parsing reuse must add zero trust");
 
-    let provider = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    let provider = catalog_or::provider_owned_id(
+        &env, &provider_owned.lawful, "Core.Classes.LawfulClasses", "leq_nat",
+    ).expect("LawfulClasses must own canonical leq_nat");
     assert!(env.env.transparent_body(provider).is_some());
     assert!(
         !env.globals
@@ -554,7 +566,9 @@ fn parsing_reuses_the_canonical_nat_providers() {
         "Parsing must not mint a local Nat subtraction"
     );
 
-    let less_eq = env.globals["Capability.Parsing.Parsing.LessEqNat"];
+    let less_eq = catalog_or::provider_owned_id(
+        &env, &parsing_owned, "Capability.Parsing.Parsing", "LessEqNat",
+    ).expect("Parsing must own checked LessEqNat");
     let body = match env.env.lookup(less_eq) {
         Some(Decl::Transparent { body, .. }) => body,
         other => panic!("LessEqNat must be transparent, got {other:?}"),
@@ -564,9 +578,13 @@ fn parsing_reuses_the_canonical_nat_providers() {
         "LessEqNat must retain the canonical provider GlobalId"
     );
 
-    let sub = env.globals["Data.Numeric.Nat.Order.sub"];
+    let sub = catalog_or::provider_owned_id(
+        &env, &provider_owned.nat_order, "Data.Numeric.Nat.Order", "sub",
+    ).expect("Nat.Order must own canonical sub");
     assert!(env.env.transparent_body(sub).is_some());
-    let remaining = env.globals["Capability.Parsing.Parsing.byte_cursor_remaining"];
+    let remaining = catalog_or::provider_owned_id(
+        &env, &parsing_owned, "Capability.Parsing.Parsing", "byte_cursor_remaining",
+    ).expect("Parsing must own checked byte_cursor_remaining");
     let remaining_body = match env.env.lookup(remaining) {
         Some(Decl::Transparent { body, .. }) => body,
         other => panic!("byte_cursor_remaining must be transparent, got {other:?}"),

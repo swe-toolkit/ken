@@ -16,10 +16,10 @@ const EXIT_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Pro
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_importing_fixture(&mut env, "length");
-    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let (lawful_owned, _) = catalog_or::load_derived_importing_fixture(&mut env, "length");
+    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env, &lawful_owned);
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("canonical Nat arithmetic provider must elaborate third");
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Order")

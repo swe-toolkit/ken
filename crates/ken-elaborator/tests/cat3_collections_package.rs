@@ -127,12 +127,15 @@ fn boolean_list(env: &ElabEnv, value: EvalVal) -> Vec<bool> {
 
 fn mk_env_with_derived_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_compare(&mut env);
+    let (transport_owned, or_owned) =
+        catalog_or::load_core_logic_compare_with_or_owned(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     let owned = catalog_or::load_derived_fixture(&mut env);
-    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "pair_compare_lt_cases");
+    catalog_or::assert_transparent_result_uses_core_logic_or(
+        &env, &or_owned, "pair_compare_lt_cases",
+    );
     (env, owned)
 }
 
@@ -235,9 +238,9 @@ fn derived_owns_checked_map_and_filter_identities() {
     assert!(!env.globals.contains_key("map"));
     assert!(!env.globals.contains_key("filter"));
 
-    catalog_or::load_core_logic_compare(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
     let owned = catalog_or::load_derived_fixture(&mut env);
     let derived_map = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", "map")
@@ -363,17 +366,19 @@ fn derived_owns_checked_map_and_filter_identities() {
 #[test]
 fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let nat_order_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("canonical Nat order provider must roots-load");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let owned = catalog_or::load_derived_fixture(&mut env);
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Derived reuse must add zero trust");
 
-    let min = env.globals["Data.Numeric.Nat.Order.min"];
-    let sub = env.globals["Data.Numeric.Nat.Order.sub"];
+    let min = catalog_or::provider_owned_id(&env, &nat_order_owned, "Data.Numeric.Nat.Order", "min")
+        .expect("Nat.Order must own checked min");
+    let sub = catalog_or::provider_owned_id(&env, &nat_order_owned, "Data.Numeric.Nat.Order", "sub")
+        .expect("Nat.Order must own checked sub");
     assert!(env.env.transparent_body(min).is_some());
     assert!(env.env.transparent_body(sub).is_some());
     assert!(
@@ -431,7 +436,7 @@ fn derived_reuses_canonical_nat_order_operations_with_zero_trust_delta() {
 #[test]
 fn derived_has_no_definitionally_equivalent_local_bool_reimplementation() {
     let mut env = ElabEnv::new().expect("base env");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+    let lawful_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the canonical Boolean provider must roots-load");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
@@ -439,8 +444,10 @@ fn derived_has_no_definitionally_equivalent_local_bool_reimplementation() {
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Derived Boolean reuse must add zero trust");
 
-    let bool_and = env.globals["Core.Classes.LawfulClasses.bool_and"];
-    let bool_leq = env.globals["Core.Classes.LawfulClasses.bool_leq"];
+    let bool_and = catalog_or::provider_owned_id(&env, &lawful_owned, "Core.Classes.LawfulClasses", "bool_and")
+        .expect("LawfulClasses must own checked bool_and");
+    let bool_leq = catalog_or::provider_owned_id(&env, &lawful_owned, "Core.Classes.LawfulClasses", "bool_leq")
+        .expect("LawfulClasses must own checked bool_leq");
     assert!(env.env.transparent_body(bool_and).is_some());
     assert!(env.env.transparent_body(bool_leq).is_some());
     assert!(!env

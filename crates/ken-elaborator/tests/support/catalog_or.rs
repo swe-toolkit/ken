@@ -96,8 +96,18 @@ pub fn load_core_logic_or(env: &mut ElabEnv) {
         .expect("Core.Logic.Or must load through strict catalog resolution");
 }
 
-pub fn load_core_logic_compare(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Compare")
+pub fn load_core_logic_compare_with_or_owned(
+    env: &mut ElabEnv,
+) -> (Vec<GlobalId>, Vec<GlobalId>) {
+    // Match Compare's declared import order so the dependency fixture keeps
+    // the same provider closure and checked GlobalId allocation order.
+    let or_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Or")
+        .expect("the Core.Logic.Or comparison dependency must roots-load");
+    let ord_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.OrdResult")
+        .expect("the Core.Logic.OrdResult comparison dependency must roots-load");
+    let transport_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Transport")
+        .expect("the Core.Logic.Transport comparison dependency must roots-load");
+    let compare_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Compare")
         .expect("the Core.Logic comparison provider closure must load");
 
     // Older acceptance fixtures elaborate a catalog consumer as a flat source
@@ -131,10 +141,36 @@ pub fn load_core_logic_compare(env: &mut ElabEnv) {
         ),
     ] {
         for name in names {
-            let id = env.globals[&format!("{module}.{name}")];
+            let id = if module == "Core.Logic.OrdResult" && ["Lt", "Eq", "Gt"].contains(name) {
+                // Constructor IDs are members of the owned inductive, not
+                // independent loader results.
+                let owner = provider_owned_id(env, &ord_owned, module, "OrdResult")
+                    .expect("OrdResult must own its carrier");
+                let qualified = format!("{module}.{name}");
+                let candidate = env.globals[&qualified];
+                assert!(
+                    matches!(env.env.lookup(owner), Some(Decl::Inductive(decl))
+                        if decl.constructors.iter().any(|ctor| ctor.id == candidate)),
+                    "{qualified} must belong to the owned OrdResult carrier"
+                );
+                candidate
+            } else {
+                let owned = if module == "Core.Logic.OrdResult" {
+                    &ord_owned
+                } else {
+                    &compare_owned
+                };
+                provider_owned_id(env, owned, module, name)
+                    .unwrap_or_else(|error| panic!("comparison owner {name}: {error}"))
+            };
             env.globals.insert((*name).to_owned(), id);
         }
     }
+    (transport_owned, or_owned)
+}
+
+pub fn load_core_logic_compare(env: &mut ElabEnv) -> Vec<GlobalId> {
+    load_core_logic_compare_with_or_owned(env).0
 }
 
 pub fn expose_module(env: &mut ElabEnv, module: &str) {
@@ -171,10 +207,13 @@ pub fn load_derived_fixture(env: &mut ElabEnv) -> Vec<GlobalId> {
 /// Retain Derived's module record while withholding selected legacy flat aliases.
 /// Each consumer's real selective import must install its exact binding; other
 /// aliases remain available to the legacy dependency fixture.
-pub fn load_derived_importing_fixture_many(env: &mut ElabEnv, imports: &[&str]) {
-    env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+pub fn load_derived_importing_fixture_many(
+    env: &mut ElabEnv,
+    imports: &[&str],
+) -> (Vec<GlobalId>, Vec<GlobalId>) {
+    let lawful_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Derived's canonical Nat-order dependency must roots-load");
-    env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+    let derived_owned = env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
     expose_module(env, "Core.Classes.LawfulClasses");
     expose_module(env, "Data.Collections.Derived");
@@ -184,10 +223,14 @@ pub fn load_derived_importing_fixture_many(env: &mut ElabEnv, imports: &[&str]) 
             "Derived fixture must contain the selectively imported binding `{imported}`"
         );
     }
+    (lawful_owned, derived_owned)
 }
 
-pub fn load_derived_importing_fixture(env: &mut ElabEnv, imported: &str) {
-    load_derived_importing_fixture_many(env, &[imported]);
+pub fn load_derived_importing_fixture(
+    env: &mut ElabEnv,
+    imported: &str,
+) -> (Vec<GlobalId>, Vec<GlobalId>) {
+    load_derived_importing_fixture_many(env, &[imported])
 }
 
 /// Flat legacy fixtures must load the new canonical function provider before
@@ -215,9 +258,10 @@ const LC_BOOL_AND_IMPORTS: [&str; 4] = [
     "bool_and::right_identity",
 ];
 
-pub fn withhold_lc_bool_and_flat_aliases(env: &mut ElabEnv) {
+pub fn withhold_lc_bool_and_flat_aliases(env: &mut ElabEnv, lawful_owned: &[GlobalId]) {
     for name in LC_BOOL_AND_IMPORTS {
-        let canonical = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
+        let canonical = provider_owned_id(env, lawful_owned, "Core.Classes.LawfulClasses", name)
+            .unwrap_or_else(|error| panic!("LC owner {name}: {error}"));
         assert_eq!(
             env.globals.remove(name),
             Some(canonical),
@@ -229,9 +273,10 @@ pub fn withhold_lc_bool_and_flat_aliases(env: &mut ElabEnv) {
 /// Restore the same canonical identities after LawfulFunctors has proved its
 /// own dependency edge. Later sources in these synthetic flat fixtures still
 /// receive the legacy aliases explicitly, rather than through LF ownership.
-pub fn restore_lc_bool_and_flat_aliases(env: &mut ElabEnv) {
+pub fn restore_lc_bool_and_flat_aliases(env: &mut ElabEnv, lawful_owned: &[GlobalId]) {
     for name in LC_BOOL_AND_IMPORTS {
-        let canonical = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
+        let canonical = provider_owned_id(env, lawful_owned, "Core.Classes.LawfulClasses", name)
+            .unwrap_or_else(|error| panic!("LC owner {name}: {error}"));
         assert_eq!(
             env.globals.insert(name.to_owned(), canonical),
             None,
@@ -244,7 +289,10 @@ pub fn restore_lc_bool_and_flat_aliases(env: &mut ElabEnv) {
 /// retained its canonical class owner. Re-loading the provider must be a no-op:
 /// if `load_derived_fixture` restores a state from before LawfulClasses, the
 /// attempted reload reaches the duplicate-instance failure this control guards.
-pub fn assert_derived_fixture_retains_lawfulclasses(env: &mut ElabEnv) {
+pub fn assert_derived_fixture_retains_lawfulclasses(
+    env: &mut ElabEnv,
+    lawful_owned: &[GlobalId],
+) {
     let loaded_before = env.loaded_module_count();
     env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the shared Derived fixture must retain its canonical class owner");
@@ -254,16 +302,18 @@ pub fn assert_derived_fixture_retains_lawfulclasses(env: &mut ElabEnv) {
         "LawfulClasses must already be loaded at the legacy-fixture boundary"
     );
 
-    let provider = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    let provider = provider_owned_id(env, lawful_owned, "Core.Classes.LawfulClasses", "leq_nat")
+        .expect("the shared Derived fixture must retain checked LC.leq_nat");
     assert_eq!(
         env.globals["leq_nat"], provider,
         "the retained class owner must preserve the canonical provider identity"
     );
 }
 
-pub fn expose_core_logic_transport(env: &mut ElabEnv) {
+pub fn expose_core_logic_transport(env: &mut ElabEnv, transport_owned: &[GlobalId]) {
     for name in ["cong", "sym", "trans"] {
-        let id = env.globals[&format!("Core.Logic.Transport.{name}")];
+        let id = provider_owned_id(env, transport_owned, "Core.Logic.Transport", name)
+            .unwrap_or_else(|error| panic!("Transport owner {name}: {error}"));
         env.globals.insert(name.to_owned(), id);
     }
 }
@@ -305,8 +355,13 @@ fn applied_head(term: &Term) -> &Term {
 /// one canonical provider. **THE GAP:** this helper cannot establish that the
 /// caller loaded a real source, so every call sits directly after that source's
 /// production elaboration path rather than behind a synthetic replacement.
-pub fn assert_transparent_result_uses_core_logic_or(env: &ElabEnv, name: &str) {
-    let or_id = env.globals["Core.Logic.Or.Or"];
+pub fn assert_transparent_result_uses_core_logic_or(
+    env: &ElabEnv,
+    or_owned: &[GlobalId],
+    name: &str,
+) {
+    let or_id = provider_owned_id(env, or_owned, "Core.Logic.Or", "Or")
+        .expect("Core.Logic.Or must own its checked carrier");
     let or_decl = env.env.inductive(or_id).expect("canonical Or family");
     assert_eq!(or_decl.params, vec![Term::omega(Level::Zero); 2]);
     assert_eq!(or_decl.level, Level::Zero);

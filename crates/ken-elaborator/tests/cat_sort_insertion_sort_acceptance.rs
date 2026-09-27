@@ -17,8 +17,8 @@ const INSERTION_SORT_KEN_MD: &str =
 
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     catalog_or::load_derived_fixture(&mut env);
     // The sequential harness has no module namespace. Hide Derived's private
     // operations and attached proofs so this package's names are inventoried

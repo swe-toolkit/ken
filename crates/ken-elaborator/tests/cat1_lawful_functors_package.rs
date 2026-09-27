@@ -17,12 +17,76 @@ fn mk_env_with_lawful_functors() -> ElabEnv {
     // aliases out of the flat fixture so those selective imports remain the
     // only route by which the package resolves them.
     catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
-    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
+    let (lawful_owned, _) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
+    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
     catalog_or::load_function_combinators(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("catalog/packages/Core/Classes/LawfulFunctors.ken.md must elaborate");
     env
+}
+
+/// Promise class: durable checked-provider identity invariant.
+/// MEASURED: forging only a flat alias preserves the loader-owned Transport
+/// operation; forging the qualified key to a distinct checked Compare ID
+/// makes the fixture alias exposure refuse. CLAIMED: fixture alias wiring
+/// cannot turn an unrelated provider into Transport by mutable spelling.
+/// THE GAP: this guards the three names exposed by the shared helper, not
+/// arbitrary aliases created by other test-local fixtures.
+#[test]
+fn transport_fixture_aliases_reject_forged_qualified_provider_key() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    let canonical = catalog_or::provider_owned_id(
+        &env, &transport_owned, "Core.Logic.Transport", "cong",
+    ).expect("Transport must own checked cong");
+    let foreign = env.globals["Core.Logic.Compare.pair_compare"];
+    assert_ne!(canonical, foreign);
+    env.globals.insert("cong".to_owned(), foreign);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    assert_eq!(env.globals["cong"], canonical);
+
+    env.globals.insert("Core.Logic.Transport.cong".to_owned(), foreign);
+    let error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    })).expect_err("forged qualified cong must fail Transport ownership");
+    let message = error.downcast_ref::<String>().map(String::as_str)
+        .or_else(|| error.downcast_ref::<&str>().copied())
+        .expect("Transport refusal must report a string");
+    assert!(message.contains("does not own"), "unexpected refusal: {message}");
+}
+
+/// Promise class: durable checked-provider identity invariant.
+/// MEASURED: a checked Compare ID cannot become a canonical LawfulClasses
+/// Bool helper by forging the qualified key before the fixture withholds its
+/// flat alias. CLAIMED: the LC fixture reads the provider's owned population.
+/// THE GAP: this pins bool_and; the shared loop checks its other three names.
+#[test]
+fn lawful_fixture_withhold_rejects_forged_qualified_provider_key() {
+    let mut env = ElabEnv::new().expect("base environment");
+    catalog_or::load_core_logic_compare(&mut env);
+    let (lawful_owned, _) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
+    let canonical = catalog_or::provider_owned_id(
+        &env, &lawful_owned, "Core.Classes.LawfulClasses", "bool_and",
+    ).expect("LawfulClasses must own checked bool_and");
+    let foreign = env.globals["Core.Logic.Compare.pair_compare"];
+    assert_ne!(canonical, foreign);
+    env.globals.insert("bool_and".to_owned(), foreign);
+    assert_eq!(
+        catalog_or::provider_owned_id(
+            &env, &lawful_owned, "Core.Classes.LawfulClasses", "bool_and",
+        ),
+        Ok(canonical),
+    );
+    env.globals.insert("Core.Classes.LawfulClasses.bool_and".to_owned(), foreign);
+    let error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        catalog_or::withhold_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
+    })).expect_err("forged qualified bool_and must fail LC ownership");
+    let message = error.downcast_ref::<String>().map(String::as_str)
+        .or_else(|| error.downcast_ref::<&str>().copied())
+        .expect("LawfulClasses refusal must report a string");
+    assert!(message.contains("does not own"), "unexpected refusal: {message}");
 }
 
 #[test]

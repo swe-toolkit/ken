@@ -279,8 +279,8 @@ fn published_module_surfaces(source: &str, module: &str, label: &str) -> BTreeSe
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     // LawfulFunctors imports `Data.Collections.Derived (list_append)` after the
     // attached-proof migration; clear both imports and keep Derived importable.
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "list_append"]);

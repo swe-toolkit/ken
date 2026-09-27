@@ -23,8 +23,8 @@ const EFFECTFUL_CLASSES_KEN_MD: &str =
 
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     // LawfulFunctors now imports `Data.Collections.Derived (list_append)` after
     // the attached-proof migration; clear both `concat_map` (EffectfulClasses's
     // import) and `list_append` so each real selective import installs its own

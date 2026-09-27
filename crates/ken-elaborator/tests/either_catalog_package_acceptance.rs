@@ -15,14 +15,15 @@ const SUMS_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Sums/Comb
 
 fn base_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
-    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let (lawful_owned, _) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
+    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
     catalog_or::load_function_combinators(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
-    catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
+    catalog_or::restore_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
     env.elaborate_ken_md_file(SUMS_KEN_MD)
         .expect("Data/Sums/Combinators.ken.md must elaborate");
     env
@@ -73,14 +74,15 @@ fn zero_axiom_in_sums_ken() {
 #[test]
 fn trusted_base_delta_is_empty_across_the_file() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
-    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
+    let transport_owned = catalog_or::load_core_logic_compare(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let (lawful_owned, _) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
+    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
     catalog_or::load_function_combinators(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
-    catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
+    catalog_or::restore_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
     let before: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_ken_md_file(SUMS_KEN_MD)
         .expect("Data/Sums/Combinators.ken.md must elaborate");

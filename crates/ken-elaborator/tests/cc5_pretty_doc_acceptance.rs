@@ -14,23 +14,38 @@ use ken_kernel::{Decl, GlobalId, Term};
 const PRETTY_DOC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
 
-fn dependency_env() -> ElabEnv {
+struct Cc5ProviderOwned {
+    derived: Vec<GlobalId>,
+    lawful: Vec<GlobalId>,
+    arithmetic: Vec<GlobalId>,
+    core_or: Vec<GlobalId>,
+}
+
+fn dependency_env_with_provider_owned() -> (ElabEnv, Cc5ProviderOwned) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+    let (transport_owned, core_or) =
+        catalog_or::load_core_logic_compare_with_or_owned(&mut env);
+    catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let lawful = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+    let arithmetic = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["length", "list_append"]);
-    env
+    let (_, derived) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["length", "list_append"]);
+    (env, Cc5ProviderOwned { derived, lawful, arithmetic, core_or })
+}
+
+fn dependency_env() -> ElabEnv {
+    dependency_env_with_provider_owned().0
 }
 
 fn full_env() -> ElabEnv {
-    let mut env = dependency_env();
+    let (mut env, dependencies) = dependency_env_with_provider_owned();
     env.elaborate_ken_md_file(PRETTY_DOC_KEN_MD)
         .expect("Capability.Formatting.Doc and every checked fence must elaborate third");
-    catalog_or::assert_transparent_result_uses_core_logic_or(&env, "pretty_bool_cases");
+    catalog_or::assert_transparent_result_uses_core_logic_or(
+        &env, &dependencies.core_or, "pretty_bool_cases",
+    );
     env
 }
 
@@ -505,16 +520,22 @@ fn pretty_doc_loader_surface_and_string_boundary_are_behavioral() {
 /// tests above separately establish the behavior and laws of those references.
 #[test]
 fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
-    let mut env = dependency_env();
+    let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+    let doc_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
         .expect("Capability.Formatting.Doc must roots-load over its dependency fixture");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "CC5 must add zero trusted-base entries");
 
-    let length = env.globals["Data.Collections.Derived.length"];
-    let add = env.globals["Data.Numeric.Nat.Arithmetic.add"];
-    let leq_nat = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    let length = catalog_or::provider_owned_id(
+        &env, &provider_owned.derived, "Data.Collections.Derived", "length",
+    ).expect("Derived must own canonical length");
+    let add = catalog_or::provider_owned_id(
+        &env, &provider_owned.arithmetic, "Data.Numeric.Nat.Arithmetic", "add",
+    ).expect("Nat.Arithmetic must own canonical add");
+    let leq_nat = catalog_or::provider_owned_id(
+        &env, &provider_owned.lawful, "Core.Classes.LawfulClasses", "leq_nat",
+    ).expect("LawfulClasses must own canonical leq_nat");
     assert!(env.env.transparent_body(length).is_some());
     assert!(env.env.transparent_body(add).is_some());
     assert!(env.env.transparent_body(leq_nat).is_some());
@@ -533,7 +554,8 @@ fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
         ("doc_fits", leq_nat),
     ] {
         let qualified = format!("Capability.Formatting.Doc.{name}");
-        let id = env.globals[&qualified];
+        let id = catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", name)
+            .unwrap_or_else(|error| panic!("Doc owner {name}: {error}"));
         let body = match env.env.lookup(id) {
             Some(Decl::Transparent { body, .. }) => body,
             other => panic!("{qualified} must be transparent, got {other:?}"),

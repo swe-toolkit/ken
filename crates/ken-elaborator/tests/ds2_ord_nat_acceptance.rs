@@ -25,11 +25,17 @@ fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
-fn base_env() -> ElabEnv {
+fn base_env_with_or_owned() -> (ElabEnv, Vec<ken_kernel::GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    let or_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Or")
+        .expect("LawfulClasses' first canonical Or dependency must roots-load");
     env.elaborate_module_from_roots(&[catalog_root()], LAWFUL)
         .expect("LawfulClasses must elaborate through its real provider closure");
-    env
+    (env, or_owned)
+}
+
+fn base_env() -> ElabEnv {
+    base_env_with_or_owned().0
 }
 
 fn load_order(env: &mut ElabEnv) {
@@ -39,13 +45,12 @@ fn load_order(env: &mut ElabEnv) {
 
 #[test]
 fn entry_elaborates_with_every_checked_fence() {
-    let mut env = base_env();
+    let (mut env, or_owned) = base_env_with_or_owned();
     load_order(&mut env);
     env.execute_loaded_entry_checked_fences(ORDER)
         .expect("Order Definition and every checked fence must elaborate");
     catalog_or::assert_transparent_result_uses_core_logic_or(
-        &env,
-        "Core.Classes.LawfulClasses.total_leq_nat",
+        &env, &or_owned, "Core.Classes.LawfulClasses.total_leq_nat",
     );
     assert!(
         env.globals.contains_key("Ord_instance_Nat"),
@@ -65,11 +70,10 @@ fn entry_elaborates_with_every_checked_fence() {
 /// two concrete equalities supply the independent axis.
 #[test]
 fn totality_source_and_public_relation_behavior_survive_the_move() {
-    let mut env = base_env();
+    let (mut env, or_owned) = base_env_with_or_owned();
     load_order(&mut env);
     catalog_or::assert_transparent_result_uses_core_logic_or(
-        &env,
-        "Core.Classes.LawfulClasses.total_leq_nat",
+        &env, &or_owned, "Core.Classes.LawfulClasses.total_leq_nat",
     );
     env.elaborate_file(
         "import Data.Numeric.Nat.Order (leq_nat)\n\
