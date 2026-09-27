@@ -23,12 +23,12 @@ NEXTTEST_TIMING_ROW = re.compile(
 )
 TSV_TIMING_ROW = re.compile(
     r"^(?P<shard>[1-8])\t(?P<seconds>[0-9.]+)\t"
-    r"ken-cli::rt_parity_native\t(?P<name>\S+)\s*$"
+    r"ken-cli::rt_parity_native\t(?P<name>\S+)(?:\tPASS)?$"
 )
 AUXILIARY_TIMING_ROW = re.compile(
     r"^empty-auxiliary-controls\t(?P<seconds>[0-9.]+)\t"
     r"(?P<binary_id>ken-cli::px8f_buffer_native|"
-    r"ken-verify::px8f_write_partition)\t(?P<name>\S+)\s*$"
+    r"ken-verify::px8f_write_partition)\t(?P<name>\S+)(?:\tPASS)?$"
 )
 
 

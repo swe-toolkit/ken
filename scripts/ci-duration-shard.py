@@ -12,9 +12,13 @@ N = 10
 # Run 36265192923's largest workspace test was 549.960s; use 600s for
 # unseen tests until measured rather than the much smaller suite median.
 DEFAULT_DURATION_SECONDS = 600.0
-WORKSPACE_TIMING_ROW = re.compile(
+NEXTTEST_TIMING_ROW = re.compile(
     r"^(?P<shard>\d+)\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
     r"\s+\(\s*\d+/\d+\)\s+(?P<test_id>.+)$"
+)
+WORKSPACE_TSV_TIMING_ROW = re.compile(
+    r"^(?P<shard>\d+)\t(?P<seconds>[0-9.]+)\t"
+    r"(?P<binary_id>\S+)\t(?P<name>\S+)\tPASS$"
 )
 EXCLUDED_BINARIES = {
     "rt_parity_native",
@@ -108,13 +112,18 @@ def read_durations(paths):
             with open(path, encoding="utf-8") as source:
                 rows = source.readlines()
             for line_number, line in enumerate(rows, 1):
-                match = WORKSPACE_TIMING_ROW.fullmatch(line.rstrip("\n"))
-                if not match:
+                row = line.rstrip("\n")
+                match = NEXTTEST_TIMING_ROW.fullmatch(row)
+                tsv_match = WORKSPACE_TSV_TIMING_ROW.fullmatch(row)
+                if not match and not tsv_match:
                     raise SystemExit(f"{path}:{line_number}: malformed workspace timing row")
-                test_id = match.group("test_id")
+                if match:
+                    test_id = match.group("test_id")
+                else:
+                    test_id = f"{tsv_match.group('binary_id')} {tsv_match.group('name')}"
                 if test_id in observed:
                     raise SystemExit(f"{path}:{line_number}: duplicate timing row {test_id}")
-                seconds = float(match.group("seconds"))
+                seconds = float((match or tsv_match).group("seconds"))
                 if seconds <= 0:
                     raise SystemExit(f"{path}:{line_number}: duration must be positive")
                 observed[test_id] = seconds

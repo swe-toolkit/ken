@@ -48,10 +48,11 @@ jobs:
   # observation from run 36265192923. Run 36276921102's 23-job first wave
   # started within 11s; run 36265192923 measured 25 starts within 24s.
   #
-  # Available workspace measurements cover 4,151 passing rows in run
-  # 36276921102. The current two-run envelope gives a 1,792.321s maximum bin
-  # over ten shards. These inputs are provisional: fold in the L2 prefix
-  # Full-CI timings before release. Assigned work is not an AC-2 wall claim.
+  # Complete workspace measurements span 4,151 tests. L2 run 36279697268
+  # was red: only shards 2, 4, 5 and 8 completed (1,844 rows). Its five
+  # partial-failure shards are retained as raw evidence but excluded from the
+  # planner input and full-shard totals. The three-source upper envelope gives
+  # a 1,821.905s maximum assigned bin over ten shards, not a wall-time claim.
   #
   # Sharding is by TEST, not by crate. A per-crate matrix would floor at the
   # slowest crate (`ken-cli` holds the heaviest binaries). Ten runners x 4
@@ -139,6 +140,7 @@ jobs:
           python3 scripts/ci-duration-shard.py inventory.json \
             docs/program/evidence/ci-workspace-timings-36265192923.tsv \
             docs/program/evidence/ci-workspace-timings-36276921102.tsv \
+            docs/program/evidence/ci-workspace-timings-36279697268-completed-shards.tsv \
             --output-dir duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
@@ -216,11 +218,11 @@ jobs:
       - name: Test buffer partition
         run: cargo nextest run --locked -p ken-cli --test px8f_buffer_native --no-tests=pass
 
-  # Available run 36276921102 measured 185 parity tests in eight source
-  # shards, plus seven auxiliary-control rows excluded from this planner.
-  # The current three-run envelope gives a 2,955.313s maximum bin over nine
-  # shards. Fold in the L2 prefix Full-CI timings before release. Assigned
-  # work is not a wall-time forecast; Full CI remains the AC-2 measurement.
+  # L2 run 36279697268 adds a complete eight-shard parity source: 185 unique
+  # tests passed, and its seven auxiliary-control rows are excluded. The
+  # four-run upper envelope gives a 3,011.177s maximum assigned bin over nine
+  # shards. This is assigned work, not a wall-time forecast; Full CI measures
+  # AC-2.
   #
   # This job deliberately does NOT take `--no-tests=pass`, unlike its two
   # px8f siblings above. It still selects a live test, so an empty selection
@@ -270,6 +272,7 @@ jobs:
             docs/program/evidence/ci-rt-parity-timings-36260020054.tsv \
             docs/program/evidence/ci-rt-parity-timings-36265192923.tsv \
             docs/program/evidence/ci-rt-parity-timings-36276921102.tsv \
+            docs/program/evidence/ci-rt-parity-timings-36279697268.tsv \
             rt-parity-artifact/plan.json
           filter=$(python3 -c 'import json,os; print(json.load(open("rt-parity-artifact/plan.json"))["bins"][int(os.environ["SHARD"])-1]["filter"])')
           cargo nextest list --locked -p ken-cli --test rt_parity_native \
