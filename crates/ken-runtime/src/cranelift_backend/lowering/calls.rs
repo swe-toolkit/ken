@@ -2316,7 +2316,7 @@ impl<'a> Lowering<'a> {
             );
             let failure_block = builder.create_block();
             let trap_check_block = builder.create_block();
-            builder
+            let status_guard = builder
                 .ins()
                 .brif(failed, failure_block, &[], trap_check_block, &[]);
             builder.switch_to_block(failure_block);
@@ -2338,6 +2338,10 @@ impl<'a> Lowering<'a> {
                 return Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call));
             }
             let trap_word = builder.ins().stack_load(types::I64, payload, trap_offset);
+            let cranelift_codegen::ir::ValueDef::Result(trap_load, _) =
+                builder.func.dfg.value_def(trap_word) else {
+                return Err(backend_module("unit TrapWord did not come from its callee frame".to_string()));
+            };
             let trapped = builder.ins().icmp_imm(
                 cranelift_codegen::ir::condcodes::IntCC::NotEqual,
                 trap_word,
@@ -2345,7 +2349,7 @@ impl<'a> Lowering<'a> {
             );
             let trap_block = builder.create_block();
             let result_block = builder.create_block();
-            builder.ins().brif(trapped, trap_block, &[], result_block, &[]);
+            let trap_guard = builder.ins().brif(trapped, trap_block, &[], result_block, &[]);
             builder.switch_to_block(trap_block);
             match self.function_local.trap_exit {
                 Some(TrapExitAuthority::UnitFrame { slots, trap_offset }) => {
@@ -2409,14 +2413,19 @@ impl<'a> Lowering<'a> {
                 // frame is caller-owned but dies when this call site returns;
                 // no pointer into it crosses the function boundary.
                 let member = builder.ins().stack_load(types::I64, payload, source.discriminant);
+                let cranelift_codegen::ir::ValueDef::Result(member_load, _) =
+                    builder.func.dfg.value_def(member) else {
+                    return Err(backend_module("pending-Vis member did not come from its callee frame".to_string()));
+                };
                 let present = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::NotEqual, member, 0,
                 );
                 let copy = builder.create_block();
                 let ready = builder.create_block();
-                builder.ins().brif(present, copy, &[], ready, &[]);
+                let copy_guard = builder.ins().brif(present, copy, &[], ready, &[]);
                 builder.switch_to_block(copy);
-                let copy_words = |builder: &mut FunctionBuilder<'_>,
+                let mut copy_facts = Vec::new();
+                let mut copy_words = |builder: &mut FunctionBuilder<'_>,
                                   start: i32, end: i32, words: u32| -> Result<(), CraneliftBackendError> {
                     for index in 0..words {
                         let delta = i32::try_from(index.checked_mul(8)
@@ -2427,7 +2436,21 @@ impl<'a> Lowering<'a> {
                         let to = end.checked_add(delta)
                             .ok_or_else(|| backend_module("pending-Vis destination offset exhausted".to_string()))?;
                         let value = builder.ins().stack_load(types::I64, payload, from);
-                        builder.ins().store(MemFlags::trusted(), value, destination.slots, to);
+                        let cranelift_codegen::ir::ValueDef::Result(load, _) =
+                            builder.func.dfg.value_def(value) else {
+                            return Err(backend_module("pending-Vis copy did not load the callee frame".to_string()));
+                        };
+                        let inst = builder.ins().store(MemFlags::trusted(), value, destination.slots, to);
+                        copy_facts.push(PendingVisSlotStore {
+                            inst, offset: to,
+                            source: PendingVisStoreSource::Copied {
+                                load, source: payload, source_offset: from,
+                                call, status_guard, trap_guard,
+                                trap_load, trap_offset,
+                                member_load, member_offset: source.discriminant,
+                                copy_guard,
+                            },
+                        });
                     }
                     Ok(())
                 };
@@ -2436,8 +2459,20 @@ impl<'a> Lowering<'a> {
                 copy_words(builder, source.continuation_inputs,
                     destination.region.continuation_inputs,
                     protocol.max_continuation_inputs)?;
-                builder.ins().store(MemFlags::trusted(), member,
+                let member_store = builder.ins().store(MemFlags::trusted(), member,
                     destination.slots, destination.region.discriminant);
+                copy_facts.push(PendingVisSlotStore {
+                    inst: member_store, offset: destination.region.discriminant,
+                    source: PendingVisStoreSource::Copied {
+                        load: member_load, source: payload,
+                        source_offset: source.discriminant,
+                        call, status_guard, trap_guard,
+                        trap_load, trap_offset,
+                        member_load, member_offset: source.discriminant,
+                        copy_guard,
+                    },
+                });
+                self.function_local.pending_vis_slot_stores.extend(copy_facts);
                 builder.ins().jump(ready, &[]);
                 builder.seal_block(copy);
                 builder.switch_to_block(ready);

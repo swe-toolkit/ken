@@ -975,6 +975,7 @@ impl ArtifactHelpers<'_> {
             context_calls: BTreeMap::new(),
             static_response_owner: None,
             pending_vis_frame: None,
+            pending_vis_slot_stores: Vec::new(),
             driven_deferred_response_effect: None,
             defining_abi_operands: Vec::new(),
             #[cfg(test)]
@@ -1112,6 +1113,40 @@ struct PendingVisFrame {
     region: PendingVisFrameRegion,
 }
 
+/// Producer writes, checked copy-up and single-use clearing are the complete
+/// set of writers to a pending record. The finished-function verifier scans
+/// the actual Store instructions, rather than trusting only this ledger.
+#[derive(Clone, Copy)]
+enum PendingVisStoreSource {
+    /// The exact word returned by `carry_pending_vis_capture`.
+    Captured(cranelift_codegen::ir::Value),
+    /// The producer-minted exact, nonzero successor-row discriminant.
+    Member(StaticResponseContinuationId),
+    /// A word loaded from the just-called unit's checked caller-owned frame.
+    Copied {
+        load: cranelift_codegen::ir::Inst,
+        source: cranelift_codegen::ir::StackSlot,
+        source_offset: i32,
+        call: cranelift_codegen::ir::Inst,
+        status_guard: cranelift_codegen::ir::Inst,
+        trap_guard: cranelift_codegen::ir::Inst,
+        trap_load: cranelift_codegen::ir::Inst,
+        trap_offset: i32,
+        member_load: cranelift_codegen::ir::Inst,
+        member_offset: i32,
+        copy_guard: cranelift_codegen::ir::Inst,
+    },
+    /// The owner consumed the member before invoking its successor K.
+    Cleared,
+}
+
+#[derive(Clone, Copy)]
+struct PendingVisSlotStore {
+    inst: cranelift_codegen::ir::Inst,
+    offset: i32,
+    source: PendingVisStoreSource,
+}
+
 struct FunctionLocalRefs {
     /// Typed identity of the generated body currently being lowered. Root
     /// adapters are deliberately outside the five-family grafted-spine graph.
@@ -1227,6 +1262,7 @@ struct FunctionLocalRefs {
     /// Caller-owned activation-frame record, present only when the planner has
     /// a closed non-relay returned-Vis protocol for this compilation.
     pending_vis_frame: Option<PendingVisFrame>,
+    pending_vis_slot_stores: Vec<PendingVisSlotStore>,
     /// The exact Deferred host-effect occurrence currently dispatched by the
     /// statically unrolled response-owner interpreter. This is scoped around
     /// one host dispatch and restores afterwards; it never makes a sibling
@@ -3996,6 +4032,11 @@ pub struct ReturnedVisCaptureObservation {
     pub disposition: Option<String>,
     pub forbidden: bool,
     pub scope: String,
+    /// `Some` only at a pending-record write, not at ordinary K lowering.
+    pub record_member_origin: Option<u32>,
+    /// The result of the *actual* whole-value admissibility walk at that write.
+    /// A Carried input is a passthrough proven by placeholder confinement.
+    pub record_admissible: Option<bool>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -4059,6 +4100,8 @@ fn record_returned_vis_lexical_captures(
             disposition,
             forbidden,
             scope: format!("{scope:?}"),
+            record_member_origin: None,
+            record_admissible: None,
         });
     }
     RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|slot| {
@@ -7241,6 +7284,39 @@ impl<'a> Lowering<'a> {
     /// the whole-graph preflight refuses one that does not. MEASURED: forcing
     /// every source-call input to cross at the program ROOT -- the maximally
     /// wrong coordinate -- leaves the suite at its exact baseline.
+    #[cfg(feature = "px8-ds-test-support")]
+    fn record_pending_vis_capture_observation(
+        &self,
+        member: StaticOriginId,
+        closure: StaticOriginId,
+        origin: StaticOriginId,
+        position: usize,
+        input: &LoweringOperand,
+        admitted: bool,
+    ) {
+        RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|window| {
+            let mut window = window.borrow_mut();
+            let Some(observations) = window.as_mut() else { return };
+            let (variant, disposition) = match input {
+                LoweringOperand::Carried(_) => ("Carried".to_owned(), None),
+                LoweringOperand::Specialized(value) => {
+                    let variant = value.variant();
+                    (format!("{variant:?}"), Some(format!("{:?}", variant.boundary_disposition())))
+                }
+            };
+            observations.push(ReturnedVisCaptureObservation {
+                closure_origin: closure.ticket_body_ordinal(),
+                capture_origin: origin.ticket_body_ordinal(),
+                capture_position: position,
+                variant, disposition,
+                forbidden: !admitted,
+                scope: format!("{:?}", self.function_local.grafted_spine_scope),
+                record_member_origin: Some(member.ticket_body_ordinal()),
+                record_admissible: Some(admitted),
+            });
+        });
+    }
+
     /// A pending-Vis record stores only boundary-admissible, first-order
     /// words. Check the entire specialized value *before* carry_call_input:
     /// transfer_into_carrier has a separate closure-environment binding route
@@ -7250,9 +7326,24 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         origin: StaticOriginId,
         input: LoweringOperand,
+        member: StaticOriginId,
+        closure: StaticOriginId,
+        position: usize,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let _ = (member, closure, position);
         if let LoweringOperand::Specialized(value) = &input {
-            value.boundary_transfer_admissibility()?;
+            let admission = value.boundary_transfer_admissibility();
+            #[cfg(feature = "px8-ds-test-support")]
+            self.record_pending_vis_capture_observation(
+                member, closure, origin, position, &input, admission.is_ok(),
+            );
+            admission?;
+        } else {
+            #[cfg(feature = "px8-ds-test-support")]
+            self.record_pending_vis_capture_observation(
+                member, closure, origin, position, &input, true,
+            );
         }
         match self.carry_call_input(
             builder, origin, input,
@@ -7364,18 +7455,34 @@ impl<'a> Lowering<'a> {
             ))
         };
         for (capture, input) in row.captures().iter().zip(captures.iter().cloned()) {
-            let word = self.carry_pending_vis_capture(builder, capture.origin(), input)?;
-            builder.ins().store(MemFlags::trusted(), word.word, frame.slots,
-                offset_at(frame.region.captures, capture.ordinal() as usize)?);
+            let word = self.carry_pending_vis_capture(
+                builder, capture.origin(), input,
+                origin, row.k_closure_origin(), capture.ordinal() as usize,
+            )?;
+            let offset = offset_at(frame.region.captures, capture.ordinal() as usize)?;
+            let inst = builder.ins().store(MemFlags::trusted(), word.word, frame.slots, offset);
+            self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+                inst, offset, source: PendingVisStoreSource::Captured(word.word),
+            });
         }
         for (index, input) in continuation_inputs.into_iter().enumerate() {
-            let word = self.carry_pending_vis_capture(builder, origin, input)?;
-            builder.ins().store(MemFlags::trusted(), word.word, frame.slots,
-                offset_at(frame.region.continuation_inputs, index)?);
+            let word = self.carry_pending_vis_capture(
+                builder, origin, input,
+                origin, row.k_closure_origin(), row.captures().len() + index,
+            )?;
+            let offset = offset_at(frame.region.continuation_inputs, index)?;
+            let inst = builder.ins().store(MemFlags::trusted(), word.word, frame.slots, offset);
+            self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+                inst, offset, source: PendingVisStoreSource::Captured(word.word),
+            });
         }
         let member = builder.ins().iconst(types::I64, i64::from(row.id().ordinal()) + 1);
-        builder.ins().store(MemFlags::trusted(), member, frame.slots,
+        let inst = builder.ins().store(MemFlags::trusted(), member, frame.slots,
             frame.region.discriminant);
+        self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+            inst, offset: frame.region.discriminant,
+            source: PendingVisStoreSource::Member(row.id()),
+        });
         Ok(())
     }
 

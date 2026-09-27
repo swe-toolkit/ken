@@ -110,6 +110,7 @@ fn run_checked_bounded_nat_fixture(
             context_calls: BTreeMap::new(),
             static_response_owner: None,
             pending_vis_frame: None,
+            pending_vis_slot_stores: Vec::new(),
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,

@@ -599,6 +599,7 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
                 let k_origin = member.k_origin.expect("derived row names K closure origin");
                 let actual_captures = captures.iter().filter(|capture| {
                     capture.closure_origin == k_origin
+                        && capture.record_member_origin.is_none()
                         && capture.scope.contains("ContinuationContext")
                 }).collect::<Vec<_>>();
                 assert!(!actual_captures.is_empty(),
@@ -613,6 +614,20 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
                     .collect::<BTreeSet<_>>();
                 assert_eq!(actual_origins, planned_origins,
                     "{label}: lowering and planner disagree on K capture population");
+                let written = captures.iter().filter(|capture|
+                    capture.record_member_origin == Some(member.origin)
+                        && capture.capture_position < member.capture_origins.len()
+                ).collect::<Vec<_>>();
+                assert!(!written.is_empty(),
+                    "{label}: no producer-origin record write reached the returned Vis");
+                assert!(written.iter().all(|capture| capture.record_admissible == Some(true)),
+                    "{label}: a record capture bypassed admissibility: {written:?}");
+                let written_origins = written.iter().map(|capture| capture.capture_origin)
+                    .collect::<BTreeSet<_>>();
+                assert_eq!(written_origins, planned_origins,
+                    "{label}: the record did not carry the exact derived K captures");
+                eprintln!("RT-OWNER-VIS RECORD {label} member={} captures={written:?}",
+                    member.origin);
             }
         }
     }

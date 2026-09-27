@@ -425,11 +425,170 @@ impl UnitBundle {
 }
 
 impl Lowering<'_> {
+    /// Verify the record's complete direct-store inventory against finalized
+    /// CLIF. A producer capture must store the helper's exact returned word;
+    /// copy-up has its own checked callee-frame provenance, and clearing is
+    /// restricted to the member slot. No other store may address these slots.
+    fn verify_pending_vis_slot_stores(&self, func: &Function) -> Result<(), CraneliftBackendError> {
+        use cranelift_codegen::ir::{InstructionData, Opcode, ValueDef};
+        let error = |why: &str| backend_module(format!(
+            "pending-Vis record-store verifier: {why}",
+        ));
+        let facts = &self.function_local.pending_vis_slot_stores;
+        let Some(frame) = self.function_local.pending_vis_frame else {
+            if !facts.is_empty() {
+                return Err(error("a generated body wrote a record without its frame"));
+            }
+            return Ok(());
+        };
+        let cfg = ControlFlowGraph::with_function(func);
+        let mut dom = cranelift_codegen::dominator_tree::DominatorTree::new();
+        dom.compute(func, &cfg);
+        let mut expected = BTreeMap::new();
+        for fact in facts {
+            if expected.insert(fact.inst, fact).is_some() {
+                return Err(error("a record store was recorded twice"));
+            }
+        }
+        let stack_word = |inst, slot, offset| matches!(
+            func.dfg.insts[inst],
+            InstructionData::StackLoad { opcode: Opcode::StackLoad,
+                stack_slot, offset: actual } if stack_slot == slot && i32::from(actual) == offset
+        );
+        let compare_nonzero = |guard, word| {
+            if func.dfg.insts[guard].opcode() != Opcode::Brif {
+                return false;
+            }
+            let Some(&condition) = func.dfg.inst_args(guard).first() else { return false };
+            let ValueDef::Result(compare, _) = func.dfg.value_def(condition) else {
+                return false;
+            };
+            matches!(func.dfg.insts[compare],
+                InstructionData::IntCompareImm { opcode: Opcode::IcmpImm, arg, imm, cond }
+                if arg == word && imm.bits() == 0
+                    && cond == cranelift_codegen::ir::condcodes::IntCC::NotEqual)
+        };
+        for inst in func.layout.blocks().flat_map(|block| func.layout.block_insts(block)) {
+            let args = func.dfg.inst_args(inst);
+            if !args.contains(&frame.slots) {
+                continue;
+            }
+            match func.dfg.insts[inst] {
+                InstructionData::Load { .. } => continue,
+                InstructionData::Store { offset, .. }
+                    if args.get(1) == Some(&frame.slots) => {
+                    let offset = i32::from(offset);
+                    if offset < frame.region.discriminant
+                        || i64::from(offset) >= i64::from(frame.region.frame_bytes) {
+                        continue;
+                    }
+                    let fact = expected.remove(&inst).ok_or_else(||
+                        error("an unaccounted store addresses a pending record slot"))?;
+                    if fact.offset != offset {
+                        return Err(error("a recorded store moved to a different record slot"));
+                    }
+                    let stored = args.first().copied().ok_or_else(||
+                        error("a pending record store has no value"))?;
+                    match fact.source {
+                        PendingVisStoreSource::Captured(word) => {
+                            if offset == frame.region.discriminant || stored != word {
+                                return Err(error("a capture slot did not store the helper result"));
+                            }
+                        }
+                        PendingVisStoreSource::Member(row) => {
+                            let ValueDef::Result(mint, _) = func.dfg.value_def(stored) else {
+                                return Err(error("a member was not minted at its producer"));
+                            };
+                            let exact = i64::from(row.ordinal()) + 1;
+                            if offset != frame.region.discriminant
+                                || !matches!(func.dfg.insts[mint],
+                                    InstructionData::UnaryImm { opcode: Opcode::Iconst, imm }
+                                    if imm.bits() == exact) {
+                                return Err(error("a member is not its producer's exact row"));
+                            }
+                        }
+                        PendingVisStoreSource::Cleared => {
+                            let ValueDef::Result(mint, _) = func.dfg.value_def(stored) else {
+                                return Err(error("the consumed member was not cleared"));
+                            };
+                            if offset != frame.region.discriminant
+                                || !matches!(func.dfg.insts[mint],
+                                    InstructionData::UnaryImm { opcode: Opcode::Iconst, imm }
+                                    if imm.bits() == 0) {
+                                return Err(error("a consumed member is not cleared to zero"));
+                            }
+                        }
+                        PendingVisStoreSource::Copied {
+                            load, source, source_offset, call, status_guard, trap_guard,
+                            trap_load, trap_offset, member_load, member_offset, copy_guard,
+                        } => {
+                            let word = func.dfg.inst_results(load).first().copied();
+                            let status = func.dfg.inst_results(call).first().copied();
+                            let trap = func.dfg.inst_results(trap_load).first().copied();
+                            let member = func.dfg.inst_results(member_load).first().copied();
+                            if !stack_word(load, source, source_offset)
+                                || !stack_word(trap_load, source, trap_offset)
+                                || !stack_word(member_load, source, member_offset)
+                                || word != Some(stored) {
+                                return Err(error("a copy store did not use its callee-frame load"));
+                            }
+                            if !status.is_some_and(|status|
+                                compare_nonzero(status_guard, status))
+                                || !trap.is_some_and(|trap|
+                                    compare_nonzero(trap_guard, trap))
+                                || !member.is_some_and(|member|
+                                    compare_nonzero(copy_guard, member))
+                                || !matches!(func.dfg.value_def(status.unwrap()),
+                                    ValueDef::Result(producer, 0) if producer == call) {
+                                return Err(error("copy-up lacks an exact status, Trap or member check"));
+                            }
+                            if !dom.dominates(call, status_guard, &func.layout)
+                                || !dom.dominates(status_guard, trap_guard, &func.layout)
+                                || !dom.dominates(trap_load, trap_guard, &func.layout)
+                                || !dom.dominates(trap_guard, member_load, &func.layout)
+                                || !dom.dominates(member_load, copy_guard, &func.layout)
+                                || (load != member_load
+                                    && !dom.dominates(copy_guard, load, &func.layout))
+                                || !dom.dominates(copy_guard, inst, &func.layout) {
+                                return Err(error("a copy store bypassed its checked callee result"));
+                            }
+                            let status_edges = func.dfg.insts[status_guard]
+                                .branch_destination(&func.dfg.jump_tables);
+                            let trap_edges = func.dfg.insts[trap_guard]
+                                .branch_destination(&func.dfg.jump_tables);
+                            let copy_edges = func.dfg.insts[copy_guard]
+                                .branch_destination(&func.dfg.jump_tables);
+                            if status_edges.get(1).is_none_or(|edge|
+                                !dom.dominates(edge.block(&func.dfg.value_lists), trap_load,
+                                    &func.layout))
+                                || trap_edges.get(1).is_none_or(|edge|
+                                    !dom.dominates(edge.block(&func.dfg.value_lists), member_load,
+                                        &func.layout))
+                                || copy_edges.first().is_none_or(|edge|
+                                    !dom.dominates(edge.block(&func.dfg.value_lists), inst,
+                                        &func.layout)) {
+                                return Err(error("copy-up took a failed status, Trap or member branch"));
+                            }
+                        }
+                    }
+                }
+                // An indirect pointer derived from the frame could hide a
+                // record write from the offset scan. Refuse such a derivation.
+                _ => return Err(error("the pending frame pointer has an untracked use")),
+            }
+        }
+        if !expected.is_empty() {
+            return Err(error("a recorded pending-Vis store was not emitted"));
+        }
+        Ok(())
+    }
+
     fn record_finished_grafted_spine_function(
         &mut self,
         function: &Function,
         bundle: &UnitBundle,
     ) -> Result<(), CraneliftBackendError> {
+        self.verify_pending_vis_slot_stores(function)?;
         let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
             backend_module(
                 "a generated unit finished without a typed grafted-spine scope".to_string(),
@@ -3055,7 +3214,10 @@ fn emit_pending_vis_owner_loop(
         // Single-use record: the next K call starts with no pending member.
         // Its callee's newly minted member is copied up only after Trap checks.
         let zero = builder.ins().iconst(types::I64, 0);
-        builder.ins().store(MemFlags::trusted(), zero, frame, region.discriminant);
+        let cleared = builder.ins().store(MemFlags::trusted(), zero, frame, region.discriminant);
+        compiler.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+            inst: cleared, offset: region.discriminant, source: PendingVisStoreSource::Cleared,
+        });
         let nested = AmbientBodyAuthority::bind(
             compiler, row.base_owner(), row.effect_source_owner(),
         );
