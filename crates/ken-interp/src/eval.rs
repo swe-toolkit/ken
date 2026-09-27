@@ -16,7 +16,8 @@
 //!   bridges the two representations.
 //! - Compound data (`Ctor`, `Pair`, `Closure`) — K3-interned, carry a `SlotId`.
 //! - Type-former values (`TypeUniverse`, `OmegaUniverse`, `PiTy`, `SigmaTy`,
-//!   `IndFormerVal`) — not K3-interned; irreducible at the value layer (G1 scope).
+//!   `IndFormerVal`, `IndTypeApp`) — not K3-interned; type equality is limited
+//!   to canonical values admitted by C5.
 //! - `CtorPending` — accumulates positional args before the constructor saturates.
 //! - `Unknown` — open-hole residue (propagates strictly through all positions).
 //! - `Neutral` — stuck on an opaque constant or open variable (closed ground
@@ -277,7 +278,14 @@ pub enum EvalVal {
     IndFormerVal {
         id: GlobalId,
     },
-    /// Refl proof (used by cast C5).
+    /// An inductive type former applied to its parameter/index values
+    /// (`D v̄`, a canonical type value, `42 §2`). Levels are carried by the
+    /// kernel and not recomputed, as for `IndFormerVal` (`42 §3.5`).
+    IndTypeApp {
+        id: GlobalId,
+        args: Rc<Vec<EvalVal>>,
+    },
+    /// Refl proof value (C5 does not inspect proof terms).
     ReflVal {
         ty: Rc<EvalVal>,
         val: Rc<EvalVal>,
@@ -1136,22 +1144,25 @@ fn elim_reduce(
 
 // ── observational reductions ─────────────────────────────────────────────────
 
-/// `castReduce A B e a` — C5 regularity: `cast A A refl a → a`.
+/// `castReduce A B e a` — C5 regularity: when `A` and `B` are the same
+/// canonical type value, `cast A B e a → a` for ANY proof `e`. `Eq` proofs are
+/// proof-irrelevant at the value layer (`42 §3.3`, `16 §1.2`), and the kernel's
+/// regularity likewise never inspects `e` (`obs.rs` `cast_reduce`).
 ///
-/// For this G1 release only C5 is grounded. The structural C6 push and the
-/// `cast Type Type` edge cases are tagged `(oracle)` in `16 §9.1`; we return
-/// `Unknown` for them (not locked, not an error).
+/// The structural C6 push between distinct same-head types and the
+/// `cast Type Type` edge cases remain out of this release's scope and yield
+/// `Unknown` (`16 §9.1` oracle; not locked, not an error).
 fn cast_reduce(a_ty: EvalVal, b_ty: EvalVal, eq: EvalVal, val: EvalVal) -> EvalVal {
-    if let EvalVal::Unknown = val {
+    // cast on unknown = unknown (`42 §4`), for every operand.
+    if [&a_ty, &b_ty, &eq, &val]
+        .iter()
+        .any(|v| matches!(v, EvalVal::Unknown))
+    {
         return EvalVal::Unknown;
     }
-    // C5: cast A A refl a → a (regularity, `16 §3.2`).
     if eq_type_eq(&a_ty, &b_ty) {
-        if matches!(eq, EvalVal::ReflVal { .. }) {
-            return val;
-        }
+        return val;
     }
-    // All other cases are (oracle) — yield Unknown for the G1 scope.
     EvalVal::Unknown
 }
 
@@ -1205,12 +1216,17 @@ fn eq_reduce(a_ty: EvalVal, lhs: EvalVal, rhs: EvalVal, globals: &GlobalEnv) -> 
 }
 
 /// Structural type equality (by value structure, not alpha-eq of closed types).
-/// Used only by C5 cast-refl to confirm the source and target are the same type.
+/// Used only by C5 regularity in `cast_reduce` to confirm the same type.
 fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
     match (a, b) {
         (EvalVal::TypeUniverse(la), EvalVal::TypeUniverse(lb)) => la.equiv(lb),
         (EvalVal::OmegaUniverse(la), EvalVal::OmegaUniverse(lb)) => la.equiv(lb),
         (EvalVal::IndFormerVal { id: ia }, EvalVal::IndFormerVal { id: ib }) => ia == ib,
+        (EvalVal::IndTypeApp { id: ia, args: aa }, EvalVal::IndTypeApp { id: ib, args: ba }) => {
+            ia == ib
+                && aa.len() == ba.len()
+                && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
+        }
         (
             EvalVal::Ctor {
                 id: a, args: aa, ..
@@ -1224,6 +1240,92 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
                 && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod ds5b_cast_regular_tests {
+    use super::*;
+
+    fn vector_at(index: EvalVal) -> EvalVal {
+        EvalVal::IndTypeApp {
+            id: GlobalId(503),
+            args: Rc::new(vec![EvalVal::IndFormerVal { id: GlobalId(17) }, index]),
+        }
+    }
+
+    fn zero() -> EvalVal {
+        EvalVal::Ctor {
+            id: GlobalId(18),
+            args: Rc::new(vec![]),
+            slot: NULL_SLOT,
+        }
+    }
+
+    fn suc(index: EvalVal) -> EvalVal {
+        EvalVal::Ctor {
+            id: GlobalId(19),
+            args: Rc::new(vec![index]),
+            slot: NULL_SLOT,
+        }
+    }
+
+    // MEASURED: the same canonical applied type carries its value through a
+    // Neutral proof. CLAIMED: C5 is proof-irrelevant at equal endpoints.
+    // THE GAP: independent elaboration checks the proof's well-typedness;
+    // this private reduction test checks only the value-layer boundary.
+    // Promise class: durable invariant, for every valid equality proof.
+    #[test]
+    fn equal_inductive_type_app_cast_ignores_neutral_proof() {
+        let ty = vector_at(suc(zero()));
+        let value = EvalVal::Int(47);
+        assert_eq!(
+            cast_reduce(ty.clone(), ty, EvalVal::Neutral, value.clone()),
+            value
+        );
+    }
+
+    // MEASURED: changing one index constructor at fixed family and parameter
+    // returns Unknown. CLAIMED: unequal types cannot pass C5. THE GAP: this
+    // is value equality, not a kernel proof of non-convertibility.
+    // Promise class: durable invariant.
+    #[test]
+    fn distinct_inductive_type_app_indices_do_not_cast() {
+        assert_eq!(
+            cast_reduce(
+                vector_at(zero()),
+                vector_at(suc(zero())),
+                EvalVal::Neutral,
+                EvalVal::Int(47)
+            ),
+            EvalVal::Unknown
+        );
+    }
+
+    // MEASURED: a Neutral index cannot establish canonical type equality.
+    // CLAIMED: open indices fail closed. THE GAP: this deliberately does not
+    // choose a structural C6 reduction for unequal or unknown indices.
+    // Promise class: durable invariant.
+    #[test]
+    fn neutral_inductive_type_app_index_does_not_cast() {
+        let ty = vector_at(EvalVal::Neutral);
+        assert_eq!(
+            cast_reduce(ty.clone(), ty, EvalVal::Neutral, EvalVal::Int(47)),
+            EvalVal::Unknown
+        );
+    }
+
+    // MEASURED: an Unknown proof prevents the equal-endpoint C5 reduction.
+    // CLAIMED: open-hole residues propagate even across regularity.
+    // THE GAP: the direct unit fixture asserts only the value-layer guard.
+    // Promise class: durable invariant.
+    #[test]
+    fn unknown_proof_blocks_equal_inductive_type_app_cast() {
+        let ty = vector_at(suc(zero()));
+        assert_eq!(
+            cast_reduce(ty.clone(), ty, EvalVal::Unknown, EvalVal::Int(47)),
+            EvalVal::Unknown
+        );
     }
 }
 
@@ -2029,6 +2131,20 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
                     nb,
                     applied: Rc::new(applied2),
                 }
+            }
+        }
+
+        // --- Inductive type former: accumulate its type/index arguments ---
+        EvalVal::IndFormerVal { id } => EvalVal::IndTypeApp {
+            id,
+            args: Rc::new(vec![u]),
+        },
+        EvalVal::IndTypeApp { id, args } => {
+            let mut args = (*args).clone();
+            args.push(u);
+            EvalVal::IndTypeApp {
+                id,
+                args: Rc::new(args),
             }
         }
 
