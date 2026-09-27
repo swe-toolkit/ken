@@ -1,7 +1,7 @@
 ---
 id: SPEC-MODULE-PATH-SINGLE-OWNER
 title: "Specify that a qualified module path has exactly one owning compilation unit, and that a foreign module declaration into an owned path is a hard owner-clash surface error in either load order; seed conformance for it"
-status: ready
+status: merged
 owner: spec
 size: S
 gate: architect
@@ -65,3 +65,10 @@ A 33 §3 clarification carrying rules 1-4, plus a conformance seed.
   coexistence tests `file_root_import_uses_its_own_exports_after_memory_shadow`
   and `file_facade_uses_source_file_exports_not_memory_shadow`) is Language
   work in the flip frame's `globals`-writes carry, not this node.
+
+## Closeout
+
+Merged at `10cc33ba3` (33 §3.1 single-owner rule and the modules D6
+conformance seed). The Language implementation carry (in-memory unit identity,
+the ownership check keyed on unit-ownership records, and migrating the two
+coexistence tests) joins the flip frame's `globals`-writes carry.
