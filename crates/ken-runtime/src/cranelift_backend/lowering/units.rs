@@ -519,9 +519,27 @@ impl Lowering<'_> {
                             }
                         }
                         PendingVisStoreSource::Copied {
-                            load, source, source_offset, call, status_guard, trap_guard,
-                            trap_load, trap_offset, member_load, member_offset, copy_guard,
+                            load, source, source_region, source_offset,
+                            call, status_guard, trap_guard, trap_load, trap_offset,
+                            member_load, member_offset, copy_guard,
                         } => {
+                            // Position correspondence is checked against the
+                            // two planner regions, not the emitter's recorded
+                            // source offset. A same-shaped sibling capture
+                            // cannot be substituted by changing only the load.
+                            let expected_source = if offset == frame.region.discriminant {
+                                Some(source_region.discriminant)
+                            } else if offset < frame.region.continuation_inputs {
+                                (offset - frame.region.captures)
+                                    .checked_add(source_region.captures)
+                            } else {
+                                (offset - frame.region.continuation_inputs)
+                                    .checked_add(source_region.continuation_inputs)
+                            };
+                            if expected_source != Some(source_offset)
+                                || member_offset != source_region.discriminant {
+                                return Err(error("copy-up changed a record field's position"));
+                            }
                             let word = func.dfg.inst_results(load).first().copied();
                             let status = func.dfg.inst_results(call).first().copied();
                             let trap = func.dfg.inst_results(trap_load).first().copied();

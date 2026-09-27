@@ -2444,7 +2444,8 @@ impl<'a> Lowering<'a> {
                         copy_facts.push(PendingVisSlotStore {
                             inst, offset: to,
                             source: PendingVisStoreSource::Copied {
-                                load, source: payload, source_offset: from,
+                                load, source: payload, source_region: source,
+                                source_offset: from,
                                 call, status_guard, trap_guard,
                                 trap_load, trap_offset,
                                 member_load, member_offset: source.discriminant,
@@ -2465,7 +2466,7 @@ impl<'a> Lowering<'a> {
                     inst: member_store, offset: destination.region.discriminant,
                     source: PendingVisStoreSource::Copied {
                         load: member_load, source: payload,
-                        source_offset: source.discriminant,
+                        source_region: source, source_offset: source.discriminant,
                         call, status_guard, trap_guard,
                         trap_load, trap_offset,
                         member_load, member_offset: source.discriminant,

@@ -1126,6 +1126,7 @@ enum PendingVisStoreSource {
     Copied {
         load: cranelift_codegen::ir::Inst,
         source: cranelift_codegen::ir::StackSlot,
+        source_region: PendingVisFrameRegion,
         source_offset: i32,
         call: cranelift_codegen::ir::Inst,
         status_guard: cranelift_codegen::ir::Inst,
