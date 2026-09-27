@@ -46,10 +46,21 @@ import-cycle constraint.
   - whether `LawfulClasses` is already in Map's import closure;
   - every Map consumer of `leq_nat` and of its laws (Check 3).
 
-  The Architect rules on the route.
-- **AC-1.** Map's public nine-name surface, exports, loader-visible
-  inventory and trust closure are byte-identical. A new provider edge is
-  added only if the Architect accepts it at AC-0.
+  The Architect rules on the route. **Ruled** (`evt_78t51c0gc83vv`): delete
+  Map's `leq_nat` and its `refl`/`trans`/`antisym` proofs, import `leq_nat`
+  selectively from `LawfulClasses` (already a direct provider), and keep
+  Map's private `total_leq_nat` byte-unchanged over the imported comparator.
+  **Why the one local remains:** the provider's `total_leq_nat` is private
+  and pinned non-importable (`cat_order_pub_export.rs`,
+  `ds2_ord_nat_acceptance.rs`), and the public `proof total for leq_nat`
+  erases the direction that `map_total_leq_nat_preserves_proof_relevant_or_tags`
+  observes. It duplicates a private helper, not a public export.
+- **AC-1.** Map's public nine-name surface, export set, `trusted_base` and
+  provider-edge set are byte-identical. Map's owned inventory, which
+  includes private names, loses exactly `leq_nat`, `leq_nat::refl`,
+  `leq_nat::trans` and `leq_nat::antisym` and gains nothing. Pins key on
+  identity through `provider_owned_id`, never on a raw GlobalId that the
+  deletion shifts.
 - **AC-2.** The Map and catalog suites stay green (Full CI).
 
 ## Stop conditions
