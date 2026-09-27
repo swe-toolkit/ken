@@ -124,7 +124,7 @@ fn render_mode (flat : Bool) (width : Nat) (indent : Nat) (doc : Doc) : List Cha
       }
   }
 
-fn render (width : Nat) (doc : Doc) : List Char = render_mode False width Zero doc
+pub fn render (width : Nat) (doc : Doc) : List Char = render_mode False width Zero doc
 ```
 
 The renderer has no ambient inputs: all choices are functions of `width` and

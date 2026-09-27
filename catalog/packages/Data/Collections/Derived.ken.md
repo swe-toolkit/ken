@@ -1873,19 +1873,14 @@ reference implementation.
 1. **Spec / WP.** `spec/30-surface/37-strings-collections.md §2.4/§2.5/
    §2.5.1/§4.1`; WP `L3-strings-surface` (this package, slice 2/2);
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
-2. **Public API.** `OrdResult`, `list_append`, `nth`, `take`, `drop`,
-   `sub`, `list_eq`, `list_compare` (the 7-combinator floor); `map`,
-   `map::id`, `map::fusion`, `filter`, `mem`, `length`, `min`,
-   `take_drop_decomposition`,
-   `map_length`, `length_take_min` (CAT-3 D1); `nth::some_below_length`,
-   `nth::at_or_beyond_is_none` (the two lookup bounds); `reverse`,
-   `reverse::involutive`,
-   `zip`, `concat_map`, `range`, `foldl` and their proofs (DS-4); `count`,
-   `Perm`, `insert`, `sort`, `sort_bool`, `sort_bool_sorted`,
-   `sort_bool_perm` (CAT-3 D2); `View`, `Lens`, `Iso`, `Representation`,
-   `RefinementView`, `IndexedView`, `SetoidMorphism` (CAT-3 D3);
-   `compare_char`, `concat`, `slice`, `char_at`, `eq`, `compare` (the 5
-   derived `String` ops).
+2. **Public API.** Operations: `bytes_nat_length`, `concat_map`, `count`,
+   `eq_from_ord`, `filter`, `length`, `list_append`, `map`, `nth`, `reverse`.
+   Attached proofs: `list_append::assoc`, `list_append::left_unit`,
+   `list_append::right_unit`, `map::fusion`, `map::id`,
+   `nth::at_or_beyond_is_none`, `nth::some_below_length`,
+   `reverse::involutive`. All other definitions in this package are
+   package-local; `cat_derived_pub_export.rs` is the authoritative inventory,
+   and publishing another name is a separate change to both.
 3. **Source map.**
 
    | Task | Section |

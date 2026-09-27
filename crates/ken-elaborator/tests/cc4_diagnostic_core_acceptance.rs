@@ -498,6 +498,11 @@ fn diagnostic_core_loader_surface_and_carrier_shapes_are_exact() {
         "origin_range_end",
         "origin_range_start",
         "origin_source_id",
+        "ValidByteRange",
+        "ValidConfigKeyPath",
+        "ValidDiagnostic",
+        "ValidOrigin",
+        "source_id_from_nat",
     ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(
