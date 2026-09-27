@@ -32,6 +32,24 @@
 
 use super::*;
 
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static PLACEHOLDER_NONOWNER_TARGET_MUTATION: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static PLACEHOLDER_NONOWNER_TARGET_APPLICATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_placeholder_nonowner_target_mutation<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    PLACEHOLDER_NONOWNER_TARGET_MUTATION.with(|flag| {
+        assert!(!flag.replace(true), "placeholder target mutation windows cannot nest");
+    });
+    PLACEHOLDER_NONOWNER_TARGET_APPLICATIONS.with(|count| count.set(0));
+    let result = operation();
+    PLACEHOLDER_NONOWNER_TARGET_MUTATION.with(|flag| flag.set(false));
+    let applications = PLACEHOLDER_NONOWNER_TARGET_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
 #[cfg(test)]
 #[derive(Clone, Copy, Debug)]
 pub(in crate::cranelift_backend) struct RtSeedCaptureWord {
@@ -2075,9 +2093,36 @@ impl<'a> Lowering<'a> {
                         })?;
                         let word = match value {
                             LoweringOperand::Carried(word) => word.word,
-                            LoweringOperand::Specialized(Lowered::StaticResponseDeferred) => {
-                                // Same inert slot transport as `carry_call_input`.
-                                // The response owner never loads parameter zero.
+                            LoweringOperand::Specialized(Lowered::StaticResponseDeferred { site }) => {
+                                let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
+                                    backend_module("a deferred host response reached a call outside a defined function scope".to_string())
+                                })?;
+                                #[cfg(feature = "px8-ds-test-support")]
+                                let checked_origin = if PLACEHOLDER_NONOWNER_TARGET_MUTATION
+                                    .with(std::cell::Cell::get) {
+                                    let nonowner = self.static_transition_plan.emittable_units()?
+                                        .into_iter()
+                                        .find(|unit| unit.entry_origin() != target.origin
+                                            && matches!(unit.definition(),
+                                                crate::cranelift_backend::planning::AbiUnitDefinition::SchedulingEntry { .. }))
+                                        .ok_or_else(|| backend_module(
+                                            "placeholder non-owner mutation found no scheduling-entry target".to_string(),
+                                        ))?;
+                                    PLACEHOLDER_NONOWNER_TARGET_APPLICATIONS.with(|count|
+                                        count.set(count.get() + 1));
+                                    nonowner.entry_origin()
+                                } else { target.origin };
+                                #[cfg(not(feature = "px8-ds-test-support"))]
+                                let checked_origin = target.origin;
+                                if !self.static_transition_plan.static_response_placeholder_mint_licensed(
+                                    *site, scope, checked_origin, slot,
+                                )? {
+                                    return Err(backend_module(
+                                        "a deferred host response may only mint owner parameter zero at its licensed site".to_string(),
+                                    ));
+                                }
+                                // The unique zero mint: this exact owner never
+                                // reads or forwards its declared parameter zero.
                                 builder.ins().iconst(types::I64, 0)
                             }
                             LoweringOperand::Specialized(value) => {

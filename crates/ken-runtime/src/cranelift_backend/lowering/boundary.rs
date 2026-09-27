@@ -111,7 +111,7 @@ impl Lowered {
             Lowered::StructuralNat(_) => LoweredVariant::StructuralNat,
             Lowered::ResponseBytes { .. } => LoweredVariant::ResponseBytes,
             Lowered::HostResult { .. } => LoweredVariant::HostResult,
-            Lowered::StaticResponseDeferred => LoweredVariant::StaticResponseDeferred,
+            Lowered::StaticResponseDeferred { .. } => LoweredVariant::StaticResponseDeferred,
             Lowered::DynamicConstructor(_) => LoweredVariant::DynamicConstructor,
             Lowered::Bytes(_) => LoweredVariant::Bytes,
             Lowered::BorrowedNativeValue { .. } => LoweredVariant::BorrowedNativeValue,
@@ -1053,7 +1053,7 @@ impl Lowered {
                 "a computational recursor closure names an in-flight activation, \
                  not a transferable value",
             )),
-            Lowered::StaticResponseDeferred => Err(unsupported(
+            Lowered::StaticResponseDeferred { .. } => Err(unsupported(
                 "StaticResponseDeferred",
                 "a deferred host response is compiler control and can only enter its exact response owner",
             )),

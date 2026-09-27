@@ -540,6 +540,7 @@ pub enum StaticResponseOwnerBodyMutation {
     OmitKCall,
     DuplicateKCall,
     CallBeforeHostValidation,
+    LoadPlaceholderIntoK,
     CallAfterAnswerCollapse,
     BypassTrapBeforeResult,
     VaryRet,
@@ -2752,6 +2753,8 @@ pub(super) fn lower_continuation_selected_case_body(
 }
 
 struct StaticResponseFinishedBody {
+    input_frame: cranelift_codegen::ir::Value,
+    placeholder_offset: i32,
     context_calls: Vec<cranelift_codegen::ir::Inst>,
     host_validation_end: cranelift_codegen::ir::Inst,
     ret_validation_end: cranelift_codegen::ir::Inst,
@@ -2793,6 +2796,19 @@ fn verify_static_response_finished_body(
         )));
     }
     let call = facts.context_calls[0];
+    // Parameter zero is an inert placeholder, not a K input. Check the
+    // finished function, not only the source-side frame_inputs construction:
+    // any direct load of that exact input-frame slot could flow into K.
+    for inst in func.layout.blocks().flat_map(|block| func.layout.block_insts(block)) {
+        if let cranelift_codegen::ir::InstructionData::Load { offset, .. } = func.dfg.insts[inst] {
+            if i32::from(offset) == facts.placeholder_offset
+                && func.dfg.inst_args(inst).first() == Some(&facts.input_frame) {
+                return Err(backend_module(
+                    "a response owner loaded its deferred parameter-zero placeholder".to_string(),
+                ));
+            }
+        }
+    }
     if Lowering::decode_direct_callee(func, call)? != expected_context {
         return Err(backend_module(
             "a response owner called a context or raw worker other than its exact K context"
@@ -3025,6 +3041,11 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             .ok_or_else(|| {
                 backend_module("response-owner frame declares no result slot".to_string())
             })?;
+        let placeholder_offset = slots.iter().zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Parameter && slot.ordinal == 0)
+            .map(|(_, offset)| i32::try_from(*offset))
+            .ok_or_else(|| backend_module("response owner has no parameter-zero placeholder slot".to_string()))?
+            .map_err(|_| backend_module("response-owner placeholder slot offset exceeds range".to_string()))?;
         let trap_offset = slots
             .iter()
             .zip(offsets)
@@ -3339,9 +3360,11 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 == Some(StaticResponseOwnerBodyMutation::CallBeforeHostValidation)
             {
                 let mut inputs = Vec::with_capacity(1 + context_suffix.len());
-                inputs.push(LoweringOperand::Specialized(
-                    Lowered::StaticResponseDeferred,
-                ));
+                // The call-before-validation mutation must reach the finished
+                // body verifier, not be intercepted by the sole placeholder mint.
+                inputs.push(LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: builder.ins().iconst(types::I64, 0),
+                }));
                 inputs.extend(context_suffix.iter().cloned());
                 let (returned, call) = compiler.call_declared_unit_target(
                     &mut builder,
@@ -3491,9 +3514,12 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             #[cfg(feature = "px8-ds-test-support")]
             match body_mutation {
                 Some(StaticResponseOwnerBodyMutation::ResponseWithOperation) => {
-                    response_input = LoweringOperand::Specialized(
-                        Lowered::StaticResponseDeferred,
-                    );
+                    // The operation's inert ABI representation is an ordinary
+                    // carried zero here. Passing the deferred marker instead
+                    // would test the new sole-mint refusal, not this verifier.
+                    response_input = LoweringOperand::Carried(CarriedBoundaryWord {
+                        word: builder.ins().iconst(types::I64, 0),
+                    });
                     response_is_current_host_result = false;
                 }
                 Some(StaticResponseOwnerBodyMutation::ResponseWithPriorResponse) => {
@@ -3529,6 +3555,14 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             let mut context_inputs = Vec::with_capacity(1 + context_suffix.len());
             context_inputs.push(response_input);
             context_inputs.extend(context_suffix.iter().cloned());
+            #[cfg(feature = "px8-ds-test-support")]
+            if body_mutation == Some(StaticResponseOwnerBodyMutation::LoadPlaceholderIntoK) {
+                context_inputs[0] = LoweringOperand::Carried(CarriedBoundaryWord {
+                    word: builder.ins().load(
+                        types::I64, MemFlags::trusted(), frame, placeholder_offset,
+                    ),
+                });
+            }
             let result_offset = i32::try_from(result_offset).map_err(|_| {
                 backend_module("response-owner result slot offset exceeds range".to_string())
             })?;
@@ -3708,6 +3742,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             builder.ins().return_(&[zero]);
             builder.seal_all_blocks();
             finished_body = StaticResponseFinishedBody {
+                input_frame: frame,
+                placeholder_offset,
                 context_calls,
                 host_validation_end,
                 ret_validation_end,

@@ -15569,7 +15569,7 @@ impl<'a> Lowering<'a> {
                         if self.static_transition_plan
                             .static_response_placeholder_licensed(site, scope)? {
                             return Ok(LoweringOperand::Specialized(
-                                Lowered::StaticResponseDeferred,
+                                Lowered::StaticResponseDeferred { site },
                             ));
                         }
                         // Unlicensed: the root lowers ordinarily rather than
@@ -15859,6 +15859,13 @@ impl<'a> Lowering<'a> {
                         self.lower_expr(builder, capture, env)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
+                #[cfg(feature = "px8-ds-test-support")]
+                super::record_returned_vis_lexical_captures(
+                    &self.static_transition_plan,
+                    static_origin,
+                    &captures,
+                    self.function_local.grafted_spine_scope,
+                )?;
                 // ⭐⭐ **`D7` — THE closure-capture cell, and the seat the
                 // framed reaching row stops at.**
                 //

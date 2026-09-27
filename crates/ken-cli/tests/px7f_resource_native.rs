@@ -501,3 +501,119 @@ fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
         "the owned descriptor is actually closed exactly once"
     );
 }
+
+/// Promise class: transition sentinel. This pins fixture-local planner origins
+/// until pending-Vis emission is installed. MEASURED: returned source origins,
+/// forwarded-call fixpoint, derived rows, effect seats and actual K captures.
+/// CLAIMED: both px7f owners need only static-operation successors.
+/// THE GAP: emission still must carry and resume them; ignored rows remain red.
+#[cfg(target_os = "linux")]
+#[test]
+fn owner_vis_return_protocol_px7f_planned_fixpoints() {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let fixtures: &[(&str, &str, u32, &[(u32, &[u32])])] = &[
+        ("right-denial-protocol", RIGHT_NOT_HELD, 578, &[(0, &[555]), (1, &[])]),
+        ("double-release-protocol", DOUBLE_RELEASE, 609,
+            &[(1, &[598]), (0, &[517]), (2, &[])]),
+    ];
+    for &(label, source, owner, expected) in fixtures {
+        let dir = output_dir(label);
+        let ((compiled, plans), captures) = ken_runtime::with_returned_vis_capture_observations(|| {
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    source, ken_cli::SourceFormat::Ken, label, dir.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                )
+            })
+        });
+        let _output = compiled.expect("static-operation fixture compiles without execution");
+        let observed = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
+            .filter(|protocol| protocol.owner_origin == owner).collect::<Vec<_>>();
+        assert_eq!(observed.len(), 1, "{label}: exactly one generated response owner");
+        let observed = observed[0];
+        assert!(observed.error.is_none(), "{label}: {:?}", observed.error);
+        assert!(!observed.excluded_by_relay, "{label}: static-operation owner excluded");
+        let expected = expected.iter().map(|(context, members)|
+            (*context, members.iter().copied().collect::<BTreeSet<_>>())
+        ).collect::<BTreeMap<_, _>>();
+        let actual = observed.contexts.iter().map(|(context, members)|
+            (*context, members.iter().map(|member| member.origin).collect::<BTreeSet<_>>())
+        ).collect::<BTreeMap<_, _>>();
+        assert_eq!(actual, expected, "{label}: actual returned-origin fixpoint");
+        for (_, members) in &observed.contexts {
+            for member in members {
+                assert!(!member.relay, "{label}: a returned member needs relay representation");
+                assert!(member.successor_id.is_some() && member.successor_context.is_some()
+                    && member.effect_origin.is_some(),
+                    "{label}: a returned member has no row or host-effect seat: {member:?}");
+                let k_origin = member.k_origin.expect("derived row names K closure origin");
+                let actual_captures = captures.iter().filter(|capture| {
+                    capture.closure_origin == k_origin
+                        && capture.scope.contains("ContinuationContext")
+                }).collect::<Vec<_>>();
+                assert!(!actual_captures.is_empty(),
+                    "{label}: returned K closure never entered lowering: {member:?}");
+                assert!(actual_captures.iter().all(|capture| !capture.forbidden),
+                    "{label}: forbidden K capture: {actual_captures:?}");
+                let actual_origins = actual_captures.iter().map(|capture| capture.capture_origin)
+                    .collect::<BTreeSet<_>>();
+                let planned_origins = member.capture_origins.iter().copied()
+                    .collect::<BTreeSet<_>>();
+                assert_eq!(actual_origins, planned_origins,
+                    "{label}: lowering and planner disagree on K capture population");
+            }
+        }
+    }
+    let dir = output_dir("escape-protocol-empty-control");
+    let (compiled, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        ken_cli::build_native_program(
+            ESCAPE_CLOSED, ken_cli::SourceFormat::Ken, "escape-protocol-empty-control",
+            dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    let _output = compiled.expect("unaffected owner compiles");
+    let protocols = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
+        .collect::<Vec<_>>();
+    assert!(protocols.iter().any(|protocol| protocol.error.is_none()
+        && !protocol.excluded_by_relay && !protocol.contexts.is_empty()
+        && protocol.contexts.iter().all(|(_, members)| members.is_empty())),
+        "unaffected empty-successor owner was not exercised: {protocols:?}");
+}
+
+/// Promise class: durable invariant. MEASURED: the same licensed placeholder
+/// accepted for its response-owner target refuses when only the declared
+/// target identity changes to a non-owner scheduling entry. CLAIMED: the sole
+/// mint cannot issue the inert zero to a non-owner. THE GAP: the test mutation
+/// changes the checked target at the actual slot-loop mint, not an earlier
+/// parser or carrier refusal; the restored executable bytes must agree.
+#[cfg(target_os = "linux")]
+#[test]
+fn owner_vis_placeholder_nonowner_target_refuses_at_sole_mint() {
+    let build = || {
+        let dir = output_dir("right-denial-placeholder-pin");
+        let output = ken_cli::build_native_program(
+            RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken, "right-denial-placeholder-pin",
+            dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        );
+        (dir, output)
+    };
+    let (baseline_root, baseline) = build();
+    let baseline = baseline.expect("licensed owner baseline compiles");
+    let baseline_bytes = std::fs::read(&baseline.artifact.executable_path)
+        .expect("baseline executable bytes");
+    let ((mutated_root, mutated), applications) =
+        ken_runtime::with_placeholder_nonowner_target_mutation(build);
+    let refused = mutated.expect_err("a placeholder to a non-owner target must refuse");
+    assert_eq!(applications, 1, "the actual target-aware mint must be reached once");
+    assert!(format!("{refused:?}").contains(
+        "a deferred host response may only mint owner parameter zero at its licensed site"
+    ), "wrong refusal: {refused:?}");
+    let (restored_root, restored) = build();
+    let restored = restored.expect("owner mint restores after the mutation");
+    assert_eq!(std::fs::read(&restored.artifact.executable_path)
+        .expect("restored executable bytes"), baseline_bytes);
+    drop(mutated_root);
+    drop(restored_root);
+    drop(baseline_root);
+}
