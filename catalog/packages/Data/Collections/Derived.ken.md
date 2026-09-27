@@ -705,6 +705,28 @@ theorem length_take_min
   }
 ```
 
+```ken example
+theorem derived_example_filter_membership_generic_consumer
+      (a : Type)
+      (eqf : a → a → Bool)
+      (p : a → Bool)
+      (x : a)
+      (compat : (y : a) → IsTrue (eqf x y) → Equal Bool (p y) (p x))
+      (xs : List a)
+    : Equal Bool (mem a eqf x (filter a p xs)) (bool_and (mem a eqf x xs) (p x)) =
+  mem_filter a eqf p x compat xs
+
+theorem derived_example_filter_sound_generic_consumer
+      (a : Type)
+      (eqf : a → a → Bool)
+      (p : a → Bool)
+      (x : a)
+      (xs : List a)
+      (membership : IsTrue (mem a eqf x (filter a p xs)))
+    : IsTrue (mem a eqf x xs) =
+  mem_filter_sound a eqf p x xs membership
+```
+
 ### 4.2 DS-4 — five more `List` combinators completing the floor
 
 `reverse`/`zip`/`concat_map`/`range`/`foldl`, each an ordinary

@@ -351,3 +351,21 @@ increment; both move to public abstract-parameter wrappers in the same
 candidate as the Map fence. The older `map_build_acceptance.rs::mk_env`
 fixture elaborates the complete Map source as a flat legacy unit; it is a
 separate census residual, not a third door user, and stays unchanged.
+
+**Map flat residual (Architect `evt_42yfw3pmj8t7s`, Steward
+`evt_72qaxq9bb9er3`).** `mk_env` is retained as an authorized white-box
+compilation context: it elaborates Map's own text as one unit, not through
+a door into a separately loaded unit. The historical
+`cat_rel_reachable_within_has_exact_fuel_recurrence` failure is the named
+regression witness. On a future session-scope recut, any change in the
+`GlobalId` that bare `fold` selects inside that flat Map unit is a measured-ID
+stop to the Architect. The selected ID in the withdrawn `2f5577e7f` failure
+was not measured; it must not be inferred from `LambdaVsNonFunction`.
+
+**Derived private-law cut (Architect `evt_23jbdb2ztb02v`, Steward
+`evt_74kdvrmck3ywr`).** The two generic applications of private
+`mem_filter` and `mem_filter_sound` move to a checked Derived-owner example
+without exposing either law. Derived test 2
+`compatibility_premise_distinguishes_true_and_false_instances` retains 4
+direct aliases (filter, mem, IsTrue, bool_and) pending an exact checked
+disposition before door deletion.
