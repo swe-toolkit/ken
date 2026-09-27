@@ -21,9 +21,11 @@
 > split; **D** `delete` is **rebuild-via-`from_list`**. Two enclave sub-rulings:
 > set laws are stated **membership-extensionally** (never `Equal (Set K)`), and
 > **`leq_nat` + its four order results are the D0 carrier prerequisite**
-> (`Nat`, not the `Axiom`-holed `Ord Int`/`Ord Char`). The D0 order results,
-> D1–D2 operations and general proofs, and D3 projection/ascending operations
-> and proofs are implemented in `catalog/packages/Data/Collections/Map.ken.md`.
+> (`Nat`, not the `Axiom`-holed `Ord Int`/`Ord Char`). The canonical D0
+> provider is `Core.Classes.LawfulClasses` (`51 §7`); its public totality proof
+> is `IsTrue`-valued, while its `Or`-valued helper is private (§2). D1–D2
+> operations and general proofs, and D3 projection/ascending operations and
+> proofs are implemented in `catalog/packages/Data/Collections/Map.ken.md`.
 > D4 currently lands transparent `compose`/`converse`, property-predicate
 > definitions, and the public `size`/`dom`/`reachable_within`/`reachable_plus`
 > closure computation. All four closure functions execute; the general
@@ -88,26 +90,34 @@ inhabited**.
 - `Ord Bool` is `Axiom`-free but has **only 2 keys** — it **cannot** exhibit a
   three-node transitivity witness (`a → b → c`: is `a → c` in the closure?),
   which the relation/closure discriminators require.
-- **`Nat` is the carrier.** The Map package now defines `leq_nat` and its four
-  order results as ordinary total Ken with zero `Axiom` and no kernel change,
-  by structural recursion on `Nat` (`data Nat = Zero | Suc Nat`, prelude).
-  This landed D0 basis remains the carrier-vacuity guard for every relation
-  discriminator.
+- **`Nat` is the carrier.** `Core.Classes.LawfulClasses` (`51 §§2.3, 7`)
+  defines the canonical `leq_nat` and its four order results as ordinary total
+  Ken with zero `Axiom` and no kernel change, by structural recursion on `Nat`
+  (`data Nat = Zero | Suc Nat`, prelude). Its canonical `Ord Nat` dictionary
+  supplies the Axiom-free lawful order. This landed D0 basis remains the
+  carrier-vacuity guard for every relation discriminator; Map neither defines
+  nor re-exports a duplicate D0 family in the amended target.
 
 ```
-fn leq_nat (m : Nat) (n : Nat) : Bool =
+pub fn leq_nat (m : Nat) (n : Nat) : Bool =
   match m {
     Zero  => True ;
     Suc m2 => match n { Zero => False ; Suc n2 => leq_nat m2 n2 }
   }
 ```
 
-The four order results are the **unbundled bare-parameter dictionary** the
-capstone already threads (`52 §2` Architect-ruled encoding). Their exact public
-identities are three `proof` selectors for `leq_nat` plus the ordinary function
-`total_leq_nat`; callers supply them directly as separate parameters. Proof
-shapes are all `Nat`-structural and comparison-driven only through `leq_nat`'s
-own recursion:
+The four structural order results are the three proofs `refl`, `trans` and
+`antisym` for `leq_nat`, plus the direction-preserving Or-valued
+`total_leq_nat`. All are real, Axiom-free Ken. The **public identities** at
+`Core.Classes.LawfulClasses` are `leq_nat`, its three attached proof selectors,
+and **`proof total for leq_nat`**, whose result is
+`IsTrue (bool_or (leq_nat x y) (leq_nat y x))`. The latter erases the
+which-direction content. The provider's `total_leq_nat` is a **private**
+Or-valued program, not a public identity or a caller-supplied Nat argument.
+Map's generic order arguments remain unbundled bare parameters (`52 §2`);
+its Or-valued `total` parameter is a separate obligation, not the public
+IsTrue proof. The structural proof shapes below are comparison-driven only
+through `leq_nat`'s own recursion:
 
 - **`proof refl for leq_nat`** has type
   `(x : Nat) → Equal Bool (leq_nat x x) True`. It inducts on `x`: the `Zero`
@@ -127,18 +137,23 @@ own recursion:
   Equal Bool (leq_nat y x) True → Equal Nat x y`. It inducts on both arguments:
   `Zero/Zero` closes with `Proved`; `Suc/Suc` applies `cong` to the predecessor
   proof; each mixed arm discharges a false premise with `absurd`.
-- **`total_leq_nat`** has type
+- **Private `total_leq_nat`** has type
   `(x y : Nat) → Or (Equal Bool (leq_nat x y) True)
   (Equal Bool (leq_nat y x) True)`. It inducts on both arguments: `Zero` on
   either side selects the corresponding `Inl`/`Inr` with `Proved`, and
-  `Suc/Suc` preserves the predecessor result's `Or` tag.
+  `Suc/Suc` preserves the predecessor result's `Or` tag. The public
+  **`proof total for leq_nat`** consumes this private result via the
+  `bool_or` bridge and has type
+  `(x y : Nat) → IsTrue (bool_or (leq_nat x y) (leq_nat y x))`.
 
 `proof antisym for leq_nat` is needed only for the `Distinct`-discharge
 boundary (`54 §4`, ADR 0010-gated, out of scope). `delete`/`union`
-invariant-preservation uses `proof trans for leq_nat` and `total_leq_nat`,
-matching the landed law-1 parameters. Implementations may bind those parameters
-to local names such as `reflLeq` and `transLeq`; such binders are not second
-public globals.
+invariant-preservation uses `proof trans for leq_nat` and **Map's Or-valued
+`total` law parameter**, matching the landed law-1 parameter shape. Nothing
+outside `LawfulClasses` instantiates that parameter at `Nat` today; the
+public IsTrue totality proof does not inhabit it. Implementations may bind
+the generic parameters to local names such as `reflLeq` and `transLeq`;
+such binders are not second public globals.
 
 The Boolean prerequisites are landed too. Canonical `bool_and` and its algebra
 come from `Core.Classes.LawfulClasses`; the Map package defines its local
@@ -514,16 +529,21 @@ executing; their faithfulness proof follows separately):
 
 ## 8. Derivation paths and build sequencing
 
-Everything bottoms out in landed built-ins plus the Map capstone. The current
-package contains `leq_nat` and its four order results; the Boolean helpers; the
-D1–D2 delete, keyed-merge, and set-algebra operations with their named proofs;
-the D3 projections and their projection/ascending proofs; and the D4
-`succ`/`rel_member`/`compose`/`converse` plus
+Everything bottoms out in landed built-ins plus the Map capstone. The D0
+carrier is supplied by `Core.Classes.LawfulClasses`: its public `leq_nat`,
+`refl`/`trans`/`antisym` selectors and IsTrue-valued `total` proof are
+Axiom-free, as is its private Or-valued `total_leq_nat` program. The amended
+Map package does not define or re-export another D0 family; it contains the
+Boolean helpers; the D1–D2 delete, keyed-merge, and set-algebra operations
+with their named proofs; the D3 projections and their projection/ascending
+proofs; and the D4 `succ`/`rel_member`/`compose`/`converse` plus
 property-predicate definitions. These ordinary `fn`/`proof`/`theorem`
 declarations reuse the landed `Tree`, Map, Set, `IsTrue`, and Boolean basis and
 have zero `Axiom` or trusted-base delta. D4's general membership proofs and
 concrete predicate proof-flips are not present merely because the definitions
-are.
+are. The pre-amendment Map-private D0 copy on `main` is superseded only when
+held increment 2 lands; this paragraph describes the amended target, not a
+claim that the copy has already been removed.
 
 The landed public computation contains
 `size`/`dom`/`reachable_within`/`reachable_plus` together, so
