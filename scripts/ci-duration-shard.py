@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Assign a filtered live nextest inventory to deterministic duration bins."""
+import csv
 import heapq
 import json
 import math
@@ -13,6 +14,15 @@ import ci_workspace_timings
 
 
 N = 7
+WALL_MODEL_TOLERANCE_SECONDS = 60.0
+WALL_CALIBRATION_COLUMNS = [
+    "run_id",
+    "shard",
+    "build_seconds",
+    "selection_seconds",
+    "test_step_seconds",
+    "job_wall_seconds",
+]
 # Use the latest complete full-CI per-test source for LPT. Missing tests use
 # their binary's measured median, or the global measured median for unseen bins.
 NEXTTEST_TIMING_ROW = re.compile(
@@ -202,6 +212,171 @@ def resolve_durations(live, measured):
     return resolved, fallbacks
 
 
+def _solve_linear_system(matrix, values):
+    size = len(values)
+    augmented = [list(row) + [values[index]] for index, row in enumerate(matrix)]
+    for column in range(size):
+        pivot = max(range(column, size), key=lambda row: abs(augmented[row][column]))
+        if abs(augmented[pivot][column]) < 1e-12:
+            raise SystemExit("workspace wall calibration is singular")
+        augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
+        divisor = augmented[column][column]
+        augmented[column] = [entry / divisor for entry in augmented[column]]
+        for row in range(size):
+            if row == column:
+                continue
+            factor = augmented[row][column]
+            augmented[row] = [
+                entry - factor * pivot_entry
+                for entry, pivot_entry in zip(augmented[row], augmented[column])
+            ]
+    return [augmented[index][-1] for index in range(size)]
+
+
+def _workspace_run_workloads(timing_paths):
+    if len(timing_paths) != N:
+        raise SystemExit("workspace wall calibration requires seven timing artifacts")
+    workloads = {}
+    all_identities = set()
+    fallback_records = None
+    run_ids = set()
+    for path in timing_paths:
+        try:
+            with open(path, encoding="utf-8") as source:
+                artifact = json.load(source)
+            artifact = ci_workspace_timings.validate_artifact(artifact)
+        except (OSError, json.JSONDecodeError, ci_workspace_timings.TimingArtifactError) as error:
+            raise SystemExit(f"{path}: invalid wall-calibration timing artifact: {error}") from error
+        run_ids.add(artifact["run_id"])
+        if fallback_records is None:
+            fallback_records = artifact["fallbacks"]
+        elif artifact["fallbacks"] != fallback_records:
+            raise SystemExit("wall-calibration artifacts disagree on fallback identities")
+        shard = artifact["shard"]
+        if shard in workloads:
+            raise SystemExit(f"duplicate wall-calibration timing shard {shard}")
+        records = artifact["records"]
+        if not records or any(record["result"] != "PASS" for record in records):
+            raise SystemExit(f"wall-calibration shard {shard} needs only passing timings")
+        identities = {record["test_id"] for record in records}
+        if all_identities & identities:
+            raise SystemExit("wall-calibration timing shards have duplicate identities")
+        all_identities |= identities
+        seconds = [float(record["seconds"]) for record in records]
+        workloads[shard] = {
+            "test_sum_seconds": sum(seconds),
+            "longest_test_seconds": max(seconds),
+        }
+    if len(run_ids) != 1 or set(workloads) != set(range(1, N + 1)):
+        raise SystemExit("wall-calibration artifacts must be one complete seven-shard run")
+    return next(iter(run_ids)), workloads
+
+
+def fit_workspace_wall_model(timing_paths, calibration_path):
+    """Fit a test-wall model and enforce its per-shard reprojection tolerance."""
+    run_id, workloads = _workspace_run_workloads(timing_paths)
+    try:
+        with open(calibration_path, encoding="utf-8", newline="") as source:
+            reader = csv.DictReader(source, delimiter="\t")
+            if reader.fieldnames != WALL_CALIBRATION_COLUMNS:
+                raise SystemExit("workspace wall calibration has invalid columns")
+            rows = list(reader)
+    except OSError as error:
+        raise SystemExit(f"{calibration_path}: cannot read wall calibration: {error}") from error
+    observations = {}
+    for row in rows:
+        try:
+            row_run_id = int(row["run_id"])
+            shard = int(row["shard"])
+            build_seconds = float(row["build_seconds"])
+            selection_seconds = float(row["selection_seconds"])
+            test_seconds = float(row["test_step_seconds"])
+            job_seconds = float(row["job_wall_seconds"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise SystemExit(f"{calibration_path}: malformed wall calibration row") from error
+        numeric = (build_seconds, selection_seconds, test_seconds, job_seconds)
+        if (
+            row_run_id != run_id
+            or not 1 <= shard <= N
+            or shard in observations
+            or any(not math.isfinite(value) or value < 0 for value in numeric)
+            or test_seconds <= 0
+            or job_seconds < test_seconds
+            or build_seconds + selection_seconds > job_seconds
+        ):
+            raise SystemExit(f"{calibration_path}: invalid wall calibration row for shard {shard}")
+        observations[shard] = {
+            **workloads.get(shard, {}),
+            "build_seconds": build_seconds,
+            "selection_seconds": selection_seconds,
+            "test_step_seconds": test_seconds,
+            "job_wall_seconds": job_seconds,
+        }
+    if set(observations) != set(range(1, N + 1)):
+        raise SystemExit("workspace wall calibration must contain each shard exactly once")
+
+    # Fit the observed Test step to total work plus its indivisible slowest test.
+    # Build, selection, and other setup remain a separate measured overhead.
+    features = [
+        [1.0, row["test_sum_seconds"], row["longest_test_seconds"]]
+        for row in (observations[shard] for shard in range(1, N + 1))
+    ]
+    measured = [observations[shard]["test_step_seconds"] for shard in range(1, N + 1)]
+    size = len(features[0])
+    normal = [
+        [sum(row[left] * row[right] for row in features) for right in range(size)]
+        for left in range(size)
+    ]
+    target = [
+        sum(features[index][column] * measured[index] for index in range(N))
+        for column in range(size)
+    ]
+    intercept, sum_coefficient, longest_coefficient = _solve_linear_system(normal, target)
+    coefficients = {
+        "intercept_seconds": intercept,
+        "sum_coefficient": sum_coefficient,
+        "longest_test_coefficient": longest_coefficient,
+    }
+    if any(not math.isfinite(value) for value in coefficients.values()) or min(
+        sum_coefficient, longest_coefficient
+    ) <= 0:
+        raise SystemExit("workspace wall calibration produced invalid workload coefficients")
+
+    setup = []
+    errors = {}
+    for shard, row in observations.items():
+        pretest = row["job_wall_seconds"] - row["test_step_seconds"]
+        setup.append(pretest)
+        predicted_test = project_test_wall_seconds(
+            row["test_sum_seconds"], row["longest_test_seconds"], coefficients
+        )
+        predicted_job = pretest + predicted_test
+        error = abs(predicted_job - row["job_wall_seconds"])
+        errors[shard] = error
+        if error > WALL_MODEL_TOLERANCE_SECONDS:
+            raise SystemExit(
+                f"wall reprojection shard {shard} differs by {error:.3f}s "
+                f"(limit {WALL_MODEL_TOLERANCE_SECONDS:.0f}s)"
+            )
+    return {
+        "run_id": run_id,
+        "intercept_seconds": intercept,
+        "sum_coefficient": sum_coefficient,
+        "longest_test_coefficient": longest_coefficient,
+        "setup_seconds": statistics.median(setup),
+        "calibration_errors": errors,
+    }
+
+
+def project_test_wall_seconds(test_sum_seconds, longest_test_seconds, model):
+    predicted = (
+        model["intercept_seconds"]
+        + model["sum_coefficient"] * test_sum_seconds
+        + model["longest_test_coefficient"] * longest_test_seconds
+    )
+    return max(0.0, predicted)
+
+
 def validate_plan(assignment_path, shard, selected_path):
     assignment = json.load(open(assignment_path))
     bins = assignment.get("bins")
@@ -228,6 +403,13 @@ def main():
         return
     arguments = sys.argv[1:]
     output = None
+    wall_calibration = None
+    if "--wall-calibration" in arguments:
+        option = arguments.index("--wall-calibration")
+        if option < 2 or option + 1 >= len(arguments):
+            raise SystemExit("--wall-calibration must follow timing files and name a TSV")
+        wall_calibration = arguments[option + 1]
+        del arguments[option : option + 2]
     if "--output-dir" in arguments:
         option = arguments.index("--output-dir")
         if option != len(arguments) - 2 or option < 2:
@@ -236,10 +418,16 @@ def main():
         arguments = arguments[:-2]
     if len(arguments) < 2:
         raise SystemExit(
-            "usage: ci-duration-shard.py INVENTORY TIMING... [--output-dir DIR]"
+            "usage: ci-duration-shard.py INVENTORY TIMING... "
+            "[--wall-calibration TSV] [--output-dir DIR]"
         )
     inventory = json.load(open(arguments[0]))
-    durations = read_durations(arguments[1:])
+    timing_paths = arguments[1:]
+    durations = read_durations(timing_paths)
+    wall_model = (
+        fit_workspace_wall_model(timing_paths, wall_calibration)
+        if wall_calibration is not None else None
+    )
     live = sorted((f"{binary_id} {name}", binary_id, name) for binary_id, name in tests(inventory))
     if not live:
         raise SystemExit("filtered live inventory selected zero testcases")
@@ -266,26 +454,43 @@ def main():
             RuntimeWarning,
             stacklevel=2,
         )
-    bins = [(0.0, index, []) for index in range(N)]
+    bins = []
+    for index in range(N):
+        score = 0.0
+        bins.append((score, index, 0.0, 0.0, []))
     heapq.heapify(bins)
     ordered = sorted(live, key=lambda row: (-planned_durations[row[0]], row[0]))
     for rendered, binary_id, name in ordered:
-        total, index, selected = heapq.heappop(bins)
+        _, index, total, longest, selected = heapq.heappop(bins)
+        duration = planned_durations[rendered]
+        total += duration
+        longest = max(longest, duration)
         selected.append((binary_id, name))
-        heapq.heappush(
-            bins,
-            (total + planned_durations[rendered], index, selected),
+        score = (
+            project_test_wall_seconds(total, longest, wall_model)
+            if wall_model is not None else total
         )
+        heapq.heappush(bins, (score, index, total, longest, selected))
 
     result = []
-    for total, index, selected in sorted(bins, key=lambda item: item[1]):
+    for _, index, total, longest, selected in sorted(bins, key=lambda item: item[1]):
         terms = [f"(binary_id(={binary}) & test(={name}))" for binary, name in selected]
-        result.append({
+        item = {
             "bin": index + 1,
             "seconds": round(total, 3),
             "tests": selected,
             "filter": " | ".join(terms),
-        })
+        }
+        if wall_model is not None:
+            projected_test = project_test_wall_seconds(total, longest, wall_model)
+            item.update({
+                "longest_test_seconds": round(longest, 3),
+                "projected_test_seconds": round(projected_test, 3),
+                "projected_job_seconds": round(
+                    projected_test + wall_model["setup_seconds"], 3
+                ),
+            })
+        result.append(item)
     if output:
         os.makedirs(output, exist_ok=True)
         limit = os.sysconf("SC_ARG_MAX") // 4
