@@ -318,15 +318,24 @@ fn cat_bool_reuse_d2_resolves_exact_is_some_provider_without_equivalent_local() 
 fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
     let (mut env, dependencies) = mk_map_dependency_env_with_provider_owned();
     let provider = catalog_or::provider_owned_id(
-        &env, &dependencies.lawful, "Core.Classes.LawfulClasses", "leq_nat",
-    ).expect("LawfulClasses must own checked leq_nat");
-    assert!(matches!(env.env.lookup(provider), Some(Decl::Transparent { .. })));
+        &env,
+        &dependencies.lawful,
+        "Core.Classes.LawfulClasses",
+        "leq_nat",
+    )
+    .expect("LawfulClasses must own checked leq_nat");
+    assert!(matches!(
+        env.env.lookup(provider),
+        Some(Decl::Transparent { .. })
+    ));
     assert_eq!(
-        env.globals.remove("leq_nat"), Some(provider),
+        env.globals.remove("leq_nat"),
+        Some(provider),
         "withhold the existing flat canonical alias before Map's import"
     );
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    let map_ids: BTreeSet<_> = env.elaborate_ken_md_file(MAP_KEN_MD)
+    let map_ids: BTreeSet<_> = env
+        .elaborate_ken_md_file(MAP_KEN_MD)
         .expect("Map must elaborate using its selective canonical leq_nat import")
         .into_iter()
         .collect();
@@ -337,7 +346,10 @@ fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
         "the imported canonical comparator is not Map-owned"
     );
     let total = env.globals["total_leq_nat"];
-    assert!(map_ids.contains(&total), "Map must own its local total witness");
+    assert!(
+        map_ids.contains(&total),
+        "Map must own its local total witness"
+    );
     let (ty, body) = match env.env.lookup(total) {
         Some(Decl::Transparent { ty, body, .. }) => (ty, body),
         other => panic!("Map total_leq_nat must be transparent, got {other:?}"),
@@ -346,12 +358,15 @@ fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
         term_reference_count(ty, provider) + term_reference_count(body, provider) > 0,
         "bare leq_nat in Map's checked total witness must bind the canonical GlobalId"
     );
-    let map_bindings: Vec<_> = env.globals.iter()
+    let map_bindings: Vec<_> = env
+        .globals
+        .iter()
         .filter(|(_, id)| map_ids.contains(id))
         .map(|(name, id)| (name.clone(), *id))
         .collect();
     let bound_ids: BTreeSet<_> = map_bindings.iter().map(|(_, id)| *id).collect();
-    let transparent_ids: BTreeSet<_> = map_ids.iter()
+    let transparent_ids: BTreeSet<_> = map_ids
+        .iter()
         .filter(|id| matches!(env.env.lookup(**id), Some(Decl::Transparent { .. })))
         .copied()
         .collect();
@@ -359,10 +374,12 @@ fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
         !transparent_ids.is_empty() && transparent_ids.is_subset(&bound_ids),
         "the real Map bindings must close over every direct transparent declaration"
     );
-    let provider_references = map_ids.iter()
+    let provider_references = map_ids
+        .iter()
         .map(|id| match env.env.lookup(*id) {
-            Some(Decl::Transparent { ty, body, .. }) =>
-                term_reference_count(ty, provider) + term_reference_count(body, provider),
+            Some(Decl::Transparent { ty, body, .. }) => {
+                term_reference_count(ty, provider) + term_reference_count(body, provider)
+            }
             _ => 0,
         })
         .sum::<usize>();
@@ -372,8 +389,13 @@ fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
     );
     for (name, id) in map_bindings {
         assert!(
-            !["leq_nat", "leq_nat::refl", "leq_nat::trans", "leq_nat::antisym"]
-                .contains(&name.as_str()),
+            ![
+                "leq_nat",
+                "leq_nat::refl",
+                "leq_nat::trans",
+                "leq_nat::antisym"
+            ]
+            .contains(&name.as_str()),
             "Map must not retain local comparator or law {name}"
         );
         env.globals.insert(format!("{MAP_MODULE}.{name}"), id);
