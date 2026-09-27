@@ -1,7 +1,7 @@
 ---
 id: RT-COMPMATCH-TREE-SCRUTINEE
 title: "Clear the next ignored L1 rows: re-measure the first refusal of every remaining unowned ignored runtime row at the increment-2 base, then repair the refusal the most rows share"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -80,6 +80,13 @@ chosen first refusal, with no other row changing colour.
   and land the group that one repair clears.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Done at `e41f7589e` (ds5b group: proof-irrelevant C5 on applied inductive
+types, the ds5b convoy row un-ignored), after the carried BufferFreeze seat
+partial `f5335a997`, which cleared no row. The three Ret-tag rows go to
+`RT-OWNER-VIS-RETURN-PROTOCOL`; the rest go to `RT-IGNORED-ROWS-NEXT-GROUP`.
 
 ## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 

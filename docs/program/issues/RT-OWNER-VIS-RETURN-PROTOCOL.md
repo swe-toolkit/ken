@@ -1,7 +1,7 @@
 ---
 id: RT-OWNER-VIS-RETURN-PROTOCOL
 title: "Carry a grafted continuation's Vis and its K back across a generated response-owner boundary, so the owner accepts a conforming non-Ret result instead of trapping at its Ret-tag check"
-status: ready
+status: active
 owner: runtime
 size: L
 gate: architect
