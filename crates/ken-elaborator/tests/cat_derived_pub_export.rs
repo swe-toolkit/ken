@@ -225,9 +225,10 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// MEASURED: the real roots loader is asked whether every mechanically parsed,
 /// publishable top-level definition and every `export` re-export item is visible,
 /// including attached proofs via their imported subjects; the successful set is
-/// compared with an independent literal contract set. CLAIMED: Derived's complete loader-visible export
-/// surface is exactly the ten authorized operations, two `nth` bound
-/// proofs, three `list_append` monoid-law attached proofs, and the one
+/// compared with an independent literal contract set. CLAIMED: Derived's
+/// complete loader-visible export surface is exactly the ten authorized
+/// operations, two `nth` bound proofs, three `list_append` monoid-law
+/// attached proofs, and the one
 /// `map::{id, fusion}` proofs and `reverse::involutive` attached proof.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
