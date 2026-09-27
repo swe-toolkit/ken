@@ -112,7 +112,11 @@ class DurationPlanTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "timings.tsv"
             path.write_text(
-                "1\t1.000\tken-cli::rt_parity_native\tsample\tFAIL\n",
+                "".join(
+                    f"{shard}\t1.000\tken-cli::rt_parity_native\tprobe_{shard}\t"
+                    f"{'FAIL' if shard == 1 else 'PASS'}\n"
+                    for shard in range(1, 9)
+                ),
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "malformed parity timing row"):
