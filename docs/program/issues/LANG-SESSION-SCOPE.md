@@ -261,6 +261,16 @@ sentence. Named-list body pins do not move; an id- or position-keyed pin
 that would move is a stop. The census goes to the Architect for one-pass
 confirmation before any provider edit.
 
+10. H rule keyed on qualified identity applied to class declarations, whose
+    globals and class-env keys are bare spellings — keyed on the declaration
+    plane (class vs value).
+
+**Stop-10 route** (Architect `evt_ax2kbwvatm8f`): the class H rows select
+from Derived's owned id population via `class_by_id` and the owner name,
+exactly one match, with no new `(module,name) → GlobalId` accessor. The
+spelling-keyed class registration itself is
+`LANG-CLASS-IDENTITY-BY-CHECKED-ID`, not this WP.
+
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
 question about a public route to a type (for example `SourceId`) goes to
