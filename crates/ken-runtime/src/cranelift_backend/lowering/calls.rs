@@ -2085,6 +2085,13 @@ impl<'a> Lowering<'a> {
                 pending_region.map_or(target.header.frame_bytes, |region| region.frame_bytes),
                 3,
             ));
+            #[cfg(feature = "px8-ds-test-support")]
+            if let Some(PendingVisFrameOwner::ResponseOwner(response)) = target.frame_owner {
+                record_pending_vis_caller_payload_observation(
+                    response, target.header.frame_bytes,
+                    builder.func.sized_stack_slots[payload].size,
+                );
+            }
             if let Some(region) = pending_region {
                 // A fresh callee frame has no pending Vis until its actual
                 // construct site writes the whole record and then the member.

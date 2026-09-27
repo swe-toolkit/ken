@@ -170,7 +170,8 @@ pub use planning::{
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::{
-    with_pending_vis_owner_frame_observations, with_returned_vis_capture_observations,
+    with_pending_vis_caller_payload_observations, with_pending_vis_owner_frame_observations,
+    with_returned_vis_capture_observations, PendingVisCallerPayloadObservation,
     PendingVisOwnerFrameObservation, ReturnedVisCaptureObservation,
 };
 #[cfg(feature = "px8-ds-test-support")]

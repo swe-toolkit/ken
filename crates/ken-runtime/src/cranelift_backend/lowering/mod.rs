@@ -4087,13 +4087,30 @@ pub fn with_returned_vis_capture_observations<T>(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingVisOwnerFrameObservation {
     pub owner_origin: u32,
+    pub response_id: u32,
+    pub base_frame_bytes: u32,
+    pub frame_bytes: Option<u32>,
     pub widths: Option<(u32, u32)>,
+}
+
+/// The caller's actual CLIF stack-slot allocation for an exact response-owner
+/// target, read back after allocation rather than inferred from the owner's
+/// separately bound tail or the planner's proposed width.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingVisCallerPayloadObservation {
+    pub response_id: u32,
+    pub base_frame_bytes: u32,
+    pub allocated_bytes: u32,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
     static PENDING_VIS_OWNER_FRAME_OBSERVATIONS:
         std::cell::RefCell<Option<Vec<PendingVisOwnerFrameObservation>>> =
+        const { std::cell::RefCell::new(None) };
+    static PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS:
+        std::cell::RefCell<Option<Vec<PendingVisCallerPayloadObservation>>> =
         const { std::cell::RefCell::new(None) };
 }
 
@@ -4113,8 +4130,40 @@ pub fn with_pending_vis_owner_frame_observations<T>(
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+pub fn with_pending_vis_caller_payload_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<PendingVisCallerPayloadObservation>) {
+    PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS.with(|slot| {
+        assert!(slot.borrow().is_none(), "pending-Vis caller windows cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS.with(|slot| {
+        slot.borrow_mut().take().expect("pending-Vis caller window")
+    });
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_pending_vis_caller_payload_observation(
+    response: StaticResponseContinuationId,
+    base_frame_bytes: u32,
+    allocated_bytes: u32,
+) {
+    PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS.with(|slot| {
+        if let Some(observations) = slot.borrow_mut().as_mut() {
+            observations.push(PendingVisCallerPayloadObservation {
+                response_id: response.ordinal(), base_frame_bytes, allocated_bytes,
+            });
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 fn record_pending_vis_owner_frame_observation(
+    response: StaticResponseContinuationId,
     owner: StaticOriginId,
+    base_frame_bytes: u32,
     frame: Option<PendingVisFrame>,
 ) {
     PENDING_VIS_OWNER_FRAME_OBSERVATIONS.with(|slot| {
@@ -4130,7 +4179,9 @@ fn record_pending_vis_owner_frame_observation(
             )
         });
         observations.push(PendingVisOwnerFrameObservation {
-            owner_origin: owner.ticket_body_ordinal(), widths,
+            owner_origin: owner.ticket_body_ordinal(), response_id: response.ordinal(),
+            base_frame_bytes, frame_bytes: frame.map(|frame| frame.region.frame_bytes),
+            widths,
         });
     });
 }

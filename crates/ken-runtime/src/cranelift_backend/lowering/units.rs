@@ -4121,7 +4121,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             )?;
             #[cfg(feature = "px8-ds-test-support")]
             record_pending_vis_owner_frame_observation(
-                emission.row.vis_origin(), function_local.pending_vis_frame,
+                emission.row.id(), emission.row.vis_origin(),
+                emission.owner.header().frame_bytes, function_local.pending_vis_frame,
             );
 
             let mut frame_inputs = BTreeMap::new();
@@ -7520,6 +7521,11 @@ impl ContinuationClaimLedger {
         // `call_declared_unit_target` consumes. Reusing it is what keeps this
         // on the existing unit-call ABI instead of inventing a second one.
         let units = plan.continuation_units()?;
+        let response_owners = plan.static_response_owner_specializations()?
+            .map_err(|infeasible| backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            )))?;
         let transported = plan
             .checked_ih_environment_transports_owned_by(defining)
             .into_iter()
@@ -7542,11 +7548,30 @@ impl ContinuationClaimLedger {
                         )
                     })?;
                 let (offsets, _frame_bytes) = unit.slot_offsets()?;
+                // A selected continuation token calls the response OWNER, not
+                // its original continuation specialization. The activation
+                // tail belongs to that exact owner; the specialization has no
+                // pending-Vis frame region. Read the same planner-selected
+                // identity used to resolve the FuncId, never the destination
+                // ABI slot or an emitter-local ordinal.
+                let frame_owner = if let Some(owner) = response_owners.iter()
+                    .find(|owner| owner.selected_caller() == identity)
+                {
+                    if owner.header() != unit.header() || owner.slots() != unit.slots() {
+                        return Err(backend_module(
+                            "a selected response owner changed its caller's activation ABI"
+                                .to_string(),
+                        ));
+                    }
+                    PendingVisFrameOwner::ResponseOwner(owner.response())
+                } else {
+                    PendingVisFrameOwner::Continuation(unit.id())
+                };
                 Ok((
                     identity.clone(),
                     DeclaredUnitCall {
                         function: module.declare_func_in_func(*target, func),
-                        frame_owner: Some(PendingVisFrameOwner::Continuation(unit.id())),
+                        frame_owner: Some(frame_owner),
                         origin: unit.continuation_origin(),
                         call_site_origin: unit.continuation_origin(),
                         header: unit.header(),

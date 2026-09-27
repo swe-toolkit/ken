@@ -547,13 +547,15 @@ fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
     assert_exact_operation_and_terminal_parity(&observation, &interpreted);
 }
 
-/// Promise class: transition sentinel. This pins fixture-local planner origins
-/// until a source occurrence changes the closed response population.
-/// MEASURED: returned source origins, forwarded-call fixpoint, derived rows,
-/// effect seats and actual K captures. CLAIMED: both px7f owners use only
-/// static-operation successors. THE GAP: this planner pin alone does not prove
-/// the emitted record, owner loop or runtime effect sequence; the two executable
-/// native/interpreter differentials and the finished-body verifier do.
+/// Promise class: transition sentinel for fixture-local planner origins;
+/// the independent caller-allocation/owner-region relation is durable.
+/// MEASURED: returned source origins, derived rows, actual K captures, and
+/// the emitted owner region against the caller's actual CLIF payload slot.
+/// CLAIMED: each selected px7f owner call allocates exactly its closed-chain
+/// frame, including the record tail. THE GAP: matching planner widths to the
+/// owner's binding alone misses caller under-allocation; this pin joins the
+/// separate emitted call payload by response identity. The two executable
+/// differentials and finished-body verifier cover effect and record behavior.
 #[cfg(target_os = "linux")]
 #[test]
 fn owner_vis_return_protocol_px7f_planned_fixpoints() {
@@ -566,14 +568,16 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     ];
     for &(label, source, owner, expected) in fixtures {
         let dir = output_dir(label);
-        let (((compiled, plans), captures), frames) =
-            ken_runtime::with_pending_vis_owner_frame_observations(|| {
-                ken_runtime::with_returned_vis_capture_observations(|| {
-                    ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                        ken_cli::build_native_program(
-                            source, ken_cli::SourceFormat::Ken, label, dir.path(),
-                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                        )
+        let ((((compiled, plans), captures), frames), callers) =
+            ken_runtime::with_pending_vis_caller_payload_observations(|| {
+                ken_runtime::with_pending_vis_owner_frame_observations(|| {
+                    ken_runtime::with_returned_vis_capture_observations(|| {
+                        ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                            ken_cli::build_native_program(
+                                source, ken_cli::SourceFormat::Ken, label, dir.path(),
+                                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                            )
+                        })
                     })
                 })
             });
@@ -611,7 +615,20 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
             .max().expect("a protocol has a successor row");
         assert_eq!(usize::try_from(width.1).unwrap(), expected_input_width,
             "{label}: owner input tail must match its own successor fixpoint");
-        eprintln!("RT-OWNER-VIS FRAME {label} owner={owner} widths={width:?} all={frames:?}");
+        let owner_frame = owner_frames[0];
+        let incoming = callers.iter().filter(|call|
+            call.response_id == owner_frame.response_id).collect::<Vec<_>>();
+        assert_eq!(incoming.len(), 1,
+            "{label}: selected response-owner call must allocate one payload: {callers:?}");
+        let incoming = incoming[0];
+        assert_eq!(incoming.base_frame_bytes, owner_frame.base_frame_bytes,
+            "{label}: selected caller and owner disagree on base frame size");
+        let bound = owner_frame.frame_bytes.expect("active owner binds a record tail");
+        let expected_bytes = owner_frame.base_frame_bytes + 8 * (1 + width.0 + width.1);
+        assert_eq!(bound, expected_bytes, "{label}: owner region does not fit its widths");
+        assert_eq!(incoming.allocated_bytes, bound,
+            "{label}: selected caller did not allocate its owner's record tail");
+        eprintln!("RT-OWNER-VIS FRAME {label} owner={owner} widths={width:?} all={frames:?} caller={incoming:?}");
         for (_, members) in &observed.contexts {
             for member in members {
                 assert!(!member.relay, "{label}: a returned member needs relay representation");
@@ -654,14 +671,18 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
         }
     }
     let dir = output_dir("escape-protocol-empty-control");
-    let ((compiled, plans), frames) = ken_runtime::with_pending_vis_owner_frame_observations(|| {
-        ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
-                ESCAPE_CLOSED, ken_cli::SourceFormat::Ken, "escape-protocol-empty-control",
-                dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            )
-        })
-    });
+    let (((compiled, plans), frames), callers) =
+        ken_runtime::with_pending_vis_caller_payload_observations(|| {
+            ken_runtime::with_pending_vis_owner_frame_observations(|| {
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_cli::build_native_program(
+                        ESCAPE_CLOSED, ken_cli::SourceFormat::Ken,
+                        "escape-protocol-empty-control", dir.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    )
+                })
+            })
+        });
     let _output = compiled.expect("unaffected owner compiles");
     let protocols = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
         .collect::<Vec<_>>();
@@ -677,9 +698,18 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
         frame.owner_origin == empty_owner.vis_origin).collect::<Vec<_>>();
     assert_eq!(empty_frames.len(), 1,
         "empty-successor owner was not emitted exactly once: {frames:?}");
-    assert!(empty_frames.iter().all(|frame| frame.widths.is_none()),
+    assert!(empty_frames.iter().all(|frame| frame.widths.is_none()
+        && frame.frame_bytes.is_none()),
         "an owner with no successors acquired a record tail: {frames:?}");
-    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?} frames={frames:?}");
+    let incoming = callers.iter().filter(|call|
+        call.response_id == empty_frames[0].response_id).collect::<Vec<_>>();
+    assert_eq!(incoming.len(), 1,
+        "empty-successor owner call was not emitted exactly once: {callers:?}");
+    assert_eq!(incoming[0].base_frame_bytes, empty_frames[0].base_frame_bytes,
+        "empty-successor caller and owner disagree on base frame size");
+    assert_eq!(incoming[0].allocated_bytes, empty_frames[0].base_frame_bytes,
+        "empty-successor caller acquired an unplanned tail");
+    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?} frames={frames:?} caller={incoming:?}");
 }
 
 /// Promise class: durable invariant. MEASURED: the same licensed placeholder
