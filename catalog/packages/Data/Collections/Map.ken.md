@@ -15790,6 +15790,34 @@ theorem map_example_fresh_canonical_comparator_misses_the_same_edge
   Proved
 ```
 
+```ken example
+const map_example_key_instance_dictionary
+    : Membership (OrderedKeyMembership Nat Unit)
+    where Membership (OrderedKeyMembership Nat Unit) =
+  d
+
+const map_example_relation_instance_dictionary
+    : Membership (RelationEdgeMembership Nat)
+    where Membership (RelationEdgeMembership Nat) =
+  d
+
+const map_example_instance_key_observed : Bool =
+  map_example_key_instance_dictionary.member (Suc Zero) map_example_down_key_view
+
+const map_example_instance_relation_observed : Bool =
+  map_example_relation_instance_dictionary.member
+    (mk_pair Nat Nat Zero (Suc Zero))
+    map_example_down_relation_view
+
+theorem map_example_instance_key_stored_comparator_finds_key
+    : Equal Bool map_example_instance_key_observed True =
+  Proved
+
+theorem map_example_instance_relation_stored_comparator_finds_edge
+    : Equal Bool map_example_instance_relation_observed True =
+  Proved
+```
+
 ## 5. Design notes
 
 **Structural induction.** Recursive proofs call themselves on the relevant

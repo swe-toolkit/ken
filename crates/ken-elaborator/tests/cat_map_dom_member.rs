@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv};
-use ken_kernel::{Decl, GlobalId};
+use ken_kernel::{Decl, GlobalId, Term};
 
 const MAP: &str = "Data.Collections.Map";
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
@@ -21,11 +21,16 @@ fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
-fn load_map() -> ElabEnv {
+fn load_map_with_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots(&[catalog_root()], MAP)
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_root()], MAP)
         .expect("Map must roots-load through its declared imports");
-    env
+    (env, owned)
+}
+
+fn load_map() -> ElabEnv {
+    load_map_with_owned().0
 }
 
 /// Promise class: transition sentinel for this proof-only Map increment.
@@ -142,6 +147,38 @@ fn map_qualified_bindings(env: &ElabEnv) -> BTreeMap<String, GlobalId> {
         .collect()
 }
 
+fn map_instance_id(env: &ElabEnv, owned: &[GlobalId], carrier: &str) -> GlobalId {
+    let spelling = format!("Membership_instance_{MAP}.{carrier}");
+    let matches = owned
+        .iter()
+        .copied()
+        .filter(|id| env.globals.get(&spelling) == Some(id))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        matches.len(),
+        1,
+        "{spelling} must select one loader-owned Map instance"
+    );
+    matches[0]
+}
+
+fn references(term: &Term, id: GlobalId) -> bool {
+    matches!(term, Term::Const { id: found, .. } if *found == id)
+        || term
+            .children()
+            .into_iter()
+            .any(|child| references(child, id))
+}
+
+fn projects_member_from(term: &Term, dictionary: GlobalId) -> bool {
+    matches!(term, Term::Proj1(field) if matches!(field.as_ref(),
+        Term::Proj2(record) if matches!(record.as_ref(), Term::Const { id, .. } if *id == dictionary)))
+        || term
+            .children()
+            .into_iter()
+            .any(|child| projects_member_from(child, dictionary))
+}
+
 /// Promise class: durable checked-identity invariant.
 ///
 /// MEASURED: real roots loading omits the private example declarations from
@@ -149,20 +186,50 @@ fn map_qualified_bindings(env: &ElabEnv) -> BTreeMap<String, GlobalId> {
 /// while preserving every Map-qualified name and ID and the trusted-base set.
 /// CLAIMED: private Map law applications and ground comparator witnesses are
 /// kernel checked in their owner, not published or paid for with new trust.
+/// The key/edge instance observations reach `.member` through their two
+/// carrier-resolved `Membership` dictionaries, not through the adapter helpers.
 /// THE GAP: the exact nine-name loader-visible public interface is measured
 /// separately by `map_dom_member_public_surface_transition_sentinel`; the
-/// checked examples are intentionally not runtime observations.
+/// checked examples are intentionally not runtime observations. Both new
+/// rows return True, so a constant-True instance remains outside their
+/// no-use-site-comparator discriminator; absent-query rows still use helpers.
 #[test]
 fn map_private_checked_examples_preserve_names_ids_and_trust() {
-    let mut env = load_map();
+    let (mut env, owned) = load_map_with_owned();
     let before = map_qualified_bindings(&env);
     let trust_before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     assert!(
         !env.globals.contains_key("map_example_size_node"),
         "example-only laws must not be tangled into the loaded module"
     );
+    let instance_examples = [
+        (
+            "map_example_instance_key_observed",
+            "map_example_key_instance_dictionary",
+            "map_example_instance_key_stored_comparator_finds_key",
+            "OrderedKeyMembership",
+        ),
+        (
+            "map_example_instance_relation_observed",
+            "map_example_relation_instance_dictionary",
+            "map_example_instance_relation_stored_comparator_finds_edge",
+            "RelationEdgeMembership",
+        ),
+    ];
+    for (observed, dictionary, theorem, _) in instance_examples {
+        for name in [observed, dictionary, theorem] {
+            assert!(
+                !env.globals.contains_key(name),
+                "{name} must be minted by the fence"
+            );
+            assert!(
+                !before.contains_key(&format!("{MAP}.{name}")),
+                "{name} must not be a loader-visible Map declaration"
+            );
+        }
+    }
     env.execute_loaded_entry_checked_fences(MAP)
-        .expect("Map's generic laws and ground comparator examples must check");
+        .expect("Map's generic laws and instance-resolved ground examples must check");
     for name in [
         "map_example_size_node",
         "map_example_dom_node",
@@ -179,6 +246,12 @@ fn map_private_checked_examples_preserve_names_ids_and_trust() {
         "map_example_stored_relation_comparator_rejects_an_absent_target",
         "map_example_stored_relation_comparator_finds_the_edge",
         "map_example_fresh_canonical_comparator_misses_the_same_edge",
+        "map_example_key_instance_dictionary",
+        "map_example_relation_instance_dictionary",
+        "map_example_instance_key_observed",
+        "map_example_instance_relation_observed",
+        "map_example_instance_key_stored_comparator_finds_key",
+        "map_example_instance_relation_stored_comparator_finds_edge",
     ] {
         let id = env.globals[name];
         assert!(
@@ -196,4 +269,40 @@ fn map_private_checked_examples_preserve_names_ids_and_trust() {
         trust_before,
         "Map checked examples must not add trusted assumptions"
     );
+    let key = map_instance_id(&env, &owned, "OrderedKeyMembership");
+    let relation = map_instance_id(&env, &owned, "RelationEdgeMembership");
+    assert_ne!(
+        key, relation,
+        "distinct Map carriers must use distinct instances"
+    );
+    for (observed, dictionary, _, carrier) in instance_examples {
+        let instance = map_instance_id(&env, &owned, carrier);
+        let observed_id = env.globals[observed];
+        let dictionary_id = env.globals[dictionary];
+        for (name, id) in [(observed, observed_id), (dictionary, dictionary_id)] {
+            assert!(!owned.contains(&id), "{name} must not be tangled into Map");
+        }
+        let Some(Decl::Transparent {
+            body: observed_body,
+            ..
+        }) = env.env.lookup(observed_id)
+        else {
+            panic!("{observed} must be a checked ground observation");
+        };
+        assert!(
+            projects_member_from(observed_body, dictionary_id),
+            "{observed} must project Membership.member from {dictionary}"
+        );
+        let Some(Decl::Transparent {
+            body: dictionary_body,
+            ..
+        }) = env.env.lookup(dictionary_id)
+        else {
+            panic!("{dictionary} must be a checked carrier-resolved dictionary");
+        };
+        assert!(
+            references(dictionary_body, instance),
+            "{dictionary} must resolve to Map's loader-owned {carrier} instance"
+        );
+    }
 }
