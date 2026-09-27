@@ -15,6 +15,11 @@ use ken_kernel::Term;
 use num_bigint::BigInt;
 use tempfile::TempDir;
 
+const STARTUP_SAFE_STUB_TIMEOUT: Duration = Duration::from_secs(5);
+// The delayed stub sleeps for one second and emits a valid refuting model;
+// this shorter deadline makes enforced timeout the only Unknown outcome.
+const DELIBERATE_TIMEOUT_PROBE: Duration = Duration::from_millis(100);
+
 fn equality(elab: &mut ElabEnv) -> ObligationTriple {
     let int_ty = Term::const_(elab.numeric_env.int_id, vec![]);
     let goal = Term::pi(
@@ -72,7 +77,7 @@ fn stub(dir: &TempDir, body: &str) -> Z3ProcessConfig {
     fs::set_permissions(&path, permissions).expect("make stub executable");
     Z3ProcessConfig {
         program: path,
-        timeout: Duration::from_millis(100),
+        timeout: STARTUP_SAFE_STUB_TIMEOUT,
     }
 }
 
@@ -90,7 +95,7 @@ fn delayed_valid_stub(dir: &TempDir) -> Z3ProcessConfig {
     fs::set_permissions(&path, permissions).expect("make delayed stub executable");
     Z3ProcessConfig {
         program: path,
-        timeout: Duration::from_millis(100),
+        timeout: DELIBERATE_TIMEOUT_PROBE,
     }
 }
 
@@ -201,6 +206,6 @@ fn missing_binary_is_not_a_build_requirement() {
     let path = Path::new("/definitely/not/a/z3/binary");
     assert_unknown(Z3ProcessConfig {
         program: path.into(),
-        timeout: Duration::from_millis(100),
+        timeout: STARTUP_SAFE_STUB_TIMEOUT,
     });
 }
