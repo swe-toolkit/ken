@@ -9,8 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::continuations::ContinuationContextId;
 use super::occurrences::StaticOriginId;
+use super::continuations::{ContinuationSpecializationId, StaticContinuationFusionId};
 use super::responses::{StaticResponseContinuation, StaticResponseContinuationId};
-use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit};
+use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit, PredeclaredFunctionId};
 use super::{planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::RuntimeExpr;
 
@@ -26,6 +27,9 @@ pub(in crate::cranelift_backend) struct ReturnedVisMember {
 pub(in crate::cranelift_backend) struct ReturnedVisContext {
     pub(in crate::cranelift_backend) context: ContinuationContextId,
     pub(in crate::cranelift_backend) members: Vec<ReturnedVisMember>,
+    /// Actual generated-call targets visited on this context's returned-result
+    /// route. A raw unit that is not on the route cannot acquire a record tail.
+    pub(in crate::cranelift_backend) returning_units: BTreeSet<PredeclaredFunctionId>,
 }
 
 #[derive(Clone, Debug)]
@@ -46,15 +50,31 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
         BTreeMap<StaticResponseContinuationId, ReturnedVisProtocol>,
     pub(in crate::cranelift_backend) members:
         BTreeMap<StaticOriginId, StaticResponseContinuation>,
-    pub(in crate::cranelift_backend) max_captures: u32,
-    pub(in crate::cranelift_backend) max_continuation_inputs: u32,
+    /// Each function's maximum over only the owner protocols whose return
+    /// paths pass through that exact generated function. Absent means no tail.
+    pub(in crate::cranelift_backend) frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum PendingVisFrameOwner {
+    Unit(PredeclaredFunctionId),
+    Context(ContinuationContextId),
+    ResponseOwner(StaticResponseContinuationId),
+    Continuation(ContinuationSpecializationId),
+    Fusion(StaticContinuationFusionId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct PendingVisFrameWidth {
+    pub(in crate::cranelift_backend) captures: u32,
+    pub(in crate::cranelift_backend) continuation_inputs: u32,
 }
 
 /// The tail of a caller-owned activation frame. Its shape is projected once
 /// from the closed successor population, never from a constructor tag or an
 /// emitter-local count. The caller allocates it; the callee writes it before
 /// returning and the caller copies it into its own frame before its next call.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisFrameRegion {
     pub(in crate::cranelift_backend) discriminant: i32,
     pub(in crate::cranelift_backend) captures: i32,
@@ -65,25 +85,29 @@ pub(in crate::cranelift_backend) struct PendingVisFrameRegion {
 impl PendingVisRecordProtocol {
     pub(in crate::cranelift_backend) fn frame_region(
         &self,
+        frame: PendingVisFrameOwner,
         base_bytes: u32,
-    ) -> Result<PendingVisFrameRegion, CraneliftBackendError> {
+    ) -> Result<Option<PendingVisFrameRegion>, CraneliftBackendError> {
+        let Some(width) = self.frames.get(&frame) else {
+            return Ok(None);
+        };
         let bytes = |words: u32| -> Result<u32, CraneliftBackendError> {
             words.checked_mul(8).ok_or_else(|| planner_error("pending-Vis frame word count exhausted"))
         };
         let captures = base_bytes.checked_add(bytes(1)?)
             .ok_or_else(|| planner_error("pending-Vis discriminant offset exhausted"))?;
-        let continuation_inputs = captures.checked_add(bytes(self.max_captures)?)
+        let continuation_inputs = captures.checked_add(bytes(width.captures)?)
             .ok_or_else(|| planner_error("pending-Vis capture offset exhausted"))?;
-        let frame_bytes = continuation_inputs.checked_add(bytes(self.max_continuation_inputs)?)
+        let frame_bytes = continuation_inputs.checked_add(bytes(width.continuation_inputs)?)
             .ok_or_else(|| planner_error("pending-Vis frame size exhausted"))?;
         let addressable = |offset: u32| i32::try_from(offset)
             .map_err(|_| planner_error("pending-Vis frame offset exceeds addressable range"));
-        Ok(PendingVisFrameRegion {
+        Ok(Some(PendingVisFrameRegion {
             discriminant: addressable(base_bytes)?,
             captures: addressable(captures)?,
             continuation_inputs: addressable(continuation_inputs)?,
             frame_bytes,
-        })
+        }))
     }
 }
 
@@ -96,8 +120,7 @@ impl StaticTransitionPlan<'_> {
     ) -> Result<Option<PendingVisRecordProtocol>, CraneliftBackendError> {
         let mut owners = BTreeMap::new();
         let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
-        let mut max_captures = 0u32;
-        let mut max_continuation_inputs = 0u32;
+        let mut frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth> = BTreeMap::new();
         for owner in &self.static_response_continuations {
             let Ok(protocol) = self.returned_vis_protocol(owner.vis_origin()) else {
                 // No partial protocol: the existing Ret-only owner stays intact.
@@ -106,6 +129,10 @@ impl StaticTransitionPlan<'_> {
             if protocol.excluded_by_relay || protocol.contexts.iter().all(|ctx| ctx.members.is_empty()) {
                 continue;
             }
+            let mut width = PendingVisFrameWidth {
+                captures: 0,
+                continuation_inputs: 0,
+            };
             for member in protocol.contexts.iter().flat_map(|context| &context.members) {
                 let row = member.successor.as_ref().ok_or_else(|| {
                     planner_error("a pending-Vis member has no exact successor response row")
@@ -116,9 +143,9 @@ impl StaticTransitionPlan<'_> {
                 if row.id().ordinal() == u32::MAX {
                     return Err(planner_error("pending-Vis discriminant exhausted"));
                 }
-                max_captures = max_captures.max(u32::try_from(row.captures().len())
+                width.captures = width.captures.max(u32::try_from(row.captures().len())
                     .map_err(|_| planner_error("pending-Vis capture run exhausted"))?);
-                max_continuation_inputs = max_continuation_inputs.max(
+                width.continuation_inputs = width.continuation_inputs.max(
                     u32::try_from(row.continuation_inputs().len())
                         .map_err(|_| planner_error("pending-Vis continuation input run exhausted"))?
                 );
@@ -128,13 +155,26 @@ impl StaticTransitionPlan<'_> {
                     }
                 }
             }
+            // The owner calls its K contexts. The result walk's generated
+            // Call edges add exact raw unit targets. Other function classes
+            // stay unmarked; a returned-Vis producer outside a marked frame
+            // refuses at its construct instead of silently allocating there.
+            let chain = std::iter::once(PendingVisFrameOwner::ResponseOwner(owner.id()))
+                .chain(protocol.contexts.iter().map(|context|
+                    PendingVisFrameOwner::Context(context.context)))
+                .chain(protocol.contexts.iter().flat_map(|context|
+                    context.returning_units.iter().copied().map(PendingVisFrameOwner::Unit)));
+            for frame in chain {
+                let entry = frames.entry(frame).or_insert(width);
+                entry.captures = entry.captures.max(width.captures);
+                entry.continuation_inputs = entry.continuation_inputs.max(width.continuation_inputs);
+            }
             owners.insert(owner.id(), protocol);
         }
         Ok((!owners.is_empty()).then_some(PendingVisRecordProtocol {
             owners,
             members,
-            max_captures,
-            max_continuation_inputs,
+            frames,
         }))
     }
 
@@ -185,10 +225,11 @@ impl StaticTransitionPlan<'_> {
         body: StaticOriginId,
         units: &[EmittableUnit<'_>],
         edges: &[EmittableCallEdge],
-    ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+    ) -> Result<(BTreeSet<StaticOriginId>, BTreeSet<PredeclaredFunctionId>), CraneliftBackendError> {
         let mut pending = vec![body];
         let mut seen = BTreeSet::new();
         let mut returned = BTreeSet::new();
+        let mut returning_units = BTreeSet::new();
         while let Some(origin) = pending.pop() {
             if !seen.insert(origin) {
                 continue;
@@ -253,6 +294,7 @@ impl StaticTransitionPlan<'_> {
                         )));
                     }
                     for target in targets {
+                        returning_units.insert(target);
                         let body = units.iter().find(|unit| unit.function() == target)
                             .ok_or_else(|| planner_error(format!(
                                 "returned-Vis Call at {origin:?} has no generated target {target:?}",
@@ -277,7 +319,7 @@ impl StaticTransitionPlan<'_> {
                 }
             }
         }
-        Ok(returned)
+        Ok((returned, returning_units))
     }
 
     /// Resolve a response owner's complete returned-Vis K-context fixpoint.
@@ -311,7 +353,7 @@ impl StaticTransitionPlan<'_> {
                 .ok_or_else(|| {
                     planner_error("returned-Vis successor has no generated K context")
                 })?;
-            let origins =
+            let (origins, returning_units) =
                 self.returned_vis_in_context(context.worker_body_origin(), &units, &edges)?;
             let mut members = Vec::new();
             for origin in origins {
@@ -376,6 +418,7 @@ impl StaticTransitionPlan<'_> {
             results.push(ReturnedVisContext {
                 context: context_id,
                 members,
+                returning_units,
             });
         }
         results.sort_by_key(|context| context.context);
@@ -441,7 +484,8 @@ mod tests {
         let observed = plan
             .returned_vis_in_context(root, &units, &edges)
             .expect("the generated result is forwarded");
-        assert_eq!(observed, BTreeSet::from([callee_body]));
+        assert_eq!(observed.0, BTreeSet::from([callee_body]));
+        assert_eq!(observed.1.len(), 1, "the returned unit call is on the chain");
         assert!(plan
             .returned_vis_in_context(root, &units, &[])
             .expect_err("a missing generated edge must refuse")

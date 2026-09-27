@@ -435,8 +435,10 @@ impl Lowering<'_> {
             "pending-Vis record-store verifier: {why}",
         ));
         let facts = &self.function_local.pending_vis_slot_stores;
+        let sites = &self.function_local.pending_vis_copy_sites;
+        let producers = &self.function_local.pending_vis_producer_sites;
         let Some(frame) = self.function_local.pending_vis_frame else {
-            if !facts.is_empty() {
+            if !facts.is_empty() || !sites.is_empty() || !producers.is_empty() {
                 return Err(error("a generated body wrote a record without its frame"));
             }
             return Ok(());
@@ -445,6 +447,13 @@ impl Lowering<'_> {
         let mut dom = cranelift_codegen::dominator_tree::DominatorTree::new();
         dom.compute(func, &cfg);
         let mut expected = BTreeMap::new();
+        let mut copied = BTreeMap::new();
+        for site in sites {
+            if site.destination != frame.region
+                || copied.insert((site.call, site.copy_guard), BTreeSet::new()).is_some() {
+                return Err(error("a copy site has the wrong frame or repeats its call"));
+            }
+        }
         for fact in facts {
             if expected.insert(fact.inst, fact).is_some() {
                 return Err(error("a record store was recorded twice"));
@@ -523,6 +532,14 @@ impl Lowering<'_> {
                             call, status_guard, trap_guard, trap_load, trap_offset,
                             member_load, member_offset, copy_guard,
                         } => {
+                            let positions = copied.get_mut(&(call, copy_guard))
+                                .ok_or_else(|| error("a copy store has no declared call site"))?;
+                            let site = sites.iter().find(|site|
+                                site.call == call && site.copy_guard == copy_guard)
+                                .ok_or_else(|| error("a copy store has no declared call site"))?;
+                            if site.source != source_region || !positions.insert(offset) {
+                                return Err(error("a copy store repeats a field or changes its source region"));
+                            }
                             // Position correspondence is checked against the
                             // two planner regions, not the emitter's recorded
                             // source offset. A same-shaped sibling capture
@@ -544,6 +561,9 @@ impl Lowering<'_> {
                             let status = func.dfg.inst_results(call).first().copied();
                             let trap = func.dfg.inst_results(trap_load).first().copied();
                             let member = func.dfg.inst_results(member_load).first().copied();
+                            if func.sized_stack_slots[source].size != source_region.frame_bytes {
+                                return Err(error("a copied callee frame has the wrong tail size"));
+                            }
                             if !stack_word(load, source, source_offset)
                                 || !stack_word(trap_load, source, trap_offset)
                                 || !stack_word(member_load, source, member_offset)
@@ -597,6 +617,76 @@ impl Lowering<'_> {
         }
         if !expected.is_empty() {
             return Err(error("a recorded pending-Vis store was not emitted"));
+        }
+        // A ledger of stores alone cannot detect omitting both a store and
+        // its fact. Start from each call site, then demand every common field
+        // of its two distinct planner regions plus the member discriminant.
+        let positions = |start: i32, bytes: i32|
+            -> Result<BTreeSet<i32>, CraneliftBackendError> {
+            if bytes < 0 || bytes % 8 != 0 {
+                return Err(error("a copy site has an invalid record width"));
+            }
+            (0..bytes / 8).map(|index| {
+                start.checked_add(index * 8)
+                    .ok_or_else(|| error("a copy site offset exhausted"))
+            }).collect()
+        };
+        for site in sites {
+            let source_end = i32::try_from(site.source.frame_bytes)
+                .map_err(|_| error("a copy source frame exceeds addressable range"))?;
+            let dest_end = i32::try_from(site.destination.frame_bytes)
+                .map_err(|_| error("a copy destination frame exceeds addressable range"))?;
+            let mut required = BTreeSet::from([site.destination.discriminant]);
+            required.extend(positions(site.destination.captures,
+                (site.source.continuation_inputs - site.source.captures)
+                    .min(site.destination.continuation_inputs - site.destination.captures))?);
+            required.extend(positions(site.destination.continuation_inputs,
+                (source_end - site.source.continuation_inputs)
+                    .min(dest_end - site.destination.continuation_inputs))?);
+            if copied.get(&(site.call, site.copy_guard)) != Some(&required) {
+                return Err(error("copy-up omitted or added a planned record field"));
+            }
+        }
+        let protocol = self.pending_vis_record_protocol.as_ref()
+            .ok_or_else(|| error("a producer has no checked returned-Vis plan"))?;
+        let mut seen_members = BTreeSet::new();
+        for site in producers {
+            if !seen_members.insert(site.member) {
+                return Err(error("a producer's member store was recorded twice"));
+            }
+            let mut rows = protocol.members.values().filter(|row| row.id() == site.row);
+            let row = rows.next().ok_or_else(|| error("a producer has no exact successor row"))?;
+            if rows.next().is_some() {
+                return Err(error("a producer's successor row is ambiguous"));
+            }
+            let member = facts.iter().find(|fact| fact.inst == site.member)
+                .ok_or_else(|| error("a producer omitted its member store"))?;
+            if member.offset != frame.region.discriminant
+                || !matches!(member.source, PendingVisStoreSource::Member(id) if id == site.row) {
+                return Err(error("a producer changed its member store"));
+            }
+            let capture_offsets = row.captures().iter().enumerate().map(|(index, _)|
+                (frame.region.captures, index))
+                .chain(row.continuation_inputs().iter().enumerate().map(|(index, _)|
+                    (frame.region.continuation_inputs, index)))
+                .map(|(start, index)| {
+                    let delta = index.checked_mul(8).and_then(|value| i32::try_from(value).ok())
+                        .ok_or_else(|| error("a producer capture offset exhausted"))?;
+                    start.checked_add(delta)
+                        .ok_or_else(|| error("a producer capture offset exhausted"))
+                }).collect::<Result<Vec<_>, _>>()?;
+            if site.capture_stores.len() != capture_offsets.len() {
+                return Err(error("a producer omitted a planned record field"));
+            }
+            for (&inst, expected_offset) in site.capture_stores.iter().zip(capture_offsets) {
+                let fact = facts.iter().find(|fact| fact.inst == inst)
+                    .ok_or_else(|| error("a producer omitted a planned record field"))?;
+                if fact.offset != expected_offset
+                    || !matches!(fact.source, PendingVisStoreSource::Captured(_))
+                    || !dom.dominates(inst, site.member, &func.layout) {
+                    return Err(error("a producer changed a planned field or wrote after its member"));
+                }
+            }
         }
         Ok(())
     }
@@ -885,6 +975,9 @@ pub(in crate::cranelift_backend) struct ResolvedUnitTarget {
 #[derive(Clone)]
 pub(in crate::cranelift_backend) struct DeclaredUnitCall {
     pub(in crate::cranelift_backend) function: FuncRef,
+    /// The exact emitted function identity, never inferred from an origin or
+    /// destination ABI. Only a planner-marked protocol chain has a frame tail.
+    pub(in crate::cranelift_backend) frame_owner: Option<PendingVisFrameOwner>,
     /// The callee's scheduling entry -- `RT-CONTSPEC-ACTIVATE` `D1b` keeps
     /// this as the target origin.
     pub(in crate::cranelift_backend) origin: StaticOriginId,
@@ -916,6 +1009,7 @@ impl CallEdgeTargets {
         for target in self.targets_in(caller) {
             let call = DeclaredUnitCall {
                 function: module.declare_func_in_func(target.function, func),
+                frame_owner: Some(PendingVisFrameOwner::Unit(target.callee)),
                 origin: target.origin,
                 call_site_origin: target.call_site_origin,
                 header: target.header,
@@ -1118,6 +1212,7 @@ impl CallEdgeTargets {
                 body,
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target.function, func),
+                    frame_owner: Some(PendingVisFrameOwner::Unit(target.callee)),
                     origin: target.origin,
                     call_site_origin: target.call_site_origin,
                     header: target.header,
@@ -1239,6 +1334,7 @@ impl WorkerTargets {
                     *origin,
                     DeclaredUnitCall {
                         function: module.declare_func_in_func(target.function, func),
+                        frame_owner: Some(PendingVisFrameOwner::Unit(target.callee)),
                         origin: target.origin,
                         call_site_origin: target.call_site_origin,
                         header: target.header,
@@ -3923,6 +4019,9 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     })?;
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target, &mut func),
+                    frame_owner: Some(PendingVisFrameOwner::Continuation(
+                        emission.row.k_specialization(),
+                    )),
                     origin: emission.row.k_body_origin(),
                     call_site_origin: emission.row.k_body_origin(),
                     header: emission.owner.header(),
@@ -4016,9 +4115,14 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             )?;
             function_local.bind_pending_vis_frame(
                 compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::ResponseOwner(emission.row.id()),
                 frame,
                 emission.owner.header().frame_bytes,
             )?;
+            #[cfg(feature = "px8-ds-test-support")]
+            record_pending_vis_owner_frame_observation(
+                emission.row.vis_origin(), function_local.pending_vis_frame,
+            );
 
             let mut frame_inputs = BTreeMap::new();
             let mut descriptor_inputs = Vec::new();
@@ -4445,7 +4549,11 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         if let Some(pending) = pending_finished.as_ref() {
             let region = compiler.pending_vis_record_protocol.as_ref()
                 .ok_or_else(|| backend_module("the pending-Vis verifier lost the closed plan".to_string()))?
-                .frame_region(emission.owner.header().frame_bytes)?;
+                .frame_region(
+                    PendingVisFrameOwner::ResponseOwner(emission.row.id()),
+                    emission.owner.header().frame_bytes,
+                )?
+                .ok_or_else(|| backend_module("a pending-Vis owner has no planned record tail".to_string()))?;
             verify_pending_vis_finished_body(
                 &func, pending, &emission.row, &emission.successors, region,
             )?;
@@ -4888,6 +4996,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 unit.worker_body_origin,
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target, &mut func),
+                    frame_owner: Some(PendingVisFrameOwner::Context(context.id())),
                     // The context EXECUTES that body, so the origin it answers
                     // for is unchanged. ⛔ Read from the CONTEXT, not from the
                     // asking unit: taking it from `unit` is what made
@@ -4987,7 +5096,8 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
-                compiler.pending_vis_record_protocol.as_ref(), frame, unit.frame_bytes,
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Continuation(unit.id), frame, unit.frame_bytes,
             )?;
             compiler.function_local = function_local;
 
@@ -5488,7 +5598,8 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
-                compiler.pending_vis_record_protocol.as_ref(), frame, context.frame_bytes,
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Context(context.id), frame, context.frame_bytes,
             )?;
             if let Some(access) = &context.checked_ih_generated_entry_access {
                 if access.context() != context.id
@@ -6083,6 +6194,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             fusion_self_edge_identities(fusion.producer_body, fusion.consuming_call);
         let self_edge = DeclaredUnitCall {
             function: module.declare_func_in_func(id, &mut func),
+            frame_owner: Some(PendingVisFrameOwner::Fusion(fusion.id)),
             origin: self_edge_body,
             call_site_origin: self_edge_call_site,
             header: fusion.header,
@@ -6205,7 +6317,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
-                compiler.pending_vis_record_protocol.as_ref(), frame, fusion.header.frame_bytes,
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Fusion(fusion.id), frame, fusion.header.frame_bytes,
             )?;
             compiler.function_local = function_local;
             compiler.open_aggregate_events(id)?;
@@ -6572,6 +6685,7 @@ fn redirect_fused_producer_invocations<M: Module>(
     for (fusion, seat, callee_origin, target, header, slots, offsets) in redirects {
         let call = DeclaredUnitCall {
             function: module.declare_func_in_func(target, func),
+            frame_owner: Some(PendingVisFrameOwner::Fusion(fusion)),
             origin: callee_origin,
             call_site_origin: seat,
             header,
@@ -6647,6 +6761,7 @@ pub(super) fn define_root_adapter<M: Module>(
         root_origin,
         DeclaredUnitCall {
             function: module.declare_func_in_func(root_id, &mut func),
+            frame_owner: Some(PendingVisFrameOwner::Unit(root.function())),
             origin: root_origin,
             // The body occurrence, NOT the scheduling entry. They coincide
             // for an ordinary root and deliberately do not when the root body
@@ -7431,6 +7546,7 @@ impl ContinuationClaimLedger {
                     identity.clone(),
                     DeclaredUnitCall {
                         function: module.declare_func_in_func(*target, func),
+                        frame_owner: Some(PendingVisFrameOwner::Continuation(unit.id())),
                         origin: unit.continuation_origin(),
                         call_site_origin: unit.continuation_origin(),
                         header: unit.header(),
@@ -8413,6 +8529,7 @@ fn declare_response_context_call_in_func<M: Module>(
     let (offsets, _frame_bytes) = context.slot_offsets()?;
     Ok(DeclaredUnitCall {
         function: module.declare_func_in_func(target, func),
+        frame_owner: Some(PendingVisFrameOwner::Context(context.id())),
         origin: context.worker_body_origin(),
         call_site_origin: context.worker_body_origin(),
         header: context.header(),
@@ -8439,6 +8556,7 @@ pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
             context.id(),
             DeclaredUnitCall {
                 function: module.declare_func_in_func(target, func),
+                frame_owner: Some(PendingVisFrameOwner::Context(context.id())),
                 // The context EXECUTES this body, so the origin it answers for
                 // is unchanged and the source edge it serves is untouched.
                 origin: context.worker_body_origin(),
@@ -8896,7 +9014,8 @@ fn define_unit_body<M: Module>(
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
-                compiler.pending_vis_record_protocol.as_ref(), slots, unit.frame_bytes,
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Unit(unit.function), slots, unit.frame_bytes,
             )?;
         }
         compiler.function_local = function_local;

@@ -169,7 +169,10 @@ pub use planning::{
 };
 
 #[cfg(feature = "px8-ds-test-support")]
-pub use lowering::{with_returned_vis_capture_observations, ReturnedVisCaptureObservation};
+pub use lowering::{
+    with_pending_vis_owner_frame_observations, with_returned_vis_capture_observations,
+    PendingVisOwnerFrameObservation, ReturnedVisCaptureObservation,
+};
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::calls::with_placeholder_nonowner_target_mutation;
 

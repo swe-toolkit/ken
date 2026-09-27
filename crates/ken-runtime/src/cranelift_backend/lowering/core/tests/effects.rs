@@ -111,6 +111,8 @@ fn run_checked_bounded_nat_fixture(
             static_response_owner: None,
             pending_vis_frame: None,
             pending_vis_slot_stores: Vec::new(),
+            pending_vis_copy_sites: Vec::new(),
+            pending_vis_producer_sites: Vec::new(),
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,

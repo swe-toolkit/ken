@@ -566,14 +566,17 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     ];
     for &(label, source, owner, expected) in fixtures {
         let dir = output_dir(label);
-        let ((compiled, plans), captures) = ken_runtime::with_returned_vis_capture_observations(|| {
-            ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
-                    source, ken_cli::SourceFormat::Ken, label, dir.path(),
-                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                )
-            })
-        });
+        let (((compiled, plans), captures), frames) =
+            ken_runtime::with_pending_vis_owner_frame_observations(|| {
+                ken_runtime::with_returned_vis_capture_observations(|| {
+                    ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                        ken_cli::build_native_program(
+                            source, ken_cli::SourceFormat::Ken, label, dir.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    })
+                })
+            });
         let _output = compiled.expect("static-operation fixture compiles without execution");
         let observed = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
             .filter(|protocol| protocol.owner_origin == owner).collect::<Vec<_>>();
@@ -590,6 +593,25 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
             (*context, members.iter().map(|member| member.origin).collect::<BTreeSet<_>>())
         ).collect::<BTreeMap<_, _>>();
         assert_eq!(actual, expected, "{label}: actual returned-origin fixpoint");
+        let owner_frames = frames.iter().filter(|frame| frame.owner_origin == owner)
+            .collect::<Vec<_>>();
+        assert_eq!(owner_frames.len(), 1,
+            "{label}: actual response-owner frame was not emitted exactly once");
+        let expected_capture_width = observed.contexts.iter()
+            .flat_map(|(_, members)| members)
+            .map(|member| member.capture_origins.len())
+            .max().expect("a protocol has a nonempty successor set");
+        let width = owner_frames[0].widths.expect("the active owner needs a record tail");
+        assert_eq!(usize::try_from(width.0).unwrap(), expected_capture_width,
+            "{label}: owner capture tail must match its own successor fixpoint");
+        let expected_input_width = observed.contexts.iter()
+            .flat_map(|(_, members)| members)
+            .map(|member| member.continuation_input_count
+                .expect("a returned member needs one existing response row"))
+            .max().expect("a protocol has a successor row");
+        assert_eq!(usize::try_from(width.1).unwrap(), expected_input_width,
+            "{label}: owner input tail must match its own successor fixpoint");
+        eprintln!("RT-OWNER-VIS FRAME {label} owner={owner} widths={width:?} all={frames:?}");
         for (_, members) in &observed.contexts {
             for member in members {
                 assert!(!member.relay, "{label}: a returned member needs relay representation");
@@ -632,11 +654,13 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
         }
     }
     let dir = output_dir("escape-protocol-empty-control");
-    let (compiled, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-        ken_cli::build_native_program(
-            ESCAPE_CLOSED, ken_cli::SourceFormat::Ken, "escape-protocol-empty-control",
-            dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-        )
+    let ((compiled, plans), frames) = ken_runtime::with_pending_vis_owner_frame_observations(|| {
+        ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            ken_cli::build_native_program(
+                ESCAPE_CLOSED, ken_cli::SourceFormat::Ken, "escape-protocol-empty-control",
+                dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        })
     });
     let _output = compiled.expect("unaffected owner compiles");
     let protocols = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
@@ -644,8 +668,18 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     let empty = protocols.iter().find(|protocol| protocol.error.is_none()
         && !protocol.excluded_by_relay && !protocol.contexts.is_empty()
         && protocol.contexts.iter().all(|(_, members)| members.is_empty()));
-    assert!(empty.is_some(), "unaffected empty-successor owner was not exercised: {protocols:?}");
-    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?}");
+    let empty = empty.unwrap_or_else(||
+        panic!("unaffected empty-successor owner was not exercised: {protocols:?}"));
+    let empty_owner = plans.iter().flat_map(|plan| &plan.all_static_response_rows)
+        .find(|row| row.vis_origin == empty.owner_origin)
+        .expect("the empty-successor protocol belongs to a generated response owner");
+    let empty_frames = frames.iter().filter(|frame|
+        frame.owner_origin == empty_owner.vis_origin).collect::<Vec<_>>();
+    assert_eq!(empty_frames.len(), 1,
+        "empty-successor owner was not emitted exactly once: {frames:?}");
+    assert!(empty_frames.iter().all(|frame| frame.widths.is_none()),
+        "an owner with no successors acquired a record tail: {frames:?}");
+    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?} frames={frames:?}");
 }
 
 /// Promise class: durable invariant. MEASURED: the same licensed placeholder

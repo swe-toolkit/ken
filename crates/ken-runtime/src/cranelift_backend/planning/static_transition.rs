@@ -22,7 +22,7 @@ mod occurrences;
 mod responses;
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
-    PendingVisFrameRegion, PendingVisRecordProtocol,
+    PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
 };
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
@@ -1097,6 +1097,7 @@ pub struct ReturnedVisMemberObservation {
     pub successor_context: Option<u32>,
     pub effect_origin: Option<u32>,
     pub capture_origins: Vec<u32>,
+    pub continuation_input_count: Option<usize>,
     pub installed: bool,
     pub relay: bool,
 }
@@ -1262,6 +1263,8 @@ fn record_static_response_feasibility_diagnostic(
                                 capture_origins: row.map(|row| row.captures().iter()
                                     .map(|capture| capture.origin().0).collect())
                                     .unwrap_or_default(),
+                                continuation_input_count:
+                                    row.map(|row| row.continuation_inputs().len()),
                                 installed: member.installed,
                                 relay: member.relay,
                             }

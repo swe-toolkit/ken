@@ -80,7 +80,8 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
 pub(in crate::cranelift_backend) use static_transition::{
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
-    FusionRegionClaimLedger, PendingVisFrameRegion, PendingVisRecordProtocol,
+    FusionRegionClaimLedger, PendingVisFrameOwner, PendingVisFrameRegion,
+    PendingVisRecordProtocol,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///

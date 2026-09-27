@@ -2842,17 +2842,16 @@ impl FunctionLocalRefs {
     pub(super) fn bind_pending_vis_frame(
         &mut self,
         protocol: Option<&PendingVisRecordProtocol>,
+        owner: PendingVisFrameOwner,
         slots: cranelift_codegen::ir::Value,
         base_bytes: u32,
     ) -> Result<(), CraneliftBackendError> {
-        if let Some(protocol) = protocol {
+        if let Some(region) = protocol.map(|protocol| protocol.frame_region(owner, base_bytes))
+            .transpose()?.flatten() {
             if self.pending_vis_frame.is_some() {
                 return Err(backend_module("pending-Vis activation frame was bound twice".to_string()));
             }
-            self.pending_vis_frame = Some(PendingVisFrame {
-                slots,
-                region: protocol.frame_region(base_bytes)?,
-            });
+            self.pending_vis_frame = Some(PendingVisFrame { slots, region });
         }
         Ok(())
     }

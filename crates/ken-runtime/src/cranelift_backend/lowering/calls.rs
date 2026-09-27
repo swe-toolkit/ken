@@ -2075,8 +2075,11 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .predeclared_boundary_closure_environment(target.origin)?;
             let pending_region = self.pending_vis_record_protocol.as_ref()
-                .map(|protocol| protocol.frame_region(target.header.frame_bytes))
-                .transpose()?;
+                .zip(target.frame_owner)
+                .map(|(protocol, frame)|
+                    protocol.frame_region(frame, target.header.frame_bytes))
+                .transpose()?
+                .flatten();
             let payload = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
                 pending_region.map_or(target.header.frame_bytes, |region| region.frame_bytes),
@@ -2404,8 +2407,7 @@ impl<'a> Lowering<'a> {
             builder.seal_block(trap_block);
             builder.switch_to_block(result_block);
             builder.seal_block(result_block);
-            if let (Some(protocol), Some(source), Some(destination)) = (
-                self.pending_vis_record_protocol.as_ref(),
+            if let (Some(source), Some(destination)) = (
                 pending_region,
                 self.function_local.pending_vis_frame,
             ) {
@@ -2423,6 +2425,9 @@ impl<'a> Lowering<'a> {
                 let copy = builder.create_block();
                 let ready = builder.create_block();
                 let copy_guard = builder.ins().brif(present, copy, &[], ready, &[]);
+                self.function_local.pending_vis_copy_sites.push(PendingVisCopySite {
+                    call, copy_guard, source, destination: destination.region,
+                });
                 builder.switch_to_block(copy);
                 let mut copy_facts = Vec::new();
                 let mut copy_words = |builder: &mut FunctionBuilder<'_>,
@@ -2455,11 +2460,34 @@ impl<'a> Lowering<'a> {
                     }
                     Ok(())
                 };
+                // Shared frames take the maximum over their *own* chains.
+                // This target may belong to fewer chains than its caller;
+                // copy only their common planned positions, never a global
+                // width or an uninitialized word beyond the callee's tail.
+                let common_words = |source_start: i32, source_end: i32,
+                                    dest_start: i32, dest_end: i32|
+                    -> Result<u32, CraneliftBackendError> {
+                    let source_bytes = source_end.checked_sub(source_start)
+                        .ok_or_else(|| backend_module("pending-Vis source region is inverted".to_string()))?;
+                    let dest_bytes = dest_end.checked_sub(dest_start)
+                        .ok_or_else(|| backend_module("pending-Vis destination region is inverted".to_string()))?;
+                    if source_bytes % 8 != 0 || dest_bytes % 8 != 0 {
+                        return Err(backend_module("pending-Vis region is not word-aligned".to_string()));
+                    }
+                    u32::try_from(source_bytes.min(dest_bytes) / 8)
+                        .map_err(|_| backend_module("pending-Vis copy width exceeds range".to_string()))
+                };
                 copy_words(builder, source.captures, destination.region.captures,
-                    protocol.max_captures)?;
+                    common_words(source.captures, source.continuation_inputs,
+                        destination.region.captures, destination.region.continuation_inputs)?)?;
+                let source_end = i32::try_from(source.frame_bytes)
+                    .map_err(|_| backend_module("pending-Vis source frame exceeds addressable range".to_string()))?;
+                let dest_end = i32::try_from(destination.region.frame_bytes)
+                    .map_err(|_| backend_module("pending-Vis destination frame exceeds addressable range".to_string()))?;
                 copy_words(builder, source.continuation_inputs,
                     destination.region.continuation_inputs,
-                    protocol.max_continuation_inputs)?;
+                    common_words(source.continuation_inputs, source_end,
+                        destination.region.continuation_inputs, dest_end)?)?;
                 let member_store = builder.ins().store(MemFlags::trusted(), member,
                     destination.slots, destination.region.discriminant);
                 copy_facts.push(PendingVisSlotStore {

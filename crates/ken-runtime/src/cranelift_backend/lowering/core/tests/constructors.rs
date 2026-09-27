@@ -256,6 +256,8 @@ fn run_dynamic_constructor_dispatch_fixture(
             static_response_owner: None,
             pending_vis_frame: None,
             pending_vis_slot_stores: Vec::new(),
+            pending_vis_copy_sites: Vec::new(),
+            pending_vis_producer_sites: Vec::new(),
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
@@ -2001,6 +2003,8 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             static_response_owner: None,
             pending_vis_frame: None,
             pending_vis_slot_stores: Vec::new(),
+            pending_vis_copy_sites: Vec::new(),
+            pending_vis_producer_sites: Vec::new(),
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
@@ -6732,6 +6736,7 @@ fn worker_descriptor(
 fn worker_call_target(template: units::WorkerTemplate) -> units::DeclaredUnitCall {
     units::DeclaredUnitCall {
         function: cranelift_codegen::ir::FuncRef::from_u32(0),
+        frame_owner: None,
         origin: template.origin,
         call_site_origin: template.call_site_origin,
         header: template.header,
