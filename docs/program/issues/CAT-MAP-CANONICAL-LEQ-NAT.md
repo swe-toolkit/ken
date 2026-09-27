@@ -78,4 +78,9 @@ import-cycle constraint.
    renamed self-recursive copy passes. Keyed on definitional (not
    structural) equivalence (evt_401q33apra6qw, ruled evt_ntwgkpzk0hga:
    disclosed as THE GAP in the pin; factoring review is the backstop).
-   Next trigger 3.
+2. A source-text consumer (an exact-line import mutation in
+   `cat_map_bool_and_owner`) was missed because the AC-0 consumer sweep was
+   by name, not by mechanism; the combined import line removed the line the
+   control replaces. Keyed on exact source-text spelling of an edited line
+   (CI red run 36351135377, ruled evt_69sc92fjt908e: split the import, test
+   unchanged). Next trigger 3.
