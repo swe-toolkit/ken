@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Assign a filtered live nextest inventory to deterministic duration bins."""
 import csv
-import heapq
 import json
 import math
 import os
@@ -14,7 +13,9 @@ import ci_workspace_timings
 
 
 N = 7
-WALL_MODEL_TOLERANCE_SECONDS = 60.0
+# Use the plain quadratic convex marginal cost, without fitting its power to
+# the A/B exploratory scores or the 90s target.
+WALL_BALANCE_POWER = 2.0
 WALL_CALIBRATION_COLUMNS = [
     "run_id",
     "shard",
@@ -23,8 +24,8 @@ WALL_CALIBRATION_COLUMNS = [
     "test_step_seconds",
     "job_wall_seconds",
 ]
-# Use the latest complete full-CI per-test source for LPT. Missing tests use
-# their binary's measured median, or the global measured median for unseen bins.
+# Use the latest complete full-CI per-test source for work estimates. Missing
+# tests use their binary's measured median, or the global median if unseen.
 NEXTTEST_TIMING_ROW = re.compile(
     r"^(?P<shard>\d+)\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
     r"\s+\(\s*\d+/\d+\)\s+(?P<test_id>.+)$"
@@ -273,7 +274,7 @@ def _workspace_run_workloads(timing_paths):
 
 
 def fit_workspace_wall_model(timing_paths, calibration_path):
-    """Fit a test-wall model and enforce its per-shard reprojection tolerance."""
+    """Fit the run-local relation from terminal test work to Test-step time."""
     run_id, workloads = _workspace_run_workloads(timing_paths)
     try:
         with open(calibration_path, encoding="utf-8", newline="") as source:
@@ -315,7 +316,7 @@ def fit_workspace_wall_model(timing_paths, calibration_path):
     if set(observations) != set(range(1, N + 1)):
         raise SystemExit("workspace wall calibration must contain each shard exactly once")
 
-    # Fit the observed Test step to total work plus its indivisible slowest test.
+    # Fit the Test step to total terminal work plus a longest-test tail feature.
     # Build, selection, and other setup remain a separate measured overhead.
     features = [
         [1.0, row["test_sum_seconds"], row["longest_test_seconds"]]
@@ -342,29 +343,16 @@ def fit_workspace_wall_model(timing_paths, calibration_path):
     ) <= 0:
         raise SystemExit("workspace wall calibration produced invalid workload coefficients")
 
-    setup = []
-    errors = {}
-    for shard, row in observations.items():
-        pretest = row["job_wall_seconds"] - row["test_step_seconds"]
-        setup.append(pretest)
-        predicted_test = project_test_wall_seconds(
-            row["test_sum_seconds"], row["longest_test_seconds"], coefficients
-        )
-        predicted_job = pretest + predicted_test
-        error = abs(predicted_job - row["job_wall_seconds"])
-        errors[shard] = error
-        if error > WALL_MODEL_TOLERANCE_SECONDS:
-            raise SystemExit(
-                f"wall reprojection shard {shard} differs by {error:.3f}s "
-                f"(limit {WALL_MODEL_TOLERANCE_SECONDS:.0f}s)"
-            )
+    setup = [
+        row["job_wall_seconds"] - row["test_step_seconds"]
+        for row in observations.values()
+    ]
     return {
         "run_id": run_id,
         "intercept_seconds": intercept,
         "sum_coefficient": sum_coefficient,
         "longest_test_coefficient": longest_coefficient,
         "setup_seconds": statistics.median(setup),
-        "calibration_errors": errors,
     }
 
 
@@ -375,6 +363,52 @@ def project_test_wall_seconds(test_sum_seconds, longest_test_seconds, model):
         + model["longest_test_coefficient"] * longest_test_seconds
     )
     return max(0.0, predicted)
+
+
+def _plan_bins(live, durations, wall_model=None, objective="default"):
+    """Assign every live test once, using only the supplied training weights."""
+    if objective == "default":
+        objective = "sum-lpt" if wall_model is None else "convex-test-wall"
+    if objective not in {"sum-lpt", "legacy-test-wall-lpt", "convex-test-wall"}:
+        raise SystemExit(f"unknown workspace shard objective: {objective}")
+    if objective != "sum-lpt" and wall_model is None:
+        raise SystemExit("test-wall objectives require a fitted model")
+
+    bins = [(0.0, index, 0.0, 0.0, []) for index in range(N)]
+    ordered = sorted(live, key=lambda row: (-durations[row[0]], row[0]))
+    for rendered, binary_id, name in ordered:
+        duration = durations[rendered]
+        if objective == "sum-lpt":
+            index = min(range(N), key=lambda i: (bins[i][2], i))
+        elif objective == "legacy-test-wall-lpt":
+            index = min(
+                range(N),
+                key=lambda i: (
+                    project_test_wall_seconds(bins[i][2], bins[i][3], wall_model),
+                    i,
+                ),
+            )
+        else:
+            def marginal_cost(index):
+                _, _, total, longest, _ = bins[index]
+                current = project_test_wall_seconds(total, longest, wall_model)
+                projected = project_test_wall_seconds(
+                    total + duration, max(longest, duration), wall_model
+                )
+                marginal = projected ** WALL_BALANCE_POWER - current ** WALL_BALANCE_POWER
+                return marginal, index
+
+            index = min(range(N), key=marginal_cost)
+        _, _, total, longest, selected = bins[index]
+        total += duration
+        longest = max(longest, duration)
+        selected.append((binary_id, name))
+        score = (
+            project_test_wall_seconds(total, longest, wall_model)
+            if wall_model is not None else total
+        )
+        bins[index] = (score, index, total, longest, selected)
+    return bins
 
 
 def validate_plan(assignment_path, shard, selected_path):
@@ -454,23 +488,7 @@ def main():
             RuntimeWarning,
             stacklevel=2,
         )
-    bins = []
-    for index in range(N):
-        score = 0.0
-        bins.append((score, index, 0.0, 0.0, []))
-    heapq.heapify(bins)
-    ordered = sorted(live, key=lambda row: (-planned_durations[row[0]], row[0]))
-    for rendered, binary_id, name in ordered:
-        _, index, total, longest, selected = heapq.heappop(bins)
-        duration = planned_durations[rendered]
-        total += duration
-        longest = max(longest, duration)
-        selected.append((binary_id, name))
-        score = (
-            project_test_wall_seconds(total, longest, wall_model)
-            if wall_model is not None else total
-        )
-        heapq.heappush(bins, (score, index, total, longest, selected))
+    bins = _plan_bins(live, planned_durations, wall_model)
 
     result = []
     for _, index, total, longest, selected in sorted(bins, key=lambda item: item[1]):

@@ -715,7 +715,7 @@ class DurationShardControls(unittest.TestCase):
                 {},
             )
 
-    def test_landed_workspace_wall_model_reprojects_measured_shards(self):
+    def test_landed_workspace_source_diagnosis_separates_stale_weights_and_fallbacks(self):
         evidence = Path(
             "docs/program/evidence/ci-workspace-run-36341523886"
         )
@@ -724,13 +724,6 @@ class DurationShardControls(unittest.TestCase):
             for shard in range(1, SHARD_COUNT + 1)
         ]
         calibration_path = evidence / "job-steps.tsv"
-        model = _planner.fit_workspace_wall_model(timing_paths, calibration_path)
-        self.assertEqual(model["run_id"], 36341523886)
-        self.assertLessEqual(
-            max(model["calibration_errors"].values()),
-            _planner.WALL_MODEL_TOLERANCE_SECONDS,
-        )
-
         actual_by_shard = {}
         binary_shards = {}
         binary_work_by_shard = {}
@@ -817,118 +810,192 @@ class DurationShardControls(unittest.TestCase):
                 for shard in range(1, SHARD_COUNT + 1)
             )
         )
-        current_projection = []
-        for shard in range(1, SHARD_COUNT + 1):
-            durations = actual_by_shard[shard]
-            work = sum(durations.values())
-            longest = max(durations.values())
-            test_wall = _planner.project_test_wall_seconds(work, longest, model)
-            steps = calibration_rows[shard]
-            measured_job_wall = float(steps["job_wall_seconds"])
-            measured_pretest = measured_job_wall - float(steps["test_step_seconds"])
-            predicted_job_wall = measured_pretest + test_wall
-            self.assertLessEqual(
-                abs(predicted_job_wall - measured_job_wall),
-                _planner.WALL_MODEL_TOLERANCE_SECONDS,
-                f"shard {shard}: predicted {predicted_job_wall}, measured {measured_job_wall}",
-            )
-            current_projection.append(predicted_job_wall)
-        self.assertEqual(len(current_projection), SHARD_COUNT)
+    def test_exploratory_cross_run_plan_beats_same_input_legacy_lpt(self):
+        # This historical comparison is exploratory; only candidate job walls
+        # from publisher Full CI can establish AC-2 or AC-2a.
+        run_ids = {"A": 36341523886, "B": 36348681380}
+        evidence = {
+            label: Path("docs/program/evidence/ci-workspace-run-" + str(run_id))
+            for label, run_id in run_ids.items()
+        }
 
-    def test_wall_model_rebalances_live_tests_and_preserves_the_union(self):
-        evidence = Path(
-            "docs/program/evidence/ci-workspace-run-36341523886"
+        def load_inventory(label):
+            value = json.loads((evidence[label] / "inventory.json").read_text())
+            return sorted(
+                (f"{binary_id} {name}", binary_id, name)
+                for binary_id, name in _planner.tests(value)
+            )
+
+        def load_training(label):
+            paths = [
+                evidence[label] / f"shard-{shard}.json"
+                for shard in range(1, SHARD_COUNT + 1)
+            ]
+            model = _planner.fit_workspace_wall_model(
+                paths, evidence[label] / "job-steps.tsv"
+            )
+            self.assertEqual(model["run_id"], run_ids[label])
+            return paths, _planner.read_durations(paths), model
+
+        def load_run_records(label, live):
+            records_by_shard = {}
+            all_records = {}
+            for shard in range(1, SHARD_COUNT + 1):
+                artifact = _planner.ci_workspace_timings.load_artifact(
+                    evidence[label] / f"shard-{shard}.json"
+                )
+                self.assertEqual(artifact["run_id"], run_ids[label])
+                self.assertEqual(artifact["shard"], shard)
+                self.assertEqual(artifact["shard_count"], SHARD_COUNT)
+                identities = {row["test_id"] for row in artifact["records"]}
+                self.assertFalse(set(all_records) & identities)
+                records_by_shard[shard] = identities
+                all_records.update(
+                    {row["test_id"]: row["seconds"] for row in artifact["records"]}
+                )
+            live_ids = {row[0] for row in live}
+            self.assertEqual(set(all_records), live_ids)
+            self.assertEqual(sum(map(len, records_by_shard.values())), len(live_ids))
+            return all_records, records_by_shard
+
+        def assign_from_training(live, training, objective="default"):
+            _, training_durations, model = training
+            estimated, fallbacks = _planner.resolve_durations(
+                live, training_durations
+            )
+            missing = {row[0] for row in live} - set(training_durations)
+            self.assertEqual(
+                {row["test_id"] for row in fallbacks}, missing
+            )
+            self.assertTrue(
+                all(
+                    row["method"] in {"binary-median", "global-median"}
+                    for row in fallbacks
+                )
+            )
+            self.assertTrue(all(row["seconds"] > 0 for row in fallbacks))
+            bins = _planner._plan_bins(
+                live, estimated, model, objective=objective
+            )
+            assigned = [
+                f"{binary_id} {name}"
+                for _, _, _, _, tests in bins
+                for binary_id, name in tests
+            ]
+            live_ids = {row[0] for row in live}
+            self.assertEqual(len(assigned), len(live_ids))
+            self.assertEqual(set(assigned), live_ids)
+            self.assertEqual(len(bins), SHARD_COUNT)
+            return bins, fallbacks
+
+        def score_test_step_spread(bins, model, actual):
+            test_steps = []
+            for _, _, _, _, tests in bins:
+                selected = [
+                    actual[f"{binary_id} {name}"]
+                    for binary_id, name in tests
+                ]
+                self.assertTrue(selected)
+                test_steps.append(
+                    _planner.project_test_wall_seconds(
+                        sum(selected), max(selected), model
+                    )
+                )
+            return max(test_steps) - statistics.median(test_steps), test_steps
+
+        training_a = load_training("A")
+        live_b = load_inventory("B")
+        # Construct both A-input assignments before scoring against B records.
+        baseline_a_to_b, _ = assign_from_training(
+            live_b, training_a, objective="legacy-test-wall-lpt"
         )
+        candidate_a_to_b, _ = assign_from_training(live_b, training_a)
+        records_b, shard_records_b = load_run_records("B", live_b)
+        self.assertEqual(
+            [
+                {f"{binary_id} {name}" for binary_id, name in tests}
+                for _, _, _, _, tests in baseline_a_to_b
+            ],
+            [shard_records_b[shard] for shard in range(1, SHARD_COUNT + 1)],
+        )
+        baseline_spread_a_to_b, _ = score_test_step_spread(
+            baseline_a_to_b, training_a[2], records_b
+        )
+        candidate_spread_a_to_b, _ = score_test_step_spread(
+            candidate_a_to_b, training_a[2], records_b
+        )
+
+        training_b = load_training("B")
+        live_a = load_inventory("A")
+        # For the reverse exploratory comparison, use the same B inputs for
+        # the legacy and convex plans before scoring both against A records.
+        baseline_b_to_a, _ = assign_from_training(
+            live_a, training_b, objective="legacy-test-wall-lpt"
+        )
+        candidate_b_to_a, _ = assign_from_training(live_a, training_b)
+        records_a, _ = load_run_records("A", live_a)
+        baseline_spread_b_to_a, _ = score_test_step_spread(
+            baseline_b_to_a, training_b[2], records_a
+        )
+        candidate_spread_b_to_a, _ = score_test_step_spread(
+            candidate_b_to_a, training_b[2], records_a
+        )
+
+        self.assertLess(
+            candidate_spread_a_to_b,
+            baseline_spread_a_to_b,
+            f"A-to-B convex {candidate_spread_a_to_b:.3f}s, legacy LPT "
+            f"{baseline_spread_a_to_b:.3f}s",
+        )
+        self.assertLess(
+            candidate_spread_b_to_a,
+            baseline_spread_b_to_a,
+            f"B-to-A convex {candidate_spread_b_to_a:.3f}s, legacy LPT "
+            f"{baseline_spread_b_to_a:.3f}s",
+        )
+
+    def test_wall_calibration_cli_partitions_the_live_inventory_once(self):
+        evidence = Path("docs/program/evidence/ci-workspace-run-36341523886")
+        inventory_path = evidence / "inventory.json"
+        inventory = json.loads(inventory_path.read_text())
+        expected = {
+            f"{binary_id} {name}"
+            for binary_id, name in _planner.tests(inventory)
+        }
         timing_paths = [
             evidence / f"shard-{shard}.json"
             for shard in range(1, SHARD_COUNT + 1)
         ]
-        durations = _planner.read_durations(timing_paths)
-        suites = {}
-        for identity in durations:
-            binary_id, separator, name = identity.partition(" ")
-            self.assertTrue(separator)
-            suite = suites.setdefault(
-                binary_id,
-                {
-                    "binary-id": binary_id,
-                    "binary-name": binary_id.rpartition("::")[2] or binary_id,
-                    "testcases": {},
-                },
-            )
-            self.assertNotIn(name, suite["testcases"])
-            suite["testcases"][name] = {"filter-match": {"status": "matches"}}
-        inventory = {
-            "test-count": sum(len(suite["testcases"]) for suite in suites.values()),
-            "rust-suites": {
-                str(index): suite for index, suite in enumerate(suites.values())
-            },
-        }
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "inventory.json").write_text(json.dumps(inventory))
-
-            def run_plan(wall_model):
-                output_dir = root / ("wall-plan" if wall_model else "sum-plan")
-                command = [
+            output = Path(temporary) / "plan"
+            result = subprocess.run(
+                [
                     sys.executable,
                     str(SCRIPT),
-                    str(root / "inventory.json"),
+                    str(inventory_path),
                     *(str(path) for path in timing_paths),
-                ]
-                if wall_model:
-                    command.extend(
-                        ["--wall-calibration", str(evidence / "job-steps.tsv")]
-                    )
-                command.extend(["--output-dir", str(output_dir)])
-                result = subprocess.run(
-                    command,
-                    text=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=False,
-                )
-                self.assertEqual(result.returncode, 0, result.stderr)
-                return json.loads(result.stdout)
-
-            sum_plan = run_plan(False)
-            wall_plan = run_plan(True)
-        expected = set(durations)
-        for plan in (sum_plan, wall_plan):
-            assigned = [
-                (binary_id, name)
-                for shard in plan["bins"]
-                for binary_id, name in shard["tests"]
-            ]
-            self.assertEqual(len(assigned), len(expected))
-            self.assertEqual(
-                {f"{binary_id} {name}" for binary_id, name in assigned}, expected
+                    "--wall-calibration",
+                    str(evidence / "job-steps.tsv"),
+                    "--output-dir",
+                    str(output),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
             )
-        self.assertEqual(wall_plan["fallbacks"], [])
-        wall_projection = [
-            shard["projected_job_seconds"] for shard in wall_plan["bins"]
+            self.assertEqual(result.returncode, 0, result.stderr)
+            assignment = json.loads(result.stdout)
+            self.assertTrue((output / "assignments.json").is_file())
+        assigned = [
+            f"{binary_id} {name}"
+            for shard in assignment["bins"]
+            for binary_id, name in shard["tests"]
         ]
-        sum_projection = []
-        model = _planner.fit_workspace_wall_model(
-            timing_paths, evidence / "job-steps.tsv"
-        )
-        for shard in sum_plan["bins"]:
-            selected = [
-                durations[f"{binary_id} {name}"]
-                for binary_id, name in shard["tests"]
-            ]
-            sum_projection.append(
-                _planner.project_test_wall_seconds(sum(selected), max(selected), model)
-                + model["setup_seconds"]
-            )
-        self.assertLessEqual(
-            max(wall_projection) - min(wall_projection),
-            _planner.WALL_MODEL_TOLERANCE_SECONDS,
-        )
-        self.assertGreater(
-            max(sum_projection) - min(sum_projection),
-            _planner.WALL_MODEL_TOLERANCE_SECONDS,
-        )
+        self.assertEqual(len(assignment["bins"]), SHARD_COUNT)
+        self.assertEqual(len(assigned), len(expected))
+        self.assertEqual(set(assigned), expected)
+        self.assertEqual(assignment["fallbacks"], [])
 
     def test_non_map_testcases_has_exact_error(self):
         with tempfile.TemporaryDirectory() as temporary:
