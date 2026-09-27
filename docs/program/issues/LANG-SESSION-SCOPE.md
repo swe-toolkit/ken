@@ -271,6 +271,19 @@ exactly one match, with no new `(module,name) → GlobalId` accessor. The
 spelling-keyed class registration itself is
 `LANG-CLASS-IDENTITY-BY-CHECKED-ID`, not this WP.
 
+11. H function host reads keyed on qualified spelling in the mutable flat
+    `globals` table — keyed on spelling.
+
+**Predicate for lines 10-11 and closure** (Architect `evt_6qvbhqywfmbne`,
+stop 11): a provider identity looked up by spelling in a mutable flat table.
+Every H read goes through one helper, `provider_owned_id` in
+`tests/support/catalog_or.rs`, which finds a candidate by qualified spelling
+and checks it against the provider's owned-id population from the real
+loader. No H row reads `env.globals` directly for a provider identity; a
+third instance means the closure was bypassed. The forged-alias pins forge
+both the flat and the qualified key. The cross-unit inline-path clash is
+`SPEC-MODULE-PATH-SINGLE-OWNER`, not this WP.
+
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
 question about a public route to a type (for example `SourceId`) goes to
