@@ -1,0 +1,3080 @@
+{
+  "run_id": 36341523886,
+  "shard": 6,
+  "shard_count": 7,
+  "unit": "seconds",
+  "records": [
+    {
+      "test_id": "ken-cli::abi_s6_mapping_surface_native second_mapping_effect_rechecks_bounds",
+      "seconds": 110.048,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::bin/ken run_argument_tests::program_arguments_after_separator_preserve_non_utf8_bytes",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::cli_i1_entrypoint_abi argv_after_separator_round_trips_non_utf8_and_pre_separator_is_rejected",
+      "seconds": 0.497,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::cli_i1_entrypoint_abi missing_and_duplicate_main_report_distinct_named_errors",
+      "seconds": 0.951,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::cli_i1_entrypoint_abi named_main_runs_when_it_is_not_the_last_declaration",
+      "seconds": 0.471,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::i8_clock_effect clock_package_is_structural_zero_trust_and_declares_no_ordering_law",
+      "seconds": 0.472,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::i8_clock_effect undeclared_clock_row_is_a_named_effect_escape",
+      "seconds": 0.442,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::k3_literal_char_native checked_literal_view_codes_match_interpreter_and_native",
+      "seconds": 80.142,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::ken_check_mode stale_reject_in_catalog_entry_is_still_refused_after_roots_loading",
+      "seconds": 0.429,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::ken_fmt every_checked_runnable_root_declares_its_fs_authority",
+      "seconds": 0.043,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::ken_md_literate_cli ken_run_accepts_exact_ken_md_fence",
+      "seconds": 0.446,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::ken_md_literate_cli ken_run_treats_unrecognized_ken_role_as_a_hard_error",
+      "seconds": 0.43,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::library_documentation_gates content_currency_gate_rejects_a_drifted_cited_source_and_recovers",
+      "seconds": 0.44,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::library_documentation_gates content_currency_gate_rejects_a_symlink_source_even_when_its_target_is_unchanged",
+      "seconds": 0.148,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::library_documentation_gates shallow_clone_self_heals_from_an_independent_full_history_origin",
+      "seconds": 3.679,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::library_documentation_gates slugify_matches_the_proposals_own_worked_anchor",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::mrc_4a1_feature_gate_artifact mrc_4a1_feature_gate_holds_at_the_artifact",
+      "seconds": 277.577,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::mrc_d8_manifest_premise mrc_d8_control_the_reader_is_not_satisfied_by_a_comment_or_a_neighbouring_table",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::px4b_native_production byte_and_c_raw_literals_do_not_leak_a_comment_scan_over_pub",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::px4b_native_production host_reply_selects_the_continuation_outcome",
+      "seconds": 79.806,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::px4b_native_production linked_home_root_uses_only_production_account_database_boundary",
+      "seconds": 65.926,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::px7l_checked_host_recursive_bind static_direct_vis_retains_the_existing_lowering_path",
+      "seconds": 73.899,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::px7o_heterogeneous_eliminator_frames nested_ok_payload_reaches_both_real_executors",
+      "seconds": 93.723,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::px7p_constructor_field_composition dynamic_carrier_producer_payload_reaches_linked_process_exit",
+      "seconds": 81.478,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::rt_cold_lowering_path_enumeration rt_cap41_endpoint_stage",
+      "seconds": 103.937,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::rt_cold_lowering_path_enumeration rt_write_pair_source",
+      "seconds": 0.552,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::rt_cold_lowering_path_enumeration rt_write_readonly_stage",
+      "seconds": 92.428,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::rt_mapping_multiop_dispatch repeated_fs_metadata_effects_match_the_interpreter",
+      "seconds": 108.867,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::rt_native_string_construction native_string_bytes_decode_normalizes_like_the_interpreter",
+      "seconds": 0.437,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::rt_selected_pending_call_admission owner_scoped_false_ordinary_answer_restores_join_refusal",
+      "seconds": 50.869,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::t2_acceptance ac1_well_typed_def_registers",
+      "seconds": 0.438,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::t2_acceptance ac2_provable_goal_yields_proved",
+      "seconds": 0.411,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::body_view_recovers_package_bound_constructor_and_match_view",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::body_view_rejects_malformed_declaration_bytes",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::body_view_rejects_unjustified_partial_primitive_contract",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::body_view_rejects_unsupported_declaration_kind",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::body_view_rejects_unsupported_dependent_motive",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::body_view_rejects_unsupported_eliminator_shape",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::int_lit_skip_term_consumes_exactly_its_own_bytes",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::package_consumer_uses_artifact_without_surface_source",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator checked_core::tests::validator_rejects_semantic_and_artifact_hash_mismatches",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator compiler_driver::tests::erased_type_only_ih_reference_does_not_claim_the_following_runtime_ordinal",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator compiler_driver::tests::executable_entrypoint_metadata_identity_is_deterministic_and_content_addressed",
+      "seconds": 1.447,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator compiler_driver::tests::real_source_reaches_checked_core_and_selects_stable_target",
+      "seconds": 0.496,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator compiler_driver::tests::target_closure_rejects_dropped_reachable_metadata",
+      "seconds": 0.528,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator compiler_driver::tests::target_selection_report_identity_is_deterministic",
+      "seconds": 1.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator elab::match_matrix_occurrence_tests::pending_sibling_is_not_weakened_before_its_binder_exists",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator elab::nested_lift_association_tests::completed_lifted_eliminator_validation_closes_outer_result_premise",
+      "seconds": 0.424,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator elab::nested_lift_association_tests::recursive_ih_neutral_or_unequal_index_evidence_is_preserved",
+      "seconds": 0.42,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator elab::nested_lift_association_tests::type_resident_support_does_not_override_omega_result_sort",
+      "seconds": 0.428,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator elab::result_transport_control_flow_tests::active_premise_frame_order_and_overflow_fail_closed",
+      "seconds": 0.424,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator erasure::px7l_tests::finish_rejects_an_unconsumed_computational_ih_slot_seed",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator erasure::px7l_tests::runtime_selected_dispatch_is_load_bearing_and_static_decode_stays_exact",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator erasure::px7l_tests::the_unmutated_host_vis_marker_passes_the_runtime_marker_gate",
+      "seconds": 1.176,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator export::exact_inventory_tests::px8_runtime_operations_have_exact_fs_family_and_injective_spellings",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator export::resource_lifetime_hash_tests::projection_covers_none_file_buffer_and_full_positioned_cases",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator fo_kripke::tests::quote_fo_accepts_both_controls_and_refuses_outside_the_slice",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::checked_class_and_record_owners_survive_same_spelling_occupancy",
+      "seconds": 0.421,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::file_reexports_preserve_provider_id_through_facade_and_in_scope",
+      "seconds": 0.426,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::file_root_import_uses_its_own_exports_after_memory_shadow",
+      "seconds": 0.426,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::file_unit_root_import_requires_its_own_inline_declaration",
+      "seconds": 0.817,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::generated_instance_same_checked_identity_reimport_is_idempotent",
+      "seconds": 0.412,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::in_memory_root_import_keeps_earlier_declared_child",
+      "seconds": 1.604,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::inline_child_private_leaf_refuses_in_owner_sibling_and_importer",
+      "seconds": 1.634,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::inline_sibling_import_requires_prior_declaration",
+      "seconds": 0.414,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator modules::namespace_effect_tests::later_same_unit_sibling_rejects_regardless_of_file_import_order",
+      "seconds": 1.203,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator parser::atom_form_closure::a_truncation_bar_starts_an_atom_only_outside_a_truncation_body",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator parser::atom_form_closure::every_type_form_is_reachable_through_at",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator parser::atom_form_closure::no_two_pattern_forms_admit_the_same_token",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator parser::atom_form_closure::three_expression_forms_are_live_at_the_head_and_refused_as_arguments",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::acceptance::let_ascription_roundtrip",
+      "seconds": 0.415,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::acceptance::two_distinct_levels",
+      "seconds": 0.415,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::cat_effectful_classes_pub_export::effectful_classes_publication_adds_zero_trust",
+      "seconds": 5.783,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::cat_ord_nat_canonical_owner::compatibility_roots_still_build_lawful_classes_and_order",
+      "seconds": 3.376,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::cat_priority_queue_acceptance::entries_ties_self_merge_count_vectors_and_persistence_match_seed",
+      "seconds": 5.46,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::cat_priority_queue_acceptance::package_adds_zero_trusted_declarations",
+      "seconds": 6.282,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::cat_tier_d_cursor_import::parsing_cursor_imports_are_canonical_and_visibility_only",
+      "seconds": 9.21,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::cat_tier_e_decoder_import::decoder_loader_visible_inventory_is_exact_and_usable",
+      "seconds": 14.553,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::cat_tier_e_json_import::json_publication_is_visibility_only",
+      "seconds": 19.042,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::ds1_empty_dec_acceptance::ac1_dec_admits_and_elim_dec_large_eliminates_into_type0",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::ds1_empty_dec_acceptance::ac1_mechanism_probe_no_method_wrong_domain_rejected",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::ds1_empty_dec_acceptance::ac2_empty_and_absurd_empty_elaborate",
+      "seconds": 0.611,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::effects::eff_overdeclared_upper_bound_accepted",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::effects::higher_order_param_declared_accepted",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::effects::higher_order_two_params_each_guarded",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::effects::row_poly_concrete_caller_substitution",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::effects::row_poly_mixed_concrete_and_var",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::kenfmt_b3_layout::ac2_ac3_mandatory_breaks_separators_and_no_alignment",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::kenfmt_b3_layout::ac3_wide_declaration_signatures_nest_and_keep_fitting_binders_flat",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::kenfmt_b3_layout::ac5_comments_are_retained_and_force_breaks",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::kenfmt_b3_layout::ac6_independent_oracle_mandatory_forms_are_exact_fixed_points",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::kenfmt_b3_layout::ac7_whole_catalog_is_parse_preserved_idempotent_and_width_bounded",
+      "seconds": 226.547,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::kenfmt_let_layout::let4_comments_stay_owned_and_shadowing_starts_a_new_segment",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::lang_fixity_decl_surface::non_associative_chain_requires_parentheses",
+      "seconds": 1.298,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::lang_fixity_decl_surface::use_and_fixity_may_precede_the_operator_definition",
+      "seconds": 0.439,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::lang_mod_catalog_evidence_frontier::discovery_known_answer_covers_both_source_spellings",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::lang_mod_catalog_evidence_frontier::evidence_status_is_typed_and_independent_from_strict_observation",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::lang_structural_result_elab::multiple_wildcard_slots_never_publish_a_latest_surface_binding",
+      "seconds": 0.44,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::lang_structural_result_elab::wildcard_slot_is_not_a_surface_addressable_recursive_result_operand",
+      "seconds": 0.44,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::n4_program_admits::single_source_package_self_admits_without_program",
+      "seconds": 0.433,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator seal2_tests::producer_closure::catalog_source_root_confinement_certificate",
+      "seconds": 22.99,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator seal2_tests::producer_closure::certificate_fails_closed_on_an_unresolvable_module_form",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator seal2_tests::producer_closure::closed_oracle_sees_carrier_off_head_under_result",
+      "seconds": 0.435,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ax2_axiom_named_postulates standalone_api_requires_and_preserves_its_caller_owner",
+      "seconds": 0.454,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::b1_exact_denotation_alphabet ordinary_declared_headroom_is_not_an_alphabet_source",
+      "seconds": 84.982,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::b1_exact_denotation_alphabet real_resource_performs_derive_the_exact_lifecycle_alphabet",
+      "seconds": 42.441,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::b1_exact_denotation_alphabet same_family_host_operations_have_distinct_signatures_and_hashes",
+      "seconds": 86.23,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::b2_acceptance hoas_foil_reaches_positivity_violation_not_universe_gate",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::b2_acceptance inert_to_conversion",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::bare_proof_selector_atom application_wraps_outside_the_single_path_selector_subject",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat1_constructor_classes parametric_instance_head_generalizes_free_type_variable",
+      "seconds": 0.46,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat3_collections_package derived_has_no_definitionally_equivalent_local_bool_reimplementation",
+      "seconds": 2.619,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat5_parsing_package cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes",
+      "seconds": 5.436,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_bsearch_acceptance entry_adds_no_trusted_declarations",
+      "seconds": 1.738,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_concat_map_append_law concat_map_append_has_the_exact_raw_checked_proposition",
+      "seconds": 2.583,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_deque_closeout deque_direct_provider_inventory_is_exact_and_canonical",
+      "seconds": 8.395,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_derived_filter_membership_law compatibility_premise_distinguishes_true_and_false_instances",
+      "seconds": 2.602,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_gcd_acceptance gcd_vectors_compute_and_divisibility_law_artifacts_remain_checked",
+      "seconds": 2.089,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_idf_trust_free_provider combinators_are_trust_free_canonical_checked_imports",
+      "seconds": 2.972,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_sort_insertion_sort_acceptance entry_adds_no_trusted_declarations",
+      "seconds": 2.821,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_string_bijection_pub_export string_bijection_loader_visible_inventory_is_exact",
+      "seconds": 0.473,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_string_bijection_pub_export string_bijection_standalone_imports_retain_provider_identities",
+      "seconds": 0.449,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cat_string_keys_closeout string_keys_loader_visible_inventory_is_empty",
+      "seconds": 1.604,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc1_nonempty_validation_acceptance cc1_packages_have_zero_trusted_base_delta",
+      "seconds": 6.299,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc1_nonempty_validation_acceptance nonempty_owner_keeps_raw_constructor_while_clients_cannot_name_it",
+      "seconds": 5.679,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc1_nonempty_validation_acceptance validation_ap_distinct_nonempty_nat_errors_keep_both_heads_in_order",
+      "seconds": 6.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc2_text_codec_numeric_acceptance verified_roundtrip_stays_structural_and_key_instances_stay_out_of_numeric",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc3_parsing_cursor_decoder_acceptance cursor_length_occurrence_population_and_migration_shape_are_pinned",
+      "seconds": 9.93,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc4_diagnostic_core_acceptance checked_cc4_chain_has_zero_trusted_base_delta",
+      "seconds": 12.355,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc4_diagnostic_core_acceptance diagnostics_reuses_the_canonical_lawful_classes_relation",
+      "seconds": 1.751,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc4_diagnostic_core_acceptance exact_non_degenerate_injections_preserve_every_location_field",
+      "seconds": 4.552,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc4_diagnostic_core_acceptance ordered_dependency_closure_elaborates_all_cc4_clients",
+      "seconds": 4.679,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc5_pretty_doc_acceptance ordered_dependency_closure_elaborates_transparent_pretty_doc",
+      "seconds": 5.702,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc5_pretty_doc_acceptance pretty_doc_loader_surface_and_string_boundary_are_behavioral",
+      "seconds": 6.082,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc7_argparse_acceptance render_host_identity_checks_flat_and_qualified_alias_forgery",
+      "seconds": 10.484,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc8_env_config_decoder_acceptance invalid_utf8_environment_value_survives_the_full_pipeline",
+      "seconds": 11.274,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc8_env_config_decoder_acceptance render_host_identity_checks_flat_and_qualified_alias_forgery",
+      "seconds": 10.634,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::cc8_env_config_decoder_acceptance schema_help_growth_reaches_both_clients_behaviorally",
+      "seconds": 10.273,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::conversions_acceptance ac1_round_trip_law_at_max_every_width",
+      "seconds": 3.603,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::conversions_acceptance ac4_saturating_add_no_overflow_still_exact",
+      "seconds": 0.442,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::conversions_acceptance ac5_neg_intn_degrades_on_min_every_signed_width",
+      "seconds": 1.782,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::decimal_char_acceptance decimal_eq_distinct_flips_vs_false_true",
+      "seconds": 0.447,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dependent_match_coherent_frame_acceptance nontrivial_direct_fin_index_elaborates",
+      "seconds": 0.707,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dependent_match_context_telescope_acceptance captured_env_index_couples_goal_type_argument",
+      "seconds": 0.7,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dependent_match_context_telescope_acceptance elim_carries_convoy_telescope_in_motive_methods_and_application",
+      "seconds": 0.436,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dependent_match_nonnullary_acceptance ac1_tree_two_recursive_fields_elaborates_and_narrows_structurally",
+      "seconds": 0.546,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dependent_match_wstyle_acceptance ac1b_itree_vis_dependent_branch_domain_elaborates",
+      "seconds": 0.575,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dependent_match_wstyle_acceptance ac1c_outer_wstyle_inner_direct_cross_slot_elaborates",
+      "seconds": 0.438,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dependent_match_wstyle_acceptance ac2_ill_typed_wstyle_arm_stays_kernel_rejected",
+      "seconds": 0.434,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dotted_module_path_parser selective_import_accepts_a_dotted_module_path",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::dotted_module_path_parser undotted_forms_still_parse",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds3_sum_combinators_acceptance ac8_maperr_does_not_touch_ok_payload",
+      "seconds": 2.762,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds4_list_combinators_acceptance ac8_off_by_one_range_length_rejected",
+      "seconds": 2.697,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds5b_dependent_match_refinement_acceptance non_indexed_match_stays_unaffected",
+      "seconds": 0.447,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds5b_dependent_match_refinement_acceptance real_fok_derivation_structural_consumers_cover_type_and_omega_motives",
+      "seconds": 2.644,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds6a_int_deceq_acceptance deceq_char_transports_from_deceq_int_not_a_fresh_postulate",
+      "seconds": 2.689,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds6c_intlit_elaborator_emission int_literal_mints_no_postulate_and_no_num_values_entry",
+      "seconds": 0.433,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds8_traversable_acceptance ac6_traverse_field_classifies_proc",
+      "seconds": 5.956,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds8_traversable_acceptance trusted_base_delta_is_empty_across_the_entry",
+      "seconds": 5.966,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds8b_pure_into_proc_widening ac6_proc_field_still_classifies_proc_at_projection_after_pure_instance",
+      "seconds": 0.429,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds8b_pure_into_proc_widening non_regression_malformed_proc_field_marker_still_rejected_at_class_decl",
+      "seconds": 0.434,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds9_json_codec_acceptance intrinsic_all_lift_admits_public_json_nested_pair_and_direct_list_control",
+      "seconds": 3.234,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ds9_json_codec_acceptance json_roots_loads_from_only_its_declared_imports",
+      "seconds": 3.335,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::either_catalog_package_acceptance ac8_non_involutive_swap_witness_rejected",
+      "seconds": 2.775,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::either_catalog_package_acceptance swap_involutive_concrete_examples",
+      "seconds": 2.749,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::either_catalog_package_acceptance trusted_base_delta_is_empty_across_the_file",
+      "seconds": 2.778,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::either_catalog_package_acceptance zero_axiom_in_sums_ken",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es2_acceptance match_on_comparison_result_elaborates",
+      "seconds": 0.662,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es2_acceptance sort_refinement_unfolds_issorted_and_perm",
+      "seconds": 0.637,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es3_modules_acceptance strict_roots_parameterized_abstract_export_keeps_two_faces",
+      "seconds": 0.43,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es3_modules_acceptance three_import_forms_resolve_to_one_binding",
+      "seconds": 0.44,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es4_classes_acceptance char_ord_laws_reject_missing_law_field",
+      "seconds": 0.78,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es4_classes_acceptance classes_are_transparent_structure_records_zero_delta",
+      "seconds": 3.082,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es4_classes_acceptance eq_bool_is_a_complete_zero_delta_instance",
+      "seconds": 2.645,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::es4_classes_acceptance ord_bool_provable_laws_are_real_proofs_not_postulates",
+      "seconds": 2.656,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::explicit_data_elaboration dependent_index_telescope_lifts_prior_index_in_motive_premise",
+      "seconds": 0.452,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::fr1_zero_ctor_data_acceptance non_empty_data_forms_still_parse_and_elaborate",
+      "seconds": 0.45,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::fr2_absurd_collision_hygiene declaring_lower_arity_j_or_eq_elaborates_fine_not_a_collision",
+      "seconds": 0.452,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::fr2_absurd_collision_hygiene non_colliding_ctor_alongside_a_colliding_one_still_reports_only_the_real_collision",
+      "seconds": 0.447,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::generated_index_evidence_closure generated_record_index_reflexivity_closes_top_second_child",
+      "seconds": 0.467,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::i4d_boundary_header_parser boundary_header_is_accepted_before_imports_and_rejected_after_them",
+      "seconds": 0.017,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::i4d_boundary_header_parser direct_file_reader_preserves_manifest_without_minting_or_trust_growth",
+      "seconds": 0.445,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ken_md_literate extraction_preserves_length_newlines_and_utf8",
+      "seconds": 0.014,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ken_md_literate ken_ignore_with_elaboration_breaking_body_is_never_checked",
+      "seconds": 0.458,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::kenfmt_signature_layout r1_signature_fit_and_split_ladder_are_exact",
+      "seconds": 0.015,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::km_literal_trust_accounting foreign_axiom_and_open_obligation_trust_entries_still_count",
+      "seconds": 0.465,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::ktr2_data_lowering_diagnostics data_type_references_follow_declaration_order",
+      "seconds": 0.877,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l2_acceptance ac1_data_decl_registers_former_and_ctors",
+      "seconds": 0.474,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l2_acceptance ac2_match_head_is_term_elim",
+      "seconds": 0.448,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l2_acceptance ac3_exhaustive_match_accepts",
+      "seconds": 0.436,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l2_acceptance ac4_duplicate_arm_is_reachability_error",
+      "seconds": 0.444,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l2_acceptance ac8_option_table_branch_motive_elaborates",
+      "seconds": 0.457,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l2_acceptance ac8_wrong_specialized_branch_still_rejects",
+      "seconds": 0.439,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l2_acceptance well_typed_match_unaffected_by_foreign_ctor_family_check",
+      "seconds": 0.438,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l3_strings_roundtrip_acceptance ac1_s2l_witness_is_always_a_valid_scalar",
+      "seconds": 0.456,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l3_strings_roundtrip_acceptance ac4_l2s_totality_on_nontrivial_list",
+      "seconds": 0.457,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l3_strings_surface_acceptance derived_string_ops_reduce_over_real_roundtrip",
+      "seconds": 2.725,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l3a_acceptance fuel_bounded_unfold_produces_finite_prefix",
+      "seconds": 0.464,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l3a_acceptance string_byte_length_differs_from_char_length",
+      "seconds": 0.443,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l3a_acceptance string_is_not_list_char_but_convertible",
+      "seconds": 0.429,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l3a_recursive_view_smoke recursive_view_reduces_on_constructor",
+      "seconds": 0.432,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l4_export_reexport abstract_reexport_preserves_hidden_constructor_boundary",
+      "seconds": 0.862,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l4_export_reexport loader_executes_import_identity_clash_and_rename_discriminators",
+      "seconds": 2.152,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l4_export_reexport loader_executes_same_identity_carveout_and_distinct_source_flip",
+      "seconds": 1.685,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l4_export_reexport parser_distinguishes_facade_and_in_scope_forms_with_renames",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l6_acceptance read_bytes_tracked_accepts",
+      "seconds": 0.476,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l6_acceptance read_bytes_untracked_is_type_error",
+      "seconds": 0.448,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l7_acceptance pure_but_effectful_foreign_is_the_named_residual",
+      "seconds": 0.443,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::l_match_ih_fix_acceptance ac2_tree_size_uses_both_ihs_and_computes_right_value",
+      "seconds": 0.432,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_application_atom_if_rejection extractor_reaches_continuation_lines",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_application_atom_if_rejection no_false_negative_across_the_test_corpus",
+      "seconds": 0.508,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_atom_start_classification_closure ac3_if_is_still_refused_as_an_argument_and_still_admitted_as_a_head",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_atom_start_classification_closure ac9_the_binder_name_exclusion_admits_separator_free_class_fields",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_atom_start_classification_closure invariant_1_no_depth_zero_comma_precedes_the_first_arrow_in_an_arm_block",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_bare_operator_atom_rejection ac_argument_position_rejects_but_not_via_this_arm",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_bare_operator_atom_rejection ac_bare_operator_rejects_affirmatively",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_bytes_hex_list_literal unbracketed_hex_integer_and_float_forms_are_unchanged",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_constructor_namespace_shadowing_guard same_constructor_spelling_across_two_sum_families_is_rejected_with_both_sites",
+      "seconds": 0.458,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_facade_export_load_order absolute_facade_selects_source_file_provider_cold_and_in_every_order",
+      "seconds": 1.635,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_facade_export_load_order later_inline_facade_rejects_before_expansion_in_every_entry_order",
+      "seconds": 1.725,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_foreign_name_control_chars ordinary_string_literal_with_nul_still_elaborates",
+      "seconds": 0.472,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_foreign_name_control_chars span_points_at_the_offending_literal_not_the_foreign_keyword",
+      "seconds": 0.447,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_foreign_name_format_chars formatter_inverse_preserves_string_and_character_values",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_foreign_name_format_chars literate_hard_errors_rebase_to_document_spans_in_every_role",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_foreign_name_format_chars unlisted_format_category_members_use_the_same_guard",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_infix_application_default ordinary_application_still_binds_tighter_than_default_infix",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_as_pattern alias_collision_with_inner_binder_is_rejected_by_name",
+      "seconds": 0.446,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_guards fully_guarded_sum_is_incomplete_and_unguarded_fallbacks_close_it",
+      "seconds": 0.926,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_guards multiple_guards_fall_through_in_source_order",
+      "seconds": 0.834,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_literal_patterns comparator_semantic_duplicates_are_subsumed_and_finite_sets_stay_open",
+      "seconds": 1.776,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_or_pattern three_alternatives_are_flat_and_map_binders_by_name",
+      "seconds": 0.472,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_tuple_pattern arity_three_right_nests_and_supplies_every_body_binding",
+      "seconds": 0.418,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_tuple_pattern empty_and_trailing_comma_tuple_patterns_have_surface_diagnostics",
+      "seconds": 0.413,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_match_tuple_pattern one_tuple_arm_is_exhaustive_but_an_inner_constructor_gap_is_named",
+      "seconds": 0.45,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_catalog_completeness lawful_local_pair_proofs_do_not_extend_the_derived_subject_namespace",
+      "seconds": 1.634,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_catalog_realization arithmetic_operations_are_public_by_exact_provider_identity",
+      "seconds": 0.541,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_catalog_realization canonical_or_publishes_constructors_under_legacy_roots_idempotently",
+      "seconds": 0.443,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_nat_floor_realization public_wrapper_rejects_floor_parent_before_allocation",
+      "seconds": 0.456,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_or_omega_param_elab omega_sorted_parameters_and_indices_elaborate_for_type_families",
+      "seconds": 0.452,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_strict_resolution_d0 closed_floor_and_kernel_vocabulary_are_buildable_from_roots",
+      "seconds": 0.448,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_strict_resolution_d0 every_ambient_name_representation_reaches_its_current_route",
+      "seconds": 1.979,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_strict_resolution_d1 one_roots_run_cannot_mix_legacy_and_strict_cache_entries",
+      "seconds": 0.474,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_strict_resolution_d1 strict_admits_floor_kernel_locals_and_explicit_imports_without_new_trust",
+      "seconds": 0.42,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_strict_resolution_d1 strict_globals_choke_covers_every_d0_globals_representation",
+      "seconds": 6.157,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_qualified_constructor_privacy forge_mapping_decl",
+      "seconds": 0.417,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_qualified_constructor_privacy forge_span_file",
+      "seconds": 0.537,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_qualified_constructors abstract_export_keeps_qualified_constructor_private",
+      "seconds": 0.607,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_qualified_constructors qualified_resource_type_matches_prescoping_bare_checked_term",
+      "seconds": 0.619,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_qualified_constructors scoped_member_spellings_are_available_to_user_declarations",
+      "seconds": 0.675,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_standard_infix_call_completion a_facade_glyph_rename_republishes_the_defining_globalid",
+      "seconds": 0.694,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_standard_infix_call_completion ac1_a_bare_comparison_completes_its_omitted_prefix",
+      "seconds": 0.453,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_standard_infix_call_completion ac2c_an_explicit_partial_application_is_not_rewritten_into_a_completed_call",
+      "seconds": 0.676,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_standard_infix_call_completion ac9_the_shape_contract_catches_the_nearest_legal_neighbour_not_only_an_obvious_break",
+      "seconds": 0.674,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_surface_block_comments ac2_two_level_nesting",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_surface_block_comments ac7_formatter_round_trips_a_block_comment",
+      "seconds": 0.017,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_surface_if true_and_false_select_their_respective_branches",
+      "seconds": 0.625,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_surface_int_precision zero_and_succ_constructor_result_indices_still_elaborate",
+      "seconds": 0.653,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_surface_pair kenfmt_canonical_projection_output_remains_accepted",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_symbolic_operator_names symbolic_name_uses_existing_export_import_and_resolution_identity",
+      "seconds": 0.591,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_truncation_surface_syntax ac2_a_bare_truncation_argument_closes_and_the_loop_continues",
+      "seconds": 0.015,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_truncation_surface_syntax ac4_kernel_level_type_target_elimination_of_trunc_remains_refused",
+      "seconds": 0.519,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_truncation_surface_syntax d1_ascii_formation_elaborates_and_kernel_checks",
+      "seconds": 0.466,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_truncation_surface_syntax d1_formation_wraps_a_full_expression_and_nests",
+      "seconds": 0.47,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_type_projection_surface_form ac2_both_rejections_fire_with_a_span_on_the_projection",
+      "seconds": 0.875,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_type_projection_surface_form positional_projection_in_type_position_names_the_unsupported_form",
+      "seconds": 0.445,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::let5_checking_mode_let unannotated_let_infers_rhs_before_checking_body",
+      "seconds": 0.473,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::literal_escapes_lexer_unit char_cardinality_rejects_empty_and_multi_scalar",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::literal_escapes_lexer_unit common_escapes_decode_in_every_kind",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::literal_escapes_lexer_unit well_shaped_invalid_scalar_spans_the_complete_escape",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::map_build_acceptance cat4_delete_dropkey_filters_all_equivalent_keys",
+      "seconds": 11.313,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::map_build_acceptance cat_rel_public_api_is_usable_while_tree_constructors_stay_private",
+      "seconds": 11.193,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::map_build_acceptance cat_rel_reachability_obeys_positive_fuel_and_domain_bound",
+      "seconds": 11.727,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::map_build_acceptance cat_rel_reachable_plus_has_exact_public_predicate",
+      "seconds": 10.849,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::mutual_recursion_surface_acceptance non_terminating_mutual_group_is_rejected_by_sct",
+      "seconds": 0.444,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::n1_duplicate_definition totally_reserved_sugar_names_keep_the_existing_hard_error",
+      "seconds": 1.288,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::n3_import_exclusion parser_distinguishes_item_rename_from_module_alias_and_rejects_hiding",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nat_arithmetic_laws_acceptance all_laws_kernel_check_before_literate_examples",
+      "seconds": 0.505,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nat_arithmetic_laws_acceptance trusted_base_delta_is_empty_across_the_entry",
+      "seconds": 0.512,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc13_core_expression_lowering transparent_declaration_body_lowers_and_evaluates_through_runtime_ir",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc14_data_match_lowering duplicate_nested_lift_arm_is_reachability_error",
+      "seconds": 0.505,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc15_record_sigma_lowering record_construction_lowers_runtime_fields_and_preserves_erased_statuses",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc16_primitive_value_lowering unsupported_runtime_primitive_name_stays_loud_and_package_facing",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc17_recursion_dictionaries_modules imported_declaration_ref_requires_exact_dependency_seed_identity",
+      "seconds": 0.041,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc18_effects_foreign_boundary_ir represented_effect_target_survives_and_reports_comparison_unavailable",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc18_effects_foreign_boundary_ir stale_interpreter_identity_still_rejects_before_unavailable_effect_report",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::nc5_erasure_runtime_ir symbol_without_runtime_metadata_rejects_loudly",
+      "seconds": 0.017,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::px3_abi_scalars ac3_manifest_max_is_ok_and_max_plus_one_is_err_for_every_scalar",
+      "seconds": 1.654,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::px7f_system_resource_acceptance resource_host_io_preserves_the_existing_host_io_identity",
+      "seconds": 0.469,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::r3_c2_source_mixed_branch c2_source_mixed_branch_walk_gates_one_to_three",
+      "seconds": 1.698,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::record_index_sigma_closure if_result_classifier_closes_a_substituted_refined_core",
+      "seconds": 0.462,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::record_index_sigma_closure nested_result_transport_composes_two_hidden_refinement_frames",
+      "seconds": 0.439,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::rt_dasm_d1b_role_b_role_decode d1b_role_b_erasure_carries_the_exact_nat_role_identity_without_widening_the_closure",
+      "seconds": 0.976,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::rt_dasm_d1b_role_c1_trusted_base_provenance c1_a_real_carrier_reaches_lowering_and_its_reports_carry_the_admitted_trust",
+      "seconds": 0.782,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::rt_dasm_d1b_role_c1_trusted_base_provenance c1_a_retargeted_assumption_identity_is_refused",
+      "seconds": 0.581,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::rt_dasm_d1b_role_c1_trusted_base_provenance c1_a_severed_tuple_partner_is_refused",
+      "seconds": 0.581,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sct_completeness_repro control_flat_single_sibling_recurses",
+      "seconds": 0.432,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sct_reconstruction_descent shape_b_bad_ack_still_rejected",
+      "seconds": 0.437,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sec1_acceptance by_proof_trichotomy_cross_case_sweep",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sec1ct_acceptance ct_value_steers_branch_guard_rejected",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sec2_acceptance attenuated_cap_at_weak_sink_accepts",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sec2_acceptance capabilities_cross_case_sweep",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sec2_acceptance unaudited_boundary_effect_is_impossible",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sec4_acceptance kernel_resolved_graph_has_no_ken_generated_workspace_dependency",
+      "seconds": 1.131,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::sub1_bytes_structural_view ac4_both_runtime_roundtrip_directions_are_real_and_total",
+      "seconds": 0.365,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::surf_space_cells_p1 ac_s4_write_core_is_bind_get_then_put",
+      "seconds": 0.465,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::surface_arrow_in_expr_acceptance arrow_returned_from_view_body_is_a_real_pi",
+      "seconds": 0.442,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::surface_def_refinement type_is_reserved_not_a_free_identifier",
+      "seconds": 0.435,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::surface_named_proof_claims attached_proof_subject_telescope_must_match",
+      "seconds": 0.465,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::surface_named_proof_claims module_selective_import_exposes_canonical_attached_proof_only",
+      "seconds": 0.441,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::surface_transport_acceptance ill_typed_transport_wrong_equation_is_kernel_rejected",
+      "seconds": 0.441,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::surface_unicode surf1_d3_unicode_and_ascii_lex_to_same_tokens",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::t1_acceptance agent_pivots_on_status_no_text_scraping",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::t1_acceptance decomposition_and_slice_kinds_round_trip",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::t1_acceptance stable_field_drop_or_rename_rejected",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v1_acceptance bogus_cert_not_proved",
+      "seconds": 0.443,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v1_acceptance old_fails_closed_while_ordinary_space_ensures_remains_live",
+      "seconds": 0.439,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v1_acceptance refinement_lowers_to_carrier",
+      "seconds": 0.441,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v1_acceptance result_out_of_ensures_rejects",
+      "seconds": 0.439,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_acceptance pure_pipeline_no_obligations_unaffected",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_checker_soundness_d0_buildability_probe probe3b_bool_true_hypothesis_eliminates_by_cases_naive_prebound",
+      "seconds": 2.693,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_checker_soundness_d1a_rule_correspondence fok_derivation_kernel_artifact_has_closed_rule_inventory",
+      "seconds": 2.654,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_checker_soundness_d2_bool_inversion fok_and_right_naive_prebound_form_is_kernel_rejected",
+      "seconds": 3.225,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_checker_soundness_d2_bool_inversion fok_or_left_false_naive_prebound_form_is_kernel_rejected",
+      "seconds": 2.614,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_checker_soundness_d4 accepted_forall_world_right_reaches_full_checker_soundness",
+      "seconds": 2.711,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_embedding_adequacy_d1 recursive_parent_call_is_rejected_by_unchanged_sct",
+      "seconds": 2.48,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_ken_level_checker_authoring fok_check_cert_accepts_genuine_derivations",
+      "seconds": 2.68,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_ken_level_checker_authoring fok_check_cert_serializer_discriminates_init_left_right_swap",
+      "seconds": 2.604,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_ken_level_checker_authoring fok_sequent_and_init_preserve_positional_field_order",
+      "seconds": 2.527,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_obligation_signature_discovery_acceptance accepted_certificate_through_public_route_yields_unknown_never_proved",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_obligation_signature_discovery_acceptance ambiguous_two_sort_obligation_is_refused_by_discovery_not_guessed",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_route_proved_composition quotation_refusal_and_no_certificate_keep_the_ipc_fallback",
+      "seconds": 2.643,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_sorted_eigenparameter_wrong_sort_controls malformed_atomic_argument_role_is_refused",
+      "seconds": 8.224,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_sorted_eigenparameter_wrong_sort_controls out_of_scope_bound_reference_is_refused",
+      "seconds": 7.983,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v3_fo_sorted_eigenparameter_wrong_sort_controls world_eigen_into_object_binder_is_refused_by_the_sort_guard",
+      "seconds": 10.909,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v4_acceptance deterministic_same_input_same_diagnostic",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v4_acceptance hole_free_program_never_unknown",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::v4_acceptance refuted_goal_false_with_forcing_world",
+      "seconds": 0.427,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-foundation canonical::tests::bignum_minimal_limb",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-foundation hash::tests::fnv1a_deterministic",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host abi_m1_d0_probe::family_projection_hashes_compose_and_one_family_mutation_is_local",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host abi_m1_d0_probe::the_generated_projections_cover_every_family_exactly_once",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host abi_v1::tests::caller_control_trap_keeps_terminal_primary_and_appends_cleanup_failure",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host abi_v1::tests::fs_rename_raw_dispatch_performs_the_exact_state_transition",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host abi_v1::tests::native_dispatch_projects_revoked_path_as_the_distinct_ioerror_tag",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host abi_v1::tests::whole_file_create_or_keep_preserves_a_concurrently_appearing_file",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host abi_v1::tests::wrong_generation_is_capability_denied_before_filesystem_access",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_v1::tests::abi_s1_d6_reuses_native_fs_handle_metadata_and_adds_no_operation",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_v1::tests::abi_s1_inheritance_get_set_are_typed_and_right_separated",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_v1::tests::abi_s6_d1_default_backend_unmap_is_unavailable_not_a_silent_drop",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_v1::tests::abi_s6_d5a_leaves_file_acquisition_represented_unavailable",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_v1::tests::ac5_new_operations_are_unavailable_and_the_promotion_set_is_untouched",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_v1::tests::fs_open_denial_remains_a_capability_error_before_resource_mint",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_v1::tests::released_acquisition_span_is_not_revived_by_slot_reuse",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_wire::tests::abi_s1_descriptor_requests_and_position_reply_round_trip_typed_wire",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_wire::tests::ac1_every_new_request_survives_an_encode_decode_round_trip",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host effect_wire::tests::sole_codec_rejects_terminal_role_length_and_class_drift",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host revocation_v1::tests::copy_preserves_node_identity_without_minting",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-host revocation_v1::tests::node_ids_are_monotonic_never_reused_and_nominally_distinct",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eff_tests::eff1_perform_observe_resume_console",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eff_tests::eff6_unknown_strict_through_driver",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eff_tests::eff7_exhaustive_driver_dispatch_no_silent_skip",
+      "seconds": 0.014,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::capacity_tests::interp_at_limit_repeat_does_not_trip",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::nfc_construction_tests::nfc_consumers_observe_normalized_literal_value",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::px5b_effect_observation_tests::actual_raw_requests_survive_descriptor_collision",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::px5b_effect_observation_tests::budget_eff_capped_short_read_reifies_effective_not_raw_remaining",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::px5b_effect_observation_tests::d1_a_wall_instant_is_not_decodable_as_a_monotonic_deadline",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::px5b_effect_observation_tests::resource_inserted_by_one_dispatch_call_stays_visible_across_later_dispatch_calls",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::px5b_effect_observation_tests::rt_parity_fs_read_at_rejects_malformed_offset_exactly",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp eval::px5b_effect_observation_tests::rt_parity_malformed_freeze_bounds_precede_closed_resource",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp tests::can_quotient_elim_computes",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp tests::det_canonical_order_independent",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp tests::lazy_if_taken_arm_only",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::b3_acceptance monitor_changes_when_t_changes",
+      "seconds": 92.087,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::b3_acceptance monitor_verdict_never_promoted_to_proved",
+      "seconds": 45.748,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::b3_acceptance non_host_trace_event_uses_exact_b1_signature_and_rejects_sibling",
+      "seconds": 45.953,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::b3_acceptance trace_events_are_checked_against_the_one_b1_alphabet",
+      "seconds": 44.92,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::elim_bool_dispatch_acceptance computed_bool_agrees_with_literal_bool_dispatch",
+      "seconds": 1.662,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::f1_bignum_acceptance f1_product_chain_exceeds_2_1000",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::fs_driver_build_capability_acceptance r2_insufficient_cap_denied_before_read",
+      "seconds": 0.418,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::i2_console_floor capture_read_is_bounded_and_eof_is_named_not_empty_chunk",
+      "seconds": 0.424,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::i2_console_floor console_surface_and_package_are_zero_trust_definitions",
+      "seconds": 0.426,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::i3_fs_floor named_errors_and_write_gate_are_total_and_discriminating",
+      "seconds": 0.454,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::i5_scoped_capability change_mode_is_distinct_handle_bound_and_validated_before_dispatch",
+      "seconds": 0.425,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::k1p5_ih_wstyle_vis_fold_acceptance wstyle_ih_folds_at_depth_two",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::l1_acceptance ac1_int_exact_above_2_53",
+      "seconds": 0.438,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::l1_acceptance ac2_expected_type_overrides_default",
+      "seconds": 0.446,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::l1_acceptance ac3_overflow_obligation_dischargeable_structure",
+      "seconds": 0.441,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::nc12_runtime_ir_evaluator p2_an_ambiguous_example_key_is_refused_rather_than_resolved_by_order",
+      "seconds": 0.018,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::nc7_differential_trust_report mismatch_report_names_compare_stage_after_both_sides_run",
+      "seconds": 0.618,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::nc9_proof_erasure_boundary_checker ken_checker_rejects_dropped_metadata_with_named_lane",
+      "seconds": 0.512,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::nc9_proof_erasure_boundary_checker ken_checker_rejects_stale_identity_with_named_lane",
+      "seconds": 0.518,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::px7f_system_resource caller_control_release_failure_preserves_success_and_body_error_ordering",
+      "seconds": 0.485,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-interp::px8p_checked_buffer malformed_and_policy_invalid_capacities_have_exact_distinct_errors",
+      "seconds": 0.468,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel check::tests::k2_piproduct_over_omega_lands_in_omega",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel check::tests::let_check_accepts_valid_body_at_outer_expected_type",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel conv::tests::closed_nil_positive_reduces_by_iota_without_refusal",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel conv::tests::level_max_same_var_higher_offset_dominates",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel conv::tests::quotient_class_congruence_compares_representatives_only",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel conv::tests::sigma_beta_whnf",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel inductive::tests::occurs_finds_former",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel sct::tests::canonical_eta_head_preserves_canonical_body_inner",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel sct::tests::is_exact_reconstruction_structural_increase_rejected",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel sct::tests::strict_self_loop_accepted",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance ac2_pair_intro_dependent",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance ac4_elim_vec_iota_vcons_var",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance ac5_positive_list_admitted",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance ac6_subject_reduction_sigma_beta",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance k2_omega_skip_prop_args",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance k2_seam1_cast_inductive_index_change_stuck",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance k2_seam3_omega_quot_elim_accepted",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::acceptance k2_trunc_eq_is_top",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::ds6a_int_deceq_certificate mistyped_eq_op_domain_is_rejected_at_registration",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::ds6b_intlit_eq_reduction intlit_converts_by_value_not_by_identity",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::ds6b_intlit_eq_reduction large_literal_does_not_diverge",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::eq_at_inductive_multifield_binder one_field_reflexive_eq_stays_well_typed_either_way",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k2c_conversion declare_def_non_recursive_admitted",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k2c_conversion declare_def_sct_rejects_self_loop",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k2c_conversion sct_accepts_mutual_arity_isolation_consumer",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k2c_conversion sct_reject_growing",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k2c_series2 j_constant_motive_still_reduces",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k3_literal_char_registration checked_carriers_reject_wrong_shape_and_char_range_without_partial_admission",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k4_omega_motive non_omega_foil_distinct_reducts_do_not_convert",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k4_omega_motive omega_motive_excluded_middle_shaped_admitted",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::k4_omega_motive type_motive_regression_still_admitted",
+      "seconds": 0.006,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::nested_inductives_all generated_all_sorts_retain_both_independent_symbolic_levels",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::nested_inductives_all neutral_method_dependent_decoder_cannot_replace_literal_all",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::nested_inductives_d1a admission_records_positive_and_non_positive_parameters",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::nested_inductives_d3_shapes transparent_aliases_preserve_former_topology_and_fail_closed_otherwise",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::nested_inductives_remaining checked_transparent_sigma_alias_rejects_inner_arrow_negative",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::nested_inductives_remaining seed_bound_head_is_unknown_and_rejected",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-kernel::sct_completeness_nested_split two_level_nested_split_flat_sibling_recursion_accepts",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime activation_abi::tests::a_profile_from_a_layout_this_runtime_does_not_implement_is_refused",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime activation_abi::tests::selected_call_checked_services_gate_rejects_capacity_and_integrity",
+      "seconds": 0.023,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime activation_abi::tests::the_abi_statuses_are_distinct",
+      "seconds": 0.02,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime activation_abi::tests::two_activations_across_the_c_abi_get_distinct_services",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_activation::tests::the_eight_authorized_limits_reach_their_own_published_ceilings",
+      "seconds": 0.014,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_resource_profile::tests::the_lookup_agrees_with_the_named_field_a_deployment_wrote",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value::invocation_aggregate_decode_tests::each_malformed_node_refuses_at_its_own_gate",
+      "seconds": 0.014,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value::reservation_units_tests::region_reservation_can_shrink_before_publication",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::ac4_invocation_data_and_limbs_are_unreachable_by_the_admitted_relation",
+      "seconds": 0.039,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_a_separately_compiled_consumer_reads_a_spilled_int_by_content",
+      "seconds": 0.08,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_ac10_a_constructible_node_cycle_is_refused_not_recursed",
+      "seconds": 0.043,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_ac6_invocation_owned_classes_are_never_persisted",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_construction_fails_closed_at_each_ceiling",
+      "seconds": 0.028,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_d5_the_durable_closure_lane_is_refused_at_allocation_by_name",
+      "seconds": 0.024,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_emitted_code_constructs_a_nonconstant_constructor_and_a_consumer_reads_it",
+      "seconds": 0.083,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_emitted_code_constructs_a_record_readable_by_name",
+      "seconds": 0.05,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_emitted_code_constructs_a_wide_persistent_int_that_outlives_the_arena",
+      "seconds": 0.066,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_emitted_code_projects_a_nested_aggregate",
+      "seconds": 0.053,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_emitted_immediate_construction_refuses_what_it_cannot_represent",
+      "seconds": 0.022,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_equal_values_share_one_persistent_referent",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime boundary_value_clif::tests::b2v_every_emitted_tag_admission_test_is_the_plans",
+      "seconds": 0.481,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime canonical::tests::set_ordering_deterministic",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::artifact::api::tests::jit_zero_epoch_child",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::artifact::api::tests::nc8_certificate_wrong_identity_rejects_before_native_run",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::artifact::api::tests::reachable_declaration_effect_metadata_rejects_before_backend_lowering",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::artifact::tests::px8i_local_helpers_reject_invalid_zero_stale_and_wrong_arena_slots",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::grafted_spine_control_graph::tests::branch_and_reconvergence_allows_two_realizable_paths_to_one_terminal",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::aggregates::tests::a_child_owner_set_outside_the_planned_meet_is_refused_before_any_allocation",
+      "seconds": 0.021,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::aggregates::tests::a_constructor_store_loop_child_reports_a_direct_boundary_transfer",
+      "seconds": 0.048,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::boundary::tests::c1_d5_a_closure_free_constructor_is_admissible",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::boundary::tests::recut2_the_emitted_helper_graph_changes_when_the_owner_bands_change",
+      "seconds": 0.053,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::boundary::tests::recut2_the_tag_admission_is_derived_from_the_partition_not_restated",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::branched_scrutinee_unit_body_observer_tests::noncarrying_match_arm_missing_recursive_position_returns_none",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::primitive::tests::explicit_partial_primitive_reports_trap_not_backend_bug",
+      "seconds": 0.031,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::primitive::tests::px8i_jit_terminal_requires_uncorrupted_local_export_evidence",
+      "seconds": 0.053,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::b2f_d9_no_spillable_tag_can_make_the_immediate_producer_answer_shape",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::b2f_d9_one_compiled_body_takes_both_arms_at_runtime",
+      "seconds": 0.03,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::c1_d3_ac_c4_each_case_binder_reads_its_own_constructor_field",
+      "seconds": 0.048,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::c1_d3_ac_c7_computational_match_eliminates_a_carried_value_non_recursively",
+      "seconds": 0.047,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::c1_d4_ac_c5_a_reordered_record_projects_the_same_field",
+      "seconds": 0.029,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::carried_bool_dispatch_selects_exact_false_and_true_ordinals",
+      "seconds": 0.027,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::constructor_field_composes_through_computational_consumer",
+      "seconds": 0.033,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::constructor_field_missing_case_owns_default_before_fields",
+      "seconds": 0.032,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::d2_a_capacity_exceeding_runtime_span_fails_before_publication",
+      "seconds": 0.027,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::d2_an_unselected_reply_arm_copies_no_bytes",
+      "seconds": 0.044,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::dynamic_constructor_duplicate_tag_and_identity_reject_exactly",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::dynamic_constructor_known_omission_owns_source_default",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::dynamic_constructor_unknown_tag_runs_malformed_not_source_default",
+      "seconds": 0.016,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::dynamic_host_result_producer_carrier_final_kind_is_runtime_guarded",
+      "seconds": 0.066,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::dynamic_host_result_producer_well_formed_control_emits",
+      "seconds": 0.036,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::heterogeneous_eliminator_well_formed_control_emits",
+      "seconds": 0.039,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::nested_computational_payload_kind_rejects_specifically",
+      "seconds": 0.031,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::nested_worker_depends_on_both_levels",
+      "seconds": 0.098,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::static_worker_construction_rejects_wrong_arity",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::constructors::static_worker_unused_binding_succeeds",
+      "seconds": 0.036,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::a_closure_stored_as_constructor_data_cannot_cross_a_unit_boundary",
+      "seconds": 0.055,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::checked_join_marker_without_exact_plan_site_rejects_before_emission",
+      "seconds": 0.029,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::checked_marker_census_rejects_duplicate_call_and_slot_occurrences_before_cfg",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::no_collection_is_keyed_by_a_scheduling_entry",
+      "seconds": 0.193,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::oriented_fresh_ih_semantics_retain_all_inherited_control_obligations",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::oriented_open_control_obligations_are_affine_and_mint_exact",
+      "seconds": 0.016,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::process_lowering_without_checked_root_authority_rejects_before_cfg",
+      "seconds": 0.028,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::px8j_all_three_producer_paths_reach_real_consumers",
+      "seconds": 0.081,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::control::the_bare_source_term_detector_catches_the_shape_it_is_looking_for",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::effects::an_incomplete_duplicate_discarded_or_misobserved_visit_rejects",
+      "seconds": 0.304,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::effects::d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation",
+      "seconds": 0.076,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::effects::directory_entry_name_is_a_governed_host_response_referent",
+      "seconds": 0.029,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::effects::px8n_decrement_and_raw_scalar_mutations_fail_the_structural_oracle",
+      "seconds": 0.026,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::effects::removing_the_carried_capacity_arm_or_restoring_the_bulk_conversion_refuses_at_the_seat",
+      "seconds": 0.117,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::every_expression_typed_field_is_a_reachable_positional_child_origin",
+      "seconds": 0.028,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::host_call_carrier::an_unrepresentable_transfer_is_refused_before_any_unit_is_declared",
+      "seconds": 0.141,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::host_call_carrier::d4_a_lexical_closure_declaration_retains_a_binding_and_still_runs",
+      "seconds": 0.058,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::host_call_carrier::d4_claiming_the_same_causal_token_twice_reds_the_ledger",
+      "seconds": 0.079,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::host_call_carrier::rt_scale_b_governed_n3_through_n7_collect_every_d2_metric",
+      "seconds": 0.796,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::host_call_carrier::the_resolved_call_edge_population_moves_with_the_program",
+      "seconds": 0.049,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::host_call_carrier::typed_trap_exit_preserves_the_planner_identity_across_two_unit_calls",
+      "seconds": 0.03,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::perturbing_a_borrowed_address_does_not_move_any_derived_origin",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::positional_candidate_settlement::call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_callee",
+      "seconds": 0.014,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::positional_candidate_settlement::ced_d3_m1_suppressing_the_binding_installation_is_refused_at_the_ih_marker_guard",
+      "seconds": 0.065,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::recursor_fusion::contkey_wrong_own_occurrence_seed_is_rejected",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::recursor_fusion::d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin",
+      "seconds": 0.074,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::recursor_fusion::required_consumer_route_manufactures_the_depth_two_plus_closure_crossing",
+      "seconds": 0.146,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::source_frame_bridge::d6b_every_raw_emission_sits_where_the_tables_agree_and_every_context_emission_where_they_differ",
+      "seconds": 0.053,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::source_frame_bridge::d8g_each_producer_input_mutation_is_caught_by_the_guard_that_owns_it",
+      "seconds": 0.157,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::source_frame_bridge::d8g_the_composed_selected_argument_reaches_its_target_at_the_shared_emitter",
+      "seconds": 0.034,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::source_frame_bridge::d8l2_the_ordinary_envelope_names_source_positions_in_every_orientation",
+      "seconds": 0.215,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::continuation_case_binder_run_resolves_a_field_by_source_position_not_envelope_ordinal",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d3b_the_consumer_refuses_an_index_the_emission_seat_does_not_hold",
+      "seconds": 0.097,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d5a_a_missing_generated_context_binding_refuses_before_any_phantom_is_emitted",
+      "seconds": 0.042,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_slot",
+      "seconds": 0.014,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d5a_the_landed_object_fixture_consumes_its_ih_marker_before_emitting_the_worker_call",
+      "seconds": 0.053,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d5a_the_retargeted_worker_call_carries_the_raw_run_plus_the_context_capture_suffix",
+      "seconds": 0.053,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d7a_the_three_field_selector_collides_where_the_four_field_selector_resolves",
+      "seconds": 0.017,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d8e_a_neighbouring_callee_installs_the_binding_and_consumes_nothing",
+      "seconds": 0.034,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d8e_the_composed_binding_is_installed_consumed_and_clears_its_own_causal_edge",
+      "seconds": 0.039,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::core::tests::specialization_binding::d8k_the_causal_population_is_a_disjoint_partition_of_direct_and_composed",
+      "seconds": 0.046,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::seed_material::tests::scalar_payload_sits_at_the_declared_offset",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::seed_material::tests::size_is_accepted_below_the_cap_and_rejected_above_it",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::source::tests::d6b_calling_the_selected_recursive_argument_in_the_ordinary_unit_copy_fails_closed_at_the_carrier",
+      "seconds": 0.074,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::source::tests::d8f_the_declined_call_does_not_answer_for_the_checked_identity",
+      "seconds": 0.092,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::lowering::units::admitted_matches_role_sequence::the_planner_issued_association_agrees",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::plan_extraction_tests::native_join_plan_surfaces_a_decode_failure_rather_than_dropping_it",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::aggregates::checked_ih_captured_env_schema::a_seed_sourced_capture_is_refused_rather_than_admitted",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::aggregates::checked_ih_captured_env_schema::the_issued_seats_are_exactly_the_seats_with_a_coordinate_run",
+      "seconds": 0.015,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::aggregates::checked_ih_captured_env_schema::transport_edges_reference_one_force_record_and_issue_no_destination_record",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::aggregates::tests::a_path_step_kind_is_load_bearing_not_an_index",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::aggregates::tests::a_scalar_nodes_owner_set_comes_from_its_exact_spill_disposition",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::aggregates::tests::the_flattening_reproduces_the_measured_tree",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::closure::tests::b2o_ac5_each_ownership_law_reddens_on_its_own",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::closure::tests::b2o_check_every_function_unit_error_site_has_an_exact_disposition",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::construction::tests::boundary_a_topology_is_identical_to_the_pre_d9_planner",
+      "seconds": 0.017,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::construction::tests::d2a_one_source_declaration_contributes_exactly_one_function",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::construction::tests::d2a_retaining_the_obsolete_scheduling_unit_restores_the_phantom",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::construction::tests::d4_the_declaration_call_partition_is_causal_in_both_directions",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::fusion::tests::d2e_binder_role_separates_a_hypothesis_from_an_ordinary_child",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::fusion::tests::d2e_ih_binding_does_not_leak_into_a_closure_body",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::fusion::tests::d2g_ac1_checked_twin_reaches_the_same_producer_to_ih_consumer_relation",
+      "seconds": 0.015,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::fusion::tests::d2i_ac2_suppressing_only_the_descent_takes_the_candidate_to_zero",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::fusion::tests::d2j_the_segment_owner_re_home_is_provenance_and_non_aliasing",
+      "seconds": 0.019,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::tests::contsrc_d2b_generated_context_capture_separates_root_from_immediate",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::tests::d3_a_same_body_sibling_interns_as_two_units_with_two_edges",
+      "seconds": 0.012,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::continuations::tests::d3_the_callable_declaration_boundary_carries_typed_transport",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::immediate_bridge::tests::lifted_heterogeneous_producer_selected_by_offset_arithmetic",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::immediate_bridge::tests::refuses_a_body_that_is_none_of_the_four_spellings",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::immediate_bridge::tests::refuses_when_the_binder_offset_underflows_the_scrutinee_index",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::joins_traps::tests::d8_join_plan_is_a_bijection_with_source_join_occurrences",
+      "seconds": 0.024,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::joins_traps::tests::d8_mixed_join_plan_is_carrier_and_arm_order_independent",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::joins_traps::tests::d8_trap_predecessors_do_not_create_a_result_edge",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::occurrences::tests::a_body_occurrence_naming_an_in_range_control_node_is_refused",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::selected_pending_calls::tests::open_return_and_generated_crossings_keep_the_admission_refusals",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::units::tests::b2o_check_imported_binding_var_capture_has_a_value_word_carrier",
+      "seconds": 0.01,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::units::tests::b2r_ac10_the_descriptor_population_matches_the_prediction_on_every_fixture",
+      "seconds": 0.018,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::units::tests::b2r_ac4_the_abi_is_invariant_under_payload_and_depth_and_rejects_an_implicit_tail",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::units::tests::contspec_abi_refuses_owner_lifetime_and_affinity_disagreement",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::units::tests::contspec_parameter_affinity_comes_from_its_exact_source_slot",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime executable_artifact_contract::tests::native_artifact_available_without_hash_rejects",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime executable_artifact_contract::tests::report_and_contract_hashes_use_canonical_field_encoding",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime executable_entrypoint_packaging::tests::non_closed_or_imported_entrypoint_rejects_before_native_work",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime hash::tests::fnv1a_deterministic",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime hash::tests::fnv1a_empty",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime ir::tests::acf1_computational_frames_differing_only_in_a_closure_body_share_a_fingerprint",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime ir::tests::checked_ih_binder_morphism_refuses_a_stale_source_occurrence",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime native_execution_differential::tests::forged_object_linker_hash_rejects_unsupported_package_kind",
+      "seconds": 2.821,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime native_int::tests::multiplication_has_no_i128_ceiling",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime native_process_entrypoint::tests::argv_environment_and_cwd_are_byte_accurate_and_field_ordered",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime native_process_entrypoint::tests::exit_status_mapping_is_shared_and_fails_closed",
+      "seconds": 0.051,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime native_process_entrypoint::tests::trap_reports_to_runtime_stderr_and_clean_run_does_not",
+      "seconds": 0.052,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime object_linker_packaging::tests::forged_entrypoint_package_kind_version_rejects_before_linking",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime object_linker_packaging::tests::forged_entrypoint_package_version_rejects_before_linking",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime object_linker_packaging::tests::generic_object_executes_the_same_exact_big_int_helper_graph",
+      "seconds": 2.964,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime object_linker_packaging::tests::linked_process_artifact_drives_real_resource_open_use_release",
+      "seconds": 2.412,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime object_linker_packaging::tests::linked_process_executes_exact_big_int_support_without_host_dispatch",
+      "seconds": 2.649,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime object_linker_packaging::tests::stale_root_execution_marker_fails_the_bound_entrypoint_check",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime oriented_subcontinuation_plan::tests::control_parent_cannot_cross_prompt_regions",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime platform_runtime_support::tests::stable_abi_target_rejects_before_native_execution",
+      "seconds": 0.009,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime platform_runtime_support::tests::trap_observation_stays_runtime_report_comparable",
+      "seconds": 0.008,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime store::tests::ac_v2c_interning_a_nested_compound_mints_exactly_one_slot",
+      "seconds": 0.013,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime store::tests::auto_gc_not_present",
+      "seconds": 0.011,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime unknown::tests::unknown_and_false_is_false",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime unknown::tests::unknown_or_true_is_true",
+      "seconds": 0.007,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime::value_depth_totality ac_p3b_debug_returns_and_renders_at_depth_d",
+      "seconds": 0.078,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-runtime::value_depth_totality ac_v1_a_host_recursive_traversal_dies_on_this_population_at_depth_d",
+      "seconds": 0.242,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-verify scenario::tests::fs_metadata_real_artifact_fields_are_exact_and_discriminating",
+      "seconds": 53.3,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-verify scenario::tests::fs_read_directory_exercises_every_path_policy_refusal",
+      "seconds": 132.84,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-verify scenario::tests::real_artifact_five_op_observation_matches_interp_on_twin_roots",
+      "seconds": 48.148,
+      "result": "PASS"
+    }
+  ],
+  "fallbacks": [
+    {
+      "test_id": "ken-cli::px7f_resource_native owner_vis_placeholder_nonowner_target_refuses_at_sole_mint",
+      "seconds": 66.474,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::px7f_resource_native owner_vis_return_protocol_px7f_planned_fixpoints",
+      "seconds": 66.474,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::rt_escape_second_resource_native r2_relay_owner_is_excluded_from_pending_vis_protocol",
+      "seconds": 54.363,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cat1_lawful_functors_package lawful_fixture_withhold_rejects_forged_qualified_provider_key",
+      "seconds": 1.3984999999999999,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cat1_lawful_functors_package transport_fixture_aliases_reject_forged_qualified_provider_key",
+      "seconds": 1.3984999999999999,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cat5_parsing_package cat5_source_id_host_read_rejects_forged_qualified_provider_alias",
+      "seconds": 4.427,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cat_bsearch_acceptance ordered_search_publishes_exactly_its_authorized_surface",
+      "seconds": 2.05,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cat_deque_acceptance deque_host_read_rejects_forged_qualified_provider_alias",
+      "seconds": 2.8,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cc5_pretty_doc_acceptance render_host_read_ignores_forged_flat_fixture_alias",
+      "seconds": 2.497,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cc7_argparse_acceptance render_host_identity_checks_flat_and_qualified_alias_forgery",
+      "seconds": 7.1705000000000005,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::cc8_env_config_decoder_acceptance render_host_identity_checks_flat_and_qualified_alias_forgery",
+      "seconds": 7.245000000000001,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::ds5b_dependent_match_refinement_acceptance two_vector_zip_recursive_step_convoy_fixture",
+      "seconds": 0.462,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::map_build_acceptance checked_map_host_read_ignores_forged_flat_aliases",
+      "seconds": 8.663499999999999,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::ds5b_cast_regular_tests::distinct_inductive_type_app_indices_do_not_cast",
+      "seconds": 0.009,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::ds5b_cast_regular_tests::equal_inductive_type_app_cast_ignores_neutral_proof",
+      "seconds": 0.009,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::ds5b_cast_regular_tests::neutral_inductive_type_app_index_does_not_cast",
+      "seconds": 0.009,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::ds5b_cast_regular_tests::unknown_proof_blocks_equal_inductive_type_app_cast",
+      "seconds": 0.009,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-runtime cranelift_backend::planning::static_transition::returned_vis::tests::returned_vis_from_generated_call_is_the_callees_occurrence",
+      "seconds": 0.013,
+      "method": "binary-median"
+    }
+  ]
+}

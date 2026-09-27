@@ -66,25 +66,22 @@ jobs:
   # about 15s of the run start; this plan alone is not a wall-time measurement.
   #
   # The 10 parity / 7 workspace / 3 auxiliary first wave stays at 20 jobs.
-  # The latest complete per-test workspace source is run 36295180542, with
-  # 4,152 PASS identities. Current-main additions absent from it include the
-  # re-enabled ds5b test, H1/inline interp tests, later provider probes, and
-  # cat1 fixture probes. Each unmeasured live identity uses its binary's
-  # measured median; an unmeasured binary uses the global median. Older
-  # workspace sources and incomplete L2 rows remain evidence, not weights for
-  # this latest-run plan. `assignments.json` and each timing artifact record
-  # every fallback identity, estimate, and median source.
+  # Planner timings come from the seven exact, provenance-bearing shard
+  # artifacts of landed run 36341523886, rather than the stale 362951 source.
+  # That current-main run measured the tests behind the 126 repeated fallback
+  # metadata rows (18 unique identities). Future live identities still use
+  # their binary's measured median, then the global median. The live inventory
+  # and its exact-once union remain dynamic.
   #
-  # Longest-first LPT across seven bins gives 2,079.255 to 2,079.259s of
-  # assigned test work per bin (0.004s spread) on the current live population.
-  # Applying run 362951's 891.048/2,598.135 nextest-to-test-sum ratio and
-  # 315.952s non-test wall calibrates the maximum to 1,029.048s (17.15m). This
-  # is assigned-work calibration, not wall evidence; median fallbacks are
-  # estimates. Each shard emits one provenance-bearing `workspace-timings.json`;
-  # the union checker requires its terminal identities to match that shard's
-  # selection.
-  # Publisher timelines and these per-test artifacts measure the actual run.
-  #
+  # The landed run's old sum-only assignment projected 2,106.017s per shard,
+  # while measured terminal sums were 1,407.179-3,436.881s. The
+  # wall model uses measured terminal work plus the longest indivisible test;
+  # its per-shard replay is checked against measured Test/job walls within 60s.
+  # Replanning the exact run's inventory balances projected job walls at about
+  # 1,056s, using the run's 317s median pre-Test overhead. This is a projection,
+  # not Full-CI evidence. The same-tree PR/main runs differed by 179s, and the
+  # landing run took 1,289s; AC-2/AC-2a remain open. The union checker continues
+  # to require terminal identities to match each shard's realized selection.
   # Among run 362951's measured tests, shard 1's 591.502s longest is below the
   # conservative 684s floor bound (1,000s runner-up minus all 316s of shard-1
   # non-test time). This does not bound unmeasured tests or prove a floor for
@@ -170,7 +167,15 @@ jobs:
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
           python3 scripts/ci-duration-shard.py inventory.json \
-            docs/program/evidence/ci-workspace-timings-36295180542.tsv \
+            docs/program/evidence/ci-workspace-run-36341523886/shard-1.json \
+            docs/program/evidence/ci-workspace-run-36341523886/shard-2.json \
+            docs/program/evidence/ci-workspace-run-36341523886/shard-3.json \
+            docs/program/evidence/ci-workspace-run-36341523886/shard-4.json \
+            docs/program/evidence/ci-workspace-run-36341523886/shard-5.json \
+            docs/program/evidence/ci-workspace-run-36341523886/shard-6.json \
+            docs/program/evidence/ci-workspace-run-36341523886/shard-7.json \
+            --wall-calibration \
+            docs/program/evidence/ci-workspace-run-36341523886/job-steps.tsv \
             --output-dir duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then

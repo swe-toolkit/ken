@@ -715,6 +715,221 @@ class DurationShardControls(unittest.TestCase):
                 {},
             )
 
+    def test_landed_workspace_wall_model_reprojects_measured_shards(self):
+        evidence = Path(
+            "docs/program/evidence/ci-workspace-run-36341523886"
+        )
+        timing_paths = [
+            evidence / f"shard-{shard}.json"
+            for shard in range(1, SHARD_COUNT + 1)
+        ]
+        calibration_path = evidence / "job-steps.tsv"
+        model = _planner.fit_workspace_wall_model(timing_paths, calibration_path)
+        self.assertEqual(model["run_id"], 36341523886)
+        self.assertLessEqual(
+            max(model["calibration_errors"].values()),
+            _planner.WALL_MODEL_TOLERANCE_SECONDS,
+        )
+
+        actual_by_shard = {}
+        binary_shards = {}
+        binary_work_by_shard = {}
+        fallbacks = []
+        run_ids = set()
+        for path in timing_paths:
+            artifact = _planner.ci_workspace_timings.load_artifact(path)
+            run_ids.add(artifact["run_id"])
+            fallbacks.append(artifact["fallbacks"])
+            actual_by_shard[artifact["shard"]] = {
+                row["test_id"]: row["seconds"] for row in artifact["records"]
+            }
+            per_binary = {}
+            for record in artifact["records"]:
+                binary_id = record["test_id"].partition(" ")[0]
+                binary_shards.setdefault(binary_id, set()).add(artifact["shard"])
+                per_binary[binary_id] = per_binary.get(binary_id, 0.0) + record["seconds"]
+            binary_work_by_shard[artifact["shard"]] = per_binary
+        # Binary aggregates are neither unique to one shard nor serial wall
+        # units here; the indivisible tail is an individual test.
+        self.assertGreater(sum(len(shards) > 1 for shards in binary_shards.values()), 0)
+        self.assertEqual(len(run_ids), 1)
+        self.assertTrue(all(rows == fallbacks[0] for rows in fallbacks))
+        self.assertEqual(
+            sum(len(rows) for rows in fallbacks),
+            SHARD_COUNT * len(fallbacks[0]),
+        )
+
+        live = sorted(
+            (identity, identity.partition(" ")[0], identity.partition(" ")[2])
+            for rows in actual_by_shard.values()
+            for identity in rows
+        )
+        old_source = _planner.read_durations(
+            "docs/program/evidence/ci-workspace-timings-36295180542.tsv"
+        )
+        old_resolved, old_fallbacks = _planner.resolve_durations(live, old_source)
+        old_fallback_map = {
+            row["test_id"]: {"seconds": row["seconds"], "method": row["method"]}
+            for row in old_fallbacks
+        }
+        recorded_fallback_map = {
+            row["test_id"]: {"seconds": row["seconds"], "method": row["method"]}
+            for row in fallbacks[0]
+        }
+        self.assertEqual(old_fallback_map, recorded_fallback_map)
+
+        measured_source = _planner.read_durations(timing_paths)
+        self.assertEqual(set(measured_source), {row[0] for row in live})
+        old_projected = {}
+        measured_terminal = {}
+        fallback_delta = {}
+        for shard, identities in actual_by_shard.items():
+            selected = set(identities)
+            old_projected[shard] = sum(old_resolved[test_id] for test_id in selected)
+            measured_terminal[shard] = sum(identities.values())
+            fallback_ids = selected & set(old_fallback_map)
+            fallback_delta[shard] = sum(
+                identities[test_id] - old_fallback_map[test_id]["seconds"]
+                for test_id in fallback_ids
+            )
+        old_projection_spread = max(old_projected.values()) - min(old_projected.values())
+        measured_terminal_spread = (
+            max(measured_terminal.values()) - min(measured_terminal.values())
+        )
+        self.assertLess(old_projection_spread, 0.01)
+        self.assertGreater(measured_terminal_spread, 1000.0)
+        total_error = sum(
+            measured_terminal[shard] - old_projected[shard]
+            for shard in actual_by_shard
+        )
+        total_fallback_error = sum(fallback_delta.values())
+        self.assertGreater(abs(total_error), abs(total_fallback_error) * 5)
+
+        with calibration_path.open(encoding="utf-8") as source:
+            calibration_rows = {
+                int(row["shard"]): row
+                for row in csv.DictReader(source, delimiter="\t")
+            }
+        self.assertTrue(
+            any(
+                max(binary_work_by_shard[shard].values())
+                > float(calibration_rows[shard]["test_step_seconds"])
+                for shard in range(1, SHARD_COUNT + 1)
+            )
+        )
+        current_projection = []
+        for shard in range(1, SHARD_COUNT + 1):
+            durations = actual_by_shard[shard]
+            work = sum(durations.values())
+            longest = max(durations.values())
+            test_wall = _planner.project_test_wall_seconds(work, longest, model)
+            steps = calibration_rows[shard]
+            measured_job_wall = float(steps["job_wall_seconds"])
+            measured_pretest = measured_job_wall - float(steps["test_step_seconds"])
+            predicted_job_wall = measured_pretest + test_wall
+            self.assertLessEqual(
+                abs(predicted_job_wall - measured_job_wall),
+                _planner.WALL_MODEL_TOLERANCE_SECONDS,
+                f"shard {shard}: predicted {predicted_job_wall}, measured {measured_job_wall}",
+            )
+            current_projection.append(predicted_job_wall)
+        self.assertEqual(len(current_projection), SHARD_COUNT)
+
+    def test_wall_model_rebalances_live_tests_and_preserves_the_union(self):
+        evidence = Path(
+            "docs/program/evidence/ci-workspace-run-36341523886"
+        )
+        timing_paths = [
+            evidence / f"shard-{shard}.json"
+            for shard in range(1, SHARD_COUNT + 1)
+        ]
+        durations = _planner.read_durations(timing_paths)
+        suites = {}
+        for identity in durations:
+            binary_id, separator, name = identity.partition(" ")
+            self.assertTrue(separator)
+            suite = suites.setdefault(
+                binary_id,
+                {
+                    "binary-id": binary_id,
+                    "binary-name": binary_id.rpartition("::")[2] or binary_id,
+                    "testcases": {},
+                },
+            )
+            self.assertNotIn(name, suite["testcases"])
+            suite["testcases"][name] = {"filter-match": {"status": "matches"}}
+        inventory = {
+            "test-count": sum(len(suite["testcases"]) for suite in suites.values()),
+            "rust-suites": {
+                str(index): suite for index, suite in enumerate(suites.values())
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "inventory.json").write_text(json.dumps(inventory))
+
+            def run_plan(wall_model):
+                output_dir = root / ("wall-plan" if wall_model else "sum-plan")
+                command = [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(root / "inventory.json"),
+                    *(str(path) for path in timing_paths),
+                ]
+                if wall_model:
+                    command.extend(
+                        ["--wall-calibration", str(evidence / "job-steps.tsv")]
+                    )
+                command.extend(["--output-dir", str(output_dir)])
+                result = subprocess.run(
+                    command,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return json.loads(result.stdout)
+
+            sum_plan = run_plan(False)
+            wall_plan = run_plan(True)
+        expected = set(durations)
+        for plan in (sum_plan, wall_plan):
+            assigned = [
+                (binary_id, name)
+                for shard in plan["bins"]
+                for binary_id, name in shard["tests"]
+            ]
+            self.assertEqual(len(assigned), len(expected))
+            self.assertEqual(
+                {f"{binary_id} {name}" for binary_id, name in assigned}, expected
+            )
+        self.assertEqual(wall_plan["fallbacks"], [])
+        wall_projection = [
+            shard["projected_job_seconds"] for shard in wall_plan["bins"]
+        ]
+        sum_projection = []
+        model = _planner.fit_workspace_wall_model(
+            timing_paths, evidence / "job-steps.tsv"
+        )
+        for shard in sum_plan["bins"]:
+            selected = [
+                durations[f"{binary_id} {name}"]
+                for binary_id, name in shard["tests"]
+            ]
+            sum_projection.append(
+                _planner.project_test_wall_seconds(sum(selected), max(selected), model)
+                + model["setup_seconds"]
+            )
+        self.assertLessEqual(
+            max(wall_projection) - min(wall_projection),
+            _planner.WALL_MODEL_TOLERANCE_SECONDS,
+        )
+        self.assertGreater(
+            max(sum_projection) - min(sum_projection),
+            _planner.WALL_MODEL_TOLERANCE_SECONDS,
+        )
+
     def test_non_map_testcases_has_exact_error(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
