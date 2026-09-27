@@ -1,11 +1,11 @@
 # run	36279697268	CI	failure	head_sha=d723f5ad83a411e2629d4de13fe65767eebf9cb7	branch=wp/LANG-SESSION-SCOPE-catalog-prefix	run_started_at=2026-09-26T23:31:08Z	run_completed_at=2026-09-26T23:49:25Z	run_elapsed_s=1097.000
 job_id	job	status	conclusion	started_at	completed_at	job_wall_s	pass_rows	fail_rows	per_test_sum_s	sum_scope	nextest_summaries
-108509054728	classify changed paths	completed	success	2026-09-26T23:31:11Z	2026-09-26T23:31:19Z	8.000	0	0	0.000	no-nextest-sum	
+108509054728	classify changed paths	completed	success	2026-09-26T23:31:11Z	2026-09-26T23:31:19Z	8.000	0	0	0.000	no-nextest-sum	none
 108509082097	test shard 2/9	completed	success	2026-09-26T23:31:21Z	2026-09-26T23:43:17Z	716.000	461	0	1606.639	complete	Summary [ 407.689s] 461 tests run: 461 passed (8 slow), 2925 skipped
-108509081974	clean-room provenance check	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:31:30Z	8.000	0	0	0.000	no-nextest-sum	
-108509081989	work-item tracker and ignored-row sweep	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:39:31Z	489.000	0	0	0.000	no-nextest-sum	
-108509081999	path-guard	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:31:30Z	8.000	0	0	0.000	no-nextest-sum	
-108509082016	conformance suite	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:31:29Z	7.000	0	0	0.000	no-nextest-sum	
+108509081974	clean-room provenance check	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:31:30Z	8.000	0	0	0.000	no-nextest-sum	none
+108509081989	work-item tracker and ignored-row sweep	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:39:31Z	489.000	0	0	0.000	no-nextest-sum	none
+108509081999	path-guard	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:31:30Z	8.000	0	0	0.000	no-nextest-sum	none
+108509082016	conformance suite	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:31:29Z	7.000	0	0	0.000	no-nextest-sum	none
 108509082069	native-slow (rt_parity_native) 6/8	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:48:54Z	1052.000	23	0	3310.331	complete	Summary [ 896.880s] 23 tests run: 23 passed (23 slow), 162 skipped
 108509082072	native-slow (rt_parity_native) 1/8	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:48:28Z	1026.000	22	0	3233.455	complete	Summary [ 873.046s] 22 tests run: 22 passed (22 slow), 163 skipped
 108509082077	native-slow (rt_parity_native) 3/8	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:48:57Z	1055.000	23	0	3338.692	complete	Summary [ 901.260s] 23 tests run: 23 passed (23 slow), 162 skipped
@@ -20,9 +20,9 @@ job_id	job	status	conclusion	started_at	completed_at	job_wall_s	pass_rows	fail_r
 108509082185	test shard 8/9	completed	success	2026-09-26T23:31:22Z	2026-09-26T23:48:46Z	1044.000	462	0	2634.947	complete	Summary [ 737.202s] 462 tests run: 462 passed (15 slow), 2956 skipped
 108509082213	test shard 9/9	completed	failure	2026-09-26T23:31:22Z	2026-09-26T23:43:06Z	704.000	142	1	1591.078	partial-failure	Summary [ 398.329s] 143/461 tests run: 142 passed (10 slow), 1 failed, 2954 skipped
 108509082064	native-slow (rt_parity_native) 4/8	completed	success	2026-09-26T23:31:23Z	2026-09-26T23:46:18Z	895.000	23	0	2673.518	complete	Summary [ 764.798s] 23 tests run: 23 passed (23 slow), 162 skipped
-108509082019	optional z3 process adapter	completed	success	2026-09-26T23:31:25Z	2026-09-26T23:42:48Z	683.000	0	0	0.000	no-nextest-sum	
+108509082019	optional z3 process adapter	completed	success	2026-09-26T23:31:25Z	2026-09-26T23:42:48Z	683.000	0	0	0.000	no-nextest-sum	none
 108509082196	test shard 1/9	completed	failure	2026-09-26T23:31:31Z	2026-09-26T23:40:43Z	552.000	107	1	852.257	partial-failure	Summary [ 224.804s] 108/461 tests run: 107 passed (4 slow), 1 failed, 2917 skipped
 108509082214	test shard 5/9	completed	success	2026-09-26T23:31:31Z	2026-09-26T23:45:25Z	834.000	461	0	1844.008	complete	Summary [ 541.217s] 461 tests run: 461 passed (7 slow), 2969 skipped
 108509082100	native-slow (empty auxiliary controls)	completed	success	2026-09-26T23:31:33Z	2026-09-26T23:43:10Z	697.000	7	0	1247.352	complete	Summary [  41.052s] 1 test run: 1 passed, 0 skipped || Summary [ 506.030s] 6 tests run: 6 passed (6 slow), 0 skipped
-108511580340	verify-realized-shard-union	completed	success	2026-09-26T23:49:09Z	2026-09-26T23:49:20Z	11.000	0	0	0.000	no-nextest-sum	
-108511612659	build + test	completed	failure	2026-09-26T23:49:22Z	2026-09-26T23:49:25Z	3.000	0	0	0.000	failed-no-nextest-sum	
+108511580340	verify-realized-shard-union	completed	success	2026-09-26T23:49:09Z	2026-09-26T23:49:20Z	11.000	0	0	0.000	no-nextest-sum	none
+108511612659	build + test	completed	failure	2026-09-26T23:49:22Z	2026-09-26T23:49:25Z	3.000	0	0	0.000	failed-no-nextest-sum	none
