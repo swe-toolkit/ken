@@ -186,11 +186,12 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 
 /// MEASURED: ordinary isolated roots loading installs exactly the checked
 /// identities in Deque's expected owned inventory, returns only identities
-/// from that population, and executes every checked fence. The resulting
-/// trusted base equals a fresh load of the Derived provider closure. CLAIMED: Deque is standalone, owns exactly its
-/// checked family, and adds no consumer-local trust. THE GAP: constructors are
-/// not separate loader results; the qualified environment inventory closes that
-/// part of the population independently.
+/// from that population, executes every checked fence, and retains identical
+/// names, ids, and trust afterward. The trusted base equals a fresh Derived
+/// provider closure before and after the fences. CLAIMED: Deque owns exactly
+/// its checked family and adds no consumer-local trust. THE GAP: constructors
+/// are not separate loader results; the qualified environment inventory
+/// closes that part of the population independently.
 #[test]
 fn deque_owned_inventory_is_exact_and_standalone_with_zero_local_trust() {
     let (mut via_deque, loader_results) = load(DEQUE);
@@ -213,6 +214,21 @@ fn deque_owned_inventory_is_exact_and_standalone_with_zero_local_trust() {
     via_deque
         .execute_loaded_entry_checked_fences(DEQUE)
         .expect("Deque Definition and every checked fence must elaborate");
+    assert_eq!(
+        qualified_owned_names(&via_deque),
+        expected_owned_names(),
+        "Deque checked fences must not grow the qualified declaration inventory"
+    );
+    assert_eq!(
+        qualified_owned_ids(&via_deque),
+        owned_ids,
+        "Deque checked fences must not change owned declaration identities"
+    );
+    assert_eq!(
+        via_deque.env.trusted_base(),
+        via_derived.env.trusted_base(),
+        "Deque checked fences must not add trust beyond Derived's provider closure"
+    );
 }
 
 /// Promise class: durable invariant.

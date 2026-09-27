@@ -10,7 +10,6 @@ use std::path::PathBuf;
 mod catalog_or;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DEQUE: &str = "Data.Collections.Deque";
@@ -39,16 +38,20 @@ fn expose_module(env: &mut ElabEnv, module: &str) {
     env.globals.extend(aliases);
 }
 
-fn loaded_env_with_owned() -> (ElabEnv, Vec<GlobalId>) {
+fn loaded_env_with_owned() -> (ElabEnv, Vec<GlobalId>, Vec<GlobalId>) {
     let mut env = base_env();
-    let owned = env.elaborate_module_from_roots(&[catalog_root()], DEQUE)
+    let derived_owned = env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("the Deque provider must roots-load before Deque");
+    let deque_owned = env.elaborate_module_from_roots(&[catalog_root()], DEQUE)
         .expect("Data.Collections.Deque must roots-load with its real provider closure");
-    expose_module(&mut env, DEQUE);
-    (env, owned)
+    (env, deque_owned, derived_owned)
 }
 
-fn loaded_env() -> ElabEnv {
-    loaded_env_with_owned().0
+fn checked_deque_examples() -> ElabEnv {
+    let (mut env, _, _) = loaded_env_with_owned();
+    env.execute_loaded_entry_checked_fences(DEQUE)
+        .expect("Deque's private laws and concrete examples must check");
+    env
 }
 
 fn leading_pi_count(term: &Term) -> usize {
@@ -109,34 +112,6 @@ fn transparent_bodies_with_saturated_provider_head_occurrence(
         .collect()
 }
 
-fn boolean_list(env: &ElabEnv, value: EvalVal) -> Vec<bool> {
-    let mut current = value;
-    let mut result = Vec::new();
-    loop {
-        match current {
-            EvalVal::Ctor { id, .. } if id == env.prelude_env.nil_id => return result,
-            EvalVal::Ctor { id, args, .. } if id == env.prelude_env.cons_id => {
-                let head = match &args[1] {
-                    EvalVal::Ctor { id, .. } if *id == env.numeric_env.bool_true_id => true,
-                    EvalVal::Ctor { id, .. } if *id == env.numeric_env.bool_false_id => false,
-                    other => panic!("expected a Boolean list head, got {other:?}"),
-                };
-                result.push(head);
-                current = args[2].clone();
-            }
-            other => panic!("expected a Boolean List constructor chain, got {other:?}"),
-        }
-    }
-}
-
-fn evaluate_boolean_list(env: &ElabEnv, name: &str) -> Vec<bool> {
-    let body = match env.env.lookup(env.globals[name]) {
-        Some(Decl::Transparent { body, .. }) => body,
-        other => panic!("{name} must be transparent, got {other:?}"),
-    };
-    boolean_list(env, eval(&[], body, &env.env, &mut EvalStore::new()))
-}
-
 /// Promise class: durable checked-identity invariant.
 /// MEASURED: forged flat aliases for every named Deque global cannot replace
 /// the provider-owned IDs selected by the host. CLAIMED: host probes inspect checked Deque ownership,
@@ -144,8 +119,9 @@ fn evaluate_boolean_list(env: &ElabEnv, name: &str) -> Vec<bool> {
 /// governed by the loader-visible closeout pin.
 #[test]
 fn entry_elaborates_and_registers_operations_and_laws() {
-    let (mut env, owned) = loaded_env_with_owned();
-    let forged = env.globals[&format!("{DERIVED}.reverse")];
+    let (mut env, owned, derived_owned) = loaded_env_with_owned();
+    let forged = catalog_or::provider_owned_id(&env, &derived_owned, DERIVED, "reverse")
+        .expect("Derived must own the checked reverse used as a forgery input");
     let names = [
         "Deque",
         "MkDeque",
@@ -196,10 +172,11 @@ fn entry_elaborates_and_registers_operations_and_laws() {
 /// THE GAP: the per-name host census above supplies the positive owner set.
 #[test]
 fn deque_host_read_rejects_forged_qualified_provider_alias() {
-    let (mut env, owned) = loaded_env_with_owned();
+    let (mut env, owned, derived_owned) = loaded_env_with_owned();
     let canonical = catalog_or::provider_owned_id(&env, &owned, DEQUE, "pushFront")
         .expect("Deque must own pushFront");
-    let forged = env.globals[&format!("{DERIVED}.reverse")];
+    let forged = catalog_or::provider_owned_id(&env, &derived_owned, DERIVED, "reverse")
+        .expect("Derived must own the checked reverse used as a forgery input");
     assert_ne!(canonical, forged);
     env.globals.insert(format!("{DEQUE}.pushFront"), forged);
     assert!(
@@ -236,14 +213,16 @@ fn entry_adds_no_consumer_local_trusted_declarations() {
 ///
 /// EVIDENCE DIVISION: exact provider identity and occurrence population are
 /// measured here. Retired named globals plus the positive/negative selective-
-/// import pair pin the elaboration-visible migration shape. Concrete
-/// observations below pin behavior. The WP census and affected-target closure
-/// own the remaining frame obligations.
+/// import pair pin the elaboration-visible migration shape. The Deque-local
+/// checked examples below pin concrete behavior. The WP census and affected-
+/// target closure own the remaining frame obligations.
 #[test]
 fn transparent_deque_bodies_have_exact_derived_head_occurrence_populations() {
-    let env = loaded_env();
-    let append = env.globals[&format!("{DERIVED}.list_append")];
-    let reverse = env.globals[&format!("{DERIVED}.reverse")];
+    let (env, _, derived_owned) = loaded_env_with_owned();
+    let append = catalog_or::provider_owned_id(&env, &derived_owned, DERIVED, "list_append")
+        .expect("Derived must own checked list_append");
+    let reverse = catalog_or::provider_owned_id(&env, &derived_owned, DERIVED, "reverse")
+        .expect("Derived must own checked reverse");
 
     for retired in ["deque_list_append", "deque_list_reverse"] {
         assert!(
@@ -312,84 +291,49 @@ fn transparent_deque_bodies_have_exact_derived_head_occurrence_populations() {
     );
 }
 
+/// Promise class: durable checked-law invariant.
+/// MEASURED: Deque's own example fence checks all four generic applications,
+/// then the host finds four transparent witnesses. CLAIMED: the private
+/// homomorphism and pop-inverse laws apply to arbitrary inputs without a
+/// client importing private Deque names. THE GAP: the checked provider laws
+/// establish the universal statements; this checks only their applications.
 #[test]
 fn both_homomorphisms_and_both_pop_inverses_instantiate_generically() {
-    let mut env = loaded_env();
-    env.elaborate_file(
-        "import Data.Collections.Derived\n\
-         theorem cat_deque_ac1_front \
-             (a : Type) (x : a) (q : Deque a) \
-           : Equal (List a) \
-               (toList a (pushFront a x q)) \
-               (Cons a x (toList a q)) = \
-           toList_pushFront a x q\n\
-         theorem cat_deque_ac1_back \
-             (a : Type) (x : a) (q : Deque a) \
-           : Equal (List a) \
-               (toList a (pushBack a x q)) \
-               (Data.Collections.Derived.list_append a (toList a q) (Cons a x (Nil a))) = \
-           toList_pushBack a x q\n\
-         fn cat_deque_ac2_front \
-             (a : Type) (x : a) (q : Deque a) \
-           : PopPreserves a x q (popFront a (pushFront a x q)) = \
-           popFront_pushFront a x q\n\
-         fn cat_deque_ac2_back \
-             (a : Type) (x : a) (q : Deque a) \
-           : PopPreserves a x q (popBack a (pushBack a x q)) = \
-           popBack_pushBack a x q",
-    )
-    .expect("both abstraction homomorphisms and both pop inverses must instantiate generically");
+    let env = checked_deque_examples();
+    for name in [
+        "deque_example_front_homomorphism",
+        "deque_example_back_homomorphism",
+        "deque_example_front_inverse",
+        "deque_example_back_inverse",
+    ] {
+        let id = env.globals[name];
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "in-module generic Deque application {name} must remain checked"
+        );
+    }
 }
 
+/// Promise class: durable closed computation invariant.
+/// MEASURED: Deque's example fence checks five exact List Bool equalities,
+/// including direct and rebalancing pop orders, with transparent proof terms.
+/// CLAIMED: these five histories preserve their specified sequence orders.
+/// THE GAP: these are closed histories, not a universal invariant over every
+/// deque; the generic laws above own their respective quantified statements.
 #[test]
 fn front_back_and_rebalancing_paths_preserve_sequence_order() {
-    let mut env = loaded_env();
-    env.elaborate_file(
-        "fn cat_deque_observe_pop \
-             (a : Type) (popped : Option (Pair a (Deque a))) \
-           : List a = \
-           match popped { \
-             None ↦ Nil a; \
-             Some item ↦ \
-               Cons a \
-                 (pair_fst a (Deque a) item) \
-                 (toList a (pair_snd a (Deque a) item)) \
-           }\n\
-         const cat_deque_push_vector : List Bool = \
-           toList Bool \
-             (pushBack Bool False \
-               (pushFront Bool False \
-                 (pushBack Bool True (empty Bool))))\n\
-         const cat_deque_pop_front_direct : List Bool = \
-           cat_deque_observe_pop Bool \
-             (popFront Bool \
-               (pushFront Bool False \
-                 (pushBack Bool True (empty Bool))))\n\
-         const cat_deque_pop_front_rebalance : List Bool = \
-           cat_deque_observe_pop Bool \
-             (popFront Bool \
-               (pushBack Bool False \
-                 (pushBack Bool True (empty Bool))))\n\
-         const cat_deque_pop_back_direct : List Bool = \
-           cat_deque_observe_pop Bool \
-             (popBack Bool \
-               (pushBack Bool False \
-                 (pushFront Bool True (empty Bool))))\n\
-         const cat_deque_pop_back_rebalance : List Bool = \
-           cat_deque_observe_pop Bool \
-             (popBack Bool \
-               (pushFront Bool False \
-                 (pushFront Bool True (empty Bool))))",
-    )
-    .expect("both direct and rebalancing pop paths must elaborate");
-
-    for (name, expected) in [
-        ("cat_deque_push_vector", vec![false, true, false]),
-        ("cat_deque_pop_front_direct", vec![false, true]),
-        ("cat_deque_pop_front_rebalance", vec![true, false]),
-        ("cat_deque_pop_back_direct", vec![false, true]),
-        ("cat_deque_pop_back_rebalance", vec![true, false]),
+    let env = checked_deque_examples();
+    for name in [
+        "deque_example_push_order",
+        "deque_example_front_direct_order",
+        "deque_example_front_rebalance_order",
+        "deque_example_back_direct_order",
+        "deque_example_back_rebalance_order",
     ] {
-        assert_eq!(evaluate_boolean_list(&env, name), expected, "{name}");
+        let id = env.globals[name];
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "in-module concrete Deque order {name} must remain checked"
+        );
     }
 }

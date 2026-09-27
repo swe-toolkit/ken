@@ -211,9 +211,15 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
         trust_after, trust_before,
         "Vector must add no trust beyond its checked provider closure"
     );
+    let pre_fence_trust: BTreeSet<_> = via_vector.env.trusted_base().into_iter().collect();
     via_vector
         .execute_loaded_entry_checked_fences(VECTOR)
         .expect("Vector Definition and every checked fence must elaborate");
+    assert_eq!(
+        via_vector.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        pre_fence_trust,
+        "Vector checked fences must not add trust"
+    );
     assert_eq!(
         qualified_owned_names(&via_vector),
         expected_owned_names(),

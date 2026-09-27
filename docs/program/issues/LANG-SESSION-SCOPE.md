@@ -308,6 +308,18 @@ prelude or catalog spelling. If (iii) fails any of these, the rows fall back
 to H: they stay test-local, with no Vector provider edit, and the measured
 failure is recorded here. A (iii) failure is not a new stop.
 
+**Deque door-use census (Deque increment).** A grep across `crates/*/tests`
+plus `crates/*/src/r_layer_tests` found one Deque exposure call site before
+migration: `cat_deque_acceptance::loaded_env_with_owned` copied 28 qualified
+private names into bare globals. Five tests reached that helper, but only two
+source probes consumed the private bare names: the four generic law
+applications (I4) and five concrete order observations (I5). After moving
+I4/I5 to the checked Deque-local example fence, there are zero Deque
+exposure call sites and zero source consumers of those aliases. The host
+forgery controls (E1/E2) and Derived occurrence check (H1) use checked
+owner IDs; the local exposure helper definition remains unused until the
+final door-deletion increment. No `r_layer_tests` consumer used Deque aliases.
+
 **Map carry, now inside this WP:** Map's `Tree` constructors, `empty` and
 `Ordered` are dispositioned E or I by the stop-6 rule. Any remaining
 question about a public route to a type (for example `SourceId`) goes to

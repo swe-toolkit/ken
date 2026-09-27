@@ -172,38 +172,55 @@ The Boolean helpers exist only for these examples and are not package laws.
 
 ```ken example
 fn vec_example_not (x : Bool) : Bool =
-  match x { True ↦ False; False ↦ True }
+  match x {
+    True ↦ False;
+    False ↦ True
+  }
 
 fn vec_example_and (x : Bool) (y : Bool) : Bool =
-  match x { True ↦ y; False ↦ False }
+  match x {
+    True ↦ y;
+    False ↦ False
+  }
 
 theorem vec_example_lookup_second
     : Equal Bool
-        (lookup Bool (Suc (Suc Zero))
-          (VCons Bool (Suc Zero) True
-            (VCons Bool Zero False (VNil Bool)))
+        (lookup
+          Bool
+          (Suc (Suc Zero))
+          (VCons Bool (Suc Zero) True (VCons Bool Zero False (VNil Bool)))
           (FSuc (Suc Zero) (FZero Zero)))
         False =
   Proved
 
 theorem vec_example_map_second
     : Equal Bool
-        (lookup Bool (Suc (Suc Zero))
-          (map Bool Bool (Suc (Suc Zero)) vec_example_not
-            (VCons Bool (Suc Zero) True
-              (VCons Bool Zero False (VNil Bool))))
+        (lookup
+          Bool
+          (Suc (Suc Zero))
+          (map
+            Bool
+            Bool
+            (Suc (Suc Zero))
+            vec_example_not
+            (VCons Bool (Suc Zero) True (VCons Bool Zero False (VNil Bool))))
           (FSuc (Suc Zero) (FZero Zero)))
         True =
   Proved
 
 theorem vec_example_zip_second
     : Equal Bool
-        (lookup Bool (Suc (Suc Zero))
-          (zip_with Bool Bool Bool (Suc (Suc Zero)) vec_example_and
-            (VCons Bool (Suc Zero) False
-              (VCons Bool Zero True (VNil Bool)))
-            (VCons Bool (Suc Zero) True
-              (VCons Bool Zero False (VNil Bool))))
+        (lookup
+          Bool
+          (Suc (Suc Zero))
+          (zip_with
+            Bool
+            Bool
+            Bool
+            (Suc (Suc Zero))
+            vec_example_and
+            (VCons Bool (Suc Zero) False (VCons Bool Zero True (VNil Bool)))
+            (VCons Bool (Suc Zero) True (VCons Bool Zero False (VNil Bool))))
           (FSuc (Suc Zero) (FZero Zero)))
         False =
   Proved
