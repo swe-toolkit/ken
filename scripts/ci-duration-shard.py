@@ -24,7 +24,7 @@ WALL_CALIBRATION_COLUMNS = [
     "test_step_seconds",
     "job_wall_seconds",
 ]
-# CI uses each identity's maximum passing duration across two full-CI sources.
+# CI uses each identity's maximum passing duration across full-CI sources.
 # A single-source observation is retained; unmeasured live identities use the
 # same-binary median or the global median when their binary has no observations.
 NEXTTEST_TIMING_ROW = re.compile(
@@ -81,6 +81,19 @@ def tests(value):
         raise SystemExit("nextest test-count differs from discovered testcases")
 
 
+def inventory_delta(live_ids, baseline_ids):
+    added = sorted(live_ids - baseline_ids)
+    removed = sorted(baseline_ids - live_ids)
+    return {
+        "baseline_count": len(baseline_ids),
+        "live_count": len(live_ids),
+        "added_count": len(added),
+        "removed_count": len(removed),
+        "added": added,
+        "removed": removed,
+    }
+
+
 def filtered_projection(inventory, output):
     value = json.load(open(inventory))
     list(tests(value))
@@ -114,7 +127,7 @@ def selected_projection(inventory, assignment_path, shard, output):
         json.dump(value, file)
 
 
-def read_duration_sources(paths):
+def read_duration_sources(paths, source_shards=None):
     if isinstance(paths, (str, os.PathLike)):
         paths = [paths]
     paths = [os.fspath(path) for path in paths]
@@ -145,6 +158,10 @@ def read_duration_sources(paths):
                 if not math.isfinite(seconds) or seconds <= 0:
                     raise SystemExit(f"{path}:{line_number}: duration must be positive and finite")
                 observed[test_id] = seconds
+                if source_shards is not None:
+                    source_shards[(test_id, source_id)] = int(
+                        (match or tsv_match).group("shard")
+                    )
         else:
             try:
                 with open(path, encoding="utf-8") as source:
@@ -182,6 +199,8 @@ def read_duration_sources(paths):
                     # timing. The planner assigns this identity a median fallback.
                     continue
                 observed[test_id] = float(seconds)
+                if source_shards is not None:
+                    source_shards[(test_id, source_id)] = artifact["shard"]
         for test_id, seconds in observed.items():
             prior = samples.setdefault(test_id, {}).get(source_id)
             samples[test_id][source_id] = seconds if prior is None else max(prior, seconds)
@@ -242,6 +261,75 @@ def resolve_durations(live, measured):
     }
     resolved, fallbacks, _ = resolve_duration_sources(live, samples)
     return resolved, fallbacks
+
+
+def latest_source_changes(live, samples, resolved, fallbacks, source_shards):
+    """Report computed fallback-to-measured transitions and >10s weight changes."""
+    run_sources = sorted(
+        {
+            source_id
+            for observations in samples.values()
+            for source_id in observations
+            if source_id.startswith("run:") and source_id.partition(":")[2].isdigit()
+        },
+        key=lambda source_id: int(source_id.partition(":")[2]),
+    )
+    if len(run_sources) < 2:
+        return None, [], []
+    latest_source = run_sources[-1]
+    previous_samples = {}
+    for test_id, observations in samples.items():
+        previous = {
+            source_id: seconds
+            for source_id, seconds in observations.items()
+            if source_id != latest_source
+        }
+        if previous:
+            previous_samples[test_id] = previous
+    if not any(test_id in previous_samples for test_id, _, _ in live):
+        return latest_source, [], []
+
+    previous_resolved, previous_fallbacks, _ = resolve_duration_sources(
+        live, previous_samples
+    )
+    previous_fallbacks = {
+        row["test_id"]: row for row in previous_fallbacks
+    }
+    current_fallbacks = {row["test_id"]: row for row in fallbacks}
+    fallback_to_measured = []
+    weight_changes = []
+    for test_id, _, _ in live:
+        previous_method = previous_fallbacks.get(test_id, {}).get(
+            "method", "measured"
+        )
+        current_method = current_fallbacks.get(test_id, {}).get(
+            "method", "measured"
+        )
+        previous_seconds = previous_resolved[test_id]
+        current_seconds = resolved[test_id]
+        if test_id in previous_fallbacks and latest_source in samples.get(test_id, {}):
+            fallback_to_measured.append({
+                "test_id": test_id,
+                "source": latest_source,
+                "previous_method": previous_method,
+                "previous_seconds": round(previous_seconds, 3),
+                "source_seconds": samples[test_id][latest_source],
+                "source_shard": source_shards.get((test_id, latest_source)),
+                "current_seconds": round(current_seconds, 3),
+            })
+        delta_seconds = current_seconds - previous_seconds
+        if abs(delta_seconds) > 10.0:
+            weight_changes.append({
+                "test_id": test_id,
+                "source": latest_source,
+                "previous_method": previous_method,
+                "previous_seconds": round(previous_seconds, 3),
+                "current_method": current_method,
+                "current_seconds": round(current_seconds, 3),
+                "delta_seconds": round(delta_seconds, 3),
+                "source_shard": source_shards.get((test_id, latest_source)),
+            })
+    return latest_source, fallback_to_measured, weight_changes
 
 
 def _solve_linear_system(matrix, values):
@@ -471,6 +559,15 @@ def main():
     wall_calibration = None
     wall_calibration_artifacts = None
     population_baseline = None
+    population_reference = None
+    if "--population-reference" in arguments:
+        option = arguments.index("--population-reference")
+        if option < 2 or option + 1 >= len(arguments):
+            raise SystemExit(
+                "--population-reference must follow timing files and name an inventory"
+            )
+        population_reference = arguments[option + 1]
+        del arguments[option : option + 2]
     if "--population-baseline" in arguments:
         option = arguments.index("--population-baseline")
         if option < 2 or option + 1 >= len(arguments):
@@ -505,18 +602,19 @@ def main():
         arguments = arguments[:-2]
     if wall_calibration_artifacts is not None and wall_calibration is None:
         raise SystemExit("--wall-calibration-artifacts requires --wall-calibration")
-    if population_baseline is not None and output is None:
-        raise SystemExit("--population-baseline requires --output-dir")
+    if (population_baseline is not None or population_reference is not None) and output is None:
+        raise SystemExit("population inventory options require --output-dir")
     if len(arguments) < 2:
         raise SystemExit(
             "usage: ci-duration-shard.py INVENTORY TIMING... "
-            "[--population-baseline INVENTORY] "
+            "[--population-baseline INVENTORY] [--population-reference INVENTORY] "
             "[--wall-calibration TSV [--wall-calibration-artifacts DIR]] "
             "[--output-dir DIR]"
         )
     inventory = json.load(open(arguments[0]))
     timing_paths = arguments[1:]
-    samples = read_duration_sources(timing_paths)
+    source_shards = {}
+    samples = read_duration_sources(timing_paths, source_shards)
     durations = {
         test_id: max(observations.values())
         for test_id, observations in samples.items()
@@ -544,18 +642,25 @@ def main():
             f"{binary_id} {name}"
             for binary_id, name in tests(baseline_inventory)
         }
-    population_delta = None
-    if baseline_ids is not None:
-        added = sorted(live_ids - baseline_ids)
-        removed = sorted(baseline_ids - live_ids)
-        population_delta = {
-            "baseline_count": len(baseline_ids),
-            "live_count": len(live_ids),
-            "added_count": len(added),
-            "removed_count": len(removed),
-            "added": added,
-            "removed": removed,
+    reference_ids = None
+    if population_reference is not None:
+        try:
+            with open(population_reference, encoding="utf-8") as source:
+                reference_inventory = json.load(source)
+        except (OSError, json.JSONDecodeError) as error:
+            raise SystemExit(
+                f"{population_reference}: invalid population reference: {error}"
+            ) from error
+        reference_ids = {
+            f"{binary_id} {name}"
+            for binary_id, name in tests(reference_inventory)
         }
+    population_delta = (
+        inventory_delta(live_ids, baseline_ids) if baseline_ids is not None else None
+    )
+    population_reference_delta = (
+        inventory_delta(live_ids, reference_ids) if reference_ids is not None else None
+    )
     stale = sorted(
         test_id for test_id in set(durations) - live_ids
         if test_id.split(" ", 1)[0].rpartition("::")[2] not in EXCLUDED_BINARIES
@@ -567,6 +672,11 @@ def main():
             stacklevel=2,
         )
     planned_durations, fallbacks, single_run = resolve_duration_sources(live, samples)
+    comparison_source, fallback_to_measured, weight_changes_over_10s = (
+        latest_source_changes(
+            live, samples, planned_durations, fallbacks, source_shards
+        )
+    )
     if fallbacks:
         binary_fallbacks = sum(
             fallback["method"] == "binary-median" for fallback in fallbacks
@@ -608,6 +718,13 @@ def main():
                 raise SystemExit(f"bin {item['bin']} filter exceeds argv guard {limit}")
             with open(os.path.join(output, f"bin-{item['bin']}.expr"), "w") as file:
                 file.write(expression)
+    assigned_shards = {
+        f"{binary_id} {name}": item["bin"]
+        for item in result
+        for binary_id, name in item["tests"]
+    }
+    for row in [*fallback_to_measured, *weight_changes_over_10s]:
+        row["planned_shard"] = assigned_shards[row["test_id"]]
     assignment = {"bins": result, "fallbacks": fallbacks}
     if output:
         with open(os.path.join(output, "assignments.json"), "w") as file:
@@ -615,12 +732,17 @@ def main():
         planning_evidence = {
             "population_baseline": population_baseline,
             "population_delta": population_delta,
+            "population_reference": population_reference,
+            "population_reference_delta": population_reference_delta,
             "measurement_sources": sorted({
                 source_id
                 for observations in samples.values()
                 for source_id in observations
             }),
             "fallbacks": fallbacks,
+            "fallback_to_measured": fallback_to_measured,
+            "weight_comparison_source": comparison_source,
+            "weight_changes_over_10s": weight_changes_over_10s,
             "single_run": single_run,
             "stale_timing_identities": stale,
         }

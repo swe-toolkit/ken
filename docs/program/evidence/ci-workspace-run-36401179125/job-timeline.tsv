@@ -1,0 +1,27 @@
+job	conclusion	started_at	completed_at	wall_s	start_offset_from_run_s
+classify changed paths	success	2026-09-28T09:04:20Z	2026-09-28T09:04:29Z	9.0	2.0
+optional z3 process adapter	success	2026-09-28T09:04:32Z	2026-09-28T09:16:03Z	691.0	14.0
+work-item tracker and ignored-row sweep	success	2026-09-28T09:04:32Z	2026-09-28T09:12:34Z	482.0	14.0
+native-slow (px8f auxiliary controls)	success	2026-09-28T09:04:32Z	2026-09-28T09:13:52Z	560.0	14.0
+test shard 2/7	success	2026-09-28T09:04:32Z	2026-09-28T09:20:37Z	965.0	14.0
+test shard 4/7	success	2026-09-28T09:04:32Z	2026-09-28T09:21:35Z	1023.0	14.0
+test shard 5/7	success	2026-09-28T09:04:32Z	2026-09-28T09:21:46Z	1034.0	14.0
+test shard 6/7	success	2026-09-28T09:04:32Z	2026-09-28T09:22:24Z	1072.0	14.0
+test shard 7/7	success	2026-09-28T09:04:32Z	2026-09-28T09:22:03Z	1051.0	14.0
+test shard 3/7	success	2026-09-28T09:04:32Z	2026-09-28T09:21:01Z	989.0	14.0
+native-slow (rt_parity_native) 6/10	success	2026-09-28T09:04:32Z	2026-09-28T09:19:25Z	893.0	14.0
+native-slow (rt_parity_native) 1/10	success	2026-09-28T09:04:32Z	2026-09-28T09:14:30Z	598.0	14.0
+native-slow (rt_parity_native) 3/10	success	2026-09-28T09:04:32Z	2026-09-28T09:13:03Z	511.0	14.0
+test shard 1/7	success	2026-09-28T09:04:32Z	2026-09-28T09:22:16Z	1064.0	14.0
+native-slow (rt_parity_native) 5/10	success	2026-09-28T09:04:32Z	2026-09-28T09:20:50Z	978.0	14.0
+native-slow (rt_parity_native) 2/10	success	2026-09-28T09:04:32Z	2026-09-28T09:14:04Z	572.0	14.0
+native-slow (rt_parity_native) 9/10	success	2026-09-28T09:04:32Z	2026-09-28T09:19:29Z	897.0	14.0
+native-slow (rt_parity_native) 7/10	success	2026-09-28T09:04:39Z	2026-09-28T09:19:35Z	896.0	21.0
+native-slow (rt_parity_native) 10/10	success	2026-09-28T09:04:32Z	2026-09-28T09:19:51Z	919.0	14.0
+native-slow (rt_parity_native) 8/10	success	2026-09-28T09:04:32Z	2026-09-28T09:16:05Z	693.0	14.0
+native-slow (rt_parity_native) 4/10	success	2026-09-28T09:04:32Z	2026-09-28T09:15:57Z	685.0	14.0
+verify-realized-shard-union	success	2026-09-28T09:22:26Z	2026-09-28T09:22:36Z	10.0	1088.0
+conformance suite	success	2026-09-28T09:22:40Z	2026-09-28T09:22:43Z	3.0	1102.0
+clean-room provenance check	success	2026-09-28T09:22:39Z	2026-09-28T09:22:43Z	4.0	1101.0
+path-guard	success	2026-09-28T09:22:39Z	2026-09-28T09:22:43Z	4.0	1101.0
+build + test	success	2026-09-28T09:22:46Z	2026-09-28T09:22:49Z	3.0	1108.0

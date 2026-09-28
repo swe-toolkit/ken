@@ -1,0 +1,145 @@
+{
+  "run_id": 36401179125,
+  "shard": 1,
+  "shard_count": 7,
+  "unit": "seconds",
+  "records": [
+    {
+      "test_id": "ken-cli::abi_s6_mapping_surface_native complete_carried_mapping_access_matrix_matches_the_interpreter",
+      "seconds": 534.681,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-cli::dasm_c2_observation_artifact_identity dasm_c2_observation_is_native_artifact_identical",
+      "seconds": 366.285,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator r_layer_tests::lang_mod_catalog_evidence_frontier::catalog_evidence_frontier_is_closed_and_honest",
+      "seconds": 462.0,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::lang_mod_strict_resolution_d0 catalog_ambient_passthrough_migration_census",
+      "seconds": 801.297,
+      "result": "PASS"
+    },
+    {
+      "test_id": "ken-elaborator::r3_c2_source_mixed_branch r3_4b_observation_feature_is_native_artifact_identical",
+      "seconds": 295.493,
+      "result": "PASS"
+    }
+  ],
+  "fallbacks": [
+    {
+      "test_id": "ken-cli::px7f_resource_native linked_public_right_denial_preserves_exact_masks",
+      "seconds": 121.481,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::px7f_resource_native linked_public_second_release_is_closed_and_the_handle_closes_once",
+      "seconds": 121.481,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::px7f_resource_native owner_vis_pending_verifier_rejects_unchecked_k_result",
+      "seconds": 121.481,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::px7m_hostresult_computational_match owner_nonmember_c2_ingress_reaches_inner_vis_trap_natively",
+      "seconds": 48.427,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::px7m_hostresult_computational_match owner_nonmember_refuses_at_the_loop_before_c2",
+      "seconds": 48.427,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::px7m_hostresult_computational_match owner_vis_verifier_bypass_drives_a_returned_member",
+      "seconds": 48.427,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-cli::rt_c5_primitive_type_native_gate indexed_int_convoy_native_refusal_waits_for_compared_native_rows",
+      "seconds": 0.063,
+      "method": "global-median"
+    },
+    {
+      "test_id": "ken-elaborator::cat_decoder_recursive_succeeds_client printed_input_decodes_via_public_recursive_success_theorem",
+      "seconds": 0.063,
+      "method": "global-median"
+    },
+    {
+      "test_id": "ken-elaborator::ds5b_dependent_match_refinement_acceptance int_type_argument_convoy_computes",
+      "seconds": 0.495,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-elaborator::ds5b_dependent_match_refinement_acceptance string_type_argument_convoy_computes",
+      "seconds": 0.495,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::checked_float32_indexed_refl_casts_but_distinct_float32_does_not",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::checked_float_indexed_refl_casts_but_distinct_float_does_not",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::checked_opaque_former_application_is_bounded_by_its_pi_arity",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::checked_string_indexed_refl_casts_but_distinct_string_does_not",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::closed_bool_indices_cast_only_in_the_same_representation",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::closed_bytes_indices_cast_by_content",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::closed_int_and_bigint_indices_cast_by_mathematical_value",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::closed_opaque_type_identity_casts_but_differing_identity_does_not",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::float32_same_nan_bits_are_reflexive_but_distinct_payloads_are_not",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::float32_signed_zero_bits_do_not_collide",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::float_same_nan_bits_are_reflexive_but_distinct_payloads_are_not",
+      "seconds": 0.01,
+      "method": "binary-median"
+    },
+    {
+      "test_id": "ken-interp eval::primitive_type_cast_tests::float_signed_zero_bits_do_not_collide",
+      "seconds": 0.01,
+      "method": "binary-median"
+    }
+  ]
+}
