@@ -45,6 +45,23 @@ can clear.
 - The owner return protocol changes the machinery these labels name, so
   every label is re-measured on its landed tree before a group is chosen.
 
+- **AC-0 ruling** (Architect `evt_49fjtm9sen7bh`):
+  - The largest group is the four duplicate-response rows, but px7n ok and
+    err sit behind `RT-FRAME-MARKER-ONCE`. So this WP clears at most the two
+    rt_escape rows, and the px7n rows are relabelled.
+  - The green `compiler_driver.rs:5409` row is un-ignored here, outside the
+    group.
+  - The repair is the occurrence key, with its constraints as stated in
+    `RT-HOST-RESPONSE-OCCURRENCE-KEY`, which this WP subsumes. An AC-0b
+    design D0 comes before any build.
+- **Build ruling** (Architect `evt_5r4g2er52c6p5`) and Steward GO
+  (`evt_72bv90phnmbav`). The build probably clears zero of the four rows.
+  The deliverable below is therefore the ruled repair with its acceptance
+  A1-A6. A1 is native sequential use of two distinguishable resource
+  brackets, which refuses today. The `compiler_driver.rs:5409` un-ignore is
+  included, and the four rows are relabelled with their measured next
+  refusals.
+
 ## Deliverable
 
 One repair, ruled by the Architect, that un-ignores every row sharing the
