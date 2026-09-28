@@ -327,9 +327,13 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "complete_bool_decoder",
         "parse_bool_expr",
         "parse_bool_expr_laws",
+        "parse_bool_expr_print_round_trip",
+        "ParsedPrintedBool",
         "parse_bool_expr_total",
         "print_bool_expr",
+        "print_bool_expr_utf8",
         "format_bool_expr",
+        "format_bool_expr_print_round_trip",
         "format_bool_expr_on_parse_success",
         "format_bool_expr_on_parse_failure",
     ] {
@@ -1354,7 +1358,8 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
         const printed_bool_expr_bytes : Bytes =
           print_bool_expr representative_bool_expr
 
-        theorem printed_bool_expr_utf8 : IsUtf8 printed_bool_expr_bytes = Axiom
+        theorem printed_bool_expr_utf8 : IsUtf8 printed_bool_expr_bytes =
+          print_bool_expr_utf8 representative_bool_expr
         instance Source PrintedBoolExprSource {
           source_id_field = MkSourceId (Suc (Suc Zero)) ;
           source_bytes_field = printed_bool_expr_bytes ;

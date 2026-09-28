@@ -1,5 +1,5 @@
-//! A printer-independent client derives byte, decode, and UTF-8 properties
-//! for its own ASCII literal using the four primitive contracts and K3.
+//! An external client derives byte and UTF-8 properties for its own ASCII
+//! literal, then applies Parsing's generic Boolean printer round trip.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -13,13 +13,15 @@ fn catalog_root() -> PathBuf {
 }
 
 /// Promise class: durable invariant.
-/// MEASURED: an external checked client inhabits byte, concatenation,
-/// decode, and UTF-8 properties for its own ASCII literal without new trust.
-/// CLAIMED: all four primitive contracts apply beyond the printer tokens.
-/// THE GAP: this client checks the independent facts, not Parsing's separate
-/// recursive-decoder round-trip proof.
+/// MEASURED: an external checked client proves F1-F4 for its own ASCII
+/// literal and applies the generic parser/formatter round trip to a printed
+/// source built with the public UTF-8 theorem, without new trust.
+/// CLAIMED: the contracts work beyond printer tokens and the public round
+/// trip is usable by a generic client, not just inside Parsing.
+/// THE GAP: checking these proof terms does not execute the reference parser;
+/// CAT-5's separate interpreter test covers its concrete behavior.
 #[test]
-fn fresh_ascii_literal_outside_parsing_derives_bytes_identity() {
+fn fresh_ascii_contracts_and_printed_bool_roundtrip_check_externally() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Binary.BytesPrimitiveContracts")
         .expect("four checked contracts load");
@@ -43,6 +45,13 @@ import Data.Binary.BytesPrimitiveContracts
 import Data.Collections.Derived (list_append, map)
 import Core.Classes.LawfulClasses (bytes_to_list_injective)
 import Core.Logic.Transport (cong, sym, trans)
+import Capability.Diagnostics.Core (source_id_from_nat)
+import Capability.Parsing.Parsing
+  (BAnd, BFalse, BNot, BTrue, BoolExpr, LessEqNat,
+    ParsedPrintedBool, ParseError, Source, format_bool_expr,
+    format_bool_expr_print_round_trip, parse_bool_expr,
+    parse_bool_expr_print_round_trip, print_bool_expr,
+    print_bool_expr_utf8, source_bytes, source_length)
 
 const fresh_text : String = "Y9$"
 const fresh_ascii : AllAscii fresh_text =
@@ -120,9 +129,48 @@ theorem fresh_concat : Equal (List UInt8)
     (list_append UInt8
       (bytes_to_list (bytes_encode fresh_text)) (bytes_to_list expected_bytes)) =
   bytes_concat_list_view (bytes_encode fresh_text) expected_bytes
+
+data ExternalPrintedSource = MkExternalPrintedSource
+
+const external_expr : BoolExpr =
+  BAnd (BNot BFalse) (BNot (BAnd BTrue BFalse))
+
+instance Source ExternalPrintedSource {
+  source_id_field = source_id_from_nat (Suc Zero) ;
+  source_bytes_field = print_bool_expr external_expr ;
+  source_utf8_field = print_bool_expr_utf8 external_expr
+}
+
+const external_source : Source = Source_instance_ExternalPrintedSource
+
+theorem external_zero_bound : LessEqNat Zero (source_length external_source) =
+  (proof zero_left for LessEqNat) (source_length external_source)
+
+theorem external_source_matches_print : Equal Bytes
+    (source_bytes external_source) (print_bool_expr external_expr) =
+  Refl
+
+theorem generic_external_parser_inverse
+      (s : Source) (e : BoolExpr)
+      (h : LessEqNat Zero (source_length s))
+      (printed : Equal Bytes (source_bytes s) (print_bool_expr e))
+    : ParsedPrintedBool e (parse_bool_expr s Zero h) =
+  parse_bool_expr_print_round_trip s e h printed
+
+theorem external_parser_inverse : ParsedPrintedBool external_expr
+    (parse_bool_expr external_source Zero external_zero_bound) =
+  generic_external_parser_inverse
+    external_source external_expr external_zero_bound
+    external_source_matches_print
+
+theorem external_formatter_identity : Equal (Result ParseError Bytes)
+    (format_bool_expr external_source)
+    (Ok ParseError Bytes (print_bool_expr external_expr)) =
+  format_bool_expr_print_round_trip
+    external_source external_expr external_source_matches_print
 "#,
     )
-    .expect("fresh checked client derives an actual Bytes equality from F2 and K3");
+    .expect("external ASCII facts and generic Boolean round trip check without added trust");
 
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
@@ -134,6 +182,10 @@ theorem fresh_concat : Equal (List UInt8)
         "fresh_concat",
         "fresh_decode",
         "fresh_utf8",
+        "external_source_matches_print",
+        "generic_external_parser_inverse",
+        "external_parser_inverse",
+        "external_formatter_identity",
     ] {
         assert!(env.globals.contains_key(law), "client law {law} checked");
     }

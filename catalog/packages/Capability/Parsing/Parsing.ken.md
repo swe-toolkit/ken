@@ -438,8 +438,9 @@ The printer's six token strings have one private identity each, shared by
 printing and their checked ASCII witnesses. String literals are opaque values:
 two separately written literals with the same spelling need a proof of their
 equality. The byte and UTF-8 bridges below establish that printed expressions
-form valid source bytes. The independent printer-to-parser round trip remains
-to be proved using the recursive Decoder's public success principle.
+form valid source bytes. The round-trip proof follows the printed tokens,
+children, and cursor suffixes through the recursive decoder: parsing succeeds
+and erases to the original expression, and formatting restores its bytes.
 
 ```ken
 export BoolExpr, BTrue, BFalse, BNot, BAnd
@@ -1162,7 +1163,7 @@ fn print_bool_expr_ascii (e : BoolExpr) : AsciiBytes (print_bool_expr e) =
           suffix_ascii
   }
 
-theorem print_bool_expr_utf8 (e : BoolExpr) : IsUtf8 (print_bool_expr e) =
+pub theorem print_bool_expr_utf8 (e : BoolExpr) : IsUtf8 (print_bool_expr e) =
   ascii_bytes_utf8 (print_bool_expr e) (print_bool_expr_ascii e)
 
 fn ListNonempty (a : Type) (xs : List a) : Prop =
@@ -1700,6 +1701,9 @@ const open_initial_code : Int = 40
 
 const not_open_remaining_codes : List Int =
   Cons Int 110 (Cons Int 111 (Cons Int 116 (Cons Int 32 (Nil Int))))
+
+const and_open_after_second_codes : List Int =
+  Cons Int 110 (Cons Int 100 (Cons Int 32 (Nil Int)))
 
 const not_second_code : Int = 110
 
@@ -3798,6 +3802,69 @@ theorem printed_not_end_view
         (cursor_after_codes_append cur open_bytes (list_append UInt8 child_bytes close_bytes))
         (cursor_after_codes_append after_open child_bytes close_bytes))
 
+theorem printed_and_end_view
+      (cur : ByteCursor) (left : BoolExpr) (right : BoolExpr)
+    : Equal ByteCursor
+        (printed_end cur (BAnd left right))
+        (cursor_after_codes
+          (printed_end
+            (cursor_after_codes
+              (printed_end
+                (cursor_after_codes cur (bytes_to_list (bytes_encode and_open_text)))
+                left)
+              (bytes_to_list (bytes_encode separator_text)))
+            right)
+          (bytes_to_list (bytes_encode close_text))) =
+  let
+    open_bytes : List UInt8 = bytes_to_list (bytes_encode and_open_text);
+    left_bytes : List UInt8 = bytes_to_list (print_bool_expr left);
+    separator_bytes : List UInt8 = bytes_to_list (bytes_encode separator_text);
+    right_bytes : List UInt8 = bytes_to_list (print_bool_expr right);
+    close_bytes : List UInt8 = bytes_to_list (bytes_encode close_text);
+    after_open : ByteCursor = cursor_after_codes cur open_bytes;
+    after_left : ByteCursor = printed_end after_open left;
+    after_separator : ByteCursor = cursor_after_codes after_left separator_bytes;
+    after_right : ByteCursor = printed_end after_separator right;
+    rest_after_right : List UInt8 = list_append UInt8 right_bytes close_bytes;
+    rest_after_separator : List UInt8 = list_append UInt8 separator_bytes rest_after_right;
+    rest_after_left : List UInt8 = list_append UInt8 left_bytes rest_after_separator;
+    unfolded : ByteCursor =
+      cursor_after_codes cur (list_append UInt8 open_bytes rest_after_left);
+    after_open_view : ByteCursor = cursor_after_codes after_open rest_after_left;
+    after_left_view : ByteCursor = cursor_after_codes after_left rest_after_separator;
+    after_separator_view : ByteCursor = cursor_after_codes after_separator rest_after_right;
+    after_close : ByteCursor = cursor_after_codes after_right close_bytes
+  in
+    trans
+      ByteCursor
+      (printed_end cur (BAnd left right))
+      unfolded
+      after_close
+      (cursor_after_codes_respects_view
+        cur
+        (bytes_to_list (print_bool_expr (BAnd left right)))
+        (list_append UInt8 open_bytes rest_after_left)
+        (printed_and_bytes_view left right))
+      (trans
+        ByteCursor
+        unfolded
+        after_open_view
+        after_close
+        (cursor_after_codes_append cur open_bytes rest_after_left)
+        (trans
+          ByteCursor
+          after_open_view
+          after_left_view
+          after_close
+          (cursor_after_codes_append after_open left_bytes rest_after_separator)
+          (trans
+            ByteCursor
+            after_left_view
+            after_separator_view
+            after_close
+            (cursor_after_codes_append after_left separator_bytes rest_after_right)
+            (cursor_after_codes_append after_separator right_bytes close_bytes))))
+
 fn PrintedBoolSpecAt
       (expr : BoolExpr) (cur : ByteCursor) (syntax : Syntax BoolExpr) (next : ByteCursor)
     : Prop =
@@ -4705,6 +4772,1347 @@ theorem bool_layer_not_succeeds_printed
         syntax
         next
         (bool_not_decoder_succeeds_printed recur cur child rest starts_with recur_works))
+
+fn bool_and_continue
+      (cur : ByteCursor)
+      (recur : Decoder ByteCursor Span (Syntax BoolExpr))
+      (ignored : UInt8)
+      (after_open : ByteCursor)
+    : DecoderResult ByteCursor Span (Syntax BoolExpr) =
+  and_leading_after cur recur after_open
+
+theorem bool_and_result_pointwise
+      (recur : Decoder ByteCursor Span (Syntax BoolExpr)) (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_and_decoder recur cur)
+        (decoder_then_result
+          UInt8
+          (Syntax BoolExpr)
+          (and_open_token_decoder cur)
+          (bool_and_continue cur recur)) =
+  Refl
+
+theorem bool_and_succeeds_on_parts
+      (recur : Decoder ByteCursor Span (Syntax BoolExpr))
+      (cur : ByteCursor)
+      (after_open : ByteCursor)
+      (left_syntax : Syntax BoolExpr)
+      (left_end : ByteCursor)
+      (after_separator : ByteCursor)
+      (right_syntax : Syntax BoolExpr)
+      (right_end : ByteCursor)
+      (after_close : ByteCursor)
+      (open_byte : UInt8)
+      (separator_byte : UInt8)
+      (close_byte : UInt8)
+      (open_succeeds : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (and_open_token_decoder cur)
+        (Decoded ByteCursor Span UInt8 open_byte after_open))
+      (opening_spaces : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder after_open)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) after_open))
+      (left_succeeds : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (recur after_open)
+        (Decoded ByteCursor Span (Syntax BoolExpr) left_syntax left_end))
+      (separator_succeeds : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder separator_code left_end)
+        (Decoded ByteCursor Span UInt8 separator_byte after_separator))
+      (middle_spaces : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder after_separator)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) after_separator))
+      (right_succeeds : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (recur after_separator)
+        (Decoded ByteCursor Span (Syntax BoolExpr) right_syntax right_end))
+      (closing_spaces : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder right_end)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) right_end))
+      (close_succeeds : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder close_code right_end)
+        (Decoded ByteCursor Span UInt8 close_byte after_close))
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_and_decoder recur cur)
+        (Decoded
+          ByteCursor
+          Span
+          (Syntax BoolExpr)
+          (syntax_node_binary
+            (byte_cursor_source cur)
+            (byte_cursor_position cur)
+            (byte_cursor_position after_close)
+            (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+            left_syntax
+            right_syntax)
+          after_close) =
+  let
+    parsed_syntax : Syntax BoolExpr =
+      syntax_node_binary
+        (byte_cursor_source cur)
+        (byte_cursor_position cur)
+        (byte_cursor_position after_close)
+        (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+        left_syntax
+        right_syntax;
+    closed : DecoderResult ByteCursor Span (Syntax BoolExpr) =
+      Decoded ByteCursor Span (Syntax BoolExpr) parsed_syntax after_close;
+    close_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (and_close_after cur left_syntax right_syntax right_end)
+      closed =
+      decoder_then_success
+        UInt8
+        (Syntax BoolExpr)
+        (byte_code_decoder close_code right_end)
+        close_byte
+        after_close
+        (λignored.
+          λend.
+            Decoded
+              ByteCursor
+              Span
+              (Syntax BoolExpr)
+              (syntax_node_binary
+                (byte_cursor_source cur)
+                (byte_cursor_position cur)
+                (byte_cursor_position end)
+                (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+                left_syntax
+                right_syntax)
+              end)
+        close_succeeds;
+    trailing_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (and_trailing_after cur left_syntax right_syntax right_end)
+      closed =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (and_trailing_after cur left_syntax right_syntax right_end)
+        (and_close_after cur left_syntax right_syntax right_end)
+        closed
+        (decoder_then_success
+          (List UInt8)
+          (Syntax BoolExpr)
+          (spaces_decoder right_end)
+          (Nil UInt8)
+          right_end
+          (λignored. λclose_start. and_close_after cur left_syntax right_syntax close_start)
+          closing_spaces)
+        close_stage;
+    right_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (and_right_after cur recur left_syntax after_separator)
+      closed =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (and_right_after cur recur left_syntax after_separator)
+        (and_trailing_after cur left_syntax right_syntax right_end)
+        closed
+        (decoder_then_success
+          (Syntax BoolExpr)
+          (Syntax BoolExpr)
+          (recur after_separator)
+          right_syntax
+          right_end
+          (λright_value. λend. and_trailing_after cur left_syntax right_value end)
+          right_succeeds)
+        trailing_stage;
+    middle_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (and_middle_after cur recur left_syntax after_separator)
+      closed =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (and_middle_after cur recur left_syntax after_separator)
+        (and_right_after cur recur left_syntax after_separator)
+        closed
+        (decoder_then_success
+          (List UInt8)
+          (Syntax BoolExpr)
+          (spaces_decoder after_separator)
+          (Nil UInt8)
+          after_separator
+          (λignored. λright_start. and_right_after cur recur left_syntax right_start)
+          middle_spaces)
+        right_stage;
+    separator_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (and_separator_after cur recur left_syntax left_end)
+      closed =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (and_separator_after cur recur left_syntax left_end)
+        (and_middle_after cur recur left_syntax after_separator)
+        closed
+        (decoder_then_success
+          UInt8
+          (Syntax BoolExpr)
+          (byte_code_decoder separator_code left_end)
+          separator_byte
+          after_separator
+          (λignored. λseparator_end. and_middle_after cur recur left_syntax separator_end)
+          separator_succeeds)
+        middle_stage;
+    left_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (and_left_after cur recur after_open)
+      closed =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (and_left_after cur recur after_open)
+        (and_separator_after cur recur left_syntax left_end)
+        closed
+        (decoder_then_success
+          (Syntax BoolExpr)
+          (Syntax BoolExpr)
+          (recur after_open)
+          left_syntax
+          left_end
+          (λleft_value. λend. and_separator_after cur recur left_value end)
+          left_succeeds)
+        separator_stage;
+    leading_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (and_leading_after cur recur after_open)
+      closed =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (and_leading_after cur recur after_open)
+        (and_left_after cur recur after_open)
+        closed
+        (decoder_then_success
+          (List UInt8)
+          (Syntax BoolExpr)
+          (spaces_decoder after_open)
+          (Nil UInt8)
+          after_open
+          (λignored. λleft_start. and_left_after cur recur left_start)
+          opening_spaces)
+        left_stage
+  in
+    trans
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (bool_and_decoder recur cur)
+      (and_leading_after cur recur after_open)
+      closed
+      (trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_and_decoder recur cur)
+        (decoder_then_result
+          UInt8
+          (Syntax BoolExpr)
+          (and_open_token_decoder cur)
+          (bool_and_continue cur recur))
+        (and_leading_after cur recur after_open)
+        (bool_and_result_pointwise recur cur)
+        (decoder_then_success
+          UInt8
+          (Syntax BoolExpr)
+          (and_open_token_decoder cur)
+          open_byte
+          after_open
+          (bool_and_continue cur recur)
+          open_succeeds))
+      leading_stage
+
+theorem bool_and_decoder_succeeds_printed
+      (recur : Decoder ByteCursor Span (Syntax BoolExpr))
+      (cur : ByteCursor)
+      (left : BoolExpr)
+      (right : BoolExpr)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (print_bool_expr (BAnd left right))) rest))
+      (recur_works : (inner : ByteCursor)
+        → (syntax : Syntax BoolExpr)
+        → (next : ByteCursor)
+        → Equal
+        Bool
+        (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+        True
+        → PrintedBoolSpec
+        inner
+        syntax
+        next
+        → Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (recur inner)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax next))
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_and_decoder recur cur)
+        (Decoded
+          ByteCursor
+          Span
+          (Syntax BoolExpr)
+          (printed_syntax cur (BAnd left right))
+          (printed_end cur (BAnd left right))) =
+  let
+    open_bytes : List UInt8 = bytes_to_list (bytes_encode and_open_text);
+    left_bytes : List UInt8 = bytes_to_list (print_bool_expr left);
+    separator_bytes : List UInt8 = bytes_to_list (bytes_encode separator_text);
+    right_bytes : List UInt8 = bytes_to_list (print_bool_expr right);
+    close_bytes : List UInt8 = bytes_to_list (bytes_encode close_text);
+    after_open : ByteCursor = cursor_after_codes cur open_bytes;
+    left_syntax : Syntax BoolExpr = printed_syntax after_open left;
+    left_end : ByteCursor = printed_end after_open left;
+    after_separator : ByteCursor = cursor_after_codes left_end separator_bytes;
+    right_syntax : Syntax BoolExpr = printed_syntax after_separator right;
+    right_end : ByteCursor = printed_end after_separator right;
+    after_close : ByteCursor = cursor_after_codes right_end close_bytes;
+    right_rest : List UInt8 = list_append UInt8 close_bytes rest;
+    separator_rest : List UInt8 = list_append UInt8 right_bytes right_rest;
+    left_rest : List UInt8 = list_append UInt8 separator_bytes separator_rest;
+    open_rest : List UInt8 = list_append UInt8 left_bytes left_rest;
+    open_starts : Equal
+      (List UInt8)
+      (source_suffix cur)
+      (list_append UInt8 open_bytes open_rest) =
+      trans
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (print_bool_expr (BAnd left right))) rest)
+        (list_append UInt8 open_bytes open_rest)
+        starts_with
+        (printed_and_suffix_view left right rest);
+    left_starts : Equal
+      (List UInt8)
+      (source_suffix after_open)
+      (list_append UInt8 left_bytes left_rest) =
+      source_suffix_after_codes cur open_bytes open_rest open_starts;
+    separator_starts : Equal
+      (List UInt8)
+      (source_suffix left_end)
+      (list_append UInt8 separator_bytes separator_rest) =
+      source_suffix_after_codes after_open left_bytes left_rest left_starts;
+    right_starts : Equal
+      (List UInt8)
+      (source_suffix after_separator)
+      (list_append UInt8 right_bytes right_rest) =
+      source_suffix_after_codes left_end separator_bytes separator_rest separator_starts;
+    close_starts : Equal
+      (List UInt8)
+      (source_suffix right_end)
+      (list_append UInt8 close_bytes rest) =
+      source_suffix_after_codes after_separator right_bytes right_rest right_starts;
+    strict_open : Equal Bool
+      (cursor_nat_lt (byte_cursor_remaining after_open) (byte_cursor_remaining cur))
+      True =
+      cursor_after_nonempty_strict
+        open_bytes
+        cur
+        open_rest
+        open_starts
+        and_open_encoded_nonempty;
+    strict_left : Equal Bool
+      (cursor_nat_lt (byte_cursor_remaining left_end) (byte_cursor_remaining after_open))
+      True =
+      cursor_after_nonempty_strict
+        left_bytes
+        after_open
+        left_rest
+        left_starts
+        (print_bool_expr_nonempty left);
+    strict_separator : Equal Bool
+      (cursor_nat_lt (byte_cursor_remaining after_separator) (byte_cursor_remaining left_end))
+      True =
+      cursor_after_nonempty_strict
+        separator_bytes
+        left_end
+        separator_rest
+        separator_starts
+        separator_encoded_nonempty;
+    strict_right : Equal Bool
+      (cursor_nat_lt (byte_cursor_remaining after_separator) (byte_cursor_remaining cur))
+      True =
+      cursor_nat_lt_trans
+        (byte_cursor_remaining after_separator)
+        (byte_cursor_remaining left_end)
+        (byte_cursor_remaining cur)
+        strict_separator
+        (cursor_nat_lt_trans
+          (byte_cursor_remaining left_end)
+          (byte_cursor_remaining after_open)
+          (byte_cursor_remaining cur)
+          strict_left
+          strict_open);
+    left_succeeds : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (recur after_open)
+      (Decoded ByteCursor Span (Syntax BoolExpr) left_syntax left_end) =
+      recur_works
+        after_open
+        left_syntax
+        left_end
+        strict_open
+        (printed_bool_spec_intro left after_open left_rest left_starts);
+    right_succeeds : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (recur after_separator)
+      (Decoded ByteCursor Span (Syntax BoolExpr) right_syntax right_end) =
+      recur_works
+        after_separator
+        right_syntax
+        right_end
+        strict_right
+        (printed_bool_spec_intro right after_separator right_rest right_starts);
+    open_succeeds : Equal
+      (DecoderResult ByteCursor Span UInt8)
+      (and_open_token_decoder cur)
+      (Decoded ByteCursor Span UInt8 (list_last_byte open_bytes) after_open) =
+      and_open_token_succeeds cur open_rest open_starts;
+    opening_spaces : Equal
+      (DecoderResult ByteCursor Span (List UInt8))
+      (spaces_decoder after_open)
+      (Decoded ByteCursor Span (List UInt8) (Nil UInt8) after_open) =
+      spaces_on_printed_expr left after_open left_rest left_starts;
+    separator_succeeds : Equal
+      (DecoderResult ByteCursor Span UInt8)
+      (byte_code_decoder separator_code left_end)
+      (Decoded ByteCursor Span UInt8 (list_last_byte separator_bytes) after_separator) =
+      separator_byte_succeeds left_end separator_rest separator_starts;
+    middle_spaces : Equal
+      (DecoderResult ByteCursor Span (List UInt8))
+      (spaces_decoder after_separator)
+      (Decoded ByteCursor Span (List UInt8) (Nil UInt8) after_separator) =
+      spaces_on_printed_expr right after_separator right_rest right_starts;
+    closing_spaces : Equal
+      (DecoderResult ByteCursor Span (List UInt8))
+      (spaces_decoder right_end)
+      (Decoded ByteCursor Span (List UInt8) (Nil UInt8) right_end) =
+      spaces_on_close_token right_end rest close_starts;
+    close_succeeds : Equal
+      (DecoderResult ByteCursor Span UInt8)
+      (byte_code_decoder close_code right_end)
+      (Decoded ByteCursor Span UInt8 (list_last_byte close_bytes) after_close) =
+      close_byte_succeeds right_end rest close_starts;
+    parsed_syntax : Syntax BoolExpr =
+      syntax_node_binary
+        (byte_cursor_source cur)
+        (byte_cursor_position cur)
+        (byte_cursor_position after_close)
+        (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+        left_syntax
+        right_syntax;
+    parsed : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (bool_and_decoder recur cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) parsed_syntax after_close) =
+      bool_and_succeeds_on_parts
+        recur
+        cur
+        after_open
+        left_syntax
+        left_end
+        after_separator
+        right_syntax
+        right_end
+        after_close
+        (list_last_byte open_bytes)
+        (list_last_byte separator_bytes)
+        (list_last_byte close_bytes)
+        open_succeeds
+        opening_spaces
+        left_succeeds
+        separator_succeeds
+        middle_spaces
+        right_succeeds
+        closing_spaces
+        close_succeeds;
+    canonical_end : ByteCursor = printed_end cur (BAnd left right);
+    end_matches : Equal ByteCursor after_close canonical_end =
+      sym ByteCursor canonical_end after_close (printed_and_end_view cur left right);
+    left_value_matches : Equal BoolExpr
+      (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+      (BAnd left (erase_spans right_syntax)) =
+      cong
+        BoolExpr
+        BoolExpr
+        (erase_spans left_syntax)
+        left
+        (λvalue. BAnd value (erase_spans right_syntax))
+        (printed_syntax_erases left after_open);
+    right_value_matches : Equal BoolExpr
+      (BAnd left (erase_spans right_syntax))
+      (BAnd left right) =
+      cong
+        BoolExpr
+        BoolExpr
+        (erase_spans right_syntax)
+        right
+        (λvalue. BAnd left value)
+        (printed_syntax_erases right after_separator);
+    expr_matches : Equal BoolExpr
+      (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+      (BAnd left right) =
+      trans
+        BoolExpr
+        (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+        (BAnd left (erase_spans right_syntax))
+        (BAnd left right)
+        left_value_matches
+        right_value_matches;
+    value_matches : Equal
+      (Syntax BoolExpr)
+      parsed_syntax
+      (syntax_node_binary
+        (byte_cursor_source cur)
+        (byte_cursor_position cur)
+        (byte_cursor_position after_close)
+        (BAnd left right)
+        left_syntax
+        right_syntax) =
+      cong
+        BoolExpr
+        (Syntax BoolExpr)
+        (BAnd (erase_spans left_syntax) (erase_spans right_syntax))
+        (BAnd left right)
+        (λvalue.
+          syntax_node_binary
+            (byte_cursor_source cur)
+            (byte_cursor_position cur)
+            (byte_cursor_position after_close)
+            value
+            left_syntax
+            right_syntax)
+        expr_matches;
+    span_matches : Equal
+      (Syntax BoolExpr)
+      (syntax_node_binary
+        (byte_cursor_source cur)
+        (byte_cursor_position cur)
+        (byte_cursor_position after_close)
+        (BAnd left right)
+        left_syntax
+        right_syntax)
+      (printed_syntax cur (BAnd left right)) =
+      cong
+        Nat
+        (Syntax BoolExpr)
+        (byte_cursor_position after_close)
+        (byte_cursor_position canonical_end)
+        (λposition.
+          syntax_node_binary
+            (byte_cursor_source cur)
+            (byte_cursor_position cur)
+            position
+            (BAnd left right)
+            left_syntax
+            right_syntax)
+        (cong ByteCursor Nat after_close canonical_end byte_cursor_position end_matches);
+    syntax_matches : Equal
+      (Syntax BoolExpr)
+      parsed_syntax
+      (printed_syntax cur (BAnd left right)) =
+      trans
+        (Syntax BoolExpr)
+        parsed_syntax
+        (syntax_node_binary
+          (byte_cursor_source cur)
+          (byte_cursor_position cur)
+          (byte_cursor_position after_close)
+          (BAnd left right)
+          left_syntax
+          right_syntax)
+        (printed_syntax cur (BAnd left right))
+        value_matches
+        span_matches
+  in
+    trans
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (bool_and_decoder recur cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) parsed_syntax after_close)
+      (Decoded
+        ByteCursor
+        Span
+        (Syntax BoolExpr)
+        (printed_syntax cur (BAnd left right))
+        canonical_end)
+      parsed
+      (decoded_bool_result_transport
+        parsed_syntax
+        (printed_syntax cur (BAnd left right))
+        after_close
+        canonical_end
+        syntax_matches
+        end_matches)
+
+theorem decoder_seq_second_rejected
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (b : Type)
+      (first : Decoder c loc a)
+      (second : Decoder c loc b)
+      (cur : c)
+      (value : a)
+      (mid : c)
+      (at : loc)
+      (first_ok : Equal (DecoderResult c loc a) (first cur) (Decoded c loc a value mid))
+      (second_rejected : Equal
+        (DecoderResult c loc b)
+        (second mid)
+        (DecoderFailed c loc b (DecoderRejected loc at)))
+    : Equal
+        (DecoderResult c loc b)
+        (decoder_seq c loc a b first second cur)
+        (DecoderFailed c loc b (DecoderRejected loc at)) =
+  trans
+    (DecoderResult c loc b)
+    (decoder_seq c loc a b first second cur)
+    (decoder_seq_resume c loc a b second (first cur))
+    (DecoderFailed c loc b (DecoderRejected loc at))
+    (decoder_seq_resume_equation c loc a b first second cur)
+    (trans
+      (DecoderResult c loc b)
+      (decoder_seq_resume c loc a b second (first cur))
+      (decoder_seq_resume c loc a b second (Decoded c loc a value mid))
+      (DecoderFailed c loc b (DecoderRejected loc at))
+      (cong
+        (DecoderResult c loc a)
+        (DecoderResult c loc b)
+        (first cur)
+        (Decoded c loc a value mid)
+        (decoder_seq_resume c loc a b second)
+        first_ok)
+      second_rejected)
+
+theorem not_open_token_rejects_and_prefix
+      (prefix : List UInt8)
+    : (cur : ByteCursor)
+      → (rest : List UInt8)
+      → Equal (List UInt8) (source_suffix cur) (list_append UInt8 prefix rest)
+      → Equal
+        (List Int)
+        (map UInt8 Int uint8_to_int prefix)
+        (Cons Int open_initial_code (Cons Int and_second_code and_open_after_second_codes))
+      → Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (not_open_token_decoder cur)
+        (DecoderFailed
+          ByteCursor
+          Span
+          UInt8
+          (DecoderRejected Span (byte_cursor_locate (byte_cursor_advance cur)))) =
+  match prefix {
+    Nil ↦ λcur. λrest. λstarts_with. λmapped. absurd mapped;
+    Cons first tail ↦
+      λcur.
+        λrest.
+          λstarts_with.
+            λmapped.
+              let
+                actual_tail : List Int = Cons Int and_second_code and_open_after_second_codes;
+                head_matches : Equal Int (uint8_to_int first) open_initial_code =
+                  mapped_codes_cons_head first tail open_initial_code actual_tail mapped;
+                tail_matches : Equal (List Int) (map UInt8 Int uint8_to_int tail) actual_tail =
+                  mapped_codes_cons_tail first tail open_initial_code actual_tail mapped;
+                after_first : ByteCursor = byte_cursor_advance cur;
+                remaining : List UInt8 = list_append UInt8 tail rest;
+                first_succeeds : Equal
+                  (DecoderResult ByteCursor Span UInt8)
+                  (byte_code_decoder open_initial_code cur)
+                  (Decoded ByteCursor Span UInt8 first after_first) =
+                  byte_code_success_from_head
+                    cur
+                    open_initial_code
+                    first
+                    remaining
+                    starts_with
+                    head_matches;
+                tail_starts : Equal (List UInt8) (source_suffix after_first) remaining =
+                  source_suffix_after_codes
+                    cur
+                    (Cons UInt8 first (Nil UInt8))
+                    remaining
+                    starts_with;
+                second_rejected : Equal
+                  (DecoderResult ByteCursor Span UInt8)
+                  (byte_code_decoder not_second_code after_first)
+                  (DecoderFailed
+                    ByteCursor
+                    Span
+                    UInt8
+                    (DecoderRejected Span (byte_cursor_locate after_first))) =
+                  byte_code_rejects_different_prefix
+                    after_first
+                    not_second_code
+                    and_second_code
+                    and_open_after_second_codes
+                    tail
+                    rest
+                    (λsame. absurd same)
+                    tail_starts
+                    tail_matches;
+                rest_rejected : Equal
+                  (DecoderResult ByteCursor Span UInt8)
+                  (token_codes_decoder not_open_remaining_codes after_first)
+                  (DecoderFailed
+                    ByteCursor
+                    Span
+                    UInt8
+                    (DecoderRejected Span (byte_cursor_locate after_first))) =
+                  decoder_seq_first_rejected
+                    ByteCursor
+                    Span
+                    UInt8
+                    UInt8
+                    (byte_code_decoder not_second_code)
+                    (token_codes_decoder (Cons Int 111 (Cons Int 116 (Cons Int 32 (Nil Int)))))
+                    after_first
+                    (byte_cursor_locate after_first)
+                    second_rejected
+              in
+                trans
+                  (DecoderResult ByteCursor Span UInt8)
+                  (not_open_token_decoder cur)
+                  (token_codes_decoder
+                    (map Char Int charToInt (string_to_list_char not_open_text))
+                    cur)
+                  (DecoderFailed
+                    ByteCursor
+                    Span
+                    UInt8
+                    (DecoderRejected Span (byte_cursor_locate after_first)))
+                  (not_open_token_code_decoder_pointwise cur)
+                  (decoder_seq_second_rejected
+                    ByteCursor
+                    Span
+                    UInt8
+                    UInt8
+                    (byte_code_decoder open_initial_code)
+                    (token_codes_decoder not_open_remaining_codes)
+                    cur
+                    first
+                    after_first
+                    (byte_cursor_locate after_first)
+                    first_succeeds
+                    rest_rejected)
+  }
+
+theorem bool_not_rejects_and_prefix
+      (recur : Decoder ByteCursor Span (Syntax BoolExpr))
+      (cur : ByteCursor)
+      (prefix : List UInt8)
+      (rest : List UInt8)
+      (starts_with : Equal (List UInt8) (source_suffix cur) (list_append UInt8 prefix rest))
+      (mapped : Equal
+        (List Int)
+        (map UInt8 Int uint8_to_int prefix)
+        (Cons Int open_initial_code (Cons Int and_second_code and_open_after_second_codes)))
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_not_decoder recur cur)
+        (DecoderFailed
+          ByteCursor
+          Span
+          (Syntax BoolExpr)
+          (DecoderRejected Span (byte_cursor_locate (byte_cursor_advance cur)))) =
+  trans
+    (DecoderResult ByteCursor Span (Syntax BoolExpr))
+    (bool_not_decoder recur cur)
+    (decoder_then_result
+      UInt8
+      (Syntax BoolExpr)
+      (not_open_token_decoder cur)
+      (bool_not_continue cur recur))
+    (DecoderFailed
+      ByteCursor
+      Span
+      (Syntax BoolExpr)
+      (DecoderRejected Span (byte_cursor_locate (byte_cursor_advance cur))))
+    (bool_not_result_pointwise recur cur)
+    (cong
+      (DecoderResult ByteCursor Span UInt8)
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (not_open_token_decoder cur)
+      (DecoderFailed
+        ByteCursor
+        Span
+        UInt8
+        (DecoderRejected Span (byte_cursor_locate (byte_cursor_advance cur))))
+      (λobserved.
+        decoder_then_result UInt8 (Syntax BoolExpr) observed (bool_not_continue cur recur))
+      (not_open_token_rejects_and_prefix prefix cur rest starts_with mapped))
+
+theorem bool_layer_and_succeeds_printed
+      (recur : Decoder ByteCursor Span (Syntax BoolExpr))
+      (cur : ByteCursor)
+      (left : BoolExpr)
+      (right : BoolExpr)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (print_bool_expr (BAnd left right))) rest))
+      (recur_works : (inner : ByteCursor)
+        → (syntax : Syntax BoolExpr)
+        → (next : ByteCursor)
+        → Equal
+        Bool
+        (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+        True
+        → PrintedBoolSpec
+        inner
+        syntax
+        next
+        → Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (recur inner)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax next))
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_decoder_layer recur cur)
+        (Decoded
+          ByteCursor
+          Span
+          (Syntax BoolExpr)
+          (printed_syntax cur (BAnd left right))
+          (printed_end cur (BAnd left right))) =
+  let
+    open_bytes : List UInt8 = bytes_to_list (bytes_encode and_open_text);
+    left_bytes : List UInt8 = bytes_to_list (print_bool_expr left);
+    separator_bytes : List UInt8 = bytes_to_list (bytes_encode separator_text);
+    right_bytes : List UInt8 = bytes_to_list (print_bool_expr right);
+    close_bytes : List UInt8 = bytes_to_list (bytes_encode close_text);
+    open_rest : List UInt8 =
+      list_append
+        UInt8
+        left_bytes
+        (list_append
+          UInt8
+          separator_bytes
+          (list_append UInt8 right_bytes (list_append UInt8 close_bytes rest)));
+    open_starts : Equal
+      (List UInt8)
+      (source_suffix cur)
+      (list_append UInt8 open_bytes open_rest) =
+      trans
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (print_bool_expr (BAnd left right))) rest)
+        (list_append UInt8 open_bytes open_rest)
+        starts_with
+        (printed_and_suffix_view left right rest);
+    open_codes : Equal
+      (List Int)
+      (map UInt8 Int uint8_to_int open_bytes)
+      (Cons Int open_initial_code (Cons Int and_second_code and_open_after_second_codes)) =
+      bytes_encode_ascii_octets and_open_text and_open_ascii;
+    syntax : Syntax BoolExpr = printed_syntax cur (BAnd left right);
+    next : ByteCursor = printed_end cur (BAnd left right);
+    and_succeeds : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (bool_and_decoder recur cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+      bool_and_decoder_succeeds_printed recur cur left right rest starts_with recur_works;
+    not_rejected : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (bool_not_decoder recur cur)
+      (DecoderFailed
+        ByteCursor
+        Span
+        (Syntax BoolExpr)
+        (DecoderRejected Span (byte_cursor_locate (byte_cursor_advance cur)))) =
+      bool_not_rejects_and_prefix recur cur open_bytes open_rest open_starts open_codes;
+    last_succeeds : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (bool_layer_last recur cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_layer_last recur cur)
+        (bool_and_decoder recur cur)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax next)
+        (decoder_alt_rejection_uses_second
+          ByteCursor
+          Span
+          (Syntax BoolExpr)
+          (bool_not_decoder recur)
+          (bool_and_decoder recur)
+          cur
+          (byte_cursor_locate (byte_cursor_advance cur))
+          not_rejected)
+        and_succeeds
+  in
+    bool_layer_open_success
+      recur
+      cur
+      open_bytes
+      open_rest
+      (Cons Int and_second_code and_open_after_second_codes)
+      open_starts
+      open_codes
+      syntax
+      next
+      last_succeeds
+
+theorem bool_layer_succeeds_for_expr
+      (e : BoolExpr)
+    : (recur : Decoder ByteCursor Span (Syntax BoolExpr))
+      → (cur : ByteCursor)
+      → ((inner : ByteCursor)
+          → (syntax : Syntax BoolExpr)
+          → (next : ByteCursor)
+          → Equal
+          Bool
+          (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+          True
+          → PrintedBoolSpec
+          inner
+          syntax
+          next
+          → Equal
+          (DecoderResult ByteCursor Span (Syntax BoolExpr))
+          (recur inner)
+          (Decoded ByteCursor Span (Syntax BoolExpr) syntax next))
+      → (syntax : Syntax BoolExpr)
+      → (next : ByteCursor)
+      → PrintedBoolSpecAt e cur syntax next
+      → Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_decoder_layer recur cur)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+  match e {
+    BTrue ↦
+      λrecur.
+        λcur.
+          λrecur_works.
+            λsyntax.
+              λnext. λholds. bool_layer_true_for_printed_spec recur cur syntax next holds;
+    BFalse ↦
+      λrecur.
+        λcur.
+          λrecur_works.
+            λsyntax.
+              λnext. λholds. bool_layer_false_for_printed_spec recur cur syntax next holds;
+    BNot child ↦
+      λrecur.
+        λcur.
+          λrecur_works.
+            λsyntax.
+              λnext.
+                λholds.
+                  bool_layer_from_canonical
+                    (BNot child)
+                    recur
+                    cur
+                    syntax
+                    next
+                    holds
+                    (bool_layer_not_succeeds_printed
+                      recur
+                      cur
+                      child
+                      (source_suffix next)
+                      (printed_bool_spec_prefix (BNot child) cur syntax next holds)
+                      recur_works);
+    BAnd left right ↦
+      λrecur.
+        λcur.
+          λrecur_works.
+            λsyntax.
+              λnext.
+                λholds.
+                  bool_layer_from_canonical
+                    (BAnd left right)
+                    recur
+                    cur
+                    syntax
+                    next
+                    holds
+                    (bool_layer_and_succeeds_printed
+                      recur
+                      cur
+                      left
+                      right
+                      (source_suffix next)
+                      (printed_bool_spec_prefix (BAnd left right) cur syntax next holds)
+                      recur_works)
+  }
+
+theorem bool_expression_decoder_succeeds_printed
+      (cur : ByteCursor)
+      (syntax : Syntax BoolExpr)
+      (next : ByteCursor)
+      (holds : PrintedBoolSpec cur syntax next)
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (bool_expression_decoder cur)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+  decoder_recursive_succeeds
+    ByteCursor
+    UInt8
+    Span
+    (Syntax BoolExpr)
+    byte_cursor_ops
+    bool_decoder_layer
+    PrintedBoolSpec
+    printed_bool_spec_positive
+    (λrecur.
+      λgrammar_start.
+        λrecur_works.
+          λvalue.
+            λend.
+              λspec_holds.
+                bool_layer_succeeds_for_expr
+                  (erase_spans value)
+                  recur
+                  grammar_start
+                  recur_works
+                  value
+                  end
+                  spec_holds)
+    cur
+    syntax
+    next
+    holds
+
+theorem complete_bool_finish_on_empty
+      (syntax : Syntax BoolExpr)
+      (end : ByteCursor)
+      (empty : Equal (List UInt8) (source_suffix end) (Nil UInt8))
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (complete_bool_finish syntax end)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax end) =
+  let remaining_zero : Equal Nat (byte_cursor_remaining end) Zero =
+    trans
+      Nat
+      (byte_cursor_remaining end)
+      (length UInt8 (source_suffix end))
+      Zero
+      (sym
+        Nat
+        (length UInt8 (source_suffix end))
+        (byte_cursor_remaining end)
+        (source_suffix_length end))
+      (cong (List UInt8) Nat (source_suffix end) (Nil UInt8) (length UInt8) empty)
+  in
+    cong
+      Nat
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (byte_cursor_remaining end)
+      Zero
+      (λremaining. complete_bool_finish_result syntax end remaining)
+      remaining_zero
+
+fn complete_bool_continue
+      (ignored : List UInt8) (start : ByteCursor)
+    : DecoderResult ByteCursor Span (Syntax BoolExpr) =
+  complete_bool_expression_after start
+
+theorem complete_bool_decoder_pointwise
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (complete_bool_decoder cur)
+        (decoder_then_result
+          (List UInt8)
+          (Syntax BoolExpr)
+          (spaces_decoder cur)
+          complete_bool_continue) =
+  Refl
+
+theorem complete_bool_decoder_succeeds_printed_cursor
+      (cur : ByteCursor)
+      (e : BoolExpr)
+      (printed_input : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (bytes_to_list (print_bool_expr e)))
+    : Equal
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (complete_bool_decoder cur)
+        (Decoded ByteCursor Span (Syntax BoolExpr) (printed_syntax cur e) (printed_end cur e)) =
+  let
+    printed_bytes : List UInt8 = bytes_to_list (print_bool_expr e);
+    syntax : Syntax BoolExpr = printed_syntax cur e;
+    next : ByteCursor = printed_end cur e;
+    with_empty_tail : Equal
+      (List UInt8)
+      (source_suffix cur)
+      (list_append UInt8 printed_bytes (Nil UInt8)) =
+      trans
+        (List UInt8)
+        (source_suffix cur)
+        printed_bytes
+        (list_append UInt8 printed_bytes (Nil UInt8))
+        printed_input
+        (sym
+          (List UInt8)
+          (list_append UInt8 printed_bytes (Nil UInt8))
+          printed_bytes
+          ((proof right_unit for list_append) UInt8 printed_bytes));
+    empty_after_print : Equal (List UInt8) (source_suffix next) (Nil UInt8) =
+      source_suffix_after_codes cur printed_bytes (Nil UInt8) with_empty_tail;
+    starting_spaces : Equal
+      (DecoderResult ByteCursor Span (List UInt8))
+      (spaces_decoder cur)
+      (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+      spaces_on_printed_expr e cur (Nil UInt8) with_empty_tail;
+    expression_succeeds : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (bool_expression_decoder cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+      bool_expression_decoder_succeeds_printed
+        cur
+        syntax
+        next
+        (printed_bool_spec_intro e cur (Nil UInt8) with_empty_tail);
+    ending_spaces : Equal
+      (DecoderResult ByteCursor Span (List UInt8))
+      (spaces_decoder next)
+      (Decoded ByteCursor Span (List UInt8) (Nil UInt8) next) =
+      spaces_on_empty_suffix next empty_after_print;
+    finish_succeeds : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (complete_bool_finish syntax next)
+      (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+      complete_bool_finish_on_empty syntax next empty_after_print;
+    trailing_succeeds : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (complete_bool_trailing_after syntax next)
+      (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (complete_bool_trailing_after syntax next)
+        (complete_bool_finish syntax next)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax next)
+        (decoder_then_success
+          (List UInt8)
+          (Syntax BoolExpr)
+          (spaces_decoder next)
+          (Nil UInt8)
+          next
+          (λignored. λend. complete_bool_finish syntax end)
+          ending_spaces)
+        finish_succeeds;
+    expression_stage : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (complete_bool_expression_after cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) syntax next) =
+      trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (complete_bool_expression_after cur)
+        (complete_bool_trailing_after syntax next)
+        (Decoded ByteCursor Span (Syntax BoolExpr) syntax next)
+        (decoder_then_success
+          (Syntax BoolExpr)
+          (Syntax BoolExpr)
+          (bool_expression_decoder cur)
+          syntax
+          next
+          complete_bool_trailing_after
+          expression_succeeds)
+        trailing_succeeds
+  in
+    trans
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (complete_bool_decoder cur)
+      (complete_bool_expression_after cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) syntax next)
+      (trans
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (complete_bool_decoder cur)
+        (decoder_then_result
+          (List UInt8)
+          (Syntax BoolExpr)
+          (spaces_decoder cur)
+          complete_bool_continue)
+        (complete_bool_expression_after cur)
+        (complete_bool_decoder_pointwise cur)
+        (decoder_then_success
+          (List UInt8)
+          (Syntax BoolExpr)
+          (spaces_decoder cur)
+          (Nil UInt8)
+          cur
+          complete_bool_continue
+          starting_spaces))
+      expression_stage
+
+fn parsed_bool_outcome
+      (s : Source) (start : Nat) (outcome : DecoderResult ByteCursor Span (Syntax BoolExpr))
+    : ParseResult (Syntax BoolExpr) =
+  match outcome {
+    Decoded syntax next ↦
+      Parsed
+        (Syntax BoolExpr)
+        syntax
+        (MkSpan start (byte_cursor_position next))
+        (byte_cursor_position next);
+    DecoderFailed err ↦ Failed (Syntax BoolExpr) (decoder_parse_error s err)
+  }
+
+theorem parse_bool_expr_result_pointwise
+      (s : Source) (start : Nat) (h : LessEqNat start (source_length s))
+    : Equal
+        (ParseResult (Syntax BoolExpr))
+        (parse_bool_expr s start h)
+        (parsed_bool_outcome s start (complete_bool_decoder (MkByteCursor s start))) =
+  Refl
+
+theorem parse_bool_expr_succeeds_printed_source
+      (s : Source)
+      (e : BoolExpr)
+      (h : LessEqNat Zero (source_length s))
+      (source_is_printed : Equal Bytes (source_bytes s) (print_bool_expr e))
+    : Equal
+        (ParseResult (Syntax BoolExpr))
+        (parse_bool_expr s Zero h)
+        (Parsed
+          (Syntax BoolExpr)
+          (printed_syntax (MkByteCursor s Zero) e)
+          (MkSpan Zero (byte_cursor_position (printed_end (MkByteCursor s Zero) e)))
+          (byte_cursor_position (printed_end (MkByteCursor s Zero) e))) =
+  let
+    cur : ByteCursor = MkByteCursor s Zero;
+    printed_bytes : List UInt8 = bytes_to_list (print_bool_expr e);
+    printed_input : Equal (List UInt8) (source_suffix cur) printed_bytes =
+      cong
+        Bytes
+        (List UInt8)
+        (source_bytes s)
+        (print_bool_expr e)
+        bytes_to_list
+        source_is_printed;
+    decoded : Equal
+      (DecoderResult ByteCursor Span (Syntax BoolExpr))
+      (complete_bool_decoder cur)
+      (Decoded ByteCursor Span (Syntax BoolExpr) (printed_syntax cur e) (printed_end cur e)) =
+      complete_bool_decoder_succeeds_printed_cursor cur e printed_input
+  in
+    trans
+      (ParseResult (Syntax BoolExpr))
+      (parse_bool_expr s Zero h)
+      (parsed_bool_outcome s Zero (complete_bool_decoder cur))
+      (Parsed
+        (Syntax BoolExpr)
+        (printed_syntax cur e)
+        (MkSpan Zero (byte_cursor_position (printed_end cur e)))
+        (byte_cursor_position (printed_end cur e)))
+      (parse_bool_expr_result_pointwise s Zero h)
+      (cong
+        (DecoderResult ByteCursor Span (Syntax BoolExpr))
+        (ParseResult (Syntax BoolExpr))
+        (complete_bool_decoder cur)
+        (Decoded ByteCursor Span (Syntax BoolExpr) (printed_syntax cur e) (printed_end cur e))
+        (parsed_bool_outcome s Zero)
+        decoded)
+
+pub fn ParsedPrintedBool (e : BoolExpr) (outcome : ParseResult (Syntax BoolExpr)) : Prop =
+  match outcome {
+    Parsed syntax consumed next ↦ Equal BoolExpr (erase_spans syntax) e;
+    Failed err ↦ Bottom
+  }
+
+pub theorem parse_bool_expr_print_round_trip
+      (s : Source)
+      (e : BoolExpr)
+      (h : LessEqNat Zero (source_length s))
+      (source_is_printed : Equal Bytes (source_bytes s) (print_bool_expr e))
+    : ParsedPrintedBool e (parse_bool_expr s Zero h) =
+  let
+    cur : ByteCursor = MkByteCursor s Zero;
+    expected : ParseResult (Syntax BoolExpr) =
+      Parsed
+        (Syntax BoolExpr)
+        (printed_syntax cur e)
+        (MkSpan Zero (byte_cursor_position (printed_end cur e)))
+        (byte_cursor_position (printed_end cur e));
+    parsed : Equal (ParseResult (Syntax BoolExpr)) (parse_bool_expr s Zero h) expected =
+      parse_bool_expr_succeeds_printed_source s e h source_is_printed
+  in
+    J
+      (λoutcome _. ParsedPrintedBool e outcome)
+      (printed_syntax_erases e cur)
+      (sym (ParseResult (Syntax BoolExpr)) (parse_bool_expr s Zero h) expected parsed)
+
+pub theorem format_bool_expr_print_round_trip
+      (s : Source)
+      (e : BoolExpr)
+      (source_is_printed : Equal Bytes (source_bytes s) (print_bool_expr e))
+    : Equal
+        (Result ParseError Bytes)
+        (format_bool_expr s)
+        (Ok ParseError Bytes (print_bool_expr e)) =
+  let
+    cur : ByteCursor = MkByteCursor s Zero;
+    zero_bound : LessEqNat Zero (source_length s) =
+      (proof zero_left for LessEqNat) (source_length s);
+    parsed_result : ParseResult (Syntax BoolExpr) =
+      Parsed
+        (Syntax BoolExpr)
+        (printed_syntax cur e)
+        (MkSpan Zero (byte_cursor_position (printed_end cur e)))
+        (byte_cursor_position (printed_end cur e));
+    parsed : Equal
+      (ParseResult (Syntax BoolExpr))
+      (parse_bool_expr s Zero zero_bound)
+      parsed_result =
+      parse_bool_expr_succeeds_printed_source s e zero_bound source_is_printed;
+    formatter_pointwise : Equal
+      (Result ParseError Bytes)
+      (format_bool_expr s)
+      (format_bool_parse_outcome (parse_bool_expr s Zero zero_bound)) =
+      Refl;
+    formatted_parsed : Equal
+      (Result ParseError Bytes)
+      (format_bool_parse_outcome (parse_bool_expr s Zero zero_bound))
+      (format_bool_parse_outcome parsed_result) =
+      cong
+        (ParseResult (Syntax BoolExpr))
+        (Result ParseError Bytes)
+        (parse_bool_expr s Zero zero_bound)
+        parsed_result
+        format_bool_parse_outcome
+        parsed;
+    printed_again : Equal Bytes
+      (print_bool_expr (erase_spans (printed_syntax cur e)))
+      (print_bool_expr e) =
+      cong
+        BoolExpr
+        Bytes
+        (erase_spans (printed_syntax cur e))
+        e
+        print_bool_expr
+        (printed_syntax_erases e cur);
+    formatted_value : Equal
+      (Result ParseError Bytes)
+      (format_bool_parse_outcome parsed_result)
+      (Ok ParseError Bytes (print_bool_expr e)) =
+      cong
+        Bytes
+        (Result ParseError Bytes)
+        (print_bool_expr (erase_spans (printed_syntax cur e)))
+        (print_bool_expr e)
+        (λbytes. Ok ParseError Bytes bytes)
+        printed_again
+  in
+    trans
+      (Result ParseError Bytes)
+      (format_bool_expr s)
+      (format_bool_parse_outcome (parse_bool_expr s Zero zero_bound))
+      (Ok ParseError Bytes (print_bool_expr e))
+      formatter_pointwise
+      (trans
+        (Result ParseError Bytes)
+        (format_bool_parse_outcome (parse_bool_expr s Zero zero_bound))
+        (format_bool_parse_outcome parsed_result)
+        (Ok ParseError Bytes (print_bool_expr e))
+        formatted_parsed
+        formatted_value)
 
 fn format_bool_parse_outcome
       (outcome : ParseResult (Syntax BoolExpr))
@@ -6363,7 +7771,9 @@ reference implementation.
    `BoolExpr`, `BTrue`, `BFalse`, `BNot`, `BAnd`, `Syntax`, `MkSyntax`,
    `syntax_root`, `syntax_children`, `erase_spans`, `ValidLocatedList`,
    `ValidSyntax`, `parse_bool_expr`, `parse_bool_expr_total`,
-   `parse_bool_expr_laws`, `print_bool_expr`, `format_bool_expr`,
+   `parse_bool_expr_laws`, `print_bool_expr`, `print_bool_expr_utf8`,
+   `ParsedPrintedBool`, `parse_bool_expr_print_round_trip`,
+   `format_bool_expr`, `format_bool_expr_print_round_trip`,
    `format_bool_expr_on_parse_success`, and
    `format_bool_expr_on_parse_failure`.
 2. **Source map.**
@@ -6384,11 +7794,14 @@ reference implementation.
    `bytes_concat_list_view` (F1), `bytes_encode_ascii_octets` (F2), and
    `ascii_bytes_utf8` (F4') from `Data.Binary.BytesPrimitiveContracts`;
    the imported module registers four trusted facts, including
-   `bytes_decode_encode` (F3), although no bridge below uses F3 yet.
+   `bytes_decode_encode` (F3). The grammar's byte-level inverse does not
+   require a decode step; an independent client exercises F3 directly.
    Every proof defined in this package —
    `LessEqNat::refl`, `LessEqNat::zero_left`, `valid_zero_width_span`,
    `parse_bool_expr_total`, `parse_bool_expr_laws`,
-   `format_bool_expr_on_parse_success`, and
+   `print_bool_expr_utf8`, `parse_bool_expr_print_round_trip`,
+   `format_bool_expr_print_round_trip`,
+   `format_bool_expr_on_parse_success`,
    `format_bool_expr_on_parse_failure`, `ascii_encoded_byte_view`,
    `ascii_encoded_utf8`, and `ascii_concat_utf8` — is real and
    kernel-checked; no law or predicate is postulated.
@@ -6405,12 +7818,19 @@ reference implementation.
    through the existing UInt8 retraction and byte-list injectivity;
    `ascii_encoded_byte_codes` transports the checked ASCII witness through
    F2, while `ascii_concat_utf8` transports its append over F1 into F4'.
-   These bridges do not assert that printing then parsing returns the
-   original expression.
+   `print_bool_expr_utf8` supplies the `Source` field for any printed
+   expression. The cursor-relative proof uses `decoder_many_rejected_succeeds`
+   for absent spaces and `decoder_recursive_succeeds` for strict child
+   progress; `ParsedPrintedBool` excludes parse failure and requires the
+   parsed expression to erase to the printer's input. The formatter law
+   additionally proves the original bytes are returned.
 6. **Consumers.** Source-aware parser implementations can use this package's
-   source, span, result, and validity vocabulary. The private byte bridges
-   prepare the printer's encoded leaves and concatenated ASCII output.
+   source, span, result, and validity vocabulary. Clients can construct a
+   `Source` from `print_bool_expr_utf8`, apply the generic parser round trip,
+   and apply the formatter law without assuming parse success.
 7. **Validation evidence.** The catalog checks the
    `Source`/`Span`/`Located`/`ParseResult`/`Parser` surface, its zero local
    `trusted_base()` delta, the Boolean grammar's constructors and byte-token
    matching, and the absence of an exported unguarded repetition combinator.
+   An independent client checks the exported proof on a source backed by
+   printed bytes, alongside its separate ASCII-literal byte contracts.
