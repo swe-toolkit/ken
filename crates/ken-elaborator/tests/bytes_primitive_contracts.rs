@@ -35,6 +35,14 @@ fn byte_list(env: &ElabEnv, value: &EvalVal) -> Vec<u8> {
     }
 }
 
+/// Promise class: durable tested-primitive contract boundary.
+/// MEASURED: four named contracts are the exact trusted-base delta; a fresh
+/// client imports public byte/list surfaces and checks four concrete proof
+/// uses, while an out-of-range ASCII certificate is kernel-rejected.
+/// CLAIMED: the public Bytes contract interface remains reachable and the
+/// false ASCII certificate is not admitted through a leaked entry scope.
+/// THE GAP: these are concrete clients of stated TCB contracts, not Ken
+/// proofs of the underlying opaque primitives' runtime behavior.
 #[test]
 fn four_late_contracts_and_fresh_ascii_client_check() {
     let mut env = ElabEnv::new().expect("prelude");
@@ -69,7 +77,7 @@ fn four_late_contracts_and_fresh_ascii_client_check() {
     );
     let client = r#"
 import Core.Logic.Transport (sym)
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, map)
 import Data.Binary.BytesPrimitiveContracts
   (AllAscii, AllAsciiCodes, AsciiBytes, IsUtf8, NoCodes, SomeCodes,
    Ascii81, Ascii55, Ascii63, MkAsciiCode, bytes_concat_list_view,
@@ -117,6 +125,7 @@ theorem fresh_bytes_client_utf8 : IsUtf8 (bytes_encode fresh_bytes_client_text) 
         .expect("existing Parsing module is available without modification");
     env.elaborate_file(
         "import Capability.Parsing.Parsing (IsUtf8 as parsing_is_utf8)\n\
+         import Data.Binary.BytesPrimitiveContracts (AsciiBytes, ascii_bytes_utf8)\n\
          theorem ascii_contract_matches_parser (bs : Bytes) (w : AsciiBytes bs)\n\
              : parsing_is_utf8 bs = ascii_bytes_utf8 bs w",
     )
@@ -124,8 +133,9 @@ theorem fresh_bytes_client_utf8 : IsUtf8 (bytes_encode fresh_bytes_client_text) 
     env.elaborate_decl("const outside_code : Int = 233")
         .expect("literal index is an ordinary checked Int");
     let outside_ascii = env
-        .elaborate_decl(
-            "const outside_ascii : AsciiCode outside_code = MkAsciiCode 233 Ascii81 Proved",
+        .elaborate_file(
+            "import Data.Binary.BytesPrimitiveContracts (AsciiCode, MkAsciiCode, Ascii81)\n\
+             const outside_ascii : AsciiCode outside_code = MkAsciiCode 233 Ascii81 Proved",
         )
         .expect_err("ASCII witness must reject code 233");
     assert!(
