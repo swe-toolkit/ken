@@ -35,6 +35,15 @@ pub(super) enum FrameTerminalKind {
     Abort,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(super) enum FrameRule {
+    E1,
+    E2,
+    R1,
+    R2,
+    N1,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct FrameTerminal {
     pub block: Block,
@@ -193,6 +202,23 @@ impl FrameEvents {
     }
 
     pub fn validate(&self, func: &Function) -> Result<(), CraneliftBackendError> {
+        let violations = self.rule_violations(func)?;
+        if violations.values().all(BTreeSet::is_empty) {
+            Ok(())
+        } else {
+            Err(refusal(format!(
+                "checked Runtime frame violations: {violations:?}"
+            )))
+        }
+    }
+
+    // Forward possible-state dataflow, per unchanged checked frame key. Each
+    // element represents a path that can arrive at a program point: Inactive,
+    // Active, or Discharged. Union at joins preserves skipped-arm obligations.
+    pub(super) fn rule_violations(
+        &self,
+        func: &Function,
+    ) -> Result<BTreeMap<FrameKey, BTreeSet<FrameRule>>, CraneliftBackendError> {
         if func.signature.returns.len() != 1 || func.signature.returns[0].value_type != types::I64 {
             return Err(refusal(
                 "checked Runtime frame Function must return exactly one I64 status",
@@ -202,7 +228,7 @@ impl FrameEvents {
             self.trace_dynamic_status_returns(func);
         }
         if self.events.is_empty() {
-            return Ok(());
+            return Ok(BTreeMap::new());
         }
         let cfg = ControlFlowGraph::with_function(func);
         let entry = func
@@ -249,17 +275,25 @@ impl FrameEvents {
                 ));
             }
         }
+        const I: u8 = 0b001;
+        const A: u8 = 0b010;
+        const D: u8 = 0b100;
         let keys: BTreeSet<_> = self.events.iter().map(|event| event.key).collect();
+        let mut violations = BTreeMap::new();
+        let mut keys_needing_extra_passes = 0usize;
         for key in keys {
-            // 0: no activation on this path, 1: active with no receipt,
-            // 2: active with one receipt. A second activation or receipt on
-            // the same path refuses, including revisiting its event on a cycle.
-            let mut queue = VecDeque::from([(entry, 0u8)]);
-            let mut visited = BTreeSet::new();
-            while let Some((block, mut state)) = queue.pop_front() {
-                if !visited.insert((block, state)) {
-                    continue;
+            let mut rules = BTreeSet::new();
+            let mut incoming = BTreeMap::from([(entry, I)]);
+            let mut queue = VecDeque::from([entry]);
+            let mut queued = BTreeSet::from([entry]);
+            let mut processed = BTreeSet::new();
+            let mut extra_pass = false;
+            while let Some(block) = queue.pop_front() {
+                queued.remove(&block);
+                if !processed.insert(block) {
+                    extra_pass = true;
                 }
+                let mut state = incoming[&block];
                 if let Some(block_events) = events.get(&block) {
                     for (_, _, event) in block_events {
                         if event.key != key {
@@ -267,48 +301,58 @@ impl FrameEvents {
                         }
                         match event.kind {
                             FrameEventKind::Activation => {
-                                if state != 0 {
-                                    return Err(refusal("checked Runtime frame marker was activated more than once on one path"));
+                                if state & A != 0 {
+                                    rules.insert(FrameRule::E1);
                                 }
-                                state = 1;
+                                if state & D != 0 {
+                                    rules.insert(FrameRule::E2);
+                                }
+                                state = A;
                             }
                             FrameEventKind::Receipt => {
-                                if state == 0 {
-                                    return Err(refusal(
-                                        "checked Runtime frame receipt has no activation",
-                                    ));
+                                if state & I != 0 {
+                                    rules.insert(FrameRule::R1);
                                 }
-                                if state == 2 {
-                                    return Err(refusal("checked Runtime frame marker was consumed more than once on one path"));
+                                if state & D != 0 {
+                                    rules.insert(FrameRule::R2);
                                 }
-                                state = 2;
+                                state = D;
                             }
                         }
                     }
                 }
                 let successors: Vec<_> = cfg.succ_iter(block).collect();
                 if successors.is_empty() {
-                    if state != 0 {
+                    if state & (A | D) != 0 {
                         let kind = match terminals.get(&block) {
                             Some(kind) => *kind,
                             None => classify_unregistered_terminal(func, block)?,
                         };
-                        match kind {
-                            FrameTerminalKind::Normal if state == 1 => {
-                                return Err(refusal(
-                                    "checked Runtime frame marker was skipped on a normal return",
-                                ));
-                            }
-                            FrameTerminalKind::Normal | FrameTerminalKind::Abort => {}
+                        if kind == FrameTerminalKind::Normal && state & A != 0 {
+                            rules.insert(FrameRule::N1);
                         }
                     }
                 } else {
                     for successor in successors {
-                        queue.push_back((successor, state));
+                        let previous = incoming.get(&successor).copied().unwrap_or(0);
+                        let joined = previous | state;
+                        if joined != previous {
+                            incoming.insert(successor, joined);
+                            if queued.insert(successor) {
+                                queue.push_back(successor);
+                            }
+                        }
                     }
                 }
             }
+            if extra_pass {
+                keys_needing_extra_passes += 1;
+            }
+            violations.insert(key, rules);
         }
-        Ok(())
+        if std::env::var_os("KEN_FRAME_TERMINAL_CENSUS").is_some() {
+            eprintln!("KEN_FRAME_FIXPOINT function={} keys_needing_extra_passes={keys_needing_extra_passes} total_keys={}", func.name, violations.len());
+        }
+        Ok(violations)
     }
 }

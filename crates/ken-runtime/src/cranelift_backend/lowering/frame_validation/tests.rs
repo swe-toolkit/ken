@@ -7,19 +7,22 @@ const KEY: FrameKey = (0, 0);
 
 #[derive(Clone, Copy)]
 enum Shape {
-    ExclusiveArms,
-    ZeroReceiptAbortArm,
-    SameBlockDuplicate,
-    SequentialBlockDuplicate,
+    ExclusiveReceipts,
+    ReceiptOrAbort,
+    ActiveAbort,
+    ExclusiveActivations,
+    DoubleEnter,
+    EnterAfterDischarge,
+    ReceiptWithoutEnter,
+    DoubleReceipt,
     OneArmSkip,
-    ReceiptWithoutActivation,
-    UnregisteredZeroStatus,
-    UnregisteredDynamicStatus,
-    UnregisteredNonzeroStatus,
+    EnterCycle,
+    ReceiptCycle,
+    UnregisteredZero,
+    UnregisteredDynamic,
+    UnregisteredNonzero,
     UnregisteredTrap,
     InvalidSignature,
-    ActivationCycle,
-    ReceiptCycle,
 }
 
 fn event(builder: &FunctionBuilder<'_>, events: &mut FrameEvents, kind: FrameEventKind) {
@@ -40,9 +43,16 @@ fn ret(
     }
 }
 
-fn exercise(shape: Shape) -> Result<(), CraneliftBackendError> {
+fn abort(builder: &mut FunctionBuilder<'_>, events: &mut FrameEvents) {
+    let failure = builder.ins().iconst(types::I64, -1);
+    builder.ins().return_(&[failure]);
+    // Exercise ABI classification rather than emitter registration.
+    let _ = events;
+}
+
+fn build(shape: Shape) -> (FrameEvents, Function) {
     let mut func = Function::new();
-    if matches!(shape, Shape::UnregisteredDynamicStatus) {
+    if matches!(shape, Shape::UnregisteredDynamic) {
         func.signature.params.push(AbiParam::new(types::I64));
     }
     func.signature
@@ -57,69 +67,116 @@ fn exercise(shape: Shape) -> Result<(), CraneliftBackendError> {
     {
         let mut builder = FunctionBuilder::new(&mut func, &mut context);
         let entry = builder.create_block();
-        if matches!(shape, Shape::UnregisteredDynamicStatus) {
+        if matches!(shape, Shape::UnregisteredDynamic) {
             builder.append_block_params_for_function_params(entry);
         }
         builder.switch_to_block(entry);
         match shape {
-            Shape::ExclusiveArms | Shape::ZeroReceiptAbortArm | Shape::OneArmSkip => {
+            Shape::ExclusiveReceipts | Shape::ReceiptOrAbort | Shape::OneArmSkip => {
                 event(&builder, &mut events, FrameEventKind::Activation);
                 let left = builder.create_block();
                 let right = builder.create_block();
+                let merge =
+                    (!matches!(shape, Shape::ReceiptOrAbort)).then(|| builder.create_block());
                 let cond = builder.ins().iconst(types::I8, 1);
                 builder.ins().brif(cond, left, &[], right, &[]);
                 builder.switch_to_block(left);
                 event(&builder, &mut events, FrameEventKind::Receipt);
-                ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
+                if matches!(shape, Shape::ReceiptOrAbort) {
+                    ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
+                } else {
+                    builder.ins().jump(merge.expect("merging branch"), &[]);
+                }
                 builder.switch_to_block(right);
                 match shape {
-                    Shape::ExclusiveArms => event(&builder, &mut events, FrameEventKind::Receipt),
-                    Shape::ZeroReceiptAbortArm | Shape::OneArmSkip => {}
+                    Shape::ExclusiveReceipts => {
+                        event(&builder, &mut events, FrameEventKind::Receipt);
+                        builder.ins().jump(merge.expect("merging branch"), &[]);
+                    }
+                    Shape::ReceiptOrAbort => abort(&mut builder, &mut events),
+                    Shape::OneArmSkip => {
+                        builder.ins().jump(merge.expect("merging branch"), &[]);
+                    }
                     _ => unreachable!(),
                 }
-                ret(
-                    &mut builder,
-                    &mut events,
-                    Some(if matches!(shape, Shape::ZeroReceiptAbortArm) {
-                        FrameTerminalKind::Abort
-                    } else {
-                        FrameTerminalKind::Normal
-                    }),
-                );
+                if let Some(merge) = merge {
+                    builder.switch_to_block(merge);
+                    ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
+                }
             }
-            Shape::SameBlockDuplicate => {
+            Shape::ActiveAbort | Shape::UnregisteredNonzero => {
                 event(&builder, &mut events, FrameEventKind::Activation);
-                event(&builder, &mut events, FrameEventKind::Receipt);
-                event(&builder, &mut events, FrameEventKind::Receipt);
+                abort(&mut builder, &mut events);
+            }
+            Shape::ExclusiveActivations => {
+                let left = builder.create_block();
+                let right = builder.create_block();
+                let merge = builder.create_block();
+                let cond = builder.ins().iconst(types::I8, 1);
+                builder.ins().brif(cond, left, &[], right, &[]);
+                for arm in [left, right] {
+                    builder.switch_to_block(arm);
+                    event(&builder, &mut events, FrameEventKind::Activation);
+                    event(&builder, &mut events, FrameEventKind::Receipt);
+                    builder.ins().jump(merge, &[]);
+                }
+                builder.switch_to_block(merge);
                 ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
             }
-            Shape::SequentialBlockDuplicate => {
+            Shape::DoubleEnter | Shape::EnterAfterDischarge | Shape::DoubleReceipt => {
                 event(&builder, &mut events, FrameEventKind::Activation);
-                event(&builder, &mut events, FrameEventKind::Receipt);
-                let second = builder.create_block();
-                builder.ins().jump(second, &[]);
-                builder.switch_to_block(second);
+                match shape {
+                    Shape::DoubleEnter => event(&builder, &mut events, FrameEventKind::Activation),
+                    Shape::EnterAfterDischarge | Shape::DoubleReceipt => {
+                        event(&builder, &mut events, FrameEventKind::Receipt);
+                    }
+                    _ => unreachable!(),
+                }
+                if matches!(shape, Shape::EnterAfterDischarge) {
+                    event(&builder, &mut events, FrameEventKind::Activation);
+                }
+                if matches!(shape, Shape::DoubleReceipt) {
+                    event(&builder, &mut events, FrameEventKind::Receipt);
+                }
+                if !matches!(shape, Shape::DoubleReceipt) {
+                    event(&builder, &mut events, FrameEventKind::Receipt);
+                }
+                ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
+            }
+            Shape::ReceiptWithoutEnter => {
                 event(&builder, &mut events, FrameEventKind::Receipt);
                 ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
             }
-            Shape::ReceiptWithoutActivation => {
-                event(&builder, &mut events, FrameEventKind::Receipt);
+            Shape::EnterCycle | Shape::ReceiptCycle => {
+                let cycle = builder.create_block();
+                let exit = builder.create_block();
+                if matches!(shape, Shape::ReceiptCycle) {
+                    event(&builder, &mut events, FrameEventKind::Activation);
+                }
+                builder.ins().jump(cycle, &[]);
+                builder.switch_to_block(cycle);
+                if matches!(shape, Shape::EnterCycle) {
+                    event(&builder, &mut events, FrameEventKind::Activation);
+                } else {
+                    event(&builder, &mut events, FrameEventKind::Receipt);
+                }
+                let cond = builder.ins().iconst(types::I8, 1);
+                builder.ins().brif(cond, cycle, &[], exit, &[]);
+                builder.switch_to_block(exit);
+                if matches!(shape, Shape::EnterCycle) {
+                    event(&builder, &mut events, FrameEventKind::Receipt);
+                }
                 ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
             }
-            Shape::UnregisteredZeroStatus => {
+            Shape::UnregisteredZero => {
                 event(&builder, &mut events, FrameEventKind::Activation);
                 event(&builder, &mut events, FrameEventKind::Receipt);
                 ret(&mut builder, &mut events, None);
             }
-            Shape::UnregisteredDynamicStatus => {
+            Shape::UnregisteredDynamic => {
                 event(&builder, &mut events, FrameEventKind::Activation);
                 let status = builder.block_params(entry)[0];
                 builder.ins().return_(&[status]);
-            }
-            Shape::UnregisteredNonzeroStatus => {
-                event(&builder, &mut events, FrameEventKind::Activation);
-                let failure = builder.ins().iconst(types::I64, -1);
-                builder.ins().return_(&[failure]);
             }
             Shape::UnregisteredTrap => {
                 event(&builder, &mut events, FrameEventKind::Activation);
@@ -133,119 +190,92 @@ fn exercise(shape: Shape) -> Result<(), CraneliftBackendError> {
                 builder.ins().return_(&[zero]);
                 events
                     .terminal(&builder, FrameTerminalKind::Normal)
-                    .expect("normal return position");
-            }
-            Shape::ActivationCycle | Shape::ReceiptCycle => {
-                let cycle = builder.create_block();
-                let exit = builder.create_block();
-                if matches!(shape, Shape::ReceiptCycle) {
-                    event(&builder, &mut events, FrameEventKind::Activation);
-                }
-                builder.ins().jump(cycle, &[]);
-                builder.switch_to_block(cycle);
-                if matches!(shape, Shape::ActivationCycle) {
-                    event(&builder, &mut events, FrameEventKind::Activation);
-                }
-                event(&builder, &mut events, FrameEventKind::Receipt);
-                let cond = builder.ins().iconst(types::I8, 1);
-                builder.ins().brif(cond, cycle, &[], exit, &[]);
-                builder.switch_to_block(exit);
-                ret(&mut builder, &mut events, Some(FrameTerminalKind::Normal));
+                    .expect("return position");
             }
         }
         builder.seal_all_blocks();
         builder.finalize();
     }
-    events.validate(&func)
+    (events, func)
+}
+
+fn expect_rules(shape: Shape, expected: &[FrameRule]) {
+    let (events, func) = build(shape);
+    let actual = events
+        .rule_violations(&func)
+        .expect("classified finished Function");
+    let expected_set: BTreeSet<_> = expected.iter().copied().collect();
+    assert_eq!(actual.get(&KEY), Some(&expected_set));
+    assert_eq!(events.validate(&func).is_ok(), expected.is_empty());
 }
 
 #[test]
-fn exclusive_successors_each_consume_once() {
-    exercise(Shape::ExclusiveArms).expect("separate receipts are not a same-path duplicate");
+fn p1_exclusive_receipts_join() {
+    expect_rules(Shape::ExclusiveReceipts, &[]);
 }
-
 #[test]
-fn abort_arm_without_receipt_and_normal_arm_with_receipt_pass() {
-    exercise(Shape::ZeroReceiptAbortArm).expect("abort may abandon the checked continuation");
+fn p2_receipt_or_abort() {
+    expect_rules(Shape::ReceiptOrAbort, &[]);
 }
-
 #[test]
-fn same_block_duplicate_receipts_refuse() {
-    assert!(
-        format!("{:?}", exercise(Shape::SameBlockDuplicate).unwrap_err())
-            .contains("consumed more than once")
-    );
+fn p3_active_abort() {
+    expect_rules(Shape::ActiveAbort, &[]);
 }
-
 #[test]
-fn reachable_sequential_receipts_refuse() {
-    assert!(format!(
-        "{:?}",
-        exercise(Shape::SequentialBlockDuplicate).unwrap_err()
-    )
-    .contains("consumed more than once"));
+fn p4_exclusive_activations_join() {
+    expect_rules(Shape::ExclusiveActivations, &[]);
 }
-
 #[test]
-fn one_arm_skip_to_normal_return_refuses() {
-    assert!(format!("{:?}", exercise(Shape::OneArmSkip).unwrap_err())
-        .contains("skipped on a normal return"));
+fn n_e1_double_enter() {
+    expect_rules(Shape::DoubleEnter, &[FrameRule::E1]);
 }
-
 #[test]
-fn receipt_without_activation_refuses() {
-    assert!(format!(
-        "{:?}",
-        exercise(Shape::ReceiptWithoutActivation).unwrap_err()
-    )
-    .contains("receipt has no activation"));
+fn n_e2_enter_after_discharge() {
+    expect_rules(Shape::EnterAfterDischarge, &[FrameRule::E2]);
+}
+#[test]
+fn n_r1_receipt_without_enter() {
+    expect_rules(Shape::ReceiptWithoutEnter, &[FrameRule::R1]);
+}
+#[test]
+fn n_r2_double_receipt() {
+    expect_rules(Shape::DoubleReceipt, &[FrameRule::R2]);
+}
+#[test]
+fn n_n1_one_arm_skip() {
+    expect_rules(Shape::OneArmSkip, &[FrameRule::N1]);
+}
+#[test]
+fn n_e1c_activation_cycle() {
+    expect_rules(Shape::EnterCycle, &[FrameRule::E1]);
+}
+#[test]
+fn n_r2c_receipt_cycle() {
+    expect_rules(Shape::ReceiptCycle, &[FrameRule::R2]);
 }
 
 #[test]
 fn unregistered_zero_status_return_refuses() {
-    assert!(
-        format!("{:?}", exercise(Shape::UnregisteredZeroStatus).unwrap_err())
-            .contains("unregistered zero-status return")
-    );
+    let (events, func) = build(Shape::UnregisteredZero);
+    assert!(format!("{:?}", events.validate(&func).unwrap_err())
+        .contains("unregistered zero-status return"));
 }
-
 #[test]
 fn unregistered_dynamic_status_return_refuses() {
-    assert!(format!(
-        "{:?}",
-        exercise(Shape::UnregisteredDynamicStatus).unwrap_err()
-    )
-    .contains("unregistered dynamic-status return"));
+    let (events, func) = build(Shape::UnregisteredDynamic);
+    assert!(format!("{:?}", events.validate(&func).unwrap_err())
+        .contains("unregistered dynamic-status return"));
 }
-
 #[test]
 fn unregistered_nonzero_status_return_without_receipt_is_abort() {
-    exercise(Shape::UnregisteredNonzeroStatus).expect("nonzero status is an ABI abort");
+    expect_rules(Shape::UnregisteredNonzero, &[]);
 }
-
 #[test]
 fn unregistered_clif_trap_without_receipt_is_abort() {
-    exercise(Shape::UnregisteredTrap).expect("CLIF trap is an abort");
+    expect_rules(Shape::UnregisteredTrap, &[]);
 }
-
 #[test]
 fn non_i64_status_signature_refuses() {
-    assert!(
-        format!("{:?}", exercise(Shape::InvalidSignature).unwrap_err())
-            .contains("exactly one I64 status")
-    );
-}
-
-#[test]
-fn activation_on_cycle_refuses() {
-    assert!(
-        format!("{:?}", exercise(Shape::ActivationCycle).unwrap_err())
-            .contains("activated more than once")
-    );
-}
-
-#[test]
-fn receipt_on_cycle_refuses() {
-    assert!(format!("{:?}", exercise(Shape::ReceiptCycle).unwrap_err())
-        .contains("consumed more than once"));
+    let (events, func) = build(Shape::InvalidSignature);
+    assert!(format!("{:?}", events.validate(&func).unwrap_err()).contains("exactly one I64 status"));
 }
