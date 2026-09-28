@@ -399,6 +399,50 @@ fn two_vector_zip_recursive_step_convoy_fixture() {
     );
 }
 
+/// RT-C5-PRIMITIVE-TYPE-ARGUMENTS AC-1: replay the checked convoy on both
+/// opaque primitive TYPE arguments. The native erasure path is an independent
+/// axis: this test measures the reference interpreter, not native cast
+/// reduction. Promise class: durable C5 regularity for closed type arguments.
+#[test]
+fn two_vector_zip_convoy_computes_with_primitive_type_arguments() {
+    for (type_name, element) in [("Int", "7"), ("String", "\"payload\"")] {
+        let mut env = vec_env();
+        elab_ok(
+            &mut env,
+            &format!(
+                "fn zipPrimitive (n : Nat) (v : Vec {type_name} n) \
+                 (w : Vec {type_name} n) : Vec {type_name} n = \
+                 match v {{ \
+                   VNil |-> VNil {type_name}; \
+                   VCons m a xs |-> match w {{ \
+                     VCons _ b ys |-> VCons {type_name} m a (zipPrimitive m xs ys) \
+                   }} \
+                 }}"
+            ),
+        );
+        let result_id = env.elaborate_decl(&format!(
+            "const zipPrimitiveResult = zipPrimitive (Suc Zero) \
+             (VCons {type_name} Zero {element} (VNil {type_name})) \
+             (VCons {type_name} Zero {element} (VNil {type_name}))"
+        ))
+        .expect("primitive-type convoy application checks");
+        let expected_id = env.elaborate_decl(&format!(
+            "const zipPrimitiveExpected = VCons {type_name} Zero {element} (VNil {type_name})"
+        ))
+        .expect("closed primitive-type vector checks");
+        let (_, result_body) = env.env.transparent_body(result_id).expect("checked result");
+        let (_, expected_body) = env.env.transparent_body(expected_id).expect("checked expected");
+        let mut store = ken_interp::EvalStore::new();
+        let result = ken_interp::eval(&[], &result_body, &env.env, &mut store);
+        let expected = ken_interp::eval(&[], &expected_body, &env.env, &mut store);
+        assert!(
+            vec_nat_structurally_eq(&result, &expected),
+            "{type_name} convoy must return its closed vector: got {result:?}, expected {expected:?}"
+        );
+        assert!(matches!(result, EvalVal::Ctor { .. }), "{type_name} must not return Unknown");
+    }
+}
+
 /// `LANG-CONVOY-MATCH-FIELD-PROVENANCE` D2 -- the let-interleaved
 /// POSITION record (NOT a region-set-vs-floor discriminator -- that claim
 /// was made, then measured false; see the correction below). The Architect

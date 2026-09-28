@@ -16,11 +16,11 @@
 //!   bridges the two representations.
 //! - Compound data (`Ctor`, `Pair`, `Closure`) — K3-interned, carry a `SlotId`.
 //! - Type-former values (`TypeUniverse`, `OmegaUniverse`, `PiTy`, `SigmaTy`,
-//!   `IndFormerVal`, `IndTypeApp`) — not K3-interned; type equality is limited
-//!   to canonical values admitted by C5.
+//!   `IndFormerVal`, `IndTypeApp`, `OpaquePrimType`) — not K3-interned; type
+//!   equality is limited to canonical values admitted by C5.
 //! - `CtorPending` — accumulates positional args before the constructor saturates.
 //! - `Unknown` — open-hole residue (propagates strictly through all positions).
-//! - `Neutral` — stuck on an opaque constant or open variable (closed ground
+//! - `Neutral` — stuck on an unsupported form or open variable (closed ground
 //!   programs never reach this per canonicity).
 
 use std::collections::{BTreeMap, HashMap};
@@ -278,6 +278,13 @@ pub enum EvalVal {
     IndFormerVal {
         id: GlobalId,
     },
+    /// A checked opaque primitive type constant, optionally applied to its
+    /// type's leading Π-bound arguments. Distinct from open/stuck Neutral and
+    /// from inductive formers, whose ids require inductive declarations.
+    OpaquePrimType {
+        id: GlobalId,
+        args: Rc<Vec<EvalVal>>,
+    },
     /// An inductive type former applied to its parameter/index values
     /// (`D v̄`, a canonical type value, `42 §2`). Levels are carried by the
     /// kernel and not recomputed, as for `IndFormerVal` (`42 §3.5`).
@@ -357,6 +364,9 @@ fn to_rt(val: &EvalVal) -> Option<RtValue> {
         // too. The recursion carries the refusal outward without a second
         // mechanism.
         EvalVal::Closure { .. } => None,
+        // Type-level identities are not K3 values, even when they occur
+        // inside a constructor or a pair being considered for interning.
+        EvalVal::OpaquePrimType { .. } => None,
         EvalVal::Bytes(b) => Some(RtValue::Bytes(b.clone())),
         EvalVal::Str(s) => Some(RtValue::String(s.as_str().to_owned())),
         _ => None,
@@ -1222,6 +1232,20 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
         (EvalVal::TypeUniverse(la), EvalVal::TypeUniverse(lb)) => la.equiv(lb),
         (EvalVal::OmegaUniverse(la), EvalVal::OmegaUniverse(lb)) => la.equiv(lb),
         (EvalVal::IndFormerVal { id: ia }, EvalVal::IndFormerVal { id: ib }) => ia == ib,
+        (
+            EvalVal::OpaquePrimType { id: ia, args: aa },
+            EvalVal::OpaquePrimType { id: ib, args: ba },
+        ) => {
+            ia == ib
+                && aa.len() == ba.len()
+                && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
+        }
+        (EvalVal::Int(x), EvalVal::Int(y)) => x == y,
+        (EvalVal::BigInt(x), EvalVal::BigInt(y)) => x == y,
+        (EvalVal::Int(x), EvalVal::BigInt(y)) => BigInt::from(*x) == *y,
+        (EvalVal::BigInt(x), EvalVal::Int(y)) => *x == BigInt::from(*y),
+        (EvalVal::Bool(x), EvalVal::Bool(y)) => x == y,
+        (EvalVal::Bytes(x), EvalVal::Bytes(y)) => x == y,
         (EvalVal::IndTypeApp { id: ia, args: aa }, EvalVal::IndTypeApp { id: ib, args: ba }) => {
             ia == ib
                 && aa.len() == ba.len()
@@ -1326,6 +1350,174 @@ mod ds5b_cast_regular_tests {
             cast_reduce(ty.clone(), ty, EvalVal::Unknown, EvalVal::Int(47)),
             EvalVal::Unknown
         );
+    }
+}
+
+#[cfg(test)]
+mod primitive_type_cast_tests {
+    use super::*;
+
+    // These value-level probes isolate C5's individual equality arms. The
+    // source convoy below separately checks the elaboration-to-eval route.
+    // Promise class: durable invariant for each closed canonical type value.
+    fn cast_index(left: EvalVal, right: EvalVal) -> EvalVal {
+        cast_type(indexed_type(left), indexed_type(right))
+    }
+
+    fn cast_type(left: EvalVal, right: EvalVal) -> EvalVal {
+        cast_reduce(
+            left.clone(),
+            right,
+            EvalVal::ReflVal {
+                ty: Rc::new(left),
+                val: Rc::new(EvalVal::Int(41)),
+            },
+            EvalVal::Int(41),
+        )
+    }
+
+    fn indexed_type(index: EvalVal) -> EvalVal {
+        EvalVal::IndTypeApp {
+            id: GlobalId(503),
+            args: Rc::new(vec![index]),
+        }
+    }
+
+    fn opaque(id: u32) -> EvalVal {
+        EvalVal::OpaquePrimType {
+            id: GlobalId(id),
+            args: Rc::new(vec![]),
+        }
+    }
+
+    #[test]
+    fn closed_opaque_type_identity_casts_but_differing_identity_does_not() {
+        let env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+        let mut store = EvalStore::new();
+        let int_id = env.globals["Int"];
+        let string_id = env.globals["String"];
+        let int = eval(&[], &Term::const_(int_id, vec![]), &env.env, &mut store);
+        let string = eval(&[], &Term::const_(string_id, vec![]), &env.env, &mut store);
+        assert_eq!(int, EvalVal::OpaquePrimType { id: int_id, args: Rc::new(vec![]) });
+        assert_eq!(string, EvalVal::OpaquePrimType { id: string_id, args: Rc::new(vec![]) });
+        assert_eq!(cast_type(int.clone(), int.clone()), EvalVal::Int(41));
+        assert_eq!(cast_type(int.clone(), string.clone()), EvalVal::Unknown);
+        assert_eq!(cast_index(int.clone(), int.clone()), EvalVal::Int(41));
+        assert_eq!(cast_index(int, string), EvalVal::Unknown);
+        assert_eq!(cast_index(EvalVal::Neutral, EvalVal::Neutral), EvalVal::Unknown);
+    }
+
+    #[test]
+    fn closed_int_and_bigint_indices_cast_by_mathematical_value() {
+        let large = BigInt::from(i64::MAX) + BigInt::from(1);
+        for (left, right) in [
+            (EvalVal::Int(9), EvalVal::Int(9)),
+            (EvalVal::BigInt(large.clone()), EvalVal::BigInt(large.clone())),
+            (EvalVal::Int(9), EvalVal::BigInt(BigInt::from(9))),
+            (EvalVal::BigInt(BigInt::from(9)), EvalVal::Int(9)),
+        ] {
+            assert_eq!(cast_index(left, right), EvalVal::Int(41));
+        }
+        assert_eq!(cast_index(EvalVal::Int(9), EvalVal::Int(10)), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(EvalVal::BigInt(large), EvalVal::BigInt(BigInt::from(9))),
+            EvalVal::Unknown
+        );
+    }
+
+    #[test]
+    fn closed_bool_indices_cast_only_in_the_same_representation() {
+        assert_eq!(cast_index(EvalVal::Bool(true), EvalVal::Bool(true)), EvalVal::Int(41));
+        assert_eq!(cast_index(EvalVal::Bool(true), EvalVal::Bool(false)), EvalVal::Unknown);
+        // Bool immediates and constructor values are deliberately not equated.
+        let true_ctor = EvalVal::Ctor {
+            id: GlobalId(504),
+            args: Rc::new(vec![]),
+            slot: NULL_SLOT,
+        };
+        assert_eq!(cast_index(EvalVal::Bool(true), true_ctor), EvalVal::Unknown);
+    }
+
+    #[test]
+    fn closed_bytes_indices_cast_by_content() {
+        assert_eq!(
+            cast_index(EvalVal::Bytes(vec![0, 255]), EvalVal::Bytes(vec![0, 255])),
+            EvalVal::Int(41)
+        );
+        assert_eq!(
+            cast_index(EvalVal::Bytes(vec![0, 255]), EvalVal::Bytes(vec![0, 254])),
+            EvalVal::Unknown
+        );
+    }
+
+    #[test]
+    fn string_index_equality_remains_unlicensed() {
+        // A checked String-indexed family can be declared at the surface,
+        // but no such reachable family has been measured in the landed corpus.
+        // This transition sentinel is retired when the Architect licenses the
+        // String-indexed family and its NFC equality arm.
+        let mut elab = ken_elaborator::ElabEnv::new().expect("checked prelude");
+        elab.elaborate_decl(
+            "data TextIndex (text : String) : Type where { MkTextIndex : TextIndex text }",
+        )
+        .expect("a String-indexed family is expressible");
+        elab.elaborate_decl("const textIndexValue : String = \"é\"")
+            .expect("closed checked String literal");
+        let text_id = elab.globals["TextIndex"];
+        let (_, text_body) = elab.env.transparent_body(elab.globals["textIndexValue"])
+            .expect("closed String has a checked body");
+        let ty = Term::app(Term::indformer(text_id, vec![]), text_body);
+        let mut store = EvalStore::new();
+        assert!(matches!(
+            eval(&[], &ty, &elab.env, &mut store),
+            EvalVal::IndTypeApp { args, .. } if matches!(args.first(), Some(EvalVal::Str(_)))
+        ));
+        let cast = Term::Cast(
+            Box::new(ty.clone()),
+            Box::new(ty.clone()),
+            Box::new(Term::Refl(Box::new(ty))),
+            Box::new(Term::IntLit(BigInt::from(41))),
+        );
+        assert_eq!(eval(&[], &cast, &elab.env, &mut EvalStore::new()), EvalVal::Unknown);
+    }
+
+    #[test]
+    fn checked_opaque_former_application_is_bounded_by_its_pi_arity() {
+        let env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+        let cap_id = env.globals["Cap"];
+        let full_id = env.globals["AFull"];
+        let partial_id = env.globals["APartial"];
+        let cap = Term::const_(cap_id, vec![]);
+        let full = Term::constructor(full_id, vec![]);
+        let partial = Term::constructor(partial_id, vec![]);
+        let mut store = EvalStore::new();
+        let full_ty = eval(&[], &Term::app(cap.clone(), full), &env.env, &mut store);
+        let partial_ty = eval(&[], &Term::app(cap, partial), &env.env, &mut store);
+        assert!(matches!(&full_ty, EvalVal::OpaquePrimType { id, args } if *id == cap_id && args.len() == 1));
+        assert_eq!(cast_type(full_ty.clone(), full_ty.clone()), EvalVal::Int(41));
+        assert_eq!(cast_type(full_ty.clone(), partial_ty), EvalVal::Unknown);
+        assert_eq!(apply(full_ty, EvalVal::Int(0), &env.env, &mut store), EvalVal::Neutral);
+        let int_id = env.globals["Int"];
+        let int = eval(&[], &Term::const_(int_id, vec![]), &env.env, &mut store);
+        assert_eq!(apply(int, EvalVal::Int(0), &env.env, &mut store), EvalVal::Neutral);
+        let resource_id = env.globals["Resource"];
+        let fs_handle = Term::constructor(env.globals["ResourceKind.FsHandle"], vec![]);
+        let resource = eval(
+            &[],
+            &Term::app(Term::const_(resource_id, vec![]), fs_handle),
+            &env.env,
+            &mut store,
+        );
+        assert!(matches!(&resource, EvalVal::OpaquePrimType { id, args } if *id == resource_id && args.len() == 1));
+        assert_eq!(cast_type(resource.clone(), resource.clone()), EvalVal::Int(41));
+        assert_eq!(apply(resource, EvalVal::Int(0), &env.env, &mut store), EvalVal::Neutral);
+        // K3 must not intern a primitive type, nor a container carrying it.
+        assert!(to_rt(&opaque(int_id.0)).is_none());
+        assert!(to_rt(&EvalVal::Pair {
+            fst: Rc::new(opaque(int_id.0)),
+            snd: Rc::new(EvalVal::Int(0)),
+            slot: NULL_SLOT,
+        }).is_none());
     }
 }
 
@@ -1903,7 +2095,10 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
             match globals.lookup(*id) {
                 Some(Decl::Transparent { body, .. }) => eval(&Vec::new(), body, globals, store),
                 Some(Decl::Primitive { reduction, .. }) => match reduction {
-                    PrimReduction::OpaqueType => EvalVal::Neutral,
+                    PrimReduction::OpaqueType => EvalVal::OpaquePrimType {
+                        id: *id,
+                        args: Rc::new(Vec::new()),
+                    },
                     PrimReduction::Literal => EvalVal::Neutral,
                     PrimReduction::Op { symbol } => EvalVal::CtorPending {
                         id: *id,
@@ -2131,6 +2326,33 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
                     nb,
                     applied: Rc::new(applied2),
                 }
+            }
+        }
+
+        // --- Checked opaque primitive former: only its declared Π arity ---
+        EvalVal::OpaquePrimType { id, args } => {
+            let Some(Decl::Primitive {
+                ty,
+                reduction: PrimReduction::OpaqueType,
+                ..
+            }) = globals.lookup(id) else {
+                return EvalVal::Neutral;
+            };
+            let mut remaining = ty;
+            for _ in 0..args.len() {
+                let Term::Pi(_, codomain) = remaining else {
+                    return EvalVal::Neutral;
+                };
+                remaining = codomain;
+            }
+            if !matches!(remaining, Term::Pi(_, _)) {
+                return EvalVal::Neutral;
+            }
+            let mut applied = (*args).clone();
+            applied.push(u);
+            EvalVal::OpaquePrimType {
+                id,
+                args: Rc::new(applied),
             }
         }
 

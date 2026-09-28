@@ -106,6 +106,7 @@ fn show_val(v: &EvalVal) -> String {
         EvalVal::PiTy { .. } => "<Π-type>".to_owned(),
         EvalVal::SigmaTy { .. } => "<Σ-type>".to_owned(),
         EvalVal::IndFormerVal { id } => format!("<inductive {}>", id),
+        EvalVal::OpaquePrimType { .. } => "<primitive type>".to_owned(),
         EvalVal::IndTypeApp { id, .. } => format!("<inductive {} applied>", id),
         EvalVal::ReflVal { .. } => "<refl>".to_owned(),
         EvalVal::Unknown => "<unknown>".to_owned(),
