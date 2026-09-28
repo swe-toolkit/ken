@@ -1336,6 +1336,16 @@ fn list_advance_over (a : Type) (start : Nat) (xs : List a) : Nat =
     Cons h rest ↦ list_advance_over a (Suc start) rest
   }
 
+theorem list_advance_over_append
+      (a : Type) (start : Nat) (left : List a) (right : List a)
+    : Equal Nat
+        (list_advance_over a start (list_append a left right))
+        (list_advance_over a (list_advance_over a start left) right) =
+  match left {
+    Nil ↦ Refl;
+    Cons head tail ↦ list_advance_over_append a (Suc start) tail right
+  }
+
 theorem list_drop_at_advance_over
       (a : Type) (start : Nat) (source : List a) (suffix : List a) (prefix : List a)
     : (starts_with : Equal (List a) (list_drop_at a start source) (list_append a prefix suffix))
@@ -1480,6 +1490,19 @@ fn cursor_after_codes (cur : ByteCursor) (codes : List UInt8) : ByteCursor =
   MkByteCursor
     (byte_cursor_source cur)
     (list_advance_over UInt8 (byte_cursor_position cur) codes)
+
+theorem cursor_after_codes_append
+      (cur : ByteCursor) (left : List UInt8) (right : List UInt8)
+    : Equal ByteCursor
+        (cursor_after_codes cur (list_append UInt8 left right))
+        (cursor_after_codes (cursor_after_codes cur left) right) =
+  cong
+    Nat
+    ByteCursor
+    (list_advance_over UInt8 (byte_cursor_position cur) (list_append UInt8 left right))
+    (list_advance_over UInt8 (list_advance_over UInt8 (byte_cursor_position cur) left) right)
+    (λposition. MkByteCursor (byte_cursor_source cur) position)
+    (list_advance_over_append UInt8 (byte_cursor_position cur) left right)
 
 theorem source_suffix_after_codes
       (cur : ByteCursor) (codes : List UInt8) (rest : List UInt8)
@@ -2862,6 +2885,118 @@ theorem byte_code_rejects_different_prefix
               starts_with
               head_is_different
   }
+
+theorem bytes_concat_three_view
+      (a : Bytes) (b : Bytes) (c : Bytes)
+    : Equal
+        (List UInt8)
+        (bytes_to_list (bytes_concat (bytes_concat a b) c))
+        (list_append
+          UInt8
+          (bytes_to_list a)
+          (list_append UInt8 (bytes_to_list b) (bytes_to_list c))) =
+  trans
+    (List UInt8)
+    (bytes_to_list (bytes_concat (bytes_concat a b) c))
+    (list_append
+      UInt8
+      (list_append UInt8 (bytes_to_list a) (bytes_to_list b))
+      (bytes_to_list c))
+    (list_append
+      UInt8
+      (bytes_to_list a)
+      (list_append UInt8 (bytes_to_list b) (bytes_to_list c)))
+    (trans
+      (List UInt8)
+      (bytes_to_list (bytes_concat (bytes_concat a b) c))
+      (list_append UInt8 (bytes_to_list (bytes_concat a b)) (bytes_to_list c))
+      (list_append
+        UInt8
+        (list_append UInt8 (bytes_to_list a) (bytes_to_list b))
+        (bytes_to_list c))
+      (bytes_concat_list_view (bytes_concat a b) c)
+      (cong
+        (List UInt8)
+        (List UInt8)
+        (bytes_to_list (bytes_concat a b))
+        (list_append UInt8 (bytes_to_list a) (bytes_to_list b))
+        (λprefix. list_append UInt8 prefix (bytes_to_list c))
+        (bytes_concat_list_view a b)))
+    ((proof assoc for list_append) UInt8 (bytes_to_list a) (bytes_to_list b) (bytes_to_list c))
+
+theorem printed_not_bytes_view
+      (child : BoolExpr)
+    : Equal
+        (List UInt8)
+        (bytes_to_list (print_bool_expr (BNot child)))
+        (list_append
+          UInt8
+          (bytes_to_list (bytes_encode not_open_text))
+          (list_append
+            UInt8
+            (bytes_to_list (print_bool_expr child))
+            (bytes_to_list (bytes_encode close_text)))) =
+  bytes_concat_three_view
+    (bytes_encode not_open_text)
+    (print_bool_expr child)
+    (bytes_encode close_text)
+
+theorem printed_not_suffix_view
+      (child : BoolExpr) (rest : List UInt8)
+    : Equal
+        (List UInt8)
+        (list_append UInt8 (bytes_to_list (print_bool_expr (BNot child))) rest)
+        (list_append
+          UInt8
+          (bytes_to_list (bytes_encode not_open_text))
+          (list_append
+            UInt8
+            (bytes_to_list (print_bool_expr child))
+            (list_append UInt8 (bytes_to_list (bytes_encode close_text)) rest))) =
+  let
+    open_bytes : List UInt8 = bytes_to_list (bytes_encode not_open_text);
+    child_bytes : List UInt8 = bytes_to_list (print_bool_expr child);
+    close_bytes : List UInt8 = bytes_to_list (bytes_encode close_text);
+    unfolded : List UInt8 =
+      list_append UInt8 open_bytes (list_append UInt8 child_bytes close_bytes);
+    after_open : List UInt8 =
+      list_append
+        UInt8
+        open_bytes
+        (list_append UInt8 (list_append UInt8 child_bytes close_bytes) rest)
+  in
+    trans
+      (List UInt8)
+      (list_append UInt8 (bytes_to_list (print_bool_expr (BNot child))) rest)
+      after_open
+      (list_append
+        UInt8
+        open_bytes
+        (list_append UInt8 child_bytes (list_append UInt8 close_bytes rest)))
+      (trans
+        (List UInt8)
+        (list_append UInt8 (bytes_to_list (print_bool_expr (BNot child))) rest)
+        (list_append UInt8 unfolded rest)
+        after_open
+        (cong
+          (List UInt8)
+          (List UInt8)
+          (bytes_to_list (print_bool_expr (BNot child)))
+          unfolded
+          (λprefix. list_append UInt8 prefix rest)
+          (printed_not_bytes_view child))
+        ((proof assoc for list_append)
+          UInt8
+          open_bytes
+          (list_append UInt8 child_bytes close_bytes)
+          rest))
+      (cong
+        (List UInt8)
+        (List UInt8)
+        (list_append UInt8 (list_append UInt8 child_bytes close_bytes) rest)
+        (list_append UInt8 child_bytes (list_append UInt8 close_bytes rest))
+        (λsuffix. list_append UInt8 open_bytes suffix)
+        ((proof assoc for list_append) UInt8 child_bytes close_bytes rest))
 
 fn format_bool_parse_outcome
       (outcome : ParseResult (Syntax BoolExpr))
