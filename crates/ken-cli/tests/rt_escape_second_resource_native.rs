@@ -651,7 +651,7 @@ fn escape_resource_plus_plain_matches_interpreter() {
 // executing the row does not discharge the skip.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-DUPLICATED-RESPONSE-BLOCK: re-measured individually at cf4533b746 on rt_escape_escape_file_then_readat and first refusal reconfirmed at 310bf4f21; this row still stops first at two host response cases claim one operation constructor. The collision is a false alarm over two legitimate inlined dispatcher copies, but neither occurrence-keying nor relaxation is authorized: producer_call_origin still has production USE sites, with observables flat or unreached only on this four-row population. Clause 3 was struck by Architect ruling evt_7sj5xmgcxwk5f, and response_origin has no production reader. With the construction refusal alone suppressed, this row next stops at ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor. Whether RT-CLOSURE-BOUNDARY-LANE is also a blocker remains undetermined. Stays ignored under this node."]
+#[ignore = "RT-IGNORED-ROWS-NEXT-GROUP A5: after the occurrence repair, first refusal is unsupported runtime-IR lowering: ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor; stays ignored until that independent blocker is repaired and the native/interpreter differential runs"]
 fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
     // Pre-fix: this panicked in `build_native_program` with
     // "checked Runtime frame marker was consumed more than once". The fork/union
@@ -711,7 +711,7 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-DUPLICATED-RESPONSE-BLOCK: re-measured individually at cf4533b746 on rt_escape_nat_fanout_escaped and first refusal reconfirmed at 310bf4f21; this row still stops first at two host response cases claim one operation constructor. The collision is a false alarm over two legitimate inlined dispatcher copies, but neither occurrence-keying nor relaxation is authorized: producer_call_origin still has production USE sites, with observables flat or unreached only on this four-row population. Clause 3 was struck by Architect ruling evt_7sj5xmgcxwk5f, and response_origin has no production reader. With the construction refusal alone suppressed, this row next stops at ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor. Whether RT-CLOSURE-BOUNDARY-LANE is also a blocker remains undetermined. Stays ignored under this node."]
+#[ignore = "RT-IGNORED-ROWS-NEXT-GROUP A5: after the occurrence repair, first refusal is unsupported runtime-IR lowering: ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor; stays ignored until that independent blocker is repaired and the native/interpreter differential runs"]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     // Closure across the bounded-Nat fanout lowerer: an escaped-resource checked
     // frame in the shared continuation of a `match n {Zero;Suc}` fanout. Pre-fix

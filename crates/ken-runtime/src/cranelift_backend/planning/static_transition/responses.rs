@@ -1260,10 +1260,61 @@ fn checked_host_response_call(
     }
 }
 
+type ResponseParents = BTreeMap<StaticOriginId, (StaticOriginId, usize)>;
+type HostResponseRoutes = BTreeMap<StaticOriginId, BTreeMap<RuntimeSymbol, HostResponseRoute>>;
+
+fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
+    let mut parents = BTreeMap::new();
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        for (position, child) in plan
+            .semantic
+            .child_origins(occurrence.static_origin)?
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            if parents.insert(child, (occurrence.static_origin, position)).is_some() {
+                return Err(planner_error("one response source occurrence has two parents"));
+            }
+        }
+    }
+    Ok(parents)
+}
+
+// erasure.rs::lower_runtime_selected_host_operation: each generated coproduct
+// InL/InR Match descends into a leaf Match, and the outermost Match is the
+// dispatch root. A source Match, even one that contains the leaf syntactically,
+// is not an operation dispatch and must not become its occurrence identity.
+fn host_response_dispatch_root(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    leaf: StaticOriginId,
+) -> Result<StaticOriginId, CraneliftBackendError> {
+    let mut root = leaf;
+    while let Some((parent, position)) = parents.get(&root).copied() {
+        let RuntimeExpr::Match { cases, .. } = plan.planned_occurrence_expr(parent)? else {
+            break;
+        };
+        let Some(case) = position.checked_sub(1).and_then(|index| cases.get(index)) else {
+            break;
+        };
+        if case.binders != 1
+            || !["::Coproduct::InL", "::Coproduct::InR"]
+                .iter()
+                .any(|suffix| case.constructor.as_str().ends_with(suffix))
+        {
+            break;
+        }
+        root = parent;
+    }
+    Ok(root)
+}
+
 fn host_response_routes(
     plan: &StaticTransitionPlan<'_>,
-) -> Result<BTreeMap<RuntimeSymbol, HostResponseRoute>, CraneliftBackendError> {
-    let mut routes = BTreeMap::new();
+) -> Result<HostResponseRoutes, CraneliftBackendError> {
+    let parents = response_parents(plan)?;
+    let mut routes: HostResponseRoutes = BTreeMap::new();
     for occurrence in plan.source_occurrences.iter().flatten() {
         let RuntimeExpr::Match { cases, .. } = occurrence.expr else {
             continue;
@@ -1293,7 +1344,8 @@ fn host_response_routes(
                 producer_call_origin,
                 response_origin,
             };
-            if routes.insert(case.constructor.clone(), route).is_some() {
+            let root = host_response_dispatch_root(plan, &parents, occurrence.static_origin)?;
+            if routes.entry(root).or_default().insert(case.constructor.clone(), route).is_some() {
                 return Err(planner_error(
                     "two host response cases claim one operation constructor",
                 ));
@@ -1303,16 +1355,187 @@ fn host_response_routes(
     Ok(routes)
 }
 
+// construction.rs::plan_expr: Match case bodies (:880-899), Let body
+// (:834-852), If branches (:854-879), and ComputationalMatch case bodies
+// (:901-951) use their parent's successor. CheckedSubcontinuationFrame[0]
+// (:818-831; lowering/source.rs:796-803) enters a checked frame, then
+// evaluates the same body and environment. CheckedComputationalIHSlots[0]
+// (:818-831; lowering/source.rs:822-827) does likewise. No other child is a
+// tail value of its parent: in particular a scrutinee, argument, value, or
+// closure/recursive-invocation body cannot carry the Vis operation to a caller.
+fn response_tail_edge(parent: &RuntimeExpr, position: usize) -> Option<usize> {
+    match parent {
+        RuntimeExpr::Match { cases, .. } if position > 0 =>
+            cases.get(position - 1).map(|case| case.binders),
+        RuntimeExpr::Let { .. } if position == 1 => Some(1),
+        RuntimeExpr::If { .. } if position == 1 || position == 2 => Some(0),
+        RuntimeExpr::ComputationalMatch { cases, .. } if position > 0 =>
+            cases.get(position - 1).and_then(|case| {
+                case.argument_binders.checked_add(case.recursive_positions.len())
+            }),
+        RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. }
+            if position == 0 => Some(0),
+        _ => None,
+    }
+}
+
+fn response_tail_path(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    body: StaticOriginId,
+    target: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    let mut cursor = target;
+    while cursor != body {
+        let Some((parent, position)) = parents.get(&cursor).copied() else {
+            return Ok(false);
+        };
+        if response_tail_edge(plan.planned_occurrence_expr(parent)?, position) != Some(0) {
+            return Ok(false);
+        }
+        cursor = parent;
+    }
+    Ok(true)
+}
+
+// The Vis constructor has operation in constructor field 0 and continuation
+// in field 1 (spec/30-surface/36-effects.md §2.1). Lowering/source.rs:
+// 2436-2518 installs the IH bindings first, then ordered constructor fields
+// (lowering/mod.rs:5644-5690). Compute the operation binder from the same
+// layout, not from the Var(1) seen in a particular compiled witness.
+fn response_vis_operation_binder(case: &crate::RuntimeComputationalMatchCase) -> Option<u32> {
+    if case.argument_binders != 2 || case.recursive_positions.as_slice() != [1] {
+        return None;
+    }
+    u32::try_from(case.recursive_positions.len()).ok()
+}
+
+fn response_forwards_vis(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    op_binder: u32,
+) -> Result<bool, CraneliftBackendError> {
+    match plan.planned_occurrence_expr(origin)? {
+        RuntimeExpr::Construct { constructor, args }
+            if constructor.as_str().ends_with("::ITree::Vis") && args.len() == 2 =>
+        {
+            Ok(matches!(&args[0], RuntimeExpr::Var(index) if *index == op_binder))
+        }
+        RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. } => response_forwards_vis(
+            plan,
+            plan.semantic.child_origin(origin, 0)?,
+            op_binder,
+        ),
+        RuntimeExpr::If { .. } => Ok(response_forwards_vis(
+            plan,
+            plan.semantic.child_origin(origin, 1)?,
+            op_binder,
+        )? && response_forwards_vis(
+            plan,
+            plan.semantic.child_origin(origin, 2)?,
+            op_binder,
+        )?),
+        RuntimeExpr::Match { cases, .. } if !cases.is_empty() && cases.iter().all(|case| case.binders == 0) => {
+            for position in 1..=cases.len() {
+                if !response_forwards_vis(plan, plan.semantic.child_origin(origin, position)?, op_binder)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+// Only the multi-candidate population runs this walk. Each positional parent
+// has one owner; every unclassified edge refuses. A CM scrutinee is an
+// eliminator, never itself a tail edge. Its Vis branch must dispatch on the
+// checked op binder or return a literal Vis with that same op binder.
+fn response_vis_dispatch_root(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    vis_origin: StaticOriginId,
+    candidates: &BTreeMap<StaticOriginId, HostResponseRoute>,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let mut cursor = vis_origin;
+    loop {
+        let Some((parent, position)) = parents.get(&cursor).copied() else {
+            return Ok(None);
+        };
+        if let RuntimeExpr::ComputationalMatch { cases, .. } = plan.planned_occurrence_expr(parent)? {
+            if position == 0 {
+                let mut vis_cases = cases.iter().enumerate().filter(|(_, case)| {
+                    case.constructor.as_str().ends_with("::ITree::Vis")
+                });
+                let Some((case_index, vis_case)) = vis_cases.next() else {
+                    return Ok(None);
+                };
+                if vis_cases.next().is_some() {
+                    return Ok(None);
+                }
+                let Some(op_binder) = response_vis_operation_binder(vis_case) else {
+                    return Ok(None);
+                };
+                let body = plan.semantic.child_origin(parent, case_index + 1)?;
+                let mut reached = None;
+                for root in candidates.keys().copied() {
+                    let RuntimeExpr::Match { .. } = plan.planned_occurrence_expr(root)? else {
+                        continue;
+                    };
+                    let scrutinee = plan.semantic.child_origin(root, 0)?;
+                    if matches!(plan.planned_occurrence_expr(scrutinee)?, RuntimeExpr::Var(index) if *index == op_binder)
+                        && response_tail_path(plan, parents, body, root)?
+                    {
+                        if reached.replace(root).is_some() {
+                            return Ok(None);
+                        }
+                    }
+                }
+                if reached.is_some() {
+                    return Ok(reached);
+                }
+                if !response_forwards_vis(plan, body, op_binder)? {
+                    return Ok(None);
+                }
+                cursor = parent;
+                continue;
+            }
+        }
+        if response_tail_edge(plan.planned_occurrence_expr(parent)?, position).is_none() {
+            return Ok(None);
+        }
+        cursor = parent;
+    }
+}
+
 fn selected_host_response_route(
     plan: &StaticTransitionPlan<'_>,
+    vis_origin: StaticOriginId,
     operation_origin: StaticOriginId,
-    routes: &BTreeMap<RuntimeSymbol, HostResponseRoute>,
+    routes: &HostResponseRoutes,
 ) -> Result<Option<(HostResponseRoute, StaticOriginId)>, CraneliftBackendError> {
     let mut selected = None;
     let mut pending = vec![operation_origin];
     while let Some(origin) = pending.pop() {
         if let RuntimeExpr::Construct { constructor, .. } = plan.planned_occurrence_expr(origin)? {
-            if let Some(route) = routes.get(constructor).copied() {
+            let candidates = routes
+                .iter()
+                .filter_map(|(root, cases)| cases.get(constructor).copied().map(|route| (*root, route)))
+                .collect::<BTreeMap<_, _>>();
+            let route = match candidates.len() {
+                0 => None,
+                1 => candidates.values().next().copied(),
+                _ => {
+                    let parents = response_parents(plan)?;
+                    let Some(root) = response_vis_dispatch_root(plan, &parents, vis_origin, &candidates)? else {
+                        return Err(planner_error("one response Vis selects a constructor with more than one host response occurrence and no structural path to exactly one of them"));
+                    };
+                    candidates.get(&root).copied()
+                }
+            };
+            if let Some(route) = route {
                 if selected.is_some() {
                     return Err(planner_error(
                         "one Vis operation subtree selects more than one host response producer",
@@ -2057,7 +2280,7 @@ impl StaticTransitionPlan<'_> {
             let vis_origin = occurrence.static_origin;
             let operation_origin = self.semantic.child_origin(vis_origin, 0)?;
             let Some((route, selected_operation_origin)) =
-                selected_host_response_route(self, operation_origin, &routes)?
+                selected_host_response_route(self, vis_origin, operation_origin, &routes)?
             else {
                 continue;
             };
@@ -4226,8 +4449,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        CheckedComputationalIHBinderMorphism, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode,
-        RuntimeValue,
+        CheckedComputationalIHBinderMorphism, RuntimeComputationalMatchCase, RuntimeMatchCase,
+        RuntimeTrap, RuntimeTrapCode, RuntimeValue,
     };
 
     fn trap() -> RuntimeTrap {
@@ -4235,6 +4458,97 @@ mod tests {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: "static response fixture is total".to_string(),
         }
+    }
+
+    fn host_response_case(constructor: &str) -> RuntimeMatchCase {
+        RuntimeMatchCase {
+            constructor: constructor.to_string(),
+            binders: 1,
+            body: RuntimeExpr::Let {
+                value: Box::new(RuntimeExpr::Effect {
+                    family: "effect:FS".to_string(),
+                    operation: HostOpV1::BufferAllocate,
+                    capability: None,
+                    args: vec![RuntimeExpr::Value(RuntimeValue::Int(1.into()))],
+                }),
+                body: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
+                    call_template_id: 1,
+                    checked_occurrence_path: Vec::new(),
+                    kind: CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
+                    binder_morphism: CheckedComputationalIHBinderMorphism::identity_for_test(0),
+                    body: Box::new(RuntimeExpr::Call {
+                        callee: Box::new(RuntimeExpr::Var(0)),
+                        args: vec![RuntimeExpr::Var(0)],
+                    }),
+                }),
+            },
+        }
+    }
+
+    fn host_response_root(constructor: &str) -> RuntimeExpr {
+        RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Var(1)),
+            cases: vec![host_response_case(constructor)],
+            default: trap(),
+        }
+    }
+
+    #[test]
+    fn same_dispatch_root_cannot_claim_one_constructor_twice() {
+        let constructor = "ctor:fixture::FSOp::Allocate";
+        let root = RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Var(1)),
+            cases: vec![host_response_case(constructor), host_response_case(constructor)],
+            default: trap(),
+        };
+        let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
+            Err(error) => error,
+            Ok(_) => panic!("one dispatch root must reject a duplicate case before lookup"),
+        };
+        assert!(
+            format!("{error:?}").contains("two host response cases claim one operation constructor"),
+            "unexpected response-route refusal: {error:?}"
+        );
+    }
+
+    #[test]
+    fn ambiguous_vis_in_call_argument_has_no_structural_dispatch_path() {
+        let constructor = "ctor:fixture::FSOp::Allocate";
+        let vis = RuntimeExpr::Construct {
+            constructor: "ctor:fixture::ITree::Vis".to_string(),
+            args: vec![
+                RuntimeExpr::Construct {
+                    constructor: constructor.to_string(),
+                    args: Vec::new(),
+                },
+                RuntimeExpr::Value(RuntimeValue::Unknown),
+            ],
+        };
+        let root = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::Value(RuntimeValue::Unknown)),
+                args: vec![vis],
+            }),
+            cases: vec![RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::ITree::Vis".to_string(),
+                argument_binders: 2,
+                recursive_positions: vec![1],
+                body: RuntimeExpr::If {
+                    scrutinee: Box::new(RuntimeExpr::Var(0)),
+                    then_expr: Box::new(host_response_root(constructor)),
+                    else_expr: Box::new(host_response_root(constructor)),
+                },
+            }],
+            default: trap(),
+        };
+        let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
+            Err(error) => error,
+            Ok(_) => panic!("Call argument cannot convey the Vis to the dispatch"),
+        };
+        assert!(
+            format!("{error:?}").contains("one response Vis selects a constructor with more than one host response occurrence and no structural path to exactly one of them"),
+            "unexpected response-route refusal: {error:?}"
+        );
     }
 
     /// A real opaque recursive field, not a population mutation: the Vis K is
