@@ -1246,6 +1246,11 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
         (EvalVal::BigInt(x), EvalVal::Int(y)) => *x == BigInt::from(*y),
         (EvalVal::Bool(x), EvalVal::Bool(y)) => x == y,
         (EvalVal::Bytes(x), EvalVal::Bytes(y)) => x == y,
+        (EvalVal::Str(x), EvalVal::Str(y)) => x == y,
+        // IEEE `==` is neither reflexive on NaN nor sound for signed zero.
+        // Distinct bit patterns are distinct literal identities for C5.
+        (EvalVal::Float(x), EvalVal::Float(y)) => x.to_bits() == y.to_bits(),
+        (EvalVal::Float32(x), EvalVal::Float32(y)) => x.to_bits() == y.to_bits(),
         (EvalVal::IndTypeApp { id: ia, args: aa }, EvalVal::IndTypeApp { id: ib, args: ba }) => {
             ia == ib
                 && aa.len() == ba.len()
@@ -1450,12 +1455,11 @@ mod primitive_type_cast_tests {
         );
     }
 
+    // Promise class: durable C5 regularity for a kernel-checked, closed
+    // String-indexed cast. The different-index negative probes the private
+    // value comparator only: no equality proof exists for unequal endpoints.
     #[test]
-    fn string_index_equality_remains_unlicensed() {
-        // A checked String-indexed family can be declared at the surface,
-        // but no such reachable family has been measured in the landed corpus.
-        // This transition sentinel is retired when the Architect licenses the
-        // String-indexed family and its NFC equality arm.
+    fn checked_string_indexed_refl_casts_but_distinct_string_does_not() {
         let mut elab = ken_elaborator::ElabEnv::new().expect("checked prelude");
         elab.elaborate_decl(
             "data TextIndex (text : String) : Type where { MkTextIndex : TextIndex text }",
@@ -1463,6 +1467,8 @@ mod primitive_type_cast_tests {
         .expect("a String-indexed family is expressible");
         elab.elaborate_decl("const textIndexValue : String = \"é\"")
             .expect("closed checked String literal");
+        elab.elaborate_decl("const textIndexOther : String = \"e\"")
+            .expect("distinct closed checked String literal");
         let text_id = elab.globals["TextIndex"];
         let (_, text_body) = elab.env.transparent_body(elab.globals["textIndexValue"])
             .expect("closed String has a checked body");
@@ -1480,11 +1486,121 @@ mod primitive_type_cast_tests {
             Box::new(ty.clone()),
             Box::new(ty.clone()),
             Box::new(Term::Refl(Box::new(ty.clone()))),
-            Box::new(value),
+            Box::new(value.clone()),
         );
         ken_kernel::check(&elab.env, &ken_kernel::Context::new(), &cast, &ty)
             .expect("the closed String-indexed cast is kernel-checked");
-        assert_eq!(eval(&[], &cast, &elab.env, &mut EvalStore::new()), EvalVal::Unknown);
+        let expected = eval(&[], &value, &elab.env, &mut store);
+        assert!(matches!(&expected, EvalVal::Ctor { id, .. } if *id == elab.globals["MkTextIndex"]));
+        assert_eq!(eval(&[], &cast, &elab.env, &mut store), expected);
+
+        let (_, other_body) = elab.env.transparent_body(elab.globals["textIndexOther"])
+            .expect("distinct checked String has a body");
+        let other_ty = Term::app(Term::indformer(text_id, vec![]), other_body);
+        assert_ne!(eval(&[], &ty, &elab.env, &mut store), eval(&[], &other_ty, &elab.env, &mut store));
+        let unequal_cast = Term::Cast(
+            Box::new(ty.clone()),
+            Box::new(other_ty),
+            Box::new(Term::Refl(Box::new(ty))),
+            Box::new(value),
+        );
+        assert_eq!(eval(&[], &unequal_cast, &elab.env, &mut store), EvalVal::Unknown);
+    }
+
+    // Promise class: durable C5 regularity for checked finite scalar literals.
+    // These source positives are kernel-checked. The unequal-index negative
+    // has no equality proof, so it exercises the value comparator directly.
+    fn checked_float_index_cast(type_name: &str, first: &str, second: &str) {
+        let mut elab = ken_elaborator::ElabEnv::new().expect("checked prelude");
+        let family = format!("{type_name}Index");
+        let ctor = format!("Mk{family}");
+        elab.elaborate_decl(&format!(
+            "data {family} (index : {type_name}) : Type where {{ {ctor} : {family} index }}"
+        ))
+        .expect("a scalar-indexed family is expressible");
+        elab.elaborate_decl(&format!("const scalarIndexValue : {type_name} = {first}"))
+            .expect("closed first scalar literal");
+        elab.elaborate_decl(&format!("const scalarIndexOther : {type_name} = {second}"))
+            .expect("closed second scalar literal");
+        let mut store = EvalStore::new();
+        for (id, literal) in &elab.num_values {
+            match literal {
+                ken_elaborator::NumericLitVal::Float(value) => {
+                    store.num_values.insert(*id, EvalVal::Float(*value));
+                }
+                ken_elaborator::NumericLitVal::Float32(value) => {
+                    store.num_values.insert(*id, EvalVal::Float32(*value));
+                }
+                _ => {}
+            }
+        }
+        let family_id = elab.globals[&family];
+        let (_, first_body) = elab.env.transparent_body(elab.globals["scalarIndexValue"])
+            .expect("first scalar has a checked body");
+        let (_, other_body) = elab.env.transparent_body(elab.globals["scalarIndexOther"])
+            .expect("second scalar has a checked body");
+        let ty = Term::app(Term::indformer(family_id, vec![]), first_body.clone());
+        let other_ty = Term::app(Term::indformer(family_id, vec![]), other_body);
+        let index_value = eval(&[], &first_body, &elab.env, &mut store);
+        assert!(match type_name {
+            "Float" => matches!(index_value, EvalVal::Float(_)),
+            "Float32" => matches!(index_value, EvalVal::Float32(_)),
+            _ => false,
+        });
+        let value = Term::app(Term::constructor(elab.globals[&ctor], vec![]), first_body);
+        let cast = Term::Cast(
+            Box::new(ty.clone()),
+            Box::new(ty.clone()),
+            Box::new(Term::Refl(Box::new(ty.clone()))),
+            Box::new(value.clone()),
+        );
+        ken_kernel::check(&elab.env, &ken_kernel::Context::new(), &cast, &ty)
+            .expect("closed scalar-indexed cast must kernel-check");
+        let expected = eval(&[], &value, &elab.env, &mut store);
+        assert!(matches!(&expected, EvalVal::Ctor { id, .. } if *id == elab.globals[&ctor]));
+        assert_eq!(eval(&[], &cast, &elab.env, &mut store), expected);
+
+        let distinct = eval(&[], &other_ty, &elab.env, &mut store);
+        assert_ne!(eval(&[], &ty, &elab.env, &mut store), distinct);
+        let unequal_cast = Term::Cast(
+            Box::new(ty.clone()),
+            Box::new(other_ty),
+            Box::new(Term::Refl(Box::new(ty))),
+            Box::new(value),
+        );
+        assert_eq!(eval(&[], &unequal_cast, &elab.env, &mut store), EvalVal::Unknown);
+    }
+
+    #[test]
+    fn checked_float_indexed_refl_casts_but_distinct_float_does_not() {
+        // Ken's writable Float positive uses finite 1.5, not a NaN literal.
+        checked_float_index_cast("Float", "1.5", "2.5");
+        let nan = EvalVal::Float(f64::from_bits(0x7ff8_0000_0000_0001));
+        assert_eq!(cast_index(nan.clone(), nan), EvalVal::Int(41));
+        assert_eq!(cast_index(EvalVal::Float(0.0), EvalVal::Float(-0.0)), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(
+                EvalVal::Float(f64::from_bits(0x7ff8_0000_0000_0001)),
+                EvalVal::Float(f64::from_bits(0x7ff8_0000_0000_0002)),
+            ),
+            EvalVal::Unknown
+        );
+    }
+
+    #[test]
+    fn checked_float32_indexed_refl_casts_but_distinct_float32_does_not() {
+        // Ken's writable Float32 positive uses finite 1.5f32, not a NaN literal.
+        checked_float_index_cast("Float32", "1.5f32", "2.5f32");
+        let nan = EvalVal::Float32(f32::from_bits(0x7fc0_0001));
+        assert_eq!(cast_index(nan.clone(), nan), EvalVal::Int(41));
+        assert_eq!(cast_index(EvalVal::Float32(0.0), EvalVal::Float32(-0.0)), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(
+                EvalVal::Float32(f32::from_bits(0x7fc0_0001)),
+                EvalVal::Float32(f32::from_bits(0x7fc0_0002)),
+            ),
+            EvalVal::Unknown
+        );
     }
 
     #[test]
