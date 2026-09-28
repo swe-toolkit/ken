@@ -73,6 +73,58 @@ fn checked_map_host_read_ignores_forged_flat_aliases() {
     }
 }
 
+/// Promise class: durable checked-identity invariant.
+/// MEASURED: the roots loader authenticates Map.fold by its owned GlobalId;
+/// a separate flat fixture loads that same Map source and its client retains
+/// the newly Map-owned fold ID. CLAIMED: the prelude's same-spelled list fold
+/// cannot supply this client's tree fold. THE GAP: these are environment-local
+/// IDs; the flat client does not establish public selective-import visibility
+/// for Map's private fold.
+#[test]
+fn map_loaded_fold_client_uses_the_checked_map_owner() {
+    let (roots_env, roots_owned) = checked_map_env();
+    let rooted_fold = checked_map_id(&roots_env, &roots_owned, "fold");
+    assert!(matches!(
+        roots_env.env.lookup(rooted_fold),
+        Some(Decl::Transparent { .. })
+    ));
+
+    let (mut env, _) = mk_map_dependency_env_with_provider_owned();
+    let flat_owned = env
+        .elaborate_ken_md_file(MAP_KEN_MD)
+        .expect("Map's real dependency/import closure must elaborate");
+    let map_fold = env.globals["fold"];
+    assert!(
+        flat_owned.contains(&map_fold),
+        "the flat client's selected fold must be owned by this Map load"
+    );
+    let checked_body = match env.env.lookup(map_fold) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("Map.fold must be checked and transparent: {other:?}"),
+    };
+    assert!(
+        term_reference_count(checked_body, map_fold) > 0,
+        "the owned tree fold must recursively refer to itself"
+    );
+
+    let client = env
+        .elaborate_decl(
+            "const map_loaded_fold_client : List Nat = \
+             fold Nat Nat (List Nat) (\\k. \\v. \\acc. Cons Nat k acc) \
+               (Nil Nat) (empty Nat Nat)",
+        )
+        .expect("unqualified fold in the Map-loaded client must elaborate");
+    let client_body = match env.env.lookup(client) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("Map client must be checked and transparent: {other:?}"),
+    };
+    assert_eq!(
+        term_reference_count(client_body, map_fold),
+        1,
+        "client must retain Map.fold's owned GlobalId, not a flat-name stand-in"
+    );
+}
+
 /// The stated stack for the D1 legacy-frame budget instrument. Two MiB remains
 /// the fixed boundary at base `d23a65021359741c59809ec9d24de9af6fe262e1`;
 /// recalibration changed only the live reservation below. An explicit

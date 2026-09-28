@@ -493,8 +493,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.elaborate_decl("data Prod a b = MkProd a b")
         .map_err(|e| ElabError::Internal(format!("prelude Prod failed: {}", e)))?;
 
-    // `List` combinators (`37 §9`, WS-L). Declaration text for `fold`/`zip`
-    // came from `tests/l3a_acceptance.rs`'s `setup_combinators` and elaborates
+    // `List` combinators (`37 §9`, WS-L). The `zip` declaration elaborates
     // against a real `ElabEnv`. `sort` and `unfoldUpTo` stay test-local:
     // `sort`'s `is_sorted ∧ Perm` obligation would add an undischarged
     // postulate, and `unfoldUpTo` is the no-coinduction infinitude idiom.
@@ -510,16 +509,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     //
     // LANG-REFINED-FALLBACK-COLDNESS-CLAIM D6: the bracket's population is
     // POSITIONAL, not nominal -- it covers whatever `elaborate_decl` calls
-    // lie between this snapshot and the matching one below, today exactly
-    // fold/zip. Inserting a declaration between the two snapshots silently
-    // enrols it in the delta check; moving one outside drops it.
+    // lie between this snapshot and the matching one below, today only zip.
+    // Inserting a declaration between the two snapshots silently enrols it
+    // in the delta check; moving one outside drops it.
     let combinator_trusted_before: std::collections::BTreeSet<GlobalId> =
         elab.env.trusted_base().into_iter().collect();
-    elab.elaborate_decl(
-        "fn fold (a b : Type) (f : a → b → b) (z : b) (xs : List a) : b = \
-         match xs { Nil |-> z ; Cons h t |-> f h (fold a b f z t) }",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude fold failed: {}", e)))?;
     elab.elaborate_decl(
         "fn zip (a b : Type) (xs : List a) (ys : List b) : List (Prod a b) = \
          match xs { Nil |-> Nil (Prod a b) ; Cons h t |-> match ys { Nil |-> Nil (Prod a b) ; Cons k u |-> Cons (Prod a b) (MkProd a b h k) (zip a b t u) } }",
