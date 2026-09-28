@@ -36,6 +36,12 @@ base where TREE-MATCH has landed.
   `CarrierRequired`. The planner's effective lexical phase while it summarizes
   1244 is `SpecializedOnly`. The `Var` arm defaults a missing entry to
   `ResultPhaseSummary::SPECIALIZED` (`joins_traps.rs:476`).
+- **A second witness, not corroboration** (Architect `evt_1mz68b0assf2d`).
+  Join 70, the `bytes_at` argument-0 Match in the TREE-MATCH Option fixture's
+  `main`, was planned `SpecializedOnly` (so `NativeScalarPair`), and its arm 62
+  lowered `Carried`. That is the same observation class as 1244. No common
+  cause is measured, and arm 62 is not shown to be a case binder. AC-0 measures
+  it separately.
 - **Unmeasured:** where the planner assigns the phase of 1249's case binders,
   and whether that assignment reads the scrutinee's planned phase or takes the
   default.

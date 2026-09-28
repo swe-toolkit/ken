@@ -44,6 +44,16 @@ Both `rt_escape` rows build natively, run, and match the interpreter.
    ProcessExitStatus variant was attributed to the ExitCode arms, not
    measured at the merge (Architect `evt_3v31che9af4x1`; §1a 0 to 1).
 
+## Sequencing (Steward `evt_qej118yh57f8`, R2)
+
+The D1 route is built, but no program that reaches it executes natively. The
+programs measured to reach it refuse later at owned sites. The WP is parked,
+not routed, until `RT-FRAME-MARKER-ONCE` lands. It then rebases and runs the
+shared-bind ExitCode pin (native equal to the interpreter on both arms, D1
+hits above 0) as its parity acceptance, then routes. The two rt_escape rows
+stay ignored, pointing at `RT-NATIVE-SEQUENTIAL-BRACKETS` and
+`RT-JOIN-PHASE-CASE-BINDER-CARRIED`.
+
 ## Deliverable
 
 The two rows run green and un-ignored natively, with the interpreter
