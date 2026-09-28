@@ -8,21 +8,29 @@ use std::os::unix::ffi::OsStringExt;
 #[cfg(target_os = "linux")]
 const SOURCE: &str = r#"program capabilities FS APartial
 proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
-  match (match eq_int (uint8_to_int byte) 1 {
-    True |-> Success;
-    False |-> Failure 7
-  }) {
-    Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      Unit ExitCode
-      (host_console APartial Unit (print_line "accepted"))
-      (\_. host_exit APartial Success);
-    Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      Unit ExitCode
-      (host_console APartial Unit (print_line "rejected"))
-      (\_. host_exit APartial (Failure code))
-  }
+  bind (Coproduct (FSOp APartial) AmbientOp)
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+    ExitCode ExitCode
+    (match (match eq_int (uint8_to_int byte) 1 {
+      True |-> Success;
+      False |-> Failure 7
+    }) {
+      Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
+        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+        Unit ExitCode
+        (host_console APartial Unit (print_line "accepted"))
+        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+          ExitCode Success);
+      Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
+        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+        Unit ExitCode
+        (host_console APartial Unit (print_line "rejected"))
+        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+          ExitCode (Failure code))
+    })
+    (\code. host_exit APartial code)
 
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
