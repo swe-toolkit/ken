@@ -1,6 +1,9 @@
 //! Finished-function checked-frame accounting. Compiler traversal order is not
 //! runtime path order: distinct successors may consume the same checked key.
 
+#[cfg(test)]
+mod tests;
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use cranelift_codegen::flowgraph::ControlFlowGraph;
@@ -45,7 +48,7 @@ pub(super) struct FrameEvents {
     pub terminals: Vec<FrameTerminal>,
 }
 
-fn refusal(reason: &str) -> CraneliftBackendError {
+fn refusal(reason: impl Into<String>) -> CraneliftBackendError {
     unsupported("OrientedSubcontinuationPlanV1", reason)
 }
 
@@ -126,8 +129,8 @@ impl FrameEvents {
         let keys: BTreeSet<_> = self.events.iter().map(|event| event.key).collect();
         for key in keys {
             // 0: no activation on this path, 1: active with no receipt,
-            // 2: active with one receipt. An activation closes the preceding
-            // segment before starting the next, including a loop iteration.
+            // 2: active with one receipt. A second activation or receipt on
+            // the same path refuses, including revisiting its event on a cycle.
             let mut queue = VecDeque::from([(entry, 0u8)]);
             let mut visited = BTreeSet::new();
             while let Some((block, mut state)) = queue.pop_front() {
@@ -141,8 +144,8 @@ impl FrameEvents {
                         }
                         match event.kind {
                             FrameEventKind::Activation => {
-                                if state == 1 {
-                                    return Err(refusal("checked Runtime frame marker was skipped before reactivation"));
+                                if state != 0 {
+                                    return Err(refusal("checked Runtime frame marker was activated more than once on one path"));
                                 }
                                 state = 1;
                             }
@@ -161,13 +164,18 @@ impl FrameEvents {
                 let successors: Vec<_> = cfg.succ_iter(block).collect();
                 if successors.is_empty() {
                     if state != 0 {
-                        let Some(kind) = terminals.get(&block) else {
-                            return Err(refusal("checked Runtime frame path has an unregistered terminal"));
-                        };
-                        if state == 1 {
-                            return Err(refusal("checked Runtime frame marker was skipped on a terminal path"));
+                        match terminals.get(&block) {
+                            Some(FrameTerminalKind::Normal) if state == 1 => {
+                                return Err(refusal("checked Runtime frame marker was skipped on a normal return"));
+                            }
+                            Some(FrameTerminalKind::Normal | FrameTerminalKind::Abort) => {}
+                            None => {
+                                return Err(refusal(format!(
+                                    "checked Runtime frame path has an unregistered terminal in {block} ({:?}) for key {key:?}",
+                                    func.layout.last_inst(block).map(|inst| func.dfg.insts[inst].opcode()),
+                                )));
+                            }
                         }
-                        let _ = kind; // Both terminal kinds close an already-consumed segment.
                     }
                 } else {
                     for successor in successors {

@@ -849,8 +849,8 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
         Some(frame_id)
     );
 
-    // A reactivation closes one segment and opens another. To exercise the
-    // same-path negative, the second receipt must follow WITHOUT reactivation.
+    // A second static activation is reachable after the first in this block.
+    // Rule (a) rejects this path at close, even before considering its receipts.
     compiler
         .enter_checked_subcontinuation_frame(&builder, frame_id, None)
         .expect("second enter re-marks the active frame");
@@ -870,9 +870,9 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "OrientedSubcontinuationPlanV1",
                 ref reason,
-            }) if reason.contains("consumed more than once")
+            }) if reason.contains("activated more than once on one path")
         ),
-        "expected 'consumed more than once', got {err:?}"
+        "expected a same-path activation refusal, got {err:?}"
     );
 }
 
