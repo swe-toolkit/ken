@@ -163,8 +163,8 @@ fn assert_private(surface: &str) {
 ///
 /// MEASURED: the roots loader queries every publishable Decoder declaration and
 /// constructor and the successful surface equals the declared carrier,
-/// combinator, and checked preservation-law inventory. CLAIMED: Decoder
-/// publishes exactly that API to its clients. THE GAP: generated
+/// combinator, and checked proof-law inventory. CLAIMED: Decoder publishes
+/// exactly that API to its clients. THE GAP: generated
 /// dictionaries are outside the query population, but this module declares no
 /// class or instance and `load_decoder` pins that fact.
 #[test]
@@ -189,6 +189,7 @@ fn parsing_decoder_loader_visible_inventory_is_exact() {
         "decoder_fail_preserves",
         "decoder_many",
         "decoder_many_preserves",
+        "decoder_many_rejected_succeeds",
         "decoder_pure",
         "decoder_pure_preserves",
         "decoder_recursive",
@@ -251,7 +252,7 @@ fn parsing_decoder_imports_exact_canonical_cursor_surface() {
 /// MEASURED: real selective-import clients cannot name any private sibling
 /// constructor, combinator worker, convenience combinator, or fuel-law helper.
 /// CLAIMED: publication does not expose implementation state beyond the
-/// deliberate checked preservation-law inventory. THE GAP: new clients may
+/// deliberate checked proof-law inventory. THE GAP: new clients may
 /// require a deliberate additive publication; the exact inventory must then
 /// move rather than silently inherit visibility.
 #[test]
