@@ -1,7 +1,7 @@
 ---
 id: CAT-DECODER-RECURSIVE-SUCCEEDS
 title: "Publish a success-only recursion principle for decoder_recursive in Capability.Parsing.Decoder, proved by strong induction on the private fuel recursor, so a recursive client parser can prove that its decoder succeeds on printed input -- the enabler BYTES D3's printer round trip needs"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect
