@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-LAWS
 title: "Proof-backfill for Capability/Parsing/Parsing.ken.md: inhabit the package's own ParserLaws proposition for parse_bool_expr (ParserValid, ParserTotal, ParserSourceLocal), and prove the Boolean printer/formatter round trip over the same syntax, spans, source and decoder representation, with no new trust"
-status: active
+status: merged
 owner: foundation
 size: L
 gate: none
@@ -89,3 +89,12 @@ origin: "One of the seventeen proof-backfill follow-ons named by docs/program/CA
   the foundation leader; do not add a contract or axiom.
 - Any `crates/**/src/**` path other than a consumer-view harness is a hard
   stop.
+
+## Closeout
+
+Both deliverables are on `origin/main`. Deliverable 1, the attached
+`ParserLaws` inhabitant `parse_bool_expr_laws`, landed at `f915b7652`.
+Deliverable 2, the Boolean printer round trip, landed with
+`BYTES-CONCAT-AND-ENCODE-CONTRACTS` D3 at `517955323`, on the four
+operator-ruled D2 facts that resolved hard-stop row 1. Hard-stop row 2
+closed with `CAT-PARSING-DECODER-PRESERVATION`.

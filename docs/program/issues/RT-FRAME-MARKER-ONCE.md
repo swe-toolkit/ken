@@ -1,7 +1,7 @@
 ---
 id: RT-FRAME-MARKER-ONCE
 title: "Native execution of a host-effect tree that one checked frame marker serves more than once: the two px7n nested-eliminator rows and the checked double bind build and run natively and agree with the interpreter, instead of refusing in object emission because the oriented subcontinuation plan consumes one checked Runtime frame marker more than once"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
@@ -43,6 +43,11 @@ double bind runs natively with the interpreter's observation.
     `checked_double_bind_admits_then_refuses_at_frame_marker`). This node's
     repair turns it red, and it becomes a native-versus-interpreter parity
     pin.
+- **A fourth witness** (Steward `evt_qej118yh57f8`). The TREE-MATCH
+  shared-bind ExitCode pin (WIP `4f101bba0`) reaches the same refusal after the
+  TREE-MATCH route fires (Architect `evt_1mz68b0assf2d`). AC-0 re-measures it.
+  This node does not repair TREE-MATCH. That WP runs its own parity pin once
+  this node lands.
 - **Unmeasured:** which plan element consumes the marker twice, from which
   source occurrence, and whether a marker is owed once per run of a shared
   tree value or once per tree. Also unmeasured: whether another blocker sits
