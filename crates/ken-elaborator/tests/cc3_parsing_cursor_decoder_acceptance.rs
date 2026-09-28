@@ -476,14 +476,20 @@ fn cc3_checked_identity_closure_and_trust_are_structural() {
     })
     .collect();
     assert_eq!(
-        after_bytes.difference(&after_cc3).copied().collect::<BTreeSet<_>>(),
+        after_bytes
+            .difference(&after_cc3)
+            .copied()
+            .collect::<BTreeSet<_>>(),
         expected_byte_facts,
         "only the four audited byte-provider facts may enter trust",
     );
 
     let parsing_owned = load_parsing_module(&mut env);
     let after_parsing: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(after_bytes, after_parsing, "Parsing must add no trust above F1-F4");
+    assert_eq!(
+        after_bytes, after_parsing,
+        "Parsing must add no trust above F1-F4"
+    );
 
     let forbidden_primitives = ["bytes_length", "bytes_slice", "bytes_at"]
         .into_iter()
