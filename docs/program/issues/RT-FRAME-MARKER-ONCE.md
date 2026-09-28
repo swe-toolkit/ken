@@ -53,6 +53,13 @@ double bind runs natively with the interpreter's observation.
   tree value or once per tree. Also unmeasured: whether another blocker sits
   behind it for any of the three programs.
 
+## Symptom inventory
+
+1. The exactly-once rule admitted a same-path duplicate activation. It was
+   keyed on the marker key, not on activation-event identity, and it carried
+   an invented re-entry positive with no reachable shape (Architect
+   `evt_11hdhkc9zp2wg`, on hard stop `evt_1yd2ay3s2d7r`).
+
 ## Deliverable
 
 One repair, ruled by the Architect. With it, the three programs build and

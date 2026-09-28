@@ -1,7 +1,7 @@
 ---
 id: CAT-DECODER-RECURSIVE-FUEL-SEED
 title: "decoder_recursive must not report fuel exhaustion on legal input: a layer that consumes one unit per recursion reaches fuel zero at end of input, so standard right-recursive repetition over public combinators fails on every input while the package claims exhaustion is impossible"
-status: active
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -74,3 +74,16 @@ One of the following, as ruled at AC-0:
   is in flight if the repair touches a statement D3 consumes.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed at `16ec25aea` (candidate `37591433f`; QA `evt_42vr3q0qfb76`,
+Architect `evt_3gdhqgnhg2mbc`), as the repair-seed ruling
+(`evt_14zf35td389ys`) directed. `decoder_recursive` now seeds its worker with
+`Suc (cursor_remaining ...)`, so its invariant is remaining < fuel at every
+layer call. `decoder_recursive_succeeds` drops the `positive` premise. Parsing's
+D3 proof and the client test are updated, and the unused
+`printed_bool_spec_positive` is deleted. The honest-length empty-end recursion
+decodes on Nil, [True] and [True,False], and the pure layer decodes on Nil.
+Reverting the seed reddens both. Trust is unchanged, and no public name is
+added or removed.
