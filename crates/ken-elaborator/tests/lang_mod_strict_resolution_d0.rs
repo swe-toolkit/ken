@@ -677,10 +677,9 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
-            // Parsing.Parsing now declares its exact Diagnostics.Core,
-            // Cursor, Decoder, and lower-tier dependencies. Its ordinary
-            // package boundary loads while strict mode retains compiler
-            // conveniences.
+            // Parsing.Parsing declares its exact package dependencies; its
+            // byte bridges use provider-less prelude builtin charToInt.
+            // Strict mode retains that name and the compiler conveniences.
             "Capability.Parsing.Parsing".to_string(),
             [
                 "And",
@@ -688,6 +687,7 @@ fn catalog_ambient_passthrough_migration_census() {
                 "and_fst",
                 "and_intro",
                 "and_snd",
+                "charToInt",
                 "eqChar",
                 "is_sorted",
                 "leqChar",

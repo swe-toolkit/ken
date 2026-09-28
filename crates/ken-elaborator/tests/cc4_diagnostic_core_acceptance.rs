@@ -373,6 +373,14 @@ fn checked_cc4_chain_has_zero_trusted_base_delta() {
     let mut parsing = dependency_env();
     load_cursor_module(&mut parsing);
     load_decoder_module(&mut parsing);
+    // Parsing imports four audited byte-provider facts. Measure its own trust
+    // delta after loading that provider, rather than attributing them to Parsing.
+    parsing
+        .elaborate_module_from_roots(
+            &[catalog_or::catalog_root()],
+            "Data.Binary.BytesPrimitiveContracts",
+        )
+        .expect("Parsing byte-contract provider must roots-load");
     let before: BTreeSet<_> = parsing.env.trusted_base().into_iter().collect();
     load_parsing_module(&mut parsing);
     let after: BTreeSet<_> = parsing.env.trusted_base().into_iter().collect();
