@@ -16,6 +16,8 @@
 //! escape `crate::cranelift_backend`.
 
 pub(in crate::cranelift_backend) mod core;
+mod frame_validation;
+use frame_validation::{FrameEventKind, FrameEvents, FrameTerminalKind};
 
 // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. A sibling of
 // `core` rather than a region inside it: `core.rs` is the module whose recursive
@@ -3167,6 +3169,7 @@ struct Lowering<'a> {
     active_join_site: Option<u64>,
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
     consumed_subcontinuation_frames: BTreeSet<(u64, u64)>,
+    checked_frame_events: Option<FrameEvents>,
     active_subcontinuation_frame: Option<u64>,
     consumed_recursive_call_templates: BTreeSet<u64>,
     pending_recursive_call: Option<CheckedRecursiveInvocationInstance>,
@@ -11976,19 +11979,35 @@ impl<'a> Lowering<'a> {
 
     fn enter_checked_subcontinuation_frame(
         &mut self,
+        builder: &FunctionBuilder<'_>,
         frame_id: u64,
+        origin: Option<StaticOriginId>,
     ) -> Result<(), CraneliftBackendError> {
-        if self
-            .active_subcontinuation_frame
-            .replace(frame_id)
-            .is_some()
-        {
+        if self.active_subcontinuation_frame.is_some() {
             return Err(unsupported(
                 "OrientedSubcontinuationPlanV1",
                 "nested checked subcontinuation occurrence marker",
             ));
         }
+        let invocation_id = self.active_recursive_invocations.last()
+            .map_or(0, |instance| instance.invocation_instance_id);
+        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
+            "OrientedSubcontinuationPlanV1",
+            "checked Runtime frame marker entered outside a generated Function scope",
+        ))?.record(builder, FrameEventKind::Activation, (invocation_id, frame_id), origin)?;
+        self.active_subcontinuation_frame = Some(frame_id);
         Ok(())
+    }
+
+    fn record_checked_frame_terminal(
+        &mut self,
+        builder: &FunctionBuilder<'_>,
+        kind: FrameTerminalKind,
+    ) -> Result<(), CraneliftBackendError> {
+        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
+            "OrientedSubcontinuationPlanV1",
+            "checked Runtime frame terminal emitted outside a generated Function scope",
+        ))?.terminal(builder, kind)
     }
 
     fn enter_checked_recursive_invocation(
@@ -12682,8 +12701,10 @@ impl<'a> Lowering<'a> {
 
     fn consume_checked_subcontinuation_frame(
         &mut self,
+        builder: &FunctionBuilder<'_>,
         cases: &[crate::RuntimeComputationalMatchCase],
         default: &RuntimeTrap,
+        origin: Option<StaticOriginId>,
     ) -> Result<Option<u64>, CraneliftBackendError> {
         let Some(frame_id) = self.active_subcontinuation_frame.take() else {
             return Ok(None);
@@ -12710,15 +12731,13 @@ impl<'a> Lowering<'a> {
             .active_recursive_invocations
             .last()
             .map_or(0, |instance| instance.invocation_instance_id);
-        if !self
-            .consumed_subcontinuation_frames
-            .insert((invocation_id, frame_id))
-        {
-            return Err(unsupported(
-                "OrientedSubcontinuationPlanV1",
-                "checked Runtime frame marker was consumed more than once",
-            ));
-        }
+        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
+            "OrientedSubcontinuationPlanV1",
+            "checked Runtime frame receipt emitted outside a generated Function scope",
+        ))?.record(builder, FrameEventKind::Receipt, (invocation_id, frame_id), origin)?;
+        // Preserve the branch-scope ledger until its separately owned cleanup;
+        // traversal-order membership no longer decides runtime-path uniqueness.
+        self.consumed_subcontinuation_frames.insert((invocation_id, frame_id));
         // `D8n` — the observation, at the REAL consumption seam and written from
         // production state that is in hand here: the pair the ledger just
         // accepted, and the defining `FuncId` of the function being emitted. ⛔ Nothing is reconstructed from a fixture or looked up in an
@@ -12751,10 +12770,12 @@ impl<'a> Lowering<'a> {
     /// the callers did not already have checked for them.
     fn checked_computational_frame(
         &mut self,
+        builder: &FunctionBuilder<'_>,
         cases: &[crate::RuntimeComputationalMatchCase],
         default: &RuntimeTrap,
+        origin: StaticOriginId,
     ) -> Result<CheckedComputationalFrame, CraneliftBackendError> {
-        let id = self.consume_checked_subcontinuation_frame(cases, default)?;
+        let id = self.consume_checked_subcontinuation_frame(builder, cases, default, Some(origin))?;
         Ok(CheckedComputationalFrame {
             id,
             invocation_id: id.map(|_| {
