@@ -1959,8 +1959,10 @@ pub(crate) fn execute_loaded_entry_checked_fences(
                 "loaded module entry '{entry}' has no completed scope"
             ))
         })?;
-    elab.module_state.root_scope = scope;
-    elab.execute_ken_md_checked_fences(&source, &extracted)
+    let previous = std::mem::replace(&mut elab.module_state.root_scope, scope);
+    let result = elab.execute_ken_md_checked_fences(&source, &extracted);
+    elab.module_state.root_scope = previous;
+    result
 }
 
 /// Plural-root entry point for the N2 in-repo loader (`33 §3.2`).
@@ -4667,6 +4669,52 @@ mod namespace_effect_tests {
     use crate::parser::parse_decls;
     use crate::ElabEnv;
     use ken_kernel::GlobalId;
+
+    /// Promise class: durable owner-scope isolation invariant (33 §3.3/§4).
+    /// MEASURED: an entry whose `ken example` fails returns Err and restores
+    /// its previous root bindings, hidden-ID roster and locals exactly; the
+    /// entry's completed scope differs from those prior bindings.
+    /// CLAIMED: a failed owner fence cannot leak its provider's local scope.
+    /// THE GAP: the same restoration on Ok is tested by the LC fenced-env
+    /// bare-name discriminator, not inferred from this one Err result.
+    #[test]
+    fn failed_entry_example_restores_previous_root_scope() {
+        const ENTRY: &str = "Core.Classes.LawfulClasses";
+        let mut env = ElabEnv::new().expect("base environment");
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+        env.elaborate_module_from_roots(&[root], ENTRY)
+            .expect("LawfulClasses owner must roots-load");
+        let before_bindings = env.module_state.root_scope.bindings.clone();
+        let before_private_ids = env.module_state.root_scope.private_ids.clone();
+        let before_locals = env.module_state.root_scope.locals.clone();
+        let owner = env
+            .module_state
+            .loaded_unit_scopes
+            .get(ENTRY)
+            .expect("owner scope");
+        assert_ne!(
+            owner.bindings, before_bindings,
+            "the entry scope must actually differ from the prior root"
+        );
+
+        let bad_source = "```ken example\nconst item2a_bad : Nat = missing_item2a\n```\n";
+        let bad_extraction = crate::literate::extract_ken_md(bad_source)
+            .expect("the deliberately bad example must still be a valid fence");
+        env.module_state
+            .loaded_literate_units
+            .insert(ENTRY.to_string(), (bad_source.to_string(), bad_extraction));
+        let err = env
+            .execute_loaded_entry_checked_fences(ENTRY)
+            .expect_err("unresolved name must reject the checked entry example");
+        assert!(
+            matches!(err, ElabError::ParseError { ref msg, .. }
+                if msg.contains("a 'ken example' block failed to elaborate")),
+            "the fence, not loading, must cause the Err: {err:?}"
+        );
+        assert_eq!(env.module_state.root_scope.bindings, before_bindings);
+        assert_eq!(env.module_state.root_scope.private_ids, before_private_ids);
+        assert_eq!(env.module_state.root_scope.locals, before_locals);
+    }
 
     /// Promise class: fail-closed identity admission. A missing roster entry
     /// must leave both namespaces untouched, and a present ID must remove

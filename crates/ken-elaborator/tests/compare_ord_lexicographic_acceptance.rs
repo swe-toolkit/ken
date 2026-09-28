@@ -233,6 +233,59 @@ fn raw_compare_discriminates_all_results_and_strict_negatives() {
     }
 }
 
+// MEASURED: an owner example checks and stays host-readable by owned ID;
+// later source runs in that same fenced environment, never a fresh client.
+// CLAIMED: successful fence execution retains checked artifacts without
+// authorizing provider-private names for a later unit. THE GAP: only the
+// bare row distinguishes this leak; the qualified row checks another route.
+// Failed fences and other providers have independent controls below.
+fn assert_lawful_fence_scope_is_restored(kind: &str, expression: &str, expected_name: &str) {
+    let (mut env, owned) = lawful_owner();
+    let provider = lawful_id(&env, &owned, "compare_raw");
+    execute_owner_examples(&mut env, &owned, &["lc_example_raw_eq"]);
+    assert_example_references(&env, &owned, "lc_example_raw_eq", provider, false);
+    let source = format!(
+        "import Core.Logic.OrdResult (OrdResult)\n\
+         import Core.Classes.LawfulClasses (bool_leq)\n\
+         const scope_probe_{kind} : OrdResult = {expression}"
+    );
+    match env.elaborate_file(&source) {
+        Err(ElabError::UnboundName { name, .. } | ElabError::UnresolvedCon { name, .. }) => {
+            assert_eq!(name, expected_name, "{kind} private reference must refuse");
+        }
+        other => panic!("{kind} private reference must refuse by name: {other:?}"),
+    }
+}
+
+/// Promise class: durable private-scope isolation invariant (33 §3.3/§4).
+/// MEASURED: after the real owner fence, bare `compare_raw` refuses by name.
+/// CLAIMED: the executor did not leak its owner's local root scope.
+/// THE GAP: this row distinguishes the unrepaired executor, which accepts the
+/// same bare source; the Err-path and other-entry controls remain separate.
+#[test]
+fn checked_lawful_fences_do_not_leak_bare_private_scope() {
+    assert_lawful_fence_scope_is_restored(
+        "bare",
+        "compare_raw Bool bool_leq True False",
+        "compare_raw",
+    );
+}
+
+/// Promise class: durable qualified-import privacy invariant (33 §3.3/§4).
+/// MEASURED: qualified private `compare_raw` refuses after the owner fence.
+/// CLAIMED: an unexported member is inaccessible by qualified client spelling.
+/// THE GAP: this passes on the unrepaired executor as well; prefix/export
+/// authorization, not root-scope restoration, guards this path. It is a
+/// non-discriminating privacy control, not evidence of the item-2a repair.
+#[test]
+fn checked_lawful_fences_do_not_leak_qualified_private_scope() {
+    assert_lawful_fence_scope_is_restored(
+        "qualified",
+        "Core.Classes.LawfulClasses.compare_raw Bool bool_leq True False",
+        "Core.Classes.LawfulClasses.compare_raw",
+    );
+}
+
 /// Promise class: durable behavior invariant. Client-resolved canonical Ord
 /// Pair/List dictionaries distinguish head, tail, and prefix lexicography.
 #[test]

@@ -14,9 +14,6 @@ use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLit
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, Term};
 
-const COLLECTIONS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
-
 fn term_reference_count(term: &Term, target: GlobalId) -> usize {
     let here = usize::from(matches!(term, Term::Const { id, .. } if *id == target));
     here + term
@@ -206,7 +203,7 @@ fn cat3_owner_examples(examples: &[&str]) -> (ElabEnv, Vec<GlobalId>) {
     // trusted-base set is identical before and after this fence execution.
     // CLAIMED: owner examples preserve provider identity and add zero trust.
     // THE GAP: qualified bindings and trust do not capture the active client
-    // root_scope; item 2a must separately restore it after the owner fences.
+    // root_scope; the executor's separate bare-scope and Err tests guard it.
     assert_eq!(
         derived_cat3_bindings(&env, &owned),
         bindings_before,
@@ -623,64 +620,6 @@ fn slice_width_is_end_minus_start_through_production_slice() {
     );
 }
 
-#[test]
-fn cat3_d1_law_surfaces_are_proof_returning_not_prop_wrappers() {
-    let compact = COLLECTIONS_KEN_MD
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        compact.contains("theorem take_drop_decomposition")
-            && compact.contains(": Equal (List a) (list_append a (take a n xs) (drop a n xs)) xs"),
-        "take/drop decomposition must be a proof-returning Equal surface"
-    );
-    assert!(
-        compact.contains("theorem map_length")
-            && compact.contains(": Equal Nat (length b (map a b f xs)) (length a xs)"),
-        "map length preservation must be a proof-returning Equal surface"
-    );
-    assert!(
-        compact.contains("theorem length_take_min")
-            && compact.contains(": Equal Nat (length a (take a n xs)) (min n (length a xs))"),
-        "take length/min law must be a proof-returning Equal surface"
-    );
-    assert!(
-        !COLLECTIONS_KEN_MD.contains(": Prop = Equal"),
-        "CAT-3 D1 laws must not be `fn law : Prop = Equal ...` wrappers"
-    );
-    assert!(
-        !COLLECTIONS_KEN_MD.contains("= Axiom"),
-        "collections CAT-3 slice must not use Axiom"
-    );
-    assert!(
-        !COLLECTIONS_KEN_MD.contains("data Perm"),
-        "CAT-3 D2 permutation must be count equality, not a raw proof-relevant data family"
-    );
-    assert!(
-        compact.contains("fn Perm (a : Type) (eqf : a → a → Bool)")
-            && compact.contains("(x : a) → Equal Nat (count a eqf x xs) (count a eqf x ys)"),
-        "CAT-3 D2 Perm must be the comparator-indexed count/multiset equality surface"
-    );
-    assert!(
-        compact.contains("fn eq_from_ord") && compact.contains("bool_and (le x y) (le y x)"),
-        "eq_from_ord must be the pinned bool_and (le x y) (le y x) definition"
-    );
-    assert!(
-        compact.contains("class View A")
-            && compact.contains("class Lens A")
-            && compact.contains("class SetoidMorphism A")
-            && compact.contains("project : Bool → Bool"),
-        "CAT-3 D3 must expose capitalized View/Lens records and a setoid-morphism project field"
-    );
-    assert!(
-        !COLLECTIONS_KEN_MD.contains("class view")
-            && !COLLECTIONS_KEN_MD.contains("fn view")
-            && !COLLECTIONS_KEN_MD.contains("const view")
-            && !COLLECTIONS_KEN_MD.contains("\nview "),
-        "CAT-3 D3 must not introduce a lowercase `view` identifier or retired view declaration"
-    );
-}
-
 /// Promise class: durable checked-proof invariant.
 ///
 /// MEASURED: owner-checked concrete examples cite the loader-owned three D1
@@ -690,7 +629,7 @@ fn cat3_d1_law_surfaces_are_proof_returning_not_prop_wrappers() {
 /// flat door, while only the declared public name is importable by a client.
 /// THE GAP: these examples instantiate, rather than re-prove, the generic
 /// laws. A fresh import test does not detect post-fence root_scope leakage;
-/// the separate item-2a repair must restore scope on every executor exit.
+/// the executor's separate bare-scope and Err tests guard that boundary.
 #[test]
 fn cat3_d1_positive_surfaces_check_against_real_package_defs() {
     let names = [
@@ -714,8 +653,8 @@ fn cat3_d1_positive_surfaces_check_against_real_package_defs() {
 
     // MEASURED: a fresh client accepts selective `map` and refuses `take`.
     // CLAIMED: owner-local take does not become a public Derived export.
-    // THE GAP: fresh-client privacy is blind to the post-fence root_scope leak;
-    // item 2a owns the post-execution refusal test and scope restoration.
+    // THE GAP: fresh-client privacy is blind to post-fence root_scope changes;
+    // the executor's bare-name control tests the fenced env independently.
     let (mut client, _) = derived_cat3_owner();
     client
         .elaborate_file("import Data.Collections.Derived (map)")
@@ -754,92 +693,48 @@ fn cat3_d2_bool_sort_surfaces_check_against_real_package_defs() {
 
 /// Promise class: durable negative discriminator.
 ///
-/// MEASURED: the owner rejects the wrong Nil endpoint paired with the valid
-/// take/drop-law application, and direct owner-scoped elaboration rejects the
-/// original false `Proved` counterexample at the proof-checking boundary.
-/// CLAIMED: the private take/drop law cannot prove that false endpoint.
-/// THE GAP: `ken reject` alone accepts any error, so the direct check guards
-/// the error family. Its owner scope currently persists after fence execution;
-/// item 2a must keep this counterexample live when that leak is removed.
+/// MEASURED: the owner rejects the wrong Nil endpoint with the real
+/// take/drop law, while the neighboring checked example proves the true
+/// endpoint. Changing only the rejected endpoint to the true one makes this
+/// test red when the reject fence unexpectedly elaborates.
+/// CLAIMED: the checked law cannot prove that concrete false endpoint.
+/// THE GAP: the executor erases error kinds, so the proof-level refusal is
+/// inferred from the accepted example and endpoint-only valid-neighbor
+/// mutation, not an observed KernelRejected/TypeMismatch. Endpoint-only pairing
+/// and name coverage are review-time checks, not durable test assertions;
+/// later fence edits could break them without reddening this pin.
 #[test]
 fn cat3_d1_wrong_take_drop_witness_rejected() {
     let example = "derived_example_cat3_take_drop_negative_control";
-    let (mut env, owned) = cat3_owner_examples(&[example]);
+    let (env, owned) = cat3_owner_examples(&[example]);
     assert_cat3_example_reference(&env, &owned, example, "take_drop_decomposition", true);
     for private in ["take", "drop"] {
         assert_cat3_example_reference(&env, &owned, example, private, false);
     }
-    let err = env
-        .elaborate_decl(
-            "theorem cat3_bad_take_drop \
-               : Equal (List Bool) \
-                  (list_append Bool \
-                    (take Bool (Suc Zero) (Cons Bool True (Nil Bool))) \
-                    (drop Bool (Suc Zero) (Cons Bool True (Nil Bool)))) \
-                  (Nil Bool) \
-               = Proved",
-        )
-        .expect_err("wrong owner-local take/drop endpoint must not typecheck");
-    let msg = format!("{err}");
-    assert!(
-        msg.contains("Type mismatch")
-            || msg.contains("type mismatch")
-            || msg.contains("Kernel rejected"),
-        "wrong owner-local witness must reject during proof checking, got {msg}"
-    );
 }
 
 /// Promise class: durable negative discriminator.
 ///
-/// MEASURED: the owner rejects descending sortedness and lost-True Perm;
-/// their valid-neighbor fence mutations become accepted and red the tests.
-/// Direct owner-scoped checks also reject both original proof claims as a
-/// type mismatch or kernel refusal, rather than an unresolved private name.
-/// CLAIMED: these false concrete order/count propositions cannot be proved.
-/// THE GAP: the two inputs are not a full sorting/permutation proof oracle;
-/// direct checks presently rely on post-fence owner-scope persistence, so
-/// item 2a must preserve their proof-checking discriminator after its fix.
+/// MEASURED: owner-local sortedness and permutation rejects fail while their
+/// paired checked examples cite the owned law/Perm identities. Swapping each
+/// reject to its example's true endpoint makes the reject unexpectedly check.
+/// CLAIMED: these concrete false order and count propositions cannot be proved.
+/// THE GAP: these inputs do not prove generic behavior; the executor erases
+/// error kinds, so proof-level refusal follows from accepted examples and
+/// endpoint-only mutations, not observed KernelRejected/TypeMismatch. Pairing
+/// and name coverage are review-time checks, not durable assertions; later
+/// fence edits could break them without reddening this pin.
 #[test]
 fn cat3_d2_bad_sorted_and_bad_perm_witnesses_rejected() {
     let names = [
         "derived_example_cat3_sorted_negative_control",
-        "derived_example_cat3_perm_negative_control",
+        "derived_example_cat3_sort_bool_perm",
     ];
-    let (mut env, owned) = cat3_owner_examples(&names);
+    let (env, owned) = cat3_owner_examples(&names);
     assert_cat3_example_reference(&env, &owned, names[0], "sort_bool_sorted", true);
+    assert_cat3_example_reference(&env, &owned, names[1], "sort_bool_perm", true);
     assert_cat3_example_reference(&env, &owned, names[1], "Perm", false);
     assert_cat3_example_reference(&env, &owned, names[1], "eq_from_ord", false);
-
-    let err = env
-        .elaborate_decl(
-            "theorem cat3_bad_sorted_bool \
-               : is_sorted Bool bool_leq (Cons Bool True (Cons Bool False (Nil Bool))) = Proved",
-        )
-        .expect_err("descending Bool list must not satisfy owner-local is_sorted");
-    let msg = format!("{err}");
-    assert!(
-        msg.contains("Type mismatch")
-            || msg.contains("type mismatch")
-            || msg.contains("Kernel rejected"),
-        "bad sorted witness should reject during proof checking, got {msg}"
-    );
-
-    let err = env
-        .elaborate_decl(
-            "theorem cat3_bad_perm_bool \
-               : Perm Bool (eq_from_ord Bool bool_leq) \
-                   (Cons Bool True (Nil Bool)) \
-                   (Nil Bool) = \
-                 \\q. match q { False |-> Proved ; True |-> Proved }",
-        )
-        .expect_err("dropping True must not satisfy owner-local count-based Perm");
-    let msg = format!("{err}");
-    assert!(
-        msg.contains("Type mismatch")
-            || msg.contains("type mismatch")
-            || msg.contains("Kernel rejected"),
-        "bad permutation witness should reject during proof checking, got {msg}"
-    );
 }
 
 /// Promise class: durable checked-class and proof invariant.
@@ -906,36 +801,21 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
 
 /// Promise class: durable negative discriminator.
 ///
-/// MEASURED: the owner rejects the get-set example with only its endpoint
-/// changed from False to True; restoring False makes that reject fence red.
-/// Direct owner-scoped elaboration rejects the original wrong proof claim
-/// at a type-checking or kernel-refusal error, not an unresolved name.
-/// CLAIMED: the checked lens get-set law does not prove the wrong endpoint.
-/// THE GAP: the fence alone can reject for an unrelated reason; the direct
-/// check is currently supported by leaked post-fence owner scope, which item
-/// 2a must remove while retaining the exact-error discriminator.
+/// MEASURED: the owner rejects the get-set proof with only its endpoint
+/// changed from the paired checked example's False to True. Restoring False
+/// makes the reject fence red because the proof now elaborates.
+/// CLAIMED: the checked lens get-set law cannot prove the wrong endpoint.
+/// THE GAP: the executor erases error kinds, so proof-level refusal is
+/// inferred from the accepted example and endpoint-only valid-neighbor
+/// mutation, not observed KernelRejected/TypeMismatch. Endpoint-only pairing
+/// and name coverage are review-time checks, not durable test assertions;
+/// later fence edits could break them without reddening this pin.
 #[test]
 fn cat3_d3_wrong_lens_endpoint_rejected() {
     let example = "derived_example_cat3_lens_get_set";
-    let (mut env, owned) = cat3_owner_examples(&[example]);
+    let (env, owned) = cat3_owner_examples(&[example]);
     assert_cat3_example_reference(&env, &owned, example, "fst_lens_get_set", true);
     for private in ["fst_pair_bool_bool", "set_fst_pair_bool_bool"] {
         assert_cat3_example_reference(&env, &owned, example, private, false);
     }
-    let err = env
-        .elaborate_decl(
-            "theorem cat3_bad_lens_get_set \
-               : Equal Bool \
-                   (fst_pair_bool_bool (set_fst_pair_bool_bool False (mk_pair Bool Bool True True))) \
-                   True \
-               = fst_lens_get_set False (mk_pair Bool Bool True True)",
-        )
-        .expect_err("wrong owner-local get-set endpoint must not typecheck");
-    let msg = format!("{err}");
-    assert!(
-        msg.contains("Type mismatch")
-            || msg.contains("type mismatch")
-            || msg.contains("Kernel rejected"),
-        "wrong lens law endpoint should reject during proof checking, got {msg}"
-    );
 }

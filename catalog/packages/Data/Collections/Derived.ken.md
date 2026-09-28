@@ -1840,8 +1840,8 @@ pub fn bytes_nat_length (bs : Bytes) : Nat = length UInt8 (bytes_to_list bs)
 The following checked owner examples instantiate private CAT-3 structural,
 sortedness, and lens laws, then evaluate two concrete slice inputs. They are
 not tangled or exported. No general slice law is proved here. Each rejected
-false proof has a matching checked use of its private operations; the take/drop
-and lens controls differ only in their claimed endpoint.
+false proof has a matching checked use of its private operations; the take/drop,
+sortedness, permutation, and lens controls differ only in their claimed endpoint.
 
 ```ken example
 fn derived_example_cat3_to_true (x : Nat) : Bool = True
@@ -1929,29 +1929,21 @@ theorem derived_example_cat3_sort_bool_perm
 theorem derived_example_cat3_sorted_negative_control
     : is_sorted Bool bool_leq (Cons Bool False (Cons Bool True (Nil Bool))) =
   sort_bool_sorted (Cons Bool True (Cons Bool False (Nil Bool)))
-
-theorem derived_example_cat3_perm_negative_control
-    : Perm Bool
-        (eq_from_ord Bool bool_leq)
-        (Cons Bool True (Nil Bool))
-        (Cons Bool True (Nil Bool)) =
-  λq. Refl
 ```
 
 ```ken reject
 theorem derived_reject_cat3_bad_sorted
     : is_sorted Bool bool_leq (Cons Bool True (Cons Bool False (Nil Bool))) =
-  Proved
+  sort_bool_sorted (Cons Bool True (Cons Bool False (Nil Bool)))
 ```
 
 ```ken reject
 theorem derived_reject_cat3_bad_perm
-    : Perm Bool (eq_from_ord Bool bool_leq) (Cons Bool True (Nil Bool)) (Nil Bool) =
-  λq.
-    match q {
-      False ↦ Proved;
-      True ↦ Proved
-    }
+    : Perm Bool
+        (eq_from_ord Bool bool_leq)
+        (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))
+        (Nil Bool) =
+  sort_bool_perm (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))
 ```
 
 ```ken example
