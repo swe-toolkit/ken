@@ -120,13 +120,18 @@ fn owner_vis_join_consumption_refuses_before_dead_subtree_disposition() {
         "the emitted-case check, not a later join error, must refuse: {error:?}");
 }
 
-/// Refused upstream by the response planner at 6bdd75394; not an admission
-/// witness. This checked double-bind source cannot reach the linearity guard:
-/// the response planner rejects its duplicate host response case first. No
-/// native artifact is executed in this test. The planner-level unit fixture in
-/// ken-runtime observes the shadowed admission guard separately.
+/// Transition sentinel for RT-FRAME-MARKER-ONCE: a checked HostIO value is run
+/// twice. MEASURED: two response-admission rows reach distinct validated
+/// owners; native object emission first refuses at the consumed-twice frame
+/// marker, not the old global response-key collision. The interpreter writes
+/// "captured\ncaptured\n" with two ConsoleWrite events and exits 0.
+/// CLAIMED: the frame marker, not response planning or admission, is the
+/// current native boundary. THE GAP: no native parity is measured because no
+/// artifact is emitted. When RT-FRAME-MARKER-ONCE repairs that marker, this
+/// sentinel must turn red and become native-versus-interpreter parity on
+/// stdout, exit code, and the two effects.
 #[test]
-fn checked_double_bind_is_refused_upstream_not_admitted() {
+fn checked_double_bind_admits_then_refuses_at_frame_marker() {
     const ORIGINAL: &str = "  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    (body MkUnit)\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      (Result IOError Unit) ExitCode\n      (host_console APartial (Result IOError Unit) (flush Stdout))\n      (\\_. host_exit APartial Success))";
     const DOUBLE_BIND: &str = "  let p : HostIO APartial Unit = body MkUnit in\n  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    p\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      Unit ExitCode\n      p\n      (\\_. host_exit APartial Success))";
     assert_eq!(PX7L.matches(ORIGINAL).count(), 1);
@@ -141,16 +146,33 @@ fn checked_double_bind_is_refused_upstream_not_admitted() {
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
-    assert!(
-        rows.is_empty(),
-        "response planning must refuse before admission: {rows:#?}"
-    );
-    let error = outcome.expect_err("double bind cannot produce a native artifact");
-    assert!(
-        format!("{error:?}").contains(
-            "native static transition planner invariant failed; please report this compiler bug: two host response cases claim one operation constructor"
-        ),
-        "the direct double bind must remain an upstream refusal, not a surrogate admission witness: {error:?}"
+    assert_eq!(rows.len(), 2, "each execution of the checked tree reaches admission");
+    let owners = rows.iter().map(|row| {
+        let ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner {
+            candidates, defining_function, ..
+        } = &row.outcome else {
+            panic!("the checked double bind must reach validated response owners: {row:?}");
+        };
+        assert_eq!(*defining_function, 5);
+        candidates.iter().map(|candidate| {
+            let ken_runtime::SelectedPendingCalleeObservation::StaticResponseOwner(owner) =
+                &candidate.callee else {
+                    panic!("the reached candidate must be a response owner: {candidate:?}");
+                };
+            (candidate.arm, *owner)
+        }).collect::<Vec<_>>()
+    }).collect::<Vec<_>>();
+    assert_eq!(owners, vec![vec![(0, 2), (1, 3)], vec![(0, 0), (1, 1)]]);
+    let error = outcome.expect_err("the frame marker still blocks native emission");
+    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(error) = error else {
+        panic!("the first refusal must occur at packaging: {error:?}");
+    };
+    assert_eq!(error.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
+    assert_eq!(error.field, "checked_process_object");
+    assert_eq!(
+        error.reason,
+        "unsupported runtime-IR lowering: OrientedSubcontinuationPlanV1: checked Runtime frame marker was consumed more than once",
+        "this is a frame-marker transition sentinel, not native parity"
     );
 }
 

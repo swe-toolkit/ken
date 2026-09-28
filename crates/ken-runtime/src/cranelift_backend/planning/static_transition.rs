@@ -1002,6 +1002,12 @@ pub struct StaticResponseFeasibilityObservation {
     pub producer_call_origin: u32,
     pub response_origin: u32,
     pub vis_origin: u32,
+    /// The selected producer leaf Match, not a global constructor lookup.
+    pub selected_leaf: u32,
+    /// The enclosing ITree::Vis case CM, when the leaf has one.
+    pub eliminating_cm: Option<u32>,
+    /// Plain child-origin subtree search, independent of the selector's walk.
+    pub cm_scrutinee_contains_vis: bool,
     pub operation: String,
     pub k_identity: String,
     pub k_specialization: u32,
@@ -1142,61 +1148,72 @@ pub fn with_static_response_feasibility_diagnostics<T>(
 fn record_static_response_feasibility_diagnostic(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<(), CraneliftBackendError> {
-    let observe = |result: Result<Vec<StaticResponseContinuation>, SsaInfeasible>| match result {
-        Ok(rows) => {
-            let observations = rows
-                .iter()
-                .map(|row| StaticResponseFeasibilityObservation {
-                    base_owner: format!("{:?}", row.base_owner()),
-                    producer_call_origin: row.producer_call_origin().0,
-                    response_origin: row.response_origin().0,
-                    vis_origin: row.vis_origin().0,
-                    operation: format!("{:?}", row.operation()),
-                    k_identity: format!("{:?}", row.k_identity()),
-                    k_specialization: row.k_specialization().0,
-                    k_closure_origin: row.k_closure_origin().0,
-                    k_body_origin: row.k_body_origin().0,
-                    k_context: row.k_context().0,
-                    context_was_preexisting: row.context_was_preexisting(),
-                    captures: row
-                        .captures()
-                        .iter()
-                        .map(|capture| StaticResponseCaptureObservation {
-                            ordinal: capture.ordinal(),
-                            origin: capture.origin().0,
-                            source: format!("{:?}", capture.source()),
-                            producer_abi_slot: capture.producer_abi_slot(),
+    let observe = |result: Result<Vec<StaticResponseContinuation>, SsaInfeasible>|
+        -> Result<_, CraneliftBackendError> {
+        match result {
+            Ok(rows) => {
+                let observations = rows
+                    .iter()
+                    .map(|row| {
+                        let (leaf, cm, contains_vis) = plan.observed_host_response_dispatch(
+                            row.vis_origin(), row.producer_call_origin(),
+                        )?;
+                        Ok(StaticResponseFeasibilityObservation {
+                            base_owner: format!("{:?}", row.base_owner()),
+                            producer_call_origin: row.producer_call_origin().0,
+                            response_origin: row.response_origin().0,
+                            vis_origin: row.vis_origin().0,
+                            selected_leaf: leaf.0,
+                            eliminating_cm: cm.map(|origin| origin.0),
+                            cm_scrutinee_contains_vis: contains_vis,
+                            operation: format!("{:?}", row.operation()),
+                            k_identity: format!("{:?}", row.k_identity()),
+                            k_specialization: row.k_specialization().0,
+                            k_closure_origin: row.k_closure_origin().0,
+                            k_body_origin: row.k_body_origin().0,
+                            k_context: row.k_context().0,
+                            context_was_preexisting: row.context_was_preexisting(),
+                            captures: row
+                                .captures()
+                                .iter()
+                                .map(|capture| StaticResponseCaptureObservation {
+                                    ordinal: capture.ordinal(),
+                                    origin: capture.origin().0,
+                                    source: format!("{:?}", capture.source()),
+                                    producer_abi_slot: capture.producer_abi_slot(),
+                                })
+                                .collect(),
+                            continuation_inputs: row
+                                .continuation_inputs()
+                                .iter()
+                                .map(|(ordinal, source, slot)| (*ordinal, format!("{source:?}"), *slot))
+                                .collect(),
                         })
-                        .collect(),
-                    continuation_inputs: row
-                        .continuation_inputs()
-                        .iter()
-                        .map(|(ordinal, source, slot)| (*ordinal, format!("{source:?}"), *slot))
-                        .collect(),
-                })
-                .collect();
-            (observations, None)
+                    })
+                    .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+                Ok((observations, None))
+            }
+            Err(infeasible) => Ok((
+                Vec::new(),
+                Some(StaticResponseInfeasibleObservation {
+                    base_owner: format!("{:?}", infeasible.base_owner()),
+                    vis_origin: infeasible.vis_origin().0,
+                    producer_call_origin: infeasible.producer_call_origin().map(|origin| origin.0),
+                    operation: infeasible.operation().map(|operation| format!("{operation:?}")),
+                    k_closure_origin: infeasible.k_closure_origin().map(|origin| origin.0),
+                    k_body_origin: infeasible.k_body_origin().map(|origin| origin.0),
+                    k_capture_count: infeasible.k_capture_count(),
+                    continuation_input_count: infeasible.continuation_input_count(),
+                    reason: infeasible.reason().to_string(),
+                }),
+            )),
         }
-        Err(infeasible) => (
-            Vec::new(),
-            Some(StaticResponseInfeasibleObservation {
-                base_owner: format!("{:?}", infeasible.base_owner()),
-                vis_origin: infeasible.vis_origin().0,
-                producer_call_origin: infeasible.producer_call_origin().map(|origin| origin.0),
-                operation: infeasible.operation().map(|operation| format!("{operation:?}")),
-                k_closure_origin: infeasible.k_closure_origin().map(|origin| origin.0),
-                k_body_origin: infeasible.k_body_origin().map(|origin| origin.0),
-                k_capture_count: infeasible.k_capture_count(),
-                continuation_input_count: infeasible.continuation_input_count(),
-                reason: infeasible.reason().to_string(),
-            }),
-        ),
     };
     let (static_response_rows, static_response_infeasible) = observe(
         plan.static_response_feasibility_ledger(ken_host::HostOpV1::BufferAllocate)?,
-    );
+    )?;
     let (all_static_response_rows, all_static_response_infeasible) =
-        observe(plan.static_response_feasibility_ledger_all()?);
+        observe(plan.static_response_feasibility_ledger_all()?)?;
     let static_response_owners = match plan.static_response_owner_specializations()? {
         Ok(owners) => owners
             .iter()

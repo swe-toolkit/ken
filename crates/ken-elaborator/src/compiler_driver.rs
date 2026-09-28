@@ -5402,11 +5402,10 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
     /// CLAIMED: once an already-green source retains more than `[main]`, the
     /// gate-4a read and full native build must observe one producer transaction.
     ///
-    /// THE GAP: no already-green source currently reaches the assertions below.
-    /// Allocation identity, closure-free equality, and exact plan bytes are all
-    /// present, but a blocked control is not evidence for any of them.
+    /// MEASURED: the checked fixture now reaches these assertions under the
+    /// ordinary test invocation. This is one transaction witness, not proof of
+    /// general closure-lane clearance or native differential equivalence.
     #[test]
-    #[ignore = "no green >[main] fixture: recursive source stops at RT-CLOSURE-BOUNDARY-LANE"]
     fn gate_4a_preparation_and_full_build_are_one_transaction() {
         let package_name = "r3_gate_4a_equality";
         let preparation = prepare_native_program_sources(
