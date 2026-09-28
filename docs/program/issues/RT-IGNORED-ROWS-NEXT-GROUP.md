@@ -54,6 +54,13 @@ can clear.
   - The repair is the occurrence key, with its constraints as stated in
     `RT-HOST-RESPONSE-OCCURRENCE-KEY`, which this WP subsumes. An AC-0b
     design D0 comes before any build.
+- **Build ruling** (Architect `evt_5r4g2er52c6p5`) and Steward GO
+  (`evt_72bv90phnmbav`). The build probably clears zero of the four rows.
+  The deliverable below is therefore the ruled repair with its acceptance
+  A1-A6. A1 is native sequential use of two distinguishable resource
+  brackets, which refuses today. The `compiler_driver.rs:5409` un-ignore is
+  included, and the four rows are relabelled with their measured next
+  refusals.
 
 ## Deliverable
 
