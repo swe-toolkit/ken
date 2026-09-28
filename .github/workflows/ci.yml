@@ -244,6 +244,8 @@ jobs:
           fi
           python3 scripts/ci-duration-shard.py validate-plan duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
           scripts/stage-ci-shard-artifact.sh "${{ matrix.shard }}" unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json" duration-filters/planning-evidence.json
+          cp duration-filters/assignments.json "realized-shard-${{ matrix.shard }}/assignments.json"
+          python3 -c 'import json,sys; shard=int(sys.argv[1]); item=json.load(open("duration-filters/assignments.json"))["bins"][shard-1]; print("CI_SHARD_PLAN shard={} selected_tests={} projected_test_s={:.3f} projected_job_s={:.3f} artifacts=realized-shard-{}/assignments.json,realized-shard-{}/planning-evidence.json".format(shard,len(item["tests"]),item["projected_test_seconds"],item["projected_job_seconds"],shard,shard))' "${{ matrix.shard }}"
           phase_timestamp realize-and-stage end
       - name: Test
         run: >-
