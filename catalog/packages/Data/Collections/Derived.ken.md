@@ -2036,6 +2036,51 @@ const derived_example_l3_compare_equal : OrdResult = compare "ab" "ab"
 const derived_example_l3_slice_concat : String = slice Zero (Suc (Suc Zero)) (concat "ab" "cd")
 ```
 
+The checked length examples use the private `range` and `zip` operations inside
+this package. The range rejection changes only the claimed endpoint: the same
+proof that establishes length `n` cannot establish length `Suc n`.
+
+```ken example
+theorem derived_example_range_length (n : Nat) : Equal Nat (length Nat (range n)) n =
+  range_length n
+
+const derived_example_range_two_length : Nat = length Nat (range (Suc (Suc Zero)))
+```
+
+```ken reject
+theorem derived_reject_range_length_off_by_one
+      (n : Nat)
+    : Equal Nat (length Nat (range n)) (Suc n) =
+  range_length n
+```
+
+```ken example
+theorem derived_example_zip3v2_length
+    : Equal Nat
+        (length
+          (Pair Nat Nat)
+          (zip
+            Nat
+            Nat
+            (Cons Nat Zero (Cons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat))))
+            (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))))
+        (Suc (Suc Zero)) =
+  zip_length
+    Nat
+    Nat
+    (Cons Nat Zero (Cons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat))))
+    (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))
+
+const derived_example_zip3v2_length_value : Nat =
+  length
+    (Pair Nat Nat)
+    (zip
+      Nat
+      Nat
+      (Cons Nat Zero (Cons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat))))
+      (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))
+```
+
 ## 5. Design notes
 
 **Package dependency.** The CAT-3 proof terms in `§4.1`–`§4.3` use `cong`/
