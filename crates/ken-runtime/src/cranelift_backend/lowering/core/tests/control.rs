@@ -849,8 +849,7 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
         Some(frame_id)
     );
 
-    // A second static activation is reachable after the first in this block.
-    // Rule (a) rejects this path at close, even before considering its receipts.
+    // The second activation follows a discharge, so E2 alone refuses at close.
     compiler
         .enter_checked_subcontinuation_frame(&builder, frame_id, None)
         .expect("second enter re-marks the active frame");
@@ -870,9 +869,11 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "OrientedSubcontinuationPlanV1",
                 ref reason,
-            }) if reason.contains("activated more than once on one path")
+            }) if reason == &format!(
+                "checked Runtime frame violations: {{(0, {frame_id}): {{E2}}}}"
+            )
         ),
-        "expected a same-path activation refusal, got {err:?}"
+        "expected exactly E2, got {err:?}"
     );
 }
 
