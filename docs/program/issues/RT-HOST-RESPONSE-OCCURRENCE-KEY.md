@@ -1,7 +1,7 @@
 ---
 id: RT-HOST-RESPONSE-OCCURRENCE-KEY
 title: "Re-key the static-transition host-response route map on the OCCURRENCE, not on the operation constructor alone, so that N legitimate instantiations each contributing one response handler stop colliding -- while two response-handling sites within ONE occurrence claiming one constructor still refuse. This is the sole route to clearing all four of the failing-ignored rows that stop at `two host response cases claim one operation constructor`, and it is an undischarged assignment from RT-HOST-RESPONSE-ROUTE-KEY-COLLISION section 3a, not a new discovery."
-status: draft
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,10 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-18, fourth repair node from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger on operator directive 2026-09-15 'The other tests should be fixed.' The occurrence-keying insight is the Steward's own section 3a amendment to RT-HOST-RESPONSE-ROUTE-KEY-COLLISION, written 2026-09-17: 'What the key actually omits is the OCCURRENCE.' It was routed to that node's AC-4 and AC-4 closed 'not reached', so the assignment has sat undischarged since. RT-DUPLICATED-RESPONSE-BLOCK then located WHERE the second presentation comes from -- per-arm inlining of a shared callee -- which makes the construction-time uniqueness assertion wrong in its SUBJECT, stated over post-inlining occurrences rather than over the source dispatcher, and NOT unnecessary. Corrected 2026-09-18 on Architect evt_5m7k7k4vrg5ay: this line previously said that node 'established the reading that licenses it', which overstates in the same direction the body did -- that node measured the origin and explicitly did NOT measure whether producing the second presentation is correct (its 8.2). The Architect ruled the repair LIVE 2026-09-18 and rejected both design arms (evt_4eghtvj2fhpz0); separately, the Architect set this node's acceptance bar, REPLACED it with a three-clause bar (evt_4eghtvj2fhpz0), and on 2026-09-19 STRUCK clause 3 (evt_7sj5xmgcxwk5f) -- the bar below is TWO clauses. The liveness ruling and the bar are two acts and this line used to fuse them. Steward-filed per COORDINATION section 2."
 ---
+
+> **Subsumed 2026-09-28 into `RT-IGNORED-ROWS-NEXT-GROUP`** (Architect
+> `evt_49fjtm9sen7bh`). That WP implements this repair under its own
+> anchor. The constraints below are its settled inputs.
 
 # The refusal, and why the key is now the right unit when it was not before
 
