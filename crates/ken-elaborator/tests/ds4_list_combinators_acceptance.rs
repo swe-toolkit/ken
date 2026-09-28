@@ -10,7 +10,13 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use ken_elaborator::ElabEnv;
+use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_kernel::{Decl, GlobalId};
+
+const DERIVED: &str = "Data.Collections.Derived";
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 
@@ -26,6 +32,92 @@ fn base_env_with_derived_owned() -> (ElabEnv, Vec<ken_kernel::GlobalId>) {
 
 fn base_env() -> ElabEnv {
     base_env_with_derived_owned().0
+}
+
+// MEASURED: the real roots loader owns each requested operation; checked
+// owner-local examples reference those GlobalIds and checked reject fences
+// fail without becoming package exports or introducing trust.
+// CLAIMED: the two selected DS4 functions exercise Derived's private laws
+// without relying on the synthetic flat-alias fixture.
+// THE GAP: a `ken reject` fence checks rejection, not its diagnostic kind;
+// the matched positive proof and endpoint-only negative are checked together.
+fn ds4_owner_examples(examples: &[(&str, &[&str])]) -> (ElabEnv, BTreeMap<String, GlobalId>) {
+    let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], DERIVED)
+        .expect("the real Derived provider and dependency closure must roots-load");
+    let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let mut operations = BTreeMap::new();
+    for (name, required) in examples {
+        assert!(
+            !env.globals.contains_key(*name)
+                && !env.globals.contains_key(&format!("{DERIVED}.{name}")),
+            "{name} must not be a tangled or published declaration"
+        );
+        for &operation in *required {
+            operations.entry(operation).or_insert_with(|| {
+                catalog_or::provider_owned_id(&env, &owned, DERIVED, operation)
+                    .unwrap_or_else(|error| panic!("{operation} must be Derived-owned: {error}"))
+            });
+        }
+    }
+    env.execute_loaded_entry_checked_fences(DERIVED)
+        .expect("Derived owner-local examples and rejects must all check");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "owner-local fences must not add trust"
+    );
+    let mut checked = BTreeMap::new();
+    for (name, required) in examples {
+        let id = *env
+            .globals
+            .get(*name)
+            .unwrap_or_else(|| panic!("{name} must check in the owner fence"));
+        assert!(
+            !owned.contains(&id),
+            "{name} must not be a provider declaration"
+        );
+        assert!(
+            !env.globals.contains_key(&format!("{DERIVED}.{name}")),
+            "{name} must not become a public provider binding"
+        );
+        let decl = env
+            .env
+            .lookup(id)
+            .expect("checked example must resolve by ID");
+        assert!(
+            matches!(decl, Decl::Transparent { .. }),
+            "{name} must be a checked transparent declaration"
+        );
+        let refs = catalog_or::declaration_references(decl);
+        for &operation in *required {
+            assert!(
+                refs.contains(&operations[operation]),
+                "{name} must reference Derived-owned {operation}"
+            );
+        }
+        checked.insert((*name).to_owned(), id);
+    }
+    (env, checked)
+}
+
+fn checked_nat(env: &ElabEnv, id: GlobalId) -> u64 {
+    fn count(env: &ElabEnv, value: &EvalVal) -> u64 {
+        match value {
+            EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.zero_id && args.is_empty() => {
+                0
+            }
+            EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.suc_id && args.len() == 1 => {
+                1 + count(env, &args[0])
+            }
+            other => panic!("expected a Nat constructor chain, got {other:?}"),
+        }
+    }
+    let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) else {
+        panic!("checked Nat example must be transparent");
+    };
+    count(env, &eval(&[], body, &env.env, &mut EvalStore::new()))
 }
 
 #[test]
@@ -111,21 +203,20 @@ fn ac8_non_involutive_witness_rejected_for_reverse_involutive() {
 // `n-1` — an off-by-one witness must be rejected.
 #[test]
 fn ac8_off_by_one_range_length_rejected() {
-    let mut env = base_env();
-    let r = env.elaborate_decl(
-        "theorem bad_range_length_off_by_one (n : Nat) : Equal Nat (length Nat (range n)) (Suc n) = range_length n",
+    // The owner-local general proof and endpoint-only reject use the same
+    // private `range` and `range_length` identities, not client-visible aliases.
+    let (env, checked) = ds4_owner_examples(&[
+        (
+            "derived_example_range_length",
+            &["length", "range", "range_length"],
+        ),
+        ("derived_example_range_two_length", &["length", "range"]),
+    ]);
+    assert_eq!(
+        checked_nat(&env, checked["derived_example_range_two_length"]),
+        2,
+        "range 2 must have exactly two elements"
     );
-    match r {
-        Ok(_) => panic!("range_length proves length(range n) = n, not Suc n — reusing it here must be rejected"),
-        Err(e) => {
-            let msg = format!("{:?}", e);
-            assert!(
-                msg.contains("TypeMismatch") || msg.contains("KernelRejected"),
-                "expected a TypeMismatch/KernelRejected (specific variant), got: {:?}",
-                e
-            );
-        }
-    }
 }
 
 // AC8 discriminator 3: `zip`'s length law is `min`, not `length xs` alone
@@ -139,7 +230,9 @@ fn ac8_zip_length_is_min_not_left_length() {
            Equal Nat (length (Pair a b) (zip a b xs ys)) (length a xs) = zip_length a b xs ys",
     );
     match r {
-        Ok(_) => panic!("zip_length proves length = min(..), not the left length alone — must be rejected"),
+        Ok(_) => panic!(
+            "zip_length proves length = min(..), not the left length alone — must be rejected"
+        ),
         Err(e) => {
             let msg = format!("{:?}", e);
             assert!(
@@ -155,11 +248,16 @@ fn ac8_zip_length_is_min_not_left_length() {
 // concrete 3-vs-2 example), not padding or erroring.
 #[test]
 fn zip_truncates_at_shorter_list_concrete_example() {
-    let mut env = base_env();
-    env.elaborate_decl(
-        "theorem zip3v2Length : Equal Nat \
-           (length (Pair Nat Nat) (zip Nat Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat)))) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) \
-           (Suc (Suc Zero)) = zip_length Nat Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat)))) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))",
-    )
-    .expect("zip of a 3-list and a 2-list has length 2 (min), provable directly from zip_length");
+    let (env, checked) = ds4_owner_examples(&[
+        (
+            "derived_example_zip3v2_length",
+            &["length", "zip", "zip_length"],
+        ),
+        ("derived_example_zip3v2_length_value", &["length", "zip"]),
+    ]);
+    assert_eq!(
+        checked_nat(&env, checked["derived_example_zip3v2_length_value"]),
+        2,
+        "zip of a 3-list and a 2-list has length 2, not the left length"
+    );
 }
