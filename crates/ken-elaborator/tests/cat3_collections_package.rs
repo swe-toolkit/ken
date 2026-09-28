@@ -8,9 +8,9 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
+use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, Term};
 
@@ -141,6 +141,117 @@ fn mk_env_with_derived_owned() -> (ElabEnv, Vec<GlobalId>) {
 
 fn mk_env() -> ElabEnv {
     mk_env_with_derived_owned().0
+}
+
+const DERIVED: &str = "Data.Collections.Derived";
+
+// MEASURED: roots loading returns Derived's provider-owned IDs without
+// installing the test-only flat-alias fixture.
+// CLAIMED: the owner, rather than the fixture, supplies these declarations.
+// THE GAP: the returned ID set alone does not establish any client's scope;
+// individual example checks and the no-op-door runs test those routes.
+fn derived_cat3_owner() -> (ElabEnv, Vec<GlobalId>) {
+    let mut env = ElabEnv::new().expect("base environment");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], DERIVED)
+        .expect("the real Derived provider and dependency closure must roots-load");
+    (env, owned)
+}
+
+// MEASURED: the qualified name resolves to an ID in this loader's owned set.
+// CLAIMED: host reads observe the checked Derived declaration, not a flat alias.
+// THE GAP: ID ownership does not prove the client's Ken source used this ID;
+// assert_cat3_example_reference checks that separately on the checked term.
+fn derived_cat3_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
+    catalog_or::provider_owned_id(env, owned, DERIVED, name)
+        .unwrap_or_else(|error| panic!("Derived owner identity {name}: {error}"))
+}
+
+// MEASURED: every currently qualified Derived binding maps to an owned ID.
+// CLAIMED: executing examples does not rebind a provider-qualified identity.
+// THE GAP: the before/after comparison below guards that interval only;
+// these qualified bindings do not inventory unqualified client scope.
+fn derived_cat3_bindings(env: &ElabEnv, owned: &[GlobalId]) -> BTreeMap<String, GlobalId> {
+    let prefix = format!("{DERIVED}.");
+    env.globals
+        .iter()
+        .filter(|(name, _)| name.starts_with(&prefix))
+        .map(|(name, id)| {
+            assert!(owned.contains(id), "{name} must be loader-owned by Derived");
+            (name.clone(), *id)
+        })
+        .collect()
+}
+
+fn cat3_owner_examples(examples: &[&str]) -> (ElabEnv, Vec<GlobalId>) {
+    let (mut env, owned) = derived_cat3_owner();
+    // MEASURED: each requested example is absent before fence execution, then
+    // present by ID as a transparent, non-provider declaration afterwards.
+    // CLAIMED: these witnesses are checked owner-local examples, not tangled
+    // exports, declarations in the provider, or assumed proof constants.
+    // THE GAP: this only covers the named examples requested by each caller;
+    // it does not certify other fences or prevent post-fence scope leakage.
+    let bindings_before = derived_cat3_bindings(&env, &owned);
+    let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    for example in examples {
+        assert!(
+            !env.globals.contains_key(*example)
+                && !bindings_before.contains_key(&format!("{DERIVED}.{example}")),
+            "{example} must not be tangled into the provider"
+        );
+    }
+    env.execute_loaded_entry_checked_fences(DERIVED)
+        .expect("Derived owner-local examples and paired rejects must all check");
+    // MEASURED: every qualified Derived binding retains its owned ID and the
+    // trusted-base set is identical before and after this fence execution.
+    // CLAIMED: owner examples preserve provider identity and add zero trust.
+    // THE GAP: qualified bindings and trust do not capture the active client
+    // root_scope; item 2a must separately restore it after the owner fences.
+    assert_eq!(
+        derived_cat3_bindings(&env, &owned),
+        bindings_before,
+        "checked examples must preserve every Derived-qualified owner identity"
+    );
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "owner examples must not introduce trust"
+    );
+    for example in examples {
+        let id = *env
+            .globals
+            .get(*example)
+            .unwrap_or_else(|| panic!("{example} must elaborate inside the owner fence"));
+        assert!(!owned.contains(&id), "{example} must not be a provider declaration");
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{example} must be a transparent checked result"
+        );
+    }
+    (env, owned)
+}
+
+// MEASURED: a loader-owned private GlobalId appears as Term::Const in the
+// transparent example's checked type or body, as selected by the caller.
+// CLAIMED: this example refers to the actual private provider declaration.
+// THE GAP: occurrence alone is not semantic necessity; the checked theorem,
+// concrete evaluation where applicable, and law-erasure mutation provide
+// independent evidence, but do not prove every occurrence is indispensable.
+fn assert_cat3_example_reference(
+    env: &ElabEnv,
+    owned: &[GlobalId],
+    example: &str,
+    private: &str,
+    in_body: bool,
+) {
+    let provider = derived_cat3_id(env, owned, private);
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(env.globals[example]) else {
+        panic!("{example} must be transparent");
+    };
+    assert!(
+        term_reference_count(if in_body { body } else { ty }, provider) > 0,
+        "{example} must cite loader-owned Derived.{private} in its checked artifact"
+    );
 }
 
 #[test]
@@ -481,30 +592,32 @@ fn derived_has_no_definitionally_equivalent_local_bool_reimplementation() {
     .expect("Derived equality must retain its nontrivial Boolean behavior");
 }
 
+/// Promise class: durable semantic discriminator.
+///
+/// MEASURED: two transparent owner examples cite the owned `slice` body and
+/// evaluate to `"bc"` for (1, 3) and empty for the reversed (3, 1) bounds.
+/// CLAIMED: on these two inputs, the checked Derived slice returns the
+/// end-minus-start window and saturates a reversed bound to an empty string.
+/// THE GAP: these closed examples do not establish behavior for every input;
+/// no general slice law is proved here.
 #[test]
 fn slice_width_is_end_minus_start_through_production_slice() {
-    let mut env = mk_env();
-    let ordinary = env
-        .elaborate_decl(
-            "const cat3_slice_ordinary : String = \
-             slice (Suc Zero) (Suc (Suc (Suc Zero))) \"abcde\"",
-        )
-        .expect("ordinary production slice witness must elaborate");
-    let underflow = env
-        .elaborate_decl(
-            "const cat3_slice_underflow : String = \
-             slice (Suc (Suc (Suc Zero))) (Suc Zero) \"abcde\"",
-        )
-        .expect("underflow production slice control must elaborate");
+    let names = [
+        "derived_example_cat3_slice_ordinary",
+        "derived_example_cat3_slice_underflow",
+    ];
+    let (env, owned) = cat3_owner_examples(&names);
+    for name in names {
+        assert_cat3_example_reference(&env, &owned, name, "slice", true);
+    }
     let mut store = make_store(&env);
-
     assert_eq!(
-        eval_transparent(&env, &mut store, ordinary),
+        eval_transparent(&env, &mut store, env.globals[names[0]]),
         EvalVal::Str("bc".into()),
         "slice 1 3 must use end minus start and return bc"
     );
     assert_eq!(
-        eval_transparent(&env, &mut store, underflow),
+        eval_transparent(&env, &mut store, env.globals[names[1]]),
         EvalVal::Str(String::new().into()),
         "slice 3 1 must saturate end minus start to zero"
     );
@@ -568,78 +681,94 @@ fn cat3_d1_law_surfaces_are_proof_returning_not_prop_wrappers() {
     );
 }
 
+/// Promise class: durable checked-proof invariant.
+///
+/// MEASURED: owner-checked concrete examples cite the loader-owned three D1
+/// laws in their bodies and private take/drop/mem in their types; a fresh
+/// client imports public `map` but refuses private `take` as UnboundName.
+/// CLAIMED: D1 proofs and private operations work in the owner without the
+/// flat door, while only the declared public name is importable by a client.
+/// THE GAP: these examples instantiate, rather than re-prove, the generic
+/// laws. A fresh import test does not detect post-fence root_scope leakage;
+/// the separate item-2a repair must restore scope on every executor exit.
 #[test]
 fn cat3_d1_positive_surfaces_check_against_real_package_defs() {
-    let mut env = mk_env();
-    let canonical_min = env.globals["Data.Numeric.Nat.Order.min"];
-    env.globals
-        .insert("cat3_canonical_min".to_owned(), canonical_min);
-    env.elaborate_decl("fn cat3_to_true (x : Nat) : Bool = True")
-        .expect("helper predicate should elaborate");
-    env.elaborate_decl("fn cat3_nat_eq_all (x : Nat) (y : Nat) : Bool = True")
-        .expect("helper equality predicate should elaborate");
+    let names = [
+        "derived_example_cat3_take_drop",
+        "derived_example_cat3_map_length",
+        "derived_example_cat3_length_take_min",
+        "derived_example_cat3_filter_mem",
+    ];
+    let (env, owned) = cat3_owner_examples(&names);
+    for (example, private) in [
+        (names[0], "take_drop_decomposition"),
+        (names[1], "map_length"),
+        (names[2], "length_take_min"),
+    ] {
+        assert_cat3_example_reference(&env, &owned, example, private, true);
+    }
+    for private in ["take", "drop"] {
+        assert_cat3_example_reference(&env, &owned, names[0], private, false);
+    }
+    assert_cat3_example_reference(&env, &owned, names[3], "mem", false);
 
-    env.elaborate_decl(
-        "theorem cat3_take_drop_sample \
-           : Equal (List Bool) \
-              (list_append Bool \
-                (take Bool (Suc Zero) (Cons Bool True (Cons Bool False (Nil Bool)))) \
-                (drop Bool (Suc Zero) (Cons Bool True (Cons Bool False (Nil Bool))))) \
-              (Cons Bool True (Cons Bool False (Nil Bool))) \
-           = take_drop_decomposition Bool (Suc Zero) (Cons Bool True (Cons Bool False (Nil Bool)))",
-    )
-    .expect("take/drop decomposition proof should check on a concrete list");
-
-    env.elaborate_decl(
-        "theorem cat3_map_length_sample \
-           : Equal Nat \
-              (length Bool (map Nat Bool cat3_to_true (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) \
-              (length Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))) \
-           = map_length Nat Bool cat3_to_true (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))",
-    )
-    .expect("map length proof should check on a concrete list");
-
-    env.elaborate_decl(
-        "theorem cat3_length_take_min_sample \
-           : Equal Nat \
-              (length Nat (take Nat (Suc Zero) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) \
-              (cat3_canonical_min (Suc Zero) (length Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) \
-           = length_take_min Nat (Suc Zero) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))",
-    )
-    .expect("length/take/min proof should check on a concrete list");
-
-    env.elaborate_decl(
-        "theorem cat3_filter_mem_sample \
-           : Equal Bool \
-              (mem Nat cat3_nat_eq_all Zero (filter Nat cat3_to_true (Cons Nat (Suc Zero) (Nil Nat)))) \
-              True \
-           = Proved",
-    )
-    .expect("filter and mem operations should reduce on concrete Bool decisions");
+    // MEASURED: a fresh client accepts selective `map` and refuses `take`.
+    // CLAIMED: owner-local take does not become a public Derived export.
+    // THE GAP: fresh-client privacy is blind to the post-fence root_scope leak;
+    // item 2a owns the post-execution refusal test and scope restoration.
+    let (mut client, _) = derived_cat3_owner();
+    client
+        .elaborate_file("import Data.Collections.Derived (map)")
+        .expect("the existing public map stays selectively importable");
+    match client.elaborate_file("import Data.Collections.Derived (take)") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, format!("{DERIVED}.take")),
+        Err(other) => panic!("private take must refuse import as UnboundName: {other:?}"),
+        Ok(_) => panic!("private take must not become an export"),
+    }
 }
 
+/// Promise class: durable checked-proof invariant.
+///
+/// MEASURED: owner-checked sort examples cite the owned sortedness and
+/// permutation laws in their bodies, and sort_bool/Perm in their types.
+/// CLAIMED: concrete Bool sort witnesses use the real private Derived laws,
+/// not flat aliases, while public bool_leq resolves in Derived's own imports.
+/// THE GAP: the example citations pin identity and checked instantiation,
+/// not all inputs or semantic indispensability of every cited constant.
 #[test]
 fn cat3_d2_bool_sort_surfaces_check_against_real_package_defs() {
-    let mut env = mk_env();
-    let sample = "(Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))";
-
-    env.elaborate_decl(&format!(
-        "theorem cat3_sort_bool_sorted_sample \
-           : is_sorted Bool bool_leq (sort_bool {sample}) = sort_bool_sorted {sample}"
-    ))
-    .expect("sort_bool_sorted should prove the sortedness surface");
-
-    env.elaborate_decl(&format!(
-        "theorem cat3_sort_bool_perm_sample \
-           : Perm Bool (eq_from_ord Bool bool_leq) {sample} (sort_bool {sample}) = \
-             sort_bool_perm {sample}"
-    ))
-    .expect("sort_bool_perm should prove count/multiset equality");
+    let names = [
+        "derived_example_cat3_sort_bool_sorted",
+        "derived_example_cat3_sort_bool_perm",
+    ];
+    let (env, owned) = cat3_owner_examples(&names);
+    for (example, private) in [
+        (names[0], "sort_bool_sorted"),
+        (names[1], "sort_bool_perm"),
+    ] {
+        assert_cat3_example_reference(&env, &owned, example, private, true);
+    }
+    assert_cat3_example_reference(&env, &owned, names[0], "sort_bool", false);
+    assert_cat3_example_reference(&env, &owned, names[1], "Perm", false);
 }
 
+/// Promise class: durable negative discriminator.
+///
+/// MEASURED: the owner rejects the wrong Nil endpoint paired with the valid
+/// take/drop-law application, and direct owner-scoped elaboration rejects the
+/// original false `Proved` counterexample at the proof-checking boundary.
+/// CLAIMED: the private take/drop law cannot prove that false endpoint.
+/// THE GAP: `ken reject` alone accepts any error, so the direct check guards
+/// the error family. Its owner scope currently persists after fence execution;
+/// item 2a must keep this counterexample live when that leak is removed.
 #[test]
 fn cat3_d1_wrong_take_drop_witness_rejected() {
-    let mut env = mk_env();
+    let example = "derived_example_cat3_take_drop_negative_control";
+    let (mut env, owned) = cat3_owner_examples(&[example]);
+    assert_cat3_example_reference(&env, &owned, example, "take_drop_decomposition", true);
+    for private in ["take", "drop"] {
+        assert_cat3_example_reference(&env, &owned, example, private, false);
+    }
     let err = env
         .elaborate_decl(
             "theorem cat3_bad_take_drop \
@@ -650,26 +779,43 @@ fn cat3_d1_wrong_take_drop_witness_rejected() {
                   (Nil Bool) \
                = Proved",
         )
-        .expect_err("wrong take/drop endpoint must not typecheck");
+        .expect_err("wrong owner-local take/drop endpoint must not typecheck");
     let msg = format!("{err}");
     assert!(
         msg.contains("Type mismatch")
             || msg.contains("type mismatch")
             || msg.contains("Kernel rejected"),
-        "wrong witness should reject during type/proof checking, got {msg}"
+        "wrong owner-local witness must reject during proof checking, got {msg}"
     );
 }
 
+/// Promise class: durable negative discriminator.
+///
+/// MEASURED: the owner rejects descending sortedness and lost-True Perm;
+/// their valid-neighbor fence mutations become accepted and red the tests.
+/// Direct owner-scoped checks also reject both original proof claims as a
+/// type mismatch or kernel refusal, rather than an unresolved private name.
+/// CLAIMED: these false concrete order/count propositions cannot be proved.
+/// THE GAP: the two inputs are not a full sorting/permutation proof oracle;
+/// direct checks presently rely on post-fence owner-scope persistence, so
+/// item 2a must preserve their proof-checking discriminator after its fix.
 #[test]
 fn cat3_d2_bad_sorted_and_bad_perm_witnesses_rejected() {
-    let mut env = mk_env();
+    let names = [
+        "derived_example_cat3_sorted_negative_control",
+        "derived_example_cat3_perm_negative_control",
+    ];
+    let (mut env, owned) = cat3_owner_examples(&names);
+    assert_cat3_example_reference(&env, &owned, names[0], "sort_bool_sorted", true);
+    assert_cat3_example_reference(&env, &owned, names[1], "Perm", false);
+    assert_cat3_example_reference(&env, &owned, names[1], "eq_from_ord", false);
 
     let err = env
         .elaborate_decl(
             "theorem cat3_bad_sorted_bool \
                : is_sorted Bool bool_leq (Cons Bool True (Cons Bool False (Nil Bool))) = Proved",
         )
-        .expect_err("descending Bool list must not satisfy is_sorted");
+        .expect_err("descending Bool list must not satisfy owner-local is_sorted");
     let msg = format!("{err}");
     assert!(
         msg.contains("Type mismatch")
@@ -686,7 +832,7 @@ fn cat3_d2_bad_sorted_and_bad_perm_witnesses_rejected() {
                    (Nil Bool) = \
                  \\q. match q { False |-> Proved ; True |-> Proved }",
         )
-        .expect_err("dropping True must not satisfy count-based Perm");
+        .expect_err("dropping True must not satisfy owner-local count-based Perm");
     let msg = format!("{err}");
     assert!(
         msg.contains("Type mismatch")
@@ -696,10 +842,26 @@ fn cat3_d2_bad_sorted_and_bad_perm_witnesses_rejected() {
     );
 }
 
+/// Promise class: durable checked-class and proof invariant.
+///
+/// MEASURED: seven registered class metadata IDs are owned transparent
+/// records; SetoidMorphism has `project`; five checked owner examples cite
+/// the corresponding owned lens, indexed and setoid operations or laws.
+/// CLAIMED: the concrete D3 witnesses use Derived's real classes and laws,
+/// not spellings installed by the flat fixture.
+/// THE GAP: registry metadata and constant occurrence are not a proof that
+/// all possible clients resolve these classes, or that every cited law is
+/// semantically necessary; only these checked examples and fields are pinned.
 #[test]
 fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
-    let mut env = mk_env();
-
+    let names = [
+        "derived_example_cat3_lens_get_set",
+        "derived_example_cat3_lens_set_get",
+        "derived_example_cat3_lens_set_set",
+        "derived_example_cat3_indexed_project",
+        "derived_example_cat3_setoid_project",
+    ];
+    let (env, owned) = cat3_owner_examples(&names);
     for class_name in [
         "View",
         "Lens",
@@ -709,9 +871,16 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
         "IndexedView",
         "SetoidMorphism",
     ] {
+        let class = env
+            .class_env
+            .class(class_name)
+            .unwrap_or_else(|| panic!("{class_name} must be a checked class"));
+        assert_eq!(class.projection.owner_name, class_name);
+        let id = class.projection.type_id;
+        assert!(owned.contains(&id), "Derived must own {class_name}");
         assert!(
-            env.class_env.class(class_name).is_some(),
-            "{class_name} should be registered as an ordinary class/record"
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{class_name} must be a checked record"
         );
     }
     assert!(
@@ -724,54 +893,35 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
             .any(|name| name == "project"),
         "setoid-morphism flavor must use field name `project`"
     );
-
-    env.elaborate_decl(
-        "theorem cat3_d3_get_set_sample \
-           : Equal Bool \
-               (fst_pair_bool_bool (set_fst_pair_bool_bool False (mk_pair Bool Bool True True))) \
-               False \
-           = fst_lens_get_set False (mk_pair Bool Bool True True)",
-    )
-    .expect("get-set lens law should be proof-returning and check");
-
-    env.elaborate_decl(
-        "theorem cat3_d3_set_get_sample \
-           : Equal (Pair Bool Bool) \
-              (set_fst_pair_bool_bool (fst_pair_bool_bool (mk_pair Bool Bool True False)) (mk_pair Bool Bool True False)) \
-              (mk_pair Bool Bool True False) \
-           = fst_lens_set_get (mk_pair Bool Bool True False)",
-    )
-    .expect("set-get lens law should be proof-returning and check as full pair equality");
-
-    env.elaborate_decl(
-        "theorem cat3_d3_set_set_sample \
-           : Equal (Pair Bool Bool) \
-              (set_fst_pair_bool_bool False (set_fst_pair_bool_bool True (mk_pair Bool Bool True False))) \
-              (set_fst_pair_bool_bool False (mk_pair Bool Bool True False)) \
-           = set_fst_pair_bool_bool::set_set True False (mk_pair Bool Bool True False)",
-    )
-    .expect("set-set lens law should be proof-returning and check as full pair equality");
-
-    env.elaborate_decl(
-        "theorem cat3_d3_indexed_project_sample \
-           : Equal Bool \
-               (bool_pair_index_project (mk_pair Bool Bool True False) True) \
-               False \
-           = Proved",
-    )
-    .expect("indexed flavor should expose a concrete project operation");
-
-    env.elaborate_decl(
-        "theorem cat3_d3_setoid_project_sample \
-           : Equal Bool (id_bool True) (id_bool True) = \
-             id_bool::respects True True Proved",
-    )
-    .expect("setoid-morphism respects law should check through project");
+    for (example, law) in [
+        (names[0], "fst_lens_get_set"),
+        (names[1], "fst_lens_set_get"),
+        (names[2], "set_fst_pair_bool_bool::set_set"),
+        (names[4], "id_bool::respects"),
+    ] {
+        assert_cat3_example_reference(&env, &owned, example, law, true);
+    }
+    assert_cat3_example_reference(&env, &owned, names[3], "bool_pair_index_project", false);
 }
 
+/// Promise class: durable negative discriminator.
+///
+/// MEASURED: the owner rejects the get-set example with only its endpoint
+/// changed from False to True; restoring False makes that reject fence red.
+/// Direct owner-scoped elaboration rejects the original wrong proof claim
+/// at a type-checking or kernel-refusal error, not an unresolved name.
+/// CLAIMED: the checked lens get-set law does not prove the wrong endpoint.
+/// THE GAP: the fence alone can reject for an unrelated reason; the direct
+/// check is currently supported by leaked post-fence owner scope, which item
+/// 2a must remove while retaining the exact-error discriminator.
 #[test]
 fn cat3_d3_wrong_lens_endpoint_rejected() {
-    let mut env = mk_env();
+    let example = "derived_example_cat3_lens_get_set";
+    let (mut env, owned) = cat3_owner_examples(&[example]);
+    assert_cat3_example_reference(&env, &owned, example, "fst_lens_get_set", true);
+    for private in ["fst_pair_bool_bool", "set_fst_pair_bool_bool"] {
+        assert_cat3_example_reference(&env, &owned, example, private, false);
+    }
     let err = env
         .elaborate_decl(
             "theorem cat3_bad_lens_get_set \
@@ -780,7 +930,7 @@ fn cat3_d3_wrong_lens_endpoint_rejected() {
                    True \
                = fst_lens_get_set False (mk_pair Bool Bool True True)",
         )
-        .expect_err("wrong get-set endpoint must not typecheck");
+        .expect_err("wrong owner-local get-set endpoint must not typecheck");
     let msg = format!("{err}");
     assert!(
         msg.contains("Type mismatch")
