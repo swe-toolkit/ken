@@ -185,9 +185,9 @@ jobs:
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
           phase_timestamp project-filtered end
           phase_timestamp planner start
-          # These 21 files are the three per-test weight sources. The newest
-          # run supplies wall calibration and the current inventory baseline;
-          # the aa9 inventory remains the population-reference comparison.
+          # These 35 files are the five per-test timing sources. The newest
+          # run supplies the current inventory baseline; run 36401179125 is the
+          # fixed wall calibration, and the aa9 inventory remains the reference.
           python3 scripts/ci-duration-shard.py inventory.json \
             docs/program/evidence/ci-workspace-run-36371407331/shard-1.json \
             docs/program/evidence/ci-workspace-run-36371407331/shard-2.json \
@@ -210,15 +210,29 @@ jobs:
             docs/program/evidence/ci-workspace-run-36401179125/shard-5.json \
             docs/program/evidence/ci-workspace-run-36401179125/shard-6.json \
             docs/program/evidence/ci-workspace-run-36401179125/shard-7.json \
+            docs/program/evidence/ci-workspace-run-36417268028/shard-1.json \
+            docs/program/evidence/ci-workspace-run-36417268028/shard-2.json \
+            docs/program/evidence/ci-workspace-run-36417268028/shard-3.json \
+            docs/program/evidence/ci-workspace-run-36417268028/shard-4.json \
+            docs/program/evidence/ci-workspace-run-36417268028/shard-5.json \
+            docs/program/evidence/ci-workspace-run-36417268028/shard-6.json \
+            docs/program/evidence/ci-workspace-run-36417268028/shard-7.json \
+            docs/program/evidence/ci-workspace-run-36419387050/shard-1.json \
+            docs/program/evidence/ci-workspace-run-36419387050/shard-2.json \
+            docs/program/evidence/ci-workspace-run-36419387050/shard-3.json \
+            docs/program/evidence/ci-workspace-run-36419387050/shard-4.json \
+            docs/program/evidence/ci-workspace-run-36419387050/shard-5.json \
+            docs/program/evidence/ci-workspace-run-36419387050/shard-6.json \
+            docs/program/evidence/ci-workspace-run-36419387050/shard-7.json \
             --population-baseline \
-            docs/program/evidence/ci-workspace-run-36401179125/inventory.json \
+            docs/program/evidence/ci-workspace-run-36419387050/inventory.json \
             --population-reference \
             docs/program/evidence/ci-workspace-run-36372772505/inventory.json \
             --wall-calibration \
             docs/program/evidence/ci-workspace-run-36401179125/job-steps.tsv \
             --wall-calibration-artifacts \
             docs/program/evidence/ci-workspace-run-36401179125 \
-            --output-dir duration-filters
+            --output-dir duration-filters > /dev/null
           phase_timestamp planner end
           phase_timestamp realize-and-stage start
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
