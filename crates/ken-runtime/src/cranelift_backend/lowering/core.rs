@@ -33,6 +33,39 @@ use super::calls::{recursive_position_unit_calls, RECURSIVE_POSITION_UNIT_CALLS}
 // production caller in this file -- only its `tests` subtree does -- so it
 // is imported in `tests/mod.rs` instead (AC-8 class 2), not here.
 
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static EXIT_CODE_CASE_OF_CASE_ROUTES: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn note_exit_code_case_of_case_route() {
+    EXIT_CODE_CASE_OF_CASE_ROUTES.with(|routes| {
+        let count = routes.get() + 1;
+        routes.set(count);
+        if std::env::var_os("RT_TREE_ROUTE_CENSUS").is_some() {
+            eprintln!("RT_TREE_ROUTE_CENSUS hit={count}");
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[doc(hidden)]
+pub fn with_exit_code_case_of_case_route_count<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    struct Restore(usize);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            EXIT_CODE_CASE_OF_CASE_ROUTES.with(|routes| routes.set(self.0));
+        }
+    }
+    let prior = EXIT_CODE_CASE_OF_CASE_ROUTES.with(|routes| routes.replace(0));
+    let _restore = Restore(prior);
+    let result = operation();
+    let count = EXIT_CODE_CASE_OF_CASE_ROUTES.with(std::cell::Cell::get);
+    (result, count)
+}
+
 mod primitive;
 
 #[cfg(test)]
@@ -6332,6 +6365,50 @@ impl<'a> Lowering<'a> {
                 producer_env,
                 &composed,
             );
+        }
+        // An inner Match that produces ExitCode must stay constructor-valued
+        // until the outer tree-producing Match selects its case. Lowering it
+        // alone projects its arms to ProcessExitStatus, which cannot be decoded
+        // back into a constructor. Other nested matches retain their route.
+        if let RuntimeExpr::Match {
+            scrutinee: inner,
+            cases: inner_cases,
+            default: inner_default,
+        } = scrutinee.expr
+        {
+            let outer_is_exit_code = producer_cases.iter().any(|case| {
+                case.constructor == self.process_symbols.exit_success
+                    || case.constructor == self.process_symbols.exit_failure
+            });
+            if outer_is_exit_code {
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                note_exit_code_case_of_case_route();
+                let inner_scrutinee = self.child_occurrence(scrutinee.static_origin, 0, inner)?;
+                let mut composed = Vec::with_capacity(eliminators.len() + 2);
+                composed.push(EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                    cases: inner_cases,
+                    default: inner_default,
+                    env: producer_env,
+                    static_origin: scrutinee.static_origin,
+                    retained_scrutinee_index: None,
+                    deferred_constructor_case: None,
+                }));
+                composed.push(EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                    cases: producer_cases,
+                    default: producer_default,
+                    env: producer_env,
+                    static_origin,
+                    retained_scrutinee_index: None,
+                    deferred_constructor_case: None,
+                }));
+                composed.extend_from_slice(eliminators);
+                return self.lower_computational_producer_expr(
+                    builder,
+                    inner_scrutinee,
+                    producer_env,
+                    &composed,
+                );
+            }
         }
         let selected = self.lower_expr(builder, scrutinee, producer_env)?;
         if let LoweringOperand::Carried(word) = selected {

@@ -183,8 +183,9 @@ pub use lowering::core::{
     handler_owned_deferred_response_mutation_is_exact,
     with_branched_scrutinee_unit_body_match_branch_entry_suppressed,
     with_branched_scrutinee_unit_body_route1, with_handler_owned_deferred_response_mutation,
-    with_match_recursor_census, BranchedScrutineeUnitBodyRoute1,
-    HandlerOwnedDeferredResponseMutation, MatchRecursorCensusRow,
+    with_match_recursor_census, with_exit_code_case_of_case_route_count,
+    BranchedScrutineeUnitBodyRoute1, HandlerOwnedDeferredResponseMutation,
+    MatchRecursorCensusRow,
 };
 
 // `RT-4B-OBSERVATION-FEATURE-GATE`: the existing D2f observer, reachable by
