@@ -5,7 +5,7 @@ mod catalog_or;
 
 use std::collections::BTreeSet;
 
-use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
+use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
@@ -433,11 +433,12 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: the roots-loaded Cursor and Parsing declarations retain no checked
-/// reference to the three opaque Bytes primitives, Cursor owns none of the four
-/// retired cache declarations, and the full CC3 load adds no trusted entry.
-/// CLAIMED: the structural parsing path remains independent of opaque byte
-/// indexing/length operations and of its retired cached carrier.
+/// MEASURED: Cursor/Decoder add no trust; the byte-contract provider adds
+/// exactly its four F1-F4 facts, and Parsing adds none on top. Cursor and
+/// Parsing retain no checked reference to opaque Bytes index/length/slice;
+/// Cursor owns none of the retired cached carrier declarations.
+/// CLAIMED: the structural parsing path adds no fifth trusted fact and stays
+/// independent of opaque byte indexing/length and the retired cache.
 /// THE GAP: these identity and inventory checks do not prove parsing results;
 /// the progress/location test below independently exercises those behaviors.
 #[test]
@@ -446,9 +447,49 @@ fn cc3_checked_identity_closure_and_trust_are_structural() {
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let cursor_owned = load_cursor_module(&mut env);
     let _decoder_owned = load_decoder_module(&mut env);
+    let after_cc3: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after_cc3, "Cursor and Decoder must add no trust");
+
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Binary.BytesPrimitiveContracts",
+    )
+    .expect("Parsing's four byte contracts must roots-load before its trust baseline");
+    let after_bytes: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let expected_byte_facts: BTreeSet<_> = [
+        "bytes_concat_list_view",
+        "bytes_encode_ascii_octets",
+        "bytes_decode_encode",
+        "ascii_bytes_utf8",
+    ]
+    .into_iter()
+    .map(|name| {
+        let public_fact = env.globals[&format!("Data.Binary.BytesPrimitiveContracts.{name}")];
+        let fresh: Vec<_> = trusted_base_delta(&env.env, public_fact)
+            .into_iter()
+            .filter(|id| !after_cc3.contains(id))
+            .collect();
+        let [backing_fact] = fresh.as_slice() else {
+            panic!("{name} must have exactly one new backing postulate, got {fresh:?}")
+        };
+        *backing_fact
+    })
+    .collect();
+    assert_eq!(
+        after_bytes
+            .difference(&after_cc3)
+            .copied()
+            .collect::<BTreeSet<_>>(),
+        expected_byte_facts,
+        "only the four audited byte-provider facts may enter trust",
+    );
+
     let parsing_owned = load_parsing_module(&mut env);
-    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(before, after, "CC3 must add zero trusted-base entries");
+    let after_parsing: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(
+        after_bytes, after_parsing,
+        "Parsing must add no trust above F1-F4"
+    );
 
     let forbidden_primitives = ["bytes_length", "bytes_slice", "bytes_at"]
         .into_iter()

@@ -197,6 +197,7 @@ struct DirectParsing {
     env: ElabEnv,
     lawful: BTreeSet<GlobalId>,
     derived: BTreeSet<GlobalId>,
+    byte_contracts: BTreeSet<GlobalId>,
     nat_order: BTreeSet<GlobalId>,
     diagnostics: BTreeSet<GlobalId>,
     cursor: BTreeSet<GlobalId>,
@@ -212,6 +213,8 @@ fn direct_parsing() -> DirectParsing {
     let lawful = module_ids(&env, "Core.Classes.LawfulClasses");
     load(&mut env, "Data.Collections.Derived");
     let derived = module_ids(&env, "Data.Collections.Derived");
+    load(&mut env, "Data.Binary.BytesPrimitiveContracts");
+    let byte_contracts = module_ids(&env, "Data.Binary.BytesPrimitiveContracts");
     load(&mut env, "Data.Numeric.Nat.Order");
     let nat_order = module_ids(&env, "Data.Numeric.Nat.Order");
     load(&mut env, DC);
@@ -241,6 +244,7 @@ fn direct_parsing() -> DirectParsing {
         env,
         lawful,
         derived,
+        byte_contracts,
         nat_order,
         diagnostics,
         cursor,
@@ -491,6 +495,7 @@ fn parsing_module_loader_visible_inventory_is_exact_and_coherent() {
         "ParseResult",
         "ParseResultValid",
         "Parsed",
+        "ParsedPrintedBool",
         "ParsedValid",
         "Parser",
         "ParserLaws",
@@ -509,6 +514,7 @@ fn parsing_module_loader_visible_inventory_is_exact_and_coherent() {
         "error_source",
         "error_span",
         "format_bool_expr",
+        "format_bool_expr_print_round_trip",
         "format_bool_expr_on_parse_failure",
         "format_bool_expr_on_parse_success",
         "located_source",
@@ -516,11 +522,13 @@ fn parsing_module_loader_visible_inventory_is_exact_and_coherent() {
         "located_value",
         "parse_bool_expr",
         "parse_bool_expr_laws",
+        "parse_bool_expr_print_round_trip",
         "parse_bool_expr_total",
         "parser_fail",
         "parser_from_decoder",
         "parser_pure",
         "print_bool_expr",
+        "print_bool_expr_utf8",
         "source_bytes",
         "source_bytes::utf8",
         "source_id",
@@ -629,7 +637,9 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
             "MkCursorOps",
             "cursor_advance",
             "cursor_locate",
+            "cursor_nat_lt",
             "cursor_peek",
+            "cursor_remaining",
         ])
     );
     assert_eq!(
@@ -644,13 +654,16 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
             "DecoderResult",
             "decoder_alt",
             "decoder_alt_preserves",
+            "decoder_alt_rejection_uses_second",
             "decoder_error_location",
             "decoder_fail",
             "decoder_many",
             "decoder_many_preserves",
+            "decoder_many_rejected_succeeds",
             "decoder_pure",
             "decoder_recursive",
             "decoder_recursive_preserves",
+            "decoder_recursive_succeeds",
             "decoder_satisfy",
             "decoder_satisfy_preserves",
             "decoder_seq",
@@ -659,20 +672,56 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
     );
     assert_eq!(
         intersection_names("Core.Classes.LawfulClasses", &loaded.lawful),
-        names(&["leq_nat", "leq_nat::trans"])
+        names(&["bytes_to_list_injective", "leq_nat", "leq_nat::trans"])
     );
     assert_eq!(
         intersection_names("Data.Collections.Derived", &loaded.derived),
         names(&[
             "bytes_nat_length",
+            "length",
             "list_append",
+            "list_append::assoc",
+            "list_append::right_unit",
+            "map",
             "nth",
             "nth::some_below_length"
         ])
     );
     assert_eq!(
+        intersection_names(
+            "Data.Binary.BytesPrimitiveContracts",
+            &loaded.byte_contracts
+        ),
+        names(&[
+            "AllAscii",
+            "AllAsciiCodes",
+            "Ascii100",
+            "Ascii101",
+            "Ascii102",
+            "Ascii108",
+            "Ascii110",
+            "Ascii111",
+            "Ascii114",
+            "Ascii115",
+            "Ascii116",
+            "Ascii117",
+            "Ascii32",
+            "Ascii40",
+            "Ascii41",
+            "Ascii97",
+            "AsciiBytes",
+            "AsciiCode",
+            "MkAsciiCode",
+            "NoCodes",
+            "SomeCodes",
+            "ascii_bytes_utf8",
+            "bytes_concat_list_view",
+            "bytes_encode_ascii_octets",
+        ])
+    );
+    assert_eq!(
         intersection_names("Data.Numeric.Nat.Order", &loaded.nat_order),
-        names(&["sub"])
+        names(&["sub", "sub::suc_decreases"])
     );
     assert!(
         refs.is_disjoint(&loaded.numeric_sibling),

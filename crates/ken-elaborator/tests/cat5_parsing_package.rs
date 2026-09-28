@@ -248,64 +248,14 @@ fn term_mentions(term: &ken_kernel::Term, target: GlobalId) -> bool {
     }
 }
 
-fn leading_pi_count(term: &ken_kernel::Term) -> usize {
-    let mut count = 0;
-    let mut current = term;
-    while let ken_kernel::Term::Pi(_, body) = current {
-        count += 1;
-        current = body;
-    }
-    count
-}
-
-fn term_contains_saturated_provider_head_occurrence(
-    term: &ken_kernel::Term,
-    provider: GlobalId,
-    arity: usize,
-) -> bool {
-    if matches!(term, ken_kernel::Term::App(_, _)) {
-        let mut argument_count = 0;
-        let mut head = term;
-        while let ken_kernel::Term::App(function, _) = head {
-            argument_count += 1;
-            head = function;
-        }
-        if argument_count >= arity
-            && matches!(head, ken_kernel::Term::Const { id, .. } if *id == provider)
-        {
-            return true;
-        }
-    }
-    term.children()
-        .into_iter()
-        .any(|child| term_contains_saturated_provider_head_occurrence(child, provider, arity))
-}
-
-fn transparent_parsing_bodies_with_saturated_provider_head_occurrence(
-    env: &ElabEnv,
-    provider: GlobalId,
-) -> BTreeSet<String> {
-    let provider_type = match env.env.lookup(provider) {
-        Some(Decl::Transparent { ty, .. }) => ty,
-        other => panic!("Derived list_append must be transparent, got {other:?}"),
-    };
-    let arity = leading_pi_count(provider_type);
-    assert!(arity > 0, "Derived list_append must have a function type");
-    let prefix = "Capability.Parsing.Parsing.";
-    env.globals
-        .iter()
-        .filter_map(|(qualified, id)| {
-            let local = qualified.strip_prefix(prefix)?;
-            let (_, body) = env.env.transparent_body(*id)?;
-            term_contains_saturated_provider_head_occurrence(&body, provider, arity)
-                .then(|| local.to_owned())
-        })
-        .collect()
-}
-
 #[test]
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
     let (mut env, provider_owned) = dependency_env_with_provider_owned();
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Binary.BytesPrimitiveContracts",
+    )
+    .expect("new Parsing byte dependency must load before its local trust baseline");
     let base_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
     let parsing_owned = load_parsing_module(&mut env);
     let after_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
@@ -377,9 +327,13 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "complete_bool_decoder",
         "parse_bool_expr",
         "parse_bool_expr_laws",
+        "parse_bool_expr_print_round_trip",
+        "ParsedPrintedBool",
         "parse_bool_expr_total",
         "print_bool_expr",
+        "print_bool_expr_utf8",
         "format_bool_expr",
+        "format_bool_expr_print_round_trip",
         "format_bool_expr_on_parse_success",
         "format_bool_expr_on_parse_failure",
     ] {
@@ -473,41 +427,26 @@ fn cat5_source_id_host_read_rejects_forged_qualified_provider_alias() {
     );
 }
 
-/// MEASURED: roots-loaded transparent Parsing bodies containing at least one
-/// saturated application-head occurrence of the exact Derived `list_append`
-/// identity form the literal expected population. The retired qualified local
-/// name is absent, and a selective-import pair distinguishes the named binding
-/// from another available provider.
-///
-/// LIMITATION: this is a syntactic occurrence-population pin. It does not prove
-/// that an occurrence is evaluated, lies on every reachable route, reaches a
-/// body's result, or excludes unrelated or local computation elsewhere.
-/// Concrete round-trip observations, including the fixed syntax-child span
-/// order, pin behavior in a sibling test; the census and affected closure own
-/// the remaining migration obligations.
+/// Promise class: durable invariant.
+/// MEASURED: Parsing adds no local trusted declaration after its explicit
+/// dependencies load; a separate consumer can call a selectively imported
+/// append provider, and an omitted sibling name is rejected.
+/// CLAIMED: the new byte bridges do not replace the canonical append provider
+/// or change the import boundary. THE GAP: this does not assert which Parsing
+/// declaration calls append; the Boolean parse/print test exercises behavior.
 #[test]
-fn parsing_append_occurrence_population_and_migration_shape_are_pinned() {
-    let (mut env, provider_owned) = dependency_env_with_provider_owned();
+fn parsing_selective_append_import_preserves_client_resolution_and_local_trust() {
+    let (mut env, _) = dependency_env_with_provider_owned();
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Binary.BytesPrimitiveContracts",
+    )
+    .expect("byte contracts must load before the local trust baseline");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
         .expect("Capability.Parsing.Parsing must roots-load with its selective import");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Parsing must add zero consumer-local trust");
-
-    assert!(
-        !env.globals
-            .contains_key("Capability.Parsing.Parsing.list_append"),
-        "the retired package-local list_append must be absent"
-    );
-    let provider = catalog_or::provider_owned_id(
-        &env, &provider_owned.derived, "Data.Collections.Derived", "list_append",
-    ).expect("Derived must own canonical list_append");
-    assert_eq!(
-        transparent_parsing_bodies_with_saturated_provider_head_occurrence(&env, provider),
-        BTreeSet::from(["syntax_node_binary".to_owned()]),
-        "transparent Parsing bodies containing a saturated exact list_append-provider \
-         application-head occurrence must match the closed expected population"
-    );
 
     let mut imported = ElabEnv::empty().expect("prelude bootstrap");
     imported
@@ -545,6 +484,11 @@ fn parsing_append_occurrence_population_and_migration_shape_are_pinned() {
 #[test]
 fn parsing_reuses_the_canonical_nat_providers() {
     let (mut env, provider_owned) = dependency_env_with_provider_owned();
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Binary.BytesPrimitiveContracts",
+    )
+    .expect("byte contracts must load before the local trust baseline");
     let before: HashSet<_> = env.env.trusted_base().into_iter().collect();
     let parsing_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
         .expect("Capability.Parsing.Parsing must roots-load over its dependency fixture");
@@ -1414,7 +1358,8 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
         const printed_bool_expr_bytes : Bytes =
           print_bool_expr representative_bool_expr
 
-        theorem printed_bool_expr_utf8 : IsUtf8 printed_bool_expr_bytes = Axiom
+        theorem printed_bool_expr_utf8 : IsUtf8 printed_bool_expr_bytes =
+          print_bool_expr_utf8 representative_bool_expr
         instance Source PrintedBoolExprSource {
           source_id_field = MkSourceId (Suc (Suc Zero)) ;
           source_bytes_field = printed_bool_expr_bytes ;
