@@ -57,7 +57,10 @@ fn indexed_int_convoy_native_refusal_waits_for_compared_native_rows() {
             error: CheckedCoreBodyViewError::UnsupportedDependentMotive { symbol, family },
             ..
         }) => {
-            assert_eq!(family, StableSymbol::declaration("rt-c5-indexed", &[], "Vec"));
+            assert_eq!(
+                family,
+                StableSymbol::declaration("rt-c5-indexed", &[], "Vec")
+            );
             assert_eq!(symbol.namespace, SymbolNamespace::Declaration);
         }
         other => panic!("expected the named indexed-motive refusal, got {other:?}"),
