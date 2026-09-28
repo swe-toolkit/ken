@@ -1549,6 +1549,54 @@ fn selected_host_response_route(
     Ok(selected)
 }
 
+// Observation only: the checked response row already carries the selected
+// producer Call. Project its dispatch root, then independently inspect the
+// selected CM's scrutinee subtree; never use the selector's value-flow walk
+// as the oracle for containment. This adds no production route or authority.
+#[cfg(feature = "px8-ds-test-support")]
+impl StaticTransitionPlan<'_> {
+    pub(super) fn observed_host_response_dispatch(
+        &self,
+        vis_origin: StaticOriginId,
+        producer_call_origin: StaticOriginId,
+    ) -> Result<(StaticOriginId, Option<StaticOriginId>, bool), CraneliftBackendError> {
+        let routes = host_response_routes(self)?;
+        let mut matching = routes.iter().filter(|(_, cases)| {
+            cases.values().any(|route| route.producer_call_origin == producer_call_origin)
+        });
+        let Some((&root, _)) = matching.next() else {
+            return Err(planner_error("an observed response call has no dispatch root"));
+        };
+        if matching.next().is_some() {
+            return Err(planner_error("an observed response call has multiple dispatch roots"));
+        }
+        let parents = response_parents(self)?;
+        let mut cursor = root;
+        while let Some((parent, position)) = parents.get(&cursor).copied() {
+            if let RuntimeExpr::ComputationalMatch { cases, .. } =
+                self.planned_occurrence_expr(parent)?
+            {
+                if position.checked_sub(1).and_then(|index| cases.get(index))
+                    .is_some_and(|case| case.constructor.as_str().ends_with("::ITree::Vis"))
+                {
+                    let mut pending = vec![self.semantic.child_origin(parent, 0)?];
+                    let mut contains_vis = false;
+                    while let Some(origin) = pending.pop() {
+                        if origin == vis_origin {
+                            contains_vis = true;
+                            break;
+                        }
+                        pending.extend(self.semantic.child_origins(origin)?.iter().copied());
+                    }
+                    return Ok((root, Some(parent), contains_vis));
+                }
+            }
+            cursor = parent;
+        }
+        Ok((root, None, false))
+    }
+}
+
 fn validate_static_response_demand_closure(
     expected: &[StaticResponseContextDemand],
     reached: &[StaticResponseContextDemand],

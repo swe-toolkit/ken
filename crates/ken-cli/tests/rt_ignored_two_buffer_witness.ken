@@ -1,0 +1,22 @@
+program capabilities FS AFull
+proc buffer_body (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult Unit Unit)
+    (ResourceBodyOk Unit Unit MkUnit)
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+        (withBuffer AFull Unit Unit (1 : Int) buffer_body)
+        (\first. bind (Coproduct (FSOp AFull) AmbientOp)
+          (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+          (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+          (withBuffer AFull Unit Unit (1 : Int) buffer_body)
+          (\second. host_exit AFull Success))
+  }
