@@ -459,6 +459,59 @@ class DurationShardControls(unittest.TestCase):
             self.assertEqual(evidence["population_delta"]["added"], [])
             self.assertEqual(evidence["population_delta"]["removed"], [])
 
+    def test_stale_only_source_binary_uses_global_median(self):
+        """A stale-only source binary must not manufacture a binary fallback.
+
+        MEASURED: live binaries contribute durations 2 and 4; only a stale
+        identity supplies a duration for the replacement's binary.
+        CLAIMED: the replacement falls back to the global live median, 3, not
+        the stale binary's 10,000.
+        THE GAP: this resolver control does not establish candidate-run timing
+        evidence; actual new-test durations and shards remain pending CI.
+        """
+        live = [
+            ("fixture::measured-a measured", "fixture::measured-a", "measured"),
+            ("fixture::measured-b measured", "fixture::measured-b", "measured"),
+            ("fixture::stale-only replacement", "fixture::stale-only", "replacement"),
+        ]
+        stale_id = "fixture::stale-only retired"
+        samples = {
+            "fixture::measured-a measured": {"run:101": 2.0},
+            "fixture::measured-b measured": {"run:102": 4.0},
+            stale_id: {"run:101": 10_000.0},
+        }
+
+        resolved, fallbacks, single_run = _planner.resolve_duration_sources(
+            live, samples
+        )
+
+        replacement_id = "fixture::stale-only replacement"
+        self.assertNotIn(stale_id, {test_id for test_id, _, _ in live})
+        self.assertEqual(resolved[replacement_id], 3.0)
+        self.assertEqual(
+            fallbacks,
+            [{
+                "test_id": replacement_id,
+                "seconds": 3.0,
+                "method": "global-median",
+            }],
+        )
+        self.assertEqual(
+            single_run,
+            [
+                {
+                    "test_id": "fixture::measured-a measured",
+                    "seconds": 2.0,
+                    "source": "run:101",
+                },
+                {
+                    "test_id": "fixture::measured-b measured",
+                    "seconds": 4.0,
+                    "source": "run:102",
+                },
+            ],
+        )
+
     def test_workspace_plan_lpt_balances_latest_live_defaults(self):
         source = Path(
             "docs/program/evidence/ci-workspace-timings-36295180542.tsv"
