@@ -1,7 +1,7 @@
 ---
 id: CAT-PRELUDE-FOLD-REMOVAL
 title: "Delete the prelude's list fold, a convenience name with no catalog consumer that collides by spelling with Data.Collections.Map's own fold; move it into Data.Collections.Derived only if the consumer census finds a list-fold user; fourth L3 slice of the minimal-prelude program"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect
