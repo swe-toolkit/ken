@@ -698,9 +698,11 @@ fn cat3_d2_bool_sort_surfaces_check_against_real_package_defs() {
 /// endpoint. Changing only the rejected endpoint to the true one makes this
 /// test red when the reject fence unexpectedly elaborates.
 /// CLAIMED: the checked law cannot prove that concrete false endpoint.
-/// THE GAP: `ken reject` does not report the error family, and no separate
-/// post-fence source is allowed to borrow the private owner scope. The paired
-/// valid-neighbor mutation guards against an unrelated rejection.
+/// THE GAP: the executor erases error kinds, so the proof-level refusal is
+/// inferred from the accepted example and endpoint-only valid-neighbor
+/// mutation, not an observed KernelRejected/TypeMismatch. Endpoint-only pairing
+/// and name coverage are review-time checks, not durable test assertions;
+/// later fence edits could break them without reddening this pin.
 #[test]
 fn cat3_d1_wrong_take_drop_witness_rejected() {
     let example = "derived_example_cat3_take_drop_negative_control";
@@ -713,21 +715,24 @@ fn cat3_d1_wrong_take_drop_witness_rejected() {
 
 /// Promise class: durable negative discriminator.
 ///
-/// MEASURED: the owner rejects descending sortedness and lost-True Perm;
-/// their paired checked examples cite the owned law/Perm identities.
-/// Both valid-neighbor fence mutations turn red on unexpected acceptance.
-/// CLAIMED: the false concrete order/count propositions cannot be proved.
-/// THE GAP: these inputs do not prove generic sort/permutation behavior;
-/// `ken reject` does not expose the error family. Pairing checked examples
-/// with two independent mutations guards an accidental unrelated refusal.
+/// MEASURED: owner-local sortedness and permutation rejects fail while their
+/// paired checked examples cite the owned law/Perm identities. Swapping each
+/// reject to its example's true endpoint makes the reject unexpectedly check.
+/// CLAIMED: these concrete false order and count propositions cannot be proved.
+/// THE GAP: these inputs do not prove generic behavior; the executor erases
+/// error kinds, so proof-level refusal follows from accepted examples and
+/// endpoint-only mutations, not observed KernelRejected/TypeMismatch. Pairing
+/// and name coverage are review-time checks, not durable assertions; later
+/// fence edits could break them without reddening this pin.
 #[test]
 fn cat3_d2_bad_sorted_and_bad_perm_witnesses_rejected() {
     let names = [
         "derived_example_cat3_sorted_negative_control",
-        "derived_example_cat3_perm_negative_control",
+        "derived_example_cat3_sort_bool_perm",
     ];
     let (env, owned) = cat3_owner_examples(&names);
     assert_cat3_example_reference(&env, &owned, names[0], "sort_bool_sorted", true);
+    assert_cat3_example_reference(&env, &owned, names[1], "sort_bool_perm", true);
     assert_cat3_example_reference(&env, &owned, names[1], "Perm", false);
     assert_cat3_example_reference(&env, &owned, names[1], "eq_from_ord", false);
 }
@@ -800,9 +805,11 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
 /// changed from the paired checked example's False to True. Restoring False
 /// makes the reject fence red because the proof now elaborates.
 /// CLAIMED: the checked lens get-set law cannot prove the wrong endpoint.
-/// THE GAP: `ken reject` alone does not establish the error family; the
-/// paired valid-neighbor mutation demonstrates that this fence tests the
-/// endpoint rather than an unavailable private owner name.
+/// THE GAP: the executor erases error kinds, so proof-level refusal is
+/// inferred from the accepted example and endpoint-only valid-neighbor
+/// mutation, not observed KernelRejected/TypeMismatch. Endpoint-only pairing
+/// and name coverage are review-time checks, not durable test assertions;
+/// later fence edits could break them without reddening this pin.
 #[test]
 fn cat3_d3_wrong_lens_endpoint_rejected() {
     let example = "derived_example_cat3_lens_get_set";
