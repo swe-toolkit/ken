@@ -24,8 +24,9 @@ WALL_CALIBRATION_COLUMNS = [
     "test_step_seconds",
     "job_wall_seconds",
 ]
-# Use the latest complete full-CI per-test source for work estimates. Missing
-# tests use their binary's measured median, or the global median if unseen.
+# CI uses each identity's maximum passing duration across two full-CI sources.
+# A single-source observation is retained; unmeasured live identities use the
+# same-binary median or the global median when their binary has no observations.
 NEXTTEST_TIMING_ROW = re.compile(
     r"^(?P<shard>\d+)\s+PASS\s+\[\s*(?P<seconds>[0-9.]+)s\s*\]"
     r"\s+\(\s*\d+/\d+\)\s+(?P<test_id>.+)$"
@@ -113,18 +114,19 @@ def selected_projection(inventory, assignment_path, shard, output):
         json.dump(value, file)
 
 
-def read_durations(paths):
+def read_duration_sources(paths):
     if isinstance(paths, (str, os.PathLike)):
         paths = [paths]
     paths = [os.fspath(path) for path in paths]
     if not paths:
         raise SystemExit("duration evidence has no input files")
-    durations = {}
+    samples = {}
     run_test_shards = {}
     run_fallbacks = {}
     for path in paths:
         observed = {}
         if path.endswith(".tsv"):
+            source_id = f"file:{path}"
             with open(path, encoding="utf-8") as source:
                 rows = source.readlines()
             for line_number, line in enumerate(rows, 1):
@@ -150,6 +152,7 @@ def read_durations(paths):
                 artifact = ci_workspace_timings.validate_artifact(evidence)
             except (OSError, json.JSONDecodeError, ci_workspace_timings.TimingArtifactError) as error:
                 raise SystemExit(f"{path}: invalid duration artifact: {error}") from error
+            source_id = f"run:{artifact['run_id']}"
             prior_fallbacks = run_fallbacks.setdefault(artifact["run_id"], artifact["fallbacks"])
             if prior_fallbacks != artifact["fallbacks"]:
                 raise SystemExit(
@@ -180,19 +183,37 @@ def read_durations(paths):
                     continue
                 observed[test_id] = float(seconds)
         for test_id, seconds in observed.items():
-            durations[test_id] = max(durations.get(test_id, seconds), seconds)
-    return durations
+            prior = samples.setdefault(test_id, {}).get(source_id)
+            samples[test_id][source_id] = seconds if prior is None else max(prior, seconds)
+    return samples
 
 
-def resolve_durations(live, measured):
-    """Fill missing live identities from per-binary then global medians."""
+def read_durations(paths):
+    return {
+        test_id: max(samples.values())
+        for test_id, samples in read_duration_sources(paths).items()
+    }
+
+
+def resolve_duration_sources(live, samples):
+    """Use measured maxima, then binary or global medians for missing tests."""
     by_binary = {}
     measured_live = {}
+    single_run = []
     for rendered, binary_id, _ in live:
-        if rendered in measured:
-            duration = measured[rendered]
-            measured_live[rendered] = duration
-            by_binary.setdefault(binary_id, []).append(duration)
+        observations = samples.get(rendered, {})
+        if not observations:
+            continue
+        duration = max(observations.values())
+        measured_live[rendered] = duration
+        by_binary.setdefault(binary_id, []).append(duration)
+        if len(observations) == 1:
+            source_id, single_seconds = next(iter(observations.items()))
+            single_run.append({
+                "test_id": rendered,
+                "seconds": single_seconds,
+                "source": source_id,
+            })
     if not measured_live:
         raise SystemExit("cannot estimate unmeasured tests without any live timing rows")
 
@@ -210,6 +231,16 @@ def resolve_durations(live, measured):
         seconds = binary_medians.get(binary_id, global_median)
         resolved[rendered] = seconds
         fallbacks.append({"test_id": rendered, "seconds": seconds, "method": method})
+    return resolved, fallbacks, single_run
+
+
+def resolve_durations(live, measured):
+    """Legacy map adapter for controls that do not need source attribution."""
+    samples = {
+        test_id: {"legacy": seconds}
+        for test_id, seconds in measured.items()
+    }
+    resolved, fallbacks, _ = resolve_duration_sources(live, samples)
     return resolved, fallbacks
 
 
@@ -438,6 +469,28 @@ def main():
     arguments = sys.argv[1:]
     output = None
     wall_calibration = None
+    wall_calibration_artifacts = None
+    population_baseline = None
+    if "--population-baseline" in arguments:
+        option = arguments.index("--population-baseline")
+        if option < 2 or option + 1 >= len(arguments):
+            raise SystemExit(
+                "--population-baseline must follow timing files and name an inventory"
+            )
+        population_baseline = arguments[option + 1]
+        del arguments[option : option + 2]
+    if "--wall-calibration-artifacts" in arguments:
+        option = arguments.index("--wall-calibration-artifacts")
+        if option < 2 or option + 1 >= len(arguments):
+            raise SystemExit(
+                "--wall-calibration-artifacts must follow timing files and name a directory"
+            )
+        calibration_dir = arguments[option + 1]
+        wall_calibration_artifacts = [
+            os.path.join(calibration_dir, f"shard-{shard}.json")
+            for shard in range(1, N + 1)
+        ]
+        del arguments[option : option + 2]
     if "--wall-calibration" in arguments:
         option = arguments.index("--wall-calibration")
         if option < 2 or option + 1 >= len(arguments):
@@ -450,22 +503,59 @@ def main():
             raise SystemExit("--output-dir must follow at least one timing file")
         output = arguments[-1]
         arguments = arguments[:-2]
+    if wall_calibration_artifacts is not None and wall_calibration is None:
+        raise SystemExit("--wall-calibration-artifacts requires --wall-calibration")
+    if population_baseline is not None and output is None:
+        raise SystemExit("--population-baseline requires --output-dir")
     if len(arguments) < 2:
         raise SystemExit(
             "usage: ci-duration-shard.py INVENTORY TIMING... "
-            "[--wall-calibration TSV] [--output-dir DIR]"
+            "[--population-baseline INVENTORY] "
+            "[--wall-calibration TSV [--wall-calibration-artifacts DIR]] "
+            "[--output-dir DIR]"
         )
     inventory = json.load(open(arguments[0]))
     timing_paths = arguments[1:]
-    durations = read_durations(timing_paths)
+    samples = read_duration_sources(timing_paths)
+    durations = {
+        test_id: max(observations.values())
+        for test_id, observations in samples.items()
+    }
+    # Keep the fixed model-fit source out of the per-test weight population.
+    calibration_paths = wall_calibration_artifacts or timing_paths
     wall_model = (
-        fit_workspace_wall_model(timing_paths, wall_calibration)
+        fit_workspace_wall_model(calibration_paths, wall_calibration)
         if wall_calibration is not None else None
     )
     live = sorted((f"{binary_id} {name}", binary_id, name) for binary_id, name in tests(inventory))
     if not live:
         raise SystemExit("filtered live inventory selected zero testcases")
     live_ids = {row[0] for row in live}
+    baseline_ids = None
+    if population_baseline is not None:
+        try:
+            with open(population_baseline, encoding="utf-8") as source:
+                baseline_inventory = json.load(source)
+        except (OSError, json.JSONDecodeError) as error:
+            raise SystemExit(
+                f"{population_baseline}: invalid population baseline: {error}"
+            ) from error
+        baseline_ids = {
+            f"{binary_id} {name}"
+            for binary_id, name in tests(baseline_inventory)
+        }
+    population_delta = None
+    if baseline_ids is not None:
+        added = sorted(live_ids - baseline_ids)
+        removed = sorted(baseline_ids - live_ids)
+        population_delta = {
+            "baseline_count": len(baseline_ids),
+            "live_count": len(live_ids),
+            "added_count": len(added),
+            "removed_count": len(removed),
+            "added": added,
+            "removed": removed,
+        }
     stale = sorted(
         test_id for test_id in set(durations) - live_ids
         if test_id.split(" ", 1)[0].rpartition("::")[2] not in EXCLUDED_BINARIES
@@ -476,7 +566,7 @@ def main():
             RuntimeWarning,
             stacklevel=2,
         )
-    planned_durations, fallbacks = resolve_durations(live, durations)
+    planned_durations, fallbacks, single_run = resolve_duration_sources(live, samples)
     if fallbacks:
         binary_fallbacks = sum(
             fallback["method"] == "binary-median" for fallback in fallbacks
@@ -522,6 +612,20 @@ def main():
     if output:
         with open(os.path.join(output, "assignments.json"), "w") as file:
             json.dump(assignment, file)
+        planning_evidence = {
+            "population_baseline": population_baseline,
+            "population_delta": population_delta,
+            "measurement_sources": sorted({
+                source_id
+                for observations in samples.values()
+                for source_id in observations
+            }),
+            "fallbacks": fallbacks,
+            "single_run": single_run,
+            "stale_timing_identities": stale,
+        }
+        with open(os.path.join(output, "planning-evidence.json"), "w") as file:
+            json.dump(planning_evidence, file)
     print(json.dumps(assignment, indent=2))
 
 

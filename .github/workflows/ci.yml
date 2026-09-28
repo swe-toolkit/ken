@@ -111,14 +111,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # NO dependency cache, deliberately. `Swatinem/rust-cache` was removed
-      # (item C8): it never measurably helped — the build step is well under
-      # a minute either way — and it is third-party code with access to the
-      # build, i.e. supply-chain surface taken on for nothing. A dependency
-      # has to earn its place. If a future change makes the build genuinely
-      # expensive, prefer first-party `actions/cache` and re-argue the case
-      # on measured numbers.
-      - name: Build
-        run: cargo build --workspace --locked
+      # (item C8): it never measurably helped and is third-party code with
+      # access to the build, i.e. supply-chain surface taken on for nothing.
+      # `cargo nextest list` builds the selected tests in the test profile.
+      # A cache has to earn its place. If a future change makes that path
+      # genuinely expensive, prefer first-party `actions/cache` and re-argue
+      # the case on measured numbers.
       # Prebuilt binary, not `cargo install cargo-nextest` — the latter
       # would compile nextest itself on every run and add minutes back.
       - name: Install cargo-nextest
@@ -171,16 +169,30 @@ jobs:
         run: |
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
+          # These 14 files are the two per-test weight sources. The retained
+          # wall-model calibration is separate; the aa9 inventory baseline
+          # records each run's live-population difference in its evidence.
           python3 scripts/ci-duration-shard.py inventory.json \
-            docs/program/evidence/ci-workspace-run-36341523886/shard-1.json \
-            docs/program/evidence/ci-workspace-run-36341523886/shard-2.json \
-            docs/program/evidence/ci-workspace-run-36341523886/shard-3.json \
-            docs/program/evidence/ci-workspace-run-36341523886/shard-4.json \
-            docs/program/evidence/ci-workspace-run-36341523886/shard-5.json \
-            docs/program/evidence/ci-workspace-run-36341523886/shard-6.json \
-            docs/program/evidence/ci-workspace-run-36341523886/shard-7.json \
+            docs/program/evidence/ci-workspace-run-36371407331/shard-1.json \
+            docs/program/evidence/ci-workspace-run-36371407331/shard-2.json \
+            docs/program/evidence/ci-workspace-run-36371407331/shard-3.json \
+            docs/program/evidence/ci-workspace-run-36371407331/shard-4.json \
+            docs/program/evidence/ci-workspace-run-36371407331/shard-5.json \
+            docs/program/evidence/ci-workspace-run-36371407331/shard-6.json \
+            docs/program/evidence/ci-workspace-run-36371407331/shard-7.json \
+            docs/program/evidence/ci-workspace-run-36372772505/shard-1.json \
+            docs/program/evidence/ci-workspace-run-36372772505/shard-2.json \
+            docs/program/evidence/ci-workspace-run-36372772505/shard-3.json \
+            docs/program/evidence/ci-workspace-run-36372772505/shard-4.json \
+            docs/program/evidence/ci-workspace-run-36372772505/shard-5.json \
+            docs/program/evidence/ci-workspace-run-36372772505/shard-6.json \
+            docs/program/evidence/ci-workspace-run-36372772505/shard-7.json \
+            --population-baseline \
+            docs/program/evidence/ci-workspace-run-36372772505/inventory.json \
             --wall-calibration \
             docs/program/evidence/ci-workspace-run-36341523886/job-steps.tsv \
+            --wall-calibration-artifacts \
+            docs/program/evidence/ci-workspace-run-36341523886 \
             --output-dir duration-filters
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
@@ -190,7 +202,7 @@ jobs:
             python3 scripts/ci-duration-shard.py project-selected inventory.json duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
           fi
           python3 scripts/ci-duration-shard.py validate-plan duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
-          scripts/stage-ci-shard-artifact.sh "${{ matrix.shard }}" unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json"
+          scripts/stage-ci-shard-artifact.sh "${{ matrix.shard }}" unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json" duration-filters/planning-evidence.json
       - name: Test
         run: >-
           scripts/run-ci-shard.sh

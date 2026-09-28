@@ -130,6 +130,335 @@ class DurationShardControls(unittest.TestCase):
         self.assertEqual(current[long_test], 591.502)
         self.assertEqual(combined[long_test], 591.502)
 
+    def test_two_run_upper_envelope_uses_computed_live_inventory(self):
+        """Keep the historical measurements separate from a synthetic live set.
+
+        MEASURED: the two captured timing populations each equal their own
+        archived filtered inventories, and their per-identity max is stable.
+        CLAIMED: the planner derives deltas, fallbacks, and stale identities
+        from whichever live inventory is supplied, not a fixed population list.
+        THE GAP: candidate CI must still report and attribute its real live
+        inventory difference and measure the newly selected test durations.
+        """
+        run_a = Path("docs/program/evidence/ci-workspace-run-36371407331")
+        run_b = Path("docs/program/evidence/ci-workspace-run-36372772505")
+        timing_a = [run_a / f"shard-{shard}.json" for shard in range(1, 8)]
+        timing_b = [run_b / f"shard-{shard}.json" for shard in range(1, 8)]
+        samples_a = _planner.read_duration_sources(timing_a)
+        samples_b = _planner.read_duration_sources(timing_b)
+        durations_a = {
+            test_id: max(values.values()) for test_id, values in samples_a.items()
+        }
+        durations_b = {
+            test_id: max(values.values()) for test_id, values in samples_b.items()
+        }
+        self.assertEqual(set(durations_a), set(durations_b))
+        samples = _planner.read_duration_sources([*timing_a, *timing_b])
+        upper_envelope = {
+            test_id: max(durations_a[test_id], durations_b[test_id])
+            for test_id in durations_a
+        }
+        self.assertEqual(
+            {test_id: max(values.values()) for test_id, values in samples.items()},
+            upper_envelope,
+        )
+
+        baseline_a = json.loads((run_a / "inventory.json").read_text())
+        baseline_b = json.loads((run_b / "inventory.json").read_text())
+        base_live_a = {
+            f"{binary_id} {name}"
+            for binary_id, name in _planner.tests(baseline_a)
+        }
+        base_live_b = {
+            f"{binary_id} {name}"
+            for binary_id, name in _planner.tests(baseline_b)
+        }
+        self.assertEqual(base_live_a, base_live_b)
+        self.assertEqual(base_live_a, set(durations_a))
+        self.assertEqual(base_live_b, set(durations_b))
+
+        # Begin with a separate historical inventory copy. These generic
+        # edits make a synthetic removed identity and two kinds of missing
+        # live identity without specifying the real current population.
+        inventory = json.loads((run_a / "inventory.json").read_text())
+        suites = {suite["binary-id"]: suite for suite in inventory["rust-suites"].values()}
+        binary_id, removed_name = sorted(
+            (binary_id, name)
+            for binary_id, name in _planner.tests(inventory)
+        )[0]
+        removed_id = f"{binary_id} {removed_name}"
+        suites[binary_id]["testcases"][removed_name]["filter-match"]["status"] = "mismatch"
+        local_missing = "synthetic_unmeasured_binary_probe"
+        suites[binary_id]["testcases"][local_missing] = {
+            "filter-match": {"status": "matches"}
+        }
+        global_binary = "ci-duration-probe::without-measurements"
+        inventory["rust-suites"]["ci-duration-probe"] = {
+            "binary-id": global_binary,
+            "binary-name": "ci-duration-probe",
+            "testcases": {
+                "synthetic_global_median_probe": {
+                    "filter-match": {"status": "matches"}
+                }
+            },
+        }
+        inventory["test-count"] += 2
+        live = sorted(
+            (f"{binary_id} {name}", binary_id, name)
+            for binary_id, name in _planner.tests(inventory)
+        )
+        live_ids = {rendered for rendered, _, _ in live}
+        self.assertNotIn(removed_id, live_ids)
+        self.assertIn(removed_id, {identity for identity in samples})
+
+        calibration = Path("docs/program/evidence/ci-workspace-run-36341523886")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            inventory_path = root / "inventory.json"
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+            output = root / "plan"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(inventory_path),
+                    *(str(path) for path in [*timing_a, *timing_b]),
+                    "--population-baseline",
+                    str(run_b / "inventory.json"),
+                    "--wall-calibration",
+                    str(calibration / "job-steps.tsv"),
+                    "--wall-calibration-artifacts",
+                    str(calibration),
+                    "--output-dir",
+                    str(output),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            assignment = json.loads(result.stdout)
+            self.assertTrue((output / "assignments.json").is_file())
+            planning = json.loads(
+                (output / "planning-evidence.json").read_text(encoding="utf-8")
+            )
+
+        resolved, expected_fallbacks, expected_single_run = (
+            _planner.resolve_duration_sources(live, samples)
+        )
+        measured_live_ids = live_ids & set(samples)
+        self.assertTrue(
+            any(len(set(samples[test_id].values())) > 1 for test_id in measured_live_ids)
+        )
+        for test_id in measured_live_ids:
+            self.assertEqual(resolved[test_id], max(samples[test_id].values()))
+        self.assertEqual(len(assignment["bins"]), SHARD_COUNT)
+        assigned = [
+            f"{binary_id} {name}"
+            for shard in assignment["bins"]
+            for binary_id, name in shard["tests"]
+        ]
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertEqual(set(assigned), live_ids)
+        self.assertNotIn(removed_id, set(assigned))
+        self.assertIn(removed_id, result.stderr)
+        self.assertEqual(assignment["fallbacks"], expected_fallbacks)
+        self.assertEqual(planning["fallbacks"], expected_fallbacks)
+        self.assertEqual(planning["single_run"], expected_single_run)
+        self.assertEqual(planning["stale_timing_identities"], [removed_id])
+        self.assertEqual(
+            planning["measurement_sources"],
+            sorted({source for values in samples.values() for source in values}),
+        )
+        self.assertEqual(
+            planning["population_baseline"], str(run_b / "inventory.json")
+        )
+        delta = planning["population_delta"]
+        self.assertEqual(delta["baseline_count"], len(base_live_b))
+        self.assertEqual(delta["live_count"], len(live_ids))
+        self.assertEqual(delta["added"], sorted(live_ids - base_live_b))
+        self.assertEqual(delta["removed"], sorted(base_live_b - live_ids))
+        self.assertEqual(delta["added_count"], len(delta["added"]))
+        self.assertEqual(delta["removed_count"], len(delta["removed"]))
+        expected_fallback_ids = live_ids - set(samples)
+        self.assertEqual(
+            {row["test_id"] for row in assignment["fallbacks"]},
+            expected_fallback_ids,
+        )
+        measured_by_binary = {}
+        for rendered, binary, _ in live:
+            if rendered in samples:
+                measured_by_binary.setdefault(binary, []).append(
+                    max(samples[rendered].values())
+                )
+        global_median = statistics.median(
+            seconds for values in measured_by_binary.values() for seconds in values
+        )
+        for fallback in assignment["fallbacks"]:
+            binary = fallback["test_id"].partition(" ")[0]
+            if binary in measured_by_binary:
+                self.assertEqual(fallback["method"], "binary-median")
+                expected_seconds = statistics.median(measured_by_binary[binary])
+            else:
+                self.assertEqual(fallback["method"], "global-median")
+                expected_seconds = global_median
+            self.assertEqual(fallback["seconds"], expected_seconds)
+        expected_single_run = []
+        for rendered, _, _ in live:
+            observations = samples.get(rendered, {})
+            if len(observations) == 1:
+                source, seconds = next(iter(observations.items()))
+                expected_single_run.append({
+                    "test_id": rendered,
+                    "seconds": seconds,
+                    "source": source,
+                })
+        self.assertEqual(planning["single_run"], expected_single_run)
+        self.assertIn(
+            f"{binary_id} {local_missing}",
+            {row["test_id"] for row in assignment["fallbacks"]},
+        )
+        self.assertIn(
+            f"{global_binary} synthetic_global_median_probe",
+            {row["test_id"] for row in assignment["fallbacks"]},
+        )
+        for row in expected_fallbacks:
+            if row["test_id"].startswith(global_binary + " "):
+                self.assertEqual(row["method"], "global-median")
+            else:
+                self.assertEqual(row["method"], "binary-median")
+        for shard in assignment["bins"]:
+            measured_total = sum(
+                resolved[f"{binary_id} {name}"]
+                for binary_id, name in shard["tests"]
+            )
+            self.assertEqual(shard["seconds"], round(measured_total, 3))
+
+    def test_single_run_observation_is_used_and_recorded_separately(self):
+        """MEASURED: one run contributes the only passing duration for a live test.
+
+        CLAIMED: it keeps that duration and is recorded separately from median
+        fallbacks. THE GAP: source provenance must reach the emitted evidence.
+        """
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run_a = timing_artifact(
+                [
+                    {"test_id": "fixture::ordinary both", "seconds": 2.0},
+                    {"test_id": "fixture::ordinary single", "seconds": 6.0},
+                    {"test_id": "fixture::ordinary removed", "seconds": 100.0},
+                ],
+                run_id=71,
+            )
+            run_b = timing_artifact(
+                [
+                    {"test_id": "fixture::ordinary both", "seconds": 4.0},
+                    {"test_id": "fixture::ordinary removed", "seconds": 200.0},
+                ],
+                run_id=72,
+            )
+            first_path = root / "run-a.json"
+            second_path = root / "run-b.json"
+            first_path.write_text(json.dumps(run_a), encoding="utf-8")
+            second_path.write_text(json.dumps(run_b), encoding="utf-8")
+            samples = _planner.read_duration_sources([first_path, second_path])
+
+        live = [
+            ("fixture::ordinary both", "fixture::ordinary", "both"),
+            ("fixture::ordinary single", "fixture::ordinary", "single"),
+            ("fixture::ordinary missing", "fixture::ordinary", "missing"),
+            ("fixture::unmeasured global", "fixture::unmeasured", "global"),
+        ]
+        resolved, fallbacks, single_run = _planner.resolve_duration_sources(
+            live, samples
+        )
+        self.assertEqual(resolved["fixture::ordinary both"], 4.0)
+        self.assertEqual(resolved["fixture::ordinary single"], 6.0)
+        self.assertEqual(resolved["fixture::ordinary missing"], 5.0)
+        self.assertEqual(resolved["fixture::unmeasured global"], 5.0)
+        self.assertNotIn("fixture::ordinary removed", resolved)
+        self.assertEqual(
+            fallbacks,
+            [
+                {
+                    "test_id": "fixture::ordinary missing",
+                    "seconds": 5.0,
+                    "method": "binary-median",
+                },
+                {
+                    "test_id": "fixture::unmeasured global",
+                    "seconds": 5.0,
+                    "method": "global-median",
+                },
+            ],
+        )
+        self.assertEqual(
+            single_run,
+            [
+                {
+                    "test_id": "fixture::ordinary single",
+                    "seconds": 6.0,
+                    "source": "run:71",
+                }
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first_path = root / "run-a.json"
+            second_path = root / "run-b.json"
+            first_path.write_text(json.dumps(run_a), encoding="utf-8")
+            second_path.write_text(json.dumps(run_b), encoding="utf-8")
+            inventory = {
+                "test-count": 4,
+                "rust-suites": {
+                    "ordinary": {
+                        "binary-id": "fixture::ordinary",
+                        "binary-name": "ordinary",
+                        "testcases": {
+                            name: {"filter-match": {"status": "matches"}}
+                            for name in ("both", "single", "missing")
+                        },
+                    },
+                    "unmeasured": {
+                        "binary-id": "fixture::unmeasured",
+                        "binary-name": "unmeasured",
+                        "testcases": {
+                            "global": {"filter-match": {"status": "matches"}}
+                        },
+                    },
+                },
+            }
+            inventory_path = root / "inventory.json"
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+            output = root / "plan"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(inventory_path),
+                    str(first_path),
+                    str(second_path),
+                    "--population-baseline",
+                    str(inventory_path),
+                    "--output-dir",
+                    str(output),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            evidence = json.loads(
+                (output / "planning-evidence.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(evidence["single_run"], single_run)
+            self.assertEqual(evidence["fallbacks"], fallbacks)
+            self.assertEqual(evidence["population_delta"]["added"], [])
+            self.assertEqual(evidence["population_delta"]["removed"], [])
+
     def test_workspace_plan_lpt_balances_latest_live_defaults(self):
         source = Path(
             "docs/program/evidence/ci-workspace-timings-36295180542.tsv"
