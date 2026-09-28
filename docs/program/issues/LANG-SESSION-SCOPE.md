@@ -361,8 +361,124 @@ made the roots/fence test pass 1/1. None of the three mutations added
 trust, widened Map's public surface, or changed its imports.
 
 **Map door-use census.** The two `expose_module` sites in
-`lang_membership_operator_surface.rs` were the only Map door users in this
-increment; both move to public abstract-parameter wrappers in the same
-candidate as the Map fence. The older `map_build_acceptance.rs::mk_env`
-fixture elaborates the complete Map source as a flat legacy unit; it is a
-separate census residual, not a third door user, and stays unchanged.
+`lang_membership_operator_surface.rs` were the Map-specific sites in that
+increment. Both moved to public abstract-parameter wrappers in the
+candidate with the Map fence. A separate door lies under
+`map_build_acceptance.rs::mk_env`: its fixture calls
+`mk_map_dependency_env_with_provider_owned`, which calls
+`catalog_or::load_derived_importing_fixture_many`. That helper roots-loads
+LawfulClasses and Derived, then calls `expose_module` on each
+(`tests/support/catalog_or.rs:218-219`), copying every qualified global
+under each module prefix into mutable flat `env.globals`. `mk_env` remains a
+white-box unit for Map's own source, but its dependency fixture crosses the
+module boundary.
+
+**Cross-provider fixture door census** (Steward `evt_2amvp527b3kyr`,
+Architect `evt_6zc6kc4be78qh`). The caller sweep used `origin/main`
+`96ca72119be02dc84771f71d2c8e0cae8dfd192c` and searched `catalog/`,
+`crates/`, `r_layer_tests/`, `examples/`, and `conformance/`. All helper
+call sites below were in `crates/`; no helper or
+`catalog_or::expose_module` calls appeared in the other roots. Nested
+`src/r_layer_tests` and CLI tests were included through `crates/`.
+
+`load_derived_importing_fixture_many`
+(`tests/support/catalog_or.rs:210-227`) has 16 call sites in 13 test files.
+Its single-import wrapper `load_derived_importing_fixture`
+(`:229-233`) has 4 call sites in 4 files. The `_many` callers are:
+
+- `tests/cat1_lawful_functors_package.rs`: 2
+- `tests/cat5_parsing_package.rs`: 1
+- `tests/cat_property_acceptance.rs`: 1
+- `tests/cc1_nonempty_validation_acceptance.rs`: 1
+- `tests/cc3_parsing_cursor_decoder_acceptance.rs`: 1
+- `tests/cc4_diagnostic_core_acceptance.rs`: 1
+- `tests/cc5_pretty_doc_acceptance.rs`: 1
+- `tests/cc7_argparse_acceptance.rs`: 1
+- `tests/cc8_env_config_decoder_acceptance.rs`: 1
+- `tests/ds3_sum_combinators_acceptance.rs`: 2
+- `tests/ds7_applicative_monad_acceptance.rs`: 1
+- `tests/ds8_traversable_acceptance.rs`: 1
+- `tests/either_catalog_package_acceptance.rs`: 2
+
+The single-import wrapper callers are:
+
+- `tests/cat_map_bool_and_owner.rs`: 1
+- `tests/cc6a_process_arguments_exit_acceptance.rs`: 1
+- `tests/es2_acceptance.rs`: 1
+- `tests/map_build_acceptance.rs`: 1
+
+The adjacent `load_derived_fixture` (`tests/support/catalog_or.rs:189-204`)
+makes the same two exposures and has 14 call sites in 11 files:
+
+- `src/r_layer_tests/ds1_empty_dec_acceptance.rs`: 1
+- `tests/cat3_collections_package.rs`: 3
+- `tests/cat_sort_insertion_sort_acceptance.rs`: 1
+- `tests/cc2_text_codec_numeric_acceptance.rs`: 1
+- `tests/compare_ord_lexicographic_acceptance.rs`: 1
+- `tests/ds4_list_combinators_acceptance.rs`: 2
+- `tests/ds6a_int_deceq_acceptance.rs`: 1
+- `tests/es4_classes_acceptance.rs`: 1
+- `tests/l3_strings_surface_acceptance.rs`: 1
+- `tests/structural_deceq_acceptance.rs`: 1
+- `tests/sub1_bytes_structural_view.rs`: 1
+
+The shared `catalog_or::expose_module` has 38 call sites in 11 files,
+plus those four calls inside `catalog_or.rs`. The external call sites are:
+
+- `src/r_layer_tests/cat_tier_d_parsing_group_import.rs`: 1 wrapper call,
+  reached at 8 local `expose` sites
+- `tests/cat5_parsing_package.rs`: 4
+- `tests/cat_bsearch_acceptance.rs`: 3
+- `tests/cc1_nonempty_validation_acceptance.rs`: 1
+- `tests/cc2_text_codec_numeric_acceptance.rs`: 1
+- `tests/cc3_parsing_cursor_decoder_acceptance.rs`: 4
+- `tests/cc4_diagnostic_core_acceptance.rs`: 4
+- `tests/cc7_argparse_acceptance.rs`: 9
+- `tests/cc8_env_config_decoder_acceptance.rs`: 8
+- `tests/ds9_json_codec_acceptance.rs`: 2
+- `tests/sub1b_uint8_deceq.rs`: 1
+
+The generic `expose_module` inventory does not claim that every call targets
+LawfulClasses or Derived, or that each caller consumes every private name.
+The mechanism sweep also found a separate CC6a `expose_module_aliases` for
+Capability modules and an unused local Deque `expose_module` definition;
+neither is a caller of `catalog_or::expose_module`. Per-name caller
+classification remains due before final door deletion. This census changes
+no acceptance criteria.
+
+**Map flat residual (Architect `evt_42yfw3pmj8t7s`, Steward
+`evt_72qaxq9bb9er3`).** `mk_env` is retained as an authorized white-box
+compilation context for Map's own source, which it elaborates as one unit.
+That classification does not cover its dependency fixture: the separate
+LawfulClasses and Derived units are flattened by the `catalog_or` helper
+in the census above. The historical
+`cat_rel_reachable_within_has_exact_fuel_recurrence` failure is the named
+regression witness. On a future session-scope recut, any change in the
+`GlobalId` that bare `fold` selects inside that flat Map unit is a measured-ID
+stop to the Architect. The selected ID in the withdrawn `2f5577e7f` failure
+was not measured; it must not be inferred from `LambdaVsNonFunction`.
+
+**Derived private-law cut (Architect `evt_23jbdb2ztb02v`, Steward
+`evt_74kdvrmck3ywr`).** The two generic applications of private
+`mem_filter` and `mem_filter_sound` move to a checked Derived-owner example
+without exposing either law. Derived test 2
+`compatibility_premise_distinguishes_true_and_false_instances` retains 4
+direct aliases (filter, mem, IsTrue, bool_and) pending an exact checked
+disposition before door deletion.
+
+**Map Membership instance-coverage carry** (Steward `evt_1r4894xhbzs8q`,
+Architect `evt_2e6zz0bme4fa2` and `evt_2bv0b64p745s7`). On landed Map
+`b6402c71c`, the ground `Membership` observations called the two adapter
+helpers directly rather than the instance `member` bodies. Independent
+use-site-`Ord` rewrites of `OrderedKeyMembership` and
+`RelationEdgeMembership` left those old observations green; the parent's
+stored-comparator witness failed. Candidate SHA
+`554401812722abe66340d89ca0e5404952e894da` adds two positive `ken example`
+observations through carrier-typed `Membership` dictionaries, reaching
+distinct loader-owned instances. Each use-site-`Ord` rewrite reddened its
+corresponding new theorem with `KernelRejected TypeMismatch`. These rows
+discriminate stored from use-site
+comparator only: both return `True`, so an instance that ignores its view and
+returns constant `True` is outside their scope. Existing absent-query rows
+still use helpers. This is a carry item, not a new node or acceptance-criteria
+change.
