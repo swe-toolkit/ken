@@ -4674,9 +4674,12 @@ mod namespace_effect_tests {
     /// MEASURED: an entry whose `ken example` fails returns Err and restores
     /// its previous root bindings, hidden-ID roster and locals exactly; the
     /// entry's completed scope differs from those prior bindings.
-    /// CLAIMED: a failed owner fence cannot leak its provider's local scope.
-    /// THE GAP: the same restoration on Ok is tested by the LC fenced-env
-    /// bare-name discriminator, not inferred from this one Err result.
+    /// CLAIMED: the Err path restores the measured `root_scope` bindings,
+    /// hidden-ID roster and locals after a failed owner fence.
+    /// THE GAP: `bindings` maps names to spellings. Equal root-scope maps do
+    /// not establish restoration of flat `env.globals` or full name-resolution
+    /// isolation; changes to `class_env` instances are also unmeasured. The
+    /// Ok-path root-scope discriminator is the separate LC fenced-env test.
     #[test]
     fn failed_entry_example_restores_previous_root_scope() {
         const ENTRY: &str = "Core.Classes.LawfulClasses";
