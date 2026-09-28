@@ -1,5 +1,5 @@
-//! D3 checkpoint: a printer-independent client derives byte identity for its
-//! own ASCII literal, using F2 and the checked K3 literal-character witness.
+//! A printer-independent client derives byte, decode, and UTF-8 properties
+//! for its own ASCII literal using the four primitive contracts and K3.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -13,11 +13,11 @@ fn catalog_root() -> PathBuf {
 }
 
 /// Promise class: durable invariant.
-/// MEASURED: an external checked client inhabits a Bytes equality for its own
-/// ASCII literal; Parsing and the client add no trusted declarations.
-/// CLAIMED: F2 applies beyond the printer's six token literals.
-/// THE GAP: neither this byte property nor the private F1/F4' bridges prove
-/// recursive decoder success; that still needs a Decoder success theorem.
+/// MEASURED: an external checked client inhabits byte, concatenation,
+/// decode, and UTF-8 properties for its own ASCII literal without new trust.
+/// CLAIMED: all four primitive contracts apply beyond the printer tokens.
+/// THE GAP: this client checks the independent facts, not Parsing's separate
+/// recursive-decoder round-trip proof.
 #[test]
 fn fresh_ascii_literal_outside_parsing_derives_bytes_identity() {
     let mut env = ElabEnv::new().expect("prelude");
@@ -37,9 +37,10 @@ fn fresh_ascii_literal_outside_parsing_derives_bytes_identity() {
     env.elaborate_file(
         r#"
 import Data.Binary.BytesPrimitiveContracts
-  (AllAscii, Ascii89, Ascii57, Ascii36, MkAsciiCode, NoCodes, SomeCodes,
-    bytes_encode_ascii_octets)
-import Data.Collections.Derived (map)
+  (AllAscii, AllAsciiCodes, AsciiBytes, IsUtf8, Ascii89, Ascii57, Ascii36,
+    MkAsciiCode, NoCodes, SomeCodes, ascii_bytes_utf8,
+    bytes_concat_list_view, bytes_decode_encode, bytes_encode_ascii_octets)
+import Data.Collections.Derived (list_append, map)
 import Core.Classes.LawfulClasses (bytes_to_list_injective)
 import Core.Logic.Transport (cong, sym, trans)
 
@@ -100,6 +101,25 @@ theorem fresh_bytes_identity : Equal Bytes (bytes_encode fresh_text) expected_by
         (bytes_to_list expected_bytes)
         (map Int UInt8 int_to_uint8_raw expected_codes)
         (list_bytes_roundtrip (map Int UInt8 int_to_uint8_raw expected_codes))))
+
+const fresh_ascii_bytes : AsciiBytes (bytes_encode fresh_text) =
+  J (λcodes _. AllAsciiCodes codes) fresh_ascii
+    (sym (List Int)
+      (map UInt8 Int uint8_to_int (bytes_to_list (bytes_encode fresh_text)))
+      expected_codes fresh_codes)
+
+theorem fresh_utf8 : IsUtf8 (bytes_encode fresh_text) =
+  ascii_bytes_utf8 (bytes_encode fresh_text) fresh_ascii_bytes
+
+theorem fresh_decode : Equal (Result Utf8Error String)
+    (bytes_decode (bytes_encode fresh_text)) (Ok Utf8Error String fresh_text) =
+  bytes_decode_encode fresh_text
+
+theorem fresh_concat : Equal (List UInt8)
+    (bytes_to_list (bytes_concat (bytes_encode fresh_text) expected_bytes))
+    (list_append UInt8
+      (bytes_to_list (bytes_encode fresh_text)) (bytes_to_list expected_bytes)) =
+  bytes_concat_list_view (bytes_encode fresh_text) expected_bytes
 "#,
     )
     .expect("fresh checked client derives an actual Bytes equality from F2 and K3");
@@ -109,5 +129,12 @@ theorem fresh_bytes_identity : Equal Bytes (bytes_encode fresh_text) expected_by
         after, before_client,
         "client proof must introduce no additional assumption"
     );
-    assert!(env.globals.contains_key("fresh_bytes_identity"));
+    for law in [
+        "fresh_bytes_identity",
+        "fresh_concat",
+        "fresh_decode",
+        "fresh_utf8",
+    ] {
+        assert!(env.globals.contains_key(law), "client law {law} checked");
+    }
 }
