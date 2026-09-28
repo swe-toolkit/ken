@@ -11905,6 +11905,15 @@ impl<'a> Lowering<'a> {
         } else {
             lowered
         };
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        if std::env::var_os("RT_TREE_DETACHED_CENSUS").is_some() {
+            eprintln!(
+                "RT_TREE_DETACHED_CENSUS residual={} owner={:?} function={:?}",
+                residual.len(),
+                self.defining_emission_owner,
+                self.defining_function_id,
+            );
+        }
         let edge = match residual.as_slice() {
             [] => return Ok(lowered),
             [edge] => *edge,
