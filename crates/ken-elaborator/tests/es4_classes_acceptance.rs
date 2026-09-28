@@ -89,12 +89,49 @@ use ken_kernel::Term;
 const LAWFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 
-fn mk_env_with_package() -> ElabEnv {
+fn mk_env_with_lawful_owned() -> (ElabEnv, Vec<ken_kernel::GlobalId>) {
     let mut env = ElabEnv::new().expect("base env construction failed");
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("the class owner must roots-load in this environment");
     catalog_or::load_derived_fixture(&mut env);
-    env
+    (env, lawful_owned)
+}
+
+fn mk_env_with_package() -> ElabEnv {
+    mk_env_with_lawful_owned().0
+}
+
+fn lawful_class_id(
+    env: &ElabEnv,
+    owned: &[ken_kernel::GlobalId],
+    class: &str,
+) -> ken_kernel::GlobalId {
+    let view = env
+        .class_env
+        .class(class)
+        .unwrap_or_else(|| panic!("{class} must be a checked class"));
+    let id = view.projection.type_id;
+    assert!(owned.contains(&id), "LawfulClasses must own {class}");
+    assert_eq!(view.projection.owner_name, class);
+    id
+}
+
+fn lawful_instance_id(
+    env: &ElabEnv,
+    owned: &[ken_kernel::GlobalId],
+    class: &str,
+    head: &str,
+) -> ken_kernel::GlobalId {
+    lawful_class_id(env, owned, class);
+    let id = env
+        .class_env
+        .instance_search(class, head)
+        .unwrap_or_else(|| panic!("{class} {head} must have a registered dictionary"));
+    assert!(owned.contains(&id), "LawfulClasses must own {class} {head}");
+    id
 }
 
 /// Walk a right-nested `Pair` chain (a class instance's record VALUE) and
@@ -170,14 +207,16 @@ fn mentions_const(t: &Term, id: ken_kernel::GlobalId) -> bool {
 // The three classes are real, zero-delta record types (`33 §5.2`, `51 §2`)
 // ─────────────────────────────────────────────────────────────────────────
 
+/// Promise class: durable checked-identity invariant. Every class type is
+/// transparent, LawfulClasses-owned, and outside the trusted base.
 #[test]
 fn classes_are_transparent_structure_records_zero_delta() {
-    let env = mk_env_with_package();
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
     let base_tb: std::collections::HashSet<_> =
         ElabEnv::new().unwrap().env.trusted_base().into_iter().collect();
 
     for name in ["Eq", "DecEq", "Ord"] {
-        let id = env.globals[name];
+        let id = lawful_class_id(&env, &lawful_owned, name);
         assert!(
             matches!(env.env.lookup(id), Some(KernelDecl::Transparent { .. })),
             "{} must be a real (Transparent) record type, not a postulate/primitive",
@@ -208,11 +247,20 @@ fn classes_are_transparent_structure_records_zero_delta() {
 /// never reduces regardless of argument concreteness, `51 §6`, which would
 /// make `total` permanently unprovable for ANY carrier, inductive or not;
 /// `Ord Bool`'s own `total` field, below, is a real proof that needs this.)
+/// Promise class: durable contract invariant. The owned Ord totality field
+/// references the owned, checked Bool disjunction rather than one direction.
 #[test]
 fn ord_total_law_is_the_bool_or_equation() {
-    let env = mk_env_with_package();
-    let bool_or_id = env.globals["bool_or"];
-    let ord_ci = env.class_env.class("Ord").unwrap();
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
+    let bool_or_id = catalog_or::provider_owned_id(
+        &env,
+        &lawful_owned,
+        "Core.Classes.LawfulClasses",
+        "bool_or",
+    )
+    .expect("LawfulClasses must own the canonical Bool disjunction");
+    let ord_id = lawful_class_id(&env, &lawful_owned, "Ord");
+    let ord_ci = env.class_env.class_by_id(ord_id).unwrap();
     let total_idx = ord_ci
         .projection
         .field_names
@@ -244,10 +292,11 @@ fn ord_total_law_is_the_bool_or_equation() {
 // exactly that flip, verified against the REAL elaborator.
 // ─────────────────────────────────────────────────────────────────────────
 
+/// Promise class: durable invariant. Owned Ord Bool's checked laws add no trust.
 #[test]
 fn ord_bool_provable_laws_are_real_proofs_not_postulates() {
-    let env = mk_env_with_package();
-    let id = env.globals["Ord_instance_Bool"];
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
+    let id = lawful_instance_id(&env, &lawful_owned, "Ord", "Bool");
     assert!(matches!(env.env.lookup(id), Some(KernelDecl::Transparent { .. })));
     let (_, body) = env.env.transparent_body(id).expect("Ord Bool instance is transparent");
     // Field order: leq, refl, antisym, trans, total.
@@ -290,10 +339,11 @@ fn ord_bool_provable_laws_are_real_proofs_not_postulates() {
     );
 }
 
+/// Promise class: durable invariant. Owned Eq Bool's checked laws add no trust.
 #[test]
 fn eq_bool_is_a_complete_zero_delta_instance() {
-    let env = mk_env_with_package();
-    let id = env.globals["Eq_instance_Bool"];
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
+    let id = lawful_instance_id(&env, &lawful_owned, "Eq", "Bool");
     let (_, body) = env.env.transparent_body(id).expect("Eq Bool instance is transparent");
     let eq_val = field_value(&env.env, &body, 0);
     let refl_val = field_value(&env.env, &body, 1);
@@ -325,10 +375,12 @@ fn eq_bool_is_a_complete_zero_delta_instance() {
     );
 }
 
+/// Promise class: durable invariant. Owned DecEq Bool's soundness and
+/// completeness are checked proofs and add no trust.
 #[test]
 fn dec_eq_bool_sound_complete_are_real_proofs_not_postulates() {
-    let env = mk_env_with_package();
-    let id = env.globals["DecEq_instance_Bool"];
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
+    let id = lawful_instance_id(&env, &lawful_owned, "DecEq", "Bool");
     let (_, body) = env.env.transparent_body(id).expect("DecEq Bool instance is transparent");
     let eq_val = field_value(&env.env, &body, 0);
     let sound_val = field_value(&env.env, &body, 1);
@@ -361,10 +413,13 @@ fn dec_eq_bool_sound_complete_are_real_proofs_not_postulates() {
 // claimed zero-delta (`51 §6`).
 // ─────────────────────────────────────────────────────────────────────────
 
+/// Promise class: transition sentinel. Ord Int currently carries an
+/// explicitly audited four-law trust delta; a future proof/trust amendment
+/// must review and retire this exact Axiom posture, not silently erase it.
 #[test]
 fn int_ord_instance_is_audited_delta_not_zero_delta() {
-    let env = mk_env_with_package();
-    let ord_int_id = env.globals["Ord_instance_Int"];
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
+    let ord_int_id = lawful_instance_id(&env, &lawful_owned, "Ord", "Int");
 
     // The instance record itself is Transparent (a real declare_def re-check
     // of the Σ-chain value) — never Opaque/Primitive itself.
@@ -419,14 +474,16 @@ fn int_ord_instance_is_audited_delta_not_zero_delta() {
 /// Int`'s `refl`/`sym`/`trans` are real, kernel-checked `J`-derived proofs,
 /// not postulates at all. `Ord Int` is untouched (still audited-delta,
 /// covered by `int_ord_instance_is_audited_delta_not_zero_delta` above).
+/// Promise class: durable trust-accounting invariant. Owned Int equality
+/// dictionaries reach the shared kernel certificate, not package axioms.
 #[test]
 fn eq_and_deceq_int_instances_are_the_ds6a_certificate_posture() {
-    let env = mk_env_with_package();
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
 
     // `DecEq Int`: `eq` is not a postulate; `sound`/`complete` ARE opaque
     // consts (the shared certificate), not fresh per-instance postulates —
     // confirmed below by identity with the certificate ids themselves.
-    let dec_eq_id = env.globals["DecEq_instance_Int"];
+    let dec_eq_id = lawful_instance_id(&env, &lawful_owned, "DecEq", "Int");
     let (_, dec_eq_body) = env
         .env
         .transparent_body(dec_eq_id)
@@ -458,7 +515,7 @@ fn eq_and_deceq_int_instances_are_the_ds6a_certificate_posture() {
 
     // `Eq Int`: `refl`/`sym`/`trans` are now REAL proofs — the discriminating
     // flip from the pre-DS-6a Axiom posture this test used to assert.
-    let eq_int_id = env.globals["Eq_instance_Int"];
+    let eq_int_id = lawful_instance_id(&env, &lawful_owned, "Eq", "Int");
     let (_, eq_int_body) = env
         .env
         .transparent_body(eq_int_id)
@@ -532,11 +589,13 @@ fn eq_and_deceq_int_instances_are_the_ds6a_certificate_posture() {
 // and re-deferred before landing, not covered by this file.
 // ─────────────────────────────────────────────────────────────────────────
 
+/// Promise class: durable checked-identity invariant. Owned Ord Char
+/// transports each field from owned Ord Int rather than minting new trust.
 #[test]
 fn char_ord_laws_carried_not_stubbed_transport_accepts() {
-    let env = mk_env_with_package();
-    let id = env.globals["Ord_instance_Char"];
-    let ord_int_id = env.globals["Ord_instance_Int"];
+    let (env, lawful_owned) = mk_env_with_lawful_owned();
+    let id = lawful_instance_id(&env, &lawful_owned, "Ord", "Char");
+    let ord_int_id = lawful_instance_id(&env, &lawful_owned, "Ord", "Int");
     assert!(matches!(env.env.lookup(id), Some(KernelDecl::Transparent { .. })));
     let (_, body) = env.env.transparent_body(id).expect("Ord Char instance is transparent");
 

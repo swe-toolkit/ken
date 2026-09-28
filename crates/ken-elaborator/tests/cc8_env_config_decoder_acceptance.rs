@@ -25,6 +25,9 @@ const SCHEMA_SOURCE: &str =
 const ARGPARSE_MODULE: &str = "Application.CommandLine.ArgParse";
 const CONFIG_DECODER_MODULE: &str = "Application.Configuration.Decoder";
 const FORGE_ARGPARSE_IMPORT: &str = r#"
+import Capability.Diagnostics.Core (Diagnostic)
+import Capability.Formatting.Doc (Doc)
+import Capability.Diagnostics.Render (diagnostic_to_doc)
 import Application.CommandLine.ArgParse
   (CommandSpec,
     FlagOption,

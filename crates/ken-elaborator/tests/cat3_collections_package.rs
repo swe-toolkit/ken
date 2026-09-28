@@ -225,8 +225,8 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: the bare prelude lacks `map`/`filter`. Real roots loading makes
-/// both checked Derived identities available, and the fixture's flat aliases,
-/// `map_length` and generic wrappers reference exactly those identities.
+/// both checked Derived identities available, and the consumer's selective
+/// import, `map_length` and generic wrappers reference exactly those identities.
 /// Nondegenerate Nil/Cons examples establish both recursive operations.
 /// CLAIMED: Derived supplies the unique structural List map/filter pair with
 /// zero new trust. THE GAP: a differently named, behaviorally isomorphic
@@ -242,14 +242,15 @@ fn derived_owns_checked_map_and_filter_identities() {
     let provider_state = catalog_or::core_logic_or_module_state(&env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
-    let owned = catalog_or::load_derived_fixture(&mut env);
+    let (_, owned) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["map", "filter"]);
     let derived_map = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", "map")
         .expect("Derived must own checked map");
     let derived_filter = catalog_or::provider_owned_id(&env, &owned, "Data.Collections.Derived", "filter")
         .expect("Derived must own checked filter");
     assert_ne!(derived_map, derived_filter);
-    assert_eq!(env.globals["map"], derived_map);
-    assert_eq!(env.globals["filter"], derived_filter);
+    assert!(!env.globals.contains_key("map"));
+    assert!(!env.globals.contains_key("filter"));
     for (name, id) in [("map", derived_map), ("filter", derived_filter)] {
         assert!(
             env.env.transparent_body(id).is_some(),
@@ -277,14 +278,17 @@ fn derived_owns_checked_map_and_filter_identities() {
     );
 
     env.elaborate_file(
-        "fn cat_derived_map_wrapper \
+        "import Data.Collections.Derived (map, filter)\n\
+         fn cat_derived_map_wrapper \
            (a : Type) (b : Type) (f : a → b) (xs : List a) : List b = \
            map a b f xs\n\
          fn cat_derived_filter_wrapper \
            (a : Type) (p : a → Bool) (xs : List a) : List a = \
            filter a p xs",
     )
-    .expect("unqualified fixture wrappers must elaborate through Derived");
+    .expect("selectively imported wrappers must elaborate through Derived");
+    assert!(!env.globals.contains_key("map"));
+    assert!(!env.globals.contains_key("filter"));
     for (wrapper, provider) in [
         ("cat_derived_map_wrapper", derived_map),
         ("cat_derived_filter_wrapper", derived_filter),
@@ -321,7 +325,8 @@ fn derived_owns_checked_map_and_filter_identities() {
     }
 
     env.elaborate_file(
-        "fn cat_derived_flip (x : Bool) : Bool = \
+        "import Data.Collections.Derived (map, filter)\n\
+         fn cat_derived_flip (x : Bool) : Bool = \
            match x { False ↦ True; True ↦ False }\n\
          fn cat_derived_keep_true (x : Bool) : Bool = x\n\
          const cat_derived_map_nil : List Bool = \

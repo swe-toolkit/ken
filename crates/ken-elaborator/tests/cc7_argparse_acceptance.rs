@@ -27,6 +27,9 @@ const ARGPARSE_MODULE: &str = "Application.CommandLine.ArgParse";
 const ARGPARSE_SOURCE: &str =
     include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
 const FORGE_ARGPARSE_IMPORT: &str = r#"
+import Capability.Diagnostics.Core (Diagnostic)
+import Capability.Formatting.Doc (Doc)
+import Capability.Diagnostics.Render (diagnostic_to_doc)
 import Application.CommandLine.ArgParse
   (CommandSpec,
     FlagOption,
@@ -510,11 +513,15 @@ fn invalid_utf8_option_value_survives_byte_identically() {
     assert_eq!(option.last(), Some(&EvalVal::Bytes(invalid)));
 }
 
+/// Promise class: durable behavior invariant. A public Doc import carries
+/// one specification change through rendered help without a parallel edit.
 #[test]
 fn adding_one_option_to_the_spec_changes_help_without_a_second_help_edit() {
     let mut env = full_env();
     env.elaborate_file(
         r#"
+        import Capability.Formatting.Doc (render)
+
         import Application.CommandLine.ArgParse
           (CommandSpec,
             FlagOption,

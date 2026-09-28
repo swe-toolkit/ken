@@ -15,11 +15,14 @@ use ken_kernel::{convert_type, subst::subst0, Context, Decl, GlobalId, Term};
 const INSERTION_SORT_KEN_MD: &str =
     include_str!("../../../catalog/packages/Algorithm/Sorting/InsertionSort.ken.md");
 
-fn base_env() -> ElabEnv {
+fn base_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    catalog_or::load_derived_fixture(&mut env);
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("the class owner must roots-load in this environment");
+    catalog_or::load_derived_importing_fixture_many(&mut env, &[]);
     // The sequential harness has no module namespace. Hide Derived's private
     // operations and attached proofs so this package's names are inventoried
     // independently, as they are under the real module loader.
@@ -33,44 +36,28 @@ fn base_env() -> ElabEnv {
     ] {
         env.globals.remove(name);
     }
-    env
+    (env, lawful_owned)
+}
+
+fn base_env() -> ElabEnv {
+    base_env_with_lawful_owned().0
 }
 
 fn elaborate_insertion_sort(env: &mut ElabEnv) {
     let extracted = ken_elaborator::literate::extract_ken_md(INSERTION_SORT_KEN_MD)
         .expect("InsertionSort literate source must extract");
-    let expected_imports = BTreeSet::from([
-        "import Core.Classes.LawfulClasses (Ord, ord_leq_at, bool_or)",
-        "import Core.Logic.Transport (sym, cong, trans)",
-        "import Data.Collections.Derived (count, eq_from_ord)",
-    ]);
-    let mut removed_imports = BTreeSet::new();
-    let source = extracted
-        .source
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            if expected_imports.contains(trimmed) {
-                removed_imports.insert(trimmed);
-                false
-            } else {
-                true
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert_eq!(
-        removed_imports, expected_imports,
-        "the fixture must remove exactly the three declared provider imports"
-    );
-    env.elaborate_file(&source)
+    env.elaborate_file(&extracted.source)
         .expect("Algorithm/Sorting/InsertionSort.ken.md must elaborate");
 }
 
-fn loaded_env() -> ElabEnv {
-    let mut env = base_env();
+fn loaded_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
+    let (mut env, lawful_owned) = base_env_with_lawful_owned();
     elaborate_insertion_sort(&mut env);
-    env
+    (env, lawful_owned)
+}
+
+fn loaded_env() -> ElabEnv {
+    loaded_env_with_lawful_owned().0
 }
 
 fn application_head_and_arguments(mut term: &Term) -> (&Term, Vec<&Term>) {
@@ -265,6 +252,8 @@ fn evaluate_nat(env: &ElabEnv, id: GlobalId) -> usize {
 /// not prove raw standalone import closure. Fresh roots-loader checks plus
 /// compile-preserving import-withdrawal and wrong-alias mutations own the
 /// standalone-closure and load-bearing evidence.
+/// Promise class: normative compatibility vector for the exact public sort
+/// surface; provider identities and checked law reach are durable invariants.
 #[test]
 fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
     let mut env = base_env();
@@ -423,6 +412,7 @@ fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
     );
 }
 
+/// Promise class: durable invariant. Checked sort imports add no trust.
 #[test]
 fn entry_adds_no_trusted_declarations() {
     let mut env = base_env();
@@ -435,58 +425,82 @@ fn entry_adds_no_trusted_declarations() {
     );
 }
 
+/// Promise class: durable behavior invariant. The owner-resolved Ord Bool
+/// dictionary drives both checked laws and every concrete sort/count result.
 #[test]
 fn boolean_vectors_compute_and_both_generic_laws_instantiate() {
-    let mut env = loaded_env();
+    let (mut env, lawful_owned) = loaded_env_with_lawful_owned();
     env.elaborate_file(
-        "theorem sort_bool_vector_sorted : \
-           is_sorted Bool (ord_leq_at Bool Ord_instance_Bool) \
-             (sort Bool Ord_instance_Bool \
-               (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))) = \
-           sort::sorted Bool Ord_instance_Bool \
-             (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))\n\
-         theorem sort_bool_vector_permutation : \
-           permutation Bool Ord_instance_Bool \
-             (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool)))) \
-             (sort Bool Ord_instance_Bool \
-               (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))) = \
-           sort::permutation Bool Ord_instance_Bool \
-             (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))",
+        "import Core.Classes.LawfulClasses (Ord, ord_leq_at)\n\
+         import Data.Collections.Derived (count, eq_from_ord)\n\
+         theorem cat_sort_bool_sorted_proof (d : Ord Bool) (xs : List Bool) : \
+           is_sorted Bool (ord_leq_at Bool d) (sort Bool d xs) = \
+           sort::sorted Bool d xs\n\
+         theorem cat_sort_bool_perm_proof (d : Ord Bool) (xs : List Bool) : \
+           permutation Bool d xs (sort Bool d xs) = \
+           sort::permutation Bool d xs\n\
+         fn cat_sort_bool_via_ord (xs : List Bool) : List Bool where Ord Bool = \
+           let sorted = cat_sort_bool_sorted_proof d xs; \
+               perm = cat_sort_bool_perm_proof d xs \
+           in sort Bool d xs\n\
+         fn cat_sort_bool_count (xs : List Bool) : Nat where Ord Bool = \
+           count Bool (eq_from_ord Bool (ord_leq_at Bool d)) True xs",
     )
-    .expect("concrete behavior and both generic correctness laws must instantiate");
+    .expect("public imports and `where Ord Bool` must resolve both laws and order vectors");
+
+    let ord_class = env
+        .class_env
+        .class("Ord")
+        .expect("Ord must remain a checked class")
+        .projection
+        .type_id;
+    assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
+    let bool_instance = env
+        .class_env
+        .instance_search("Ord", "Bool")
+        .expect("the canonical Ord Bool dictionary must be registered");
+    assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be LawfulClasses-owned");
+    let wrapper_id = env.globals["cat_sort_bool_via_ord"];
+    let wrapper_references = catalog_or::declaration_references(
+        env.env.lookup(wrapper_id).expect("the checked wrapper must exist"),
+    );
+    assert!(
+        wrapper_references.contains(&bool_instance),
+        "the checked sort/law wrapper must reach the owned Ord Bool dictionary"
+    );
+    for law in ["cat_sort_bool_sorted_proof", "cat_sort_bool_perm_proof"] {
+        assert!(
+            wrapper_references.contains(&env.globals[law]),
+            "the concrete Ord Bool wrapper must instantiate its checked {law}"
+        );
+    }
 
     let empty_id = env
         .elaborate_decl(
             "const cat_sort_bool_empty : List Bool = \
-             sort Bool Ord_instance_Bool (Nil Bool)",
+             cat_sort_bool_via_ord (Nil Bool)",
         )
         .expect("empty Boolean sort vector must elaborate");
     let sorted_id = env
         .elaborate_decl(
             "const cat_sort_bool_sorted : List Bool = \
-             sort Bool Ord_instance_Bool \
-               (Cons Bool False (Cons Bool True (Nil Bool)))",
+             cat_sort_bool_via_ord (Cons Bool False (Cons Bool True (Nil Bool)))",
         )
         .expect("already-sorted Boolean vector must elaborate");
     let duplicate_id = env
         .elaborate_decl(
             "const cat_sort_bool_vector : List Bool = \
-             sort Bool Ord_instance_Bool \
-               (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))",
+             cat_sort_bool_via_ord (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))",
         )
         .expect("concrete Boolean sort vector must elaborate");
     let true_count_id = env
         .elaborate_decl(
             "const cat_sort_true_count : Nat = \
-             count Bool (eq_from_ord Bool (ord_leq_at Bool Ord_instance_Bool)) True \
-               (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))",
+             cat_sort_bool_count (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))",
         )
         .expect("canonical count and order-derived equality must compute together");
     assert_eq!(evaluate_boolean_list(&env, empty_id), Vec::<bool>::new());
     assert_eq!(evaluate_boolean_list(&env, sorted_id), [false, true]);
-    assert_eq!(
-        evaluate_boolean_list(&env, duplicate_id),
-        [false, true, true]
-    );
+    assert_eq!(evaluate_boolean_list(&env, duplicate_id), [false, true, true]);
     assert_eq!(evaluate_nat(&env, true_count_id), 2);
 }

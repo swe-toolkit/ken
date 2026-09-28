@@ -452,7 +452,7 @@ on routed d3 `d3e7beaa8fc487a8da32d4ffe63017caf4b03c66` counted all 76
 invocations: 16 `_many`, four single wrappers, 14 Derived fixtures, 38
 external `expose_module` calls and four internal calls. The eight local
 reach sites of the tier-D generic wrapper are separately enumerated.
-The full per-invocation consumed-name table, with each source file:line,
+The initial per-invocation consumed-name table, with each source file:line,
 exposed module, and reached names, is `/tmp/lang-session-catalog-or-per-call.tsv`
 (SHA-256 `267d11ee8c5178e46ec5c44f2d952a9f481af58165efbc31e53c036b3c0d9b18`;
 convo `evt_ssydn1ky0jtd`). A later lexical audit corrected only the
@@ -462,7 +462,17 @@ already-public names in the deferred `cat5_parsing_package.rs:77` row:
 convo `evt_1250608g5rrcy`). The original Architect-reviewed table remains
 unchanged. The correction adds existing-public Parsing names, removes the
 unread `span_origin` from that row, and changes no private row, count, or
-item-1 scope.
+item-1 scope. A second, no-op-door and dynamic-host-loop audit added five
+reached-name groups at already counted invocations, not new calls or pins:
+private LC `compare_bool_cases` reached through DS1's helper; public LC
+`Eq`, `DecEq`, `Ord`, and `bool_or` read dynamically in ES4; the public Doc
+`render` used by CC7's help-growth snippet; and public Derived
+`bytes_nat_length` used in SUB1's Ken expression. The separate additive
+`/tmp/lang-session-catalog-or-additive.tsv` (SHA-256
+`b2a6fdfbe6478169570b14fddcdd5c933e2680784af5aea2513c918525743345`;
+following discovery `evt_4vyxgzndatjen`) records each test function and site,
+plane, and checked-ID route. Neither the ruled 76-row original nor the
+49-pin table was overwritten.
 
 The table distinguishes `W`, a public flat alias removed by a fixture to
 prove an import; `P`, an existing-public name read through a flat alias
@@ -519,7 +529,10 @@ Forge's `Diagnostic`, `Doc`, `diagnostic_to_doc` from CC7/CC8. The 20
 `_many`/single fixtures remove only their listed public Derived aliases;
 LawfulFunctors fixtures also withhold four public `bool_and` aliases. Four
 host controls assert the flat public LC `leq_nat` matches its loader-owned
-ID. These `W`/`H` controls measure the door and remain until deletion.
+ID. Per-test `W` and `leq_nat` host controls still measure the door and
+remain until deletion; the shared fixture's removal control is converted
+in item 1 to assert absence after removal, without asserting that the door
+exposed an alias first (Architect `evt_12nc3hq6s2pzk`).
 
 **Stop-9 pin census.** The 49-row test/function/file:line/property,
 promise-class-annotation and route census is
@@ -545,7 +558,17 @@ example; (6) Decoder `decoder_map` only if public composition cannot retain
 the probe's property; (7) Parsing private examples; (8) the final door
 removal, remaining W/`leq_nat` controls, and Derived test-2 disposition.
 Every increment returns with exact checked text and rechecks file collisions.
-Item 1 must survive a restored, disposable no-op `expose_module` mutation.
+The item-1 migration unit is a whole test function (Architect
+`evt_6pa7fhxkbpnrq`): a function with any later private Ken obligation or
+per-test door control defers atomically to its latest required increment.
+Every changed function must survive a restored, disposable no-op
+`expose_module` mutation; a new companion test cannot stand in for it.
+CC1's private `Monad` negative cannot yet meet the item-1 EC guard:
+`provider_owned_id` finds no qualified `Core.Classes.EffectfulClasses.Monad`
+global in that roots-loaded environment. The candidate restores the original
+negative untouched; it claims no EC migration or production registry seam.
+The guarded spelling-view alternative and its lawful-instance mutation
+remain a later exact-text obligation (Architect `evt_78z6k087mxve7`).
 Decoder item 6 waits for CAT-DECODER-RECURSIVE-SUCCEEDS; Parsing item 7
 waits for BYTES D3. Because BYTES D3 also edits
 `tests/cat5_parsing_package.rs` and
