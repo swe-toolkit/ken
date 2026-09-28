@@ -64,11 +64,14 @@ fn run_sequential_brackets_witness() {
     for row in &rows {
         assert!(
             row.eliminating_cm.is_some(),
-            "a selected root must have a Vis-case CM: {row:?}"
+            "Vis {}: selected root {} must have a Vis-case CM",
+            row.vis_origin,
+            row.selected_dispatch_root,
         );
         assert!(
             row.cm_scrutinee_contains_vis,
-            "the eliminating CM's scrutinee must contain the very Vis it dispatches: {row:?}"
+            "Vis {}: selected root {} in CM {:?} must be in that CM's scrutinee",
+            row.vis_origin, row.selected_dispatch_root, row.eliminating_cm,
         );
     }
     assert_ne!(rows[0].eliminating_cm, rows[1].eliminating_cm);
