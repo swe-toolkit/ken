@@ -73,15 +73,20 @@ jobs:
   # their binary's measured median, then the global median. The live inventory
   # and its exact-once union remain dynamic.
   #
-  # The landed run's old sum-only assignment projected 2,106.017s per shard,
-  # while measured terminal sums were 1,407.179-3,436.881s. The
-  # wall model uses measured terminal work plus the longest indivisible test;
-  # its per-shard replay is checked against measured Test/job walls within 60s.
-  # Replanning the exact run's inventory balances projected job walls at about
-  # 1,056s, using the run's 317s median pre-Test overhead. This is a projection,
-  # not Full-CI evidence. The same-tree PR/main runs differed by 179s, and the
-  # landing run took 1,289s; AC-2/AC-2a remain open. The union checker continues
-  # to require terminal identities to match each shard's realized selection.
+  # Increment 8's 1,056s projected job wall did not predict the next landed
+  # run: run 36348681380 measured shard walls of 610-1,190s (median 724s,
+  # max-minus-median 466s) and a 1,229s run wall. Its same-tree PR run took
+  # 1,207s. The earlier PR/main pair also differed by 179s, so absolute wall
+  # prediction is not the balance property.
+  #
+  # The planner uses the untuned q=2 convex marginal cost over the
+  # training-fitted Test-step relation to spread heavy tests. The A/B cross-run
+  # comparison is exploratory: it scores fixed assignments against opposite-run
+  # test durations and compares them with same-input legacy LPT plans. These
+  # historical projections are not held-out acceptance or measured Full-CI
+  # evidence. The union checker still requires terminal identities to match
+  # each realized shard.
+  # AC-2/AC-2a remain open pending measured publisher Full-CI evidence.
   # Among run 362951's measured tests, shard 1's 591.502s longest is below the
   # conservative 684s floor bound (1,000s runner-up minus all 316s of shard-1
   # non-test time). This does not bound unmeasured tests or prove a floor for

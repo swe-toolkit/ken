@@ -82,6 +82,12 @@ class WorkspaceTimingControls(unittest.TestCase):
             "        SKIP [         ] (───────) ken-cli "
             "entrypoint_tests::anone_readfile_reaches_named_denial_before_capture_host_syscall"
         )
+        # Captured from run 36358883286, shard 1 Test stdout, job 108731983064.
+        # Its four-test shard prints a three-dash skip placeholder.
+        small_shard_skipped = (
+            "        SKIP [         ] (───) ken-elaborator "
+            "checked_core::tests::acceptance_examples_fit_metadata_without_runtime_layout"
+        )
         passed = (
             "        PASS [   0.474s] (  1/594) ken-cli "
             "entrypoint_tests::apartial_cannot_apply_afull_writefile_wrapper"
@@ -91,6 +97,12 @@ class WorkspaceTimingControls(unittest.TestCase):
             "ken-cli::rt_selected_pending_call_admission "
             "selected_pending_write_arm_controls_agree_across_executors"
         )
+        # A small-shard terminal SLOW row uses a 1/4 ordinal, not a dash marker.
+        small_shard_slow = (
+            "        SLOW [ 455.338s] (1/4) "
+            "ken-elaborator::r3_c2_source_mixed_branch "
+            "r3_4b_observation_feature_is_native_artifact_identical"
+        )
         slow_event = (
             "SLOW [> 60.000s] (───) ken-cli::rt_selected_pending_call_admission "
             "selected_pending_write_arm_controls_agree_across_executors"
@@ -99,22 +111,37 @@ class WorkspaceTimingControls(unittest.TestCase):
             "ken-cli::rt_selected_pending_call_admission",
             "selected_pending_write_arm_controls_agree_across_executors",
         )
+        small_shard_slow_identity = (
+            "ken-elaborator::r3_c2_source_mixed_branch",
+            "r3_4b_observation_feature_is_native_artifact_identical",
+        )
         listing = self.listing(
             [
                 (
                     "ken-cli",
                     "entrypoint_tests::anone_readfile_reaches_named_denial_before_capture_host_syscall",
                 ),
+                (
+                    "ken-elaborator",
+                    "checked_core::tests::acceptance_examples_fit_metadata_without_runtime_layout",
+                ),
                 ("ken-cli", "entrypoint_tests::apartial_cannot_apply_afull_writefile_wrapper"),
                 slow_identity,
+                small_shard_slow_identity,
             ],
             selected={
                 ("ken-cli", "entrypoint_tests::apartial_cannot_apply_afull_writefile_wrapper"),
                 slow_identity,
+                small_shard_slow_identity,
             },
         )
         artifact = timings.emit_artifact(
-            "\n".join((skipped, passed, slow_event, slow)), listing, 987, 1
+            "\n".join(
+                (skipped, small_shard_skipped, passed, slow_event, slow, small_shard_slow)
+            ),
+            listing,
+            987,
+            1,
         )
         self.assertEqual(
             artifact["records"],
@@ -128,6 +155,12 @@ class WorkspaceTimingControls(unittest.TestCase):
                     "test_id": "ken-cli::rt_selected_pending_call_admission "
                     "selected_pending_write_arm_controls_agree_across_executors",
                     "seconds": 100.525,
+                    "result": "PASS",
+                },
+                {
+                    "test_id": "ken-elaborator::r3_c2_source_mixed_branch "
+                    "r3_4b_observation_feature_is_native_artifact_identical",
+                    "seconds": 455.338,
                     "result": "PASS",
                 },
             ],
@@ -160,6 +193,12 @@ class WorkspaceTimingControls(unittest.TestCase):
         ):
             timings.emit_artifact(
                 "SKIP [ 1.000s] (1/1) fixture::binary test", selected, 1, 1
+            )
+        with self.assertRaisesRegex(
+            timings.TimingArtifactError, "malformed skipped result"
+        ):
+            timings.emit_artifact(
+                "SKIP [         ] () fixture::binary test", selected, 1, 1
             )
 
     def test_duplicate_terminal_identity_fails_closed(self):

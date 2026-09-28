@@ -18,7 +18,7 @@ TERMINAL_LINE = re.compile(
     r"\s+(?P<test_id>\S.+?)\s*$"
 )
 SKIP_LINE = re.compile(
-    r"^\s*SKIP \[         \] \(───────\) (?P<test_id>\S.+?)\s*$"
+    r"^\s*SKIP \[         \] \(─+\) (?P<test_id>\S.+?)\s*$"
 )
 SLOW_EVENT_LINE = re.compile(
     r"^\s*SLOW\s+\[\s*>\s*"
