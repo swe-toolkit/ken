@@ -227,27 +227,34 @@ fn flipped_outer_arm_label_preserves_the_inner_owner_contract() {
     );
 }
 
-// C4: native counterexample to the owner's checked Ret ingress. Without
-// bypass, the same checked program above exits normally; here the test-only
-// owner sends a Vis-tagged carrier through its unchecked Result slot. The
-// emitted C2 branch must terminate when that carrier reaches the Match.
+// C4: a native counterexample to the owner-fed C2 Match. The first test-only
+// hook admits a Vis past the entire finished-body layer. The second changes
+// its member to an out-of-set discriminant and bypasses only the loop's
+// unknown-member exit, depositing that non-member in the Result slot. C2 must
+// trap at the inner Match rather than merely emit an unreachable trap branch.
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[test]
-fn owner_ret_check_bypass_reaches_the_inner_vis_trap_natively() {
+fn owner_nonmember_c2_ingress_reaches_inner_vis_trap_natively() {
     use std::os::unix::process::ExitStatusExt;
     let dir = output_dir("owner-vis-trap");
-    let ((output, applications), emissions) =
-        ken_runtime::with_selected_pending_match_emissions(|| {
-            ken_runtime::with_static_response_owner_body_mutation(
-                ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
-                || ken_cli::build_native_program(
-                    OK_PROGRAM, ken_cli::SourceFormat::Ken,
-                    "px7m-owner-vis-bypass", dir.path(),
-                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                ),
-            )
-        });
-    assert_eq!(applications, 1, "one admitted owner must carry the test-only bypass");
+    let (((output, applications), emissions), nonmember_applications) =
+        ken_runtime::with_pending_vis_nonmember_mutation(
+            ken_runtime::PendingVisNonmemberMutation::BypassToC2, || {
+                ken_runtime::with_selected_pending_match_emissions(|| {
+                    ken_runtime::with_static_response_owner_body_mutation(
+                        ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
+                        || ken_cli::build_native_program(
+                            OK_PROGRAM, ken_cli::SourceFormat::Ken,
+                            "px7m-owner-vis-bypass", dir.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        ),
+                    )
+                })
+            },
+        );
+    assert_eq!(applications, 1, "one owner must bypass finished-body verification");
+    assert_eq!(nonmember_applications, 1,
+        "one protocol owner must admit the distinct out-of-set C2 ingress");
     let output = output.expect("the bypass builds a native artifact before it is run");
     assert!(emissions.iter().any(|row|
         row.kind == ken_runtime::SelectedPendingMatchEmissionKind::ValidatedOwnerVisTrap),
@@ -260,6 +267,94 @@ fn owner_ret_check_bypass_reaches_the_inner_vis_trap_natively() {
     assert_eq!(native.status.signal(), Some(4),
         "the bypassed owner must trap in the native executable, not refuse at admission or emission; status={:?} stdout={:?} stderr={:?}",
         native.status, native.stdout, native.stderr);
+}
+
+/// Promise class: durable invariant. The injected Vis is a lawful returned
+/// member; bypassing finished-body verification alone must make the owner
+/// drive the next host effect, not confuse an emitted C2 trap with a reached
+/// one. The distinct fourth Flush is absent from the unmutated run.
+#[cfg(target_os = "linux")]
+#[test]
+fn owner_vis_verifier_bypass_drives_a_returned_member() {
+    let run = |label: &str, mutated: bool| {
+        let dir = output_dir(label);
+        let build = || ken_cli::build_native_program(
+            OK_PROGRAM, ken_cli::SourceFormat::Ken, "px7m-owner-loop-member",
+            dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        );
+        let output = if mutated {
+            let (result, applications) = ken_runtime::with_static_response_owner_body_mutation(
+                ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
+                build,
+            );
+            assert_eq!(applications, 1, "the finished-body bypass must reach one owner");
+            result
+        } else { build() }.expect("both member configurations compile");
+        ken_runtime::run_bound_process_effect_observation(
+            &output.artifact, &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: Vec::new(), environment: Vec::new(),
+                cwd: dir.path().to_owned(), plan_hash: output.plan_transport_hash,
+            },
+        ).expect("the member is driven to a native terminal result")
+    };
+    let baseline = run("px7m-member-baseline", false);
+    let injected = run("px7m-member-injected", true);
+    let operations = |observation: &ken_runtime::EffectObservation| observation.effect_trace
+        .iter().map(|event| event.operation).collect::<Vec<_>>();
+    assert_eq!(operations(&baseline), [
+        ken_runtime::HostOpV1::ConsoleWrite,
+        ken_runtime::HostOpV1::ConsoleWrite,
+        ken_runtime::HostOpV1::ConsoleFlush,
+    ]);
+    assert_eq!(operations(&injected), [
+        ken_runtime::HostOpV1::ConsoleWrite,
+        ken_runtime::HostOpV1::ConsoleWrite,
+        ken_runtime::HostOpV1::ConsoleFlush,
+        ken_runtime::HostOpV1::ConsoleFlush,
+    ], "the injected member must cause a distinct owner-loop dispatch");
+    assert_eq!(injected.stdout, baseline.stdout);
+    assert_eq!(injected.exit_status, baseline.exit_status);
+}
+
+/// Promise class: durable invariant. A non-member discriminant cannot select
+/// a successor or escape to C2 while the owner loop's unknown-member exit is
+/// intact. This pairs the same invalid input with the C2-bypass test above.
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn owner_nonmember_refuses_at_the_loop_before_c2() {
+    let dir = output_dir("px7m-unknown-member-refusal");
+    let ((output, bypass_applications), nonmember_applications) =
+        ken_runtime::with_pending_vis_nonmember_mutation(
+            ken_runtime::PendingVisNonmemberMutation::Refuse, || {
+                ken_runtime::with_static_response_owner_body_mutation(
+                    ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
+                    || ken_cli::build_native_program(
+                        OK_PROGRAM, ken_cli::SourceFormat::Ken,
+                        "px7m-unknown-member-refusal", dir.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    ),
+                )
+            },
+        );
+    assert_eq!(bypass_applications, 1, "one owner must bypass the finished-body layer");
+    assert_eq!(nonmember_applications, 1, "one owner must receive the invalid member");
+    let output = output.expect("the non-member object builds before its native refusal");
+    let native = std::process::Command::new(&output.artifact.executable_path)
+        .current_dir(dir.path()).env_clear()
+        .env("KEN_HOST_OBSERVATION_PATH", dir.path().join("nonmember-trace"))
+        .output().expect("the native non-member executable starts");
+    assert_eq!(native.status.code(), Some(1),
+        "the unknown member must fail by status, not SIGILL: {native:?}");
+    assert!(native.status.signal().is_none(),
+        "the loop refused before the inner C2 trap: {native:?}");
+    let error = ken_runtime::run_bound_process_effect_observation(
+        &output.artifact, &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(), environment: Vec::new(),
+            cwd: dir.path().to_owned(), plan_hash: output.plan_transport_hash,
+        },
+    ).expect_err("the unknown member returns a native failure");
+    assert!(format!("{error:?}").contains("UnclassifiedRuntimeTrap { terminal_value: -1 }"),
+        "the unknown-member exit must propagate its exact -1: {error:?}");
 }
 
 // Owner node: RT-CARRIED-RESIDUAL-IH-ARITY.

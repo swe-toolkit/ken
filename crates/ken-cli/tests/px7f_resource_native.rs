@@ -712,6 +712,28 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?} frames={frames:?} caller={incoming:?}");
 }
 
+/// Promise class: durable invariant. An owner whose generated K result is
+/// loaded before the Trap branch must be rejected by the pending-Vis finished
+/// CLIF verifier, not merely by a Ret-only verifier or a runtime trap.
+#[cfg(target_os = "linux")]
+#[test]
+fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
+    let dir = output_dir("right-denial-unchecked-k-result");
+    let (compiled, applications) = ken_runtime::with_static_response_owner_body_mutation(
+        ken_runtime::StaticResponseOwnerBodyMutation::BypassTrapBeforeResult,
+        || ken_cli::build_native_program(
+            RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken,
+            "right-denial-unchecked-k-result", dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        ),
+    );
+    assert_eq!(applications, 1, "the pending-Vis owner must receive the K mutation");
+    let error = compiled.expect_err("an unchecked K result must not emit an object");
+    assert!(format!("{error:?}").contains(
+        "pending-Vis finished-body verifier: a selected K result lacks status then Trap branches"
+    ), "the exact pending-Vis verifier must refuse: {error:?}");
+}
+
 /// Promise class: durable invariant. MEASURED: the same licensed placeholder
 /// accepted for its response-owner target refuses when only the declared
 /// target identity changes to a non-owner scheduling entry. CLAIMED: the sole

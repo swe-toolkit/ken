@@ -811,10 +811,21 @@ pub enum StaticResponseOwnerBodyMutation {
     CallAfterAnswerCollapse,
     BypassTrapBeforeResult,
     VaryRet,
-    /// Test-only: send a Vis-tagged response through the Result slot without
-    /// the owner's Ret identity/arity checks, so the consuming trap is live.
+    /// Test-only: inject a Vis carrier past finished-body verification. A
+    /// lawful returned member is driven by the owner loop; a separate unknown-
+    /// member ingress is needed to witness the downstream C2 backstop.
     BypassRetValidationAndReturnVis,
     OmitOwnerDefinition,
+}
+
+/// Construct the same out-of-set member on both sides of the loop guard.
+/// Only `BypassToC2` disables the loop's unknown-member exit; `Refuse` leaves
+/// it intact and witnesses its native failure independently.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PendingVisNonmemberMutation {
+    Refuse,
+    BypassToC2,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -828,6 +839,11 @@ thread_local! {
         std::cell::Cell<Option<StaticResponseOwnerBodyMutation>> =
         const { std::cell::Cell::new(None) };
     static STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static PENDING_VIS_NONMEMBER_MUTATION:
+        std::cell::Cell<Option<PendingVisNonmemberMutation>> =
+        const { std::cell::Cell::new(None) };
+    static PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
 }
 
@@ -883,6 +899,43 @@ pub fn with_static_response_owner_body_mutation<T>(
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_owner_body_mutation_is_exact() -> bool {
     STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_pending_vis_nonmember_mutation<T>(
+    mutation: PendingVisNonmemberMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            PENDING_VIS_NONMEMBER_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    PENDING_VIS_NONMEMBER_MUTATION.with(|slot| {
+        assert_eq!(slot.replace(Some(mutation)), None);
+    });
+    PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications = PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS
+        .with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn claim_pending_vis_nonmember_mutation(
+    eligible: bool,
+) -> Option<PendingVisNonmemberMutation> {
+    PENDING_VIS_NONMEMBER_MUTATION.with(|slot| {
+        let mutation = slot.get()?;
+        if !eligible || PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS
+            .with(|count| count.get() != 0) {
+            return None;
+        }
+        PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(|count| count.set(1));
+        Some(mutation)
+    })
 }
 
 // Test-only E4 observation: the response capture value is loaded by the
@@ -3208,6 +3261,8 @@ fn emit_pending_vis_owner_loop(
     successor_contexts: &BTreeMap<StaticResponseContinuationId, FuncId>,
     result_offset: i32,
     placeholder_offset: i32,
+    force_unknown_member: bool,
+    bypass_unknown_to_c2: bool,
 ) -> Result<PendingVisFinishedBody, CraneliftBackendError> {
     if successors.is_empty() {
         return Err(backend_module("a pending-Vis owner has no successor set".to_string()));
@@ -3246,6 +3301,12 @@ fn emit_pending_vis_owner_loop(
     let cranelift_codegen::ir::ValueDef::Result(member_load, _) = builder.func.dfg.value_def(member) else {
         return Err(backend_module("pending-Vis member is not a finished load".to_string()));
     };
+    #[cfg(feature = "px8-ds-test-support")]
+    let member = if force_unknown_member {
+        builder.ins().iconst(types::I64, -99)
+    } else { member };
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    let _ = (force_unknown_member, bypass_unknown_to_c2);
     let mut member_branches = Vec::new();
     let mut member_ids = Vec::new();
     let mut member_blocks = Vec::new();
@@ -3261,8 +3322,22 @@ fn emit_pending_vis_owner_loop(
         member_blocks.push(selected);
         builder.switch_to_block(next);
     }
-    let invalid = builder.ins().iconst(types::I64, -1);
-    builder.ins().return_(&[invalid]);
+    #[cfg(feature = "px8-ds-test-support")]
+    if bypass_unknown_to_c2 {
+        // Test-only: deliberately cross the exact unknown-member exit with
+        // the non-member Vis. The C2 match must trap on this owner-fed value.
+        builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
+        let success = builder.ins().iconst(types::I64, 0);
+        builder.ins().return_(&[success]);
+    } else {
+        let invalid = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[invalid]);
+    }
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    {
+        let invalid = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[invalid]);
+    }
     let offset_at = |start: i32, ordinal: usize| -> Result<i32, CraneliftBackendError> {
         let delta = ordinal.checked_mul(8).and_then(|bytes| i32::try_from(bytes).ok())
             .ok_or_else(|| backend_module("pending-Vis owner payload offset exhausted".to_string()))?;
@@ -4428,9 +4503,10 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 }
             };
             // A bypass alone is inconclusive on a source whose real owner
-            // returns Ret. The test-only mutation supplies a Vis carrier of
-            // the source constructor's exact identity and field count. Its
-            // fields are never read: the C2 branch traps on the tag first.
+            // returns Ret. This test-only mutation supplies a Vis carrier of
+            // the source constructor's exact identity and field count. A
+            // planned returned member is driven by the pending-Vis loop; only
+            // the separate non-member ingress reaches the C2 backstop.
             #[cfg(feature = "px8-ds-test-support")]
             let bypass_ret_validation = body_mutation
                 == Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis);
@@ -4460,12 +4536,22 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     backend_module("a pending-Vis owner has no caller-owned record".to_string()))?;
                 let initial_call = *context_calls.first().ok_or_else(||
                     backend_module("a pending-Vis owner did not call its first K".to_string()))?;
+                #[cfg(feature = "px8-ds-test-support")]
+                let nonmember_mode = claim_pending_vis_nonmember_mutation(bypass_ret_validation);
+                let (force_unknown_member, bypass_unknown_to_c2) = {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    { (nonmember_mode.is_some(),
+                        nonmember_mode == Some(PendingVisNonmemberMutation::BypassToC2)) }
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    { (false, false) }
+                };
                 pending_finished = Some(emit_pending_vis_owner_loop(
                     compiler, &mut builder, frame, pending.region,
                     &emission.row, initial_call, expected_context_target,
                     host_validation_end, returned, &emission.successors,
                     &successor_targets, &successor_contexts,
                     result_offset, placeholder_offset,
+                    force_unknown_member, bypass_unknown_to_c2,
                 )?);
             } else {
             let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
@@ -4547,36 +4633,38 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         frame_scope.close(compiler)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
-        if let Some(pending) = pending_finished.as_ref() {
-            let region = compiler.pending_vis_record_protocol.as_ref()
-                .ok_or_else(|| backend_module("the pending-Vis verifier lost the closed plan".to_string()))?
-                .frame_region(
-                    PendingVisFrameOwner::ResponseOwner(emission.row.id()),
-                    emission.owner.header().frame_bytes,
-                )?
-                .ok_or_else(|| backend_module("a pending-Vis owner has no planned record tail".to_string()))?;
-            verify_pending_vis_finished_body(
-                &func, pending, &emission.row, &emission.successors, region,
-            )?;
-        } else {
-            let ret_only = finished_body.as_ref().ok_or_else(|| backend_module(
-                "a Ret-only response owner has no finished-body facts".to_string(),
-            ))?;
-            // The scoped bypass deliberately violates the original Ret
-            // verifier; every other mutation and production emission runs it.
-            #[cfg(feature = "px8-ds-test-support")]
-            if body_mutation != Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis) {
+        // The test-only Vis ingress bypasses finished-body verification as a
+        // layer, whichever owner arm is emitted. No production build has this
+        // predicate; every owner still runs its exact finished-body verifier.
+        let verify_finished_body = || -> Result<(), CraneliftBackendError> {
+            if let Some(pending) = pending_finished.as_ref() {
+                let region = compiler.pending_vis_record_protocol.as_ref()
+                    .ok_or_else(|| backend_module("the pending-Vis verifier lost the closed plan".to_string()))?
+                    .frame_region(
+                        PendingVisFrameOwner::ResponseOwner(emission.row.id()),
+                        emission.owner.header().frame_bytes,
+                    )?
+                    .ok_or_else(|| backend_module("a pending-Vis owner has no planned record tail".to_string()))?;
+                verify_pending_vis_finished_body(
+                    &func, pending, &emission.row, &emission.successors, region,
+                )?;
+            } else {
+                let ret_only = finished_body.as_ref().ok_or_else(|| backend_module(
+                    "a Ret-only response owner has no finished-body facts".to_string(),
+                ))?;
                 verify_static_response_finished_body(
                     &func, expected_context_target,
                     emission.row.k_ret_identity().tag_abi_word()?, ret_only,
                 )?;
             }
-            #[cfg(not(feature = "px8-ds-test-support"))]
-            verify_static_response_finished_body(
-                &func, expected_context_target,
-                emission.row.k_ret_identity().tag_abi_word()?, ret_only,
-            )?;
+            Ok(())
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        if body_mutation != Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis) {
+            verify_finished_body()?;
         }
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        verify_finished_body()?;
         compiler.commit_aggregate_events()?;
         #[cfg(feature = "px8-ds-test-support")]
         if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitOwnerDefinition) {
