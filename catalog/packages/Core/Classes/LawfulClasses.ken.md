@@ -2428,6 +2428,207 @@ instance Ord String {
 }
 ```
 
+The following checked examples stay inside LawfulClasses, where the raw
+comparator and its laws are private. They do not add exports or assumptions.
+The opposite Boolean directions and the non-Boolean element cases make the
+comparison behavior distinguishable from a shape-only order.
+
+```ken example
+theorem lc_example_raw_eq : Equal OrdResult (compare_raw Bool bool_leq True True) ord_eq =
+  Proved
+
+theorem lc_example_raw_lt : Equal OrdResult (compare_raw Bool bool_leq False True) ord_lt =
+  Proved
+
+theorem lc_example_raw_gt : Equal OrdResult (compare_raw Bool bool_leq True False) ord_gt =
+  Proved
+
+theorem lc_example_raw_eq_sound : Equal Bool True True =
+  proof eq_sound for compare_raw Bool bool_leq (Ord_instance_Bool).antisym True True Proved
+
+theorem lc_example_raw_lt_sound : Equal Bool (bool_leq False True) True =
+  proof lt_sound for compare_raw Bool bool_leq False True Proved
+
+theorem lc_example_raw_gt_sound : Equal Bool (bool_leq False True) True =
+  proof gt_sound for compare_raw Bool bool_leq (Ord_instance_Bool).total True False Proved
+
+theorem lc_example_raw_lt_reverse_false : Equal Bool (bool_leq True False) False =
+  proof lt_reverse_false for compare_raw Bool bool_leq False True Proved
+
+theorem lc_example_raw_gt_forward_false : Equal Bool (bool_leq True False) False =
+  proof gt_forward_false for compare_raw Bool bool_leq True False Proved
+```
+
+The structural dictionaries discharge each law on nontrivial Pair and List
+values. The examples use the checked instance proofs, without introducing a
+second instance or an axiom.
+
+```ken example
+theorem lc_example_pair_refl_law
+    : IsTrue
+        (pair_ord_leq
+          Bool
+          Bool
+          Ord_instance_Bool
+          Ord_instance_Bool
+          (mk_pair Bool Bool False True)
+          (mk_pair Bool Bool False True)) =
+  (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool).refl
+    (mk_pair Bool Bool False True)
+
+theorem lc_example_pair_antisym_law
+    : Equal (Pair Bool Bool) (mk_pair Bool Bool False True) (mk_pair Bool Bool False True) =
+  (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool).antisym
+    (mk_pair Bool Bool False True)
+    (mk_pair Bool Bool False True)
+    Proved
+    Proved
+
+theorem lc_example_pair_trans_law
+    : IsTrue
+        (pair_ord_leq
+          Bool
+          Bool
+          Ord_instance_Bool
+          Ord_instance_Bool
+          (mk_pair Bool Bool False False)
+          (mk_pair Bool Bool True False)) =
+  (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool).trans
+    (mk_pair Bool Bool False False)
+    (mk_pair Bool Bool False True)
+    (mk_pair Bool Bool True False)
+    Proved
+    Proved
+
+theorem lc_example_pair_total_law
+    : IsTrue
+        (bool_or
+          (pair_ord_leq
+            Bool
+            Bool
+            Ord_instance_Bool
+            Ord_instance_Bool
+            (mk_pair Bool Bool True False)
+            (mk_pair Bool Bool False False))
+          (pair_ord_leq
+            Bool
+            Bool
+            Ord_instance_Bool
+            Ord_instance_Bool
+            (mk_pair Bool Bool False False)
+            (mk_pair Bool Bool True False))) =
+  (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool).total
+    (mk_pair Bool Bool True False)
+    (mk_pair Bool Bool False False)
+
+theorem lc_example_list_refl_law
+    : IsTrue
+        (list_ord_leq
+          Bool
+          Ord_instance_Bool
+          (Cons Bool False (Cons Bool True (Nil Bool)))
+          (Cons Bool False (Cons Bool True (Nil Bool)))) =
+  (Ord_instance_List Bool Ord_instance_Bool).refl (Cons Bool False (Cons Bool True (Nil Bool)))
+
+theorem lc_example_list_antisym_law
+    : Equal
+        (List Bool)
+        (Cons Bool False (Cons Bool True (Nil Bool)))
+        (Cons Bool False (Cons Bool True (Nil Bool))) =
+  (Ord_instance_List Bool Ord_instance_Bool).antisym
+    (Cons Bool False (Cons Bool True (Nil Bool)))
+    (Cons Bool False (Cons Bool True (Nil Bool)))
+    Proved
+    Proved
+
+theorem lc_example_list_trans_law
+    : IsTrue
+        (list_ord_leq
+          Bool
+          Ord_instance_Bool
+          (Cons Bool False (Nil Bool))
+          (Cons Bool True (Nil Bool))) =
+  (Ord_instance_List Bool Ord_instance_Bool).trans
+    (Cons Bool False (Nil Bool))
+    (Cons Bool False (Cons Bool True (Nil Bool)))
+    (Cons Bool True (Nil Bool))
+    Proved
+    Proved
+
+theorem lc_example_list_total_law
+    : IsTrue
+        (bool_or
+          (list_ord_leq
+            Bool
+            Ord_instance_Bool
+            (Cons Bool True (Nil Bool))
+            (Cons Bool False (Nil Bool)))
+          (list_ord_leq
+            Bool
+            Ord_instance_Bool
+            (Cons Bool False (Nil Bool))
+            (Cons Bool True (Nil Bool)))) =
+  (Ord_instance_List Bool Ord_instance_Bool).total
+    (Cons Bool True (Nil Bool))
+    (Cons Bool False (Nil Bool))
+```
+
+The nested List instance must consult its element's canonical Pair comparator,
+including the second component when the first components tie. The opposite
+directions on the same pairs distinguish ordering by shape alone.
+
+```ken example
+const lc_example_list_pair_head_lt : Bool =
+  (Ord_instance_List
+    (Pair Bool Bool)
+    (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool)).leq
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool False True) (Nil (Pair Bool Bool)))
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool True False) (Nil (Pair Bool Bool)))
+
+theorem lc_example_list_pair_head_lt_reduces : Equal Bool lc_example_list_pair_head_lt True =
+  Proved
+
+const lc_example_list_pair_head_gt : Bool =
+  (Ord_instance_List
+    (Pair Bool Bool)
+    (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool)).leq
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool True False) (Nil (Pair Bool Bool)))
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool False True) (Nil (Pair Bool Bool)))
+
+theorem lc_example_list_pair_head_gt_reduces : Equal Bool lc_example_list_pair_head_gt False =
+  Proved
+
+const lc_example_list_pair_tail_lt : Bool =
+  (Ord_instance_List
+    (Pair Bool Bool)
+    (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool)).leq
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool True False) (Nil (Pair Bool Bool)))
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool True True) (Nil (Pair Bool Bool)))
+
+theorem lc_example_list_pair_tail_lt_reduces : Equal Bool lc_example_list_pair_tail_lt True =
+  Proved
+
+const lc_example_list_pair_tail_gt : Bool =
+  (Ord_instance_List
+    (Pair Bool Bool)
+    (Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool)).leq
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool True True) (Nil (Pair Bool Bool)))
+    (Cons (Pair Bool Bool) (mk_pair Bool Bool True False) (Nil (Pair Bool Bool)))
+
+theorem lc_example_list_pair_tail_gt_reduces : Equal Bool lc_example_list_pair_tail_gt False =
+  Proved
+
+const lc_example_list_bool_lt : Bool =
+  list_ord_leq Bool Ord_instance_Bool (Cons Bool False (Nil Bool)) (Cons Bool True (Nil Bool))
+
+theorem lc_example_list_bool_lt_reduces : Equal Bool lc_example_list_bool_lt True = Proved
+
+const lc_example_list_bool_gt : Bool =
+  list_ord_leq Bool Ord_instance_Bool (Cons Bool True (Nil Bool)) (Cons Bool False (Nil Bool))
+
+theorem lc_example_list_bool_gt_reduces : Equal Bool lc_example_list_bool_gt False = Proved
+```
+
 ## 5. Design notes
 
 ### 5.1 Why `Eq Bool`'s `sym`/`trans` need a real correction, not only K7
