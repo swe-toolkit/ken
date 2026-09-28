@@ -7,9 +7,10 @@ separate.
 
 ## 1. Definition
 
-Ordinary rejection is backtrackable. Zero progress and impossible fuel
-exhaustion are named, non-backtrackable failures so repetition cannot silently
-loop or truncate.
+Ordinary rejection is backtrackable. Zero progress and fuel exhaustion are
+named, non-backtrackable failures so repetition cannot silently loop or
+truncate. A strictly decreasing recursive layer has enough fuel for its final
+call at the exhausted cursor.
 
 decoder combinators preserve the supplied instance location opaquely; errors
 from different `CursorOps` instances are not position-comparable without an
@@ -224,7 +225,8 @@ pub fn decoder_recursive
       (ops : CursorOps c el loc)
       (layer : Decoder c loc a → Decoder c loc a)
     : Decoder c loc a =
-  λcur. decoder_recursive_fuel c el loc a ops layer (cursor_remaining c el loc ops cur) cur
+  λcur.
+    decoder_recursive_fuel c el loc a ops layer (Suc (cursor_remaining c el loc ops cur)) cur
 ```
 
 ## 2. Laws
@@ -443,7 +445,7 @@ theorem decoder_recursive_equation
           ops
           layer
           cur
-          (cursor_remaining c el loc ops cur)) =
+          (Suc (cursor_remaining c el loc ops cur))) =
   Refl
 
 fn decoder_result_end_or
@@ -2493,7 +2495,7 @@ pub theorem decoder_recursive_preserves
   λcur.
     λgood.
       decoder_recursive_fuel_preserves
-        (cursor_remaining c el loc ops cur)
+        (Suc (cursor_remaining c el loc ops cur))
         c
         el
         loc
@@ -2509,38 +2511,25 @@ pub theorem decoder_recursive_preserves
 
 theorem decoder_positive_excludes_zero_fuel
       (n : Nat)
-    : Equal Bool (cursor_nat_lt Zero n) True
-      → Equal Bool (cursor_nat_lt n (Suc Zero)) True
-      → Bottom =
-  match n {
-    Zero ↦ λpositive. λbound. absurd positive;
-    Suc rest ↦ λpositive. λbound. absurd bound
-  }
+    : Equal Bool (cursor_nat_lt n Zero) True → Bottom =
+  λbound. absurd bound
 
 theorem decoder_lt_shrink
-      (k : Nat)
+      (fuel : Nat)
     : (x : Nat)
       → (y : Nat)
       → Equal Bool (cursor_nat_lt x y) True
-      → Equal Bool (cursor_nat_lt y (Suc (Suc k))) True
-      → Equal Bool (cursor_nat_lt x (Suc k)) True =
-  match k {
+      → Equal Bool (cursor_nat_lt y (Suc fuel)) True
+      → Equal Bool (cursor_nat_lt x fuel) True =
+  match fuel {
     Zero ↦
       λx.
         λy.
           match y {
             Zero ↦ λsmaller. λbounded. absurd smaller;
-            Suc y2 ↦
-              match y2 {
-                Zero ↦
-                  match x {
-                    Zero ↦ λsmaller. λbounded. Proved;
-                    Suc x2 ↦ λsmaller. λbounded. absurd smaller
-                  };
-                Suc y3 ↦ λsmaller. λbounded. absurd bounded
-              }
+            Suc y2 ↦ λsmaller. λbounded. absurd bounded
           };
-    Suc k2 ↦
+    Suc fuel2 ↦
       λx.
         λy.
           match y {
@@ -2548,7 +2537,7 @@ theorem decoder_lt_shrink
             Suc y2 ↦
               match x {
                 Zero ↦ λsmaller. λbounded. Proved;
-                Suc x2 ↦ λsmaller. λbounded. decoder_lt_shrink k2 x2 y2 smaller bounded
+                Suc x2 ↦ λsmaller. λbounded. decoder_lt_shrink fuel2 x2 y2 smaller bounded
               }
           }
   }
@@ -2568,17 +2557,6 @@ theorem decoder_recursive_fuel_succeeds
       (ops : CursorOps c el loc)
       (layer : Decoder c loc a → Decoder c loc a)
       (spec : c → a → c → Prop)
-      (positive : (cur : c)
-        → (v : a)
-        → (next : c)
-        → spec
-        cur
-        v
-        next
-        → Equal
-        Bool
-        (cursor_nat_lt Zero (cursor_remaining c el loc ops cur))
-        True)
       (step : (recur : Decoder c loc a)
         → (cur : c)
         → ((inner : c)
@@ -2612,7 +2590,7 @@ theorem decoder_recursive_fuel_succeeds
       → (v : a)
       → (next : c)
       → spec cur v next
-      → Equal Bool (cursor_nat_lt (cursor_remaining c el loc ops cur) (Suc fuel)) True
+      → Equal Bool (cursor_nat_lt (cursor_remaining c el loc ops cur) fuel) True
       → Equal
         (DecoderResult c loc a)
         (decoder_recursive_fuel c el loc a ops layer fuel cur)
@@ -2627,7 +2605,6 @@ theorem decoder_recursive_fuel_succeeds
                 absurd
                   (decoder_positive_excludes_zero_fuel
                     (cursor_remaining c el loc ops cur)
-                    (positive cur v next holds)
                     bounded);
     Suc fuel2 ↦
       λcur.
@@ -2652,7 +2629,6 @@ theorem decoder_recursive_fuel_succeeds
                               ops
                               layer
                               spec
-                              positive
                               step
                               inner
                               inner_v
@@ -2677,17 +2653,6 @@ pub theorem decoder_recursive_succeeds
       (ops : CursorOps c el loc)
       (layer : Decoder c loc a → Decoder c loc a)
       (spec : c → a → c → Prop)
-      (positive : (cur : c)
-        → (v : a)
-        → (next : c)
-        → spec
-        cur
-        v
-        next
-        → Equal
-        Bool
-        (cursor_nat_lt Zero (cursor_remaining c el loc ops cur))
-        True)
       (step : (recur : Decoder c loc a)
         → (cur : c)
         → ((inner : c)
@@ -2730,7 +2695,7 @@ pub theorem decoder_recursive_succeeds
       λnext.
         λholds.
           decoder_recursive_fuel_succeeds
-            (cursor_remaining c el loc ops cur)
+            (Suc (cursor_remaining c el loc ops cur))
             c
             el
             loc
@@ -2738,7 +2703,6 @@ pub theorem decoder_recursive_succeeds
             ops
             layer
             spec
-            positive
             step
             cur
             v
@@ -2794,7 +2758,10 @@ Build token decoders with `decoder_satisfy`, use `decoder_pure` and
 `decoder_fail` as the base cases, and combine them with `decoder_bind`,
 `decoder_seq`, and `decoder_alt`. `decoder_many` repeats a step, while
 `decoder_recursive` supplies a structurally fuel-bounded recursive layer.
-Callers never supply repetition or recursion fuel; both bounds come from
+It starts with `Suc (CursorOps.remaining cur)` fuel: at each layer call the
+remaining fuel is greater than the remaining input, so strictly decreasing
+recursive calls have a final call even at an exhausted cursor. Callers never
+supply repetition or recursion fuel; both bounds come from
 `CursorOps.remaining`. A caller may apply `DecoderPreserves` with its own
 cursor/location predicates. For `satisfy` it supplies an advance-preservation
 premise for successful peeks; for `many` it supplies step preservation; and
@@ -2803,18 +2770,20 @@ recursive argument. The latter two laws discharge the private fuel cases
 internally rather than exposing a caller fuel budget.
 
 `decoder_recursive_succeeds` proves success on cursors covered by a client's
-`spec`. The client proves those cursors have positive remaining input and
-supplies a layer step that succeeds when recursive calls on strictly smaller
-cursors succeed. The theorem quantifies over no failure result, and neither
+`spec`, including the exhausted cursor. The client supplies a layer step that
+succeeds when recursive calls on strictly smaller cursors succeed. The
+theorem quantifies over no failure result, and neither
 publishes the fuel recursor nor equates it with a re-seeded recursive decoder.
 `decoder_many_rejected_succeeds` returns an empty list without advancing when
 its step rejects at the current cursor; the rejection's location is arbitrary.
 
 ## 4. Design notes
 
-`DecoderFuelExhausted` is observable only when a cursor or recursive layer
-violates its stated progress contract. Legal repeated input cannot reach it:
-every success consumes at least one unit from a fuel seed equal to `remaining`.
+`DecoderFuelExhausted` remains the non-backtrackable zero-fuel backstop. The
+recursive seed is `Suc remaining`; its fuel stays greater than `remaining` at
+every layer call when each recursive child strictly decreases that count.
+The terminal layer therefore runs even at `remaining = Zero`. Legal repeated
+input also cannot exhaust its separate `decoder_many` worker.
 
 ## 5. References
 
@@ -2830,9 +2799,10 @@ conjunction projections; they import no proof assumption. In particular,
 `decoder_many_preserves` inducts over its private fuel and keeps zero-progress
 and fuel-exhaustion locations valid; `decoder_recursive_preserves` inducts over
 its private fuel and uses a layer-preservation premise. The success-only
-`decoder_recursive_succeeds` inducts over the same private fuel with a checked
-strict-order bound; its zero-fuel branch contradicts the client's positive
-remaining premise. `decoder_many_rejected_succeeds` instead splits on the
+`decoder_recursive_succeeds` inducts over the private recursive fuel with the
+checked invariant `remaining < fuel`; its zero-fuel branch contradicts that
+bound even at an exhausted cursor. `decoder_many_rejected_succeeds` instead
+splits on the
 private repetition fuel, using the zero-remaining branch or the step's
 rejection to prove an empty result. Neither this package nor its proof
 dependencies add an axiom or primitive.

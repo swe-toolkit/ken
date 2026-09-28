@@ -13,7 +13,8 @@ fn catalog_root() -> PathBuf {
 
 /// Promise class: durable invariant.
 /// MEASURED: a checked client applies decoder_recursive_succeeds to its own
-/// recursive list-of-octets decoder and derives Decoded for bytes_encode "Y".
+/// recursive list-of-octets decoder with honest remaining length and derives
+/// Decoded for bytes_encode "Y".
 /// CLAIMED: the public theorem allows a client to derive success on printed
 /// input without naming Decoder's private fuel worker.
 /// THE GAP: this is a small client, not Parsing's full printer/grammar theorem;
@@ -37,7 +38,7 @@ import Capability.Parsing.Decoder
 import Data.Collections.Derived (length)
 import Core.Logic.Transport (sym, trans)
 
-fn sample_remaining (cur : List UInt8) : Nat = Suc (length UInt8 cur)
+fn sample_remaining (cur : List UInt8) : Nat = length UInt8 cur
 fn sample_peek (cur : List UInt8) : Option UInt8 = None UInt8
 fn sample_advance (cur : List UInt8) : List UInt8 = cur
 fn sample_locate (cur : List UInt8) : Nat = Zero
@@ -57,13 +58,6 @@ fn sample_spec (cur : List UInt8) (v : Bool) (next : List UInt8) : Prop =
   Equal (DecoderResult (List UInt8) Nat Bool)
     (Decoded (List UInt8) Nat Bool v next)
     (Decoded (List UInt8) Nat Bool True (Nil UInt8))
-
-theorem sample_positive
-    (cur : List UInt8) (v : Bool) (next : List UInt8)
-    : sample_spec cur v next
-      → Equal Bool (cursor_nat_lt Zero
-          (cursor_remaining (List UInt8) UInt8 Nat sample_ops cur)) True =
-  λholds. Proved
 
 theorem sample_nil_lt_cons (head : UInt8) (tail : List UInt8)
     : Equal Bool
@@ -112,7 +106,7 @@ theorem printed_input_decodes : Equal (DecoderResult (List UInt8) Nat Bool)
     (decoder_recursive (List UInt8) UInt8 Nat Bool sample_ops sample_layer printed_cursor)
     (Decoded (List UInt8) Nat Bool True (Nil UInt8)) =
   decoder_recursive_succeeds (List UInt8) UInt8 Nat Bool sample_ops sample_layer
-    sample_spec sample_positive sample_step
+    sample_spec sample_step
     printed_cursor True (Nil UInt8) sample_spec_empty
 "#,
     )

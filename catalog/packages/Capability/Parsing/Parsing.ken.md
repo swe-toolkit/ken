@@ -5633,30 +5633,6 @@ theorem cursor_after_nonempty_strict
             λnonempty. cursor_after_codes_nonempty_strict cur first more rest starts_with
   }
 
-theorem printed_bool_spec_positive
-      (cur : ByteCursor)
-      (syntax : Syntax BoolExpr)
-      (next : ByteCursor)
-      (holds : PrintedBoolSpec cur syntax next)
-    : Equal Bool (cursor_nat_lt Zero (byte_cursor_remaining cur)) True =
-  source_suffix_positive_prefix
-    (bytes_to_list (print_bool_expr (erase_spans syntax)))
-    cur
-    (source_suffix next)
-    (and_fst
-      (Equal
-        (List UInt8)
-        (source_suffix cur)
-        (list_append
-          UInt8
-          (bytes_to_list (print_bool_expr (erase_spans syntax)))
-          (source_suffix next)))
-      (And
-        (Equal (Syntax BoolExpr) syntax (printed_syntax cur (erase_spans syntax)))
-        (Equal ByteCursor next (printed_end cur (erase_spans syntax))))
-      holds)
-    (print_bool_expr_nonempty (erase_spans syntax))
-
 theorem printed_end_self
       (e : BoolExpr) (cur : ByteCursor)
     : Equal ByteCursor (printed_end cur e) (printed_end cur e) =
@@ -7474,7 +7450,6 @@ theorem bool_expression_decoder_succeeds_printed
     byte_cursor_ops
     bool_decoder_layer
     PrintedBoolSpec
-    printed_bool_spec_positive
     (λrecur.
       λgrammar_start.
         λrecur_works.
