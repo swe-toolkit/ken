@@ -11999,15 +11999,18 @@ impl<'a> Lowering<'a> {
         Ok(())
     }
 
+    #[track_caller]
     fn record_checked_frame_terminal(
         &mut self,
         builder: &FunctionBuilder<'_>,
         kind: FrameTerminalKind,
     ) -> Result<(), CraneliftBackendError> {
-        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
-            "OrientedSubcontinuationPlanV1",
-            "checked Runtime frame terminal emitted outside a generated Function scope",
-        ))?.terminal(builder, kind)
+        // An unscoped adapter cannot carry a checked marker. Its terminal
+        // needs no ledger; entry/receipt events still refuse without a scope.
+        if let Some(events) = self.checked_frame_events.as_mut() {
+            events.terminal(builder, kind)?;
+        }
+        Ok(())
     }
 
     fn enter_checked_recursive_invocation(
