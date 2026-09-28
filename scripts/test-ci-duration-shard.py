@@ -338,10 +338,10 @@ class DurationShardControls(unittest.TestCase):
     def test_third_run_reports_fallback_transitions_and_large_weight_changes(self):
         """Add a third complete run without naming identities to special-case.
 
-        MEASURED: each captured source stays separate; run C's selected timings
-        equal its live inventory, and comparisons derive from the same inputs.
+        MEASURED: run C's source-shard map is checked per identity against raw
+        shard artifacts, and selected timings equal the live inventory.
         CLAIMED: new measurements replace prior fallbacks, and every absolute
-        weight change over 10s is reported from the source data.
+        weight change over 10s is reported with true source provenance.
         THE GAP: candidate PR and first post-landing runs must still provide
         actual acceptance measurements and identity attributions.
         """
@@ -365,6 +365,7 @@ class DurationShardControls(unittest.TestCase):
         })
         self.assertIn(newest_source, source_ids)
         self.assertEqual(len(source_ids), 3)
+        raw_source_shards = {}
         for shard in range(1, SHARD_COUNT + 1):
             artifact = json.loads(
                 (run_c / f"shard-{shard}.json").read_text(encoding="utf-8")
@@ -373,6 +374,15 @@ class DurationShardControls(unittest.TestCase):
             self.assertEqual(checked["run_id"], source_run["id"])
             self.assertEqual(checked["shard"], shard)
             self.assertTrue(all(row["result"] == "PASS" for row in checked["records"]))
+            for row in artifact["records"]:
+                key = (row["test_id"], newest_source)
+                self.assertNotIn(key, raw_source_shards)
+                raw_source_shards[key] = artifact["shard"]
+        for key, raw_shard in raw_source_shards.items():
+            self.assertEqual(
+                source_shards.get(key), raw_shard,
+                f"parsed source shard disagrees with raw artifact for {key[0]}",
+            )
 
         inventory = json.loads((run_c / "inventory.json").read_text(encoding="utf-8"))
         live = sorted(
@@ -451,7 +461,7 @@ class DurationShardControls(unittest.TestCase):
                     "previous_method": previous_method,
                     "previous_seconds": round(previous_seconds, 3),
                     "source_seconds": samples[test_id][newest_source],
-                    "source_shard": source_shards[(test_id, newest_source)],
+                    "source_shard": raw_source_shards[(test_id, newest_source)],
                     "current_seconds": round(current_seconds, 3),
                 })
             delta_seconds = current_seconds - previous_seconds
@@ -464,7 +474,7 @@ class DurationShardControls(unittest.TestCase):
                     "current_method": current_method,
                     "current_seconds": round(current_seconds, 3),
                     "delta_seconds": round(delta_seconds, 3),
-                    "source_shard": source_shards.get((test_id, newest_source)),
+                    "source_shard": raw_source_shards.get((test_id, newest_source)),
                 })
         self.assertTrue(expected_transitions)
         self.assertTrue(expected_weight_changes)
