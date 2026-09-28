@@ -1445,6 +1445,18 @@ fn response_forwards_vis(
             }
             Ok(true)
         }
+        RuntimeExpr::ComputationalMatch { cases, .. }
+            if !cases.is_empty() && cases.iter().all(|case| {
+                case.argument_binders == 0 && case.recursive_positions.is_empty()
+            }) =>
+        {
+            for position in 1..=cases.len() {
+                if !response_forwards_vis(plan, plan.semantic.child_origin(origin, position)?, op_binder)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
         _ => Ok(false),
     }
 }
@@ -4597,6 +4609,34 @@ mod tests {
             format!("{error:?}").contains("one response Vis selects a constructor with more than one host response occurrence and no structural path to exactly one of them"),
             "unexpected response-route refusal: {error:?}"
         );
+    }
+
+    #[test]
+    fn zero_binder_computational_case_can_forward_a_vis_operation() {
+        let root = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            cases: vec![RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::Tag::Only".to_string(),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::ITree::Vis".to_string(),
+                    args: vec![
+                        RuntimeExpr::Var(1),
+                        RuntimeExpr::Value(RuntimeValue::Unknown),
+                    ],
+                },
+            }],
+            default: trap(),
+        };
+        let plan = super::super::plan_static_transition_graph(&root, &BTreeMap::new())
+            .expect("the forward-case fixture has planned source occurrences");
+        let cm = plan.source_occurrences.iter().flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::ComputationalMatch { .. }))
+            .expect("the computational match has a source origin")
+            .static_origin;
+        assert!(response_forwards_vis(&plan, cm, 1).unwrap());
+        assert!(!response_forwards_vis(&plan, cm, 0).unwrap());
     }
 
     /// A real opaque recursive field, not a population mutation: the Vis K is
