@@ -1,7 +1,7 @@
 ---
 id: RT-FRAME-MARKER-ONCE
 title: "Native execution of a host-effect tree that one checked frame marker serves more than once: the two px7n nested-eliminator rows and the checked double bind build and run natively and agree with the interpreter, instead of refusing in object emission because the oriented subcontinuation plan consumes one checked Runtime frame marker more than once"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
