@@ -1995,6 +1995,47 @@ const derived_example_cat3_slice_underflow : String =
   slice (Suc (Suc (Suc Zero))) (Suc Zero) "abcde"
 ```
 
+These owner-local string examples exercise the private derived operations. The
+clamp example takes its upper index as an argument so a host can check the
+99-step unary input on a stated-stack thread without giving the CLI's fence
+checker that deep a term. They are checked declarations, not package exports.
+
+```ken example
+const derived_example_l3_concat_ascii : String = concat "ab" "cd"
+
+const derived_example_l3_concat_multibyte : String = concat "世" "界"
+
+const derived_example_l3_slice_ordinary : String =
+  slice (Suc Zero) (Suc (Suc (Suc Zero))) "abcde"
+
+fn derived_example_l3_slice_clamp (upper : Nat) : String = slice Zero upper "abc"
+
+const derived_example_l3_slice_underflow : String = slice (Suc (Suc Zero)) (Suc Zero) "abc"
+
+const derived_example_l3_char_at_found : Option Char = char_at (Suc Zero) "abc"
+
+const derived_example_l3_char_at_oob : Option Char =
+  char_at (Suc (Suc (Suc (Suc (Suc Zero))))) "abc"
+
+const derived_example_l3_char_at_empty : Option Char = char_at Zero ""
+
+const derived_example_l3_eq_equal : Bool = eq "abc" "abc"
+
+const derived_example_l3_eq_codepoint : Bool = eq "abc" "abd"
+
+const derived_example_l3_eq_length : Bool = eq "ab" "abc"
+
+const derived_example_l3_compare_prefix : OrdResult = compare "a" "ab"
+
+const derived_example_l3_compare_lex : OrdResult = compare "ab" "b"
+
+const derived_example_l3_compare_greater : OrdResult = compare "b" "a"
+
+const derived_example_l3_compare_equal : OrdResult = compare "ab" "ab"
+
+const derived_example_l3_slice_concat : String = slice Zero (Suc (Suc Zero)) (concat "ab" "cd")
+```
+
 ## 5. Design notes
 
 **Package dependency.** The CAT-3 proof terms in `§4.1`–`§4.3` use `cong`/
