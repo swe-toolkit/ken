@@ -596,10 +596,10 @@ fn derived_has_no_definitionally_equivalent_local_bool_reimplementation() {
 ///
 /// MEASURED: two transparent owner examples cite the owned `slice` body and
 /// evaluate to `"bc"` for (1, 3) and empty for the reversed (3, 1) bounds.
-/// CLAIMED: the real Derived slice uses end-minus-start width with saturating
-/// underflow rather than start-minus-end or an unguarded subtraction.
-/// THE GAP: these two closed examples distinguish the stated wrong formulas,
-/// not every possible slice input; provider laws own the general contract.
+/// CLAIMED: on these two inputs, the checked Derived slice returns the
+/// end-minus-start window and saturates a reversed bound to an empty string.
+/// THE GAP: these closed examples do not establish behavior for every input;
+/// no general slice law is proved here.
 #[test]
 fn slice_width_is_end_minus_start_through_production_slice() {
     let names = [

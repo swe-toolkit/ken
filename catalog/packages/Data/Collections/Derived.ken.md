@@ -1837,10 +1837,11 @@ postulate, cached-`Nat` carrier, or `Axiom`.
 pub fn bytes_nat_length (bs : Bytes) : Nat = length UInt8 (bytes_to_list bs)
 ```
 
-The following checked owner examples apply private CAT-3 structural, sortedness,
-lens, and slice laws. They are not tangled or exported. Each rejected false
-proof has a matching checked use of its private operations; the take/drop and
-lens controls differ only in their claimed endpoint.
+The following checked owner examples instantiate private CAT-3 structural,
+sortedness, and lens laws, then evaluate two concrete slice inputs. They are
+not tangled or exported. No general slice law is proved here. Each rejected
+false proof has a matching checked use of its private operations; the take/drop
+and lens controls differ only in their claimed endpoint.
 
 ```ken example
 fn derived_example_cat3_to_true (x : Nat) : Bool = True
