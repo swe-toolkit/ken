@@ -1,7 +1,7 @@
 ---
 id: BYTES-CONCAT-AND-ENCODE-CONTRACTS
 title: "register four trusted byte contracts -- F1 bytes_concat list view, F2 one whole-ASCII-string encoding equation, F3 bytes_decode (bytes_encode s) = Ok s, F4' AsciiBytes bs -> IsUtf8 bs -- over a checked AllAscii witness built on KERNEL-LITERAL-CHAR-VIEW, so any client can reason from explicit ASCII literals; then finish CAT-PARSING-LAWS' printer round trip with them"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: architect
@@ -107,3 +107,16 @@ stop and report the mismatch; do not build around it.
   D2 starts, STOP and return to the Steward.
 - A fifth trusted fact, a general UTF-8 model, a new primitive or a change to
   the `Source` contract is a STOP back to the operator.
+
+## Closeout
+
+Landed at `517955323` (candidate `6b2781cdd`; QA `evt_63a8w2stwrn9x`,
+Architect `evt_7001gdwsnh1q1`). D3 is the final deliverable. It proves the
+Boolean printer, parser and formatter round trips in `Parsing.ken.md` on the
+four D2 facts, and it completes `CAT-PARSING-LAWS`' held deliverable 2.
+Parsing gains four public names: `ParsedPrintedBool`, `print_bool_expr_utf8`,
+`parse_bool_expr_print_round_trip` and `format_bool_expr_print_round_trip`.
+Parsing adds no trust of its own. Its transitive trusted base is the four D2
+facts, which `bytes_primitive_contracts.rs` pins. The strict ambient census
+records Parsing's provider-less prelude `charToInt`, which joins the
+SESSION-SCOPE flip inventory.

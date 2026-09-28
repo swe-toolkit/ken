@@ -1,7 +1,7 @@
 ---
 id: CAT-DECODER-RECURSIVE-FUEL-SEED
 title: "decoder_recursive must not report fuel exhaustion on legal input: a layer that consumes one unit per recursion reaches fuel zero at end of input, so standard right-recursive repetition over public combinators fails on every input while the package claims exhaustion is impossible"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect
