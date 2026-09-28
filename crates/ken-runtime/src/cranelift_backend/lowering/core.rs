@@ -6366,21 +6366,27 @@ impl<'a> Lowering<'a> {
                 &composed,
             );
         }
-        // An inner Match that produces ExitCode must stay constructor-valued
-        // until the outer tree-producing Match selects its case. Lowering it
-        // alone projects its arms to ProcessExitStatus, which cannot be decoded
-        // back into a constructor. Other nested matches retain their route.
+        // An inner Match whose outer constructor family cannot survive a
+        // NativeScalarPair join must meet the outer producer while each arm
+        // still carries its constructor. Bool and Nat retain their existing
+        // scalar route; neither an exit projection nor a scalar refusal can
+        // recover the other constructors after a standalone join.
         if let RuntimeExpr::Match {
             scrutinee: inner,
             cases: inner_cases,
             default: inner_default,
         } = scrutinee.expr
         {
-            let outer_is_exit_code = producer_cases.iter().any(|case| {
-                case.constructor == self.process_symbols.exit_success
-                    || case.constructor == self.process_symbols.exit_failure
-            });
-            if outer_is_exit_code {
+            let symbols = &self.process_symbols;
+            let all_in = |family: &[&RuntimeSymbol]| {
+                producer_cases
+                    .iter()
+                    .all(|case| family.iter().any(|symbol| &case.constructor == *symbol))
+            };
+            let outer_needs_composition = !producer_cases.is_empty()
+                && !all_in(&[&symbols.bool_true, &symbols.bool_false])
+                && !all_in(&[&symbols.nat_zero, &symbols.nat_suc]);
+            if outer_needs_composition {
                 #[cfg(any(test, feature = "px8-ds-test-support"))]
                 note_exit_code_case_of_case_route();
                 let inner_scrutinee = self.child_occurrence(scrutinee.static_origin, 0, inner)?;
