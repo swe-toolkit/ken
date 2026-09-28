@@ -26,14 +26,24 @@ A native program can use two resource brackets one after the other.
   `unsupported runtime-IR lowering: BoundaryCarrier: a carried recursive
   hypothesis is an eliminated value, not a callable, so it takes no
   arguments, but the call provides 1`.
-- The refusal is `reject_carried_residual_arguments` in
+- The message comes from `reject_carried_residual_arguments` in
   `crates/ken-runtime/src/cranelift_backend/lowering/core.rs` (`:3128`).
 - **Controls.** One bracket with the same body compiles (exit 0). The same
   refusal appears when the second bracket is moved into a separately named
   `proc` with capacity 6.
-- The NEXT-GROUP ring checks whether this refusal is independent of the
-  route selection (`evt_1ys064x0c11be` (a)-(b)). If it is implicated, this
-  node waits for the Architect's re-ruling.
+- **Ruled INDEPENDENT of the route selection** (Architect
+  `evt_20tgpkchtnck2`). The refusal persists under the "last by origin"
+  selection, in which no route hands the refusing call to any Vis.
+- **The site, pinned.** It is the source-machine guard at
+  `crates/ken-runtime/src/cranelift_backend/lowering/source.rs:5015`
+  (arguments 1, funcid 44, owner `PredeclaredFunctionId(3)`,
+  `pending_application` None), reached from call `StaticOriginId(187)`.
+  - In the witness plan, 187 is CM12's Vis-case dispatch continuation call:
+    IHInvocation188 -> Let191 -> leaf Match309 -> root Match312 ->
+    IHSlots313 -> CM12 Vis.
+  - The refusal needs the second bracket's CM318 nested in CM12's Ret case,
+    which is why one bracket compiles.
+  - Logs: `/tmp/rt-ignored-build/a1-{repaired-instrumented2,first,last}.log`.
 - **Possible overlap.** Both `rt_escape` rows also use two brackets
   (`withResource` then `withBuffer`). `RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE`
   may reach this refusal next. AC-0 checks that, so that the two nodes do not
