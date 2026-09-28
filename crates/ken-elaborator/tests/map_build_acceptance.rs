@@ -306,16 +306,16 @@ fn cat_bool_reuse_d2_resolves_exact_is_some_provider_without_equivalent_local() 
 }
 
 /// Promise class: durable checked-identity invariant.
-/// MEASURED: Map's selective import binds bare `leq_nat` to LawfulClasses'
-/// owned GlobalId, and no Map-owned transparent declaration has both a
-/// kernel-equivalent type and body. CLAIMED: Map reuses the canonical Nat
-/// comparator rather than carrying a second definition. THE GAP: A renamed,
+/// MEASURED: Map adds no trust, owns none of the five retired
+/// comparator/law/totality names, and has no transparent declaration
+/// kernel-equivalent to LawfulClasses' checked `leq_nat` GlobalId. CLAIMED:
+/// Map retires its named Nat order duplication. THE GAP: A renamed,
 /// fully self-recursive copy is not kernel-convertible to the provider
 /// (conversion does not identify distinct recursive declarations), so this
 /// pin does not detect it; measured: `leq_nat_shadow` recursing on itself stays
 /// green. Factoring review is the backstop.
 #[test]
-fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
+fn cat_map_retires_leq_nat_family_and_totality_name() {
     let (mut env, dependencies) = mk_map_dependency_env_with_provider_owned();
     let provider = catalog_or::provider_owned_id(
         &env,
@@ -331,32 +331,19 @@ fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
     assert_eq!(
         env.globals.remove("leq_nat"),
         Some(provider),
-        "withhold the existing flat canonical alias before Map's import"
+        "withhold the flat canonical alias so Map cannot rely on it without an import"
     );
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let map_ids: BTreeSet<_> = env
         .elaborate_ken_md_file(MAP_KEN_MD)
-        .expect("Map must elaborate using its selective canonical leq_nat import")
+        .expect("Map must elaborate without a Nat comparator import")
         .into_iter()
         .collect();
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Map comparator reuse must add zero trust");
     assert!(
         !map_ids.contains(&provider),
-        "the imported canonical comparator is not Map-owned"
-    );
-    let total = env.globals["total_leq_nat"];
-    assert!(
-        map_ids.contains(&total),
-        "Map must own its local total witness"
-    );
-    let (ty, body) = match env.env.lookup(total) {
-        Some(Decl::Transparent { ty, body, .. }) => (ty, body),
-        other => panic!("Map total_leq_nat must be transparent, got {other:?}"),
-    };
-    assert!(
-        term_reference_count(ty, provider) + term_reference_count(body, provider) > 0,
-        "bare leq_nat in Map's checked total witness must bind the canonical GlobalId"
+        "the canonical comparator must not be Map-owned"
     );
     let map_bindings: Vec<_> = env
         .globals
@@ -374,29 +361,17 @@ fn cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local() {
         !transparent_ids.is_empty() && transparent_ids.is_subset(&bound_ids),
         "the real Map bindings must close over every direct transparent declaration"
     );
-    let provider_references = map_ids
-        .iter()
-        .map(|id| match env.env.lookup(*id) {
-            Some(Decl::Transparent { ty, body, .. }) => {
-                term_reference_count(ty, provider) + term_reference_count(body, provider)
-            }
-            _ => 0,
-        })
-        .sum::<usize>();
-    assert!(
-        provider_references > 0,
-        "Map's checked direct declarations must actually use canonical leq_nat"
-    );
     for (name, id) in map_bindings {
         assert!(
             ![
                 "leq_nat",
                 "leq_nat::refl",
                 "leq_nat::trans",
-                "leq_nat::antisym"
+                "leq_nat::antisym",
+                "total_leq_nat"
             ]
             .contains(&name.as_str()),
-            "Map must not retain local comparator or law {name}"
+            "Map must not retain retired comparator, law, or totality name {name}"
         );
         env.globals.insert(format!("{MAP_MODULE}.{name}"), id);
     }
@@ -1223,42 +1198,6 @@ fn lookupassocagree_law5_is_a_real_general_proof_term() {
 // CAT-4 (`58`) — Layer-2 keyed collections / sets / relations
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Promise class: durable invariant. The Map package's reused total-order
-/// witness remains proof-relevant: case analysis distinguishes the side chosen
-/// by `total_leq_nat`.
-///
-/// **MEASURED:** the real Map package's `total_leq_nat` produces opposite Bool
-/// tags for a left witness and a right witness. **CLAIMED:** its imported
-/// catalog `Or` retains distinguishable `Inl`/`Inr` computation. **THE GAP:**
-/// merely type-checking both constructors would not prove informative
-/// elimination; `map_or_tag` consumes the actual witness by case analysis.
-#[test]
-fn map_total_leq_nat_preserves_proof_relevant_or_tags() {
-    let mut env = mk_env();
-    env.elaborate_decl(
-        "fn map_or_tag (a : Omega) (b : Omega) (choice : Or a b) : Bool = \
-         match choice { Inl p |-> True ; Inr q |-> False }",
-    )
-    .expect("Map Or tag observer must elaborate");
-    env.elaborate_file(
-        "theorem map_total_left_tag \
-           : Equal Bool \
-               (map_or_tag \
-                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
-                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
-                 (total_leq_nat Zero (Suc Zero))) \
-               True = Proved \
-         theorem map_total_right_tag \
-           : Equal Bool \
-               (map_or_tag \
-                 (Equal Bool (leq_nat (Suc Zero) Zero) True) \
-                 (Equal Bool (leq_nat Zero (Suc Zero)) True) \
-                 (total_leq_nat (Suc Zero) Zero)) \
-               False = Proved",
-    )
-    .expect("both Map Or tags must remain distinguishable by case analysis");
-}
-
 #[test]
 fn cat4_new_api_is_derived_and_axiom_free() {
     let (env, dependencies) = mk_env_with_provider_owned();
@@ -1279,7 +1218,6 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "bool_and::idempotent",
         "bool_and::left_identity",
         "bool_and::right_identity",
-        "total_leq_nat",
         "order_equiv_key",
         "bool_and::intro",
         "order_equiv_key_true_from_order_equiv",
