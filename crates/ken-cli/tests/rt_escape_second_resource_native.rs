@@ -717,7 +717,7 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-NATIVE-TREE-MATCH D1: first ObjectEmission refusal is a carried Match arm source join StaticOriginId(1244) planned native scalar lanes but lowered Carried; arm origin 1241, PredeclaredFunctionId(6); RT-JOIN-PHASE-CASE-BINDER-CARRIED AC-0 owns this witness, not native parity"]
+#[ignore = "RT-NATIVE-TREE-MATCH D1: first ObjectEmission refusal is a carried `Match` arm source join StaticOriginId(1244) planned native scalar lanes but lowering produced a carried boundary word; arm origin 1241, PredeclaredFunctionId(6); RT-JOIN-PHASE-CASE-BINDER-CARRIED AC-0 owns this witness, not native parity"]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     // Closure across the bounded-Nat fanout lowerer: an escaped-resource checked
     // frame in the shared continuation of a `match n {Zero;Suc}` fanout. Pre-fix
