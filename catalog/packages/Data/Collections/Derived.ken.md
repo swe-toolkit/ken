@@ -2081,6 +2081,25 @@ const derived_example_zip3v2_length_value : Nat =
       (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))
 ```
 
+These checked obligation shapes use the package-local comparator-indexed `Perm`.
+The constrained form takes the comparator from the imported lawful `Ord Int`
+dictionary; the explicit form receives it as an argument.
+
+```ken example
+import Core.Classes.LawfulClasses (Ord)
+
+fn derived_example_sort_obligation_explicit
+      (cmp : Int → Int → Bool) (ys : List Int) (xs : List Int)
+    : Prop =
+  And (is_sorted Int cmp ys) (Perm Int cmp ys xs)
+
+fn derived_example_sort_obligation_via_ord
+      (ys : List Int) (xs : List Int)
+    : Prop
+    where Ord Int =
+  And (is_sorted Int (d.leq) ys) (Perm Int (d.leq) ys xs)
+```
+
 ## 5. Design notes
 
 **Package dependency.** The CAT-3 proof terms in `§4.1`–`§4.3` use `cong`/
