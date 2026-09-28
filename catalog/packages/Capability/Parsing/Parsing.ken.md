@@ -48,7 +48,13 @@ import Capability.Diagnostics.Core
     origin_source_id)
 
 import Capability.Parsing.Cursor
-  (CursorOps, MkCursorOps, cursor_advance, cursor_locate, cursor_peek)
+  (CursorOps,
+    MkCursorOps,
+    cursor_advance,
+    cursor_locate,
+    cursor_nat_lt,
+    cursor_peek,
+    cursor_remaining)
 
 import Capability.Parsing.Decoder
   (Decoded,
@@ -101,7 +107,7 @@ import Data.Binary.BytesPrimitiveContracts
     bytes_concat_list_view,
     bytes_encode_ascii_octets)
 
-import Data.Collections.Derived (bytes_nat_length, list_append, map, nth)
+import Data.Collections.Derived (bytes_nat_length, length, list_append, map, nth)
 
 import Data.Numeric.Nat.Order (sub)
 
@@ -1155,6 +1161,970 @@ fn print_bool_expr_ascii (e : BoolExpr) : AsciiBytes (print_bool_expr e) =
 
 theorem print_bool_expr_utf8 (e : BoolExpr) : IsUtf8 (print_bool_expr e) =
   ascii_bytes_utf8 (print_bool_expr e) (print_bool_expr_ascii e)
+
+fn ListNonempty (a : Type) (xs : List a) : Prop =
+  match xs {
+    Nil ↦ Bottom;
+    Cons head tail ↦ Top
+  }
+
+theorem list_nonempty_from_code_head
+      (xs : List UInt8) (code : Int) (rest : List Int)
+    : Equal (List Int) (map UInt8 Int uint8_to_int xs) (Cons Int code rest)
+      → ListNonempty UInt8 xs =
+  match xs {
+    Nil ↦ λcodes. absurd codes;
+    Cons byte tail ↦ λcodes. Proved
+  }
+
+theorem true_encoded_nonempty
+    : ListNonempty UInt8 (bytes_to_list (bytes_encode true_token_text)) =
+  list_nonempty_from_code_head
+    (bytes_to_list (bytes_encode true_token_text))
+    116
+    (Cons Int 114 (Cons Int 117 (Cons Int 101 (Nil Int))))
+    (bytes_encode_ascii_octets true_token_text true_token_ascii)
+
+theorem false_encoded_nonempty
+    : ListNonempty UInt8 (bytes_to_list (bytes_encode false_token_text)) =
+  list_nonempty_from_code_head
+    (bytes_to_list (bytes_encode false_token_text))
+    102
+    (Cons Int 97 (Cons Int 108 (Cons Int 115 (Cons Int 101 (Nil Int)))))
+    (bytes_encode_ascii_octets false_token_text false_token_ascii)
+
+theorem not_open_encoded_nonempty
+    : ListNonempty UInt8 (bytes_to_list (bytes_encode not_open_text)) =
+  list_nonempty_from_code_head
+    (bytes_to_list (bytes_encode not_open_text))
+    40
+    (Cons Int 110 (Cons Int 111 (Cons Int 116 (Cons Int 32 (Nil Int)))))
+    (bytes_encode_ascii_octets not_open_text not_open_ascii)
+
+theorem and_open_encoded_nonempty
+    : ListNonempty UInt8 (bytes_to_list (bytes_encode and_open_text)) =
+  list_nonempty_from_code_head
+    (bytes_to_list (bytes_encode and_open_text))
+    40
+    (Cons Int 97 (Cons Int 110 (Cons Int 100 (Cons Int 32 (Nil Int)))))
+    (bytes_encode_ascii_octets and_open_text and_open_ascii)
+
+theorem list_nonempty_append_left
+      (a : Type) (left : List a) (right : List a)
+    : ListNonempty a left → ListNonempty a (list_append a left right) =
+  match left {
+    Nil ↦ λnonempty. absurd nonempty;
+    Cons head tail ↦ λnonempty. Proved
+  }
+
+theorem bytes_concat_nonempty_left
+      (left : Bytes) (right : Bytes) (nonempty : ListNonempty UInt8 (bytes_to_list left))
+    : ListNonempty UInt8 (bytes_to_list (bytes_concat left right)) =
+  J
+    (λview _. ListNonempty UInt8 view)
+    (list_nonempty_append_left UInt8 (bytes_to_list left) (bytes_to_list right) nonempty)
+    (sym
+      (List UInt8)
+      (bytes_to_list (bytes_concat left right))
+      (list_append UInt8 (bytes_to_list left) (bytes_to_list right))
+      (bytes_concat_list_view left right))
+
+theorem print_bool_expr_nonempty
+      (e : BoolExpr)
+    : ListNonempty UInt8 (bytes_to_list (print_bool_expr e)) =
+  match e {
+    BTrue ↦ true_encoded_nonempty;
+    BFalse ↦ false_encoded_nonempty;
+    BNot child ↦
+      bytes_concat_nonempty_left
+        (bytes_concat (bytes_encode not_open_text) (print_bool_expr child))
+        (bytes_encode close_text)
+        (bytes_concat_nonempty_left
+          (bytes_encode not_open_text)
+          (print_bool_expr child)
+          not_open_encoded_nonempty);
+    BAnd left right ↦
+      bytes_concat_nonempty_left
+        (bytes_concat
+          (bytes_concat (bytes_encode and_open_text) (print_bool_expr left))
+          (bytes_encode separator_text))
+        (bytes_concat (print_bool_expr right) (bytes_encode close_text))
+        (bytes_concat_nonempty_left
+          (bytes_concat (bytes_encode and_open_text) (print_bool_expr left))
+          (bytes_encode separator_text)
+          (bytes_concat_nonempty_left
+            (bytes_encode and_open_text)
+            (print_bool_expr left)
+            and_open_encoded_nonempty))
+  }
+
+theorem separator_encoded_nonempty
+    : ListNonempty UInt8 (bytes_to_list (bytes_encode separator_text)) =
+  list_nonempty_from_code_head
+    (bytes_to_list (bytes_encode separator_text))
+    32
+    (Nil Int)
+    (bytes_encode_ascii_octets separator_text separator_ascii)
+
+theorem close_encoded_nonempty : ListNonempty UInt8 (bytes_to_list (bytes_encode close_text)) =
+  list_nonempty_from_code_head
+    (bytes_to_list (bytes_encode close_text))
+    41
+    (Nil Int)
+    (bytes_encode_ascii_octets close_text close_ascii)
+
+fn list_drop_at (a : Type) (n : Nat) (xs : List a) : List a =
+  match n {
+    Zero ↦ xs;
+    Suc n2 ↦
+      match xs {
+        Nil ↦ Nil a;
+        Cons h rest ↦ list_drop_at a n2 rest
+      }
+  }
+
+fn list_tail_or_nil (a : Type) (xs : List a) : List a =
+  match xs {
+    Nil ↦ Nil a;
+    Cons h rest ↦ rest
+  }
+
+theorem list_drop_at_suc
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal (List a) (list_drop_at a (Suc n) xs) (list_tail_or_nil a (list_drop_at a n xs)) =
+  match n {
+    Zero ↦
+      match xs {
+        Nil ↦ Proved;
+        Cons h rest ↦ Refl
+      };
+    Suc n2 ↦
+      match xs {
+        Nil ↦ Proved;
+        Cons h rest ↦ list_drop_at_suc a n2 rest
+      }
+  }
+
+theorem list_drop_at_nth
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal (Option a) (nth a n xs) (nth a Zero (list_drop_at a n xs)) =
+  match n {
+    Zero ↦ Refl;
+    Suc n2 ↦
+      match xs {
+        Nil ↦ Proved;
+        Cons h rest ↦ list_drop_at_nth a n2 rest
+      }
+  }
+
+theorem list_drop_at_length
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal Nat (length a (list_drop_at a n xs)) (sub (length a xs) n) =
+  match n {
+    Zero ↦ Refl;
+    Suc n2 ↦
+      match xs {
+        Nil ↦ Proved;
+        Cons h rest ↦ list_drop_at_length a n2 rest
+      }
+  }
+
+fn list_advance_over (a : Type) (start : Nat) (xs : List a) : Nat =
+  match xs {
+    Nil ↦ start;
+    Cons h rest ↦ list_advance_over a (Suc start) rest
+  }
+
+theorem list_drop_at_advance_over
+      (a : Type) (start : Nat) (source : List a) (suffix : List a) (prefix : List a)
+    : (starts_with : Equal (List a) (list_drop_at a start source) (list_append a prefix suffix))
+      → Equal (List a) (list_drop_at a (list_advance_over a start prefix) source) suffix =
+  match prefix {
+    Nil ↦ λstarts_with. starts_with;
+    Cons h rest ↦
+      λstarts_with.
+        let next_starts_with : Equal
+          (List a)
+          (list_drop_at a (Suc start) source)
+          (list_append a rest suffix) =
+          trans
+            (List a)
+            (list_drop_at a (Suc start) source)
+            (list_tail_or_nil a (list_drop_at a start source))
+            (list_append a rest suffix)
+            (list_drop_at_suc a start source)
+            (cong
+              (List a)
+              (List a)
+              (list_drop_at a start source)
+              (list_append a (Cons a h rest) suffix)
+              (list_tail_or_nil a)
+              starts_with)
+        in
+          list_drop_at_advance_over a (Suc start) source suffix rest next_starts_with
+  }
+
+fn source_suffix (cur : ByteCursor) : List UInt8 =
+  list_drop_at
+    UInt8
+    (byte_cursor_position cur)
+    (bytes_to_list (source_bytes (byte_cursor_source cur)))
+
+theorem source_suffix_length
+      (cur : ByteCursor)
+    : Equal Nat (length UInt8 (source_suffix cur)) (byte_cursor_remaining cur) =
+  match cur {
+    MkByteCursor source position ↦
+      list_drop_at_length UInt8 position (bytes_to_list (source_bytes source))
+  }
+
+theorem source_suffix_positive
+      (cur : ByteCursor)
+      (head : UInt8)
+      (rest : List UInt8)
+      (starts_with : Equal (List UInt8) (source_suffix cur) (Cons UInt8 head rest))
+    : Equal Bool (cursor_nat_lt Zero (byte_cursor_remaining cur)) True =
+  trans
+    Bool
+    (cursor_nat_lt Zero (byte_cursor_remaining cur))
+    (cursor_nat_lt Zero (length UInt8 (source_suffix cur)))
+    True
+    (cong
+      Nat
+      Bool
+      (byte_cursor_remaining cur)
+      (length UInt8 (source_suffix cur))
+      (λn. cursor_nat_lt Zero n)
+      (sym
+        Nat
+        (length UInt8 (source_suffix cur))
+        (byte_cursor_remaining cur)
+        (source_suffix_length cur)))
+    (trans
+      Bool
+      (cursor_nat_lt Zero (length UInt8 (source_suffix cur)))
+      (cursor_nat_lt Zero (length UInt8 (Cons UInt8 head rest)))
+      True
+      (cong
+        (List UInt8)
+        Bool
+        (source_suffix cur)
+        (Cons UInt8 head rest)
+        (λxs. cursor_nat_lt Zero (length UInt8 xs))
+        starts_with)
+      Proved)
+
+theorem cursor_nat_lt_from_leq_nat
+      (left : Nat) (right : Nat)
+    : Equal Bool (cursor_nat_lt left right) (leq_nat (Suc left) right) =
+  match right {
+    Zero ↦ Proved;
+    Suc right2 ↦
+      match left {
+        Zero ↦ Proved;
+        Suc left2 ↦ cursor_nat_lt_from_leq_nat left2 right2
+      }
+  }
+
+theorem sub_positive_in_bounds
+      (len : Nat)
+    : (position : Nat)
+      → Equal Bool (cursor_nat_lt Zero (sub len position)) True
+      → LessEqNat (Suc position) len =
+  match len {
+    Zero ↦
+      λposition.
+        match position {
+          Zero ↦ λpositive. absurd positive;
+          Suc position2 ↦ λpositive. absurd positive
+        };
+    Suc len2 ↦
+      λposition.
+        match position {
+          Zero ↦ λpositive. Proved;
+          Suc position2 ↦ λpositive. sub_positive_in_bounds len2 position2 positive
+        }
+  }
+
+theorem byte_cursor_advance_strict
+      (cur : ByteCursor)
+    : Equal Bool (cursor_nat_lt Zero (byte_cursor_remaining cur)) True
+      → Equal Bool
+        (cursor_nat_lt
+          (byte_cursor_remaining (byte_cursor_advance cur))
+          (byte_cursor_remaining cur))
+        True =
+  match cur {
+    MkByteCursor source position ↦
+      λpositive.
+        trans
+          Bool
+          (cursor_nat_lt
+            (sub (source_length source) (Suc position))
+            (sub (source_length source) position))
+          (leq_nat
+            (Suc (sub (source_length source) (Suc position)))
+            (sub (source_length source) position))
+          True
+          (cursor_nat_lt_from_leq_nat
+            (sub (source_length source) (Suc position))
+            (sub (source_length source) position))
+          ((proof suc_decreases for sub)
+            (source_length source)
+            position
+            (sub_positive_in_bounds (source_length source) position positive))
+  }
+
+fn cursor_after_codes (cur : ByteCursor) (codes : List UInt8) : ByteCursor =
+  MkByteCursor
+    (byte_cursor_source cur)
+    (list_advance_over UInt8 (byte_cursor_position cur) codes)
+
+theorem source_suffix_after_codes
+      (cur : ByteCursor) (codes : List UInt8) (rest : List UInt8)
+    : Equal (List UInt8) (source_suffix cur) (list_append UInt8 codes rest)
+      → Equal (List UInt8) (source_suffix (cursor_after_codes cur codes)) rest =
+  λstarts_with.
+    list_drop_at_advance_over
+      UInt8
+      (byte_cursor_position cur)
+      (bytes_to_list (source_bytes (byte_cursor_source cur)))
+      rest
+      codes
+      starts_with
+
+theorem leq_nat_suc (n : Nat) : Equal Bool (leq_nat n (Suc n)) True =
+  match n {
+    Zero ↦ Proved;
+    Suc n2 ↦ leq_nat_suc n2
+  }
+
+theorem cursor_nat_lt_trans
+      (left : Nat)
+      (middle : Nat)
+      (right : Nat)
+      (first : Equal Bool (cursor_nat_lt left middle) True)
+      (second : Equal Bool (cursor_nat_lt middle right) True)
+    : Equal Bool (cursor_nat_lt left right) True =
+  let
+    left_to_middle : Equal Bool (leq_nat (Suc left) middle) True =
+      trans
+        Bool
+        (leq_nat (Suc left) middle)
+        (cursor_nat_lt left middle)
+        True
+        (sym
+          Bool
+          (cursor_nat_lt left middle)
+          (leq_nat (Suc left) middle)
+          (cursor_nat_lt_from_leq_nat left middle))
+        first;
+    middle_to_right : Equal Bool (leq_nat (Suc middle) right) True =
+      trans
+        Bool
+        (leq_nat (Suc middle) right)
+        (cursor_nat_lt middle right)
+        True
+        (sym
+          Bool
+          (cursor_nat_lt middle right)
+          (leq_nat (Suc middle) right)
+          (cursor_nat_lt_from_leq_nat middle right))
+        second;
+    left_to_middle_suc : Equal Bool (leq_nat (Suc left) (Suc middle)) True =
+      (proof trans for leq_nat)
+        (Suc left)
+        middle
+        (Suc middle)
+        left_to_middle
+        (leq_nat_suc middle);
+    left_to_right : Equal Bool (leq_nat (Suc left) right) True =
+      (proof trans for leq_nat) (Suc left) (Suc middle) right left_to_middle_suc middle_to_right
+  in
+    trans
+      Bool
+      (cursor_nat_lt left right)
+      (leq_nat (Suc left) right)
+      True
+      (cursor_nat_lt_from_leq_nat left right)
+      left_to_right
+
+theorem cursor_after_codes_nonempty_strict
+      (cur : ByteCursor) (first : UInt8) (more : List UInt8)
+    : (rest : List UInt8)
+      → Equal (List UInt8) (source_suffix cur) (list_append UInt8 (Cons UInt8 first more) rest)
+      → Equal Bool
+        (cursor_nat_lt
+          (byte_cursor_remaining (cursor_after_codes cur (Cons UInt8 first more)))
+          (byte_cursor_remaining cur))
+        True =
+  match more {
+    Nil ↦
+      λrest.
+        λstarts_with.
+          byte_cursor_advance_strict cur (source_suffix_positive cur first rest starts_with);
+    Cons second tail ↦
+      λrest.
+        λstarts_with.
+          let
+            after_first : ByteCursor = byte_cursor_advance cur;
+            first_strict : Equal Bool
+              (cursor_nat_lt (byte_cursor_remaining after_first) (byte_cursor_remaining cur))
+              True =
+              byte_cursor_advance_strict
+                cur
+                (source_suffix_positive
+                  cur
+                  first
+                  (list_append UInt8 (Cons UInt8 second tail) rest)
+                  starts_with);
+            rest_starts : Equal
+              (List UInt8)
+              (source_suffix after_first)
+              (list_append UInt8 (Cons UInt8 second tail) rest) =
+              source_suffix_after_codes
+                cur
+                (Cons UInt8 first (Nil UInt8))
+                (list_append UInt8 (Cons UInt8 second tail) rest)
+                starts_with;
+            rest_strict : Equal Bool
+              (cursor_nat_lt
+                (byte_cursor_remaining
+                  (cursor_after_codes after_first (Cons UInt8 second tail)))
+                (byte_cursor_remaining after_first))
+              True =
+              cursor_after_codes_nonempty_strict after_first second tail rest rest_starts
+          in
+            cursor_nat_lt_trans
+              (byte_cursor_remaining (cursor_after_codes after_first (Cons UInt8 second tail)))
+              (byte_cursor_remaining after_first)
+              (byte_cursor_remaining cur)
+              rest_strict
+              first_strict
+  }
+
+fn list_last_byte (xs : List UInt8) : UInt8 =
+  match xs {
+    Nil ↦ (0 : UInt8);
+    Cons head rest ↦
+      match rest {
+        Nil ↦ head;
+        Cons next tail ↦ list_last_byte rest
+      }
+  }
+
+fn token_codes_decoder (codes : List Int) : Decoder ByteCursor Span UInt8 =
+  match codes {
+    Nil ↦ byte_code_decoder (0 : Int);
+    Cons code more ↦
+      match more {
+        Nil ↦ byte_code_decoder code;
+        Cons next rest ↦
+          decoder_seq
+            ByteCursor
+            Span
+            UInt8
+            UInt8
+            (byte_code_decoder code)
+            (token_codes_decoder more)
+      }
+  }
+
+const true_token_codes : List Int = map Char Int charToInt (string_to_list_char true_token_text)
+
+theorem true_token_code_decoder_pointwise
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (true_token_decoder cur)
+        (token_codes_decoder true_token_codes cur) =
+  Refl
+
+theorem false_token_code_decoder_pointwise
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (false_token_decoder cur)
+        (token_codes_decoder
+          (map Char Int charToInt (string_to_list_char false_token_text))
+          cur) =
+  Refl
+
+theorem not_open_token_code_decoder_pointwise
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (not_open_token_decoder cur)
+        (token_codes_decoder (map Char Int charToInt (string_to_list_char not_open_text)) cur) =
+  Refl
+
+theorem and_open_token_code_decoder_pointwise
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (and_open_token_decoder cur)
+        (token_codes_decoder (map Char Int charToInt (string_to_list_char and_open_text)) cur) =
+  Refl
+
+const separator_code : Int = 32
+
+const close_code : Int = 41
+
+theorem separator_code_decoder_pointwise
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder separator_code cur)
+        (token_codes_decoder
+          (map Char Int charToInt (string_to_list_char separator_text))
+          cur) =
+  Refl
+
+theorem close_code_decoder_pointwise
+      (cur : ByteCursor)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder close_code cur)
+        (token_codes_decoder (map Char Int charToInt (string_to_list_char close_text)) cur) =
+  Refl
+
+fn decoder_seq_resume
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (b : Type)
+      (second : Decoder c loc b)
+      (first_outcome : DecoderResult c loc a)
+    : DecoderResult c loc b =
+  match first_outcome {
+    Decoded value next ↦ second next;
+    DecoderFailed err ↦ DecoderFailed c loc b err
+  }
+
+theorem decoder_seq_resume_equation
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (b : Type)
+      (first : Decoder c loc a)
+      (second : Decoder c loc b)
+      (cur : c)
+    : Equal
+        (DecoderResult c loc b)
+        (decoder_seq c loc a b first second cur)
+        (decoder_seq_resume c loc a b second (first cur)) =
+  Refl
+
+theorem decoder_seq_success
+      (c : Type)
+      (loc : Type)
+      (a : Type)
+      (b : Type)
+      (first : Decoder c loc a)
+      (second : Decoder c loc b)
+      (cur : c)
+      (value : a)
+      (mid : c)
+      (last : b)
+      (end : c)
+      (first_ok : Equal (DecoderResult c loc a) (first cur) (Decoded c loc a value mid))
+      (second_ok : Equal (DecoderResult c loc b) (second mid) (Decoded c loc b last end))
+    : Equal
+        (DecoderResult c loc b)
+        (decoder_seq c loc a b first second cur)
+        (Decoded c loc b last end) =
+  trans
+    (DecoderResult c loc b)
+    (decoder_seq c loc a b first second cur)
+    (decoder_seq_resume c loc a b second (first cur))
+    (Decoded c loc b last end)
+    (decoder_seq_resume_equation c loc a b first second cur)
+    (trans
+      (DecoderResult c loc b)
+      (decoder_seq_resume c loc a b second (first cur))
+      (decoder_seq_resume c loc a b second (Decoded c loc a value mid))
+      (Decoded c loc b last end)
+      (cong
+        (DecoderResult c loc a)
+        (DecoderResult c loc b)
+        (first cur)
+        (Decoded c loc a value mid)
+        (decoder_seq_resume c loc a b second)
+        first_ok)
+      second_ok)
+
+theorem token_mapped_single
+      (head : UInt8)
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (Cons UInt8 head (Nil UInt8)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (token_codes_decoder (map UInt8 Int uint8_to_int (Cons UInt8 head (Nil UInt8))) cur)
+        (Decoded
+          ByteCursor
+          Span
+          UInt8
+          (list_last_byte (Cons UInt8 head (Nil UInt8)))
+          (cursor_after_codes cur (Cons UInt8 head (Nil UInt8)))) =
+  byte_code_success_from_head cur (uint8_to_int head) head rest starts_with Refl
+
+theorem token_mapped_succeeds_cons
+      (tail : List UInt8)
+    : (head : UInt8)
+      → (cur : ByteCursor)
+      → (rest : List UInt8)
+      → Equal (List UInt8) (source_suffix cur) (list_append UInt8 (Cons UInt8 head tail) rest)
+      → Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (token_codes_decoder (map UInt8 Int uint8_to_int (Cons UInt8 head tail)) cur)
+        (Decoded
+          ByteCursor
+          Span
+          UInt8
+          (list_last_byte (Cons UInt8 head tail))
+          (cursor_after_codes cur (Cons UInt8 head tail))) =
+  match tail {
+    Nil ↦ λhead. λcur. λrest. λstarts_with. token_mapped_single head cur rest starts_with;
+    Cons second rest_bytes ↦
+      λhead.
+        λcur.
+          λrest.
+            λstarts_with.
+              let
+                remaining_bytes : List UInt8 =
+                  list_append UInt8 (Cons UInt8 second rest_bytes) rest;
+                first_ok : Equal
+                  (DecoderResult ByteCursor Span UInt8)
+                  (byte_code_decoder (uint8_to_int head) cur)
+                  (Decoded ByteCursor Span UInt8 head (byte_cursor_advance cur)) =
+                  byte_code_success_from_head
+                    cur
+                    (uint8_to_int head)
+                    head
+                    remaining_bytes
+                    starts_with
+                    Refl;
+                after_first : ByteCursor = byte_cursor_advance cur;
+                rest_starts : Equal
+                  (List UInt8)
+                  (source_suffix after_first)
+                  (list_append UInt8 (Cons UInt8 second rest_bytes) rest) =
+                  source_suffix_after_codes
+                    cur
+                    (Cons UInt8 head (Nil UInt8))
+                    remaining_bytes
+                    starts_with;
+                rest_ok : Equal
+                  (DecoderResult ByteCursor Span UInt8)
+                  (token_codes_decoder
+                    (map UInt8 Int uint8_to_int (Cons UInt8 second rest_bytes))
+                    after_first)
+                  (Decoded
+                    ByteCursor
+                    Span
+                    UInt8
+                    (list_last_byte (Cons UInt8 second rest_bytes))
+                    (cursor_after_codes after_first (Cons UInt8 second rest_bytes))) =
+                  token_mapped_succeeds_cons rest_bytes second after_first rest rest_starts
+              in
+                decoder_seq_success
+                  ByteCursor
+                  Span
+                  UInt8
+                  UInt8
+                  (byte_code_decoder (uint8_to_int head))
+                  (token_codes_decoder
+                    (map UInt8 Int uint8_to_int (Cons UInt8 second rest_bytes)))
+                  cur
+                  head
+                  after_first
+                  (list_last_byte (Cons UInt8 second rest_bytes))
+                  (cursor_after_codes after_first (Cons UInt8 second rest_bytes))
+                  first_ok
+                  rest_ok
+  }
+
+theorem token_mapped_succeeds
+      (prefix : List UInt8)
+    : (cur : ByteCursor)
+      → (rest : List UInt8)
+      → Equal (List UInt8) (source_suffix cur) (list_append UInt8 prefix rest)
+      → ListNonempty UInt8 prefix
+      → Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (token_codes_decoder (map UInt8 Int uint8_to_int prefix) cur)
+        (Decoded
+          ByteCursor
+          Span
+          UInt8
+          (list_last_byte prefix)
+          (cursor_after_codes cur prefix)) =
+  match prefix {
+    Nil ↦ λcur. λrest. λstarts_with. λnonempty. absurd nonempty;
+    Cons head tail ↦
+      λcur.
+        λrest.
+          λstarts_with. λnonempty. token_mapped_succeeds_cons tail head cur rest starts_with
+  }
+
+theorem ascii_token_succeeds
+      (s : String)
+      (ascii : AllAscii s)
+      (decoder : Decoder ByteCursor Span UInt8)
+      (same_decoder : (cur : ByteCursor)
+        → Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (decoder cur)
+        (token_codes_decoder (map Char Int charToInt (string_to_list_char s)) cur))
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode s)) rest))
+      (nonempty : ListNonempty UInt8 (bytes_to_list (bytes_encode s)))
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (decoder cur)
+        (Decoded
+          ByteCursor
+          Span
+          UInt8
+          (list_last_byte (bytes_to_list (bytes_encode s)))
+          (cursor_after_codes cur (bytes_to_list (bytes_encode s)))) =
+  let
+    encoded_bytes : List UInt8 = bytes_to_list (bytes_encode s);
+    matched_codes : Equal
+      (List Int)
+      (map Char Int charToInt (string_to_list_char s))
+      (map UInt8 Int uint8_to_int encoded_bytes) =
+      sym
+        (List Int)
+        (map UInt8 Int uint8_to_int encoded_bytes)
+        (map Char Int charToInt (string_to_list_char s))
+        (bytes_encode_ascii_octets s ascii);
+    matched_decoder : Equal
+      (DecoderResult ByteCursor Span UInt8)
+      (token_codes_decoder (map Char Int charToInt (string_to_list_char s)) cur)
+      (token_codes_decoder (map UInt8 Int uint8_to_int encoded_bytes) cur) =
+      cong
+        (List Int)
+        (DecoderResult ByteCursor Span UInt8)
+        (map Char Int charToInt (string_to_list_char s))
+        (map UInt8 Int uint8_to_int encoded_bytes)
+        (λcodes. token_codes_decoder codes cur)
+        matched_codes
+  in
+    trans
+      (DecoderResult ByteCursor Span UInt8)
+      (decoder cur)
+      (token_codes_decoder (map UInt8 Int uint8_to_int encoded_bytes) cur)
+      (Decoded
+        ByteCursor
+        Span
+        UInt8
+        (list_last_byte encoded_bytes)
+        (cursor_after_codes cur encoded_bytes))
+      (trans
+        (DecoderResult ByteCursor Span UInt8)
+        (decoder cur)
+        (token_codes_decoder (map Char Int charToInt (string_to_list_char s)) cur)
+        (token_codes_decoder (map UInt8 Int uint8_to_int encoded_bytes) cur)
+        (same_decoder cur)
+        matched_decoder)
+      (token_mapped_succeeds encoded_bytes cur rest starts_with nonempty)
+
+theorem true_token_succeeds
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode true_token_text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (true_token_decoder cur)
+        (Decoded
+          ByteCursor
+          Span
+          UInt8
+          (list_last_byte (bytes_to_list (bytes_encode true_token_text)))
+          (cursor_after_codes cur (bytes_to_list (bytes_encode true_token_text)))) =
+  ascii_token_succeeds
+    true_token_text
+    true_token_ascii
+    true_token_decoder
+    true_token_code_decoder_pointwise
+    cur
+    rest
+    starts_with
+    true_encoded_nonempty
+
+theorem false_token_succeeds
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode false_token_text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (false_token_decoder cur)
+        (Decoded
+          ByteCursor
+          Span
+          UInt8
+          (list_last_byte (bytes_to_list (bytes_encode false_token_text)))
+          (cursor_after_codes cur (bytes_to_list (bytes_encode false_token_text)))) =
+  ascii_token_succeeds
+    false_token_text
+    false_token_ascii
+    false_token_decoder
+    false_token_code_decoder_pointwise
+    cur
+    rest
+    starts_with
+    false_encoded_nonempty
+
+fn byte_code_result_decision
+      (cur : ByteCursor) (code : Int) (head : UInt8) (decision : Bool)
+    : DecoderResult ByteCursor Span UInt8 =
+  match decision {
+    True ↦ Decoded ByteCursor Span UInt8 head (byte_cursor_advance cur);
+    False ↦ DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (byte_cursor_locate cur))
+  }
+
+fn byte_code_result_peek
+      (cur : ByteCursor) (code : Int) (observed : Option UInt8)
+    : DecoderResult ByteCursor Span UInt8 =
+  match observed {
+    None ↦ DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (byte_cursor_locate cur));
+    Some head ↦ byte_code_result_decision cur code head (eq_int (uint8_to_int head) code)
+  }
+
+theorem byte_code_result_peek_equation
+      (cur : ByteCursor) (code : Int)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder code cur)
+        (byte_code_result_peek cur code (byte_cursor_peek cur)) =
+  Refl
+
+theorem mapped_codes_cons_head
+      (head : UInt8)
+      (tail : List UInt8)
+      (code : Int)
+      (codes : List Int)
+      (matches : Equal
+        (List Int)
+        (map UInt8 Int uint8_to_int (Cons UInt8 head tail))
+        (Cons Int code codes))
+    : Equal Int (uint8_to_int head) code =
+  and_fst
+    (Equal Int (uint8_to_int head) code)
+    (Equal (List Int) (map UInt8 Int uint8_to_int tail) codes)
+    matches
+
+theorem mapped_codes_cons_tail
+      (head : UInt8)
+      (tail : List UInt8)
+      (code : Int)
+      (codes : List Int)
+      (matches : Equal
+        (List Int)
+        (map UInt8 Int uint8_to_int (Cons UInt8 head tail))
+        (Cons Int code codes))
+    : Equal (List Int) (map UInt8 Int uint8_to_int tail) codes =
+  and_snd
+    (Equal Int (uint8_to_int head) code)
+    (Equal (List Int) (map UInt8 Int uint8_to_int tail) codes)
+    matches
+
+theorem byte_code_decoded_self
+      (c : Type) (loc : Type) (a : Type) (cur : c) (head : a)
+    : Equal (DecoderResult c loc a) (Decoded c loc a head cur) (Decoded c loc a head cur) =
+  Refl
+
+theorem byte_code_decision_true_base
+      (cur : ByteCursor) (code : Int) (head : UInt8)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_result_decision cur code head True)
+        (Decoded ByteCursor Span UInt8 head (byte_cursor_advance cur)) =
+  byte_code_decoded_self ByteCursor Span UInt8 (byte_cursor_advance cur) head
+
+theorem byte_code_decision_true
+      (cur : ByteCursor) (code : Int) (head : UInt8) (decision : Bool)
+    : Equal Bool decision True
+      → Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_result_decision cur code head decision)
+        (Decoded ByteCursor Span UInt8 head (byte_cursor_advance cur)) =
+  match decision {
+    True ↦ λaccepted. byte_code_decision_true_base cur code head;
+    False ↦ λaccepted. absurd accepted
+  }
+
+theorem byte_code_success_from_head
+      (cur : ByteCursor)
+      (code : Int)
+      (head : UInt8)
+      (rest : List UInt8)
+      (starts_with : Equal (List UInt8) (source_suffix cur) (Cons UInt8 head rest))
+      (matching : Equal Int (uint8_to_int head) code)
+    : Equal
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder code cur)
+        (Decoded ByteCursor Span UInt8 head (byte_cursor_advance cur)) =
+  let
+    peeked_head : Equal (Option UInt8) (byte_cursor_peek cur) (Some UInt8 head) =
+      trans
+        (Option UInt8)
+        (byte_cursor_peek cur)
+        (nth UInt8 Zero (source_suffix cur))
+        (Some UInt8 head)
+        (list_drop_at_nth
+          UInt8
+          (byte_cursor_position cur)
+          (bytes_to_list (source_bytes (byte_cursor_source cur))))
+        (cong
+          (List UInt8)
+          (Option UInt8)
+          (source_suffix cur)
+          (Cons UInt8 head rest)
+          (nth UInt8 Zero)
+          starts_with);
+    observed_head : Equal
+      (DecoderResult ByteCursor Span UInt8)
+      (byte_code_result_peek cur code (byte_cursor_peek cur))
+      (byte_code_result_peek cur code (Some UInt8 head)) =
+      cong
+        (Option UInt8)
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_cursor_peek cur)
+        (Some UInt8 head)
+        (byte_code_result_peek cur code)
+        peeked_head;
+    accepted : Equal Bool (eq_int (uint8_to_int head) code) True =
+      int_eq_complete (uint8_to_int head) code matching
+  in
+    trans
+      (DecoderResult ByteCursor Span UInt8)
+      (byte_code_decoder code cur)
+      (byte_code_result_peek cur code (Some UInt8 head))
+      (Decoded ByteCursor Span UInt8 head (byte_cursor_advance cur))
+      (trans
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder code cur)
+        (byte_code_result_peek cur code (byte_cursor_peek cur))
+        (byte_code_result_peek cur code (Some UInt8 head))
+        (byte_code_result_peek_equation cur code)
+        observed_head)
+      (byte_code_decision_true cur code head (eq_int (uint8_to_int head) code) accepted)
 
 fn format_bool_parse_outcome
       (outcome : ParseResult (Syntax BoolExpr))
