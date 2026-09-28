@@ -1,7 +1,7 @@
 ---
 id: LANG-KENFMT-AXIOM-CLOSING-PAREN
 title: "Formatter repair: ken fmt must print a valid axiom declaration whose type ends in a parenthesized application without dropping the final closing parenthesis, so formatting is parse-preserving and idempotent on every axiom shape"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -80,3 +80,10 @@ output for a declaration that already round-trips.
 
 Stop if the fix changes the output for any declaration that already
 round-trips, or if it needs a grammar change.
+
+## Closeout
+
+Landed at `39906f9f9` (2026-09-24): the `TypeAtomForm::Paren` arm re-spans
+over its parentheses, with the AC-1 and AC-1a regression tests on main. The
+node was left open at the time; closed 2026-09-28 on the Foundation leader's
+measurement on `8dd81d7b6` (`evt_35ds5ejemt5yf`).
