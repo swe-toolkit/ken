@@ -1,7 +1,7 @@
 ---
 id: RT-OWNER-VIS-RETURN-PROTOCOL
 title: "Carry a grafted continuation's Vis and its K back across a generated response-owner boundary, so the owner accepts a conforming non-Ret result instead of trapping at its Ret-tag check"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: architect
@@ -16,7 +16,8 @@ origin: "Architect scheduling fact 2026-09-27 (evt_6f0ms4dg8c99k): three L1 igno
 
 ## Objective
 
-Clear the three L1 rows that stop at the response-owner Ret-tag check.
+Clear the two px7f rows that stop at the response-owner Ret-tag check (r2
+was rescoped out; see below).
 
 ## Settled inputs -- measured at `6fed125f5` and partial `129ecd207`
 
@@ -48,7 +49,7 @@ r2's exact current failure.
 ## Deliverable
 
 A return protocol for generated response owners, designed at D0, ruled by the
-Architect, and built, that un-ignores all three rows.
+Architect, and built, that un-ignores the two px7f rows.
 
 ## Acceptance
 
@@ -57,7 +58,7 @@ Architect, and built, that un-ignores all three rows.
   long, how the owner resumes the carried K, and why it is none of the
   denied routes. Cite the spec clauses it implements. The Architect rules on
   it before any build.
-- **AC-1.** All three rows run green and un-ignored, with both engines
+- **AC-1.** Both px7f rows run green and un-ignored, with both engines
   agreeing.
 - **AC-2 (control).** Removing the carrier re-reddens each row at the Ret-tag
   check; then it is restored.
@@ -96,6 +97,23 @@ capture with a bind-authorized record for the same emission owner is a
 finding for the Architect, not a silent pass. All disposable mutations were
 restored. This records the Architect's replacement control
 (`evt_1d9s0xdpjak13`); it does not claim a successful bypass.
+
+## Closeout
+
+Landed in two increments: increment 1 at `05399d98b` and increment 2 at
+`e2baffd23`, the respin after stop 3. On `e2baffd23` both px7f rows
+(`linked_public_right_denial_preserves_exact_masks` and
+`linked_public_second_release_is_closed_and_the_handle_closes_once`) carry
+no `#[ignore]`. r2 stays ignored under `RT-SOURCE-IH-RELAY-K-VALUE`.
+
+Carried, not closed here:
+
+- The shared two-owner compiled overlap is unmeasured (implementer
+  handback, Check 9).
+- The bind-route limit that the increment 2 pins disclose in their THE GAP
+  line.
+- A future pending capture with a bind-authorized record for the same
+  emission owner goes to the Architect as a finding (capture control above).
 
 ## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 

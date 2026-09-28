@@ -1,7 +1,7 @@
 ---
 id: RT-C5-PRIMITIVE-TYPE-ARGUMENTS
 title: "Give closed primitive type constants a comparable interpreter value, so C5 cast regularity fires on applied types with Int, String or other primitive arguments instead of returning Unknown on a closed, hole-free program"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
