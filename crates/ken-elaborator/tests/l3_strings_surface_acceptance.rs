@@ -118,9 +118,6 @@ fn mk_env_with_derived_owned() -> (ElabEnv, Vec<GlobalId>) {
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     let owned = catalog_or::load_derived_fixture(&mut env);
-    let canonical_sub = env.globals["Data.Numeric.Nat.Order.sub"];
-    env.globals
-        .insert("l3_canonical_nat_sub".to_owned(), canonical_sub);
     (env, owned)
 }
 
@@ -191,10 +188,13 @@ fn nat(n: u32) -> String {
     s
 }
 
-/// Every acceptance run here uses a real generic-recursion depth (up to the
-/// pinned `slice 0 99 …` corpus value) — an oversized default test-thread
-/// stack avoids the plain (non-algorithmic) stack exhaustion a ~100-deep
-/// unary-`Nat`/nested-`match` recursion hits under the default 8 MiB stack.
+/// Baseline provisioning for the pinned `slice 0 99 …` unary-`Nat` corpus.
+/// With `RUST_MIN_STACK` unset, the full eight-test suite overflowed at stated
+/// child stacks of 1, 2 and 3 MiB and passed at 4 MiB. The 99-step test alone
+/// has the same 3/4 MiB boundary; its composition sibling passes at 2 MiB.
+/// The measured effective peak is at most 4 MiB on this host, leaving at
+/// least 252 MiB headroom on the existing fixed 256 MiB child stack. This is
+/// baseline provisioning, not a pin on stack growth or a regression repair.
 fn run_with_big_stack<F: FnOnce() + Send + 'static>(f: F) {
     std::thread::Builder::new()
         .stack_size(256 * 1024 * 1024)
