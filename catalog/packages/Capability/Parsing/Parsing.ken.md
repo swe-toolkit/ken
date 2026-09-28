@@ -82,6 +82,21 @@ import Data.Binary.BytesPrimitiveContracts
     AsciiBytes,
     NoCodes,
     SomeCodes,
+    MkAsciiCode,
+    Ascii32,
+    Ascii40,
+    Ascii41,
+    Ascii97,
+    Ascii100,
+    Ascii101,
+    Ascii102,
+    Ascii108,
+    Ascii110,
+    Ascii111,
+    Ascii114,
+    Ascii115,
+    Ascii116,
+    Ascii117,
     ascii_bytes_utf8,
     bytes_concat_list_view,
     bytes_encode_ascii_octets)
@@ -410,9 +425,12 @@ alternatives, and recursive grammar layers. The checked local continuation
 lemmas preserve it through each syntax-building branch and the final
 end-of-input check. `parse_bool_expr_laws` applies that result to the
 unweakened `ParserValid`, `ParserTotal`, and `ParserSourceLocal` contract.
-The independent printer-to-parser round trip is not yet claimed. The checked
-byte and UTF-8 bridges below establish its input facts, but the recursive
-Decoder's public laws preserve bounds rather than establish a successful parse.
+The printer's six token strings have one private identity each, shared by
+printing and their checked ASCII witnesses. String literals are opaque values:
+two separately written literals with the same spelling need a proof of their
+equality. The byte and UTF-8 bridges below establish that printed expressions
+form valid source bytes. The independent printer-to-parser round trip remains
+to be proved using the recursive Decoder's public success principle.
 
 ```ken
 export BoolExpr, BTrue, BFalse, BNot, BAnd
@@ -788,20 +806,32 @@ fn complete_bool_decoder (cur : ByteCursor) : DecoderResult ByteCursor Span (Syn
 pub const parse_bool_expr : Parser (Syntax BoolExpr) =
   parser_from_decoder (Syntax BoolExpr) complete_bool_decoder
 
+const true_token_text = "true"
+
+const false_token_text = "false"
+
+const not_open_text = "(not "
+
+const and_open_text = "(and "
+
+const separator_text = " "
+
+const close_text = ")"
+
 pub fn print_bool_expr (e : BoolExpr) : Bytes =
   match e {
-    BTrue ↦ bytes_encode "true";
-    BFalse ↦ bytes_encode "false";
+    BTrue ↦ bytes_encode true_token_text;
+    BFalse ↦ bytes_encode false_token_text;
     BNot child ↦
       bytes_concat
-        (bytes_concat (bytes_encode "(not ") (print_bool_expr child))
-        (bytes_encode ")");
+        (bytes_concat (bytes_encode not_open_text) (print_bool_expr child))
+        (bytes_encode close_text);
     BAnd left right ↦
       bytes_concat
         (bytes_concat
-          (bytes_concat (bytes_encode "(and ") (print_bool_expr left))
-          (bytes_encode " "))
-        (bytes_concat (print_bool_expr right) (bytes_encode ")"))
+          (bytes_concat (bytes_encode and_open_text) (print_bool_expr left))
+          (bytes_encode separator_text))
+        (bytes_concat (print_bool_expr right) (bytes_encode close_text))
   }
 
 pub fn format_bool_expr (s : Source) : Result ParseError Bytes =
@@ -977,6 +1007,154 @@ theorem ascii_concat_utf8
       (a : Bytes) (b : Bytes) (left : AsciiBytes a) (right : AsciiBytes b)
     : IsUtf8 (bytes_concat a b) =
   ascii_bytes_utf8 (bytes_concat a b) (ascii_bytes_concat a b left right)
+
+const true_token_ascii : AllAscii true_token_text =
+  SomeCodes
+    116
+    (Cons Int 114 (Cons Int 117 (Cons Int 101 (Nil Int))))
+    (MkAsciiCode 116 Ascii116 Proved)
+    (SomeCodes
+      114
+      (Cons Int 117 (Cons Int 101 (Nil Int)))
+      (MkAsciiCode 114 Ascii114 Proved)
+      (SomeCodes
+        117
+        (Cons Int 101 (Nil Int))
+        (MkAsciiCode 117 Ascii117 Proved)
+        (SomeCodes 101 (Nil Int) (MkAsciiCode 101 Ascii101 Proved) NoCodes)))
+
+const false_token_ascii : AllAscii false_token_text =
+  SomeCodes
+    102
+    (Cons Int 97 (Cons Int 108 (Cons Int 115 (Cons Int 101 (Nil Int)))))
+    (MkAsciiCode 102 Ascii102 Proved)
+    (SomeCodes
+      97
+      (Cons Int 108 (Cons Int 115 (Cons Int 101 (Nil Int))))
+      (MkAsciiCode 97 Ascii97 Proved)
+      (SomeCodes
+        108
+        (Cons Int 115 (Cons Int 101 (Nil Int)))
+        (MkAsciiCode 108 Ascii108 Proved)
+        (SomeCodes
+          115
+          (Cons Int 101 (Nil Int))
+          (MkAsciiCode 115 Ascii115 Proved)
+          (SomeCodes 101 (Nil Int) (MkAsciiCode 101 Ascii101 Proved) NoCodes))))
+
+const not_open_ascii : AllAscii not_open_text =
+  SomeCodes
+    40
+    (Cons Int 110 (Cons Int 111 (Cons Int 116 (Cons Int 32 (Nil Int)))))
+    (MkAsciiCode 40 Ascii40 Proved)
+    (SomeCodes
+      110
+      (Cons Int 111 (Cons Int 116 (Cons Int 32 (Nil Int))))
+      (MkAsciiCode 110 Ascii110 Proved)
+      (SomeCodes
+        111
+        (Cons Int 116 (Cons Int 32 (Nil Int)))
+        (MkAsciiCode 111 Ascii111 Proved)
+        (SomeCodes
+          116
+          (Cons Int 32 (Nil Int))
+          (MkAsciiCode 116 Ascii116 Proved)
+          (SomeCodes 32 (Nil Int) (MkAsciiCode 32 Ascii32 Proved) NoCodes))))
+
+const and_open_ascii : AllAscii and_open_text =
+  SomeCodes
+    40
+    (Cons Int 97 (Cons Int 110 (Cons Int 100 (Cons Int 32 (Nil Int)))))
+    (MkAsciiCode 40 Ascii40 Proved)
+    (SomeCodes
+      97
+      (Cons Int 110 (Cons Int 100 (Cons Int 32 (Nil Int))))
+      (MkAsciiCode 97 Ascii97 Proved)
+      (SomeCodes
+        110
+        (Cons Int 100 (Cons Int 32 (Nil Int)))
+        (MkAsciiCode 110 Ascii110 Proved)
+        (SomeCodes
+          100
+          (Cons Int 32 (Nil Int))
+          (MkAsciiCode 100 Ascii100 Proved)
+          (SomeCodes 32 (Nil Int) (MkAsciiCode 32 Ascii32 Proved) NoCodes))))
+
+const separator_ascii : AllAscii separator_text =
+  SomeCodes 32 (Nil Int) (MkAsciiCode 32 Ascii32 Proved) NoCodes
+
+const close_ascii : AllAscii close_text =
+  SomeCodes 41 (Nil Int) (MkAsciiCode 41 Ascii41 Proved) NoCodes
+
+fn print_bool_expr_ascii (e : BoolExpr) : AsciiBytes (print_bool_expr e) =
+  match e {
+    BTrue ↦ ascii_encoded_byte_codes true_token_text true_token_ascii;
+    BFalse ↦ ascii_encoded_byte_codes false_token_text false_token_ascii;
+    BNot child ↦
+      let
+        open_ascii : AsciiBytes (bytes_encode not_open_text) =
+          ascii_encoded_byte_codes not_open_text not_open_ascii;
+        child_ascii : AsciiBytes (print_bool_expr child) = print_bool_expr_ascii child;
+        open_child_ascii : AsciiBytes
+          (bytes_concat (bytes_encode not_open_text) (print_bool_expr child)) =
+          ascii_bytes_concat
+            (bytes_encode not_open_text)
+            (print_bool_expr child)
+            open_ascii
+            child_ascii;
+        end_ascii : AsciiBytes (bytes_encode close_text) =
+          ascii_encoded_byte_codes close_text close_ascii
+      in
+        ascii_bytes_concat
+          (bytes_concat (bytes_encode not_open_text) (print_bool_expr child))
+          (bytes_encode close_text)
+          open_child_ascii
+          end_ascii;
+    BAnd left right ↦
+      let
+        open_ascii : AsciiBytes (bytes_encode and_open_text) =
+          ascii_encoded_byte_codes and_open_text and_open_ascii;
+        left_ascii : AsciiBytes (print_bool_expr left) = print_bool_expr_ascii left;
+        open_left_ascii : AsciiBytes
+          (bytes_concat (bytes_encode and_open_text) (print_bool_expr left)) =
+          ascii_bytes_concat
+            (bytes_encode and_open_text)
+            (print_bool_expr left)
+            open_ascii
+            left_ascii;
+        separator_bytes_ascii : AsciiBytes (bytes_encode separator_text) =
+          ascii_encoded_byte_codes separator_text separator_ascii;
+        prefix_ascii : AsciiBytes
+          (bytes_concat
+            (bytes_concat (bytes_encode and_open_text) (print_bool_expr left))
+            (bytes_encode separator_text)) =
+          ascii_bytes_concat
+            (bytes_concat (bytes_encode and_open_text) (print_bool_expr left))
+            (bytes_encode separator_text)
+            open_left_ascii
+            separator_bytes_ascii;
+        right_ascii : AsciiBytes (print_bool_expr right) = print_bool_expr_ascii right;
+        close_bytes_ascii : AsciiBytes (bytes_encode close_text) =
+          ascii_encoded_byte_codes close_text close_ascii;
+        suffix_ascii : AsciiBytes
+          (bytes_concat (print_bool_expr right) (bytes_encode close_text)) =
+          ascii_bytes_concat
+            (print_bool_expr right)
+            (bytes_encode close_text)
+            right_ascii
+            close_bytes_ascii
+      in
+        ascii_bytes_concat
+          (bytes_concat
+            (bytes_concat (bytes_encode and_open_text) (print_bool_expr left))
+            (bytes_encode separator_text))
+          (bytes_concat (print_bool_expr right) (bytes_encode close_text))
+          prefix_ascii
+          suffix_ascii
+  }
+
+theorem print_bool_expr_utf8 (e : BoolExpr) : IsUtf8 (print_bool_expr e) =
+  ascii_bytes_utf8 (print_bool_expr e) (print_bool_expr_ascii e)
 
 fn format_bool_parse_outcome
       (outcome : ParseResult (Syntax BoolExpr))
