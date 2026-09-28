@@ -1573,11 +1573,15 @@ mod primitive_type_cast_tests {
 
     #[test]
     fn checked_float_indexed_refl_casts_but_distinct_float_does_not() {
-        // Ken's writable Float positive uses finite 1.5, not a NaN literal.
+        // The checked surface positive uses finite 1.5, not a NaN literal.
         checked_float_index_cast("Float", "1.5", "2.5");
+    }
+
+    #[test]
+    fn float_same_nan_bits_are_reflexive_but_distinct_payloads_are_not() {
+        // Value-layer control: this is not claimed to be a writable NaN literal.
         let nan = EvalVal::Float(f64::from_bits(0x7ff8_0000_0000_0001));
         assert_eq!(cast_index(nan.clone(), nan), EvalVal::Int(41));
-        assert_eq!(cast_index(EvalVal::Float(0.0), EvalVal::Float(-0.0)), EvalVal::Unknown);
         assert_eq!(
             cast_index(
                 EvalVal::Float(f64::from_bits(0x7ff8_0000_0000_0001)),
@@ -1588,12 +1592,21 @@ mod primitive_type_cast_tests {
     }
 
     #[test]
+    fn float_signed_zero_bits_do_not_collide() {
+        assert_eq!(cast_index(EvalVal::Float(0.0), EvalVal::Float(-0.0)), EvalVal::Unknown);
+    }
+
+    #[test]
     fn checked_float32_indexed_refl_casts_but_distinct_float32_does_not() {
-        // Ken's writable Float32 positive uses finite 1.5f32, not a NaN literal.
+        // The checked surface positive uses finite 1.5f32, not a NaN literal.
         checked_float_index_cast("Float32", "1.5f32", "2.5f32");
+    }
+
+    #[test]
+    fn float32_same_nan_bits_are_reflexive_but_distinct_payloads_are_not() {
+        // Value-layer control: this is not claimed to be a writable NaN literal.
         let nan = EvalVal::Float32(f32::from_bits(0x7fc0_0001));
         assert_eq!(cast_index(nan.clone(), nan), EvalVal::Int(41));
-        assert_eq!(cast_index(EvalVal::Float32(0.0), EvalVal::Float32(-0.0)), EvalVal::Unknown);
         assert_eq!(
             cast_index(
                 EvalVal::Float32(f32::from_bits(0x7fc0_0001)),
@@ -1601,6 +1614,11 @@ mod primitive_type_cast_tests {
             ),
             EvalVal::Unknown
         );
+    }
+
+    #[test]
+    fn float32_signed_zero_bits_do_not_collide() {
+        assert_eq!(cast_index(EvalVal::Float32(0.0), EvalVal::Float32(-0.0)), EvalVal::Unknown);
     }
 
     #[test]
