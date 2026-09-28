@@ -71,9 +71,11 @@ import Capability.Parsing.Decoder
     decoder_fail,
     decoder_many,
     decoder_many_preserves,
+    decoder_many_rejected_succeeds,
     decoder_pure,
     decoder_recursive,
     decoder_recursive_preserves,
+    decoder_recursive_succeeds,
     decoder_satisfy,
     decoder_satisfy_preserves,
     decoder_seq,
@@ -642,7 +644,7 @@ const and_open_token_decoder : Decoder ByteCursor Span UInt8 =
           (byte_code_decoder (32 : Int)))))
 
 const spaces_decoder : Decoder ByteCursor Span (List UInt8) =
-  decoder_many ByteCursor UInt8 Span UInt8 byte_cursor_ops (byte_code_decoder (32 : Int))
+  decoder_many ByteCursor UInt8 Span UInt8 byte_cursor_ops (byte_code_decoder separator_code)
 
 fn bool_true_decoder (cur : ByteCursor) : DecoderResult ByteCursor Span (Syntax BoolExpr) =
   match true_token_decoder cur {
@@ -2997,6 +2999,95 @@ theorem printed_not_suffix_view
         (list_append UInt8 child_bytes (list_append UInt8 close_bytes rest))
         (λsuffix. list_append UInt8 open_bytes suffix)
         ((proof assoc for list_append) UInt8 child_bytes close_bytes rest))
+
+theorem spaces_on_nonspace_prefix
+      (cur : ByteCursor)
+      (prefix : List UInt8)
+      (rest : List UInt8)
+      (actual : Int)
+      (actual_rest : List Int)
+      (different : Equal Int actual separator_code → Bottom)
+      (starts_with : Equal (List UInt8) (source_suffix cur) (list_append UInt8 prefix rest))
+      (mapped : Equal
+        (List Int)
+        (map UInt8 Int uint8_to_int prefix)
+        (Cons Int actual actual_rest))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  decoder_many_rejected_succeeds
+    ByteCursor
+    UInt8
+    Span
+    UInt8
+    byte_cursor_ops
+    (byte_code_decoder separator_code)
+    cur
+    (byte_cursor_locate cur)
+    (byte_code_rejects_different_prefix
+      cur
+      separator_code
+      actual
+      actual_rest
+      prefix
+      rest
+      different
+      starts_with
+      mapped)
+
+theorem spaces_on_empty_suffix
+      (cur : ByteCursor) (empty : Equal (List UInt8) (source_suffix cur) (Nil UInt8))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  let
+    peeked_none : Equal (Option UInt8) (byte_cursor_peek cur) (None UInt8) =
+      trans
+        (Option UInt8)
+        (byte_cursor_peek cur)
+        (nth UInt8 Zero (source_suffix cur))
+        (None UInt8)
+        (list_drop_at_nth
+          UInt8
+          (byte_cursor_position cur)
+          (bytes_to_list (source_bytes (byte_cursor_source cur))))
+        (cong
+          (List UInt8)
+          (Option UInt8)
+          (source_suffix cur)
+          (Nil UInt8)
+          (nth UInt8 Zero)
+          empty);
+    step_rejected : Equal
+      (DecoderResult ByteCursor Span UInt8)
+      (byte_code_decoder separator_code cur)
+      (DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (byte_cursor_locate cur))) =
+      trans
+        (DecoderResult ByteCursor Span UInt8)
+        (byte_code_decoder separator_code cur)
+        (byte_code_result_peek cur separator_code (byte_cursor_peek cur))
+        (DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (byte_cursor_locate cur)))
+        (byte_code_result_peek_equation cur separator_code)
+        (cong
+          (Option UInt8)
+          (DecoderResult ByteCursor Span UInt8)
+          (byte_cursor_peek cur)
+          (None UInt8)
+          (λobserved. byte_code_result_peek cur separator_code observed)
+          peeked_none)
+  in
+    decoder_many_rejected_succeeds
+      ByteCursor
+      UInt8
+      Span
+      UInt8
+      byte_cursor_ops
+      (byte_code_decoder separator_code)
+      cur
+      (byte_cursor_locate cur)
+      step_rejected
 
 fn format_bool_parse_outcome
       (outcome : ParseResult (Syntax BoolExpr))
