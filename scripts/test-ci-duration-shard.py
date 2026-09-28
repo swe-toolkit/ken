@@ -335,6 +335,233 @@ class DurationShardControls(unittest.TestCase):
             )
             self.assertEqual(shard["seconds"], round(measured_total, 3))
 
+    def test_third_run_reports_fallback_transitions_and_large_weight_changes(self):
+        """Add a third complete run without naming identities to special-case.
+
+        MEASURED: run C's source-shard map is checked per identity against raw
+        shard artifacts, and selected timings equal the live inventory.
+        CLAIMED: new measurements replace prior fallbacks, and every absolute
+        weight change over 10s is reported with true source provenance.
+        THE GAP: candidate PR and first post-landing runs must still provide
+        actual acceptance measurements and identity attributions.
+        """
+        run_a = Path("docs/program/evidence/ci-workspace-run-36371407331")
+        run_b = Path("docs/program/evidence/ci-workspace-run-36372772505")
+        run_c = Path("docs/program/evidence/ci-workspace-run-36401179125")
+        timing_paths = [
+            *(run_a / f"shard-{shard}.json" for shard in range(1, 8)),
+            *(run_b / f"shard-{shard}.json" for shard in range(1, 8)),
+            *(run_c / f"shard-{shard}.json" for shard in range(1, 8)),
+        ]
+        source_run = json.loads((run_c / "run.json").read_text(encoding="utf-8"))
+        self.assertEqual(source_run["id"], 36401179125)
+        self.assertEqual(source_run["head_sha"], "c569eef94d3efeb9da81aae6efe541411496c531")
+        self.assertEqual(source_run["conclusion"], "success")
+        newest_source = f"run:{source_run['id']}"
+        source_shards = {}
+        samples = _planner.read_duration_sources(timing_paths, source_shards)
+        source_ids = sorted({
+            source for observations in samples.values() for source in observations
+        })
+        self.assertIn(newest_source, source_ids)
+        self.assertEqual(len(source_ids), 3)
+        raw_source_shards = {}
+        for shard in range(1, SHARD_COUNT + 1):
+            artifact = json.loads(
+                (run_c / f"shard-{shard}.json").read_text(encoding="utf-8")
+            )
+            checked = _planner.ci_workspace_timings.validate_artifact(artifact)
+            self.assertEqual(checked["run_id"], source_run["id"])
+            self.assertEqual(checked["shard"], shard)
+            self.assertTrue(all(row["result"] == "PASS" for row in checked["records"]))
+            for row in artifact["records"]:
+                key = (row["test_id"], newest_source)
+                self.assertNotIn(key, raw_source_shards)
+                raw_source_shards[key] = artifact["shard"]
+        for key, raw_shard in raw_source_shards.items():
+            self.assertEqual(
+                source_shards.get(key), raw_shard,
+                f"parsed source shard disagrees with raw artifact for {key[0]}",
+            )
+
+        inventory = json.loads((run_c / "inventory.json").read_text(encoding="utf-8"))
+        live = sorted(
+            (f"{binary_id} {name}", binary_id, name)
+            for binary_id, name in _planner.tests(inventory)
+        )
+        live_ids = {rendered for rendered, _, _ in live}
+        baseline_c = json.loads(
+            (run_c / "inventory.json").read_text(encoding="utf-8")
+        )
+        baseline_c_ids = {
+            f"{binary_id} {name}"
+            for binary_id, name in _planner.tests(baseline_c)
+        }
+        self.assertEqual(live_ids, baseline_c_ids)
+        c_selected = set()
+        for shard in range(1, SHARD_COUNT + 1):
+            artifact = _planner.ci_workspace_timings.validate_artifact(
+                json.loads((run_c / f"shard-{shard}.json").read_text(encoding="utf-8"))
+            )
+            c_selected.update(row["test_id"] for row in artifact["records"])
+        self.assertEqual(c_selected, live_ids)
+
+        previous_samples = {
+            test_id: {
+                source: seconds
+                for source, seconds in observations.items()
+                if source != newest_source
+            }
+            for test_id, observations in samples.items()
+            if any(source != newest_source for source in observations)
+        }
+        previous_resolved, previous_fallbacks, _ = (
+            _planner.resolve_duration_sources(live, previous_samples)
+        )
+        resolved, expected_fallbacks, _ = _planner.resolve_duration_sources(
+            live, samples
+        )
+        newest_source_dominates = []
+        for test_id in live_ids:
+            observations = samples.get(test_id, {})
+            if observations:
+                self.assertEqual(resolved[test_id], max(observations.values()))
+            previous_values = [
+                seconds
+                for source, seconds in observations.items()
+                if source != newest_source
+            ]
+            if previous_values and observations.get(newest_source, 0) > max(previous_values):
+                newest_source_dominates.append(test_id)
+        self.assertTrue(newest_source_dominates)
+        previous_fallback_by_id = {
+            row["test_id"]: row for row in previous_fallbacks
+        }
+        current_fallback_by_id = {
+            row["test_id"]: row for row in expected_fallbacks
+        }
+        expected_transitions = []
+        expected_weight_changes = []
+        for test_id in sorted(live_ids):
+            previous_method = previous_fallback_by_id.get(test_id, {}).get(
+                "method", "measured"
+            )
+            current_method = current_fallback_by_id.get(test_id, {}).get(
+                "method", "measured"
+            )
+            previous_seconds = previous_resolved[test_id]
+            current_seconds = resolved[test_id]
+            if (
+                test_id in previous_fallback_by_id
+                and newest_source in samples.get(test_id, {})
+            ):
+                expected_transitions.append({
+                    "test_id": test_id,
+                    "source": newest_source,
+                    "previous_method": previous_method,
+                    "previous_seconds": round(previous_seconds, 3),
+                    "source_seconds": samples[test_id][newest_source],
+                    "source_shard": raw_source_shards[(test_id, newest_source)],
+                    "current_seconds": round(current_seconds, 3),
+                })
+            delta_seconds = current_seconds - previous_seconds
+            if abs(delta_seconds) > 10.0:
+                expected_weight_changes.append({
+                    "test_id": test_id,
+                    "source": newest_source,
+                    "previous_method": previous_method,
+                    "previous_seconds": round(previous_seconds, 3),
+                    "current_method": current_method,
+                    "current_seconds": round(current_seconds, 3),
+                    "delta_seconds": round(delta_seconds, 3),
+                    "source_shard": raw_source_shards.get((test_id, newest_source)),
+                })
+        self.assertTrue(expected_transitions)
+        self.assertTrue(expected_weight_changes)
+
+        baseline_b = json.loads((run_b / "inventory.json").read_text(encoding="utf-8"))
+        baseline_ids = {
+            f"{binary_id} {name}"
+            for binary_id, name in _planner.tests(baseline_b)
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "plan"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(run_c / "inventory.json"),
+                    *(str(path) for path in timing_paths),
+                    "--population-baseline",
+                    str(run_c / "inventory.json"),
+                    "--population-reference",
+                    str(run_b / "inventory.json"),
+                    "--wall-calibration",
+                    str(run_c / "job-steps.tsv"),
+                    "--wall-calibration-artifacts",
+                    str(run_c),
+                    "--output-dir",
+                    str(output),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            assignment = json.loads(result.stdout)
+            planning = json.loads(
+                (output / "planning-evidence.json").read_text(encoding="utf-8")
+            )
+
+        assigned = [
+            f"{binary_id} {name}"
+            for shard in assignment["bins"]
+            for binary_id, name in shard["tests"]
+        ]
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertEqual(set(assigned), live_ids)
+        self.assertEqual(assignment["fallbacks"], expected_fallbacks)
+        self.assertEqual(planning["fallbacks"], expected_fallbacks)
+        planned_shards = {
+            f"{binary_id} {name}": shard["bin"]
+            for shard in assignment["bins"]
+            for binary_id, name in shard["tests"]
+        }
+        for row in [*expected_transitions, *expected_weight_changes]:
+            row["planned_shard"] = planned_shards[row["test_id"]]
+        self.assertEqual(
+            planning["measurement_sources"], source_ids
+        )
+        self.assertEqual(planning["weight_comparison_source"], newest_source)
+        self.assertEqual(planning["fallback_to_measured"], expected_transitions)
+        self.assertEqual(
+            planning["weight_changes_over_10s"], expected_weight_changes
+        )
+        self.assertEqual(planning["population_baseline"], str(run_c / "inventory.json"))
+        self.assertEqual(planning["population_reference"], str(run_b / "inventory.json"))
+        current_delta = planning["population_delta"]
+        self.assertEqual(current_delta["baseline_count"], len(baseline_c_ids))
+        self.assertEqual(current_delta["live_count"], len(live_ids))
+        self.assertEqual(current_delta["added"], sorted(live_ids - baseline_c_ids))
+        self.assertEqual(current_delta["removed"], sorted(baseline_c_ids - live_ids))
+        reference_delta = planning["population_reference_delta"]
+        self.assertEqual(reference_delta["baseline_count"], len(baseline_ids))
+        self.assertEqual(reference_delta["live_count"], len(live_ids))
+        self.assertEqual(reference_delta["added"], sorted(live_ids - baseline_ids))
+        self.assertEqual(reference_delta["removed"], sorted(baseline_ids - live_ids))
+        expected_single_run = []
+        for test_id, _, _ in live:
+            observations = samples.get(test_id, {})
+            if len(observations) == 1:
+                source, seconds = next(iter(observations.items()))
+                expected_single_run.append({
+                    "test_id": test_id,
+                    "seconds": seconds,
+                    "source": source,
+                })
+        self.assertEqual(planning["single_run"], expected_single_run)
+
     def test_single_run_observation_is_used_and_recorded_separately(self):
         """MEASURED: one run contributes the only passing duration for a live test.
 

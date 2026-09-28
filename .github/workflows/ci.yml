@@ -109,7 +109,11 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7]
     steps:
+      - name: Record checkout start
+        run: echo "CI_PHASE_TIMING shard=${{ matrix.shard }} phase=checkout event=start unix_s=$(date -u +%s.%N)"
       - uses: actions/checkout@v4
+      - name: Record checkout end
+        run: echo "CI_PHASE_TIMING shard=${{ matrix.shard }} phase=checkout event=end unix_s=$(date -u +%s.%N)"
       # NO dependency cache, deliberately. `Swatinem/rust-cache` was removed
       # (item C8): it never measurably helped and is third-party code with
       # access to the build, i.e. supply-chain surface taken on for nothing.
@@ -119,6 +123,8 @@ jobs:
       # the case on measured numbers.
       # Prebuilt binary, not `cargo install cargo-nextest` — the latter
       # would compile nextest itself on every run and add minutes back.
+      - name: Record nextest install start
+        run: echo "CI_PHASE_TIMING shard=${{ matrix.shard }} phase=install-nextest event=start unix_s=$(date -u +%s.%N)"
       - name: Install cargo-nextest
         # SHA-PINNED, not tag-tracked. `@nextest` / `@v2` are FLOATING tags the
         # maintainer can repoint at any commit, so a compromised or moved tag
@@ -138,6 +144,8 @@ jobs:
         uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: nextest
+      - name: Record nextest install end
+        run: echo "CI_PHASE_TIMING shard=${{ matrix.shard }} phase=install-nextest event=end unix_s=$(date -u +%s.%N)"
       # nextest schedules every test across every binary against one global
       # thread pool. NOTE: `cargo test` was ALREADY parallel *within* each
       # binary (libtest defaults to one thread per CPU); only the 200 binaries
@@ -167,11 +175,19 @@ jobs:
       # union are checked by scripts/check-ci-shard-union.py.
       - name: Select duration-balanced shard
         run: |
+          phase_timestamp() {
+            printf 'CI_PHASE_TIMING shard=%s phase=%s event=%s unix_s=%s\n' "${{ matrix.shard }}" "$1" "$2" "$(date -u +%s.%N)"
+          }
+          phase_timestamp nextest-list start
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
+          phase_timestamp nextest-list end
+          phase_timestamp project-filtered start
           python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
-          # These 14 files are the two per-test weight sources. The retained
-          # wall-model calibration is separate; the aa9 inventory baseline
-          # records each run's live-population difference in its evidence.
+          phase_timestamp project-filtered end
+          phase_timestamp planner start
+          # These 21 files are the three per-test weight sources. The newest
+          # run supplies wall calibration and the current inventory baseline;
+          # the aa9 inventory remains the population-reference comparison.
           python3 scripts/ci-duration-shard.py inventory.json \
             docs/program/evidence/ci-workspace-run-36371407331/shard-1.json \
             docs/program/evidence/ci-workspace-run-36371407331/shard-2.json \
@@ -187,13 +203,24 @@ jobs:
             docs/program/evidence/ci-workspace-run-36372772505/shard-5.json \
             docs/program/evidence/ci-workspace-run-36372772505/shard-6.json \
             docs/program/evidence/ci-workspace-run-36372772505/shard-7.json \
+            docs/program/evidence/ci-workspace-run-36401179125/shard-1.json \
+            docs/program/evidence/ci-workspace-run-36401179125/shard-2.json \
+            docs/program/evidence/ci-workspace-run-36401179125/shard-3.json \
+            docs/program/evidence/ci-workspace-run-36401179125/shard-4.json \
+            docs/program/evidence/ci-workspace-run-36401179125/shard-5.json \
+            docs/program/evidence/ci-workspace-run-36401179125/shard-6.json \
+            docs/program/evidence/ci-workspace-run-36401179125/shard-7.json \
             --population-baseline \
+            docs/program/evidence/ci-workspace-run-36401179125/inventory.json \
+            --population-reference \
             docs/program/evidence/ci-workspace-run-36372772505/inventory.json \
             --wall-calibration \
-            docs/program/evidence/ci-workspace-run-36341523886/job-steps.tsv \
+            docs/program/evidence/ci-workspace-run-36401179125/job-steps.tsv \
             --wall-calibration-artifacts \
-            docs/program/evidence/ci-workspace-run-36341523886 \
+            docs/program/evidence/ci-workspace-run-36401179125 \
             --output-dir duration-filters
+          phase_timestamp planner end
+          phase_timestamp realize-and-stage start
           planned=$(python3 -c 'import json; print(len(json.load(open("duration-filters/assignments.json"))["bins"][${{ matrix.shard }} - 1]["tests"]))')
           if [ "$planned" -eq 0 ]; then
             python3 scripts/ci-duration-shard.py project-empty inventory.json "selected-${{ matrix.shard }}.json"
@@ -203,6 +230,7 @@ jobs:
           fi
           python3 scripts/ci-duration-shard.py validate-plan duration-filters/assignments.json "${{ matrix.shard }}" "selected-${{ matrix.shard }}.json"
           scripts/stage-ci-shard-artifact.sh "${{ matrix.shard }}" unfiltered-inventory.json inventory.json "selected-${{ matrix.shard }}.json" duration-filters/planning-evidence.json
+          phase_timestamp realize-and-stage end
       - name: Test
         run: >-
           scripts/run-ci-shard.sh
