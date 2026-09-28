@@ -1837,6 +1837,171 @@ postulate, cached-`Nat` carrier, or `Axiom`.
 pub fn bytes_nat_length (bs : Bytes) : Nat = length UInt8 (bytes_to_list bs)
 ```
 
+The following checked owner examples apply private CAT-3 structural, sortedness,
+lens, and slice laws. They are not tangled or exported. Each rejected false
+proof has a matching checked use of its private operations; the take/drop and
+lens controls differ only in their claimed endpoint.
+
+```ken example
+fn derived_example_cat3_to_true (x : Nat) : Bool = True
+
+fn derived_example_cat3_nat_eq_all (x : Nat) (y : Nat) : Bool = True
+
+theorem derived_example_cat3_take_drop
+    : Equal
+        (List Bool)
+        (list_append
+          Bool
+          (take Bool (Suc Zero) (Cons Bool True (Cons Bool False (Nil Bool))))
+          (drop Bool (Suc Zero) (Cons Bool True (Cons Bool False (Nil Bool)))))
+        (Cons Bool True (Cons Bool False (Nil Bool))) =
+  take_drop_decomposition Bool (Suc Zero) (Cons Bool True (Cons Bool False (Nil Bool)))
+
+theorem derived_example_cat3_map_length
+    : Equal Nat
+        (length
+          Bool
+          (map
+            Nat
+            Bool
+            derived_example_cat3_to_true
+            (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))))
+        (length Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))) =
+  map_length
+    Nat
+    Bool
+    derived_example_cat3_to_true
+    (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))
+
+theorem derived_example_cat3_length_take_min
+    : Equal Nat
+        (length Nat (take Nat (Suc Zero) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))))
+        (min (Suc Zero) (length Nat (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))) =
+  length_take_min Nat (Suc Zero) (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat)))
+
+theorem derived_example_cat3_filter_mem
+    : Equal Bool
+        (mem
+          Nat
+          derived_example_cat3_nat_eq_all
+          Zero
+          (filter Nat derived_example_cat3_to_true (Cons Nat (Suc Zero) (Nil Nat))))
+        True =
+  Proved
+
+theorem derived_example_cat3_take_drop_negative_control
+    : Equal
+        (List Bool)
+        (list_append
+          Bool
+          (take Bool (Suc Zero) (Cons Bool True (Nil Bool)))
+          (drop Bool (Suc Zero) (Cons Bool True (Nil Bool))))
+        (Cons Bool True (Nil Bool)) =
+  take_drop_decomposition Bool (Suc Zero) (Cons Bool True (Nil Bool))
+```
+
+```ken reject
+theorem derived_reject_cat3_wrong_take_drop
+    : Equal
+        (List Bool)
+        (list_append
+          Bool
+          (take Bool (Suc Zero) (Cons Bool True (Nil Bool)))
+          (drop Bool (Suc Zero) (Cons Bool True (Nil Bool))))
+        (Nil Bool) =
+  Proved
+```
+
+```ken example
+theorem derived_example_cat3_sort_bool_sorted
+    : is_sorted Bool bool_leq
+        (sort_bool (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))) =
+  sort_bool_sorted (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))
+
+theorem derived_example_cat3_sort_bool_perm
+    : Perm Bool
+        (eq_from_ord Bool bool_leq)
+        (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))
+        (sort_bool (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))) =
+  sort_bool_perm (Cons Bool True (Cons Bool False (Cons Bool True (Nil Bool))))
+
+theorem derived_example_cat3_sorted_negative_control
+    : is_sorted Bool bool_leq (Cons Bool False (Cons Bool True (Nil Bool))) =
+  sort_bool_sorted (Cons Bool True (Cons Bool False (Nil Bool)))
+
+theorem derived_example_cat3_perm_negative_control
+    : Perm Bool
+        (eq_from_ord Bool bool_leq)
+        (Cons Bool True (Nil Bool))
+        (Cons Bool True (Nil Bool)) =
+  λq. Refl
+```
+
+```ken reject
+theorem derived_reject_cat3_bad_sorted
+    : is_sorted Bool bool_leq (Cons Bool True (Cons Bool False (Nil Bool))) =
+  Proved
+```
+
+```ken reject
+theorem derived_reject_cat3_bad_perm
+    : Perm Bool (eq_from_ord Bool bool_leq) (Cons Bool True (Nil Bool)) (Nil Bool) =
+  λq.
+    match q {
+      False ↦ Proved;
+      True ↦ Proved
+    }
+```
+
+```ken example
+theorem derived_example_cat3_lens_get_set
+    : Equal Bool
+        (fst_pair_bool_bool (set_fst_pair_bool_bool False (mk_pair Bool Bool True True)))
+        False =
+  fst_lens_get_set False (mk_pair Bool Bool True True)
+
+theorem derived_example_cat3_lens_set_get
+    : Equal
+        (Pair Bool Bool)
+        (set_fst_pair_bool_bool
+          (fst_pair_bool_bool (mk_pair Bool Bool True False))
+          (mk_pair Bool Bool True False))
+        (mk_pair Bool Bool True False) =
+  fst_lens_set_get (mk_pair Bool Bool True False)
+
+theorem derived_example_cat3_lens_set_set
+    : Equal
+        (Pair Bool Bool)
+        (set_fst_pair_bool_bool
+          False
+          (set_fst_pair_bool_bool True (mk_pair Bool Bool True False)))
+        (set_fst_pair_bool_bool False (mk_pair Bool Bool True False)) =
+  set_fst_pair_bool_bool::set_set True False (mk_pair Bool Bool True False)
+
+theorem derived_example_cat3_indexed_project
+    : Equal Bool (bool_pair_index_project (mk_pair Bool Bool True False) True) False =
+  Proved
+
+theorem derived_example_cat3_setoid_project : Equal Bool (id_bool True) (id_bool True) =
+  id_bool::respects True True Proved
+```
+
+```ken reject
+theorem derived_reject_cat3_wrong_lens_get_set
+    : Equal Bool
+        (fst_pair_bool_bool (set_fst_pair_bool_bool False (mk_pair Bool Bool True True)))
+        True =
+  fst_lens_get_set False (mk_pair Bool Bool True True)
+```
+
+```ken example
+const derived_example_cat3_slice_ordinary : String =
+  slice (Suc Zero) (Suc (Suc (Suc Zero))) "abcde"
+
+const derived_example_cat3_slice_underflow : String =
+  slice (Suc (Suc (Suc Zero))) (Suc Zero) "abcde"
+```
+
 ## 5. Design notes
 
 **Package dependency.** The CAT-3 proof terms in `§4.1`–`§4.3` use `cong`/
