@@ -462,14 +462,15 @@ already-public names in the deferred `cat5_parsing_package.rs:77` row:
 convo `evt_1250608g5rrcy`). The original Architect-reviewed table remains
 unchanged. The correction adds existing-public Parsing names, removes the
 unread `span_origin` from that row, and changes no private row, count, or
-item-1 scope. A second, no-op-door and dynamic-host-loop audit added five
+item-1 scope. A second, no-op-door and dynamic-host-loop audit added six
 reached-name groups at already counted invocations, not new calls or pins:
 private LC `compare_bool_cases` reached through DS1's helper; public LC
-`Eq`, `DecEq`, `Ord`, and `bool_or` read dynamically in ES4; the public Doc
-`render` used by CC7's help-growth snippet; and public Derived
+String-key names read dynamically in CC2; public LC `Eq`, `DecEq`, `Ord`, and
+`bool_or` read dynamically in ES4; the public Doc `render` used by CC7's
+help-growth snippet; and public Derived
 `bytes_nat_length` used in SUB1's Ken expression. The separate additive
 `/tmp/lang-session-catalog-or-additive.tsv` (SHA-256
-`b2a6fdfbe6478169570b14fddcdd5c933e2680784af5aea2513c918525743345`;
+`9ab059f0642689e3318094d80e2bb820f1b05b4189cc8ae52153bd7b7fe72b06`;
 following discovery `evt_4vyxgzndatjen`) records each test function and site,
 plane, and checked-ID route. Neither the ruled 76-row original nor the
 49-pin table was overwritten.
