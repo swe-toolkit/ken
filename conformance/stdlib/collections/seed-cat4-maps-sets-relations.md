@@ -31,16 +31,19 @@ provenance, not substitutes for the current producers):
   `is_sorted_append`, and the `trans`/`cong` "stop-one-step-short" transport
   bridges. **Zero `Axiom`, zero `trusted_base` delta throughout.** Permutation
   is the one Map law still deferred (proof-relevant, C5).
-- **The D0–D4 producer has a split evidence boundary.** The current Map package
-  contains `leq_nat`, `delete`, `union`, `intersection`, `difference`, `keys`,
-  `values`, `compose`, `converse`, the relation predicates, and the public
-  closure computation `size`/`dom`/`reachable_within`/`reachable_plus`. It
-  contains the D0 order results, D1–D2 general proof corpus, and D3
-  projection/ascending proofs. The D4 operation, predicate, and closure
-  definitions are transparent, but there is still no general compose/converse
-  membership proof, concrete property-predicate proof witness, or general
-  closure faithfulness/saturation proof. Those remain conformance obligations,
-  not consequences inferred from declaration presence.
+- **The D0–D4 producer has a split evidence boundary.** The canonical D0 basis
+  is supplied by `Core.Classes.LawfulClasses`; Map's amended target contains no
+  D0 declaration or export and contains `delete`, `union`, `intersection`,
+  `difference`, `keys`, `values`, `compose`,
+  `converse`, the relation predicates, and the public closure computation
+  `size`/`dom`/`reachable_within`/`reachable_plus`. Map contains the D1–D2
+  general proof corpus and D3 projection/ascending proofs. The D4 operation,
+  predicate, and closure definitions are transparent, but there is still no
+  general compose/converse membership proof, concrete property-predicate proof
+  witness, or general closure faithfulness/saturation proof. Those remain
+  conformance obligations, not consequences inferred from declaration
+  presence. Main's pre-amendment Map-private D0 copy remains until held
+  increment 2 lands; it is not the target provider.
 - **The named closure computation is landed and executing.** The eight
   structured closure rows below map to concrete observations over their stated
   operands. The general faithfulness/saturation proof remains a separate later
@@ -91,29 +94,33 @@ provenance, not substitutes for the current producers):
   trees with the same key-set) — extensional is the **only sound** formulation,
   and is what makes the set laws corollaries of the map lookup-characterization
   + `bool_or`/`bool_and` algebra.
-- **Sub-ruling (2) — carrier:** use the landed Axiom-free `leq_nat` plus its
-  four order results as the D0 basis; proved discriminators key on
-  **`Map Nat`/`Set Nat`/`Relation Nat`**, never `Map Int` (`Ord Int`/`Ord Char`
-  are Axiom-holed, so the accept arm goes vacuous and the flip degenerates to
-  reject-vs-reject).
+- **Sub-ruling (2) — carrier:** use `Core.Classes.LawfulClasses`' landed
+  Axiom-free `leq_nat` plus its four order results as the D0 basis; proved
+  discriminators key on **`Map Nat`/`Set Nat`/`Relation Nat`**, never
+  `Map Int` (`Ord Int`/`Ord Char` are Axiom-holed, so the accept arm goes
+  vacuous and the flip degenerates to reject-vs-reject).
   `Ord Bool` is Axiom-free but 2-key — too degenerate for a ≥3-key relation
   discriminator (a→b→c ⊬ a→c). The carrier-vacuity guard binds (the CAT-3
   `List Bool` lesson, one carrier up).
 
-**Status — landed definitions, concrete execution, and general proofs are
-distinct.** On exact test blob
+**Pre-amendment as-built status — landed definitions, concrete execution, and
+general proofs are distinct.** On exact test blob
 `eabd6527b89e50c9c201adfeecc646928c8ae7da` and Map blob
 `8e37b69ba2cfe124e8f9410e54e791e56a86730b`, the targeted command
 `scripts/ken-cargo test -p ken-elaborator --test map_build_acceptance` returned
-`36 passed; 0 failed; 0 ignored`.
+`36 passed; 0 failed; 0 ignored`. This records the pre-amendment Map D0
+producer and test; it is not evidence for the new `LawfulClasses` owner
+contract.
 
-The suite retains five earlier `cat4_*` rows. One checks the named D0–D4 globals
-for transparent declarations and zero trusted-base delta. Four execute values:
-delete removes the requested key; union observes the left-biased collision
-orientation while intersection and difference observe one result each;
-`keys`/`values` produce aligned lists; and relation smoke observes the present
-composed edge `1 → 3` and present converse edge `2 → 1`. That relation smoke
-does **not** execute either absent-edge control below and does not prove a
+At those blobs the suite has five earlier `cat4_*` rows. One checks Map's
+pre-amendment D0–D4 globals for transparent declarations and zero
+trusted-base delta. Held increment 2 must move the D0 inventory to
+`LawfulClasses`; the recorded result does not discharge that update. Four rows
+execute values: delete removes the requested key; union observes the left-biased
+collision orientation while intersection and difference observe one result
+each; `keys`/`values` produce aligned lists; and relation smoke observes the
+present composed edge `1 → 3` and present converse edge `2 → 1`. That relation
+smoke does **not** execute either absent-edge control below and does not prove a
 general membership law or inhabit a property predicate. The corresponding D4
 law rows therefore remain explicit unexecuted obligations.
 
@@ -139,17 +146,20 @@ is public as an abstract type name; its constructors remain private.
 -- Abstract carrier type name; Leaf and Node remain private constructors:
 pub data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
 
--- D0 carrier prerequisite (Axiom-free, Nat inductive):
-fn leq_nat (m : Nat) (n : Nat) : Bool
-proof refl for leq_nat (x : Nat) : Equal Bool (leq_nat x x) True
-proof trans for leq_nat (x : Nat) (y : Nat) (z : Nat)
+-- Canonical D0 carrier prerequisite: Core.Classes.LawfulClasses.
+pub fn leq_nat (m : Nat) (n : Nat) : Bool
+pub proof refl for leq_nat (x : Nat) : Equal Bool (leq_nat x x) True
+pub proof trans for leq_nat (x : Nat) (y : Nat) (z : Nat)
   : Equal Bool (leq_nat x y) True
     -> Equal Bool (leq_nat y z) True -> Equal Bool (leq_nat x z) True
-fn total_leq_nat (x : Nat) (y : Nat)
-  : Or (Equal Bool (leq_nat x y) True) (Equal Bool (leq_nat y x) True)
-proof antisym for leq_nat (x : Nat) (y : Nat)
+pub proof antisym for leq_nat (x : Nat) (y : Nat)
   : Equal Bool (leq_nat x y) True
     -> Equal Bool (leq_nat y x) True -> Equal Nat x y
+pub proof total for leq_nat (x : Nat) (y : Nat)
+  : IsTrue (bool_or (leq_nat x y) (leq_nat y x))
+-- Provider-private Or-valued support, not a public/caller-supplied identity:
+fn total_leq_nat (x : Nat) (y : Nat)
+  : Or (Equal Bool (leq_nat x y) True) (Equal Bool (leq_nat y x) True)
 
 -- D1 delete (Fork D — rebuild, drop_key = filter):
 fn drop_key (k : Type) (v : Type) (leq : k -> k -> Bool) (key : k)
@@ -257,21 +267,50 @@ pub fn reachable_plus (k : Type) (leq : k -> k -> Bool)
 - spec: `58 §2` sub-ruling 2, `51 §6` (Axiom-free order carriers),
   `../classes/seed-lawful-classes.md` (`Ord Bool` the only landed Axiom-free
   order carrier; `Ord Int`/`Ord Char` Axiom-holed).
-- given: the landed D0 basis `leq_nat` plus `proof refl for leq_nat`,
-  `proof trans for leq_nat`, `proof antisym for leq_nat`, and
-  `total_leq_nat`.
-- expect: all four order results are **real and kernel-checked** over inductive
-  `Nat`: the three attached proofs recurse structurally and `total_leq_nat`
-  returns a proof-relevant `Or` value. Each has zero `Axiom` and zero
-  trusted-base delta. Unlike primitive `Int`, `Nat` supplies the eliminator that
-  makes these results derivable. **The flip:** stub any result with `Axiom` →
-  the cone walk reports a non-empty delta → rejected; the real result leaves
-  the delta empty → accepted.
+- given: load `Core.Classes.LawfulClasses` through the real provider path and
+  resolve its canonical checked identities: `leq_nat`, the `refl`, `trans`,
+  and `antisym` proof selectors, and `proof total for leq_nat`. Inspect the
+  private `total_leq_nat` through its provider-owned declaration identity, not
+  through an unqualified flat global alias.
+- expect: the three attached equality proofs and private Or-valued
+  `total_leq_nat` are the four real, kernel-checked structural order results
+  over inductive `Nat`, each with zero `Axiom` and zero trusted-base delta. The
+  public `proof total for leq_nat` is also real and zero-delta, with the exact
+  `IsTrue (bool_or (leq_nat x y) (leq_nat y x))` result; it does not export or
+  replace the private Or-valued helper. The canonical identities are owned by
+  `LawfulClasses`, not Map; a same-spelling flat alias or Map-local lookalike
+  does not satisfy the owner-identity assertion. Map's public interface has no
+  D0 comparator, order-proof, or totality entry: it neither defines nor
+  re-exports this family. A client can resolve the provider's public identities
+  but cannot import or reference `total_leq_nat`. Unlike primitive `Int`,
+  `Nat` supplies the eliminator that makes these results derivable. **The flip:**
+  stub any result with `Axiom` → the cone walk reports a non-empty delta →
+  rejected; use a different owner's same-spelling identity → the owner check
+  fails; add a Map re-export → the public-interface inventory fails; the real
+  provider results leave the delta empty and pass the identity check.
 - why: the carrier prerequisite that makes the proved CAT-4 discriminators
   **non-vacuous** — see the standing carrier discriminator below.
   **`(soundness)`** — an `Axiom`-holed `leq_nat` would make every proved
-  `Map Nat` law's accept-arm vacuous. Structural delta-flip. (soundness;
-  structural zero-delta.)
+  `Map Nat` law's accept-arm vacuous. Structural owner-identity and
+  zero-delta flips. (soundness; canonical provider + zero-delta.)
+- staging: two parts, discharged separately. (1) Absence of a Map-local D0
+  copy is **RED UNTIL held increment 2**, whose
+  `cat_map_retires_leq_nat_family_and_totality_name` rejects Map bindings named
+  `leq_nat`, `leq_nat::refl`/`trans`/`antisym`, or `total_leq_nat`. (2) The
+  provider-owned identity and zero-delta oracle already has tests on main:
+  `class_owner_provider_loader_visible_inventories_are_exact`
+  (`crates/ken-elaborator/src/r_layer_tests/cat_bool_pub_export.rs:478`)
+  checks the exact public LawfulClasses inventory, including `leq_nat::total`;
+  `lawful_totality_bridge_remains_a_private_transparent_provider_artifact`
+  (`crates/ken-elaborator/src/r_layer_tests/cat_order_pub_export.rs:107–116`)
+  checks the private `total_leq_nat` by provider-owned identity and that it is
+  not importable; `totality_source_and_public_relation_behavior_survive_the_move`
+  and `trusted_base_delta_is_empty_across_the_entry`
+  (`crates/ken-elaborator/tests/ds2_ord_nat_acceptance.rs:72–76, 92`) check the
+  Or identity and zero delta. The Map re-export flip has no executed mutation
+  yet and remains an unexecuted obligation. The existing
+  `cat4_new_api_is_derived_and_axiom_free` Map-owned inventory on main is not
+  evidence that the amended target has landed.
 
 ---
 
@@ -739,11 +778,14 @@ neighboring behavior that must flip.
 - why: the carrier-vacuity guard **promoted to a standing discriminator** so the
   build cannot silently pick an Axiom-holed carrier and ship a vacuous green
   (exactly CAT-3's `verified-sort-proved-carrier-is-lawful-bool`, one carrier up
-  — Nat here because relations need ≥3 keys). The current
-  `cat4_new_api_is_derived_and_axiom_free` row establishes that `leq_nat` and
-  its four order results are transparent with zero trusted-base delta. It does
-  not execute every proof-flip's carrier choice; the cross-case inventory below
-  keeps that separate structural obligation explicit. **`(soundness)`** —
+  — Nat here because relations need ≥3 keys). The implementation pin
+  `cat_map_leq_nat_resolves_canonical_owner_without_equivalent_local` (renamed
+  by held increment 2 to `cat_map_retires_leq_nat_family_and_totality_name`)
+  checks, with the flat alias withheld, that the comparator's `LawfulClasses`
+  identity is not Map-owned; after increment 2 it also rejects any Map binding
+  named `leq_nat`, its three selectors, or `total_leq_nat`. The carrier test
+  does not execute every proof-flip's carrier choice; the cross-case inventory
+  below keeps that separate structural obligation explicit. **`(soundness)`** —
   verdict-independent structural (which carrier + whether its order basis cites
   an `Axiom`). (soundness; landed order-basis evidence; cross-case carrier-use
   obligation retained.)
@@ -829,10 +871,11 @@ blobs recorded in the status section. In particular:
   `reachable_plus`; no camel-case closure spelling remains;
 - the old `N−1` correspondence claim is removed and the target-only-sink case
   independently requires the corrected `N` bound;
-- D0 order results, D1–D2 general proofs, and D3 projection/ascending proofs
-  are landed; D4 operation/predicate definitions, the two positive smoke
-  observations, unexecuted conformance arms, and general
-  proof residuals are stated separately;
+- the canonical D0 order results are supplied by `LawfulClasses`; D1–D2
+  general proofs and D3 projection/ascending proofs are landed; D4
+  operation/predicate definitions, the two positive smoke observations,
+  unexecuted conformance arms, and general proof residuals are stated
+  separately;
 - the targeted result is anchored to the exact test and Map blobs that were run,
   and no individual D4 law obligation is credited from aggregate greenness; and
 - the landed four-function computation and later general relation proofs remain
@@ -842,3 +885,13 @@ blobs recorded in the status section. In particular:
 
 Any independent vote binds both this seed's citations and its case coverage to
 the exact candidate, not merely to the historical CAT-4 fork record.
+
+## Clean-room provenance
+
+This CAT-MAP clarification was derived from Ken's amended specification, the
+settled Architect ruling, Ken's own producer/test artifacts, and first
+principles. The Research advisory also consulted prior art on library ownership
+and re-export practice from Haskell, Mathlib/Lean, Rust, and Agda; that material
+informed governance approach only, and no source expression was copied. No
+copyleft reference, `local/refs/` implementation, or excluded prototype was
+consulted. A copyleft originality scan is not applicable.
