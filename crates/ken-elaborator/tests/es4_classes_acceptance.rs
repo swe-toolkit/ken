@@ -82,9 +82,11 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
+use std::collections::BTreeSet;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::env::Decl as KernelDecl;
-use ken_kernel::Term;
+use ken_kernel::{GlobalId, Term};
 
 const LAWFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
@@ -100,8 +102,111 @@ fn mk_env_with_lawful_owned() -> (ElabEnv, Vec<ken_kernel::GlobalId>) {
     (env, lawful_owned)
 }
 
-fn mk_env_with_package() -> ElabEnv {
-    mk_env_with_lawful_owned().0
+// MEASURED: two checked owner-local definitions reference the Derived-owned
+// four-argument Perm and the imported LawfulClasses-owned Ord class; neither
+// is published, and executing the fences adds no trust.
+// CLAIMED: the explicit and dictionary comparator obligations use the same
+// checked predicate shape without consulting a private flat fixture alias.
+// THE GAP: the host compares the actual comparator subterms in these two
+// examples; it does not quantify over every potential sort client.
+fn es4_owner_comparator_obligations() -> (ElabEnv, GlobalId, GlobalId, GlobalId, GlobalId) {
+    const DERIVED: &str = "Data.Collections.Derived";
+    const LAWFUL: &str = "Core.Classes.LawfulClasses";
+    let mut env = ElabEnv::new().expect("base environment");
+    let root = catalog_or::catalog_root();
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[root.clone()], LAWFUL)
+        .expect("LawfulClasses must roots-load");
+    let derived_owned = env
+        .elaborate_module_from_roots(&[root], DERIVED)
+        .expect("Derived and its real dependencies must roots-load");
+    let perm_id = catalog_or::provider_owned_id(&env, &derived_owned, DERIVED, "Perm")
+        .expect("the four-argument Perm must belong to Derived");
+    let ord_id = lawful_class_id(&env, &lawful_owned, "Ord");
+    let ord_int_id = lawful_instance_id(&env, &lawful_owned, "Ord", "Int");
+    assert_eq!(
+        env.class_env
+            .class("Ord")
+            .expect("Ord must be a checked class")
+            .projection
+            .type_id,
+        ord_id,
+        "the constrained form must use the checked public Ord class"
+    );
+    let outer_perm = env.globals.get("Perm").copied();
+    assert_ne!(
+        outer_perm,
+        Some(perm_id),
+        "private Perm must not be a flat client alias"
+    );
+    let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let names = [
+        "derived_example_sort_obligation_explicit",
+        "derived_example_sort_obligation_via_ord",
+    ];
+    for name in names {
+        assert!(
+            !env.globals.contains_key(name)
+                && !env.globals.contains_key(&format!("{DERIVED}.{name}")),
+            "{name} must not be a tangled or published declaration"
+        );
+    }
+    env.execute_loaded_entry_checked_fences(DERIVED)
+        .expect("Derived owner-local examples and rejects must check");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "owner-local examples must not add trust"
+    );
+    assert_eq!(
+        env.globals.get("Ord").copied(),
+        Some(ord_id),
+        "the checked owner example must import the canonical public Ord identity"
+    );
+    assert_eq!(
+        env.globals.get("Perm").copied(),
+        outer_perm,
+        "fences must not install a private Perm alias"
+    );
+    assert_eq!(
+        catalog_or::provider_owned_id(&env, &derived_owned, DERIVED, "Perm"),
+        Ok(perm_id),
+        "fence execution must retain the Derived-owned private Perm identity"
+    );
+    let mut ids = Vec::new();
+    for name in names {
+        let id = *env
+            .globals
+            .get(name)
+            .unwrap_or_else(|| panic!("{name} must check in its owner fence"));
+        assert!(
+            !derived_owned.contains(&id),
+            "{name} must not be a provider declaration"
+        );
+        assert!(
+            !env.globals.contains_key(&format!("{DERIVED}.{name}")),
+            "{name} must not become public"
+        );
+        let decl = env
+            .env
+            .lookup(id)
+            .expect("checked example must resolve by ID");
+        assert!(
+            matches!(decl, KernelDecl::Transparent { .. }),
+            "{name} must be a checked definition"
+        );
+        let refs = catalog_or::declaration_references(decl);
+        assert!(
+            refs.contains(&perm_id),
+            "{name} must reference Derived-owned Perm"
+        );
+        assert!(
+            refs.contains(&env.globals["is_sorted"]),
+            "{name} must use is_sorted"
+        );
+        ids.push(id);
+    }
+    (env, ids[0], ids[1], perm_id, ord_int_id)
 }
 
 fn lawful_class_id(
@@ -675,55 +780,95 @@ fn char_ord_laws_reject_missing_law_field() {
 // `sort`/`is_sorted` form threads (`51 §4`, reflect-don't-extend).
 // ─────────────────────────────────────────────────────────────────────────
 
+/// Promise class: durable checked relation. Both obligation forms pass the
+/// same comparator to the exact owned `Perm` and the prelude `is_sorted`.
 #[test]
 fn where_ord_supplies_same_comparator_as_explicit_form() {
-    let mut env = mk_env_with_package();
+    // Both original obligations check in the private Perm owner scope. The
+    // constrained form imports the canonical public Ord class in its fence.
+    let (env, explicit_id, via_dict_id, perm_id, ord_int_id) = es4_owner_comparator_obligations();
 
-    // (a) explicit comparator form (ES2-remainder's landed shape).
-    let explicit_id = env
-        .elaborate_decl(
-            "fn sortObligationExplicit (cmp : Int -> Int -> Bool) (ys : List Int) (xs : List Int) : Prop = \
-             And (is_sorted Int cmp ys) (Perm Int cmp ys xs)",
-        )
-        .expect("explicit-comparator obligation elaborates");
-
-    // (b) `where Ord Int`-constrained form — `d.leq` supplied by the
-    // resolved dictionary, same obligation shape.
-    let via_dict_id = env
-        .elaborate_decl(
-            "fn sortObligationViaDict (ys : List Int) (xs : List Int) : Prop where Ord Int = \
-             And (is_sorted Int (d.leq) ys) (Perm Int (d.leq) ys xs)",
-        )
-        .expect("`where Ord Int` obligation elaborates — d.leq must project the resolved dictionary's leq field");
-
-    // Discriminating: both must produce a body of the SAME STRUCTURAL shape
-    // (`And (is_sorted Int <cmp> ys) (Perm Int <cmp> ys xs)`) — not merely "both
-    // type-check". Peel the two param-lambdas (leq/none, ys, xs) down to the
-    // inner body and compare modulo the substituted comparator.
+    // Peel the declared arguments, then require exactly the same And of the
+    // same two predicates with the same comparator inside each predicate.
     let (_, explicit_body) = env.env.transparent_body(explicit_id).unwrap();
     let (_, dict_body) = env.env.transparent_body(via_dict_id).unwrap();
 
     fn peel_lams(t: &Term, n: usize) -> Term {
         let mut cur = t.clone();
         for _ in 0..n {
-            match cur {
-                Term::Lam(_, body) => cur = *body,
-                other => return other,
-            }
+            cur = match cur {
+                Term::Lam(_, body) => *body,
+                other => panic!("expected {n} declaration arguments, got {other:?}"),
+            };
         }
         cur
     }
-    // explicit: Lam(leq) Lam(ys) Lam(xs) -> body; via-dict: Lam(ys) Lam(xs) -> body.
+
+    fn applied(t: &Term) -> (&Term, Vec<&Term>) {
+        let mut head = t;
+        let mut args = Vec::new();
+        while let Term::App(function, arg) = head {
+            args.push(arg.as_ref());
+            head = function.as_ref();
+        }
+        args.reverse();
+        (head, args)
+    }
+
+    fn comparator<'a>(env: &ElabEnv, perm_id: GlobalId, t: &'a Term) -> &'a Term {
+        let (and_head, conjuncts) = applied(t);
+        assert_eq!(*and_head, Term::const_(env.globals["And"], vec![]));
+        assert_eq!(
+            conjuncts.len(),
+            2,
+            "obligation must conjoin exactly two predicates"
+        );
+        let (sorted_head, sorted_args) = applied(conjuncts[0]);
+        let (perm_head, perm_args) = applied(conjuncts[1]);
+        assert_eq!(*sorted_head, Term::const_(env.globals["is_sorted"], vec![]));
+        assert_eq!(*perm_head, Term::const_(perm_id, vec![]));
+        assert_eq!(
+            sorted_args.len(),
+            3,
+            "is_sorted needs type, comparator and list"
+        );
+        assert_eq!(
+            perm_args.len(),
+            4,
+            "Perm needs type, comparator and two lists"
+        );
+        assert_eq!(
+            *sorted_args[0],
+            Term::const_(env.numeric_env.int_id, vec![])
+        );
+        assert_eq!(
+            sorted_args[0], perm_args[0],
+            "predicates must share the carrier"
+        );
+        assert_eq!(
+            sorted_args[1], perm_args[1],
+            "predicates must share the comparator"
+        );
+        assert_eq!(
+            sorted_args[2], perm_args[2],
+            "predicates must share the sorted list"
+        );
+        assert_eq!(*sorted_args[2], Term::Var(1), "both predicates must use ys");
+        assert_eq!(*perm_args[3], Term::Var(0), "Perm must compare ys to xs");
+        sorted_args[1]
+    }
+
+    // explicit: Lam(cmp) Lam(ys) Lam(xs); dictionary: Lam(ys) Lam(xs).
     let explicit_inner = peel_lams(&explicit_body, 3);
     let dict_inner = peel_lams(&dict_body, 2);
-
-    fn is_and_is_sorted_perm_shape(t: &Term) -> bool {
-        // App(App(Const(And), is_sorted-app), Perm-app) — just check the
-        // outer head is an application chain of depth >= 2 (structural
-        // shape check; exact head ids vary run-to-run only by content, not
-        // structure).
-        matches!(t, Term::App(f, _) if matches!(f.as_ref(), Term::App(_, _)))
-    }
-    assert!(is_and_is_sorted_perm_shape(&explicit_inner), "explicit form must have the And(is_sorted,Perm) shape");
-    assert!(is_and_is_sorted_perm_shape(&dict_inner), "where Ord Int form must have the SAME And(is_sorted,Perm) shape");
+    assert_eq!(
+        *comparator(&env, perm_id, &explicit_inner),
+        Term::Var(2),
+        "explicit form must use the supplied comparator"
+    );
+    assert_eq!(
+        *comparator(&env, perm_id, &dict_inner),
+        expected_field_proj(ord_int_id, 0),
+        "where Ord Int must supply the canonical dictionary's leq field"
+    );
 }
