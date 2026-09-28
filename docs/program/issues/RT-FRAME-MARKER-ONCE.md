@@ -1,42 +1,80 @@
 ---
 id: RT-FRAME-MARKER-ONCE
-title: "Checked Runtime frame marker is consumed more than once under a nested computational eliminator"
-status: draft
+title: "Native execution of a host-effect tree that one checked frame marker serves more than once: the two px7n nested-eliminator rows and the checked double bind build and run natively and agree with the interpreter, instead of refusing in object emission because the oriented subcontinuation plan consumes one checked Runtime frame marker more than once"
+status: ready
 owner: runtime
-size: TBD
-gate: none
-depends_on: [RT-SRCBODY-BIND-ORDER]
+size: M
+gate: architect
+tier: T1
+depends_on: [RT-IGNORED-ROWS-NEXT-GROUP]
 blocks: []
 github: null
-origin: Measured at frozen base 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differential (evt_2jc88hbzfskpm). All 16 CI failures at aa032cc2 fail at the base too -- ZERO bind-order flips -- so this is pre-existing base debt, not a regression. Steward-filed (agents cannot create tracked work per COORDINATION §2).
+origin: "Measured at 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differential (evt_2jc88hbzfskpm) as pre-existing base debt. RT-IGNORED-ROWS-NEXT-GROUP's occurrence-key repair moves both px7n rows to this refusal (AC-0 ruling evt_49fjtm9sen7bh), and its CI respin adds the checked double bind as a third witness (Architect evt_6ne90bptkxg33). Operator L1 directive 2026-09-17 (clear the ignored tests). Steward-filed per COORDINATION section 2."
 ---
 
-> ## THE FRAME IS OWED. This node is `draft` and NOT startable.
->
-> It exists so that a **skipped CI row has an owner**. A skipped row measures
-> nothing; the node that owns it owns **un-skipping** it. Size is `TBD`
-> deliberately -- nothing measured bounds the repair, and a guessed size on this
-> campaign has been wrong every time it was guessed.
+# One checked frame marker, consumed more than once
 
-## Exact signature
+## Objective
 
-```text
-OrientedSubcontinuationPlanV1: checked Runtime frame marker was consumed more than once
-```
+The two `px7n` rows run green and un-ignored natively, and the checked
+double bind runs natively with the interpreter's observation.
 
-## Rows it owns
+## Settled inputs (on the NEXT-GROUP repair, `07eb1971e` and its respin)
 
-- \`px7n_nested_computational_eliminator\` \`nested_err_payload_reaches_both_real_executors\`
+- **The refusal**, verbatim:
+  `ObjectEmission/checked_process_object: unsupported runtime-IR lowering:
+  OrientedSubcontinuationPlanV1: checked Runtime frame marker was consumed
+  more than once`.
+- **The rows**, in `crates/ken-cli/tests/px7n_nested_computational_eliminator.rs`:
+  `nested_ok_payload_reaches_both_real_executors` (`:150`) and
+  `nested_err_payload_reaches_both_real_executors` (`:171`). Both are
+  relabelled to this node by NEXT-GROUP.
+- **The smallest witness**, in
+  `crates/ken-cli/tests/rt_selected_pending_call_admission.rs`: the checked
+  double bind, `let p = body MkUnit in bind p (λ_. bind p (λ_. exit))`.
+  - It runs one HostIO tree value twice. That is a legitimate program: a
+    tree is a description, so its effects run twice.
+  - On the respin, planning yields exactly 2 admission rows. Object emission
+    then refuses as above, and no native artifact is produced
+    (runtime-implementer `evt_5sa7g29th903g`).
+  - Interpreter target: effect trace `ConsoleIsTerminal, ConsoleWrite,
+    ConsoleWrite`, stdout `captured\ncaptured\n`, exit 0.
+  - The test is a transition sentinel (renamed on the respin to
+    `checked_double_bind_admits_then_refuses_at_frame_marker`). This node's
+    repair turns it red, and it becomes a native-versus-interpreter parity
+    pin.
+- **Unmeasured:** which plan element consumes the marker twice, from which
+  source occurrence, and whether a marker is owed once per run of a shared
+  tree value or once per tree. Also unmeasured: whether another blocker sits
+  behind it for any of the three programs.
 
-## Why this is NOT [[RT-CARRIER-BYTESPAN-OBSERVE]]
+## Deliverable
 
-**Different mechanism entirely.** This is a planner exact-once violation on a
-frame marker, refused at object emission. It has no effect seat, no \`Avail\`
-membership test, and no carrier observation in it.
+One repair, ruled by the Architect. With it, the three programs build and
+run natively, the interpreter agrees on each, and a marker that truly has a
+second consumer still refuses.
 
-## Provenance
+## Acceptance
 
-**Fails at frozen base `21fd46dc`, so it is not caused by the de Bruijn
-binding repair.** Measured per row with `--no-fail-fast`; see the hazard note
-in the D10 handback -- `cargo test` with several `--test` flags is fail-fast
-**per binary**, and a partial run reads as a complete one.
+- **AC-0 (probe, then D0; no build).**
+  - Re-measure the three programs on the landed NEXT-GROUP respin (Check 4).
+  - At the refusal, report the marker's identity, both consuming sites, and
+    the source occurrence each serves.
+  - Propose the repair. Name what the interpreter does on the same term, and
+    which duplicate consumption the fixed plan must still refuse.
+  - The Architect rules before any build.
+- **AC-1.** Both `px7n` rows pass un-ignored on both engines. The double-bind
+  sentinel is replaced by a parity pin: native stdout, exit code and effect
+  count equal the interpreter's (two writes).
+- **AC-2 (control).** Reverting the repair returns each program to the AC-0
+  refusal. A plan that consumes one marker at two sites serving the same
+  occurrence still refuses. Rows outside the three keep their current
+  refusal.
+
+## Stop conditions
+
+- Any kernel, `trusted_base()` or spec change (an operator question).
+- A program needs a second, independent repair behind this one: land what
+  the one repair clears, relabel the rest, and report.
+- **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
+  `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.

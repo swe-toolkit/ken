@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE
 title: "Clear the two rt_escape rows' next native refusal: lower a tree-producing ComputationalMatch whose scrutinee is not a specialized Bool, Nat or constructor, so the escaped-resource and nat-fanout programs build and run natively and agree with the interpreter"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
@@ -36,6 +36,13 @@ Both `rt_escape` rows build natively, run, and match the interpreter.
 - **Unmeasured:** which operand kind reaches the refusal, from which source
   term, and whether `RT-CLOSURE-BOUNDARY-LANE` or another blocker sits
   behind it.
+
+## Symptom inventory
+
+1. The D0b gate was keyed on the outer case set being the ExitCode
+   constructors. At the refusal, the measured outer is Option. The
+   ProcessExitStatus variant was attributed to the ExitCode arms, not
+   measured at the merge (Architect `evt_3v31che9af4x1`; §1a 0 to 1).
 
 ## Deliverable
 

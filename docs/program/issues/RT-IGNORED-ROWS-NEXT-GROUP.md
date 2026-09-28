@@ -1,7 +1,7 @@
 ---
 id: RT-IGNORED-ROWS-NEXT-GROUP
 title: "Clear the next ignored L1 rows: re-measure the first refusal of every remaining unowned ignored runtime row once the owner return protocol lands, then repair the refusal the most rows share"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -87,3 +87,28 @@ chosen first refusal, with no other row changing colour.
   one repair clears.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Landed at `68be6686d` (candidate `7794f1ca3`; the first candidate
+`07eb1971e` was red on PR #4329 and was respun as test-only).
+- **Repair:** host-response routes are keyed per leaf. More than one
+  candidate resolves through the tail table and the descent from the
+  computational match's op binder, and refuses otherwise (Architect
+  `evt_1y9rpazn2sj6j`). This subsumes `RT-HOST-RESPONSE-OCCURRENCE-KEY`.
+- **Cleared:** `compiler_driver.rs:5409`
+  `gate_4a_preparation_and_full_build_are_one_transaction` runs un-ignored,
+  and its exemption entry is retired.
+- **Relabelled with measured next refusals:**
+  - the two `px7n` rows go to `RT-FRAME-MARKER-ONCE`;
+  - `rt_escape` `:654` and `:714` go to
+    `RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE`.
+- **New sentinel:** the checked double bind now reaches admission and
+  refuses at the frame marker. It is pinned as the transition sentinel
+  `checked_double_bind_admits_then_refuses_at_frame_marker`, retired by
+  `RT-FRAME-MARKER-ONCE`.
+- **A1:** native sequential brackets stay refused at the BoundaryCarrier
+  arity check, which is independent of the route selection. That is
+  `RT-NATIVE-SEQUENTIAL-BRACKETS`.
+- **Not relabelled:** `rt_escape:686` and `rt_span_prov_native.rs:355` keep
+  their earlier labels and have no successor yet.
