@@ -614,3 +614,186 @@ comparator only: both return `True`, so an instance that ignores its view and
 returns constant `True` is outside their scope. Existing absent-query rows
 still use helpers. This is a carry item, not a new node or acceptance-criteria
 change.
+
+**Direct-writer census, after item 1** (Steward `evt_6mytrrnr0h1ms`,
+Architect `evt_e25945tdk1gd`). At landed item-1 base
+`701e13472e057467f195fa69bccbee98d786326a`, a lexical scan of all
+`crates/**/*.rs` for the Rust token sequence `globals . insert (` or
+`globals . extend (` (arbitrary whitespace, comments and string literals
+excluded) found **157 source sites**: 94 production `insert` calls, 55 test
+`insert` calls and eight test `extend` calls. The roots included every crate's
+integration tests, `ken-elaborator/src/r_layer_tests`,
+`src/seal2_tests`, and inline `#[cfg(test)]` modules in `src/elab.rs` and
+`src/modules.rs`. No other crate had a site. An independent physical-line
+grep found 144 apparent sites; five were comment/string lookalikes and 18
+real calls split the receiver from `.insert` across lines, yielding 157.
+Each row below is one syntactic writer; loop fan-out and calls through the
+shared helper are not extra sites.
+`ke/` abbreviates `crates/ken-elaborator/`, and `ki/` abbreviates
+`crates/ken-interp/` **in these two tables only**. The independently generated
+scan is `/tmp/lang-direct-writer-population.tsv` (SHA-256
+`da5b17f203e34ef05db460d7d5eb714f6e58c35556cf9b3e9eb4465ce5df3c68`);
+the classified 157-site ledger is
+`/tmp/lang-direct-writer-classification.tsv` (SHA-256
+`de939dd2838bb3e9014a05349bf65677b0f1caa0e7b187da814bfe69b21d8feb`).
+These are additive: the ruled 76-call and 49-pin tables above are unchanged.
+
+`R` denotes a resolution-enabling test writer: it installs, or was written to
+install, a flat identity used by Ken or by a host observer. Its row states the
+actual provider, the current reach boundary and the later migration item.
+`C` denotes a kept control, including literal forgery, intentionally ambient
+negative/positive fixtures, and host-only synthetic mirrors that do **not**
+supply a Ken import. Calling the latter "forgery" would overstate the
+mechanism. A green no-op at an R site means only the stated test or suite
+passed **with every other alias route still enabled**. It does not authorize
+leaving the writer behind or deleting its consumer. Synthetic test-local
+kernel declarations and private TCB escape discriminators have no catalog
+provider to import; their item-8 rows require an exact disposition, not a
+fabricated public route.
+
+**Test writers: complete per-site disposition and disposable result.** For each
+R writer, the source expression was separately replaced by a typed no-op;
+its named baseline test passed 1/1 (22 distinct baseline targets), the
+mutated target executed exactly one test, and the writer was restored to its
+pre-probe SHA-256 before the next run. Sixteen R sites failed 0/1, eight
+passed 1/1. `R` does not mean a migration has landed. `C` sites remain
+unchanged: some are negative/positive controls; others are host-only mirrors,
+not Ken import bypasses. None is a proposed migration probe.
+The per-site result ledger is `/tmp/lang-direct-writer-probe-results.tsv`
+(SHA-256 `b6ccb89464f8ebc1a96e2d37807437b23b08eb385eaa6144f6b3f84d6cdea3b3`);
+`/tmp/lang-direct-writer-probe-<probe>.log` holds the exact command output.
+The first four attempted probes were invalid compile failures caused by the
+probe script leaving a receiver (`env.None`), not by the writer; they are
+retained only as `/tmp/lang-direct-writer-probe-<probe>-invalid-build.log` and
+were replaced by four compile-preserving runs. They are not in the valid
+result count. All source blobs were restored and the final worktree diff
+contains only this issue appendix.
+
+| Site | Method | Class | Provider or control reason | Route/item | Probe, single target |
+|---|---|---|---|---|---|
+| `ke/src/elab.rs:19590` | `insert` | R | synthetic checked ShadowSibling for Ken expression, not catalog | 8: local-fixture ruling | ELAB-19590: RED 0/1 |
+| `ke/src/elab.rs:19888` | `insert` | R | synthetic raw recursiveOwner for elaborator RExpr, not catalog | 8: local-fixture ruling | ELAB-19888: RED 0/1 |
+| `ke/src/modules.rs:4679` | `insert` | C (keep) | host-only extra True alias tests private-roster identity sweep | keep | not mutated |
+| `ke/src/modules.rs:4744` | `insert` | C (keep) | forged Proved floor ID must be refused | keep | not mutated |
+| `ke/src/modules.rs:4864` | `insert` | C (keep) | forged Proved during strict roots load must be refused | keep | not mutated |
+| `ke/src/modules.rs:7363` | `insert` | C (keep) | forged attached-proof key tests file proof selection | keep | not mutated |
+| `ke/src/r_layer_tests/cc6b_path_posix_acceptance.rs:42` | `insert` | R | public Capability.Filesystem.Path.Posix; host bare lookup after source import | 8: host-identity rewrite | CC6b42: RED 0/1 |
+| `ke/src/seal2_tests/producer_closure.rs:642` | `insert` | C (keep) | synthetic unknown ID tests producer-closure refusal | keep | not mutated |
+| `ke/tests/cat1_lawful_functors_package.rs:45` | `insert` | C (keep) | flat cong forged, checked Transport owner must prevail | keep | not mutated |
+| `ke/tests/cat1_lawful_functors_package.rs:49` | `insert` | C (keep) | qualified cong forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/cat1_lawful_functors_package.rs:75` | `insert` | C (keep) | flat bool_and forged, checked LC owner must prevail | keep | not mutated |
+| `ke/tests/cat1_lawful_functors_package.rs:82` | `insert` | C (keep) | qualified bool_and forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/cat3_collections_package.rs:575` | `insert` | R | public Data.Numeric.Nat.Order.min renamed cat3_canonical_min for Ken proof | 3: CAT3 whole function | CAT3-575: RED 0/1 |
+| `ke/tests/cat5_parsing_package.rs:48` | `extend` | R | Core.Classes.LawfulClasses aliases copied after Derived; CAT5 source boundary | 7: CAT5 after BYTES D3; W/H in 8 | CAT5-48: GREEN 1/1 |
+| `ke/tests/cat5_parsing_package.rs:464` | `insert` | C (keep) | flat SourceId forged, Diagnostics owner must prevail | keep | not mutated |
+| `ke/tests/cat5_parsing_package.rs:469` | `insert` | C (keep) | qualified Diagnostics SourceId forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/cat_deque_acceptance.rs:38` | `extend` | R | Data.Collections.Deque flat helper currently has zero callers | 8: retire dormant fixture | DEQUE-38: GREEN 1/1 |
+| `ke/tests/cat_deque_acceptance.rs:141` | `insert` | C (keep) | flat Deque names forged, owned-ID host reads must prevail | keep | not mutated |
+| `ke/tests/cat_deque_acceptance.rs:181` | `insert` | C (keep) | qualified Deque.pushFront forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/cat_derived_filter_membership_law.rs:52` | `insert` | R | Derived.filter/mem and LC.IsTrue/bool_and; four aliases of Derived test 2 | 8: Derived test-2 disposition | DFILTER-52: RED 0/1 |
+| `ke/tests/cat_derived_sort_laws.rs:45` | `insert` | R | Derived count/Perm/insert/sort/laws plus LC IsTrue/bool_or/leq_nat | 3: Derived private sort laws | DSORT-45: RED 0/1 |
+| `ke/tests/cat_map_bool_and_owner.rs:213` | `insert` | C (keep) | Map-qualified host observation rebinds Map-owned IDs; no Ken client read | keep | not mutated |
+| `ke/tests/cat_vec_acceptance.rs:41` | `extend` | R | Data.Vector.Vector public/private operations in Ken test source | 8: Vector owner/public split | VEC-41: RED 0/1 |
+| `ke/tests/cc2_text_codec_numeric_acceptance.rs:42` | `extend` | R | Core.Classes.LawfulClasses only, NOT Derived; checked String keys in CC2 | 2: LC group; door joint control in 8 | CC2-42: GREEN 1/1 |
+| `ke/tests/cc3_parsing_cursor_decoder_acceptance.rs:40` | `extend` | R | Core.Classes.LawfulClasses aliases in CC3 Cursor/Decoder/Diagnostics fixture | 4/6/7 consumers; 8 shared W/H | CC3-40: GREEN 1/1 |
+| `ke/tests/cc4_diagnostic_core_acceptance.rs:41` | `extend` | R | Core.Classes.LawfulClasses aliases in CC4 Diagnostics/Cursor/Parsing fixture | 4/7 consumers; 8 shared W/H | CC4-41: GREEN 1/1 |
+| `ke/tests/cc5_pretty_doc_acceptance.rs:324` | `insert` | C (keep) | flat render forged, checked Doc owner must prevail | keep | not mutated |
+| `ke/tests/cc5_pretty_doc_acceptance.rs:326` | `insert` | C (keep) | qualified Doc.render forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/cc6a_process_arguments_exit_acceptance.rs:59` | `extend` | R | Capability.Process.Arguments flat aliases; checked host read | 8: Process fixture | CC6a-59: RED 0/1 |
+| `ke/tests/cc7_argparse_acceptance.rs:368` | `insert` | C (keep) | flat render forged, checked Doc owner must prevail | keep | not mutated |
+| `ke/tests/cc7_argparse_acceptance.rs:373` | `insert` | C (keep) | qualified Doc.render forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/cc8_env_config_decoder_acceptance.rs:393` | `insert` | C (keep) | flat render forged, checked Doc owner must prevail | keep | not mutated |
+| `ke/tests/cc8_env_config_decoder_acceptance.rs:398` | `insert` | C (keep) | qualified Doc.render forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/es2_acceptance.rs:310` | `insert` | C (keep) | flat Tree forged, checked Map owner must prevail | keep | not mutated |
+| `ke/tests/es2_acceptance.rs:312` | `insert` | C (keep) | flat Map operations forged, checked Map owner must prevail | keep | not mutated |
+| `ke/tests/k3_literal_char_view.rs:19` | `insert` | R | public Data.Collections.Derived.map in checked ASCII Ken source | 3: Derived public import | K3-19: RED 0/1 |
+| `ke/tests/kernel_conv_congruence_closure.rs:43` | `insert` | R | test-local kernel defs installed by install_def, then Ken fixtures read names | 8: local-fixture ruling | KCONV-43: RED 0/1 |
+| `ke/tests/l3_strings_surface_acceptance.rs:36` | `insert` | R | public Data.Numeric.Nat.Order.sub renamed l3_canonical_nat_sub for Ken | 3: L3 whole function | L3-36: RED 0/1 |
+| `ke/tests/l3a_acceptance.rs:311` | `insert` | R | public Data.Collections.Derived.map for map_id Ken source | 3: Derived public import | L3a-311: RED 0/1 |
+| `ke/tests/lang_mod_strict_resolution_d0.rs:180` | `insert` | C (keep) | deliberate AmbientTrue control: D0 ambient path remains accepted | keep | not mutated |
+| `ke/tests/lang_mod_strict_resolution_d1.rs:60` | `insert` | C (keep) | deliberate AmbientTrue control: strict D1 path refuses ambient name | keep | not mutated |
+| `ke/tests/lang_prelude_collections.rs:33` | `insert` | R | public Data.Collections.Derived.map/filter for Ken List client | 3: Derived public imports | PRELUDE-33: RED 0/1 |
+| `ke/tests/lang_prelude_floor_fifteen.rs:280` | `insert` | C (keep) | forged Top floor ID must be refused | keep | not mutated |
+| `ke/tests/lang_qualified_constructors.rs:407` | `insert` | C (keep) | forged ResourceKind.Buffer key must not redirect checked constructor | keep | not mutated |
+| `ke/tests/lang_qualified_constructors.rs:450` | `insert` | C (keep) | forged ResourceKind.Buffer key must not create bare member | keep | not mutated |
+| `ke/tests/lang_qualified_constructors.rs:491` | `insert` | C (keep) | forged ResourceKind.Buffer key must not capture user type name | keep | not mutated |
+| `ke/tests/lang_qualified_constructors.rs:525` | `insert` | C (keep) | forged ResourceKind.Buffer key must not redirect checked imported family | keep | not mutated |
+| `ke/tests/lang_qualified_constructors.rs:629` | `insert` | C (keep) | forged Colour.Red key must not redirect checked constructor | keep | not mutated |
+| `ke/tests/lang_standard_infix_call_completion.rs:715` | `insert` | C (keep) | forged Bar key must not redirect Foo instance head | keep | not mutated |
+| `ke/tests/map_build_acceptance.rs:62` | `insert` | C (keep) | flat Map keys forged, owner check must prevail | keep | not mutated |
+| `ke/tests/map_build_acceptance.rs:67` | `insert` | C (keep) | qualified Map keys forged, owned-ID guard rejects | keep | not mutated |
+| `ke/tests/map_build_acceptance.rs:72` | `insert` | C (keep) | restore Map keys after forgery for next case | keep | not mutated |
+| `ke/tests/map_build_acceptance.rs:293` | `insert` | C (keep) | Map-qualified host binding mirror, no Ken client reads it | keep | not mutated |
+| `ke/tests/map_build_acceptance.rs:376` | `insert` | C (keep) | Map-qualified host binding mirror, no Ken client reads it | keep | not mutated |
+| `ke/tests/map_build_acceptance.rs:1206` | `insert` | C (keep) | forged succ host key must not spoof structural Map check | keep | not mutated |
+| `ke/tests/px8f_buffer_io_surface.rs:374` | `insert` | C (keep) | escape a sealed constructor in host to test closure detector | keep | not mutated |
+| `ke/tests/px8f_buffer_io_surface.rs:391` | `insert` | C (keep) | unknown host ID must make closure detector reject | keep | not mutated |
+| `ke/tests/support/catalog_or.rs:166` | `insert` | R | Core.Logic.OrdResult/Compare qualified providers copied to flat test scope | 2 compare laws; 8 shared fixture | SUP166: RED 0/1 |
+| `ke/tests/support/catalog_or.rs:186` | `extend` | R | catalog_or::expose_module alias door; 76 family invocations classified earlier | 8: remove private door | SUP186: GREEN 1/1 |
+| `ke/tests/support/catalog_or.rs:282` | `insert` | R | public LC.bool_and family restored after LawfulFunctors import control | 8: shared fixture | SUP282: GREEN 1/1 |
+| `ke/tests/support/catalog_or.rs:318` | `insert` | R | public Core.Logic.Transport cong/sym/trans flat fixture aliases | 8: shared fixture | SUP318: GREEN 1/1 |
+| `ki/tests/px8p_checked_buffer.rs:16` | `insert` | R | private prelude resource_release ID fed to Ken escape-discriminator source | 8: private TCB fixture ruling | PX8P-16: RED 0/1 |
+| `ki/tests/px8p_checked_buffer.rs:20` | `insert` | R | private prelude buffer_resource ID fed to Ken escape-discriminator source | 8: private TCB fixture ruling | PX8P-20: RED 0/1 |
+
+The following production writes are **not test fixture aliases**. Their exact
+sites are counted to keep the test/production boundary explicit. Each line
+number is a distinct `insert`; production elaboration, checked prelude
+registration, and the `checked_core` reverse ID→symbol map are not muted or
+scheduled for this test-only WP. The list is exhaustive for these two
+mechanisms across `crates/` at the measured base.
+
+| Production file | Exact `insert` line numbers | Role |
+|---|---|---|
+| `ke/src/bytes.rs` | `57`, `62`, `88`, `103`, `118`, `145`, `194`, `237`, `248`, `274`, `294` | built-in Bytes/String and checked conversions |
+| `ke/src/checked_core.rs` | `140` | reverse GlobalId→symbol map, not a Ken spelling map |
+| `ke/src/conversions.rs` | `134`, `198`, `340` | production conversion registration |
+| `ke/src/data.rs` | `99`, `114`, `298`, `311` | data and constructor registration |
+| `ke/src/decimal_char.rs` | `133` | decimal-character primitive registration |
+| `ke/src/elab.rs` | `12224`, `12329`, `12338`, `12408`, `12545`, `13039`, `13141`, `13424`, `13715`, `13812`, `13898`, `14040`, `14411`, `14575`, `14614`, `14669`, `14764`, `15020`, `15079`, `15098` | checked source declaration and instance registration |
+| `ke/src/foreign.rs` | `176` | foreign declaration registration |
+| `ke/src/lib.rs` | `382` | ElabEnv raw declaration registration |
+| `ke/src/modules.rs` | `269` | production module-qualified binding registration |
+| `ke/src/numbers.rs` | `288`, `304`, `320`, `336`, `405`, `406`, `485`, `489`, `492` | numeric and Bool primitive registration |
+| `ke/src/prelude.rs` | `722`, `723`, `724`, `781`, `782`, `783`, `787`, `788`, `789`, `793`, `797`, `802`, `821`, `837`, `854`, `870`, `882`, `914`, `932`, `977`, `996`, `1015`, `1032`, `1042`, `1132`, `1137`, `1156`, `1180`, `1210`, `1229`, `1248`, `1479`, `1487`, `1489`, `1521`, `1565`, `1760`, `1843`, `2129`, `2164`, `2939`, `2946` | kernel/prelude floor bootstrap |
+
+**No-op attribution and the live-door confounder.** Source-restored full-suite
+controls show CAT5:48 21/21, CC2:42 5/5, CC3:40 6/6, CC4:41 7/7, DEQUE:38
+6/6, shared LC restore SUP282 7/7 and Transport SUP318 7/7 with **only that
+writer** no-opped. Those seven green results do not prove public imports
+suffice: the live `catalog_or::expose_module` still supplies other flat
+aliases. Compare-ord with shared SUP186 no-opped was 1/4: only the already
+migrated Pair/List function passed; `compare_raw`, the structural-law test and
+the non-Bool list test failed on `compare_raw`, `pair_ord_leq`, and
+`list_ord_leq`. All eight baselines passed completely and all were restored.
+The exact full-suite results are
+`/tmp/lang-direct-writer-full-results.tsv` (SHA-256
+`38f79ca12bac71080e5ce7bd52b14ca60974e7323788a7e20c09ebbe4fb15cac`).
+
+A separate **coupled** discriminator no-opped each LC local `extend` together
+with the shared `expose_module` writer, one CC2/CC3/CC4/CAT5 binary at a
+time. Baselines passed 5/5, 6/6, 7/7, 21/21 respectively; coupled runs
+passed 4/5, 0/6, 3/7, 0/21. CC2's failure was explicitly
+`UnresolvedCon compare_char` from **Derived**, not proof that its local
+LawfulClasses writer was needed. Other failures include the per-test
+`leq_nat` controls and deferred private Ken names. This compound probe
+measures fallback reachability, not the independent necessity of an LC
+writer; both subject files were restored byte-identically each time.
+`/tmp/lang-direct-writer-coupled-results.tsv` (SHA-256
+`053ca7bea8f0630e86ec10b51f7c7241fbbc5ac3cc93892b1a92158b65de99f8`)
+and its `/tmp/lang-direct-writer-coupled-<probe>.log` files retain the results.
+
+Decoder provider work landed at `00ffedcfd`; item 6 no longer waits for
+that landing, but still waits for item 5's probe. The CAT5/tier-D item-7
+file collision still waits for BYTES D3. No item 6 or 7 work begins here.
+
+The first-cause single-site reds include public Ken names
+`cat3_canonical_min`, Derived `count`/`map`/`filter`, Vector `Vec`, and private
+PX8p prelude names as `UnresolvedCon`, plus a CC6b missing host `MkPath` and
+a CC6a missing host `process_arguments`. The Derived test-2 no-op first hits
+its preexisting flat host `filter` assertion; **that failure alone does not
+prove** the subsequent Ken `mem`/`IsTrue`/`bool_and` resolutions. Each synthetic
+kernel fixture red is local source/RExpr name resolution, not a catalog export
+failure. Item 2 remains unstarted. Before item 8 can delete the door, its
+owner must disposition every R row together with the per-test W/H controls,
+without deleting the C controls or confusing a local synthetic declaration
+with an importable catalog export. No acceptance criterion changes here.
