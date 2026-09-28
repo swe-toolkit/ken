@@ -73,6 +73,30 @@ Architect, and built, that un-ignores all three rows.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
 
+## Increment 2 pending-Vis capture control (measured)
+
+At the px7f right-denial producer, returned Vis555's capture origin 549
+was replaced, in a disposable control, by its actual K closure. That closure
+carries environment record 1486. With the whole-value guard intact, this
+operand refused `unsupported runtime-IR lowering: Closure`. With the guard
+bypassed, the same operand entered the bind route but independently refused
+`Closure`: record 1486 is not bind-authorized for this emission owner.
+
+A second disposable control substituted the planner's bind-authorized
+seat550 environment record 110 on the same K closure. The intact guard again
+refused `unsupported runtime-IR lowering: Closure`. With the guard bypassed,
+the bind route independently refused `BoundaryClosureEnvironment` because
+record 110 disagrees with the producer's exact emission owner. The fixture
+has three environment records; only 110 and 790 are bind-authorized, and
+neither belongs to this producer's emission owner.
+
+The whole-value guard remains a fail-closed defense in depth, not a
+load-bearing guard on any measured pending-Vis capture. A future pending
+capture with a bind-authorized record for the same emission owner is a
+finding for the Architect, not a silent pass. All disposable mutations were
+restored. This records the Architect's replacement control
+(`evt_1d9s0xdpjak13`); it does not claim a successful bypass.
+
 ## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 
 1. returned-set member Vis388 (owner 578, context 0) has K =

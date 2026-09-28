@@ -2723,7 +2723,9 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 .map(|row| (row.vis_origin(), row.producer_call_origin())),
         )
         .collect::<BTreeSet<_>>();
+    let pending_vis_record_protocol = static_transition_plan.pending_vis_record_protocol()?;
     let mut compiler = Lowering {
+        pending_vis_record_protocol,
         continuation_claims: None,
         fusion_compositions: None,
         static_worker_fields: StaticWorkerFieldLedger::default(),
@@ -15673,6 +15675,9 @@ impl<'a> Lowering<'a> {
                         })));
                     }
                 }
+                self.record_pending_vis_construct(
+                    builder, static_origin, constructor, &lowered_args,
+                )?;
                 if lowered_args
                     .iter()
                     .any(|argument| matches!(argument, LoweringOperand::Carried(_)))

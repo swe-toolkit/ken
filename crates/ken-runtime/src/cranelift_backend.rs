@@ -88,6 +88,7 @@ pub use lowering::units::{
     static_response_owner_body_mutation_is_exact,
     with_retained_unit_call_target_mutation, with_static_response_caller_retarget_mutation,
     with_static_response_owner_body_mutation, with_rt_seed_response_metadata_observations,
+    with_pending_vis_nonmember_mutation, PendingVisNonmemberMutation,
     RetainedUnitCallTargetMutation,
     StaticResponseCallerRetargetMutation, StaticResponseOwnerBodyMutation,
 };
@@ -169,7 +170,11 @@ pub use planning::{
 };
 
 #[cfg(feature = "px8-ds-test-support")]
-pub use lowering::{with_returned_vis_capture_observations, ReturnedVisCaptureObservation};
+pub use lowering::{
+    with_pending_vis_caller_payload_observations, with_pending_vis_owner_frame_observations,
+    with_returned_vis_capture_observations, PendingVisCallerPayloadObservation,
+    PendingVisOwnerFrameObservation, ReturnedVisCaptureObservation,
+};
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::calls::with_placeholder_nonowner_target_mutation;
 

@@ -425,11 +425,278 @@ impl UnitBundle {
 }
 
 impl Lowering<'_> {
+    /// Verify the record's complete direct-store inventory against finalized
+    /// CLIF. A producer capture must store the helper's exact returned word;
+    /// copy-up has its own checked callee-frame provenance, and clearing is
+    /// restricted to the member slot. No other store may address these slots.
+    fn verify_pending_vis_slot_stores(&self, func: &Function) -> Result<(), CraneliftBackendError> {
+        use cranelift_codegen::ir::{InstructionData, Opcode, ValueDef};
+        let error = |why: &str| backend_module(format!(
+            "pending-Vis record-store verifier: {why}",
+        ));
+        let facts = &self.function_local.pending_vis_slot_stores;
+        let sites = &self.function_local.pending_vis_copy_sites;
+        let producers = &self.function_local.pending_vis_producer_sites;
+        let Some(frame) = self.function_local.pending_vis_frame else {
+            if !facts.is_empty() || !sites.is_empty() || !producers.is_empty() {
+                return Err(error("a generated body wrote a record without its frame"));
+            }
+            return Ok(());
+        };
+        let cfg = ControlFlowGraph::with_function(func);
+        let mut dom = cranelift_codegen::dominator_tree::DominatorTree::new();
+        dom.compute(func, &cfg);
+        let mut expected = BTreeMap::new();
+        let mut copied = BTreeMap::new();
+        for site in sites {
+            if site.destination != frame.region
+                || copied.insert((site.call, site.copy_guard), BTreeSet::new()).is_some() {
+                return Err(error("a copy site has the wrong frame or repeats its call"));
+            }
+        }
+        for fact in facts {
+            if expected.insert(fact.inst, fact).is_some() {
+                return Err(error("a record store was recorded twice"));
+            }
+        }
+        let stack_word = |inst, slot, offset| matches!(
+            func.dfg.insts[inst],
+            InstructionData::StackLoad { opcode: Opcode::StackLoad,
+                stack_slot, offset: actual } if stack_slot == slot && i32::from(actual) == offset
+        );
+        let compare_nonzero = |guard, word| {
+            if func.dfg.insts[guard].opcode() != Opcode::Brif {
+                return false;
+            }
+            let Some(&condition) = func.dfg.inst_args(guard).first() else { return false };
+            let ValueDef::Result(compare, _) = func.dfg.value_def(condition) else {
+                return false;
+            };
+            matches!(func.dfg.insts[compare],
+                InstructionData::IntCompareImm { opcode: Opcode::IcmpImm, arg, imm, cond }
+                if arg == word && imm.bits() == 0
+                    && cond == cranelift_codegen::ir::condcodes::IntCC::NotEqual)
+        };
+        for inst in func.layout.blocks().flat_map(|block| func.layout.block_insts(block)) {
+            let args = func.dfg.inst_args(inst);
+            if !args.contains(&frame.slots) {
+                continue;
+            }
+            match func.dfg.insts[inst] {
+                InstructionData::Load { .. } => continue,
+                InstructionData::Store { offset, .. }
+                    if args.get(1) == Some(&frame.slots) => {
+                    let offset = i32::from(offset);
+                    if offset < frame.region.discriminant
+                        || i64::from(offset) >= i64::from(frame.region.frame_bytes) {
+                        continue;
+                    }
+                    let fact = expected.remove(&inst).ok_or_else(||
+                        error("an unaccounted store addresses a pending record slot"))?;
+                    if fact.offset != offset {
+                        return Err(error("a recorded store moved to a different record slot"));
+                    }
+                    let stored = args.first().copied().ok_or_else(||
+                        error("a pending record store has no value"))?;
+                    match fact.source {
+                        PendingVisStoreSource::Captured(word) => {
+                            if offset == frame.region.discriminant || stored != word {
+                                return Err(error("a capture slot did not store the helper result"));
+                            }
+                        }
+                        PendingVisStoreSource::Member(row) => {
+                            let ValueDef::Result(mint, _) = func.dfg.value_def(stored) else {
+                                return Err(error("a member was not minted at its producer"));
+                            };
+                            let exact = i64::from(row.ordinal()) + 1;
+                            if offset != frame.region.discriminant
+                                || !matches!(func.dfg.insts[mint],
+                                    InstructionData::UnaryImm { opcode: Opcode::Iconst, imm }
+                                    if imm.bits() == exact) {
+                                return Err(error("a member is not its producer's exact row"));
+                            }
+                        }
+                        PendingVisStoreSource::Cleared => {
+                            let ValueDef::Result(mint, _) = func.dfg.value_def(stored) else {
+                                return Err(error("the consumed member was not cleared"));
+                            };
+                            if offset != frame.region.discriminant
+                                || !matches!(func.dfg.insts[mint],
+                                    InstructionData::UnaryImm { opcode: Opcode::Iconst, imm }
+                                    if imm.bits() == 0) {
+                                return Err(error("a consumed member is not cleared to zero"));
+                            }
+                        }
+                        PendingVisStoreSource::Copied {
+                            load, source, source_region, source_offset,
+                            call, status_guard, trap_guard, trap_load, trap_offset,
+                            member_load, member_offset, copy_guard,
+                        } => {
+                            let positions = copied.get_mut(&(call, copy_guard))
+                                .ok_or_else(|| error("a copy store has no declared call site"))?;
+                            let site = sites.iter().find(|site|
+                                site.call == call && site.copy_guard == copy_guard)
+                                .ok_or_else(|| error("a copy store has no declared call site"))?;
+                            if site.source != source_region || !positions.insert(offset) {
+                                return Err(error("a copy store repeats a field or changes its source region"));
+                            }
+                            // Position correspondence is checked against the
+                            // two planner regions, not the emitter's recorded
+                            // source offset. A same-shaped sibling capture
+                            // cannot be substituted by changing only the load.
+                            let expected_source = if offset == frame.region.discriminant {
+                                Some(source_region.discriminant)
+                            } else if offset < frame.region.continuation_inputs {
+                                (offset - frame.region.captures)
+                                    .checked_add(source_region.captures)
+                            } else {
+                                (offset - frame.region.continuation_inputs)
+                                    .checked_add(source_region.continuation_inputs)
+                            };
+                            if expected_source != Some(source_offset)
+                                || member_offset != source_region.discriminant {
+                                return Err(error("copy-up changed a record field's position"));
+                            }
+                            let word = func.dfg.inst_results(load).first().copied();
+                            let status = func.dfg.inst_results(call).first().copied();
+                            let trap = func.dfg.inst_results(trap_load).first().copied();
+                            let member = func.dfg.inst_results(member_load).first().copied();
+                            if func.sized_stack_slots[source].size != source_region.frame_bytes {
+                                return Err(error("a copied callee frame has the wrong tail size"));
+                            }
+                            if !stack_word(load, source, source_offset)
+                                || !stack_word(trap_load, source, trap_offset)
+                                || !stack_word(member_load, source, member_offset)
+                                || word != Some(stored) {
+                                return Err(error("a copy store did not use its callee-frame load"));
+                            }
+                            if !status.is_some_and(|status|
+                                compare_nonzero(status_guard, status))
+                                || !trap.is_some_and(|trap|
+                                    compare_nonzero(trap_guard, trap))
+                                || !member.is_some_and(|member|
+                                    compare_nonzero(copy_guard, member))
+                                || !matches!(func.dfg.value_def(status.unwrap()),
+                                    ValueDef::Result(producer, 0) if producer == call) {
+                                return Err(error("copy-up lacks an exact status, Trap or member check"));
+                            }
+                            if !dom.dominates(call, status_guard, &func.layout)
+                                || !dom.dominates(status_guard, trap_guard, &func.layout)
+                                || !dom.dominates(trap_load, trap_guard, &func.layout)
+                                || !dom.dominates(trap_guard, member_load, &func.layout)
+                                || !dom.dominates(member_load, copy_guard, &func.layout)
+                                || (load != member_load
+                                    && !dom.dominates(copy_guard, load, &func.layout))
+                                || !dom.dominates(copy_guard, inst, &func.layout) {
+                                return Err(error("a copy store bypassed its checked callee result"));
+                            }
+                            let status_edges = func.dfg.insts[status_guard]
+                                .branch_destination(&func.dfg.jump_tables);
+                            let trap_edges = func.dfg.insts[trap_guard]
+                                .branch_destination(&func.dfg.jump_tables);
+                            let copy_edges = func.dfg.insts[copy_guard]
+                                .branch_destination(&func.dfg.jump_tables);
+                            if status_edges.get(1).is_none_or(|edge|
+                                !dom.dominates(edge.block(&func.dfg.value_lists), trap_load,
+                                    &func.layout))
+                                || trap_edges.get(1).is_none_or(|edge|
+                                    !dom.dominates(edge.block(&func.dfg.value_lists), member_load,
+                                        &func.layout))
+                                || copy_edges.first().is_none_or(|edge|
+                                    !dom.dominates(edge.block(&func.dfg.value_lists), inst,
+                                        &func.layout)) {
+                                return Err(error("copy-up took a failed status, Trap or member branch"));
+                            }
+                        }
+                    }
+                }
+                // An indirect pointer derived from the frame could hide a
+                // record write from the offset scan. Refuse such a derivation.
+                _ => return Err(error("the pending frame pointer has an untracked use")),
+            }
+        }
+        if !expected.is_empty() {
+            return Err(error("a recorded pending-Vis store was not emitted"));
+        }
+        // A ledger of stores alone cannot detect omitting both a store and
+        // its fact. Start from each call site, then demand every common field
+        // of its two distinct planner regions plus the member discriminant.
+        let positions = |start: i32, bytes: i32|
+            -> Result<BTreeSet<i32>, CraneliftBackendError> {
+            if bytes < 0 || bytes % 8 != 0 {
+                return Err(error("a copy site has an invalid record width"));
+            }
+            (0..bytes / 8).map(|index| {
+                start.checked_add(index * 8)
+                    .ok_or_else(|| error("a copy site offset exhausted"))
+            }).collect()
+        };
+        for site in sites {
+            let source_end = i32::try_from(site.source.frame_bytes)
+                .map_err(|_| error("a copy source frame exceeds addressable range"))?;
+            let dest_end = i32::try_from(site.destination.frame_bytes)
+                .map_err(|_| error("a copy destination frame exceeds addressable range"))?;
+            let mut required = BTreeSet::from([site.destination.discriminant]);
+            required.extend(positions(site.destination.captures,
+                (site.source.continuation_inputs - site.source.captures)
+                    .min(site.destination.continuation_inputs - site.destination.captures))?);
+            required.extend(positions(site.destination.continuation_inputs,
+                (source_end - site.source.continuation_inputs)
+                    .min(dest_end - site.destination.continuation_inputs))?);
+            if copied.get(&(site.call, site.copy_guard)) != Some(&required) {
+                return Err(error("copy-up omitted or added a planned record field"));
+            }
+        }
+        let protocol = self.pending_vis_record_protocol.as_ref()
+            .ok_or_else(|| error("a producer has no checked returned-Vis plan"))?;
+        let mut seen_members = BTreeSet::new();
+        for site in producers {
+            if !seen_members.insert(site.member) {
+                return Err(error("a producer's member store was recorded twice"));
+            }
+            let mut rows = protocol.members.values().filter(|row| row.id() == site.row);
+            let row = rows.next().ok_or_else(|| error("a producer has no exact successor row"))?;
+            if rows.next().is_some() {
+                return Err(error("a producer's successor row is ambiguous"));
+            }
+            let member = facts.iter().find(|fact| fact.inst == site.member)
+                .ok_or_else(|| error("a producer omitted its member store"))?;
+            if member.offset != frame.region.discriminant
+                || !matches!(member.source, PendingVisStoreSource::Member(id) if id == site.row) {
+                return Err(error("a producer changed its member store"));
+            }
+            let capture_offsets = row.captures().iter().enumerate().map(|(index, _)|
+                (frame.region.captures, index))
+                .chain(row.continuation_inputs().iter().enumerate().map(|(index, _)|
+                    (frame.region.continuation_inputs, index)))
+                .map(|(start, index)| {
+                    let delta = index.checked_mul(8).and_then(|value| i32::try_from(value).ok())
+                        .ok_or_else(|| error("a producer capture offset exhausted"))?;
+                    start.checked_add(delta)
+                        .ok_or_else(|| error("a producer capture offset exhausted"))
+                }).collect::<Result<Vec<_>, _>>()?;
+            if site.capture_stores.len() != capture_offsets.len() {
+                return Err(error("a producer omitted a planned record field"));
+            }
+            for (&inst, expected_offset) in site.capture_stores.iter().zip(capture_offsets) {
+                let fact = facts.iter().find(|fact| fact.inst == inst)
+                    .ok_or_else(|| error("a producer omitted a planned record field"))?;
+                if fact.offset != expected_offset
+                    || !matches!(fact.source, PendingVisStoreSource::Captured(_))
+                    || !dom.dominates(inst, site.member, &func.layout) {
+                    return Err(error("a producer changed a planned field or wrote after its member"));
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn record_finished_grafted_spine_function(
         &mut self,
         function: &Function,
         bundle: &UnitBundle,
     ) -> Result<(), CraneliftBackendError> {
+        self.verify_pending_vis_slot_stores(function)?;
         let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
             backend_module(
                 "a generated unit finished without a typed grafted-spine scope".to_string(),
@@ -544,10 +811,21 @@ pub enum StaticResponseOwnerBodyMutation {
     CallAfterAnswerCollapse,
     BypassTrapBeforeResult,
     VaryRet,
-    /// Test-only: send a Vis-tagged response through the Result slot without
-    /// the owner's Ret identity/arity checks, so the consuming trap is live.
+    /// Test-only: inject a Vis carrier past finished-body verification. A
+    /// lawful returned member is driven by the owner loop; a separate unknown-
+    /// member ingress is needed to witness the downstream C2 backstop.
     BypassRetValidationAndReturnVis,
     OmitOwnerDefinition,
+}
+
+/// Construct the same out-of-set member on both sides of the loop guard.
+/// Only `BypassToC2` disables the loop's unknown-member exit; `Refuse` leaves
+/// it intact and witnesses its native failure independently.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PendingVisNonmemberMutation {
+    Refuse,
+    BypassToC2,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -561,6 +839,11 @@ thread_local! {
         std::cell::Cell<Option<StaticResponseOwnerBodyMutation>> =
         const { std::cell::Cell::new(None) };
     static STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static PENDING_VIS_NONMEMBER_MUTATION:
+        std::cell::Cell<Option<PendingVisNonmemberMutation>> =
+        const { std::cell::Cell::new(None) };
+    static PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
 }
 
@@ -616,6 +899,43 @@ pub fn with_static_response_owner_body_mutation<T>(
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_owner_body_mutation_is_exact() -> bool {
     STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_pending_vis_nonmember_mutation<T>(
+    mutation: PendingVisNonmemberMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            PENDING_VIS_NONMEMBER_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    PENDING_VIS_NONMEMBER_MUTATION.with(|slot| {
+        assert_eq!(slot.replace(Some(mutation)), None);
+    });
+    PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications = PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS
+        .with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn claim_pending_vis_nonmember_mutation(
+    eligible: bool,
+) -> Option<PendingVisNonmemberMutation> {
+    PENDING_VIS_NONMEMBER_MUTATION.with(|slot| {
+        let mutation = slot.get()?;
+        if !eligible || PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS
+            .with(|count| count.get() != 0) {
+            return None;
+        }
+        PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(|count| count.set(1));
+        Some(mutation)
+    })
 }
 
 // Test-only E4 observation: the response capture value is loaded by the
@@ -708,6 +1028,9 @@ pub(in crate::cranelift_backend) struct ResolvedUnitTarget {
 #[derive(Clone)]
 pub(in crate::cranelift_backend) struct DeclaredUnitCall {
     pub(in crate::cranelift_backend) function: FuncRef,
+    /// The exact emitted function identity, never inferred from an origin or
+    /// destination ABI. Only a planner-marked protocol chain has a frame tail.
+    pub(in crate::cranelift_backend) frame_owner: Option<PendingVisFrameOwner>,
     /// The callee's scheduling entry -- `RT-CONTSPEC-ACTIVATE` `D1b` keeps
     /// this as the target origin.
     pub(in crate::cranelift_backend) origin: StaticOriginId,
@@ -739,6 +1062,7 @@ impl CallEdgeTargets {
         for target in self.targets_in(caller) {
             let call = DeclaredUnitCall {
                 function: module.declare_func_in_func(target.function, func),
+                frame_owner: Some(PendingVisFrameOwner::Unit(target.callee)),
                 origin: target.origin,
                 call_site_origin: target.call_site_origin,
                 header: target.header,
@@ -941,6 +1265,7 @@ impl CallEdgeTargets {
                 body,
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target.function, func),
+                    frame_owner: Some(PendingVisFrameOwner::Unit(target.callee)),
                     origin: target.origin,
                     call_site_origin: target.call_site_origin,
                     header: target.header,
@@ -1062,6 +1387,7 @@ impl WorkerTargets {
                     *origin,
                     DeclaredUnitCall {
                         function: module.declare_func_in_func(target.function, func),
+                        frame_owner: Some(PendingVisFrameOwner::Unit(target.callee)),
                         origin: target.origin,
                         call_site_origin: target.call_site_origin,
                         header: target.header,
@@ -2752,6 +3078,385 @@ pub(super) fn lower_continuation_selected_case_body(
     Ok(lowered)
 }
 
+/// Emit one validated response effect from an existing response row. Initial
+/// owners and pending-Vis successors use this same lowering, so a successor
+/// does not acquire a second operation/effect or frame-input authority.
+fn lower_static_response_effect(
+    compiler: &mut Lowering<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    row: &StaticResponseContinuation,
+    effect: &RuntimeExpr,
+    operation_arguments: &BTreeMap<StaticOriginId, RuntimeExpr>,
+    frame_inputs: &BTreeMap<StaticResponseFrameSource, LoweringOperand>,
+) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst), CraneliftBackendError> {
+    let frame_operand = |binding: &StaticResponseEnvironmentBinding| {
+        frame_inputs.get(&binding.frame_source()).cloned().ok_or_else(|| {
+            backend_module(format!(
+                "the response environment source {:?} names absent frame input {:?}",
+                binding.source(), binding.frame_source(),
+            ))
+        })
+    };
+    let mut lowered_arguments = BTreeMap::new();
+    let mut effect_environment = Vec::with_capacity(
+        row.effect_environment().len(),
+    );
+    for input in row.effect_environment() {
+        let operand = match input {
+            StaticResponseEffectInput::Frame(binding) => frame_operand(binding)?,
+            StaticResponseEffectInput::BoundedNatToInt {
+                span,
+                span_identity,
+            } => {
+                let span = match frame_operand(span)? {
+                    LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Specialized(_) => {
+                        return Err(backend_module(
+                            "a response BoundedNat conversion span is not carried"
+                                .to_string(),
+                        ));
+                    }
+                };
+                let tag = compiler.emit_carrier_tag(builder, span)?;
+                let expected = i64::try_from(span_identity.tag_abi_word()?).map_err(|_| {
+                    backend_module(
+                        "response span identity exceeds the runtime tag word".to_string(),
+                    )
+                })?;
+                Lowering::require_i64(builder, tag, expected);
+                let fields = compiler.emit_carrier_field_count(builder, span)?;
+                Lowering::require_i64(builder, fields, 3);
+                let length = compiler.emit_carrier_field(builder, span, 2)?;
+                let length_tag = builder.ins().band_imm(
+                    length.word,
+                    crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                );
+                Lowering::require_i64(
+                    builder,
+                    length_tag,
+                    crate::boundary_value::BoundaryTag::ImmediateBoundedNat as i64,
+                );
+                let value = builder.ins().ushr_imm(
+                    length.word,
+                    i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
+                );
+                LoweringOperand::Specialized(
+                    compiler.lower_dynamic_small_int(builder, value),
+                )
+            }
+            StaticResponseEffectInput::OperationArgument {
+                origin,
+                environment,
+            } => {
+                if let Some(lowered) = lowered_arguments.get(origin).cloned() {
+                    lowered
+                } else {
+                    let argument = operation_arguments.get(origin).ok_or_else(|| {
+                        backend_module(
+                            "a mapped response operation argument has no retained source expression"
+                                .to_string(),
+                        )
+                    })?;
+                    let argument_environment = environment
+                        .iter()
+                        .map(|binding| {
+                            frame_operand(binding)
+                                .map(LoweringEnvironmentBinding::Value)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let lowered = compiler.lower_expr(
+                        builder,
+                        SourceOccurrence {
+                            expr: argument,
+                            static_origin: *origin,
+                        },
+                        &argument_environment,
+                    )?;
+                    if lowered_arguments.insert(*origin, lowered.clone()).is_some() {
+                        return Err(backend_module(
+                            "one response operation argument was lowered twice".to_string(),
+                        ));
+                    }
+                    lowered
+                }
+            }
+        };
+        effect_environment.push(LoweringEnvironmentBinding::Value(operand));
+    }
+
+    let response = compiler.lower_expr(
+        builder,
+        SourceOccurrence {
+            expr: effect,
+            static_origin: row.effect_origin(),
+        },
+        &effect_environment,
+    )?;
+    if !matches!(response, LoweringOperand::Specialized(Lowered::HostResult { .. })) {
+        return Err(backend_module(
+            "a specialized response owner did not materialize an exact HostResult"
+                .to_string(),
+        ));
+    }
+    let host_validation_block = builder.current_block().ok_or_else(|| {
+        backend_module(
+            "host response validation left no active response-owner block".to_string(),
+        )
+    })?;
+    let host_validation_end = builder
+        .func
+        .layout
+        .last_inst(host_validation_block)
+        .ok_or_else(|| {
+            backend_module(
+                "host response validation emitted no finished instruction".to_string(),
+            )
+        })?;
+    Ok((response, host_validation_end))
+}
+
+struct SuccessorEffect {
+    row: StaticResponseContinuation,
+    effect: RuntimeExpr,
+    operation_arguments: BTreeMap<StaticOriginId, RuntimeExpr>,
+}
+
+struct PendingVisOwnerCall {
+    row: StaticResponseContinuationId,
+    call: cranelift_codegen::ir::Inst,
+    expected_context: FuncId,
+    host_validation_end: cranelift_codegen::ir::Inst,
+    ret_identity: u64,
+}
+
+struct PendingVisFinishedBody {
+    calls: Vec<PendingVisOwnerCall>,
+    result_store: cranelift_codegen::ir::Inst,
+    returned_word: cranelift_codegen::ir::Value,
+    member_load: cranelift_codegen::ir::Inst,
+    member_branches: Vec<cranelift_codegen::ir::Inst>,
+    member_ids: Vec<StaticResponseContinuationId>,
+    selected_blocks: Vec<cranelift_codegen::ir::Block>,
+    payload_loads: Vec<Vec<cranelift_codegen::ir::Inst>>,
+    placeholder_offset: i32,
+    input_frame: cranelift_codegen::ir::Value,
+    record_discriminant_offset: i32,
+}
+
+/// The initial validated host effect and K call already happened. Every
+/// subsequent iteration is selected by the producer-minted response-row id;
+/// no runtime tag, closure word or allocator chooses a successor target.
+fn emit_pending_vis_owner_loop(
+    compiler: &mut Lowering<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    frame: cranelift_codegen::ir::Value,
+    region: PendingVisFrameRegion,
+    initial: &StaticResponseContinuation,
+    initial_call: cranelift_codegen::ir::Inst,
+    initial_context: FuncId,
+    initial_validation: cranelift_codegen::ir::Inst,
+    returned: CarriedBoundaryWord,
+    successors: &[SuccessorEffect],
+    successor_targets: &BTreeMap<StaticResponseContinuationId, DeclaredUnitCall>,
+    successor_contexts: &BTreeMap<StaticResponseContinuationId, FuncId>,
+    result_offset: i32,
+    placeholder_offset: i32,
+    force_unknown_member: bool,
+    bypass_unknown_to_c2: bool,
+) -> Result<PendingVisFinishedBody, CraneliftBackendError> {
+    if successors.is_empty() {
+        return Err(backend_module("a pending-Vis owner has no successor set".to_string()));
+    }
+    let mut calls = vec![PendingVisOwnerCall {
+        row: initial.id(), call: initial_call, expected_context: initial_context,
+        host_validation_end: initial_validation,
+        ret_identity: initial.k_ret_identity().tag_abi_word()?,
+    }];
+    let result = builder.create_block();
+    builder.append_block_param(result, types::I64);
+    builder.append_block_param(result, types::I64);
+    let first_ret = i64::try_from(initial.k_ret_identity().tag_abi_word()?)
+        .map_err(|_| backend_module("pending-Vis initial Ret tag exceeds range".to_string()))?;
+    let first_ret = builder.ins().iconst(types::I64, first_ret);
+    builder.ins().jump(result, &[returned.word, first_ret]);
+    builder.switch_to_block(result);
+    let returned_word = builder.block_params(result)[0];
+    let expected_ret = builder.block_params(result)[1];
+    let returned = CarriedBoundaryWord { word: returned_word };
+    let actual_tag = compiler.emit_carrier_tag(builder, returned)?;
+    let is_ret = builder.ins().icmp(
+        cranelift_codegen::ir::condcodes::IntCC::Equal, actual_tag, expected_ret,
+    );
+    let ret = builder.create_block();
+    let vis = builder.create_block();
+    builder.ins().brif(is_ret, ret, &[], vis, &[]);
+    builder.switch_to_block(ret);
+    let ret_fields = compiler.emit_carrier_field_count(builder, returned)?;
+    Lowering::require_i64(builder, ret_fields, 1);
+    let result_store = builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
+    let success = builder.ins().iconst(types::I64, 0);
+    builder.ins().return_(&[success]);
+    builder.switch_to_block(vis);
+    let member = builder.ins().load(types::I64, MemFlags::trusted(), frame, region.discriminant);
+    let cranelift_codegen::ir::ValueDef::Result(member_load, _) = builder.func.dfg.value_def(member) else {
+        return Err(backend_module("pending-Vis member is not a finished load".to_string()));
+    };
+    #[cfg(feature = "px8-ds-test-support")]
+    let member = if force_unknown_member {
+        builder.ins().iconst(types::I64, -99)
+    } else { member };
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    let _ = (force_unknown_member, bypass_unknown_to_c2);
+    let mut member_branches = Vec::new();
+    let mut member_ids = Vec::new();
+    let mut member_blocks = Vec::new();
+    for successor in successors {
+        let selected = builder.create_block();
+        let next = builder.create_block();
+        let expected = i64::from(successor.row.id().ordinal()) + 1;
+        let matches = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal, member, expected,
+        );
+        member_branches.push(builder.ins().brif(matches, selected, &[], next, &[]));
+        member_ids.push(successor.row.id());
+        member_blocks.push(selected);
+        builder.switch_to_block(next);
+    }
+    #[cfg(feature = "px8-ds-test-support")]
+    if bypass_unknown_to_c2 {
+        // Test-only: deliberately cross the exact unknown-member exit with
+        // the non-member Vis. The C2 match must trap on this owner-fed value.
+        builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
+        let success = builder.ins().iconst(types::I64, 0);
+        builder.ins().return_(&[success]);
+    } else {
+        let invalid = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[invalid]);
+    }
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    {
+        let invalid = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[invalid]);
+    }
+    let offset_at = |start: i32, ordinal: usize| -> Result<i32, CraneliftBackendError> {
+        let delta = ordinal.checked_mul(8).and_then(|bytes| i32::try_from(bytes).ok())
+            .ok_or_else(|| backend_module("pending-Vis owner payload offset exhausted".to_string()))?;
+        start.checked_add(delta).ok_or_else(|| backend_module(
+            "pending-Vis owner payload exceeds its activation frame".to_string(),
+        ))
+    };
+    let selected_blocks = member_blocks.clone();
+    let mut payload_loads = Vec::new();
+    for (successor, selected) in successors.iter().zip(member_blocks) {
+        builder.switch_to_block(selected);
+        let mut row_loads = Vec::new();
+        let row = &successor.row;
+        // A stale record for an unrelated non-Ret constructor is never an
+        // effect permission. Both the member and its exact Vis identity hold.
+        let vis_identity = compiler.static_transition_plan
+            .constructor_symbol_identity(row.vis_origin())?.tag_abi_word()?;
+        let vis_identity = i64::try_from(vis_identity)
+            .map_err(|_| backend_module("pending-Vis constructor tag exceeds range".to_string()))?;
+        Lowering::require_i64(builder, actual_tag, vis_identity);
+        let fields = compiler.emit_carrier_field_count(builder, returned)?;
+        Lowering::require_i64(builder, fields, 2);
+        let mut inputs = BTreeMap::new();
+        let target = successor_targets.get(&row.id()).ok_or_else(||
+            backend_module("a pending-Vis successor K context was not declared".to_string()))?;
+        if target.header.parameters as usize != row.captures().len() + 1
+            || target.header.captures as usize != row.continuation_inputs().len() {
+            return Err(backend_module(
+                "a pending-Vis successor disagrees with its K-context ABI".to_string(),
+            ));
+        }
+        for (index, capture) in row.captures().iter().enumerate() {
+            if capture.ordinal() as usize != index {
+                return Err(backend_module("pending-Vis capture ordinals are not dense".to_string()));
+            }
+            let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
+                offset_at(region.captures, index)?);
+            if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
+                row_loads.push(inst);
+            }
+            if inputs.insert(StaticResponseFrameSource::Parameter(capture.producer_abi_slot()),
+                LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
+                return Err(backend_module("pending-Vis capture source repeats a destination slot".to_string()));
+            }
+        }
+        for (index, (ordinal, _, abi_position)) in row.continuation_inputs().iter().enumerate() {
+            if *ordinal as usize != index || !target.slots.get(*abi_position as usize)
+                .is_some_and(|slot| slot.kind == AbiSlotKind::Capture && slot.ordinal == *ordinal) {
+                return Err(backend_module(
+                    "pending-Vis continuation input disagrees with the successor ABI".to_string(),
+                ));
+            }
+            let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
+                offset_at(region.continuation_inputs, index)?);
+            if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
+                row_loads.push(inst);
+            }
+            if inputs.insert(StaticResponseFrameSource::Capture(*ordinal),
+                LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
+                return Err(backend_module("pending-Vis continuation input repeats a slot".to_string()));
+            }
+        }
+        // Single-use record: the next K call starts with no pending member.
+        // Its callee's newly minted member is copied up only after Trap checks.
+        let zero = builder.ins().iconst(types::I64, 0);
+        let cleared = builder.ins().store(MemFlags::trusted(), zero, frame, region.discriminant);
+        compiler.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+            inst: cleared, offset: region.discriminant, source: PendingVisStoreSource::Cleared,
+        });
+        let nested = AmbientBodyAuthority::bind(
+            compiler, row.base_owner(), row.effect_source_owner(),
+        );
+        let effect = lower_static_response_effect(
+            compiler, builder, row, &successor.effect,
+            &successor.operation_arguments, &inputs,
+        );
+        nested.release(compiler);
+        let (response, host_validation_end) = effect?;
+        let mut call_inputs = vec![response];
+        for capture in row.captures() {
+            call_inputs.push(inputs.get(&StaticResponseFrameSource::Parameter(
+                capture.producer_abi_slot(),
+            )).cloned().ok_or_else(|| backend_module(
+                "pending-Vis K capture has no recorded parameter".to_string(),
+            ))?);
+        }
+        for (ordinal, _, _) in row.continuation_inputs() {
+            call_inputs.push(inputs.get(&StaticResponseFrameSource::Capture(*ordinal))
+                .cloned().ok_or_else(|| backend_module(
+                    "pending-Vis K continuation input has no recorded capture".to_string(),
+                ))?);
+        }
+        let (next_result, call) = compiler.call_declared_unit_target(
+            builder, target.clone(), &call_inputs, None,
+            #[cfg(test)] None,
+        )?;
+        let LoweringOperand::Carried(next_result) = next_result else {
+            return Err(backend_module("pending-Vis successor K returned a template".to_string()));
+        };
+        let expected_context = successor_contexts.get(&row.id()).copied().ok_or_else(||
+            backend_module("pending-Vis successor has no exact generated K target".to_string()))?;
+        calls.push(PendingVisOwnerCall {
+            row: row.id(), call, expected_context, host_validation_end,
+            ret_identity: row.k_ret_identity().tag_abi_word()?,
+        });
+        let expected_ret = i64::try_from(row.k_ret_identity().tag_abi_word()?)
+            .map_err(|_| backend_module("pending-Vis successor Ret tag exceeds range".to_string()))?;
+        let expected_ret = builder.ins().iconst(types::I64, expected_ret);
+        builder.ins().jump(result, &[next_result.word, expected_ret]);
+        payload_loads.push(row_loads);
+    }
+    Ok(PendingVisFinishedBody {
+        calls, result_store, returned_word, member_load, member_branches,
+        member_ids, selected_blocks, payload_loads,
+        placeholder_offset, input_frame: frame,
+        record_discriminant_offset: region.discriminant,
+    })
+}
+
 struct StaticResponseFinishedBody {
     input_frame: cranelift_codegen::ir::Value,
     placeholder_offset: i32,
@@ -2762,6 +3467,190 @@ struct StaticResponseFinishedBody {
     returned_word: cranelift_codegen::ir::Value,
     response_is_current_host_result: bool,
     ret_abi_word: u64,
+}
+
+/// Check the loop's FINISHED control flow, not just the call handles supplied
+/// during emission. Each incoming edge to the result join must come from one
+/// exact generated K call after its own status and Trap branches. Thus neither
+/// ResultWord nor the pending record is read on an unchecked callee path.
+fn verify_pending_vis_finished_body(
+    func: &Function,
+    facts: &PendingVisFinishedBody,
+    initial: &StaticResponseContinuation,
+    successors: &[SuccessorEffect],
+    region: PendingVisFrameRegion,
+) -> Result<(), CraneliftBackendError> {
+    use cranelift_codegen::ir::{InstructionData, Opcode, ValueDef};
+    let error = |reason: &str| backend_module(format!(
+        "pending-Vis finished-body verifier: {reason}",
+    ));
+    if facts.calls.len() != successors.len() + 1
+        || facts.member_branches.len() != successors.len()
+        || facts.member_ids.len() != successors.len()
+        || facts.selected_blocks.len() != successors.len()
+        || facts.payload_loads.len() != successors.len()
+        || facts.calls[0].row != initial.id()
+        || facts.calls[0].ret_identity != initial.k_ret_identity().tag_abi_word()?
+    {
+        return Err(error("the returned successor set or initial K call is incomplete"));
+    }
+    for inst in func.layout.blocks().flat_map(|block| func.layout.block_insts(block)) {
+        if let InstructionData::Load { offset, .. } = func.dfg.insts[inst] {
+            if i32::from(offset) == facts.placeholder_offset
+                && func.dfg.inst_args(inst).first() == Some(&facts.input_frame) {
+                return Err(error("the owner loaded its parameter-zero placeholder"));
+            }
+        }
+    }
+    let InstructionData::Load { offset, .. } = func.dfg.insts[facts.member_load] else {
+        return Err(error("member discrimination is not a finished frame load"));
+    };
+    if i32::from(offset) != facts.record_discriminant_offset
+        || func.dfg.inst_args(facts.member_load).first() != Some(&facts.input_frame)
+    {
+        return Err(error("member discrimination reads a non-record location"));
+    }
+    let Some(&member_word) = func.dfg.inst_results(facts.member_load).first() else {
+        return Err(error("member load has no word"));
+    };
+    let ValueDef::Param(result_block, 0) = func.dfg.value_def(facts.returned_word) else {
+        return Err(error("the returned K word is not the result join's first parameter"));
+    };
+    if func.dfg.inst_args(facts.result_store).first() != Some(&facts.returned_word)
+        || !matches!(func.dfg.insts[facts.result_store], InstructionData::Store { .. })
+    {
+        return Err(error("the owner stored something other than its Trap-checked K result"));
+    }
+    let cfg = ControlFlowGraph::with_function(func);
+    let mut dom = cranelift_codegen::dominator_tree::DominatorTree::new();
+    dom.compute(func, &cfg);
+    if !dom.dominates(result_block, facts.member_load, &func.layout)
+        || !dom.dominates(result_block, facts.result_store, &func.layout)
+    {
+        return Err(error("a record or Result read bypasses the checked K join"));
+    }
+    let incoming = cfg.pred_iter(result_block).collect::<Vec<_>>();
+    if incoming.len() != facts.calls.len() {
+        return Err(error("a K result reached the join without a selected-row call"));
+    }
+    let mut reached = BTreeSet::new();
+    for edge in incoming {
+        if func.dfg.insts[edge.inst].opcode() != Opcode::Jump {
+            return Err(error("a K result join has a non-call predecessor"));
+        }
+        let dominating = facts.calls.iter().filter(|candidate|
+            dom.dominates(candidate.call, edge.inst, &func.layout)
+        ).collect::<Vec<_>>();
+        let selected = dominating.iter().copied().find(|candidate|
+            dominating.iter().all(|other| other.call == candidate.call
+                || dom.dominates(other.call, candidate.call, &func.layout))
+        ).ok_or_else(|| error("a K result predecessor has no unique latest call"))?;
+        if !reached.insert(selected.row) {
+            return Err(error("one response row entered the K join twice"));
+        }
+        if Lowering::decode_direct_callee(func, selected.call)? != selected.expected_context {
+            return Err(error("a selected response row called a non-exact K context"));
+        }
+        let positions = func.layout.blocks()
+            .flat_map(|block| func.layout.block_insts(block))
+            .enumerate().map(|(index, inst)| (inst, index))
+            .collect::<BTreeMap<_, _>>();
+        if positions[&selected.call] <= positions[&selected.host_validation_end] {
+            return Err(error("a selected K was called before its host effect validation"));
+        }
+        let guards = positions.iter().filter(|(inst, _)| {
+            func.dfg.insts[**inst].opcode() == Opcode::Brif
+                && dom.dominates(selected.call, **inst, &func.layout)
+                && dom.dominates(**inst, edge.inst, &func.layout)
+        }).map(|(inst, _)| *inst).collect::<Vec<_>>();
+        if guards.len() < 2 {
+            return Err(error("a selected K result lacks status then Trap branches"));
+        }
+        let jumps = func.dfg.insts[edge.inst].branch_destination(&func.dfg.jump_tables);
+        let Some(destination) = jumps.first() else {
+            return Err(error("a K result predecessor has no join destination"));
+        };
+        if destination.block(&func.dfg.value_lists) != result_block {
+            return Err(error("a K result predecessor jumps outside the checked join"));
+        }
+        let args = destination.args_slice(&func.dfg.value_lists);
+        let Some((&word, &expected)) = args.first().zip(args.get(1)) else {
+            return Err(error("a K result join is missing its result or exact Ret identity"));
+        };
+        let ValueDef::Result(word_load, _) = func.dfg.value_def(word) else {
+            return Err(error("a K result was not read from its callee frame"));
+        };
+        if func.dfg.insts[word_load].opcode() != Opcode::StackLoad
+            || !guards.iter().all(|guard| dom.dominates(*guard, word_load, &func.layout)) {
+            return Err(error("a K ResultWord was read before the status/Trap checks"));
+        }
+        let ValueDef::Result(expected_inst, _) = func.dfg.value_def(expected) else {
+            return Err(error("a K Ret identity was not minted for its exact row"));
+        };
+        let InstructionData::UnaryImm { opcode: Opcode::Iconst, imm } = func.dfg.insts[expected_inst] else {
+            return Err(error("a K Ret identity is not a literal from its row"));
+        };
+        if imm.bits() != i64::try_from(selected.ret_identity)
+            .map_err(|_| error("a K Ret identity exceeds the word range"))? {
+            return Err(error("a K Ret identity disagrees with the selected row"));
+        }
+    }
+    if facts.calls.iter().any(|call| !reached.contains(&call.row)) {
+        return Err(error("a selected-row K call has no checked result edge"));
+    }
+    for (index, successor) in successors.iter().enumerate() {
+        let row = &successor.row;
+        if facts.calls[index + 1].row != row.id()
+            || facts.calls[index + 1].ret_identity != row.k_ret_identity().tag_abi_word()?
+            || facts.member_ids[index] != row.id()
+        {
+            return Err(error("a successor's K, Ret and member identities disagree"));
+        }
+        let branch = facts.member_branches[index];
+        let destinations = func.dfg.insts[branch].branch_destination(&func.dfg.jump_tables);
+        if destinations.first().map(|dest| dest.block(&func.dfg.value_lists))
+            != Some(facts.selected_blocks[index]) {
+            return Err(error("a member check does not select its recorded successor block"));
+        }
+        let Some(&condition) = func.dfg.inst_args(branch).first() else {
+            return Err(error("a successor branch has no condition"));
+        };
+        let ValueDef::Result(compare, _) = func.dfg.value_def(condition) else {
+            return Err(error("a successor branch does not compare the member"));
+        };
+        let InstructionData::IntCompareImm { opcode: Opcode::IcmpImm, arg, imm, cond } =
+            func.dfg.insts[compare] else {
+            return Err(error("a successor branch is not an exact member comparison"));
+        };
+        if arg != member_word || cond != cranelift_codegen::ir::condcodes::IntCC::Equal
+            || imm.bits() != i64::from(row.id().ordinal()) + 1 {
+            return Err(error("a successor branch did not check its exact nonzero member"));
+        }
+        if facts.payload_loads[index].len()
+            != row.captures().len() + row.continuation_inputs().len() {
+            return Err(error("a successor did not read its complete capture payload"));
+        }
+        for (position, load) in facts.payload_loads[index].iter().enumerate() {
+            if !dom.dominates(branch, *load, &func.layout)
+                || !dom.dominates(facts.selected_blocks[index], *load, &func.layout) {
+                return Err(error("a payload read bypassed its member check"));
+            }
+            let base = if position < row.captures().len() {
+                region.captures + i32::try_from(position * 8).map_err(|_| error("capture offset exhausted"))?
+            } else {
+                region.continuation_inputs + i32::try_from((position - row.captures().len()) * 8)
+                    .map_err(|_| error("continuation input offset exhausted"))?
+            };
+            let InstructionData::Load { offset, .. } = func.dfg.insts[*load] else {
+                return Err(error("a successor payload did not come from its activation frame"));
+            };
+            if i32::from(offset) != base
+                || func.dfg.inst_args(*load).first() != Some(&facts.input_frame) {
+                return Err(error("a successor payload load names an unplanned record slot"));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Validate the response-owner relation from the finished Function rather than
@@ -2948,6 +3837,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         row: StaticResponseContinuation,
         effect: RuntimeExpr,
         operation_arguments: BTreeMap<StaticOriginId, RuntimeExpr>,
+        successors: Vec<SuccessorEffect>,
         offsets: Vec<u32>,
     }
     let mut emissions = Vec::with_capacity(owners.len());
@@ -2987,6 +3877,33 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 );
             }
         }
+        let successors = compiler.pending_vis_record_protocol.as_ref()
+            .and_then(|protocol| protocol.owners.get(&row.id()))
+            .map(|protocol| {
+                protocol.contexts.iter().flat_map(|context| &context.members)
+                    .map(|member| member.successor.as_ref().ok_or_else(||
+                        backend_module("a pending-Vis member has no derived response row".to_string())))
+                    .collect::<Result<Vec<_>, _>>()
+            }).transpose()?.unwrap_or_default();
+        let mut distinct_successors = BTreeMap::new();
+        for successor in successors {
+            distinct_successors.entry(successor.id()).or_insert_with(|| (*successor).clone());
+        }
+        let successors = distinct_successors.into_values().map(|row| {
+            let effect = compiler.retained_body_occurrence(row.effect_origin())?.expr.clone();
+            if !matches!(&effect, RuntimeExpr::Effect { operation, .. } if *operation == row.operation()) {
+                return Err(backend_module("a pending-Vis successor has no exact host effect".to_string()));
+            }
+            let mut operation_arguments = BTreeMap::new();
+            for input in row.effect_environment() {
+                if let StaticResponseEffectInput::OperationArgument { origin, .. } = input {
+                    operation_arguments.entry(*origin).or_insert(
+                        compiler.retained_body_occurrence(*origin)?.expr.clone(),
+                    );
+                }
+            }
+            Ok(SuccessorEffect { row, effect, operation_arguments })
+        }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let (offsets, frame_bytes) = owner.slot_offsets()?;
         if frame_bytes != owner.header().frame_bytes {
             return Err(backend_module(
@@ -2998,6 +3915,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             row,
             effect,
             operation_arguments,
+            successors,
             offsets,
         });
     }
@@ -3075,6 +3993,33 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             &mut function_local.unit_calls,
         )?;
         function_local.declaration_calls = declared_calls.declarations;
+        for successor in &emission.successors {
+            let declared = call_edges.declare_in_func(
+                successor.row.operation_source_owner(), module, &mut func,
+            )?;
+            for (site, call) in declared.static_bodies {
+                if let Some(previous) = function_local.unit_calls.insert(site, call.clone()) {
+                    if previous.origin != call.origin || previous.header != call.header {
+                        return Err(backend_module(
+                            "two pending-Vis effect owners disagree on one generated call target".to_string(),
+                        ));
+                    }
+                }
+            }
+            call_edges.declare_retained_body_targets_in_func(
+                successor.row.operation_source_owner(), module, &mut func,
+                &mut function_local.unit_calls,
+            )?;
+            for (site, call) in declared.declarations {
+                if let Some(previous) = function_local.declaration_calls.insert(site, call.clone()) {
+                    if previous.origin != call.origin || previous.header != call.header {
+                        return Err(backend_module(
+                            "two pending-Vis effect owners disagree on one declaration target".to_string(),
+                        ));
+                    }
+                }
+            }
+        }
         function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
         function_local.raw_worker_calls = function_local.worker_calls.clone();
         function_local.worker_templates = worker_targets.templates().clone();
@@ -3149,6 +4094,9 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     })?;
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target, &mut func),
+                    frame_owner: Some(PendingVisFrameOwner::Continuation(
+                        emission.row.k_specialization(),
+                    )),
                     origin: emission.row.k_body_origin(),
                     call_site_origin: emission.row.k_body_origin(),
                     header: emission.owner.header(),
@@ -3175,6 +4123,19 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         function_local
             .context_calls
             .insert(emission.owner.k_context(), selected_context.clone());
+        let successor_contexts = emission.successors.iter().map(|successor| {
+            let context = bundle.context(successor.row.k_context()).ok_or_else(||
+                backend_module("a pending-Vis successor K context was never generated".to_string()))?;
+            Ok((successor.row.id(), context))
+        }).collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
+        let successor_targets = emission.successors.iter().map(|successor| {
+            let target = declare_response_context_call_in_func(
+                module, &mut func, &compiler.static_transition_plan, bundle,
+                successor.row.k_context(),
+            )?;
+            function_local.context_calls.insert(successor.row.k_context(), target.clone());
+            Ok((successor.row.id(), target))
+        }).collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
         let ambient = AmbientBodyAuthority::bind(
             compiler,
@@ -3182,7 +4143,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             emission.row.effect_source_owner(),
         );
         let mut func_ctx = FunctionBuilderContext::new();
-        let finished_body;
+        let mut finished_body = None;
+        let mut pending_finished = None;
         {
             let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
             let entry = builder.create_block();
@@ -3226,6 +4188,17 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     backend_module("response-owner trap slot offset exceeds range".to_string())
                 })?,
             )?;
+            function_local.bind_pending_vis_frame(
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::ResponseOwner(emission.row.id()),
+                frame,
+                emission.owner.header().frame_bytes,
+            )?;
+            #[cfg(feature = "px8-ds-test-support")]
+            record_pending_vis_owner_frame_observation(
+                emission.row.id(), emission.row.vis_origin(),
+                emission.owner.header().frame_bytes, function_local.pending_vis_frame,
+            );
 
             let mut frame_inputs = BTreeMap::new();
             let mut descriptor_inputs = Vec::new();
@@ -3261,18 +4234,6 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             function_local.static_response_owner = Some(emission.owner.id());
             compiler.function_local = function_local;
 
-            let frame_operand = |binding: &StaticResponseEnvironmentBinding| {
-                frame_inputs
-                    .get(&binding.frame_source())
-                    .cloned()
-                    .ok_or_else(|| {
-                        backend_module(format!(
-                            "the response environment source {:?} names absent frame input {:?}",
-                            binding.source(),
-                            binding.frame_source(),
-                        ))
-                    })
-            };
             let mut context_suffix = Vec::with_capacity(
                 emission.row.captures().len()
                     + emission.row.continuation_inputs().len(),
@@ -3378,121 +4339,10 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 early_returned = Some(returned);
             }
 
-            let mut lowered_arguments = BTreeMap::new();
-            let mut effect_environment = Vec::with_capacity(
-                emission.row.effect_environment().len(),
-            );
-            for input in emission.row.effect_environment() {
-                let operand = match input {
-                    StaticResponseEffectInput::Frame(binding) => frame_operand(binding)?,
-                    StaticResponseEffectInput::BoundedNatToInt {
-                        span,
-                        span_identity,
-                    } => {
-                        let span = match frame_operand(span)? {
-                            LoweringOperand::Carried(word) => word,
-                            LoweringOperand::Specialized(_) => {
-                                return Err(backend_module(
-                                    "a response BoundedNat conversion span is not carried"
-                                        .to_string(),
-                                ));
-                            }
-                        };
-                        let tag = compiler.emit_carrier_tag(&mut builder, span)?;
-                        let expected = i64::try_from(span_identity.tag_abi_word()?).map_err(|_| {
-                            backend_module(
-                                "response span identity exceeds the runtime tag word".to_string(),
-                            )
-                        })?;
-                        Lowering::require_i64(&mut builder, tag, expected);
-                        let fields = compiler.emit_carrier_field_count(&mut builder, span)?;
-                        Lowering::require_i64(&mut builder, fields, 3);
-                        let length = compiler.emit_carrier_field(&mut builder, span, 2)?;
-                        let length_tag = builder.ins().band_imm(
-                            length.word,
-                            crate::boundary_value::BOUNDARY_TAG_MASK as i64,
-                        );
-                        Lowering::require_i64(
-                            &mut builder,
-                            length_tag,
-                            crate::boundary_value::BoundaryTag::ImmediateBoundedNat as i64,
-                        );
-                        let value = builder.ins().ushr_imm(
-                            length.word,
-                            i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
-                        );
-                        LoweringOperand::Specialized(
-                            compiler.lower_dynamic_small_int(&mut builder, value),
-                        )
-                    }
-                    StaticResponseEffectInput::OperationArgument {
-                        origin,
-                        environment,
-                    } => {
-                        if let Some(lowered) = lowered_arguments.get(origin).cloned() {
-                            lowered
-                        } else {
-                            let argument = emission.operation_arguments.get(origin).ok_or_else(|| {
-                                backend_module(
-                                    "a mapped response operation argument has no retained source expression"
-                                        .to_string(),
-                                )
-                            })?;
-                            let argument_environment = environment
-                                .iter()
-                                .map(|binding| {
-                                    frame_operand(binding)
-                                        .map(LoweringEnvironmentBinding::Value)
-                                })
-                                .collect::<Result<Vec<_>, _>>()?;
-                            let lowered = compiler.lower_expr(
-                                &mut builder,
-                                SourceOccurrence {
-                                    expr: argument,
-                                    static_origin: *origin,
-                                },
-                                &argument_environment,
-                            )?;
-                            if lowered_arguments.insert(*origin, lowered.clone()).is_some() {
-                                return Err(backend_module(
-                                    "one response operation argument was lowered twice".to_string(),
-                                ));
-                            }
-                            lowered
-                        }
-                    }
-                };
-                effect_environment.push(LoweringEnvironmentBinding::Value(operand));
-            }
-
-            let response = compiler.lower_expr(
-                &mut builder,
-                SourceOccurrence {
-                    expr: &emission.effect,
-                    static_origin: emission.row.effect_origin(),
-                },
-                &effect_environment,
+            let (response, host_validation_end) = lower_static_response_effect(
+                compiler, &mut builder, &emission.row, &emission.effect,
+                &emission.operation_arguments, &frame_inputs,
             )?;
-            if !matches!(response, LoweringOperand::Specialized(Lowered::HostResult { .. })) {
-                return Err(backend_module(
-                    "a specialized response owner did not materialize an exact HostResult"
-                        .to_string(),
-                ));
-            }
-            let host_validation_block = builder.current_block().ok_or_else(|| {
-                backend_module(
-                    "host response validation left no active response-owner block".to_string(),
-                )
-            })?;
-            let host_validation_end = builder
-                .func
-                .layout
-                .last_inst(host_validation_block)
-                .ok_or_else(|| {
-                    backend_module(
-                        "host response validation emitted no finished instruction".to_string(),
-                    )
-                })?;
             #[cfg(feature = "px8-ds-test-support")]
             let raw_host_result_escape = if body_mutation
                 == Some(StaticResponseOwnerBodyMutation::RawHostResultEscape)
@@ -3653,9 +4503,10 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 }
             };
             // A bypass alone is inconclusive on a source whose real owner
-            // returns Ret. The test-only mutation supplies a Vis carrier of
-            // the source constructor's exact identity and field count. Its
-            // fields are never read: the C2 branch traps on the tag first.
+            // returns Ret. This test-only mutation supplies a Vis carrier of
+            // the source constructor's exact identity and field count. A
+            // planned returned member is driven by the pending-Vis loop; only
+            // the separate non-member ingress reaches the C2 backstop.
             #[cfg(feature = "px8-ds-test-support")]
             let bypass_ret_validation = body_mutation
                 == Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis);
@@ -3680,6 +4531,29 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             } else {
                 returned
             };
+            if !emission.successors.is_empty() {
+                let pending = compiler.function_local.pending_vis_frame.ok_or_else(||
+                    backend_module("a pending-Vis owner has no caller-owned record".to_string()))?;
+                let initial_call = *context_calls.first().ok_or_else(||
+                    backend_module("a pending-Vis owner did not call its first K".to_string()))?;
+                #[cfg(feature = "px8-ds-test-support")]
+                let nonmember_mode = claim_pending_vis_nonmember_mutation(bypass_ret_validation);
+                let (force_unknown_member, bypass_unknown_to_c2) = {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    { (nonmember_mode.is_some(),
+                        nonmember_mode == Some(PendingVisNonmemberMutation::BypassToC2)) }
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    { (false, false) }
+                };
+                pending_finished = Some(emit_pending_vis_owner_loop(
+                    compiler, &mut builder, frame, pending.region,
+                    &emission.row, initial_call, expected_context_target,
+                    host_validation_end, returned, &emission.successors,
+                    &successor_targets, &successor_contexts,
+                    result_offset, placeholder_offset,
+                    force_unknown_member, bypass_unknown_to_c2,
+                )?);
+            } else {
             let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
             #[cfg(feature = "px8-ds-test-support")]
             let ret_abi_word = if body_mutation
@@ -3740,8 +4614,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             };
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().return_(&[zero]);
-            builder.seal_all_blocks();
-            finished_body = StaticResponseFinishedBody {
+            finished_body = Some(StaticResponseFinishedBody {
                 input_frame: frame,
                 placeholder_offset,
                 context_calls,
@@ -3751,29 +4624,47 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 returned_word: application.word.word,
                 response_is_current_host_result,
                 ret_abi_word,
-            };
+            });
+            }
+            builder.seal_all_blocks();
             builder.finalize();
         }
         ambient.release(compiler);
         frame_scope.close(compiler)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
-        // The scoped bypass deliberately violates the finished Ret verifier;
-        // every other mutation and every production emission still runs it.
+        // The test-only Vis ingress bypasses finished-body verification as a
+        // layer, whichever owner arm is emitted. No production build has this
+        // predicate; every owner still runs its exact finished-body verifier.
+        let verify_finished_body = || -> Result<(), CraneliftBackendError> {
+            if let Some(pending) = pending_finished.as_ref() {
+                let region = compiler.pending_vis_record_protocol.as_ref()
+                    .ok_or_else(|| backend_module("the pending-Vis verifier lost the closed plan".to_string()))?
+                    .frame_region(
+                        PendingVisFrameOwner::ResponseOwner(emission.row.id()),
+                        emission.owner.header().frame_bytes,
+                    )?
+                    .ok_or_else(|| backend_module("a pending-Vis owner has no planned record tail".to_string()))?;
+                verify_pending_vis_finished_body(
+                    &func, pending, &emission.row, &emission.successors, region,
+                )?;
+            } else {
+                let ret_only = finished_body.as_ref().ok_or_else(|| backend_module(
+                    "a Ret-only response owner has no finished-body facts".to_string(),
+                ))?;
+                verify_static_response_finished_body(
+                    &func, expected_context_target,
+                    emission.row.k_ret_identity().tag_abi_word()?, ret_only,
+                )?;
+            }
+            Ok(())
+        };
         #[cfg(feature = "px8-ds-test-support")]
         if body_mutation != Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis) {
-            verify_static_response_finished_body(
-                &func, expected_context_target,
-                emission.row.k_ret_identity().tag_abi_word()?, &finished_body,
-            )?;
+            verify_finished_body()?;
         }
         #[cfg(not(feature = "px8-ds-test-support"))]
-        verify_static_response_finished_body(
-            &func,
-            expected_context_target,
-            emission.row.k_ret_identity().tag_abi_word()?,
-            &finished_body,
-        )?;
+        verify_finished_body()?;
         compiler.commit_aggregate_events()?;
         #[cfg(feature = "px8-ds-test-support")]
         if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitOwnerDefinition) {
@@ -3827,6 +4718,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
         worker_capture_count: usize,
         header_parameters: u32,
         header_captures: u32,
+        frame_bytes: u32,
         /// `D8o` — the owner of the source body this specialization lowers: the
         /// continuation's own consumer. ⛔ Carried from the planner view rather
         /// than derived here; it is an existing planner fact reaching the site
@@ -3874,7 +4766,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
         .into_iter()
         .filter(|unit| ordinary_targets.contains(&unit.id()))
         .map(|unit| {
-            let (offsets, _frame_bytes) = unit.slot_offsets()?;
+            let (offsets, frame_bytes) = unit.slot_offsets()?;
             Ok(OwnedContinuationEmission {
                 id: unit.id(),
                 slots: unit.slots().to_vec(),
@@ -3890,6 +4782,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 worker_capture_count: unit.worker_capture_count(),
                 header_parameters: unit.header().parameters,
                 header_captures: unit.header().captures,
+                frame_bytes,
                 consumer_owner: unit.consumer_owner(),
             })
         })
@@ -4192,6 +5085,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 unit.worker_body_origin,
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target, &mut func),
+                    frame_owner: Some(PendingVisFrameOwner::Context(context.id())),
                     // The context EXECUTES that body, so the origin it answers
                     // for is unchanged. ⛔ Read from the CONTEXT, not from the
                     // asking unit: taking it from `unit` is what made
@@ -4289,6 +5183,10 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 i32::try_from(trap_offset).map_err(|_| {
                     backend_module("continuation trap slot offset exceeds range".to_string())
                 })?,
+            )?;
+            function_local.bind_pending_vis_frame(
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Continuation(unit.id), frame, unit.frame_bytes,
             )?;
             compiler.function_local = function_local;
 
@@ -4509,6 +5407,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         offsets: Vec<u32>,
         header_parameters: u32,
         header_captures: u32,
+        frame_bytes: u32,
         checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
     }
     // Own every projected fact before the loop: the projection borrows the plan
@@ -4524,7 +5423,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         .continuation_contexts()?
         .into_iter()
         .map(|context| {
-            let (offsets, _frame_bytes) = context.slot_offsets()?;
+            let (offsets, frame_bytes) = context.slot_offsets()?;
             let raw_owner = context.raw_owner();
             // `D2` — a context whose raw owner has no descriptor is a context
             // whose body has no declared ABI, which is not a binding-order
@@ -4621,6 +5520,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 offsets,
                 header_parameters: context.header().parameters,
                 header_captures: context.header().captures,
+                frame_bytes,
                 checked_ih_generated_entry_access,
             })
         })
@@ -4785,6 +5685,10 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 i32::try_from(trap_offset).map_err(|_| {
                     backend_module("generated context trap slot offset exceeds range".to_string())
                 })?,
+            )?;
+            function_local.bind_pending_vis_frame(
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Context(context.id), frame, context.frame_bytes,
             )?;
             if let Some(access) = &context.checked_ih_generated_entry_access {
                 if access.context() != context.id
@@ -5379,6 +6283,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             fusion_self_edge_identities(fusion.producer_body, fusion.consuming_call);
         let self_edge = DeclaredUnitCall {
             function: module.declare_func_in_func(id, &mut func),
+            frame_owner: Some(PendingVisFrameOwner::Fusion(fusion.id)),
             origin: self_edge_body,
             call_site_origin: self_edge_call_site,
             header: fusion.header,
@@ -5499,6 +6404,10 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 i32::try_from(trap_offset).map_err(|_| {
                     backend_module("fused region trap slot offset exceeds range".to_string())
                 })?,
+            )?;
+            function_local.bind_pending_vis_frame(
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Fusion(fusion.id), frame, fusion.header.frame_bytes,
             )?;
             compiler.function_local = function_local;
             compiler.open_aggregate_events(id)?;
@@ -5865,6 +6774,7 @@ fn redirect_fused_producer_invocations<M: Module>(
     for (fusion, seat, callee_origin, target, header, slots, offsets) in redirects {
         let call = DeclaredUnitCall {
             function: module.declare_func_in_func(target, func),
+            frame_owner: Some(PendingVisFrameOwner::Fusion(fusion)),
             origin: callee_origin,
             call_site_origin: seat,
             header,
@@ -5940,6 +6850,7 @@ pub(super) fn define_root_adapter<M: Module>(
         root_origin,
         DeclaredUnitCall {
             function: module.declare_func_in_func(root_id, &mut func),
+            frame_owner: Some(PendingVisFrameOwner::Unit(root.function())),
             origin: root_origin,
             // The body occurrence, NOT the scheduling entry. They coincide
             // for an ordinary root and deliberately do not when the root body
@@ -6698,6 +7609,11 @@ impl ContinuationClaimLedger {
         // `call_declared_unit_target` consumes. Reusing it is what keeps this
         // on the existing unit-call ABI instead of inventing a second one.
         let units = plan.continuation_units()?;
+        let response_owners = plan.static_response_owner_specializations()?
+            .map_err(|infeasible| backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            )))?;
         let transported = plan
             .checked_ih_environment_transports_owned_by(defining)
             .into_iter()
@@ -6720,10 +7636,30 @@ impl ContinuationClaimLedger {
                         )
                     })?;
                 let (offsets, _frame_bytes) = unit.slot_offsets()?;
+                // A selected continuation token calls the response OWNER, not
+                // its original continuation specialization. The activation
+                // tail belongs to that exact owner; the specialization has no
+                // pending-Vis frame region. Read the same planner-selected
+                // identity used to resolve the FuncId, never the destination
+                // ABI slot or an emitter-local ordinal.
+                let frame_owner = if let Some(owner) = response_owners.iter()
+                    .find(|owner| owner.selected_caller() == identity)
+                {
+                    if owner.header() != unit.header() || owner.slots() != unit.slots() {
+                        return Err(backend_module(
+                            "a selected response owner changed its caller's activation ABI"
+                                .to_string(),
+                        ));
+                    }
+                    PendingVisFrameOwner::ResponseOwner(owner.response())
+                } else {
+                    PendingVisFrameOwner::Continuation(unit.id())
+                };
                 Ok((
                     identity.clone(),
                     DeclaredUnitCall {
                         function: module.declare_func_in_func(*target, func),
+                        frame_owner: Some(frame_owner),
                         origin: unit.continuation_origin(),
                         call_site_origin: unit.continuation_origin(),
                         header: unit.header(),
@@ -7706,6 +8642,7 @@ fn declare_response_context_call_in_func<M: Module>(
     let (offsets, _frame_bytes) = context.slot_offsets()?;
     Ok(DeclaredUnitCall {
         function: module.declare_func_in_func(target, func),
+        frame_owner: Some(PendingVisFrameOwner::Context(context.id())),
         origin: context.worker_body_origin(),
         call_site_origin: context.worker_body_origin(),
         header: context.header(),
@@ -7732,6 +8669,7 @@ pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
             context.id(),
             DeclaredUnitCall {
                 function: module.declare_func_in_func(target, func),
+                frame_owner: Some(PendingVisFrameOwner::Context(context.id())),
                 // The context EXECUTES this body, so the origin it answers for
                 // is unchanged and the source edge it serves is untouched.
                 origin: context.worker_body_origin(),
@@ -8187,6 +9125,10 @@ fn define_unit_body<M: Module>(
                 i32::try_from(trap_offset).map_err(|_| {
                     backend_module("abi trap slot offset exceeds addressable range".to_string())
                 })?,
+            )?;
+            function_local.bind_pending_vis_frame(
+                compiler.pending_vis_record_protocol.as_ref(),
+                PendingVisFrameOwner::Unit(unit.function), slots, unit.frame_bytes,
             )?;
         }
         compiler.function_local = function_local;

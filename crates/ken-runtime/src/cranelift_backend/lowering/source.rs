@@ -1702,6 +1702,9 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         )?;
                                     lowered[position] = environment.into_operand();
                                 }
+                                self.record_pending_vis_construct(
+                                    builder, static_origin, &constructor, &lowered,
+                                )?;
                                 let constructed = if lowered.iter().any(|field| {
                                     matches!(field, LoweringOperand::Carried(_))
                                 }) {

@@ -283,9 +283,11 @@ pub(in crate::cranelift_backend) use super::planning::{
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
-    StaticResponseContinuation, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseContinuation, StaticResponseContinuationId,
+    StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
+    PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
     verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
@@ -972,6 +974,10 @@ impl ArtifactHelpers<'_> {
             worker_templates: BTreeMap::new(),
             context_calls: BTreeMap::new(),
             static_response_owner: None,
+            pending_vis_frame: None,
+            pending_vis_slot_stores: Vec::new(),
+            pending_vis_copy_sites: Vec::new(),
+            pending_vis_producer_sites: Vec::new(),
             driven_deferred_response_effect: None,
             defining_abi_operands: Vec::new(),
             #[cfg(test)]
@@ -1103,6 +1109,61 @@ struct GeneratedContextCaptures {
     operands: Vec<LoweringOperand>,
 }
 
+#[derive(Clone, Copy)]
+struct PendingVisFrame {
+    slots: cranelift_codegen::ir::Value,
+    region: PendingVisFrameRegion,
+}
+
+/// Producer writes, checked copy-up and single-use clearing are the complete
+/// set of writers to a pending record. The finished-function verifier scans
+/// the actual Store instructions, rather than trusting only this ledger.
+#[derive(Clone, Copy)]
+enum PendingVisStoreSource {
+    /// The exact word returned by `carry_pending_vis_capture`.
+    Captured(cranelift_codegen::ir::Value),
+    /// The producer-minted exact, nonzero successor-row discriminant.
+    Member(StaticResponseContinuationId),
+    /// A word loaded from the just-called unit's checked caller-owned frame.
+    Copied {
+        load: cranelift_codegen::ir::Inst,
+        source: cranelift_codegen::ir::StackSlot,
+        source_region: PendingVisFrameRegion,
+        source_offset: i32,
+        call: cranelift_codegen::ir::Inst,
+        status_guard: cranelift_codegen::ir::Inst,
+        trap_guard: cranelift_codegen::ir::Inst,
+        trap_load: cranelift_codegen::ir::Inst,
+        trap_offset: i32,
+        member_load: cranelift_codegen::ir::Inst,
+        member_offset: i32,
+        copy_guard: cranelift_codegen::ir::Inst,
+    },
+    /// The owner consumed the member before invoking its successor K.
+    Cleared,
+}
+
+#[derive(Clone, Copy)]
+struct PendingVisSlotStore {
+    inst: cranelift_codegen::ir::Inst,
+    offset: i32,
+    source: PendingVisStoreSource,
+}
+
+#[derive(Clone, Copy)]
+struct PendingVisCopySite {
+    call: cranelift_codegen::ir::Inst,
+    copy_guard: cranelift_codegen::ir::Inst,
+    source: PendingVisFrameRegion,
+    destination: PendingVisFrameRegion,
+}
+
+struct PendingVisProducerSite {
+    member: cranelift_codegen::ir::Inst,
+    row: StaticResponseContinuationId,
+    capture_stores: Vec<cranelift_codegen::ir::Inst>,
+}
+
 struct FunctionLocalRefs {
     /// Typed identity of the generated body currently being lowered. Root
     /// adapters are deliberately outside the five-family grafted-spine graph.
@@ -1215,6 +1276,14 @@ struct FunctionLocalRefs {
     /// `FuncRef` crosses a function.
     context_calls: BTreeMap<ContinuationContextId, units::DeclaredUnitCall>,
     static_response_owner: Option<StaticResponseOwnerId>,
+    /// Caller-owned record, present only on this frame's planner-derived
+    /// protocol chain. Off-chain functions keep their exact original ABI.
+    pending_vis_frame: Option<PendingVisFrame>,
+    pending_vis_slot_stores: Vec<PendingVisSlotStore>,
+    /// Every checked call that must copy a present record. Recorded before
+    /// individual stores so omitting all stores cannot evade completeness.
+    pending_vis_copy_sites: Vec<PendingVisCopySite>,
+    pending_vis_producer_sites: Vec<PendingVisProducerSite>,
     /// The exact Deferred host-effect occurrence currently dispatched by the
     /// statically unrolled response-owner interpreter. This is scoped around
     /// one host dispatch and restores afterwards; it never makes a sibling
@@ -2521,6 +2590,7 @@ pub(in crate::cranelift_backend) enum GeneratedUnitCallInputCaller {
     SourceLexicalClosureArgument,
     SourceLexicalClosureCapture,
     SourceMachineDeclaredUnit,
+    PendingVisRecordCapture,
 }
 
 /// The planner level named by a generated-unit call-input diagnostic.
@@ -3024,6 +3094,7 @@ struct Lowering<'a> {
     /// pins exactly that, by requiring `CompiledModule: 'static`; give the
     /// artifact a borrowed field and the pin stops compiling.
     static_transition_plan: StaticTransitionPlan<'a>,
+    pending_vis_record_protocol: Option<PendingVisRecordProtocol>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,
@@ -3982,6 +4053,11 @@ pub struct ReturnedVisCaptureObservation {
     pub disposition: Option<String>,
     pub forbidden: bool,
     pub scope: String,
+    /// `Some` only at a pending-record write, not at ordinary K lowering.
+    pub record_member_origin: Option<u32>,
+    /// The result of the *actual* whole-value admissibility walk at that write.
+    /// A Carried input is a passthrough proven by placeholder confinement.
+    pub record_admissible: Option<bool>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -4003,6 +4079,111 @@ pub fn with_returned_vis_capture_observations<T>(
         slot.borrow_mut().take().expect("returned-Vis capture window")
     });
     (result, observations)
+}
+
+/// Test-only evidence from the actual response-owner frame binding, not a
+/// repetition of the planner's proposed width. None means no record tail.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingVisOwnerFrameObservation {
+    pub owner_origin: u32,
+    pub response_id: u32,
+    pub base_frame_bytes: u32,
+    pub frame_bytes: Option<u32>,
+    pub widths: Option<(u32, u32)>,
+}
+
+/// The caller's actual CLIF stack-slot allocation for an exact response-owner
+/// target, read back after allocation rather than inferred from the owner's
+/// separately bound tail or the planner's proposed width.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingVisCallerPayloadObservation {
+    pub response_id: u32,
+    pub base_frame_bytes: u32,
+    pub allocated_bytes: u32,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static PENDING_VIS_OWNER_FRAME_OBSERVATIONS:
+        std::cell::RefCell<Option<Vec<PendingVisOwnerFrameObservation>>> =
+        const { std::cell::RefCell::new(None) };
+    static PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS:
+        std::cell::RefCell<Option<Vec<PendingVisCallerPayloadObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_pending_vis_owner_frame_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<PendingVisOwnerFrameObservation>) {
+    PENDING_VIS_OWNER_FRAME_OBSERVATIONS.with(|slot| {
+        assert!(slot.borrow().is_none(), "pending-Vis owner windows cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = PENDING_VIS_OWNER_FRAME_OBSERVATIONS.with(|slot| {
+        slot.borrow_mut().take().expect("pending-Vis owner window")
+    });
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_pending_vis_caller_payload_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<PendingVisCallerPayloadObservation>) {
+    PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS.with(|slot| {
+        assert!(slot.borrow().is_none(), "pending-Vis caller windows cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS.with(|slot| {
+        slot.borrow_mut().take().expect("pending-Vis caller window")
+    });
+    (result, observations)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_pending_vis_caller_payload_observation(
+    response: StaticResponseContinuationId,
+    base_frame_bytes: u32,
+    allocated_bytes: u32,
+) {
+    PENDING_VIS_CALLER_PAYLOAD_OBSERVATIONS.with(|slot| {
+        if let Some(observations) = slot.borrow_mut().as_mut() {
+            observations.push(PendingVisCallerPayloadObservation {
+                response_id: response.ordinal(), base_frame_bytes, allocated_bytes,
+            });
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_pending_vis_owner_frame_observation(
+    response: StaticResponseContinuationId,
+    owner: StaticOriginId,
+    base_frame_bytes: u32,
+    frame: Option<PendingVisFrame>,
+) {
+    PENDING_VIS_OWNER_FRAME_OBSERVATIONS.with(|slot| {
+        let mut active = slot.borrow_mut();
+        let Some(observations) = active.as_mut() else { return };
+        let widths = frame.map(|frame| {
+            let region = frame.region;
+            (
+                u32::try_from((region.continuation_inputs - region.captures) / 8)
+                    .expect("planned capture width"),
+                (region.frame_bytes - u32::try_from(region.continuation_inputs)
+                    .expect("planned input offset")) / 8,
+            )
+        });
+        observations.push(PendingVisOwnerFrameObservation {
+            owner_origin: owner.ticket_body_ordinal(), response_id: response.ordinal(),
+            base_frame_bytes, frame_bytes: frame.map(|frame| frame.region.frame_bytes),
+            widths,
+        });
+    });
 }
 
 #[derive(Clone)]
@@ -4045,6 +4226,8 @@ fn record_returned_vis_lexical_captures(
             disposition,
             forbidden,
             scope: format!("{scope:?}"),
+            record_member_origin: None,
+            record_admissible: None,
         });
     }
     RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|slot| {
@@ -7227,6 +7410,217 @@ impl<'a> Lowering<'a> {
     /// the whole-graph preflight refuses one that does not. MEASURED: forcing
     /// every source-call input to cross at the program ROOT -- the maximally
     /// wrong coordinate -- leaves the suite at its exact baseline.
+    #[cfg(feature = "px8-ds-test-support")]
+    fn record_pending_vis_capture_observation(
+        &self,
+        member: StaticOriginId,
+        closure: StaticOriginId,
+        origin: StaticOriginId,
+        position: usize,
+        input: &LoweringOperand,
+        admitted: bool,
+    ) {
+        RETURNED_VIS_CAPTURE_OBSERVATIONS.with(|window| {
+            let mut window = window.borrow_mut();
+            let Some(observations) = window.as_mut() else { return };
+            let (variant, disposition) = match input {
+                LoweringOperand::Carried(_) => ("Carried".to_owned(), None),
+                LoweringOperand::Specialized(value) => {
+                    let variant = value.variant();
+                    (format!("{variant:?}"), Some(format!("{:?}", variant.boundary_disposition())))
+                }
+            };
+            observations.push(ReturnedVisCaptureObservation {
+                closure_origin: closure.ticket_body_ordinal(),
+                capture_origin: origin.ticket_body_ordinal(),
+                capture_position: position,
+                variant, disposition,
+                forbidden: !admitted,
+                scope: format!("{:?}", self.function_local.grafted_spine_scope),
+                record_member_origin: Some(member.ticket_body_ordinal()),
+                record_admissible: Some(admitted),
+            });
+        });
+    }
+
+    /// A pending-Vis record stores only boundary-admissible, first-order
+    /// words. Check the entire specialized value *before* carry_call_input:
+    /// transfer_into_carrier has a separate closure-environment binding route.
+    /// On every measured pending-Vis shape this guard is defense in depth:
+    /// the actual closure record is bind-unauthorized, and the authorized
+    /// record has a different emission owner, so that route also refuses.
+    /// A future same-owner bind-authorized capture is an Architect finding.
+    fn carry_pending_vis_capture(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        origin: StaticOriginId,
+        input: LoweringOperand,
+        member: StaticOriginId,
+        closure: StaticOriginId,
+        position: usize,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let _ = (member, closure, position);
+        if let LoweringOperand::Specialized(value) = &input {
+            let admission = value.boundary_transfer_admissibility();
+            #[cfg(feature = "px8-ds-test-support")]
+            self.record_pending_vis_capture_observation(
+                member, closure, origin, position, &input, admission.is_ok(),
+            );
+            admission?;
+        } else {
+            #[cfg(feature = "px8-ds-test-support")]
+            self.record_pending_vis_capture_observation(
+                member, closure, origin, position, &input, true,
+            );
+        }
+        match self.carry_call_input(
+            builder, origin, input,
+            #[cfg(test)]
+            GeneratedUnitCallInputCaller::PendingVisRecordCapture,
+            #[cfg(test)]
+            GeneratedUnitCallInputCallee::Entry(origin),
+        )? {
+            LoweringOperand::Carried(word) => Ok(word),
+            LoweringOperand::Specialized(_) => Err(backend_module(
+                "a pending-Vis capture did not become a carried word".to_string(),
+            )),
+        }
+    }
+
+    /// Mint one producer-origin member and its bounded capture payload. The
+    /// constructor's lowered K operand is the authority for capture *class*;
+    /// the existing successor response row supplies identity, order and ABI.
+    fn record_pending_vis_construct(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        origin: StaticOriginId,
+        constructor: &str,
+        lowered: &[LoweringOperand],
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(row) = self.pending_vis_record_protocol.as_ref()
+            .and_then(|protocol| protocol.members.get(&origin)).cloned() else {
+            return Ok(());
+        };
+        if !constructor.ends_with("::ITree::Vis") || lowered.len() != 2
+            || row.vis_origin() != origin
+        {
+            return Err(backend_module(
+                "a pending-Vis member is not its planned binary Vis occurrence".to_string(),
+            ));
+        }
+        let Some(frame) = self.function_local.pending_vis_frame else {
+            return Err(backend_module(
+                "a pending-Vis construct has no caller-owned activation record".to_string(),
+            ));
+        };
+        let LoweringOperand::Specialized(Lowered::Closure {
+            captures, params, body, ..
+        }) = &lowered[1] else {
+            return Err(backend_module(
+                "a pending-Vis K is not its planned lexical closure".to_string(),
+            ));
+        };
+        if *body != row.k_body_origin() || params.len() != 1
+            || captures.len() != row.captures().len()
+        {
+            return Err(backend_module(
+                "a pending-Vis K disagrees with its exact successor row".to_string(),
+            ));
+        }
+        let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
+            backend_module("a pending-Vis construct has no generated function scope".to_string())
+        })?;
+        let GraftedSpineFunctionScope::ContinuationContext(context_id) = scope else {
+            return Err(backend_module(
+                "a pending-Vis K's continuation inputs lack a context exit".to_string(),
+            ));
+        };
+        if !self.pending_vis_record_protocol.as_ref().is_some_and(|protocol| {
+            protocol.owners.values().any(|owner| owner.contexts.iter().any(|context| {
+                context.context == context_id && context.members.iter().any(|member| member.origin == origin)
+            }))
+        }) {
+            return Err(backend_module(
+                "a pending-Vis construct disagrees with its planned K-context exit".to_string(),
+            ));
+        }
+        let context = self.static_transition_plan.continuation_contexts()?
+            .into_iter().find(|context| context.id() == context_id)
+            .ok_or_else(|| backend_module("a pending-Vis source context was not generated".to_string()))?;
+        let context_captures = context.captures()?;
+        let mut continuation_inputs = Vec::new();
+        for (_destination_ordinal, source, _destination_abi_position) in row.continuation_inputs() {
+            // These are two different ABI planes: the response-row position
+            // names the *destination* owner Capture slot, while the source
+            // coordinate locates this value in the *current* K context.
+            let matches = context_captures.iter()
+                .filter(|capture| capture.coordinate == *source).collect::<Vec<_>>();
+            let [source_capture] = matches.as_slice() else {
+                return Err(backend_module(
+                    "a pending-Vis continuation input has no unique source context capture".to_string(),
+                ));
+            };
+            let source_position = context.parameters().checked_add(source_capture.ordinal)
+                .ok_or_else(|| backend_module("pending-Vis source context position exhausted".to_string()))?;
+            let slot = context.slots().get(source_position as usize)
+                .ok_or_else(|| backend_module("a pending-Vis continuation input has no source slot".to_string()))?;
+            if slot.kind != AbiSlotKind::Capture || slot.ordinal != source_capture.ordinal {
+                return Err(backend_module(
+                    "a pending-Vis continuation input disagrees with its source context Capture slot".to_string(),
+                ));
+            }
+            let operand = self.function_local.defining_abi_operands
+                .get(source_position as usize).cloned()
+                .ok_or_else(|| backend_module("a pending-Vis context has no declared continuation input".to_string()))?;
+            continuation_inputs.push(operand);
+        }
+        let offset_at = |base: i32, index: usize| -> Result<i32, CraneliftBackendError> {
+            let delta = index.checked_mul(8)
+                .and_then(|bytes| i32::try_from(bytes).ok())
+                .ok_or_else(|| backend_module("pending-Vis record offset exhausted".to_string()))?;
+            base.checked_add(delta).ok_or_else(|| backend_module(
+                "pending-Vis record slot exceeds addressable range".to_string(),
+            ))
+        };
+        let mut capture_stores = Vec::new();
+        for (capture, input) in row.captures().iter().zip(captures.iter().cloned()) {
+            let word = self.carry_pending_vis_capture(
+                builder, capture.origin(), input,
+                origin, row.k_closure_origin(), capture.ordinal() as usize,
+            )?;
+            let offset = offset_at(frame.region.captures, capture.ordinal() as usize)?;
+            let inst = builder.ins().store(MemFlags::trusted(), word.word, frame.slots, offset);
+            capture_stores.push(inst);
+            self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+                inst, offset, source: PendingVisStoreSource::Captured(word.word),
+            });
+        }
+        for (index, input) in continuation_inputs.into_iter().enumerate() {
+            let word = self.carry_pending_vis_capture(
+                builder, origin, input,
+                origin, row.k_closure_origin(), row.captures().len() + index,
+            )?;
+            let offset = offset_at(frame.region.continuation_inputs, index)?;
+            let inst = builder.ins().store(MemFlags::trusted(), word.word, frame.slots, offset);
+            capture_stores.push(inst);
+            self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+                inst, offset, source: PendingVisStoreSource::Captured(word.word),
+            });
+        }
+        let member = builder.ins().iconst(types::I64, i64::from(row.id().ordinal()) + 1);
+        let inst = builder.ins().store(MemFlags::trusted(), member, frame.slots,
+            frame.region.discriminant);
+        self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+            inst, offset: frame.region.discriminant,
+            source: PendingVisStoreSource::Member(row.id()),
+        });
+        self.function_local.pending_vis_producer_sites.push(PendingVisProducerSite {
+            member: inst, row: row.id(), capture_stores,
+        });
+        Ok(())
+    }
+
     fn carry_call_input(
         &mut self,
         builder: &mut FunctionBuilder<'_>,

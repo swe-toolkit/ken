@@ -43,6 +43,51 @@ fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
     observation
 }
 
+/// Promise class: durable invariant. The interpreter and native owner must
+/// perform the same ordered effect sequence and return the same terminal
+/// result on an identical checked program. Neither side supplies the other's
+/// expected trace; removing the pending-Vis protocol restores a native trap.
+fn run_with_interpreter(name: &str, source: &str) -> (
+    ken_runtime::EffectObservation,
+    ken_runtime::EffectObservation,
+) {
+    let dir = output_dir(name);
+    std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
+    let output = ken_cli::build_native_program(
+        source, ken_cli::SourceFormat::Ken, name, dir.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    ).expect("checked PX7-F program compiles to the linked native artifact");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &output.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: dir.path().to_owned(),
+            plan_hash: output.plan_transport_hash,
+        },
+    ).expect("the linked PX7-F native child runs");
+    let mut host = ken_interp::PosixHost::new_at(dir.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        source, ken_cli::SourceFormat::Ken, &[], &[],
+        dir.path().as_os_str().as_encoded_bytes(), &mut host,
+    ).expect("the PX7-F source runs in the interpreter");
+    (native, interpreted)
+}
+
+fn assert_exact_operation_and_terminal_parity(
+    native: &ken_runtime::EffectObservation,
+    interpreted: &ken_runtime::EffectObservation,
+) {
+    assert_eq!(native.effect_trace, interpreted.effect_trace,
+        "every host operation, request, outcome and its order must agree");
+    assert_eq!(native.terminal_exit, interpreted.terminal_exit,
+        "the terminal exit class must agree");
+    assert_eq!(native.terminal_error, interpreted.terminal_error,
+        "the terminal error must agree");
+    assert_eq!(native.exit_status, interpreted.exit_status,
+        "the terminal status must agree");
+}
+
 const ESCAPE_CLOSED: &str = r#"program capabilities FS AFull
 fn escape_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
@@ -440,9 +485,8 @@ fn bounded_epoch_refuses_before_the_checked_program_issues_an_effect() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that. Re-measured at 310bf4f21: owner Vis StaticOriginId(578) fails the Ret-tag check at lowering/units.rs:3663-3671."]
 fn linked_public_right_denial_preserves_exact_masks() {
-    let observation = run("right-denial", RIGHT_NOT_HELD);
+    let (observation, interpreted) = run_with_interpreter("right-denial", RIGHT_NOT_HELD);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
     assert!(observation.effect_trace.iter().any(|event| matches!(
         event.outcome,
@@ -453,6 +497,7 @@ fn linked_public_right_denial_preserves_exact_masks() {
             }
         ))
     )));
+    assert_exact_operation_and_terminal_parity(&observation, &interpreted);
 }
 
 #[cfg(target_os = "linux")]
@@ -460,9 +505,8 @@ fn linked_public_right_denial_preserves_exact_masks() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-PX7F-LINKED-PUBLIC-ROWS: require_i64(ret_tag, expected_ret) in define_static_response_owner_bodies rejects the response-K carrier because the planner expects the immediate Ret identity while the conforming grafted continuation returns Vis. This refusal is terminal here: RT-PLANNER-KRET-GRAFTED-SPINE is parked at structural stop 16 because preserving that Vis and its lexical K across the generated boundary has no lawful existing representation; no live node owns the next step and this node established that. Re-measured at 310bf4f21: owner Vis StaticOriginId(609) fails the Ret-tag check at lowering/units.rs:3663-3671."]
 fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
-    let observation = run("double-release", DOUBLE_RELEASE);
+    let (observation, interpreted) = run_with_interpreter("double-release", DOUBLE_RELEASE);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
     assert_eq!(observation.terminal_error, None);
     let releases = observation
@@ -500,13 +544,18 @@ fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
         1,
         "the owned descriptor is actually closed exactly once"
     );
+    assert_exact_operation_and_terminal_parity(&observation, &interpreted);
 }
 
-/// Promise class: transition sentinel. This pins fixture-local planner origins
-/// until pending-Vis emission is installed. MEASURED: returned source origins,
-/// forwarded-call fixpoint, derived rows, effect seats and actual K captures.
-/// CLAIMED: both px7f owners need only static-operation successors.
-/// THE GAP: emission still must carry and resume them; ignored rows remain red.
+/// Promise class: transition sentinel for fixture-local planner origins;
+/// the independent caller-allocation/owner-region relation is durable.
+/// MEASURED: returned source origins, derived rows, actual K captures, and
+/// the emitted owner region against the caller's actual CLIF payload slot.
+/// CLAIMED: each selected px7f owner call allocates exactly its closed-chain
+/// frame, including the record tail. THE GAP: matching planner widths to the
+/// owner's binding alone misses caller under-allocation; this pin joins the
+/// separate emitted call payload by response identity. The two executable
+/// differentials and finished-body verifier cover effect and record behavior.
 #[cfg(target_os = "linux")]
 #[test]
 fn owner_vis_return_protocol_px7f_planned_fixpoints() {
@@ -519,14 +568,19 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     ];
     for &(label, source, owner, expected) in fixtures {
         let dir = output_dir(label);
-        let ((compiled, plans), captures) = ken_runtime::with_returned_vis_capture_observations(|| {
-            ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
-                    source, ken_cli::SourceFormat::Ken, label, dir.path(),
-                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                )
-            })
-        });
+        let ((((compiled, plans), captures), frames), callers) =
+            ken_runtime::with_pending_vis_caller_payload_observations(|| {
+                ken_runtime::with_pending_vis_owner_frame_observations(|| {
+                    ken_runtime::with_returned_vis_capture_observations(|| {
+                        ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                            ken_cli::build_native_program(
+                                source, ken_cli::SourceFormat::Ken, label, dir.path(),
+                                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                            )
+                        })
+                    })
+                })
+            });
         let _output = compiled.expect("static-operation fixture compiles without execution");
         let observed = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
             .filter(|protocol| protocol.owner_origin == owner).collect::<Vec<_>>();
@@ -543,6 +597,38 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
             (*context, members.iter().map(|member| member.origin).collect::<BTreeSet<_>>())
         ).collect::<BTreeMap<_, _>>();
         assert_eq!(actual, expected, "{label}: actual returned-origin fixpoint");
+        let owner_frames = frames.iter().filter(|frame| frame.owner_origin == owner)
+            .collect::<Vec<_>>();
+        assert_eq!(owner_frames.len(), 1,
+            "{label}: actual response-owner frame was not emitted exactly once");
+        let expected_capture_width = observed.contexts.iter()
+            .flat_map(|(_, members)| members)
+            .map(|member| member.capture_origins.len())
+            .max().expect("a protocol has a nonempty successor set");
+        let width = owner_frames[0].widths.expect("the active owner needs a record tail");
+        assert_eq!(usize::try_from(width.0).unwrap(), expected_capture_width,
+            "{label}: owner capture tail must match its own successor fixpoint");
+        let expected_input_width = observed.contexts.iter()
+            .flat_map(|(_, members)| members)
+            .map(|member| member.continuation_input_count
+                .expect("a returned member needs one existing response row"))
+            .max().expect("a protocol has a successor row");
+        assert_eq!(usize::try_from(width.1).unwrap(), expected_input_width,
+            "{label}: owner input tail must match its own successor fixpoint");
+        let owner_frame = owner_frames[0];
+        let incoming = callers.iter().filter(|call|
+            call.response_id == owner_frame.response_id).collect::<Vec<_>>();
+        assert_eq!(incoming.len(), 1,
+            "{label}: selected response-owner call must allocate one payload: {callers:?}");
+        let incoming = incoming[0];
+        assert_eq!(incoming.base_frame_bytes, owner_frame.base_frame_bytes,
+            "{label}: selected caller and owner disagree on base frame size");
+        let bound = owner_frame.frame_bytes.expect("active owner binds a record tail");
+        let expected_bytes = owner_frame.base_frame_bytes + 8 * (1 + width.0 + width.1);
+        assert_eq!(bound, expected_bytes, "{label}: owner region does not fit its widths");
+        assert_eq!(incoming.allocated_bytes, bound,
+            "{label}: selected caller did not allocate its owner's record tail");
+        eprintln!("RT-OWNER-VIS FRAME {label} owner={owner} widths={width:?} all={frames:?} caller={incoming:?}");
         for (_, members) in &observed.contexts {
             for member in members {
                 assert!(!member.relay, "{label}: a returned member needs relay representation");
@@ -552,6 +638,7 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
                 let k_origin = member.k_origin.expect("derived row names K closure origin");
                 let actual_captures = captures.iter().filter(|capture| {
                     capture.closure_origin == k_origin
+                        && capture.record_member_origin.is_none()
                         && capture.scope.contains("ContinuationContext")
                 }).collect::<Vec<_>>();
                 assert!(!actual_captures.is_empty(),
@@ -566,24 +653,85 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
                     .collect::<BTreeSet<_>>();
                 assert_eq!(actual_origins, planned_origins,
                     "{label}: lowering and planner disagree on K capture population");
+                let written = captures.iter().filter(|capture|
+                    capture.record_member_origin == Some(member.origin)
+                        && capture.capture_position < member.capture_origins.len()
+                ).collect::<Vec<_>>();
+                assert!(!written.is_empty(),
+                    "{label}: no producer-origin record write reached the returned Vis");
+                assert!(written.iter().all(|capture| capture.record_admissible == Some(true)),
+                    "{label}: a record capture bypassed admissibility: {written:?}");
+                let written_origins = written.iter().map(|capture| capture.capture_origin)
+                    .collect::<BTreeSet<_>>();
+                assert_eq!(written_origins, planned_origins,
+                    "{label}: the record did not carry the exact derived K captures");
+                eprintln!("RT-OWNER-VIS RECORD {label} member={} captures={written:?}",
+                    member.origin);
             }
         }
     }
     let dir = output_dir("escape-protocol-empty-control");
-    let (compiled, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-        ken_cli::build_native_program(
-            ESCAPE_CLOSED, ken_cli::SourceFormat::Ken, "escape-protocol-empty-control",
-            dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-        )
-    });
+    let (((compiled, plans), frames), callers) =
+        ken_runtime::with_pending_vis_caller_payload_observations(|| {
+            ken_runtime::with_pending_vis_owner_frame_observations(|| {
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_cli::build_native_program(
+                        ESCAPE_CLOSED, ken_cli::SourceFormat::Ken,
+                        "escape-protocol-empty-control", dir.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    )
+                })
+            })
+        });
     let _output = compiled.expect("unaffected owner compiles");
     let protocols = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
         .collect::<Vec<_>>();
     let empty = protocols.iter().find(|protocol| protocol.error.is_none()
         && !protocol.excluded_by_relay && !protocol.contexts.is_empty()
         && protocol.contexts.iter().all(|(_, members)| members.is_empty()));
-    assert!(empty.is_some(), "unaffected empty-successor owner was not exercised: {protocols:?}");
-    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?}");
+    let empty = empty.unwrap_or_else(||
+        panic!("unaffected empty-successor owner was not exercised: {protocols:?}"));
+    let empty_owner = plans.iter().flat_map(|plan| &plan.all_static_response_rows)
+        .find(|row| row.vis_origin == empty.owner_origin)
+        .expect("the empty-successor protocol belongs to a generated response owner");
+    let empty_frames = frames.iter().filter(|frame|
+        frame.owner_origin == empty_owner.vis_origin).collect::<Vec<_>>();
+    assert_eq!(empty_frames.len(), 1,
+        "empty-successor owner was not emitted exactly once: {frames:?}");
+    assert!(empty_frames.iter().all(|frame| frame.widths.is_none()
+        && frame.frame_bytes.is_none()),
+        "an owner with no successors acquired a record tail: {frames:?}");
+    let incoming = callers.iter().filter(|call|
+        call.response_id == empty_frames[0].response_id).collect::<Vec<_>>();
+    assert_eq!(incoming.len(), 1,
+        "empty-successor owner call was not emitted exactly once: {callers:?}");
+    assert_eq!(incoming[0].base_frame_bytes, empty_frames[0].base_frame_bytes,
+        "empty-successor caller and owner disagree on base frame size");
+    assert_eq!(incoming[0].allocated_bytes, empty_frames[0].base_frame_bytes,
+        "empty-successor caller acquired an unplanned tail");
+    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?} frames={frames:?} caller={incoming:?}");
+}
+
+/// Promise class: durable invariant. An owner whose generated K result is
+/// loaded before the Trap branch must be rejected by the pending-Vis finished
+/// CLIF verifier, not merely by a Ret-only verifier or a runtime trap.
+#[cfg(target_os = "linux")]
+#[test]
+fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
+    let dir = output_dir("right-denial-unchecked-k-result");
+    let (compiled, applications) = ken_runtime::with_static_response_owner_body_mutation(
+        ken_runtime::StaticResponseOwnerBodyMutation::BypassTrapBeforeResult,
+        || ken_cli::build_native_program(
+            RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken,
+            "right-denial-unchecked-k-result", dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        ),
+    );
+    assert_eq!(applications, 1, "the pending-Vis owner must receive the K mutation");
+    let error = compiled.expect_err("an unchecked K result must not emit an object");
+    assert!(format!("{error:?}").contains(
+        "pending-Vis finished-body verifier: a selected K result lacks status then Trap branches"
+    ), "the exact pending-Vis verifier must refuse: {error:?}");
 }
 
 /// Promise class: durable invariant. MEASURED: the same licensed placeholder
