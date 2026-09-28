@@ -2745,6 +2745,47 @@ pub theorem decoder_recursive_succeeds
             next
             holds
             (decoder_lt_self_suc (cursor_remaining c el loc ops cur))
+
+pub theorem decoder_many_rejected_succeeds
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (step : Decoder c loc a)
+      (cur : c)
+      (at : loc)
+      (rejected : Equal
+        (DecoderResult c loc a)
+        (step cur)
+        (DecoderFailed c loc a (DecoderRejected loc at)))
+    : Equal
+        (DecoderResult c loc (List a))
+        (decoder_many c el loc a ops step cur)
+        (Decoded c loc (List a) (Nil a) cur) =
+  decoder_nat_elim
+    (λn.
+      Equal Nat (cursor_remaining c el loc ops cur) n
+      → Equal
+        (DecoderResult c loc (List a))
+        (decoder_many_fuel c el loc a ops step n cur)
+        (Decoded c loc (List a) (Nil a) cur))
+    (cursor_remaining c el loc ops cur)
+    (λremaining_is_zero.
+      decoder_many_zero_result_matches c el loc a ops step cur Zero remaining_is_zero)
+    (λn2 ignored.
+      decoder_many_fuel_outcome_matches
+        c
+        el
+        loc
+        a
+        ops
+        step
+        (Suc n2)
+        cur
+        (DecoderFailed c loc a (DecoderRejected loc at))
+        rejected)
+    Refl
 ```
 
 ## 3. Using it
@@ -2766,6 +2807,8 @@ internally rather than exposing a caller fuel budget.
 supplies a layer step that succeeds when recursive calls on strictly smaller
 cursors succeed. The theorem quantifies over no failure result, and neither
 publishes the fuel recursor nor equates it with a re-seeded recursive decoder.
+`decoder_many_rejected_succeeds` returns an empty list without advancing when
+its step rejects at the current cursor; the rejection's location is arbitrary.
 
 ## 4. Design notes
 
@@ -2789,8 +2832,10 @@ and fuel-exhaustion locations valid; `decoder_recursive_preserves` inducts over
 its private fuel and uses a layer-preservation premise. The success-only
 `decoder_recursive_succeeds` inducts over the same private fuel with a checked
 strict-order bound; its zero-fuel branch contradicts the client's positive
-remaining premise. Neither this package nor its proof dependencies add an axiom
-or primitive.
+remaining premise. `decoder_many_rejected_succeeds` instead splits on the
+private repetition fuel, using the zero-remaining branch or the step's
+rejection to prove an empty result. Neither this package nor its proof
+dependencies add an axiom or primitive.
 
 ## 7. Package  summary
 
@@ -2799,6 +2844,7 @@ with `Decoded` and `DecoderFailed`, `Decoder`, location projection, and the
 pure, failure, bind, sequence, alternative, predicate-token, repetition, and
 recursive combinators consumed by downstream packages. `DecoderPreserves`,
 `DecoderNonBacktrackable`, the two `alt` branch equations, the eight combinator
-preservation theorems, and `decoder_recursive_succeeds` form the checked public
-proof interface. The older semantic equations, `DecoderManyConsumesAllLaw`,
-both fuel recursors, and the new fuel and order lemmas stay private.
+preservation theorems, `decoder_recursive_succeeds`, and
+`decoder_many_rejected_succeeds` form the checked public proof interface. The
+older semantic equations, `DecoderManyConsumesAllLaw`, both fuel recursors, and
+the private fuel and order lemmas stay private.
