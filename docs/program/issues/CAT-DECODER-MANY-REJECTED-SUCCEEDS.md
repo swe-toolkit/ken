@@ -1,7 +1,7 @@
 ---
 id: CAT-DECODER-MANY-REJECTED-SUCCEEDS
 title: "Publish decoder_many_rejected_succeeds in Capability.Parsing.Decoder: when the step rejects at the current cursor, decoder_many decodes Nil there without consuming, so BYTES D3 can prove spaces_decoder succeeds on printed input through the sealed many fuel"
-status: active
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -60,3 +60,11 @@ laws. No Decoder definition changes.
   the verbatim error.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed at `b0d07b46f` (candidate `c6a7cb7ce`). `pub theorem
+decoder_many_rejected_succeeds` is Decoder's one new public name, and its
+proof matches the Architect's ruling token for token. Trust is unchanged,
+and both mutations are refused on a current build. AC-3, the `spaces_decoder`
+consumer, lands with BYTES D3.
