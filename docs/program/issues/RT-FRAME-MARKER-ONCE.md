@@ -59,6 +59,16 @@ double bind runs natively with the interpreter's observation.
    keyed on the marker key, not on activation-event identity, and it carried
    an invented re-entry positive with no reachable shape (Architect
    `evt_11hdhkc9zp2wg`, on hard stop `evt_1yd2ay3s2d7r`).
+2. Terminal classification by emitter registration assumed ledger access at
+   every abort emitter (the static `require_*` family, about 146 callers). It
+   was keyed on emitter provenance instead of the ABI status the Function
+   returns (Architect `evt_1chmsz4k1se05`, on hard stop `evt_1hy1fsf51wkrc`).
+3. Mutation acceptance assumed one rule per control. Rules (a), (b) and (d)
+   overlap on `control.rs:807`, so the rule set was never executed against
+   its own controls (Architect `evt_1ew4w7jzdz1cm`, on hard stop
+   `evt_750pw6w085aev`). The shared predicate: the rulings specified rules and
+   acceptance without running them against the concrete controls and
+   populations they govern. Research advisory requested at stop 3.
 
 ## Deliverable
 
