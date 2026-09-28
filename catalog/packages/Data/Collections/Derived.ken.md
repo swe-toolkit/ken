@@ -1909,7 +1909,7 @@ theorem derived_reject_cat3_wrong_take_drop
           (take Bool (Suc Zero) (Cons Bool True (Nil Bool)))
           (drop Bool (Suc Zero) (Cons Bool True (Nil Bool))))
         (Nil Bool) =
-  Proved
+  take_drop_decomposition Bool (Suc Zero) (Cons Bool True (Nil Bool))
 ```
 
 ```ken example
