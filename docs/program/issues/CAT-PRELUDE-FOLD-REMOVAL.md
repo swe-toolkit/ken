@@ -34,6 +34,12 @@ catalog definition or has none.
   consumer. Test, r-layer, example and conformance consumers are unmeasured.
   The word `fold` appears widely in prose, so the census is by resolved
   identity, not by grep.
+- **Carry, a separate commit:** `Capability/Parsing/Decoder.ken.md:241-243`
+  still says the recursive equation exposes "the zero-fuel failure". Since
+  `CAT-DECODER-RECURSIVE-FUEL-SEED` (`16ec25aea`), the equation passes
+  `Suc (cursor_remaining ...)` and always reduces to the layer arm. Correct
+  the sentence to the checked definition; the wording is the owner's call
+  (Adversary `evt_rm498t04afxk`). No definition changes.
 - **Out of scope:** `zip` and `Prod` (runtime and ABI keyed; an L2 floor
   question), and `And`/`and_*`/`is_sorted` (`CAT-AND-SORTED-PRELUDE-MOVE`).
 
