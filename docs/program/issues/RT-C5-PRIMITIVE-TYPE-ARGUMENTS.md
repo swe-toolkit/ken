@@ -1,7 +1,7 @@
 ---
 id: RT-C5-PRIMITIVE-TYPE-ARGUMENTS
 title: "Give closed primitive type constants a comparable interpreter value, so C5 cast regularity fires on applied types with Int, String or other primitive arguments instead of returning Unknown on a closed, hole-free program"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -62,3 +62,21 @@ identity, distinct from `Neutral`. Scalar index values (`Int`, `Bool`,
 - Any kernel, `trusted_base()` or spec change (an operator question).
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Landed at `235b8cefe` (PR #4319, candidate `cf915732e`). `eq_type_eq` in
+`crates/ken-interp/src/eval.rs` gained `Str` and `Float`/`Float32` arms,
+the floats compared by bits. So a closed reflexive cast over an applied type
+with a primitive argument now evaluates to its value on the interpreter.
+Trust is unchanged.
+
+Carries:
+- **Native half deferred** (Architect `evt_23q2tzd5xxghf`). The native
+  engine refuses the convoy at the `CheckedCoreBodyView`
+  `UnsupportedDependentMotive` gate, before it reaches C5.
+  `crates/ken-cli/tests/rt_c5_primitive_type_native_gate.rs` pins that
+  refusal. The native `Int` and `String` convoy rows are owed by whichever WP
+  lifts that gate; no node owns it yet.
+- **Compound and higher-order indices** (stop 1, `evt_7nf6ds3er67t1`) are
+  placed in `RT-C5-COMPOUND-HIGHER-ORDER-INDICES`.

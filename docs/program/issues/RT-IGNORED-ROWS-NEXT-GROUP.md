@@ -1,7 +1,7 @@
 ---
 id: RT-IGNORED-ROWS-NEXT-GROUP
 title: "Clear the next ignored L1 rows: re-measure the first refusal of every remaining unowned ignored runtime row once the owner return protocol lands, then repair the refusal the most rows share"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
