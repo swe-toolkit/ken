@@ -1,7 +1,7 @@
 ---
 id: CAT-DECODER-RECURSIVE-SUCCEEDS
 title: "Publish a success-only recursion principle for decoder_recursive in Capability.Parsing.Decoder, proved by strong induction on the private fuel recursor, so a recursive client parser can prove that its decoder succeeds on printed input -- the enabler BYTES D3's printer round trip needs"
-status: active
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -69,3 +69,11 @@ private fuel lemma. No Decoder definition or error constructor changes.
   Architect.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed at `00ffedcfd` (the replay of `bc92bba84`, whose Full CI red was one
+Z3 adapter test on no changed path). `pub theorem decoder_recursive_succeeds`
+is Decoder's one new public name, backed by four private lemmas. Trust is
+unchanged. The AC-2 client witnesses only applicability, as its THE GAP line
+says, so BYTES D3 is the first consumer to use a cursor-sensitive `spec`.
