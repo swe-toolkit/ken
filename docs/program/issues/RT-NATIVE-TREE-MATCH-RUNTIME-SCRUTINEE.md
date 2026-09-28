@@ -37,6 +37,13 @@ Both `rt_escape` rows build natively, run, and match the interpreter.
   term, and whether `RT-CLOSURE-BOUNDARY-LANE` or another blocker sits
   behind it.
 
+## Symptom inventory
+
+1. The D0b gate was keyed on the outer case set being the ExitCode
+   constructors. At the refusal, the measured outer is Option. The
+   ProcessExitStatus variant was attributed to the ExitCode arms, not
+   measured at the merge (Architect `evt_3v31che9af4x1`; §1a 0 to 1).
+
 ## Deliverable
 
 The two rows run green and un-ignored natively, with the interpreter
