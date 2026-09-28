@@ -1295,6 +1295,7 @@ impl<'a> Lowering<'a> {
                 builder.switch_to_block(rejected);
                 let failure = builder.ins().iconst(types::I64, -1);
                 builder.ins().return_(&[failure]);
+                self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                 builder.switch_to_block(arm);
                 Self::require_i64(builder, arity, expected_arity as i64);
                 if expected_arity != 0 {
@@ -1380,6 +1381,7 @@ impl<'a> Lowering<'a> {
             builder.switch_to_block(test_block);
             let failure = builder.ins().iconst(types::I64, -1);
             builder.ins().return_(&[failure]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             let Some(merge) = merge else {
                 let unreachable_continuation = builder.create_block();
                 builder.switch_to_block(unreachable_continuation);
@@ -1435,6 +1437,7 @@ impl<'a> Lowering<'a> {
                 let Some((index, case)) = case else {
                     let failure = builder.ins().iconst(types::I64, -1);
                     builder.ins().return_(&[failure]);
+                    self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                     continue;
                 };
                 if case.binders != fields.len() {
@@ -1533,6 +1536,7 @@ impl<'a> Lowering<'a> {
                 else {
                     let failure = builder.ins().iconst(types::I64, -1);
                     builder.ins().return_(&[failure]);
+                    self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                     continue;
                 };
                 let arm_env = env_with([payload], env);
@@ -1789,6 +1793,7 @@ impl<'a> Lowering<'a> {
                     Err(_owned_default) => {
                         let failure = builder.ins().iconst(types::I64, -4);
                         builder.ins().return_(&[failure]);
+                        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                         test_block = next;
                         continue;
                     }
@@ -1830,6 +1835,7 @@ impl<'a> Lowering<'a> {
                 .ins()
                 .iconst(types::I64, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
             builder.ins().return_(&[malformed]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             let Some(merge) = merge else {
                 let unreachable_continuation = builder.create_block();
                 builder.switch_to_block(unreachable_continuation);
@@ -2738,6 +2744,7 @@ impl<'a> Lowering<'a> {
             };
             let status = self.emit_current_trap(builder, trap)?;
             builder.ins().return_(&[status]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             Ok(true)
         }
 }
