@@ -322,6 +322,7 @@ fn owner_vis_verifier_bypass_drives_a_returned_member() {
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[test]
 fn owner_nonmember_refuses_at_the_loop_before_c2() {
+    use std::os::unix::process::ExitStatusExt;
     let dir = output_dir("px7m-unknown-member-refusal");
     let ((output, bypass_applications), nonmember_applications) =
         ken_runtime::with_pending_vis_nonmember_mutation(
