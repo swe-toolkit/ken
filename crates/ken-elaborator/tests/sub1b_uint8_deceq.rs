@@ -8,30 +8,58 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::Decl;
+use ken_kernel::{Decl, GlobalId};
 const BYTES_KEYS: &str =
     include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
 
-fn dependency_env() -> ElabEnv {
+fn dependency_env() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base env");
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("LawfulClasses provider must roots-load");
     catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
-    env
+    (env, lawful_owned)
 }
 
-fn env_with_bytes_keys() -> ElabEnv {
-    let mut env = dependency_env();
+fn env_with_bytes_keys() -> (ElabEnv, Vec<GlobalId>) {
+    let (mut env, lawful_owned) = dependency_env();
     env.elaborate_ken_md_file(BYTES_KEYS)
         .expect("BytesKeys package");
-    env
+    (env, lawful_owned)
 }
 
-fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
+fn lawful_id(env: &ElabEnv, lawful_owned: &[GlobalId], name: &str) -> GlobalId {
+    catalog_or::provider_owned_id(env, lawful_owned, "Core.Classes.LawfulClasses", name)
+        .unwrap_or_else(|error| panic!("{name} must belong to the loaded class owner: {error}"))
+}
+
+fn assert_transparent_globals(env: &ElabEnv, lawful_owned: &[GlobalId], names: &[&str]) {
+    let dec_eq_class = env
+        .class_env
+        .class("DecEq")
+        .expect("DecEq must remain a checked class")
+        .projection
+        .type_id;
+    assert!(
+        lawful_owned.contains(&dec_eq_class),
+        "DecEq must remain a checked class owned by LawfulClasses"
+    );
     for name in names {
-        let id = env.globals[*name];
+        let id = if let Some(head) = name.strip_prefix("DecEq_instance_") {
+            let instance = env
+                .class_env
+                .instance_search("DecEq", head)
+                .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
+            assert!(
+                lawful_owned.contains(&instance),
+                "DecEq {head} must resolve to a LawfulClasses-owned dictionary"
+            );
+            instance
+        } else {
+            lawful_id(env, lawful_owned, name)
+        };
         assert!(
             env.env.transparent_body(id).is_some(),
             "{name} must be a real kernel-checked transparent declaration"
@@ -52,8 +80,14 @@ fn make_store(env: &ElabEnv) -> EvalStore {
     store
 }
 
-fn eval_bytes_deceq(env: &ElabEnv, store: &mut EvalStore, left: &[u8], right: &[u8]) -> bool {
-    let id = env.globals["bytes_deceq_eq"];
+fn eval_bytes_deceq(
+    env: &ElabEnv,
+    store: &mut EvalStore,
+    lawful_owned: &[GlobalId],
+    left: &[u8],
+    right: &[u8],
+) -> bool {
+    let id = lawful_id(env, lawful_owned, "bytes_deceq_eq");
     let function = match env.env.lookup(id) {
         Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
         other => panic!("expected transparent bytes_deceq_eq, got {other:?}"),
@@ -93,6 +127,8 @@ fn ac1_trusted_base_delta_is_exactly_uint8_int_retract() {
     );
 }
 
+/// Promise class: durable checked-identity invariant. The real BytesKeys
+/// client reaches LawfulClasses-owned checked dictionaries with no new trust.
 #[test]
 fn ac2_ac3_catalog_derivation_adds_zero_trust_and_has_real_laws() {
     let extracted =
@@ -102,7 +138,7 @@ fn ac2_ac3_catalog_derivation_adds_zero_trust_and_has_real_laws() {
         "BytesKeys checked Ken must contain zero Axiom literals"
     );
 
-    let mut env = dependency_env();
+    let (mut env, lawful_owned) = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_ken_md_file(BYTES_KEYS)
         .expect("BytesKeys package");
@@ -113,6 +149,7 @@ fn ac2_ac3_catalog_derivation_adds_zero_trust_and_has_real_laws() {
     );
     assert_transparent_globals(
         &env,
+        &lawful_owned,
         &[
             "uint8_to_int_injective",
             "uint8_deceq_eq",
@@ -128,9 +165,11 @@ fn ac2_ac3_catalog_derivation_adds_zero_trust_and_has_real_laws() {
     );
 }
 
+/// Promise class: durable behavior invariant. Owner-resolved byte equality
+/// distinguishes equal, unequal, prefix, and invalid byte sequences.
 #[test]
 fn ac4_deceq_bytes_decides_raw_bytes_non_vacuously() {
-    let env = env_with_bytes_keys();
+    let (env, lawful_owned) = env_with_bytes_keys();
     let mut store = make_store(&env);
     for (name, left, right, expected) in [
         (
@@ -149,7 +188,7 @@ fn ac4_deceq_bytes_decides_raw_bytes_non_vacuously() {
         ("sub1b_prefix", &[0xff][..], &[0xff, 0x00][..], false),
         ("sub1b_invalid_pair", &[0xff][..], &[0xfe][..], false),
     ] {
-        let actual = eval_bytes_deceq(&env, &mut store, left, right);
+        let actual = eval_bytes_deceq(&env, &mut store, &lawful_owned, left, right);
         assert_eq!(actual, expected, "{name} produced the wrong decision");
     }
 }

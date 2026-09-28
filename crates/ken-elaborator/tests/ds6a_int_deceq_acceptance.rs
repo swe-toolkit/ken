@@ -59,11 +59,31 @@ fn expected_field_proj(id: ken_kernel::GlobalId, idx: usize) -> Term {
 // `Ord Char` transport.
 // ─────────────────────────────────────────────────────────────────────────
 
+/// Promise class: durable checked-identity invariant. Owner-resolved DecEq
+/// Char projects DecEq Int's fields and adds no fresh trust.
 #[test]
 fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
-    let env = mk_env_with_package();
-    let id = env.globals["DecEq_instance_Char"];
-    let dec_eq_int_id = env.globals["DecEq_instance_Int"];
+    let mut env = mk_env_with_package();
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("the LawfulClasses owner must roots-load in this environment");
+    let class_id = env
+        .class_env
+        .class("DecEq")
+        .expect("DecEq must remain a checked class")
+        .projection
+        .type_id;
+    assert!(lawful_owned.contains(&class_id), "DecEq must be owned by LawfulClasses");
+    let instance_id = |head: &str| {
+        let id = env
+            .class_env
+            .instance_search("DecEq", head)
+            .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
+        assert!(lawful_owned.contains(&id), "DecEq {head} must belong to LawfulClasses");
+        id
+    };
+    let id = instance_id("Char");
+    let dec_eq_int_id = instance_id("Int");
     assert!(matches!(env.env.lookup(id), Some(KernelDecl::Transparent { .. })));
     let (_, body) = env
         .env

@@ -10,7 +10,7 @@
 mod catalog_or;
 
 use ken_elaborator::{trusted_base_delta, ElabEnv};
-use ken_kernel::env::Decl;
+use ken_kernel::{env::Decl, GlobalId};
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
@@ -20,6 +20,14 @@ fn mk_env() -> ElabEnv {
     env
 }
 
+fn mk_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
+    let mut env = mk_env();
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("LawfulClasses must return its checked IDs in the same comparison environment");
+    (env, lawful_owned)
+}
+
 fn assert_bool_reduces(env: &mut ElabEnv, name: &str, expression: &str, expected: &str) {
     env.elaborate_decl(&format!("const {name} : Bool = {expression}"))
         .unwrap_or_else(|e| panic!("{name} must elaborate: {e}"));
@@ -27,6 +35,23 @@ fn assert_bool_reduces(env: &mut ElabEnv, name: &str, expression: &str, expected
         "theorem {name}_reduces : Equal Bool {name} {expected} = Proved"
     ))
     .unwrap_or_else(|e| panic!("{name} must reduce to {expected}: {e}"));
+}
+
+fn assert_bool_reduces_with_ord(
+    env: &mut ElabEnv,
+    name: &str,
+    ty: &str,
+    expression: &str,
+    expected: &str,
+) {
+    env.elaborate_decl(&format!(
+        "const {name} : Bool where Ord {ty} = {expression}"
+    ))
+    .unwrap_or_else(|error| panic!("{name} must resolve public Ord {ty}: {error}"));
+    env.elaborate_decl(&format!(
+        "theorem {name}_reduces : Equal Bool {name} {expected} = Proved"
+    ))
+    .unwrap_or_else(|error| panic!("{name} must reduce to {expected}: {error}"));
 }
 
 fn assert_ord_result_reduces(env: &mut ElabEnv, name: &str, expression: &str, expected: &str) {
@@ -88,69 +113,132 @@ fn raw_compare_discriminates_all_results_and_strict_negatives() {
     );
 }
 
+/// Promise class: durable behavior invariant. Client-resolved canonical Ord
+/// Pair/List dictionaries distinguish head, tail, and prefix lexicography.
 #[test]
 fn pair_and_list_instances_compute_lexicographically() {
-    let mut env = mk_env();
-    let pair_ord = "Ord_instance_Pair Bool Bool Ord_instance_Bool Ord_instance_Bool";
-    let list_ord = "Ord_instance_List Bool Ord_instance_Bool";
+    let (mut env, lawful_owned) = mk_env_with_lawful_owned();
+    env.elaborate_file("import Core.Classes.LawfulClasses (Ord)")
+        .expect("the comparison client must import public Ord");
+    let pair_ord = "d";
+    let list_ord = "d";
 
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "pair_head_lt",
+        "(Pair Bool Bool)",
         &format!("({pair_ord}).leq (mk_pair Bool Bool False True) (mk_pair Bool Bool True False)"),
         "True",
     );
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "pair_head_gt",
+        "(Pair Bool Bool)",
         &format!("({pair_ord}).leq (mk_pair Bool Bool True False) (mk_pair Bool Bool False True)"),
         "False",
     );
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "pair_equal_head_tail_lt",
+        "(Pair Bool Bool)",
         &format!("({pair_ord}).leq (mk_pair Bool Bool True False) (mk_pair Bool Bool True True)"),
         "True",
     );
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "pair_equal_head_tail_gt",
+        "(Pair Bool Bool)",
         &format!("({pair_ord}).leq (mk_pair Bool Bool True True) (mk_pair Bool Bool True False)"),
         "False",
     );
 
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "list_prefix_lt",
+        "(List Bool)",
         &format!(
             "({list_ord}).leq (Cons Bool False (Nil Bool)) (Cons Bool False (Cons Bool True (Nil Bool)))"
         ),
         "True",
     );
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "list_prefix_gt",
+        "(List Bool)",
         &format!(
             "({list_ord}).leq (Cons Bool False (Cons Bool True (Nil Bool))) (Cons Bool False (Nil Bool))"
         ),
         "False",
     );
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "list_head_lt",
+        "(List Bool)",
         &format!(
             "({list_ord}).leq (Cons Bool False (Cons Bool True (Nil Bool))) (Cons Bool True (Nil Bool))"
         ),
         "True",
     );
-    assert_bool_reduces(
+    assert_bool_reduces_with_ord(
         &mut env,
         "list_head_gt",
+        "(List Bool)",
         &format!(
             "({list_ord}).leq (Cons Bool True (Nil Bool)) (Cons Bool False (Cons Bool True (Nil Bool)))"
         ),
         "False",
     );
+
+    let ord_class = env
+        .class_env
+        .class("Ord")
+        .expect("checked Ord class")
+        .projection
+        .type_id;
+    assert!(
+        lawful_owned.contains(&ord_class),
+        "LawfulClasses must own Ord"
+    );
+    for (head, names) in [
+        (
+            "Pair",
+            [
+                "pair_head_lt",
+                "pair_head_gt",
+                "pair_equal_head_tail_lt",
+                "pair_equal_head_tail_gt",
+            ],
+        ),
+        (
+            "List",
+            [
+                "list_prefix_lt",
+                "list_prefix_gt",
+                "list_head_lt",
+                "list_head_gt",
+            ],
+        ),
+    ] {
+        let instance = env
+            .class_env
+            .instance_search("Ord", head)
+            .unwrap_or_else(|| panic!("Ord {head} must remain registered"));
+        assert!(
+            lawful_owned.contains(&instance),
+            "Ord {head} must be LC-owned"
+        );
+        for name in names {
+            let references = catalog_or::declaration_references(
+                env.env
+                    .lookup(env.globals[name])
+                    .expect("the checked order vector must exist"),
+            );
+            assert!(
+                references.contains(&instance),
+                "{name} must resolve the owner-checked Ord {head} instance"
+            );
+        }
+    }
 }
 
 #[test]

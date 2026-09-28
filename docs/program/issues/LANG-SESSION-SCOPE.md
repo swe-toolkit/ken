@@ -442,9 +442,141 @@ The generic `expose_module` inventory does not claim that every call targets
 LawfulClasses or Derived, or that each caller consumes every private name.
 The mechanism sweep also found a separate CC6a `expose_module_aliases` for
 Capability modules and an unused local Deque `expose_module` definition;
-neither is a caller of `catalog_or::expose_module`. Per-name caller
-classification remains due before final door deletion. This census changes
-no acceptance criteria.
+neither is a caller of `catalog_or::expose_module`. This census changes no
+acceptance criteria.
+
+**Per-name `catalog_or` door classification** (Architect
+`evt_2pwssda6rb5rx`, amended `evt_1cgncc9j8w2n2`; Steward
+`evt_6x7jz7hz6kg9d`, corrected `evt_dj5m6f5x4eke`). The independent sweep
+on routed d3 `d3e7beaa8fc487a8da32d4ffe63017caf4b03c66` counted all 76
+invocations: 16 `_many`, four single wrappers, 14 Derived fixtures, 38
+external `expose_module` calls and four internal calls. The eight local
+reach sites of the tier-D generic wrapper are separately enumerated.
+The initial per-invocation consumed-name table, with each source file:line,
+exposed module, and reached names, is `/tmp/lang-session-catalog-or-per-call.tsv`
+(SHA-256 `267d11ee8c5178e46ec5c44f2d952a9f481af58165efbc31e53c036b3c0d9b18`;
+convo `evt_ssydn1ky0jtd`). A later lexical audit corrected only the
+already-public names in the deferred `cat5_parsing_package.rs:77` row:
+`/tmp/lang-session-catalog-or-per-call-audited.tsv` (SHA-256
+`87c9bfb2a2809ee63d738e6d14b9ce9e7c502a6a214e4dee14dbb2f02f22f683`;
+convo `evt_1250608g5rrcy`). The original Architect-reviewed table remains
+unchanged. The correction adds existing-public Parsing names, removes the
+unread `span_origin` from that row, and changes no private row, count, or
+item-1 scope. A second, no-op-door and dynamic-host-loop audit added six
+reached-name groups at already counted invocations, not new calls or pins:
+private LC `compare_bool_cases` reached through DS1's helper; public LC
+String-key names read dynamically in CC2; public LC `Eq`, `DecEq`, `Ord`, and
+`bool_or` read dynamically in ES4; the public Doc `render` used by CC7's
+help-growth snippet; and public Derived
+`bytes_nat_length` used in SUB1's Ken expression. The separate additive
+`/tmp/lang-session-catalog-or-additive.tsv` (SHA-256
+`9ab059f0642689e3318094d80e2bb820f1b05b4189cc8ae52153bd7b7fe72b06`;
+following discovery `evt_4vyxgzndatjen`) records each test function and site,
+plane, and checked-ID route. Neither the ruled 76-row original nor the
+49-pin table was overwritten.
+
+The table distinguishes `W`, a public flat alias removed by a fixture to
+prove an import; `P`, an existing-public name read through a flat alias
+without a client import; `H`, a host flat lookup; and `I`, a private checked
+Ken name, constructor, or generated instance. Host-only class-registry
+observations are not flat reads. The four internal exposure calls inherit
+only the names reached by their 34 Derived/many/single callers, not the
+whole copied module. Existing catalog source imports, qualified host reads,
+Map's own local `fold`/`insert`/`total_leq_nat`, and InsertionSort's local
+`sort` are not attributed to the copied Derived or LawfulClasses aliases.
+
+Private `I` providers and reaching callers, retaining the table's exact
+per-row names rather than broadening an interface:
+
+- LawfulClasses: `compare_ord_lexicographic_acceptance.rs:19` reaches
+  `compare_raw` and five attached proofs; `ds1_empty_dec_acceptance.rs:379`,
+  `cat_sort_insertion_sort_acceptance.rs:22`,
+  `cat_bsearch_acceptance.rs:179`, `ds6a_int_deceq_acceptance.rs:24`,
+  `structural_deceq_acceptance.rs:15`, `es4_classes_acceptance.rs:96`,
+  `cc2_text_codec_numeric_acceptance.rs:46`, and `sub1b_uint8_deceq.rs:21`
+  reach the named, unexported `Ord`/`Eq`/`DecEq` dictionaries recorded in
+  the table. Generated dictionary identity is checked by loader-owned ID,
+  never by an `*_instance_*` spelling alone.
+- Derived: `cat3_collections_package.rs:135` invokes private list
+  structural/sort/lens names; `ds4_list_combinators_acceptance.rs:23`
+  invokes `range`, `range_length`, `zip`, `zip_length`;
+  `es4_classes_acceptance.rs:96` invokes the Derived comparator-indexed
+  `Perm`, distinct from the prelude's; `l3_strings_surface_acceptance.rs:34`
+  invokes `concat`, `slice`, `char_at`, `eq`, `compare`; and
+  `cc2_text_codec_numeric_acceptance.rs:46` invokes `compare_char`.
+  `cat3_collections_package.rs:245` instead reads public `map`/`filter`.
+- Diagnostics.Core: `cat5_parsing_package.rs:52` reaches the private
+  `MkSourceId` constructor. `cc4_diagnostic_core_acceptance.rs:44` reaches
+  `MkSourceId`, `environment_origin`, and `config_key_origin`.
+- Cursor: `cc3_parsing_cursor_decoder_acceptance.rs:57` reaches private
+  `arg_cursor_*`, `arg_location_origin*`, and `MkArgCursor` through host
+  observations; `cc4_diagnostic_core_acceptance.rs:54` also invokes
+  `arg_location_origin` in Ken.
+- Decoder: `cc3_parsing_cursor_decoder_acceptance.rs:67` observes private
+  combinator/fuel helpers and `DecoderZeroProgress` in its host list;
+  `ds9_json_codec_acceptance.rs:592` invokes `decoder_map` in Ken.
+- Parsing: `cc3_parsing_cursor_decoder_acceptance.rs:77` and
+  `cc4_diagnostic_core_acceptance.rs:74` host-read private cursor, span,
+  and grammar helpers; `cat5_parsing_package.rs:77` invokes private
+  `bool_expr_eq` and `syntax_leaf` in Ken.
+- EffectfulClasses: `cc1_nonempty_validation_acceptance.rs:293` tests
+  private `Monad` by a `NoInstance` negative probe.
+- Json: `ds9_json_codec_acceptance.rs:549` invokes private `json_size`.
+
+Public `P` without an explicit route is a stop, not an export request.
+It includes CAT3/DS4 plain list snippets, CAT-BSEARCH's three exposed
+providers, CC3/CC4/CAT5 plain clients, DS9's Json/Decoder snippets, and
+Forge's `Diagnostic`, `Doc`, `diagnostic_to_doc` from CC7/CC8. The 20
+`_many`/single fixtures remove only their listed public Derived aliases;
+LawfulFunctors fixtures also withhold four public `bool_and` aliases. Four
+host controls assert the flat public LC `leq_nat` matches its loader-owned
+ID. Per-test `W` and `leq_nat` host controls still measure the door and
+remain until deletion; the shared fixture's removal control is converted
+in item 1 to assert absence after removal, without asserting that the door
+exposed an alias first (Architect `evt_12nc3hq6s2pzk`).
+
+**Stop-9 pin census.** The 49-row test/function/file:line/property,
+promise-class-annotation and route census is
+`/tmp/lang-session-catalog-or-pin-census.tsv` (SHA-256
+`c59d0325023228105ff7aba69350354b6effa56cd7b1a2e6bd37a7bada28213f`;
+convo `evt_6ffstwbv51jmg`). It covers LawfulClasses (six), Derived
+(thirteen), Diagnostics.Core (four), Cursor (five), Decoder (four), Parsing
+(five), EffectfulClasses (seven), Json (four), and the cross-catalog ledger
+(one). The routes include exact public/loader-visible inventories, private
+import refusals, trust closure, owned class/instance populations, all-owned
+checked bodies/references, and named-list pins. Twenty-three older tests
+have no `Promise class` annotation; the table says `UNLABELLED`, not an
+invented quotation. The `cc3:364`, `cc4:210`, and `cat5:307` named lists
+and `lang_mod_catalog_evidence_frontier.rs:759` ledger retain their measured
+promises. The Derived test-2 four-alias residual remains separate.
+
+The Architect's sequence is eight increments: (1) test-only public routes,
+authenticated host observations, generated-instance `where` resolution,
+and a controlled EC negative; (2) LC private compare laws in owner examples;
+(3) Derived private families in owner examples, split if needed; (4)
+Diagnostics.Core/Cursor private observations; (5) Json `json_size` owner
+example; (6) Decoder `decoder_map` only if public composition cannot retain
+the probe's property; (7) Parsing private examples; (8) the final door
+removal, remaining W/`leq_nat` controls, and Derived test-2 disposition.
+Every increment returns with exact checked text and rechecks file collisions.
+The item-1 migration unit is a whole test function (Architect
+`evt_6pa7fhxkbpnrq`): a function with any later private Ken obligation or
+per-test door control defers atomically to its latest required increment.
+Every changed function must survive a restored, disposable no-op
+`expose_module` mutation; a new companion test cannot stand in for it.
+CC1's private `Monad` negative cannot yet meet the item-1 EC guard:
+`provider_owned_id` finds no qualified `Core.Classes.EffectfulClasses.Monad`
+global in that roots-loaded environment. The candidate restores the original
+negative untouched; it claims no EC migration or production registry seam.
+The guarded spelling-view alternative and its lawful-instance mutation
+remain a later exact-text obligation (Architect `evt_78z6k087mxve7`).
+Decoder item 6 waits for CAT-DECODER-RECURSIVE-SUCCEEDS; Parsing item 7
+waits for BYTES D3. Because BYTES D3 also edits
+`tests/cat5_parsing_package.rs` and
+`src/r_layer_tests/cat_tier_d_parsing_group_import.rs`, all rows in those
+files move to item 7; the cat5:31 W/H controls remain final item 8.
+Item 1 does not touch either file. No acceptance criterion or private door
+is changed by this factual record.
 
 **Map flat residual (Architect `evt_42yfw3pmj8t7s`, Steward
 `evt_72qaxq9bb9er3`).** `mk_env` is retained as an authorized white-box

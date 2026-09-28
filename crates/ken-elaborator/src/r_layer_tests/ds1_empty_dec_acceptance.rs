@@ -369,6 +369,8 @@ fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
 // Confirm `catalog/packages/Core/Classes/LawfulClasses.ken.md` still elaborates
 // over its declared dependencies and registers the same canonical dictionary
 // consumed by EmptyDec.
+/// Promise class: durable checked-identity invariant. The private LC
+/// comparison witness returns canonical Or; owned DecEq Bool stays checked.
 #[test]
 fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
@@ -376,13 +378,47 @@ fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
         catalog_or::load_core_logic_compare_with_or_owned(&mut env);
     let provider_state = catalog_or::core_logic_or_module_state(&env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], LAWFUL)
+        .expect("the class owner must roots-load before the flat fixture");
     catalog_or::load_derived_fixture(&mut env);
     catalog_or::restore_core_logic_or_module_state(&mut env, &provider_state);
-    catalog_or::assert_transparent_result_uses_core_logic_or(
-        &env, &or_owned, "compare_bool_cases",
-    );
+    let or_id = catalog_or::provider_owned_id(&env, &or_owned, "Core.Logic.Or", "Or")
+        .expect("canonical Or must belong to its roots-loaded owner");
+    let or_decl = env.env.inductive(or_id).expect("canonical Or family");
+    assert_eq!(or_decl.params, vec![Term::omega(Level::Zero); 2]);
+    assert_eq!(or_decl.level, Level::Zero);
+    let compare_bool_cases =
+        catalog_or::provider_owned_id(&env, &lawful_owned, LAWFUL, "compare_bool_cases")
+            .expect("the private comparison witness must belong to LawfulClasses");
+    let ty = match env.env.lookup(compare_bool_cases) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("compare_bool_cases must be transparent: {other:?}"),
+    };
+    let mut result = ty;
+    while let Term::Pi(_, body) = result {
+        result = body;
+    }
+    while let Term::App(function, _) = result {
+        result = function;
+    }
     assert!(
-        env.globals.contains_key("DecEq_instance_Bool"),
-        "the landed package's own DecEq_instance_Bool must be a real registered global"
+        matches!(result, Term::IndFormer { id, .. } if *id == or_id),
+        "LawfulClasses' checked private witness must return canonical Or"
+    );
+    let dec_eq_class = env
+        .class_env
+        .class("DecEq")
+        .expect("DecEq must remain a registered class")
+        .projection
+        .type_id;
+    assert!(lawful_owned.contains(&dec_eq_class), "LawfulClasses must own DecEq");
+    let bool_instance = env
+        .class_env
+        .instance_search("DecEq", "Bool")
+        .expect("DecEq Bool must be a registered dictionary");
+    assert!(
+        lawful_owned.contains(&bool_instance) && env.env.transparent_body(bool_instance).is_some(),
+        "the landed class owner must own its checked DecEq Bool dictionary"
     );
 }

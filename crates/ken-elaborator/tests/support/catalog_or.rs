@@ -218,9 +218,10 @@ pub fn load_derived_importing_fixture_many(
     expose_module(env, "Core.Classes.LawfulClasses");
     expose_module(env, "Data.Collections.Derived");
     for imported in imports {
+        env.globals.remove(*imported);
         assert!(
-            env.globals.remove(*imported).is_some(),
-            "Derived fixture must contain the selectively imported binding `{imported}`"
+            !env.globals.contains_key(*imported),
+            "{imported} must be absent so the client resolves it through its own import"
         );
     }
     (lawful_owned, derived_owned)

@@ -23,11 +23,12 @@ const NUMERIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const NUMERIC_SEED: &str = include_str!("../../../conformance/stdlib/text/seed-text-numeric.md");
 
-fn dependency_env() -> ElabEnv {
+fn dependency_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
     let lawful_prefix = "Core.Classes.LawfulClasses.";
     let lawful_aliases: Vec<_> = env
@@ -39,14 +40,20 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
-    env
+    (env, lawful_owned)
 }
 
-fn load_derived_dependencies(env: &mut ElabEnv) {
+fn dependency_env() -> ElabEnv {
+    dependency_env_with_lawful_owned().0
+}
+
+fn load_derived_dependencies(env: &mut ElabEnv) -> Vec<GlobalId> {
     catalog_or::load_derived_fixture(env);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+    let diagnostic_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load after Derived");
     catalog_or::expose_module(env, "Capability.Diagnostics.Core");
+    diagnostic_owned
 }
 
 fn full_env() -> ElabEnv {
@@ -146,31 +153,60 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
     }
 }
 
+/// Promise class: durable checked-identity invariant. The ordered dependency
+/// closure checks the actual LC and Diagnostics owner identities, not aliases.
 #[test]
 fn ordered_dependency_closure_elaborates_codec_then_numeric() {
-    let mut env = dependency_env();
+    let (mut env, lawful_owned) = dependency_env_with_lawful_owned();
 
     env.elaborate_ken_md_file(STRING_BIJECTION_KEN_MD)
         .expect("StringBijection.ken.md must elaborate fourth as the prerequisite");
     env.elaborate_ken_md_file(STRING_KEYS_KEN_MD)
         .expect("Data/Text/StringKeys.ken.md must elaborate fifth");
-    assert_transparent_globals(
-        &env,
-        &[
-            "string_to_list_char_injective",
-            "string_deceq_eq",
-            "string_deceq_eq::sound",
-            "string_deceq_eq::complete",
-            "DecEq_instance_String",
-            "string_ord_leq",
-            "string_ord_leq::refl",
-            "string_ord_leq::antisym",
-            "string_ord_leq::trans",
-            "string_ord_leq::total",
-            "Ord_instance_String",
-        ],
-    );
-    load_derived_dependencies(&mut env);
+    assert_transparent_globals(&env, &["string_to_list_char_injective"]);
+    for name in [
+        "string_deceq_eq",
+        "string_deceq_eq::sound",
+        "string_deceq_eq::complete",
+        "string_ord_leq",
+        "string_ord_leq::refl",
+        "string_ord_leq::antisym",
+        "string_ord_leq::trans",
+        "string_ord_leq::total",
+    ] {
+        let id =
+            catalog_or::provider_owned_id(&env, &lawful_owned, "Core.Classes.LawfulClasses", name)
+                .unwrap_or_else(|error| panic!("LawfulClasses-owned String key {name}: {error}"));
+        assert!(
+            env.env.transparent_body(id).is_some(),
+            "{name} must be an owned transparent, checked String-key declaration"
+        );
+    }
+    for class in ["DecEq", "Ord"] {
+        let class_id = env
+            .class_env
+            .class(class)
+            .unwrap_or_else(|| panic!("{class} must remain a checked class"))
+            .projection
+            .type_id;
+        assert!(
+            lawful_owned.contains(&class_id),
+            "{class} must be the class checked by LawfulClasses"
+        );
+        let instance = env
+            .class_env
+            .instance_search(class, "String")
+            .unwrap_or_else(|| panic!("{class} String must be a registered dictionary"));
+        assert!(
+            lawful_owned.contains(&instance),
+            "{class} String must be checked in the LawfulClasses roots-loader run"
+        );
+        assert!(
+            env.env.transparent_body(instance).is_some(),
+            "{class} String must be an owned transparent dictionary"
+        );
+    }
+    let diagnostic_owned = load_derived_dependencies(&mut env);
 
     env.elaborate_ken_md_file(CODEC_KEN_MD)
         .expect("Data/Text/Codec.ken.md and every checked fence must elaborate sixth");
@@ -214,7 +250,18 @@ fn ordered_dependency_closure_elaborates_codec_then_numeric() {
             "show_digits",
         ],
     );
-    for name in ["NumericErrorKind", "Diagnostic", "DecimalDigit"] {
+    let diagnostic_id = catalog_or::provider_owned_id(
+        &env,
+        &diagnostic_owned,
+        "Capability.Diagnostics.Core",
+        "Diagnostic",
+    )
+    .expect("Diagnostic must be owned by the same Diagnostics.Core roots load");
+    assert!(
+        matches!(env.env.lookup(diagnostic_id), Some(Decl::Inductive(_))),
+        "owned Diagnostic must be the checked data declaration"
+    );
+    for name in ["NumericErrorKind", "DecimalDigit"] {
         assert!(
             env.globals.contains_key(name),
             "expected checked data `{name}`"

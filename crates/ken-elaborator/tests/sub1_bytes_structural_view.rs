@@ -218,6 +218,8 @@ fn ac2_trusted_base_delta_is_exactly_the_named_pair_and_propositions() {
     }
 }
 
+/// Promise class: durable invariant. Owner-checked structural length remains
+/// transparent, computes the nonempty byte view, and adds no trusted entry.
 #[test]
 fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
     let mut env = ElabEnv::new().expect("base env");
@@ -226,15 +228,28 @@ fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
         .expect("Derived's canonical Nat-order dependency must roots-load");
     let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    catalog_or::load_derived_fixture(&mut env);
+    let (_, derived_owned) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["bytes_nat_length"]);
     let trust_after_package: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         trust_after_package, trust_before,
         "the derived byte surface must add zero trusted declarations"
     );
 
-    let length_id = env.globals["length"];
-    let bytes_nat_length_id = env.globals["bytes_nat_length"];
+    let length_id = catalog_or::provider_owned_id(
+        &env,
+        &derived_owned,
+        "Data.Collections.Derived",
+        "length",
+    )
+    .expect("the real Derived loader must own length");
+    let bytes_nat_length_id = catalog_or::provider_owned_id(
+        &env,
+        &derived_owned,
+        "Data.Collections.Derived",
+        "bytes_nat_length",
+    )
+    .expect("the real Derived loader must own bytes_nat_length");
     let (_, length_body) = env
         .env
         .transparent_body(length_id)
@@ -253,6 +268,8 @@ fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
         env.bytes_env.bytes_to_list_id
     ));
 
+    env.elaborate_file("import Data.Collections.Derived (bytes_nat_length)")
+        .expect("the public bytes length must enter the caller through its declared import");
     let mut store = make_store(&env);
     let value = eval_view(
         &mut env,

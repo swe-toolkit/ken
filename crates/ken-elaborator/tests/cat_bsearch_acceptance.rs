@@ -173,56 +173,63 @@ fn entry_adds_no_trusted_declarations() {
     );
 }
 
+/// Promise class: durable behavior invariant. A public-import client resolves
+/// the owned Ord Bool dictionary and checks both sortedness evidence and
+/// positive/negative search decisions on distinct nondegenerate inputs.
 #[test]
 fn generic_decision_and_yes_no_evidence_instantiate() {
     let mut env = roots_env();
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("the class owner must roots-load in the same environment");
+    let ord_class = env
+        .class_env
+        .class("Ord")
+        .expect("Ord must remain a checked class")
+        .projection
+        .type_id;
+    assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
+    let bool_instance = env
+        .class_env
+        .instance_search("Ord", "Bool")
+        .expect("Ord Bool must remain registered");
+    assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be owner-checked");
     catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
     catalog_or::expose_module(&mut env, MODULE);
     catalog_or::expose_module(&mut env, "Core.Logic.EmptyDec");
     env.elaborate_file(
-        "fn cat_bsearch_decision \
+        "import Core.Classes.LawfulClasses (Ord, ord_leq_at)\n\
+         import Algorithm.Searching.OrderedSearch (elem, sorted_for_search, search)\n\
+         import Core.Logic.EmptyDec (Dec as empty_dec_Dec, decide as empty_dec_decide)\n\
+         fn cat_bsearch_decision \
              (a : Type) (d : Ord a) (x : a) (xs : List a) \
              (sorted : sorted_for_search a d xs) \
-           : Dec (Equal Bool (elem a d x xs) True) = \
-           search a d x xs sorted\n\
-         theorem cat_bsearch_sorted_true : \
-           sorted_for_search Bool Ord_instance_Bool \
-             (Cons Bool True (Nil Bool)) = \
-           and_intro \
-             ((x : Bool) \
-               -> Equal Bool \
-                    (elem Bool Ord_instance_Bool x (Nil Bool)) \
-                    True \
-               -> Equal Bool \
-                    (ord_leq_at Bool Ord_instance_Bool True x) \
-                    True) \
-             (sorted_for_search Bool Ord_instance_Bool (Nil Bool)) \
-             (\\x.match x { \
-               True |-> \\member.Proved; \
-               False |-> \\member.absurd member \
-             }) \
-             Proved\n\
-         theorem cat_bsearch_sorted_false_true : \
-           sorted_for_search Bool Ord_instance_Bool \
-             (Cons Bool False (Cons Bool True (Nil Bool))) = \
-           and_intro \
-             ((x : Bool) \
-               -> Equal Bool \
-                    (elem Bool Ord_instance_Bool x \
-                      (Cons Bool True (Nil Bool))) \
-                    True \
-               -> Equal Bool \
-                    (ord_leq_at Bool Ord_instance_Bool False x) \
-                    True) \
-             (sorted_for_search Bool Ord_instance_Bool \
-               (Cons Bool True (Nil Bool))) \
-             (\\x.match x { \
-               True |-> \\member.Proved; \
-               False |-> \\member.Proved \
-             }) \
-             cat_bsearch_sorted_true",
+           : empty_dec_Dec (Equal Bool (elem a d x xs) True) = \
+           search a d x xs sorted",
     )
-    .expect("generic Dec result and concrete sortedness witnesses must elaborate");
+    .expect("generic Dec result must elaborate from public imports");
+
+    let sorted_witnesses = "let sorted_true = \
+      and_intro \
+        ((x : Bool) \
+          -> Equal Bool (elem Bool d x (Nil Bool)) True \
+          -> Equal Bool (ord_leq_at Bool d True x) True) \
+        (sorted_for_search Bool d (Nil Bool)) \
+        (\\x.match x { \
+          True |-> \\member.Proved; \
+          False |-> \\member.absurd member \
+        }) Proved; \
+      sorted_false_true = \
+      and_intro \
+        ((x : Bool) \
+          -> Equal Bool (elem Bool d x (Cons Bool True (Nil Bool))) True \
+          -> Equal Bool (ord_leq_at Bool d False x) True) \
+        (sorted_for_search Bool d (Cons Bool True (Nil Bool))) \
+        (\\x.match x { \
+          True |-> \\member.Proved; \
+          False |-> \\member.Proved \
+        }) sorted_true \
+      in ";
 
     for (name, query, list, sorted, expected) in [
         ("empty_absent", "False", "Nil Bool", "Proved", false),
@@ -230,21 +237,21 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
             "head_present",
             "False",
             "Cons Bool False (Cons Bool True (Nil Bool))",
-            "cat_bsearch_sorted_false_true",
+            "sorted_false_true",
             true,
         ),
         (
             "tail_present",
             "True",
             "Cons Bool False (Cons Bool True (Nil Bool))",
-            "cat_bsearch_sorted_false_true",
+            "sorted_false_true",
             true,
         ),
         (
             "pruned_absent",
             "False",
             "Cons Bool True (Nil Bool)",
-            "cat_bsearch_sorted_true",
+            "sorted_true",
             false,
         ),
         (
@@ -254,22 +261,33 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
             "and_intro \
                ((x : Bool) \
                  -> Equal Bool \
-                      (elem Bool Ord_instance_Bool x (Nil Bool)) True \
+                      (elem Bool d x (Nil Bool)) True \
                  -> Equal Bool \
-                      (ord_leq_at Bool Ord_instance_Bool False x) True) \
-               (sorted_for_search Bool Ord_instance_Bool (Nil Bool)) \
+                      (ord_leq_at Bool d False x) True) \
+               (sorted_for_search Bool d (Nil Bool)) \
                (\\x.\\member.absurd member) Proved",
             false,
         ),
     ] {
-        let proposition = format!("Equal Bool (elem Bool Ord_instance_Bool {query} ({list})) True");
+        let proposition = format!("Equal Bool (elem Bool d {query} ({list})) True");
         let declaration = format!(
-            "const cat_bsearch_{name} : Bool = \
-             decide ({proposition}) \
-               (search Bool Ord_instance_Bool {query} ({list}) ({sorted}))"
+            "import Core.Classes.LawfulClasses (Ord)\n\
+             import Algorithm.Searching.OrderedSearch (elem, sorted_for_search, search)\n\
+             import Core.Logic.EmptyDec (decide as empty_dec_decide)\n\
+             const cat_bsearch_{name} : Bool where Ord Bool = \
+             {sorted_witnesses} empty_dec_decide ({proposition}) \
+               (search Bool d {query} ({list}) ({sorted}))"
         );
-        env.elaborate_decl(&declaration)
+        env.elaborate_file(&declaration)
             .unwrap_or_else(|error| panic!("{name} decision must elaborate: {error}"));
+        let case_id = env.globals[&format!("cat_bsearch_{name}")];
+        let references = catalog_or::declaration_references(
+            env.env.lookup(case_id).expect("the checked decision must exist"),
+        );
+        assert!(
+            references.contains(&bool_instance),
+            "{name} must resolve its Ord Bool dictionary from the loaded class owner"
+        );
         assert_eq!(
             evaluate_bool(&env, &format!("cat_bsearch_{name}")),
             expected,
