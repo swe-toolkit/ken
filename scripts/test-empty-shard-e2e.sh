@@ -40,13 +40,19 @@ empty=next(i+1 for i,b in enumerate(plan['bins']) if not b['tests'])
 open('empty-index','w').write(str(empty))
 PY
 empty=$(<empty-index)
+printf '{"population_delta":{"added":["fixture::live t"]}}\n' > planning-evidence.json
 python3 "$repo/scripts/ci-duration-shard.py" project-empty inventory.json "selected-$empty.json"
 python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$empty" "selected-$empty.json"
 for n in $(seq 1 7); do
   planned=$(python3 -c "import json; print(len(json.load(open('filters/assignments.json'))['bins'][$n - 1]['tests']))")
   python3 "$repo/scripts/ci-duration-shard.py" project-selected inventory.json filters/assignments.json "$n" "selected-$n.json"
   python3 "$repo/scripts/ci-duration-shard.py" validate-plan filters/assignments.json "$n" "selected-$n.json"
-  "$repo/scripts/stage-ci-shard-artifact.sh" "$n" unfiltered-inventory.json inventory.json "selected-$n.json"
+  if [ "$n" -eq 1 ]; then
+    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" unfiltered-inventory.json inventory.json "selected-$n.json" planning-evidence.json
+    cmp planning-evidence.json "realized-shard-$n/planning-evidence.json"
+  else
+    "$repo/scripts/stage-ci-shard-artifact.sh" "$n" unfiltered-inventory.json inventory.json "selected-$n.json"
+  fi
   python3 - "$n" <<'PY3'
 import json
 import sys
