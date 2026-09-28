@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE
 title: "Clear the two rt_escape rows' next native refusal: lower a tree-producing ComputationalMatch whose scrutinee is not a specialized Bool, Nat or constructor, so the escaped-resource and nat-fanout programs build and run natively and agree with the interpreter"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
