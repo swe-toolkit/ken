@@ -66,6 +66,17 @@ import-cycle constraint.
   GlobalId that the deletion shifts.
 - **AC-2.** The Map and catalog suites stay green (Full CI).
 
+- **AC-3 (recut after stop 3, Steward evt_8entn03svwk2).** Main is out of
+  conformance with §58 §§2 and 8 since increment 1. The repair is a Spec
+  amendment naming LawfulClasses as the Nat-order provider, not a revert,
+  unless the census below finds a plane where the owning module is
+  load-bearing. Before any further route ruling, a plane-complete ownership
+  census of `leq_nat`, its three proofs and `total_leq_nat` is posted: `spec/`
+  and `conformance/` (Spec leader), and `catalog/`, `docs/program` and
+  `crates/` by name, source-text mechanism and identity (Foundation). The
+  Architect then rules the route once against the census and the Research
+  advisory. Candidate `7c0d3875` is held.
+
 ## Stop conditions
 
 - The change would add a Map public name or widen its interface.
@@ -86,4 +97,11 @@ import-cycle constraint.
    by name, not by mechanism; the combined import line removed the line the
    control replaces. Keyed on exact source-text spelling of an edited line
    (CI red run 36351135377, ruled evt_69sc92fjt908e: split the import, test
-   unchanged). Next trigger 3.
+   unchanged).
+3. Increment 2's route (delete Map's `total_leq_nat`) was ruled without
+   reading `spec/50-stdlib/58-maps-sets-relations.md` §§2 and 8, which name
+   Map as the provider of `leq_nat` and its four order results; increment 1
+   had already removed four of them. Keyed on the owning module named in a
+   normative spec, not on code-name consumers (QA evt_2ztee6q31p0vk, Spec
+   evt_5my9xhynmc1fe; Architect evt_2cnccr7d2t7cb: §1b predicate is an
+   ownership move scoped from one plane; Research called). Next trigger 4.
