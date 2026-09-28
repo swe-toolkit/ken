@@ -12,19 +12,20 @@ mod catalog_or;
 use ken_elaborator::{trusted_base_delta, ElabEnv};
 use ken_kernel::{env::Decl, GlobalId};
 
-fn mk_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
+fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    let lawful_owned = env
-        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
-        .expect("LawfulClasses must roots-load in the same comparison environment");
     catalog_or::load_derived_fixture(&mut env);
-    (env, lawful_owned)
+    env
 }
 
-fn mk_env() -> ElabEnv {
-    mk_env_with_lawful_owned().0
+fn mk_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
+    let mut env = mk_env();
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("LawfulClasses must return its checked IDs in the same comparison environment");
+    (env, lawful_owned)
 }
 
 fn assert_bool_reduces(env: &mut ElabEnv, name: &str, expression: &str, expected: &str) {
