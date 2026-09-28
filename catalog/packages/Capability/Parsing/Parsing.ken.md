@@ -72,9 +72,21 @@ import Capability.Parsing.Decoder
     decoder_seq,
     decoder_seq_preserves)
 
-import Core.Classes.LawfulClasses (leq_nat)
+import Core.Classes.LawfulClasses (bytes_to_list_injective, leq_nat)
 
-import Data.Collections.Derived (bytes_nat_length, list_append, nth)
+import Core.Logic.Transport (cong, sym, trans)
+
+import Data.Binary.BytesPrimitiveContracts
+  (AllAscii,
+    AllAsciiCodes,
+    AsciiBytes,
+    NoCodes,
+    SomeCodes,
+    ascii_bytes_utf8,
+    bytes_concat_list_view,
+    bytes_encode_ascii_octets)
+
+import Data.Collections.Derived (bytes_nat_length, list_append, map, nth)
 
 import Data.Numeric.Nat.Order (sub)
 
@@ -398,8 +410,9 @@ alternatives, and recursive grammar layers. The checked local continuation
 lemmas preserve it through each syntax-building branch and the final
 end-of-input check. `parse_bool_expr_laws` applies that result to the
 unweakened `ParserValid`, `ParserTotal`, and `ParserSourceLocal` contract.
-The independent printer-to-parser round trip is not claimed: it still needs
-primitive `Bytes` concatenation-view and encoded-literal facts.
+The independent printer-to-parser round trip is not yet claimed. The checked
+byte and UTF-8 bridges below establish its input facts, but the recursive
+Decoder's public laws preserve bounds rather than establish a successful parse.
 
 ```ken
 export BoolExpr, BTrue, BFalse, BNot, BAnd
@@ -796,6 +809,174 @@ pub fn format_bool_expr (s : Source) : Result ParseError Bytes =
     Parsed syntax consumed next ↦ Ok ParseError Bytes (print_bool_expr (erase_spans syntax));
     Failed err ↦ Err ParseError Bytes err
   }
+
+theorem map_uint8_codes_retract
+      (xs : List UInt8)
+    : Equal (List UInt8) (map Int UInt8 int_to_uint8_raw (map UInt8 Int uint8_to_int xs)) xs =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      trans
+        (List UInt8)
+        (Cons
+          UInt8
+          (int_to_uint8_raw (uint8_to_int h))
+          (map Int UInt8 int_to_uint8_raw (map UInt8 Int uint8_to_int t)))
+        (Cons UInt8 h (map Int UInt8 int_to_uint8_raw (map UInt8 Int uint8_to_int t)))
+        (Cons UInt8 h t)
+        (cong
+          UInt8
+          (List UInt8)
+          (int_to_uint8_raw (uint8_to_int h))
+          h
+          (λhead.
+            Cons UInt8 head (map Int UInt8 int_to_uint8_raw (map UInt8 Int uint8_to_int t)))
+          (uint8_int_retract h))
+        (cong
+          (List UInt8)
+          (List UInt8)
+          (map Int UInt8 int_to_uint8_raw (map UInt8 Int uint8_to_int t))
+          t
+          (Cons UInt8 h)
+          (map_uint8_codes_retract t))
+  }
+
+theorem ascii_encoded_byte_view
+      (s : String) (ascii : AllAscii s)
+    : Equal Bytes
+        (bytes_encode s)
+        (list_to_bytes
+          (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s)))) =
+  bytes_to_list_injective
+    (bytes_encode s)
+    (list_to_bytes
+      (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s))))
+    (trans
+      (List UInt8)
+      (bytes_to_list (bytes_encode s))
+      (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s)))
+      (bytes_to_list
+        (list_to_bytes
+          (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s)))))
+      (trans
+        (List UInt8)
+        (bytes_to_list (bytes_encode s))
+        (map
+          Int
+          UInt8
+          int_to_uint8_raw
+          (map UInt8 Int uint8_to_int (bytes_to_list (bytes_encode s))))
+        (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s)))
+        (sym
+          (List UInt8)
+          (map
+            Int
+            UInt8
+            int_to_uint8_raw
+            (map UInt8 Int uint8_to_int (bytes_to_list (bytes_encode s))))
+          (bytes_to_list (bytes_encode s))
+          (map_uint8_codes_retract (bytes_to_list (bytes_encode s))))
+        (cong
+          (List Int)
+          (List UInt8)
+          (map UInt8 Int uint8_to_int (bytes_to_list (bytes_encode s)))
+          (map Char Int charToInt (string_to_list_char s))
+          (map Int UInt8 int_to_uint8_raw)
+          (bytes_encode_ascii_octets s ascii)))
+      (sym
+        (List UInt8)
+        (bytes_to_list
+          (list_to_bytes
+            (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s)))))
+        (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s)))
+        (list_bytes_roundtrip
+          (map Int UInt8 int_to_uint8_raw (map Char Int charToInt (string_to_list_char s))))))
+
+fn ascii_encoded_byte_codes (s : String) (ascii : AllAscii s) : AsciiBytes (bytes_encode s) =
+  J
+    (λcodes _. AllAsciiCodes codes)
+    ascii
+    (sym
+      (List Int)
+      (map UInt8 Int uint8_to_int (bytes_to_list (bytes_encode s)))
+      (map Char Int charToInt (string_to_list_char s))
+      (bytes_encode_ascii_octets s ascii))
+
+theorem ascii_encoded_utf8 (s : String) (ascii : AllAscii s) : IsUtf8 (bytes_encode s) =
+  ascii_bytes_utf8 (bytes_encode s) (ascii_encoded_byte_codes s ascii)
+
+theorem map_appends
+      (a : Type) (b : Type) (f : a → b) (xs : List a) (ys : List a)
+    : Equal
+        (List b)
+        (map a b f (list_append a xs ys))
+        (list_append b (map a b f xs) (map a b f ys)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons head tail ↦
+      cong
+        (List b)
+        (List b)
+        (map a b f (list_append a tail ys))
+        (list_append b (map a b f tail) (map a b f ys))
+        (Cons b (f head))
+        (map_appends a b f tail ys)
+  }
+
+fn all_ascii_codes_append
+      (xs : List Int) (ys : List Int) (left : AllAsciiCodes xs) (right : AllAsciiCodes ys)
+    : AllAsciiCodes (list_append Int xs ys) =
+  match left {
+    NoCodes ↦ right;
+    SomeCodes code tail witness rest ↦
+      SomeCodes
+        code
+        (list_append Int tail ys)
+        witness
+        (all_ascii_codes_append tail ys rest right)
+  }
+
+fn ascii_bytes_concat
+      (a : Bytes) (b : Bytes) (left : AsciiBytes a) (right : AsciiBytes b)
+    : AsciiBytes (bytes_concat a b) =
+  let
+    concatenated_codes : AllAsciiCodes
+      (list_append
+        Int
+        (map UInt8 Int uint8_to_int (bytes_to_list a))
+        (map UInt8 Int uint8_to_int (bytes_to_list b))) =
+      all_ascii_codes_append
+        (map UInt8 Int uint8_to_int (bytes_to_list a))
+        (map UInt8 Int uint8_to_int (bytes_to_list b))
+        left
+        right;
+    mapped_codes : AllAsciiCodes
+      (map UInt8 Int uint8_to_int (list_append UInt8 (bytes_to_list a) (bytes_to_list b))) =
+      J
+        (λcodes _. AllAsciiCodes codes)
+        concatenated_codes
+        (sym
+          (List Int)
+          (map UInt8 Int uint8_to_int (list_append UInt8 (bytes_to_list a) (bytes_to_list b)))
+          (list_append
+            Int
+            (map UInt8 Int uint8_to_int (bytes_to_list a))
+            (map UInt8 Int uint8_to_int (bytes_to_list b)))
+          (map_appends UInt8 Int uint8_to_int (bytes_to_list a) (bytes_to_list b)))
+  in
+    J
+      (λview _. AllAsciiCodes (map UInt8 Int uint8_to_int view))
+      mapped_codes
+      (sym
+        (List UInt8)
+        (bytes_to_list (bytes_concat a b))
+        (list_append UInt8 (bytes_to_list a) (bytes_to_list b))
+        (bytes_concat_list_view a b))
+
+theorem ascii_concat_utf8
+      (a : Bytes) (b : Bytes) (left : AsciiBytes a) (right : AsciiBytes b)
+    : IsUtf8 (bytes_concat a b) =
+  ascii_bytes_utf8 (bytes_concat a b) (ascii_bytes_concat a b left right)
 
 fn format_bool_parse_outcome
       (outcome : ParseResult (Syntax BoolExpr))
@@ -2471,12 +2652,18 @@ reference implementation.
    definitions over `Nat`, `Bool`, `Bytes`, `Equal`, `And`, `List`, and
    parser-result data. It adds no kernel primitive, no source-loader
    behavior, and no language-semantics change.
-4. **`trusted_base()` delta.** **Zero.** Every proof in this package —
+4. **`trusted_base()` delta.** **Zero locally.** The byte bridges inherit
+   `bytes_concat_list_view` (F1), `bytes_encode_ascii_octets` (F2), and
+   `ascii_bytes_utf8` (F4') from `Data.Binary.BytesPrimitiveContracts`;
+   the imported module registers four trusted facts, including
+   `bytes_decode_encode` (F3), although no bridge below uses F3 yet.
+   Every proof defined in this package —
    `LessEqNat::refl`, `LessEqNat::zero_left`, `valid_zero_width_span`,
    `parse_bool_expr_total`, `parse_bool_expr_laws`,
    `format_bool_expr_on_parse_success`, and
-   `format_bool_expr_on_parse_failure` — is real and kernel-checked; no law
-   or predicate is postulated.
+   `format_bool_expr_on_parse_failure`, `ascii_encoded_byte_view`,
+   `ascii_encoded_utf8`, and `ascii_concat_utf8` — is real and
+   kernel-checked; no law or predicate is postulated.
 5. **Proof families.** `LessEqNat::refl` — induction on `n`.
    `LessEqNat::zero_left` — definitional (first match arm). `valid_zero_width_span`
    — direct composition of the two via `and_intro`, no case-split of its
@@ -2486,11 +2673,16 @@ reference implementation.
    outcome-to-parser-validity bridge; `decoder_recursive_preserves`
    handles fuel internally. `format_bool_expr_on_parse_success` and
    `format_bool_expr_on_parse_failure` — equality transport across each
-   parser-result alternative. These equations do not assert that printing
-   then parsing returns the original expression.
+   parser-result alternative. `ascii_encoded_byte_view` transports F2
+   through the existing UInt8 retraction and byte-list injectivity;
+   `ascii_encoded_byte_codes` transports the checked ASCII witness through
+   F2, while `ascii_concat_utf8` transports its append over F1 into F4'.
+   These bridges do not assert that printing then parsing returns the
+   original expression.
 6. **Consumers.** Source-aware parser implementations can use this package's
-   source, span, result, and validity vocabulary.
+   source, span, result, and validity vocabulary. The private byte bridges
+   prepare the printer's encoded leaves and concatenated ASCII output.
 7. **Validation evidence.** The catalog checks the
-   `Source`/`Span`/`Located`/`ParseResult`/`Parser` surface, its zero
+   `Source`/`Span`/`Located`/`ParseResult`/`Parser` surface, its zero local
    `trusted_base()` delta, the Boolean grammar's constructors and byte-token
    matching, and the absence of an exported unguarded repetition combinator.

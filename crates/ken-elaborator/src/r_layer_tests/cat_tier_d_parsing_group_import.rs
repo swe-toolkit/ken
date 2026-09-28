@@ -197,6 +197,7 @@ struct DirectParsing {
     env: ElabEnv,
     lawful: BTreeSet<GlobalId>,
     derived: BTreeSet<GlobalId>,
+    byte_contracts: BTreeSet<GlobalId>,
     nat_order: BTreeSet<GlobalId>,
     diagnostics: BTreeSet<GlobalId>,
     cursor: BTreeSet<GlobalId>,
@@ -212,6 +213,8 @@ fn direct_parsing() -> DirectParsing {
     let lawful = module_ids(&env, "Core.Classes.LawfulClasses");
     load(&mut env, "Data.Collections.Derived");
     let derived = module_ids(&env, "Data.Collections.Derived");
+    load(&mut env, "Data.Binary.BytesPrimitiveContracts");
+    let byte_contracts = module_ids(&env, "Data.Binary.BytesPrimitiveContracts");
     load(&mut env, "Data.Numeric.Nat.Order");
     let nat_order = module_ids(&env, "Data.Numeric.Nat.Order");
     load(&mut env, DC);
@@ -241,6 +244,7 @@ fn direct_parsing() -> DirectParsing {
         env,
         lawful,
         derived,
+        byte_contracts,
         nat_order,
         diagnostics,
         cursor,
@@ -659,15 +663,32 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
     );
     assert_eq!(
         intersection_names("Core.Classes.LawfulClasses", &loaded.lawful),
-        names(&["leq_nat", "leq_nat::trans"])
+        names(&["bytes_to_list_injective", "leq_nat", "leq_nat::trans"])
     );
     assert_eq!(
         intersection_names("Data.Collections.Derived", &loaded.derived),
         names(&[
             "bytes_nat_length",
             "list_append",
+            "map",
             "nth",
             "nth::some_below_length"
+        ])
+    );
+    assert_eq!(
+        intersection_names(
+            "Data.Binary.BytesPrimitiveContracts",
+            &loaded.byte_contracts
+        ),
+        names(&[
+            "AllAscii",
+            "AllAsciiCodes",
+            "AsciiBytes",
+            "AsciiCode",
+            "SomeCodes",
+            "ascii_bytes_utf8",
+            "bytes_concat_list_view",
+            "bytes_encode_ascii_octets",
         ])
     );
     assert_eq!(
