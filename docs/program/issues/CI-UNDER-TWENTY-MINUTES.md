@@ -1,7 +1,7 @@
 ---
 id: CI-UNDER-TWENTY-MINUTES
 title: "Bring Full CI wall time under 20 minutes by splitting the longest multi-case rt_parity_native tests and balancing the native-parity runners by measured duration, with every test and assertion preserved"
-status: active
+status: merged
 owner: verify
 size: M
 gate: architect
@@ -78,3 +78,22 @@ critical path under 20 minutes with margin.
   it touches `rt_parity_native.rs`, coordinate through the Steward.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Accepted on increment 12, landed at `83b20f189` (candidate `2fe46bf04`;
+Verify verdict `evt_418w4frtpbrv3`).
+- **Walls:** the PR run `36439436031` took 1,110s and the first post-landing
+  run `36442072417` took 1,107s. Both are under the 1,140s rebalance cutoff,
+  down from 28.4 minutes at the start.
+- **Population and topology:** both runs cover the 4,192 live identities
+  exactly once, all passing. The 20-job first wave is unchanged.
+- **Mechanism:**
+  - duration-balanced workspace and parity shards, weighted over five measured
+    source runs;
+  - split multi-case parity tests;
+  - a Select step that stages the full plan as an artifact and logs a
+    one-line summary.
+- **Residual:** `nextest-list`, the test build, takes 178-276s per shard. It
+  is not a rebalance lever, because every shard builds the full workspace
+  inventory.
