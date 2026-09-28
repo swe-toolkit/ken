@@ -2926,6 +2926,193 @@ theorem bytes_concat_three_view
         (bytes_concat_list_view a b)))
     ((proof assoc for list_append) UInt8 (bytes_to_list a) (bytes_to_list b) (bytes_to_list c))
 
+theorem bytes_concat_five_view
+      (a : Bytes) (b : Bytes) (c : Bytes) (d : Bytes) (e : Bytes)
+    : Equal
+        (List UInt8)
+        (bytes_to_list (bytes_concat (bytes_concat (bytes_concat a b) c) (bytes_concat d e)))
+        (list_append
+          UInt8
+          (bytes_to_list a)
+          (list_append
+            UInt8
+            (bytes_to_list b)
+            (list_append
+              UInt8
+              (bytes_to_list c)
+              (list_append UInt8 (bytes_to_list d) (bytes_to_list e))))) =
+  let
+    a_codes : List UInt8 = bytes_to_list a;
+    b_codes : List UInt8 = bytes_to_list b;
+    c_codes : List UInt8 = bytes_to_list c;
+    d_codes : List UInt8 = bytes_to_list d;
+    e_codes : List UInt8 = bytes_to_list e;
+    first_three : Bytes = bytes_concat (bytes_concat a b) c;
+    last_two : Bytes = bytes_concat d e;
+    prefix : List UInt8 = list_append UInt8 a_codes (list_append UInt8 b_codes c_codes);
+    suffix : List UInt8 = list_append UInt8 d_codes e_codes;
+    first_view : Equal (List UInt8) (bytes_to_list first_three) prefix =
+      bytes_concat_three_view a b c;
+    last_view : Equal (List UInt8) (bytes_to_list last_two) suffix = bytes_concat_list_view d e;
+    prefix_extended : Equal
+      (List UInt8)
+      (list_append UInt8 (bytes_to_list first_three) (bytes_to_list last_two))
+      (list_append UInt8 prefix (bytes_to_list last_two)) =
+      cong
+        (List UInt8)
+        (List UInt8)
+        (bytes_to_list first_three)
+        prefix
+        (λcodes. list_append UInt8 codes (bytes_to_list last_two))
+        first_view;
+    suffix_extended : Equal
+      (List UInt8)
+      (list_append UInt8 prefix (bytes_to_list last_two))
+      (list_append UInt8 prefix suffix) =
+      cong
+        (List UInt8)
+        (List UInt8)
+        (bytes_to_list last_two)
+        suffix
+        (λcodes. list_append UInt8 prefix codes)
+        last_view;
+    associate_suffix : Equal
+      (List UInt8)
+      (list_append UInt8 prefix suffix)
+      (list_append
+        UInt8
+        a_codes
+        (list_append UInt8 b_codes (list_append UInt8 c_codes suffix))) =
+      trans
+        (List UInt8)
+        (list_append UInt8 prefix suffix)
+        (list_append
+          UInt8
+          a_codes
+          (list_append UInt8 (list_append UInt8 b_codes c_codes) suffix))
+        (list_append
+          UInt8
+          a_codes
+          (list_append UInt8 b_codes (list_append UInt8 c_codes suffix)))
+        ((proof assoc for list_append) UInt8 a_codes (list_append UInt8 b_codes c_codes) suffix)
+        (cong
+          (List UInt8)
+          (List UInt8)
+          (list_append UInt8 (list_append UInt8 b_codes c_codes) suffix)
+          (list_append UInt8 b_codes (list_append UInt8 c_codes suffix))
+          (λcodes. list_append UInt8 a_codes codes)
+          ((proof assoc for list_append) UInt8 b_codes c_codes suffix))
+  in
+    trans
+      (List UInt8)
+      (bytes_to_list (bytes_concat first_three last_two))
+      (list_append UInt8 (bytes_to_list first_three) (bytes_to_list last_two))
+      (list_append UInt8 a_codes (list_append UInt8 b_codes (list_append UInt8 c_codes suffix)))
+      (bytes_concat_list_view first_three last_two)
+      (trans
+        (List UInt8)
+        (list_append UInt8 (bytes_to_list first_three) (bytes_to_list last_two))
+        (list_append UInt8 prefix (bytes_to_list last_two))
+        (list_append
+          UInt8
+          a_codes
+          (list_append UInt8 b_codes (list_append UInt8 c_codes suffix)))
+        prefix_extended
+        (trans
+          (List UInt8)
+          (list_append UInt8 prefix (bytes_to_list last_two))
+          (list_append UInt8 prefix suffix)
+          (list_append
+            UInt8
+            a_codes
+            (list_append UInt8 b_codes (list_append UInt8 c_codes suffix)))
+          suffix_extended
+          associate_suffix))
+
+theorem list_append_five_suffix
+      (a : Type)
+      (first : List a)
+      (second : List a)
+      (third : List a)
+      (fourth : List a)
+      (fifth : List a)
+      (rest : List a)
+    : Equal
+        (List a)
+        (list_append
+          a
+          (list_append
+            a
+            first
+            (list_append a second (list_append a third (list_append a fourth fifth))))
+          rest)
+        (list_append
+          a
+          first
+          (list_append
+            a
+            second
+            (list_append a third (list_append a fourth (list_append a fifth rest))))) =
+  let
+    tail_one : List a = list_append a second (list_append a third (list_append a fourth fifth));
+    tail_two : List a = list_append a third (list_append a fourth fifth);
+    tail_three : List a = list_append a fourth fifth;
+    start : List a = list_append a (list_append a first tail_one) rest;
+    after_first : List a = list_append a first (list_append a tail_one rest);
+    after_second : List a =
+      list_append a first (list_append a second (list_append a tail_two rest));
+    after_third : List a =
+      list_append
+        a
+        first
+        (list_append a second (list_append a third (list_append a tail_three rest)));
+    after_fourth : List a =
+      list_append
+        a
+        first
+        (list_append
+          a
+          second
+          (list_append a third (list_append a fourth (list_append a fifth rest))))
+  in
+    trans
+      (List a)
+      start
+      after_first
+      after_fourth
+      ((proof assoc for list_append) a first tail_one rest)
+      (trans
+        (List a)
+        after_first
+        after_second
+        after_fourth
+        (cong
+          (List a)
+          (List a)
+          (list_append a tail_one rest)
+          (list_append a second (list_append a tail_two rest))
+          (λxs. list_append a first xs)
+          ((proof assoc for list_append) a second tail_two rest))
+        (trans
+          (List a)
+          after_second
+          after_third
+          after_fourth
+          (cong
+            (List a)
+            (List a)
+            (list_append a tail_two rest)
+            (list_append a third (list_append a tail_three rest))
+            (λxs. list_append a first (list_append a second xs))
+            ((proof assoc for list_append) a third tail_three rest))
+          (cong
+            (List a)
+            (List a)
+            (list_append a tail_three rest)
+            (list_append a fourth (list_append a fifth rest))
+            (λxs. list_append a first (list_append a second (list_append a third xs)))
+            ((proof assoc for list_append) a fourth fifth rest))))
+
 theorem printed_not_bytes_view
       (child : BoolExpr)
     : Equal
@@ -2941,6 +3128,31 @@ theorem printed_not_bytes_view
   bytes_concat_three_view
     (bytes_encode not_open_text)
     (print_bool_expr child)
+    (bytes_encode close_text)
+
+theorem printed_and_bytes_view
+      (left : BoolExpr) (right : BoolExpr)
+    : Equal
+        (List UInt8)
+        (bytes_to_list (print_bool_expr (BAnd left right)))
+        (list_append
+          UInt8
+          (bytes_to_list (bytes_encode and_open_text))
+          (list_append
+            UInt8
+            (bytes_to_list (print_bool_expr left))
+            (list_append
+              UInt8
+              (bytes_to_list (bytes_encode separator_text))
+              (list_append
+                UInt8
+                (bytes_to_list (print_bool_expr right))
+                (bytes_to_list (bytes_encode close_text)))))) =
+  bytes_concat_five_view
+    (bytes_encode and_open_text)
+    (print_bool_expr left)
+    (bytes_encode separator_text)
+    (print_bool_expr right)
     (bytes_encode close_text)
 
 theorem printed_not_suffix_view
@@ -3000,6 +3212,69 @@ theorem printed_not_suffix_view
         (λsuffix. list_append UInt8 open_bytes suffix)
         ((proof assoc for list_append) UInt8 child_bytes close_bytes rest))
 
+theorem printed_and_suffix_view
+      (left : BoolExpr) (right : BoolExpr) (rest : List UInt8)
+    : Equal
+        (List UInt8)
+        (list_append UInt8 (bytes_to_list (print_bool_expr (BAnd left right))) rest)
+        (list_append
+          UInt8
+          (bytes_to_list (bytes_encode and_open_text))
+          (list_append
+            UInt8
+            (bytes_to_list (print_bool_expr left))
+            (list_append
+              UInt8
+              (bytes_to_list (bytes_encode separator_text))
+              (list_append
+                UInt8
+                (bytes_to_list (print_bool_expr right))
+                (list_append UInt8 (bytes_to_list (bytes_encode close_text)) rest))))) =
+  let
+    open_bytes : List UInt8 = bytes_to_list (bytes_encode and_open_text);
+    left_bytes : List UInt8 = bytes_to_list (print_bool_expr left);
+    separator_bytes : List UInt8 = bytes_to_list (bytes_encode separator_text);
+    right_bytes : List UInt8 = bytes_to_list (print_bool_expr right);
+    close_bytes : List UInt8 = bytes_to_list (bytes_encode close_text);
+    unfolded : List UInt8 =
+      list_append
+        UInt8
+        open_bytes
+        (list_append
+          UInt8
+          left_bytes
+          (list_append UInt8 separator_bytes (list_append UInt8 right_bytes close_bytes)))
+  in
+    trans
+      (List UInt8)
+      (list_append UInt8 (bytes_to_list (print_bool_expr (BAnd left right))) rest)
+      (list_append UInt8 unfolded rest)
+      (list_append
+        UInt8
+        open_bytes
+        (list_append
+          UInt8
+          left_bytes
+          (list_append
+            UInt8
+            separator_bytes
+            (list_append UInt8 right_bytes (list_append UInt8 close_bytes rest)))))
+      (cong
+        (List UInt8)
+        (List UInt8)
+        (bytes_to_list (print_bool_expr (BAnd left right)))
+        unfolded
+        (λprefix. list_append UInt8 prefix rest)
+        (printed_and_bytes_view left right))
+      (list_append_five_suffix
+        UInt8
+        open_bytes
+        left_bytes
+        separator_bytes
+        right_bytes
+        close_bytes
+        rest)
+
 theorem spaces_on_nonspace_prefix
       (cur : ByteCursor)
       (prefix : List UInt8)
@@ -3035,6 +3310,152 @@ theorem spaces_on_nonspace_prefix
       different
       starts_with
       mapped)
+
+theorem spaces_on_ascii_token
+      (text : String)
+      (ascii : AllAscii text)
+      (actual : Int)
+      (actual_rest : List Int)
+      (codes : Equal
+        (List Int)
+        (map Char Int charToInt (string_to_list_char text))
+        (Cons Int actual actual_rest))
+      (different : Equal Int actual separator_code → Bottom)
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  spaces_on_nonspace_prefix
+    cur
+    (bytes_to_list (bytes_encode text))
+    rest
+    actual
+    actual_rest
+    different
+    starts_with
+    (trans
+      (List Int)
+      (map UInt8 Int uint8_to_int (bytes_to_list (bytes_encode text)))
+      (map Char Int charToInt (string_to_list_char text))
+      (Cons Int actual actual_rest)
+      (bytes_encode_ascii_octets text ascii)
+      codes)
+
+theorem spaces_on_true_token
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode true_token_text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  spaces_on_ascii_token
+    true_token_text
+    true_token_ascii
+    true_initial_code
+    true_remaining_codes
+    Refl
+    (λsame. absurd same)
+    cur
+    rest
+    starts_with
+
+theorem spaces_on_false_token
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode false_token_text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  spaces_on_ascii_token
+    false_token_text
+    false_token_ascii
+    false_initial_code
+    false_remaining_codes
+    Refl
+    (λsame. absurd same)
+    cur
+    rest
+    starts_with
+
+theorem spaces_on_not_open_token
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode not_open_text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  spaces_on_ascii_token
+    not_open_text
+    not_open_ascii
+    open_initial_code
+    (Cons Int 110 (Cons Int 111 (Cons Int 116 (Cons Int 32 (Nil Int)))))
+    Refl
+    (λsame. absurd same)
+    cur
+    rest
+    starts_with
+
+theorem spaces_on_and_open_token
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode and_open_text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  spaces_on_ascii_token
+    and_open_text
+    and_open_ascii
+    open_initial_code
+    (Cons Int 97 (Cons Int 110 (Cons Int 100 (Cons Int 32 (Nil Int)))))
+    Refl
+    (λsame. absurd same)
+    cur
+    rest
+    starts_with
+
+theorem spaces_on_close_token
+      (cur : ByteCursor)
+      (rest : List UInt8)
+      (starts_with : Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (bytes_encode close_text)) rest))
+    : Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  spaces_on_ascii_token
+    close_text
+    close_ascii
+    close_code
+    (Nil Int)
+    Refl
+    (λsame. absurd same)
+    cur
+    rest
+    starts_with
 
 theorem spaces_on_empty_suffix
       (cur : ByteCursor) (empty : Equal (List UInt8) (source_suffix cur) (Nil UInt8))
@@ -3088,6 +3509,81 @@ theorem spaces_on_empty_suffix
       cur
       (byte_cursor_locate cur)
       step_rejected
+
+theorem spaces_on_printed_expr
+      (e : BoolExpr)
+    : (cur : ByteCursor)
+      → (rest : List UInt8)
+      → Equal
+        (List UInt8)
+        (source_suffix cur)
+        (list_append UInt8 (bytes_to_list (print_bool_expr e)) rest)
+      → Equal
+        (DecoderResult ByteCursor Span (List UInt8))
+        (spaces_decoder cur)
+        (Decoded ByteCursor Span (List UInt8) (Nil UInt8) cur) =
+  match e {
+    BTrue ↦ λcur. λrest. λstarts_with. spaces_on_true_token cur rest starts_with;
+    BFalse ↦ λcur. λrest. λstarts_with. spaces_on_false_token cur rest starts_with;
+    BNot child ↦
+      λcur.
+        λrest.
+          λstarts_with.
+            let
+              child_and_close : List UInt8 =
+                list_append
+                  UInt8
+                  (bytes_to_list (print_bool_expr child))
+                  (list_append UInt8 (bytes_to_list (bytes_encode close_text)) rest);
+              open_starts : Equal
+                (List UInt8)
+                (source_suffix cur)
+                (list_append
+                  UInt8
+                  (bytes_to_list (bytes_encode not_open_text))
+                  child_and_close) =
+                trans
+                  (List UInt8)
+                  (source_suffix cur)
+                  (list_append UInt8 (bytes_to_list (print_bool_expr (BNot child))) rest)
+                  (list_append
+                    UInt8
+                    (bytes_to_list (bytes_encode not_open_text))
+                    child_and_close)
+                  starts_with
+                  (printed_not_suffix_view child rest)
+            in
+              spaces_on_not_open_token cur child_and_close open_starts;
+    BAnd left right ↦
+      λcur.
+        λrest.
+          λstarts_with.
+            let
+              after_open : List UInt8 =
+                list_append
+                  UInt8
+                  (bytes_to_list (print_bool_expr left))
+                  (list_append
+                    UInt8
+                    (bytes_to_list (bytes_encode separator_text))
+                    (list_append
+                      UInt8
+                      (bytes_to_list (print_bool_expr right))
+                      (list_append UInt8 (bytes_to_list (bytes_encode close_text)) rest)));
+              open_starts : Equal
+                (List UInt8)
+                (source_suffix cur)
+                (list_append UInt8 (bytes_to_list (bytes_encode and_open_text)) after_open) =
+                trans
+                  (List UInt8)
+                  (source_suffix cur)
+                  (list_append UInt8 (bytes_to_list (print_bool_expr (BAnd left right))) rest)
+                  (list_append UInt8 (bytes_to_list (bytes_encode and_open_text)) after_open)
+                  starts_with
+                  (printed_and_suffix_view left right rest)
+            in
+              spaces_on_and_open_token cur after_open open_starts
+  }
 
 fn format_bool_parse_outcome
       (outcome : ParseResult (Syntax BoolExpr))
