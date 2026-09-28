@@ -233,6 +233,47 @@ fn raw_compare_discriminates_all_results_and_strict_negatives() {
     }
 }
 
+// MEASURED: an owner example checks and stays host-readable by owned ID;
+// a later private source reference in that same fenced environment refuses
+// by name. CLAIMED: entry fencing does not install the owner's private scope
+// into later units. THE GAP: Err-path restoration and the caller census
+// separately guard failed fences and other providers.
+fn assert_lawful_fence_scope_is_restored(kind: &str, expression: &str, expected_name: &str) {
+    let (mut env, owned) = lawful_owner();
+    let provider = lawful_id(&env, &owned, "compare_raw");
+    execute_owner_examples(&mut env, &owned, &["lc_example_raw_eq"]);
+    assert_example_references(&env, &owned, "lc_example_raw_eq", provider, false);
+    let source = format!("const scope_probe_{kind} : OrdResult = {expression}");
+    match env.elaborate_file(&source) {
+        Err(ElabError::UnboundName { name, .. } | ElabError::UnresolvedCon { name, .. }) => {
+            assert_eq!(name, expected_name, "{kind} private reference must refuse");
+        }
+        other => panic!("{kind} private reference must refuse by name: {other:?}"),
+    }
+}
+
+/// Promise class: durable private-scope isolation invariant (33 §3.3/§4).
+/// Bare private `compare_raw` must refuse after the actual owner fence runs.
+#[test]
+fn checked_lawful_fences_do_not_leak_bare_private_scope() {
+    assert_lawful_fence_scope_is_restored(
+        "bare",
+        "compare_raw Bool bool_leq True False",
+        "compare_raw",
+    );
+}
+
+/// Promise class: durable private-scope isolation invariant (33 §3.3/§4).
+/// Qualified private `compare_raw` must refuse in the same fenced environment.
+#[test]
+fn checked_lawful_fences_do_not_leak_qualified_private_scope() {
+    assert_lawful_fence_scope_is_restored(
+        "qualified",
+        "Core.Classes.LawfulClasses.compare_raw Bool bool_leq True False",
+        "Core.Classes.LawfulClasses.compare_raw",
+    );
+}
+
 /// Promise class: durable behavior invariant. Client-resolved canonical Ord
 /// Pair/List dictionaries distinguish head, tail, and prefix lexicography.
 #[test]
