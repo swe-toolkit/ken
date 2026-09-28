@@ -1002,9 +1002,9 @@ pub struct StaticResponseFeasibilityObservation {
     pub producer_call_origin: u32,
     pub response_origin: u32,
     pub vis_origin: u32,
-    /// The actual selected dispatch root, not a global constructor lookup.
-    pub selected_dispatch_root: u32,
-    /// The enclosing ITree::Vis case CM, when the root has one.
+    /// The selected producer leaf Match, not a global constructor lookup.
+    pub selected_leaf: u32,
+    /// The enclosing ITree::Vis case CM, when the leaf has one.
     pub eliminating_cm: Option<u32>,
     /// Plain child-origin subtree search, independent of the selector's walk.
     pub cm_scrutinee_contains_vis: bool,
@@ -1155,7 +1155,7 @@ fn record_static_response_feasibility_diagnostic(
                 let observations = rows
                     .iter()
                     .map(|row| {
-                        let (root, cm, contains_vis) = plan.observed_host_response_dispatch(
+                        let (leaf, cm, contains_vis) = plan.observed_host_response_dispatch(
                             row.vis_origin(), row.producer_call_origin(),
                         )?;
                         Ok(StaticResponseFeasibilityObservation {
@@ -1163,7 +1163,7 @@ fn record_static_response_feasibility_diagnostic(
                             producer_call_origin: row.producer_call_origin().0,
                             response_origin: row.response_origin().0,
                             vis_origin: row.vis_origin().0,
-                            selected_dispatch_root: root.0,
+                            selected_leaf: leaf.0,
                             eliminating_cm: cm.map(|origin| origin.0),
                             cm_scrutinee_contains_vis: contains_vis,
                             operation: format!("{:?}", row.operation()),

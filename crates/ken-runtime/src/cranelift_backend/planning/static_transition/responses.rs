@@ -1281,39 +1281,12 @@ fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, 
     Ok(parents)
 }
 
-// erasure.rs::lower_runtime_selected_host_operation: each generated coproduct
-// InL/InR Match descends into a leaf Match, and the outermost Match is the
-// dispatch root. A source Match, even one that contains the leaf syntactically,
-// is not an operation dispatch and must not become its occurrence identity.
-fn host_response_dispatch_root(
-    plan: &StaticTransitionPlan<'_>,
-    parents: &ResponseParents,
-    leaf: StaticOriginId,
-) -> Result<StaticOriginId, CraneliftBackendError> {
-    let mut root = leaf;
-    while let Some((parent, position)) = parents.get(&root).copied() {
-        let RuntimeExpr::Match { cases, .. } = plan.planned_occurrence_expr(parent)? else {
-            break;
-        };
-        let Some(case) = position.checked_sub(1).and_then(|index| cases.get(index)) else {
-            break;
-        };
-        if case.binders != 1
-            || !["::Coproduct::InL", "::Coproduct::InR"]
-                .iter()
-                .any(|suffix| case.constructor.as_str().ends_with(suffix))
-        {
-            break;
-        }
-        root = parent;
-    }
-    Ok(root)
-}
-
+// A checked Let->Effect->Call case identifies its own leaf Match. Its
+// enclosing Match ancestors need not be generated operation dispatches:
+// ordinary source matches use the same runtime-IR constructor and binders.
 fn host_response_routes(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<HostResponseRoutes, CraneliftBackendError> {
-    let parents = response_parents(plan)?;
     let mut routes: HostResponseRoutes = BTreeMap::new();
     for occurrence in plan.source_occurrences.iter().flatten() {
         let RuntimeExpr::Match { cases, .. } = occurrence.expr else {
@@ -1344,8 +1317,8 @@ fn host_response_routes(
                 producer_call_origin,
                 response_origin,
             };
-            let root = host_response_dispatch_root(plan, &parents, occurrence.static_origin)?;
-            if routes.entry(root).or_default().insert(case.constructor.clone(), route).is_some() {
+            let leaf = occurrence.static_origin;
+            if routes.entry(leaf).or_default().insert(case.constructor.clone(), route).is_some() {
                 return Err(planner_error(
                     "two host response cases claim one operation constructor",
                 ));
@@ -1378,25 +1351,6 @@ fn response_tail_edge(parent: &RuntimeExpr, position: usize) -> Option<usize> {
             if position == 0 => Some(0),
         _ => None,
     }
-}
-
-fn response_tail_path(
-    plan: &StaticTransitionPlan<'_>,
-    parents: &ResponseParents,
-    body: StaticOriginId,
-    target: StaticOriginId,
-) -> Result<bool, CraneliftBackendError> {
-    let mut cursor = target;
-    while cursor != body {
-        let Some((parent, position)) = parents.get(&cursor).copied() else {
-            return Ok(false);
-        };
-        if response_tail_edge(plan.planned_occurrence_expr(parent)?, position) != Some(0) {
-            return Ok(false);
-        }
-        cursor = parent;
-    }
-    Ok(true)
 }
 
 // The Vis constructor has operation in constructor field 0 and continuation
@@ -1461,11 +1415,95 @@ fn response_forwards_vis(
     }
 }
 
-// Only the multi-candidate population runs this walk. Each positional parent
-// has one owner; every unclassified edge refuses. A CM scrutinee is an
-// eliminator, never itself a tail edge. Its Vis branch must dispatch on the
-// checked op binder or return a literal Vis with that same op binder.
-fn response_vis_dispatch_root(
+// Follow only zero-binder tail edges from a Vis case to the first Match
+// scrutinizing the checked operation binder. A source Match on an unrelated
+// scrutinee cannot become the entry just by enclosing a response leaf.
+// Return whether EVERY reached tail exit found such an entry; a conditional
+// with an unrelated exit is not a proven operation-dispatch flow.
+fn response_dispatch_entries(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    binder: u32,
+    reached: &mut BTreeSet<StaticOriginId>,
+) -> Result<bool, CraneliftBackendError> {
+    let mut pending = vec![origin];
+    let mut complete = true;
+    while let Some(origin) = pending.pop() {
+        let expr = plan.planned_occurrence_expr(origin)?;
+        if matches!(expr, RuntimeExpr::Match { .. }) {
+            let scrutinee = plan.semantic.child_origin(origin, 0)?;
+            if matches!(
+                plan.planned_occurrence_expr(scrutinee)?,
+                RuntimeExpr::Var(index) if *index == binder
+            ) {
+                reached.insert(origin);
+                continue;
+            }
+        }
+        let mut found_tail = false;
+        for (position, child) in plan
+            .semantic
+            .child_origins(origin)?
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            if response_tail_edge(expr, position) == Some(0) {
+                found_tail = true;
+                pending.push(child);
+            }
+        }
+        // Even if another branch reaches an entry, this one cannot be
+        // silently omitted. Keep traversing to detect competing entries.
+        if !found_tail {
+            complete = false;
+        }
+    }
+    Ok(complete)
+}
+
+// At a dispatch Match, each one-binder case can pass only its freshly bound
+// payload, Var(0), to the next Match. Producer keys are checked leaf Matches;
+// no generated/source marker or constructor spelling is required.
+fn response_dispatch_leaves(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    binder: u32,
+    candidates: &BTreeMap<StaticOriginId, HostResponseRoute>,
+    reached: &mut BTreeSet<StaticOriginId>,
+) -> Result<(), CraneliftBackendError> {
+    let RuntimeExpr::Match { cases, .. } = plan.planned_occurrence_expr(origin)? else {
+        return Ok(());
+    };
+    let scrutinee = plan.semantic.child_origin(origin, 0)?;
+    if !matches!(
+        plan.planned_occurrence_expr(scrutinee)?,
+        RuntimeExpr::Var(index) if *index == binder
+    ) {
+        return Ok(());
+    }
+    if candidates.contains_key(&origin) {
+        reached.insert(origin);
+    }
+    for (index, case) in cases.iter().enumerate() {
+        if case.binders != 1 {
+            continue;
+        }
+        let body = plan.semantic.child_origin(origin, index + 1)?;
+        let mut next = BTreeSet::new();
+        response_dispatch_entries(plan, body, 0, &mut next)?;
+        for child in next {
+            response_dispatch_leaves(plan, child, 0, candidates, reached)?;
+        }
+    }
+    Ok(())
+}
+
+// Only the multi-candidate population runs this walk. Positional parents
+// classify the Vis-to-CM path; at its Vis case, descend by the checked op
+// binder, not by the syntax or supposed provenance of Match ancestors.
+// A CM scrutinee is an eliminator, never itself a tail edge.
+fn response_vis_dispatch_leaf(
     plan: &StaticTransitionPlan<'_>,
     parents: &ResponseParents,
     vis_origin: StaticOriginId,
@@ -1491,22 +1529,23 @@ fn response_vis_dispatch_root(
                     return Ok(None);
                 };
                 let body = plan.semantic.child_origin(parent, case_index + 1)?;
-                let mut reached = None;
-                for root in candidates.keys().copied() {
-                    let RuntimeExpr::Match { .. } = plan.planned_occurrence_expr(root)? else {
-                        continue;
-                    };
-                    let scrutinee = plan.semantic.child_origin(root, 0)?;
-                    if matches!(plan.planned_occurrence_expr(scrutinee)?, RuntimeExpr::Var(index) if *index == op_binder)
-                        && response_tail_path(plan, parents, body, root)?
-                    {
-                        if reached.replace(root).is_some() {
-                            return Ok(None);
-                        }
+                let mut entries = BTreeSet::new();
+                let complete = response_dispatch_entries(plan, body, op_binder, &mut entries)?;
+                if !entries.is_empty() {
+                    // More than one entry, or a branch without one, represents
+                    // alternatives rather than one guaranteed operation flow.
+                    if !complete || entries.len() != 1 {
+                        return Ok(None);
                     }
-                }
-                if reached.is_some() {
-                    return Ok(reached);
+                    let mut reached = BTreeSet::new();
+                    response_dispatch_leaves(
+                        plan,
+                        *entries.first().unwrap(),
+                        op_binder,
+                        candidates,
+                        &mut reached,
+                    )?;
+                    return Ok((reached.len() == 1).then(|| *reached.first().unwrap()));
                 }
                 if !response_forwards_vis(plan, body, op_binder)? {
                     return Ok(None);
@@ -1534,17 +1573,17 @@ fn selected_host_response_route(
         if let RuntimeExpr::Construct { constructor, .. } = plan.planned_occurrence_expr(origin)? {
             let candidates = routes
                 .iter()
-                .filter_map(|(root, cases)| cases.get(constructor).copied().map(|route| (*root, route)))
+                .filter_map(|(leaf, cases)| cases.get(constructor).copied().map(|route| (*leaf, route)))
                 .collect::<BTreeMap<_, _>>();
             let route = match candidates.len() {
                 0 => None,
                 1 => candidates.values().next().copied(),
                 _ => {
                     let parents = response_parents(plan)?;
-                    let Some(root) = response_vis_dispatch_root(plan, &parents, vis_origin, &candidates)? else {
+                    let Some(leaf) = response_vis_dispatch_leaf(plan, &parents, vis_origin, &candidates)? else {
                         return Err(planner_error("one response Vis selects a constructor with more than one host response occurrence and no structural path to exactly one of them"));
                     };
-                    candidates.get(&root).copied()
+                    candidates.get(&leaf).copied()
                 }
             };
             if let Some(route) = route {
@@ -1562,9 +1601,9 @@ fn selected_host_response_route(
 }
 
 // Observation only: the checked response row already carries the selected
-// producer Call. Project its dispatch root, then independently inspect the
-// selected CM's scrutinee subtree; never use the selector's value-flow walk
-// as the oracle for containment. This adds no production route or authority.
+// producer Call. Project its leaf, then independently inspect the selected
+// CM's scrutinee subtree; never use the selector's value-flow walk as the
+// oracle for containment. This adds no production route or authority.
 #[cfg(feature = "px8-ds-test-support")]
 impl StaticTransitionPlan<'_> {
     pub(super) fn observed_host_response_dispatch(
@@ -1576,14 +1615,14 @@ impl StaticTransitionPlan<'_> {
         let mut matching = routes.iter().filter(|(_, cases)| {
             cases.values().any(|route| route.producer_call_origin == producer_call_origin)
         });
-        let Some((&root, _)) = matching.next() else {
-            return Err(planner_error("an observed response call has no dispatch root"));
+        let Some((&leaf, _)) = matching.next() else {
+            return Err(planner_error("an observed response call has no dispatch leaf"));
         };
         if matching.next().is_some() {
-            return Err(planner_error("an observed response call has multiple dispatch roots"));
+            return Err(planner_error("an observed response call has multiple dispatch leaves"));
         }
         let parents = response_parents(self)?;
-        let mut cursor = root;
+        let mut cursor = leaf;
         while let Some((parent, position)) = parents.get(&cursor).copied() {
             if let RuntimeExpr::ComputationalMatch { cases, .. } =
                 self.planned_occurrence_expr(parent)?
@@ -1600,12 +1639,12 @@ impl StaticTransitionPlan<'_> {
                         }
                         pending.extend(self.semantic.child_origins(origin)?.iter().copied());
                     }
-                    return Ok((root, Some(parent), contains_vis));
+                    return Ok((leaf, Some(parent), contains_vis));
                 }
             }
             cursor = parent;
         }
-        Ok((root, None, false))
+        Ok((leaf, None, false))
     }
 }
 
@@ -4554,7 +4593,7 @@ mod tests {
     }
 
     #[test]
-    fn same_dispatch_root_cannot_claim_one_constructor_twice() {
+    fn same_leaf_cannot_claim_one_constructor_twice() {
         let constructor = "ctor:fixture::FSOp::Allocate";
         let root = RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Var(1)),
@@ -4563,11 +4602,92 @@ mod tests {
         };
         let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
             Err(error) => error,
-            Ok(_) => panic!("one dispatch root must reject a duplicate case before lookup"),
+            Ok(_) => panic!("one producer leaf must reject a duplicate case before lookup"),
         };
         assert!(
             format!("{error:?}").contains("two host response cases claim one operation constructor"),
             "unexpected response-route refusal: {error:?}"
+        );
+    }
+
+    #[test]
+    fn source_inl_match_is_not_the_generated_dispatch_root() {
+        let root = RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            cases: vec![RuntimeMatchCase {
+                constructor: "ctor:fixture::Coproduct::InL".to_string(),
+                binders: 1,
+                body: host_response_root("ctor:fixture::FSOp::Allocate"),
+            }],
+            default: trap(),
+        };
+        let plan = super::super::plan_static_transition_graph(&root, &BTreeMap::new())
+            .expect("the source-match wrapper is a representable planned expression");
+        let outer = plan.source_occurrences.iter().flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::Match { cases, .. }
+                if cases.iter().any(|case| case.constructor.ends_with("::Coproduct::InL"))))
+            .expect("source match is in the plan")
+            .static_origin;
+        let routes = host_response_routes(&plan).expect("one response case has one route");
+        assert_eq!(routes.len(), 1);
+        assert!(
+            !routes.contains_key(&outer),
+            "a source InL Match surrounding the producer is not itself a producer leaf"
+        );
+        let (&leaf, cases) = routes.iter().next().unwrap();
+        assert_ne!(leaf, outer);
+        assert!(cases.contains_key("ctor:fixture::FSOp::Allocate"));
+    }
+
+    #[test]
+    fn source_match_on_op_binder_selects_its_effect_leaf() {
+        let constructor = "ctor:fixture::FSOp::Allocate";
+        let vis = RuntimeExpr::Construct {
+            constructor: "ctor:fixture::ITree::Vis".to_string(),
+            args: vec![
+                RuntimeExpr::Construct {
+                    constructor: constructor.to_string(),
+                    args: Vec::new(),
+                },
+                RuntimeExpr::Value(RuntimeValue::Unknown),
+            ],
+        };
+        // The source Match itself scrutinizes the CM's checked operation
+        // binder, performs an Effect, and calls its checked continuation.
+        // Another leaf outside the CM has the identical constructor: the
+        // single-candidate shortcut cannot select the desired producer.
+        let root = RuntimeExpr::If {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            then_expr: Box::new(RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(vis),
+                cases: vec![RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::ITree::Vis".to_string(),
+                    argument_binders: 2,
+                    recursive_positions: vec![1],
+                    body: host_response_root(constructor),
+                }],
+                default: trap(),
+            }),
+            else_expr: Box::new(host_response_root(constructor)),
+        };
+        let plan = super::super::plan_static_transition_graph(&root, &BTreeMap::new())
+            .expect("both source response producers are representable");
+        let cm = plan.source_occurrences.iter().flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::ComputationalMatch { .. }))
+            .expect("source computational match has an origin")
+            .static_origin;
+        let vis_origin = plan.semantic.child_origin(cm, 0).unwrap();
+        let operation_origin = plan.semantic.child_origin(vis_origin, 0).unwrap();
+        let source_match = plan.semantic.child_origin(cm, 1).unwrap();
+        let routes = host_response_routes(&plan).unwrap();
+        assert_eq!(routes.len(), 2, "the second producer requires the descent");
+        let selected = selected_host_response_route(&plan, vis_origin, operation_origin, &routes)
+            .unwrap()
+            .expect("the op binder flows into the source Match Effect arm");
+        assert_eq!(
+            selected.0.producer_call_origin,
+            routes[&source_match][constructor].producer_call_origin,
+            "the checked op binder selects the source Match producer, not its sibling"
         );
     }
 

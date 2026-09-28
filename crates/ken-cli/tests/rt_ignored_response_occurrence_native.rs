@@ -58,20 +58,20 @@ fn run_sequential_brackets_witness() {
         "two occurrences of one response constructor must select distinct calls"
     );
     assert_ne!(
-        rows[0].selected_dispatch_root, rows[1].selected_dispatch_root,
-        "the selected calls must belong to distinct dispatch roots"
+        rows[0].selected_leaf, rows[1].selected_leaf,
+        "the selected calls must belong to distinct producer leaves"
     );
     for row in &rows {
         assert!(
             row.eliminating_cm.is_some(),
-            "Vis {}: selected root {} must have a Vis-case CM",
+            "Vis {}: selected leaf {} must have a Vis-case CM",
             row.vis_origin,
-            row.selected_dispatch_root,
+            row.selected_leaf,
         );
         assert!(
             row.cm_scrutinee_contains_vis,
-            "Vis {}: selected root {} in CM {:?} must be in that CM's scrutinee",
-            row.vis_origin, row.selected_dispatch_root, row.eliminating_cm,
+            "Vis {}: selected leaf {} in CM {:?} must be in that CM's scrutinee",
+            row.vis_origin, row.selected_leaf, row.eliminating_cm,
         );
     }
     assert_ne!(rows[0].eliminating_cm, rows[1].eliminating_cm);
