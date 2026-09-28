@@ -52,6 +52,10 @@ One of the following, as ruled at AC-0:
 
 - **AC-0 (probe, then ruling).**
   - Re-run the repro and its control at the landed base.
+  - Probe a `pure True` layer, which never recurses, on the empty cursor
+    (Architect `evt_31j0qdmc443nw`). If it fails, the defect is in the seed
+    itself, and a claim-correction route must state that
+    `decoder_recursive` cannot succeed at an exhausted cursor.
   - Probe the JSON consumer.
   - Report whether a reseed changes any public statement, including
     `decoder_recursive_succeeds`'s `positive` premise.
