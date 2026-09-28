@@ -1,7 +1,7 @@
 ---
 id: LANG-KENFMT-AXIOM-CLOSING-PAREN
 title: "Formatter repair: ken fmt must print a valid axiom declaration whose type ends in a parenthesized application without dropping the final closing parenthesis, so formatting is parse-preserving and idempotent on every axiom shape"
-status: ready
+status: active
 owner: foundation
 size: S
 gate: architect

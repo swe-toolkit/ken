@@ -1,7 +1,7 @@
 ---
 id: CAT-MAP-CANONICAL-LEQ-NAT
 title: "Replace Map's private leq_nat reimplementation with the canonical Core.Classes.LawfulClasses.leq_nat, if Map can import it without changing its public surface, trust closure or pinned provider edges"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -83,6 +83,17 @@ import-cycle constraint.
 - Any kernel, `trusted_base()` or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Landed in three commits. Increment 1 (`c3896b72e`, respin `19dfa5e7d` after
+the CI red on `a1a538d85`) imports the canonical `leq_nat` and deletes Map's
+duplicate and its three proofs. The Spec amendment (`a215e140d`) names
+LawfulClasses as the Nat-order provider in §58 §§2 and 8 and the CAT-4 seed.
+Increment 2 (`8dd81d7b6`) deletes Map's private `total_leq_nat`, the unused
+import and the or-tags test that never measured Map's copy. Map now defines no
+Nat order; main conforms to §58 again. Carried to the Architect: the first
+client that needs a public Or-valued Nat totality (`evt_7zwcp751eb3zd`).
 
 ## SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 
