@@ -662,12 +662,15 @@ not Ken import bypasses. None is a proposed migration probe.
 The per-site result ledger is `/tmp/lang-direct-writer-probe-results.tsv`
 (SHA-256 `b6ccb89464f8ebc1a96e2d37807437b23b08eb385eaa6144f6b3f84d6cdea3b3`);
 `/tmp/lang-direct-writer-probe-<probe>.log` holds the exact command output.
-The first four attempted probes were invalid compile failures caused by the
-probe script leaving a receiver (`env.None`), not by the writer; they are
-retained only as `/tmp/lang-direct-writer-probe-<probe>-invalid-build.log` and
-were replaced by four compile-preserving runs. They are not in the valid
-result count. All source blobs were restored and the final worktree diff
-contains only this issue appendix.
+The first four attempted probes were invalid compiler failures caused by
+leaving `env.` before the stub, not by the writer. CAT3-575 and CC6b42 used
+`env./* per-writer no-op */ None::<ken_kernel::GlobalId>` (E0609: no field
+`None`); CAT5-48 and DEQUE-38 used `env./* per-writer no-op */ ()`
+(unexpected `(`, E0618: expected function). None ran a test. Their logs remain
+at `/tmp/lang-direct-writer-probe-<probe>-invalid-build.log`; each was rerun
+with a compile-preserving no-op after removing the receiver. They are not in
+the valid 24-run result count. All source blobs were restored and the final
+worktree diff contains only this issue appendix.
 
 | Site | Method | Class | Provider or control reason | Route/item | Probe, single target |
 |---|---|---|---|---|---|
