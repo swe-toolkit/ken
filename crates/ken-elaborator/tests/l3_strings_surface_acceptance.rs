@@ -22,10 +22,96 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
+const DERIVED: &str = "Data.Collections.Derived";
+
+// MEASURED: the roots loader owns the five private operations; the checked
+// fences produce transparent example IDs that reference those owned IDs.
+// CLAIMED: the value probes exercise Derived's private operations in their
+// owner scope without publishing them or introducing trust.
+// THE GAP: the requested examples are authenticated here, not every fence in
+// the package. The four disposable no-op-door runs test alias independence.
+fn l3_owner_examples(examples: &[(&str, &[&str])]) -> (ElabEnv, BTreeMap<String, GlobalId>) {
+    let mut env = ElabEnv::new().expect("base environment");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], DERIVED)
+        .expect("the real Derived provider and dependency closure must roots-load");
+    let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let owned_ops: BTreeMap<_, _> = ["concat", "slice", "char_at", "eq", "compare"]
+        .into_iter()
+        .map(|name| {
+            (
+                name,
+                catalog_or::provider_owned_id(&env, &owned, DERIVED, name)
+                    .unwrap_or_else(|error| panic!("{name} must be Derived-owned: {error}")),
+            )
+        })
+        .collect();
+    for (name, _) in examples {
+        assert!(
+            !env.globals.contains_key(*name)
+                && !env.globals.contains_key(&format!("{DERIVED}.{name}")),
+            "{name} must not be a tangled or published declaration"
+        );
+    }
+    env.execute_loaded_entry_checked_fences(DERIVED)
+        .expect("Derived owner-local examples and rejects must all check");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "owner examples must not add trust"
+    );
+    for (name, id) in &owned_ops {
+        assert_eq!(
+            catalog_or::provider_owned_id(&env, &owned, DERIVED, name),
+            Ok(*id),
+            "fence execution must preserve the owner identity for {name}"
+        );
+    }
+    let mut checked = BTreeMap::new();
+    for (name, operations) in examples {
+        let id = *env
+            .globals
+            .get(*name)
+            .unwrap_or_else(|| panic!("{name} must check in the owner fence"));
+        assert!(
+            !owned.contains(&id),
+            "{name} must not be a provider declaration"
+        );
+        assert!(
+            !env.globals.contains_key(&format!("{DERIVED}.{name}")),
+            "{name} must not become a public provider binding"
+        );
+        let decl = env
+            .env
+            .lookup(id)
+            .expect("checked example must resolve by ID");
+        assert!(
+            matches!(decl, Decl::Transparent { .. }),
+            "{name} must be a checked transparent declaration"
+        );
+        let refs = catalog_or::declaration_references(decl);
+        for operation in *operations {
+            assert!(
+                refs.contains(&owned_ops[*operation]),
+                "{name} must reference Derived-owned {operation}"
+            );
+        }
+        checked.insert((*name).to_owned(), id);
+    }
+    (env, checked)
+}
+
+fn l3_example_id(checked: &BTreeMap<String, GlobalId>, name: &str) -> GlobalId {
+    *checked
+        .get(name)
+        .unwrap_or_else(|| panic!("missing checked {name}"))
+}
 
 fn mk_env_with_derived_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::new().expect("base env");
@@ -287,44 +373,72 @@ fn list_floor_recursion_in_sct_sound_zone() {
 #[test]
 fn derived_string_ops_reduce_over_real_roundtrip() {
     run_with_big_stack(|| {
-        let mut env = mk_env();
+        let (mut env, checked) = l3_owner_examples(&[
+            ("derived_example_l3_concat_ascii", &["concat"]),
+            ("derived_example_l3_concat_multibyte", &["concat"]),
+            ("derived_example_l3_slice_ordinary", &["slice"]),
+            ("derived_example_l3_slice_clamp", &["slice"]),
+            ("derived_example_l3_slice_underflow", &["slice"]),
+            ("derived_example_l3_char_at_found", &["char_at"]),
+            ("derived_example_l3_char_at_oob", &["char_at"]),
+            ("derived_example_l3_char_at_empty", &["char_at"]),
+        ]);
         let mut store = make_store(&env);
 
         // concat, including a multi-byte pair (CJK), preserves every scalar.
-        let v = eval_view(&mut env, &mut store, "t_concat", "String", "concat \"ab\" \"cd\"");
-        assert_eq!(v, EvalVal::Str("abcd".into()), "concat \"ab\" \"cd\" must be \"abcd\"");
-        let v = eval_view(&mut env, &mut store, "t_concat_mb", "String", "concat \"世\" \"界\"");
-        assert_eq!(v, EvalVal::Str("世界".into()), "concat must preserve multi-byte scalars");
+        let v = eval_def(
+            &env,
+            &mut store,
+            l3_example_id(&checked, "derived_example_l3_concat_ascii"),
+        );
+        assert_eq!(
+            v,
+            EvalVal::Str("abcd".into()),
+            "concat \"ab\" \"cd\" must be \"abcd\""
+        );
+        let v = eval_def(
+            &env,
+            &mut store,
+            l3_example_id(&checked, "derived_example_l3_concat_multibyte"),
+        );
+        assert_eq!(
+            v,
+            EvalVal::Str("世界".into()),
+            "concat must preserve multi-byte scalars"
+        );
 
         // slice: ordinary, over-range clamp, and j < i (empty, no underflow).
-        let v = eval_view(
-            &mut env,
+        let v = eval_def(
+            &env,
             &mut store,
-            "t_slice1",
-            "String",
-            &format!("slice ({}) ({}) \"abcde\"", nat(1), nat(3)),
+            l3_example_id(&checked, "derived_example_l3_slice_ordinary"),
         );
-        assert_eq!(v, EvalVal::Str("bc".into()), "slice 1 3 \"abcde\" must be \"bc\"");
+        assert_eq!(
+            v,
+            EvalVal::Str("bc".into()),
+            "slice 1 3 \"abcde\" must be \"bc\""
+        );
 
-        let v = eval_view(
-            &mut env,
+        let upper_id = env
+            .elaborate_decl(&format!("const l3_clamp_upper : Nat = {}", nat(99)))
+            .expect("the original 99-step clamp index must check in the host");
+        let upper = eval_def(&env, &mut store, upper_id);
+        let clamp = eval_def(
+            &env,
             &mut store,
-            "t_slice_clamp",
-            "String",
-            &format!("slice ({}) ({}) \"abc\"", nat(0), nat(99)),
+            l3_example_id(&checked, "derived_example_l3_slice_clamp"),
         );
+        let v = apply(clamp, upper, &env.env, &mut store);
         assert_eq!(
             v,
             EvalVal::Str("abc".into()),
             "slice 0 99 \"abc\" must clamp to \"abc\" (over-range take stops at the end)"
         );
 
-        let v = eval_view(
-            &mut env,
+        let v = eval_def(
+            &env,
             &mut store,
-            "t_slice_underflow",
-            "String",
-            &format!("slice ({}) ({}) \"abc\"", nat(2), nat(1)),
+            l3_example_id(&checked, "derived_example_l3_slice_underflow"),
         );
         assert_eq!(
             v,
@@ -335,19 +449,35 @@ fn derived_string_ops_reduce_over_real_roundtrip() {
         // char_at: Option Char, honest absence.
         let some_id = env.globals["Some"];
         let none_id = env.globals["None"];
-        let v = eval_view(&mut env, &mut store, "t_charat1", "Option Char", &format!("char_at ({}) \"abc\"", nat(1)));
+        let v = eval_def(
+            &env,
+            &mut store,
+            l3_example_id(&checked, "derived_example_l3_char_at_found"),
+        );
         match v {
             EvalVal::Ctor { id, ref args, .. } if id == some_id => {
-                assert_eq!(args[1], EvalVal::Int('b' as i64), "char_at 1 \"abc\" must be Some 'b'");
+                assert_eq!(
+                    args[1],
+                    EvalVal::Int('b' as i64),
+                    "char_at 1 \"abc\" must be Some 'b'"
+                );
             }
             other => panic!("char_at 1 \"abc\" must be Some 'b'; got {other:?}"),
         }
-        let v = eval_view(&mut env, &mut store, "t_charat_oob", "Option Char", &format!("char_at ({}) \"abc\"", nat(5)));
+        let v = eval_def(
+            &env,
+            &mut store,
+            l3_example_id(&checked, "derived_example_l3_char_at_oob"),
+        );
         assert!(
             matches!(v, EvalVal::Ctor { id, .. } if id == none_id),
             "char_at 5 \"abc\" must be None"
         );
-        let v = eval_view(&mut env, &mut store, "t_charat_empty", "Option Char", &format!("char_at ({}) \"\"", nat(0)));
+        let v = eval_def(
+            &env,
+            &mut store,
+            l3_example_id(&checked, "derived_example_l3_char_at_empty"),
+        );
         assert!(
             matches!(v, EvalVal::Ctor { id, .. } if id == none_id),
             "char_at 0 \"\" must be None"
@@ -361,41 +491,99 @@ fn derived_string_ops_reduce_over_real_roundtrip() {
 
 #[test]
 fn string_eq_codepoint_wise_accept_reject_pair() {
-    let mut env = mk_env();
+    let (env, checked) = l3_owner_examples(&[
+        ("derived_example_l3_eq_equal", &["eq"]),
+        ("derived_example_l3_eq_codepoint", &["eq"]),
+        ("derived_example_l3_eq_length", &["eq"]),
+    ]);
     let mut store = make_store(&env);
     let true_id = env.globals["True"];
     let false_id = env.globals["False"];
 
-    let v = eval_view(&mut env, &mut store, "t_eq_accept", "Bool", "eq \"abc\" \"abc\"");
-    assert!(matches!(v, EvalVal::Ctor{id,..} if id==true_id), "eq \"abc\" \"abc\" must be True");
+    let v = eval_def(
+        &env,
+        &mut store,
+        l3_example_id(&checked, "derived_example_l3_eq_equal"),
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor{id,..} if id==true_id),
+        "eq \"abc\" \"abc\" must be True"
+    );
 
     // Non-degenerate reject: same length, single codepoint differs — the
     // tightest guard (a length-only equality would pass this and both
     // corpus witnesses below, and only this case catches it).
-    let v = eval_view(&mut env, &mut store, "t_eq_reject_samelen", "Bool", "eq \"abc\" \"abd\"");
-    assert!(matches!(v, EvalVal::Ctor{id,..} if id==false_id), "eq \"abc\" \"abd\" must be False");
+    let v = eval_def(
+        &env,
+        &mut store,
+        l3_example_id(&checked, "derived_example_l3_eq_codepoint"),
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor{id,..} if id==false_id),
+        "eq \"abc\" \"abd\" must be False"
+    );
 
-    let v = eval_view(&mut env, &mut store, "t_eq_reject_len", "Bool", "eq \"ab\" \"abc\"");
-    assert!(matches!(v, EvalVal::Ctor{id,..} if id==false_id), "eq \"ab\" \"abc\" must be False");
+    let v = eval_def(
+        &env,
+        &mut store,
+        l3_example_id(&checked, "derived_example_l3_eq_length"),
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor{id,..} if id==false_id),
+        "eq \"ab\" \"abc\" must be False"
+    );
 }
 
 /// `surface/strings/string-compare-3way-lexicographic-triple`
 #[test]
 fn string_compare_3way_lexicographic_triple() {
-    let mut env = mk_env();
+    let (env, checked) = l3_owner_examples(&[
+        ("derived_example_l3_compare_prefix", &["compare"]),
+        ("derived_example_l3_compare_lex", &["compare"]),
+        ("derived_example_l3_compare_greater", &["compare"]),
+        ("derived_example_l3_compare_equal", &["compare"]),
+    ]);
     let mut store = make_store(&env);
-    let lt_id = env.globals["Lt"];
+    let lt_id = env.globals["Core.Logic.OrdResult.Lt"];
     let eq_id = env.globals["Core.Logic.OrdResult.Eq"];
-    let gt_id = env.globals["Gt"];
+    let gt_id = env.globals["Core.Logic.OrdResult.Gt"];
 
-    let v = eval_view(&mut env, &mut store, "t_cmp1", "OrdResult", "compare \"a\" \"ab\"");
-    assert!(matches!(v, EvalVal::Ctor{id,..} if id==lt_id), "compare \"a\" \"ab\" must be Lt; got {v:?}");
-    let v = eval_view(&mut env, &mut store, "t_cmp2", "OrdResult", "compare \"ab\" \"b\"");
-    assert!(matches!(v, EvalVal::Ctor{id,..} if id==lt_id), "compare \"ab\" \"b\" must be Lt; got {v:?}");
-    let v = eval_view(&mut env, &mut store, "t_cmp3", "OrdResult", "compare \"b\" \"a\"");
-    assert!(matches!(v, EvalVal::Ctor{id,..} if id==gt_id), "compare \"b\" \"a\" must be Gt; got {v:?}");
-    let v = eval_view(&mut env, &mut store, "t_cmp4", "OrdResult", "compare \"ab\" \"ab\"");
-    assert!(matches!(v, EvalVal::Ctor{id,..} if id==eq_id), "compare \"ab\" \"ab\" must be Eq; got {v:?}");
+    let v = eval_def(
+        &env,
+        &mut store,
+        l3_example_id(&checked, "derived_example_l3_compare_prefix"),
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor{id,..} if id==lt_id),
+        "compare \"a\" \"ab\" must be Lt; got {v:?}"
+    );
+    let v = eval_def(
+        &env,
+        &mut store,
+        l3_example_id(&checked, "derived_example_l3_compare_lex"),
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor{id,..} if id==lt_id),
+        "compare \"ab\" \"b\" must be Lt; got {v:?}"
+    );
+    let v = eval_def(
+        &env,
+        &mut store,
+        l3_example_id(&checked, "derived_example_l3_compare_greater"),
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor{id,..} if id==gt_id),
+        "compare \"b\" \"a\" must be Gt; got {v:?}"
+    );
+    let v = eval_def(
+        &env,
+        &mut store,
+        l3_example_id(&checked, "derived_example_l3_compare_equal"),
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor{id,..} if id==eq_id),
+        "compare \"ab\" \"ab\" must be Eq; got {v:?}"
+    );
 }
 
 /// `surface/strings/list-eq-is-codepoint-wise-not-nfc-folding` (property)
@@ -457,19 +645,32 @@ fn list_append_and_bytes_concat_are_distinct_pure_operations() {
 #[test]
 fn concat_slice_compose_and_floor_totality() {
     run_with_big_stack(|| {
-        let mut env = mk_env();
+        let (mut env, checked) =
+            l3_owner_examples(&[("derived_example_l3_slice_concat", &["slice", "concat"])]);
         let mut store = make_store(&env);
 
         // slice 0 (charLength a) (concat a b) ≡ a, on a scalar-clean corpus.
         // charLength "ab" = 2.
-        let v = eval_view(
-            &mut env,
+        let v = eval_def(
+            &env,
             &mut store,
-            "t_roundtrip",
-            "String",
-            &format!("slice ({}) ({}) (concat \"ab\" \"cd\")", nat(0), nat(2)),
+            l3_example_id(&checked, "derived_example_l3_slice_concat"),
         );
-        assert_eq!(v, EvalVal::Str("ab".into()), "slice 0 (charLength \"ab\") (concat \"ab\" \"cd\") must be \"ab\"");
+        assert_eq!(
+            v,
+            EvalVal::Str("ab".into()),
+            "slice 0 (charLength \"ab\") (concat \"ab\" \"cd\") must be \"ab\""
+        );
+
+        // list_append and canonical Nat sub remain public: import each from its
+        // provider instead of relying on the test fixture's flat aliases.
+        assert!(!env.globals.contains_key("list_append"));
+        assert!(!env.globals.contains_key("l3_canonical_nat_sub"));
+        env.elaborate_file(
+            "import Data.Collections.Derived (list_append)\n\
+             import Data.Numeric.Nat.Order (sub as l3_canonical_nat_sub)",
+        )
+        .expect("public list_append and canonical sub must selectively import");
 
         // list_append associativity on a small corpus:
         // list_append (list_append xs ys) zs ≡ list_append xs (list_append ys zs).
