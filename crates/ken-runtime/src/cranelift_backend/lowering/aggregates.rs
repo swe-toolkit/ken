@@ -3197,6 +3197,7 @@ impl<'a> Lowering<'a> {
             let identity = builder.ins().iconst(types::I64, identity.abi_word());
             let malformed = signed_root_trap_token(builder, identity);
             builder.ins().return_(&[malformed]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             builder.switch_to_block(merge);
             Ok(CarriedBoundaryWord {
                 word: builder.block_params(merge)[0],

@@ -1950,9 +1950,10 @@ impl<'a> Lowering<'a> {
         }
 
         fn branch_on_selected_call_status(
+            &mut self,
             builder: &mut FunctionBuilder<'_>,
             status: cranelift_codegen::ir::Value,
-        ) {
+        ) -> Result<(), CraneliftBackendError> {
             let failed = builder.ins().icmp_imm(
                 cranelift_codegen::ir::condcodes::IntCC::NotEqual, status, 0,
             );
@@ -1961,9 +1962,11 @@ impl<'a> Lowering<'a> {
             builder.ins().brif(failed, failure, &[], continued, &[]);
             builder.switch_to_block(failure);
             builder.ins().return_(&[status]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             builder.seal_block(failure);
             builder.switch_to_block(continued);
             builder.seal_block(continued);
+            Ok(())
         }
 
         pub(super) fn issue_selected_call_ticket(
@@ -1990,7 +1993,7 @@ impl<'a> Lowering<'a> {
                 return Err(backend_module("selected issuer returned no status".to_string()));
             };
             let status = *status;
-            Self::branch_on_selected_call_status(builder, status);
+            self.branch_on_selected_call_status(builder, status)?;
             Ok(pointer)
         }
 
@@ -2031,7 +2034,7 @@ impl<'a> Lowering<'a> {
                 return Err(backend_module("selected gate returned no status".to_string()));
             };
             let status = *status;
-            Self::branch_on_selected_call_status(builder, status);
+            self.branch_on_selected_call_status(builder, status)?;
             #[cfg(test)]
             if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
                 == SelectedTicketGateMutation::DuplicateConsume
@@ -2042,7 +2045,7 @@ impl<'a> Lowering<'a> {
                     return Err(backend_module("duplicate gate returned no status".to_string()));
                 };
                 let status = *status;
-                Self::branch_on_selected_call_status(builder, status);
+                self.branch_on_selected_call_status(builder, status)?;
             }
             Ok(())
         }
@@ -2331,6 +2334,7 @@ impl<'a> Lowering<'a> {
                 .brif(failed, failure_block, &[], trap_check_block, &[]);
             builder.switch_to_block(failure_block);
             builder.ins().return_(&[unit_status]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             builder.seal_block(failure_block);
             builder.switch_to_block(trap_check_block);
             builder.seal_block(trap_check_block);
@@ -2373,6 +2377,7 @@ impl<'a> Lowering<'a> {
                         .store(MemFlags::trusted(), trap_word, slots, trap_offset);
                     let no_result = builder.ins().iconst(types::I64, 0);
                     builder.ins().return_(&[no_result]);
+                    self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                 }
                 Some(TrapExitAuthority::Root {
                     process_sentinel: true,
@@ -2385,6 +2390,7 @@ impl<'a> Lowering<'a> {
                     });
                     let process_trap = signed_root_trap_token(builder, trap_word);
                     builder.ins().return_(&[process_trap]);
+                    self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                 }
                 Some(TrapExitAuthority::Root {
                     process_sentinel: false,
@@ -2404,6 +2410,7 @@ impl<'a> Lowering<'a> {
                         crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG,
                     );
                     builder.ins().return_(&[root_token]);
+                    self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                 }
                 None => {
                     return Err(backend_module(

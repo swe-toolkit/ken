@@ -3296,6 +3296,7 @@ fn emit_pending_vis_owner_loop(
     let result_store = builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
     let success = builder.ins().iconst(types::I64, 0);
     builder.ins().return_(&[success]);
+    compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
     builder.switch_to_block(vis);
     let member = builder.ins().load(types::I64, MemFlags::trusted(), frame, region.discriminant);
     let cranelift_codegen::ir::ValueDef::Result(member_load, _) = builder.func.dfg.value_def(member) else {
@@ -3329,6 +3330,7 @@ fn emit_pending_vis_owner_loop(
         builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
         let success = builder.ins().iconst(types::I64, 0);
         builder.ins().return_(&[success]);
+        compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
     } else {
         let invalid = builder.ins().iconst(types::I64, -1);
         builder.ins().return_(&[invalid]);
