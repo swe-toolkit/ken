@@ -1466,18 +1466,24 @@ mod primitive_type_cast_tests {
         let text_id = elab.globals["TextIndex"];
         let (_, text_body) = elab.env.transparent_body(elab.globals["textIndexValue"])
             .expect("closed String has a checked body");
-        let ty = Term::app(Term::indformer(text_id, vec![]), text_body);
+        let ty = Term::app(Term::indformer(text_id, vec![]), text_body.clone());
         let mut store = EvalStore::new();
         assert!(matches!(
             eval(&[], &ty, &elab.env, &mut store),
             EvalVal::IndTypeApp { args, .. } if matches!(args.first(), Some(EvalVal::Str(_)))
         ));
+        let value = Term::app(
+            Term::constructor(elab.globals["MkTextIndex"], vec![]),
+            text_body,
+        );
         let cast = Term::Cast(
             Box::new(ty.clone()),
             Box::new(ty.clone()),
-            Box::new(Term::Refl(Box::new(ty))),
-            Box::new(Term::IntLit(BigInt::from(41))),
+            Box::new(Term::Refl(Box::new(ty.clone()))),
+            Box::new(value),
         );
+        ken_kernel::check(&elab.env, &ken_kernel::Context::new(), &cast, &ty)
+            .expect("the closed String-indexed cast is kernel-checked");
         assert_eq!(eval(&[], &cast, &elab.env, &mut EvalStore::new()), EvalVal::Unknown);
     }
 
