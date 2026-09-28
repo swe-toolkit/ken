@@ -2506,6 +2506,245 @@ pub theorem decoder_recursive_preserves
         layer_preserves
         cur
         good
+
+theorem decoder_positive_excludes_zero_fuel
+      (n : Nat)
+    : Equal Bool (cursor_nat_lt Zero n) True
+      → Equal Bool (cursor_nat_lt n (Suc Zero)) True
+      → Bottom =
+  match n {
+    Zero ↦ λpositive. λbound. absurd positive;
+    Suc rest ↦ λpositive. λbound. absurd bound
+  }
+
+theorem decoder_lt_shrink
+      (k : Nat)
+    : (x : Nat)
+      → (y : Nat)
+      → Equal Bool (cursor_nat_lt x y) True
+      → Equal Bool (cursor_nat_lt y (Suc (Suc k))) True
+      → Equal Bool (cursor_nat_lt x (Suc k)) True =
+  match k {
+    Zero ↦
+      λx.
+        λy.
+          match y {
+            Zero ↦ λsmaller. λbounded. absurd smaller;
+            Suc y2 ↦
+              match y2 {
+                Zero ↦
+                  match x {
+                    Zero ↦ λsmaller. λbounded. Proved;
+                    Suc x2 ↦ λsmaller. λbounded. absurd smaller
+                  };
+                Suc y3 ↦ λsmaller. λbounded. absurd bounded
+              }
+          };
+    Suc k2 ↦
+      λx.
+        λy.
+          match y {
+            Zero ↦ λsmaller. λbounded. absurd smaller;
+            Suc y2 ↦
+              match x {
+                Zero ↦ λsmaller. λbounded. Proved;
+                Suc x2 ↦ λsmaller. λbounded. decoder_lt_shrink k2 x2 y2 smaller bounded
+              }
+          }
+  }
+
+theorem decoder_lt_self_suc (n : Nat) : Equal Bool (cursor_nat_lt n (Suc n)) True =
+  match n {
+    Zero ↦ Proved;
+    Suc n2 ↦ decoder_lt_self_suc n2
+  }
+
+theorem decoder_recursive_fuel_succeeds
+      (fuel : Nat)
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (layer : Decoder c loc a → Decoder c loc a)
+      (spec : c → a → c → Prop)
+      (positive : (cur : c)
+        → (v : a)
+        → (next : c)
+        → spec
+        cur
+        v
+        next
+        → Equal
+        Bool
+        (cursor_nat_lt Zero (cursor_remaining c el loc ops cur))
+        True)
+      (step : (recur : Decoder c loc a)
+        → (cur : c)
+        → ((inner : c)
+          → (v : a)
+          → (next : c)
+          → Equal
+          Bool
+          (cursor_nat_lt
+            (cursor_remaining c el loc ops inner)
+            (cursor_remaining c el loc ops cur))
+          True
+          → spec
+          inner
+          v
+          next
+          → Equal
+          (DecoderResult c loc a)
+          (recur inner)
+          (Decoded c loc a v next))
+        → (v : a)
+        → (next : c)
+        → spec
+        cur
+        v
+        next
+        → Equal
+        (DecoderResult c loc a)
+        (layer recur cur)
+        (Decoded c loc a v next))
+    : (cur : c)
+      → (v : a)
+      → (next : c)
+      → spec cur v next
+      → Equal Bool (cursor_nat_lt (cursor_remaining c el loc ops cur) (Suc fuel)) True
+      → Equal
+        (DecoderResult c loc a)
+        (decoder_recursive_fuel c el loc a ops layer fuel cur)
+        (Decoded c loc a v next) =
+  match fuel {
+    Zero ↦
+      λcur.
+        λv.
+          λnext.
+            λholds.
+              λbounded.
+                absurd
+                  (decoder_positive_excludes_zero_fuel
+                    (cursor_remaining c el loc ops cur)
+                    (positive cur v next holds)
+                    bounded);
+    Suc fuel2 ↦
+      λcur.
+        λv.
+          λnext.
+            λholds.
+              λbounded.
+                step
+                  (decoder_recursive_fuel c el loc a ops layer fuel2)
+                  cur
+                  (λinner.
+                    λinner_v.
+                      λinner_next.
+                        λsmaller.
+                          λinner_holds.
+                            decoder_recursive_fuel_succeeds
+                              fuel2
+                              c
+                              el
+                              loc
+                              a
+                              ops
+                              layer
+                              spec
+                              positive
+                              step
+                              inner
+                              inner_v
+                              inner_next
+                              inner_holds
+                              (decoder_lt_shrink
+                                fuel2
+                                (cursor_remaining c el loc ops inner)
+                                (cursor_remaining c el loc ops cur)
+                                smaller
+                                bounded))
+                  v
+                  next
+                  holds
+  }
+
+pub theorem decoder_recursive_succeeds
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (a : Type)
+      (ops : CursorOps c el loc)
+      (layer : Decoder c loc a → Decoder c loc a)
+      (spec : c → a → c → Prop)
+      (positive : (cur : c)
+        → (v : a)
+        → (next : c)
+        → spec
+        cur
+        v
+        next
+        → Equal
+        Bool
+        (cursor_nat_lt Zero (cursor_remaining c el loc ops cur))
+        True)
+      (step : (recur : Decoder c loc a)
+        → (cur : c)
+        → ((inner : c)
+          → (v : a)
+          → (next : c)
+          → Equal
+          Bool
+          (cursor_nat_lt
+            (cursor_remaining c el loc ops inner)
+            (cursor_remaining c el loc ops cur))
+          True
+          → spec
+          inner
+          v
+          next
+          → Equal
+          (DecoderResult c loc a)
+          (recur inner)
+          (Decoded c loc a v next))
+        → (v : a)
+        → (next : c)
+        → spec
+        cur
+        v
+        next
+        → Equal
+        (DecoderResult c loc a)
+        (layer recur cur)
+        (Decoded c loc a v next))
+    : (cur : c)
+      → (v : a)
+      → (next : c)
+      → spec cur v next
+      → Equal
+        (DecoderResult c loc a)
+        (decoder_recursive c el loc a ops layer cur)
+        (Decoded c loc a v next) =
+  λcur.
+    λv.
+      λnext.
+        λholds.
+          decoder_recursive_fuel_succeeds
+            (cursor_remaining c el loc ops cur)
+            c
+            el
+            loc
+            a
+            ops
+            layer
+            spec
+            positive
+            step
+            cur
+            v
+            next
+            holds
+            (decoder_lt_self_suc (cursor_remaining c el loc ops cur))
 ```
 
 ## 3. Using it
@@ -2522,6 +2761,12 @@ for `recursive` it supplies preservation of the layer for every preserving
 recursive argument. The latter two laws discharge the private fuel cases
 internally rather than exposing a caller fuel budget.
 
+`decoder_recursive_succeeds` proves success on cursors covered by a client's
+`spec`. The client proves those cursors have positive remaining input and
+supplies a layer step that succeeds when recursive calls on strictly smaller
+cursors succeed. The theorem quantifies over no failure result, and neither
+publishes the fuel recursor nor equates it with a re-seeded recursive decoder.
+
 ## 4. Design notes
 
 `DecoderFuelExhausted` is observable only when a cursor or recursive layer
@@ -2535,13 +2780,17 @@ None.
 ## 6. Trust  derivation
 
 Every combinator is transparent, structurally recursive on `Nat` fuel, and
-uses only checked cursor operations. The semantic equations, repetition law, and parametric preservation laws are
-ordinary transparent terms using `J`, structural eliminators, and the prelude
+uses only checked cursor operations. The semantic equations, repetition law,
+and parametric preservation laws are ordinary transparent terms using `J`,
+structural eliminators, and the prelude
 conjunction projections; they import no proof assumption. In particular,
 `decoder_many_preserves` inducts over its private fuel and keeps zero-progress
 and fuel-exhaustion locations valid; `decoder_recursive_preserves` inducts over
-its private fuel and uses a layer-preservation premise. Neither this package
-nor its proof dependencies add an axiom or primitive.
+its private fuel and uses a layer-preservation premise. The success-only
+`decoder_recursive_succeeds` inducts over the same private fuel with a checked
+strict-order bound; its zero-fuel branch contradicts the client's positive
+remaining premise. Neither this package nor its proof dependencies add an axiom
+or primitive.
 
 ## 7. Package  summary
 
@@ -2549,7 +2798,7 @@ Public surface: `DecoderError` with ordinary `DecoderRejected`, `DecoderResult`
 with `Decoded` and `DecoderFailed`, `Decoder`, location projection, and the
 pure, failure, bind, sequence, alternative, predicate-token, repetition, and
 recursive combinators consumed by downstream packages. `DecoderPreserves`,
-`DecoderNonBacktrackable`, the two `alt` branch equations, and the eight
-combinator preservation theorems form the checked public proof interface.
-The older semantic equations, `DecoderManyConsumesAllLaw`, and both fuel
-recursors stay private.
+`DecoderNonBacktrackable`, the two `alt` branch equations, the eight combinator
+preservation theorems, and `decoder_recursive_succeeds` form the checked public
+proof interface. The older semantic equations, `DecoderManyConsumesAllLaw`,
+both fuel recursors, and the new fuel and order lemmas stay private.
