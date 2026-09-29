@@ -335,6 +335,8 @@ fn term_mentions(term: &ken_kernel::Term, target: GlobalId) -> bool {
     }
 }
 
+/// Promise class: normative compatibility vector (exact checked-owned Parsing
+/// name list); the same test pins zero trusted-base delta.
 #[test]
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
     let (mut env, provider_owned) = dependency_env_with_provider_owned();
