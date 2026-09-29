@@ -48,14 +48,23 @@ stop and report the mismatch; do not build around it.
 1. **Measure, in one CI run, before any change.** Record each shard's build
    time, split into three parts: third-party dependencies, the
    workspace-crate chain, and the test binaries (`cargo build --timings`).
-   From that, predict the wall saving of (a) per-shard binary ownership,
-   (b) a first-party dependency cache, and (c) both.
+   Also record each shard's peak disk use and peak memory. From that,
+   predict the wall saving of (a) per-shard binary ownership, (b) a
+   first-party dependency cache, and (c) both.
 2. **If the best prediction saves at least two minutes of wall time,**
    build it:
    - the planner assigns whole test binaries to shards, balanced by
      measured build plus run time;
    - each shard builds only its own binaries;
    - add the dependency cache only if step 1 measured it to help.
+
+3. **Resource recording, kept whatever step 2 decides** (operator
+   2026-09-29). Every build and test job logs its peak disk and memory, and
+   a failed job logs a `df -h` and `free -m` snapshot at failure. This
+   diagnoses the runner SIGBUS on post-landing run `36495621224`
+   (`native-slow (rt_parity_native) 2/10`, 09-28 23:04Z): three minutes of
+   silence during `cargo build --workspace`, then several `rustc` processes
+   and `cargo` died together with exit 135.
 
 ## Acceptance
 
@@ -67,6 +76,9 @@ stop and report the mismatch; do not build around it.
   baseline. The 20-job first wave is unchanged.
 - **AC-3 (control).** A binary removed from every shard's assignment turns
   the union check red.
+- **AC-4 (recording).** Both runs show per-job peak disk and memory in the
+  logs. A deliberately failed step on a scratch branch shows the failure
+  snapshot.
 
 ## Scope
 
@@ -77,7 +89,8 @@ stop and report the mismatch; do not build around it.
 
 ## Stop conditions
 
-- Step 1 predicts under 120 s of saving. Stop with the measurements and do
-  not build; the Steward returns it to the operator.
+- Step 1 predicts under 120 s of saving. Stop with the measurements, land
+  only the recording (step 3), and the Steward returns the rest to the
+  operator.
 - The chosen design needs a 21st job or a third-party action. Stop to the
   Steward.
