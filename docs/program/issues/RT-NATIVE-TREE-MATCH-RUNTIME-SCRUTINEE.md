@@ -43,6 +43,12 @@ Both `rt_escape` rows build natively, run, and match the interpreter.
    constructors. At the refusal, the measured outer is Option. The
    ProcessExitStatus variant was attributed to the ExitCode arms, not
    measured at the merge (Architect `evt_3v31che9af4x1`; §1a 0 to 1).
+5. Byte-1 root guard refuses a carried ExitCode constructor delivered by a
+   continuation-specialization result edge; keyed on the delivering edge's
+   representation (the root guard accepts only an immediate status).
+   Architect `evt_215bv807te16m`; §1a 4 to 5. Byte 1 becomes a third
+   `RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN` AC-1 witness; byte-2 parity stays
+   here.
 
 ## Sequencing (Steward `evt_qej118yh57f8`, R2)
 

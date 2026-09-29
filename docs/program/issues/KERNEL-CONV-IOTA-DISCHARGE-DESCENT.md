@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-IOTA-DISCHARGE-DESCENT
 title: "Conversion never halts on two distinct recursive heads whose neutral elimination sits under a closed ι-redex: the no-progress ledger discharges the head pair on any ι-progress, so a closed `elim_Bool true` resets it every lap. Discharge only on ι-progress that witnesses descent toward the pair's recurrence"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1
