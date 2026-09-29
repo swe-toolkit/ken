@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId};
+use ken_kernel::{Decl, GlobalId, Term};
 
 const STRING_BIJECTION_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Text/StringBijection.ken.md");
@@ -379,11 +379,112 @@ fn located_numeric_discriminators_and_codec_boundary_are_checked() {
     assert!(NUMERIC_SEED.contains("text/numeric/empty-input-located-at-zero"));
     assert!(NUMERIC_SEED.contains("text/numeric/invalid-digit-exact-char-index"));
 
+    // MEASURED: the checked owner example uses Derived's private compare_char
+    // as the comparator argument of the public list_compare operation.
+    // CLAIMED: the concrete alpha/beta String-key order observation survives
+    // without a private flat alias.
+    // THE GAP: one checked pair does not prove general String ordering.
+    let mut owner_env = ElabEnv::new().expect("base environment");
+    let derived = "Data.Collections.Derived";
+    let derived_owned = owner_env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], derived)
+        .expect("Derived must roots-load with its public dependencies");
+    let compare_char_id =
+        catalog_or::provider_owned_id(&owner_env, &derived_owned, derived, "compare_char")
+            .expect("the private Char comparator must be owned by Derived");
+    let compare_provider = "Core.Logic.Compare";
+    let result_provider = "Core.Logic.OrdResult";
+    let compare_owned = owner_env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], compare_provider)
+        .expect("the public comparison provider must roots-load");
+    let result_owned = owner_env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], result_provider)
+        .expect("the public result provider must roots-load");
+    let list_compare_id =
+        catalog_or::provider_owned_id(&owner_env, &compare_owned, compare_provider, "list_compare")
+            .expect("list_compare must belong to its public provider");
+    let ord_result_leq_id =
+        catalog_or::provider_owned_id(&owner_env, &result_owned, result_provider, "ord_result_leq")
+            .expect("ord_result_leq must belong to its public provider");
+    assert_ne!(
+        owner_env.globals.get("compare_char").copied(),
+        Some(compare_char_id),
+        "compare_char must not be a flat client alias"
+    );
+    let example_name = "derived_example_string_key_order_alpha_beta";
+    assert!(
+        !owner_env.globals.contains_key(example_name)
+            && !owner_env
+                .globals
+                .contains_key(&format!("{derived}.{example_name}")),
+        "the owner example must not be a provider declaration or public export"
+    );
+    let trust_before: BTreeSet<_> = owner_env.env.trusted_base().into_iter().collect();
+    owner_env
+        .execute_loaded_entry_checked_fences(derived)
+        .expect("Derived owner examples must check");
+    assert_eq!(
+        owner_env
+            .env
+            .trusted_base()
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
+        trust_before,
+        "the checked example must not add trust"
+    );
+    assert_eq!(
+        catalog_or::provider_owned_id(&owner_env, &derived_owned, derived, "compare_char"),
+        Ok(compare_char_id),
+        "fences must retain the same provider-owned comparator"
+    );
+    let example_id = *owner_env
+        .globals
+        .get(example_name)
+        .expect("owner example must check by its local identity");
+    assert!(!derived_owned.contains(&example_id));
+    assert!(!owner_env
+        .globals
+        .contains_key(&format!("{derived}.{example_name}")));
+    let (_, example_body) = owner_env
+        .env
+        .transparent_body(example_id)
+        .expect("owner example must be a checked transparent definition");
+    fn applied(term: &Term) -> (&Term, Vec<&Term>) {
+        let mut head = term;
+        let mut args = Vec::new();
+        while let Term::App(function, arg) = head {
+            args.push(arg.as_ref());
+            head = function.as_ref();
+        }
+        args.reverse();
+        (head, args)
+    }
+    let (project_head, project_args) = applied(&example_body);
+    assert_eq!(*project_head, Term::const_(ord_result_leq_id, vec![]));
+    assert_eq!(project_args.len(), 1, "order must project one comparison");
+    let (compare_head, compare_args) = applied(project_args[0]);
+    assert_eq!(*compare_head, Term::const_(list_compare_id, vec![]));
+    assert_eq!(
+        compare_args.len(),
+        4,
+        "list comparison needs type, comparator and two lists"
+    );
+    assert_eq!(
+        *compare_args[1],
+        Term::const_(compare_char_id, vec![]),
+        "the actual list comparator must be Derived-owned compare_char"
+    );
+    let mut order_store = make_store(&owner_env);
+    let order_value = eval(&[], &example_body, &owner_env.env, &mut order_store);
+    assert!(
+        bool_value(&owner_env, &order_value),
+        "String ordering must be lexicographic"
+    );
+
     let mut env = full_env();
     for declaration in [
         "const cc2_string_key_equal_compute : Bool = list_eq Char eqChar (string_to_list_char \"alpha\") (string_to_list_char \"alpha\")",
         "const cc2_string_key_distinct_compute : Bool = list_eq Char eqChar (string_to_list_char \"alpha\") (string_to_list_char \"beta\")",
-        "const cc2_string_key_order_compute : Bool = ord_result_leq (list_compare Char compare_char (string_to_list_char \"alpha\") (string_to_list_char \"beta\"))",
     ] {
         env.elaborate_decl(declaration)
             .expect("equivalent String-key discriminator must elaborate");
@@ -404,14 +505,6 @@ fn located_numeric_discriminators_and_codec_boundary_are_checked() {
         ),
         "distinct String keys must compare unequal"
     );
-    assert!(
-        bool_value(
-            &env,
-            &eval_global(&env, &mut store, "cc2_string_key_order_compute")
-        ),
-        "String ordering must be lexicographic"
-    );
-
     let zero = eval_global(&env, &mut store, "digit_zero_result");
     assert_eq!(small_int(ctor_args(&env, &zero, "Some").last().unwrap()), 0);
     let nine = eval_global(&env, &mut store, "digit_nine_result");
@@ -436,13 +529,21 @@ fn located_numeric_discriminators_and_codec_boundary_are_checked() {
     ] {
         let result = eval_global(&env, &mut store, name);
         let diagnostic = ctor_args(&env, &result, "Err").last().unwrap();
-        let fields = ctor_args(&env, diagnostic, "MkDiagnostic");
-        let origin = ctor_args(&env, &fields[0], "ArgumentOrigin");
+        let fields = ctor_args(&env, diagnostic, "Capability.Diagnostics.Core.MkDiagnostic");
+        let origin = ctor_args(
+            &env,
+            &fields[0],
+            "Capability.Diagnostics.Core.ArgumentOrigin",
+        );
         assert_eq!(nat_count(&env, &origin[0]), 2);
-        let range = ctor_args(&env, &origin[1], "MkByteRange");
+        let range = ctor_args(&env, &origin[1], "Capability.Diagnostics.Core.MkByteRange");
         assert_eq!(nat_count(&env, &range[0]), expected_position);
         assert_eq!(nat_count(&env, &range[1]), expected_position);
-        let code = ctor_args(&env, &fields[1], "MkDiagnosticCode");
+        let code = ctor_args(
+            &env,
+            &fields[1],
+            "Capability.Diagnostics.Core.MkDiagnosticCode",
+        );
         assert_eq!(code.last(), Some(&EvalVal::Str(expected_code.into())));
     }
 

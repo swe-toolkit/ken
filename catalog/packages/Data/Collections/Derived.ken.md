@@ -2036,6 +2036,16 @@ const derived_example_l3_compare_equal : OrdResult = compare "ab" "ab"
 const derived_example_l3_slice_concat : String = slice Zero (Suc (Suc Zero)) (concat "ab" "cd")
 ```
 
+This checked String-key observation keeps the private Char comparator in its
+owning package. The list comparison and result projection are imported public
+operations; the example is not a package export.
+
+```ken example
+const derived_example_string_key_order_alpha_beta : Bool =
+  ord_result_leq
+    (list_compare Char compare_char (string_to_list_char "alpha") (string_to_list_char "beta"))
+```
+
 The checked length examples use the private `range` and `zip` operations inside
 this package. The range rejection changes only the claimed endpoint: the same
 proof that establishes length `n` cannot establish length `Suc n`.
