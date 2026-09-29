@@ -278,9 +278,10 @@ reflexivity and transitivity witnesses for the shared comparator, §4.7.12
 proves the successor-set union characterization of `compose` and its membership
 corollary. A checked `Nat` chain refutes transitivity until its missing `0→2`
 edge is added. Under the same lawful comparator and ordered-representation
-premises, the closure laws prove positive-walk faithfulness and saturation. The converse
-membership characterization uses outer `Ordered` and `Distinct` and ordered
-successor sets; the checked chain refutes the unreversed direction.
+premises, the closure laws prove positive-walk faithfulness and saturation.
+The converse membership characterization uses outer `Ordered` and
+`Distinct` and ordered successor sets; the checked chain refutes the
+unreversed direction.
 
 ## 4. Laws & proofs
 
