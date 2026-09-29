@@ -67,6 +67,38 @@ fn group_escape_to_another_member_is_refused_atomically() {
 }
 
 #[test]
+fn malformed_later_member_leaves_an_entire_group_opaque() {
+    let mut env = GlobalEnv::new();
+    let goal = constant(env.top_id());
+    let first = declare_postulate(&mut env, "first".into(), vec![], goal.clone()).unwrap();
+    let second = declare_postulate(&mut env, "second".into(), vec![], goal).unwrap();
+    let cert = constant(env.tt_id());
+    let before = env.clone();
+    let error = admit_bodies(
+        &mut env,
+        &[(first, cert), (second, Term::ty(Level::zero()))],
+    )
+    .unwrap_err();
+    assert!(matches!(error, KernelError::TypeMismatch { .. }));
+    assert_eq!(env, before);
+    assert!(env.trusted_base().contains(&first));
+    assert!(env.trusted_base().contains(&second));
+}
+
+#[test]
+fn duplicate_group_id_does_not_upgrade_or_retire_trust() {
+    let mut env = GlobalEnv::new();
+    let goal = constant(env.top_id());
+    let hole = declare_postulate(&mut env, "hole".into(), vec![], goal).unwrap();
+    let cert = constant(env.tt_id());
+    let before = env.clone();
+    let error = admit_bodies(&mut env, &[(hole, cert.clone()), (hole, cert)]).unwrap_err();
+    assert!(matches!(error, KernelError::IllFormedDecl(ref why) if why.contains("duplicate")));
+    assert_eq!(env, before);
+    assert!(env.trusted_base().contains(&hole));
+}
+
+#[test]
 fn honest_checked_certificate_retires_only_its_hole() {
     let mut env = GlobalEnv::new();
     let goal = constant(env.top_id());
