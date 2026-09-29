@@ -54,6 +54,12 @@ hits above 0) as its parity acceptance, then routes. The two rt_escape rows
 stay ignored, pointing at `RT-NATIVE-SEQUENTIAL-BRACKETS` and
 `RT-JOIN-PHASE-CASE-BINDER-CARRIED`.
 
+**Carry (Architect `evt_erryd8111g8k`).** The six `source.rs`
+`CheckedFrameBranchScope` sites join a consumed ledger by union, which hides
+a one-arm skip (Research `evt_4fp1trpwpxw3q`). Whichever node retires them
+adopts `RT-FRAME-MARKER-ONCE`'s per-key state lattice (E1, E2, R1, R2, N1),
+not a second mechanism.
+
 ## Deliverable
 
 The two rows run green and un-ignored natively, with the interpreter
