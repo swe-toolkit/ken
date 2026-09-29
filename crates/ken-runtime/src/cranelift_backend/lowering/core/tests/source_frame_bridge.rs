@@ -932,11 +932,13 @@ pub(in crate::cranelift_backend::lowering) fn d8n_compile() -> Option<CraneliftB
 /// the slot-marker guard, which is only reachable while the bridge carries a
 /// frame id (`D8m`).
 ///
-/// ## Clause 2 — restoring the old lifetime brings the refusal back
+/// ## Clause 2 — restoring the old lifetime and gate brings refusal back
 ///
-/// The switch shares the set compile-wide again: the exact pre-`D8n` behaviour,
-/// not an invented corruption. ⛔ Without this, "it compiles now" and "nothing
-/// was ever checked" are indistinguishable.
+/// The test-only switch shares the set compile-wide and restores the former
+/// insert-time duplicate gate at the real receipt seam. Both are needed: the
+/// finished-Function validator no longer treats set membership as a refusal.
+/// This is the pre-`D8n` comparator, not a new production rule. ⛔ Without
+/// this, "it compiles now" and "nothing was ever checked" look identical.
 ///
 /// ## Clause 3 — branch successors and separate Functions are different
 ///
@@ -1062,16 +1064,16 @@ fn d8n_checked_frame_consumption_is_per_function_not_per_compile() {
          the number this test happens to write into the plan: {slots:?}"
     );
 
-    // Clause 2 — the old lifetime, restored.
+    // Clause 2 — the old lifetime AND insert-time gate, restored under test.
     set_d8n_compile_wide_lifecycle(true);
     let restored = d8n_compile().map(|error| format!("{error:?}"));
     set_d8n_compile_wide_lifecycle(false);
-    let restored = restored.expect("the compile-wide lifetime must refuse");
+    let restored = restored.expect("the old compile-wide gate must refuse");
     assert!(
-        restored.contains("consumed more than once"),
-        "sharing the consumed-frame set compile-wide must reproduce the second-function duplicate \
-         refusal. If it does not, this witness is no longer splitting one source body across two \
-         Functions and clause 1 is green for a reason it does not name: {restored}"
+        restored.contains("checked Runtime frame marker was consumed more than once"),
+        "sharing the set AND restoring its old insert-time detector must reject the second \
+         Function's duplicate. Otherwise this historical comparator is inert or the fixture no \
+         longer splits one source body across two Functions: {restored}"
     );
 }
 
@@ -2440,17 +2442,17 @@ fn d8m_the_checked_bridge_refuses_every_way_the_transported_identity_can_go_wron
          {source_duplicate}"
     );
 
-    // Duplicate consumption — the lowering-plane law, reached by restoring the
-    // pre-D8n compile-wide ledger lifetime.
+    // Historical duplicate gate — restore both the compile-wide lifetime and
+    // its insert-time check. The current close-time rule remains unmodified.
     set_d8n_compile_wide_lifecycle(true);
     let wide = d8m_two_occurrence_compile((first, second), (first, second), None);
     set_d8n_compile_wide_lifecycle(false);
-    let wide = refusal(wide, "a compile-wide consumed-frame ledger");
+    let wide = refusal(wide, "the old compile-wide insert-time gate");
     assert!(
         wide.contains("checked Runtime frame marker was consumed more than once"),
-        "one source occurrence lowered into two Functions consumes its pair once in each, so a \
-         ledger shared across the compile sees a duplicate. That is the affine law firing at the \
-         consumption seam, on a lawful program: {wide}"
+        "one source occurrence lowered into two Functions consumes its pair once in each; the \
+         restored shared set and old insert-time detector must refuse the second, rather than \
+         misattributing the old gate to today's finished-Function validator: {wide}"
     );
 
     // Wrapper-origin substitution.
