@@ -4,7 +4,7 @@ title: "Cut the per-shard test-build phase of Full CI: each workspace test shard
 status: ready
 owner: verify
 size: M
-gate: architect
+gate: verify-qa
 tier: T2
 depends_on: [V3-Z3-STUB-EXEC-RACE]
 blocks: []
@@ -86,6 +86,12 @@ stop and report the mismatch; do not build around it.
   scripts it calls.
 - Must not move: the test population, any test body, and the `--locked`
   workspace compile check (it may move to one job, but it must stay).
+
+## Gate
+
+Verify QA only. Workflow and CI paths are outside the Architect's domain
+(COORDINATION §8a, §14a). If a change reaches `crates/`, the Architect gate
+returns (Steward kickoff `evt_70t1502evc5w6`).
 
 ## Stop conditions
 
