@@ -8178,15 +8178,26 @@ impl<'a> Lowering<'a> {
                 )));
             }
             let settled_identity = record.identity.clone();
-            self.function_local.composed_discharges
+            self.function_local
+                .composed_discharges
                 .entry(record.identity)
                 .or_default()
                 .insert(record.inst);
             // The composed call has passed every finished-CLIF verification.
             // Its enter and receipt are both anchored to that verified call;
             // two calls on one path become E2 in the token lattice.
-            self.record_checked_call_token_inst(func, FrameEventKind::Activation, &settled_identity, record.inst)?;
-            self.record_checked_call_token_inst(func, FrameEventKind::Receipt, &settled_identity, record.inst)?;
+            self.record_checked_call_token_inst(
+                func,
+                FrameEventKind::Activation,
+                &settled_identity,
+                record.inst,
+            )?;
+            self.record_checked_call_token_inst(
+                func,
+                FrameEventKind::Receipt,
+                &settled_identity,
+                record.inst,
+            )?;
             // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — `ComposedCall`, settled
             // at the ONE seat where a composed claim has passed every clause and
             // is admitted to the verified population, so the disposition is
@@ -12025,10 +12036,15 @@ impl<'a> Lowering<'a> {
         builder: &FunctionBuilder<'_>,
         identity: &ContinuationCallIdentity,
     ) -> Result<(), CraneliftBackendError> {
-        self.checked_call_token_events.as_mut().ok_or_else(|| unsupported(
-            "OrientedSubcontinuationPlanV1",
-            "continuation call token claimed outside a generated Function scope",
-        ))?.record(builder, FrameEventKind::Activation, identity.clone())
+        self.checked_call_token_events
+            .as_mut()
+            .ok_or_else(|| {
+                unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "continuation call token claimed outside a generated Function scope",
+                )
+            })?
+            .record(builder, FrameEventKind::Activation, identity.clone())
     }
 
     fn record_checked_call_token_inst(
@@ -12038,10 +12054,15 @@ impl<'a> Lowering<'a> {
         identity: &ContinuationCallIdentity,
         inst: cranelift_codegen::ir::Inst,
     ) -> Result<(), CraneliftBackendError> {
-        self.checked_call_token_events.as_mut().ok_or_else(|| unsupported(
-            "OrientedSubcontinuationPlanV1",
-            "continuation call token emitted outside a generated Function scope",
-        ))?.record_inst(func, kind, identity.clone(), inst)
+        self.checked_call_token_events
+            .as_mut()
+            .ok_or_else(|| {
+                unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "continuation call token emitted outside a generated Function scope",
+                )
+            })?
+            .record_inst(func, kind, identity.clone(), inst)
     }
 
     fn enter_checked_recursive_invocation(

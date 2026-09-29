@@ -7743,9 +7743,10 @@ impl ContinuationClaimLedger {
     /// lawful `ComposedCall` obligation is answered by verified composed
     /// consumption and never becomes a direct call, so an "every obligation
     /// became one direct call" reading would exclude a legal member of the very
-    /// representation this documents. What the union equality says is "every
-    /// call obligation was answered exactly once, in exactly one of the two
-    /// forms, and nothing that was not an obligation was answered at all."
+    /// representation this documents. Set equality says each obligation is
+    /// answered in one of the two forms somewhere in the artifact, and no
+    /// non-obligation is answered. The separate Function-local token lattice
+    /// enforces at most one enter/receipt on each reachable runtime path.
     ///
     /// ⛔ Equality is asserted between sets, not between counts. Two sets of the
     /// same size can differ, and a length comparison here would pass for a

@@ -1961,10 +1961,12 @@ impl CheckedTokenFunctionScope {
         compiler: &mut Lowering<'_>,
         func: &Function,
     ) -> Result<(), CraneliftBackendError> {
-        let events = compiler.checked_call_token_events.take().ok_or_else(|| unsupported(
-            "OrientedSubcontinuationPlanV1",
-            "a generated Function closed without its continuation call token scope",
-        ))?;
+        let events = compiler.checked_call_token_events.take().ok_or_else(|| {
+            unsupported(
+                "OrientedSubcontinuationPlanV1",
+                "a generated Function closed without its continuation call token scope",
+            )
+        })?;
         events.validate_named(func, "continuation call token")
     }
 }
@@ -11607,7 +11609,9 @@ impl<'a> Lowering<'a> {
         ));
         #[cfg(test)]
         if mutation == ContinuationEmissionMutation::ClaimTokenTwice {
-            self.continuation_claims.as_mut().expect("claim ledger remains open")
+            self.continuation_claims
+                .as_mut()
+                .expect("claim ledger remains open")
                 .claim_exact(&identity, claimed_owner)?;
             self.record_checked_call_token(builder, &identity)?;
         }
@@ -11629,9 +11633,11 @@ impl<'a> Lowering<'a> {
         let mut inputs = operands.ordinary;
         inputs.extend(operands.continuation_inputs);
 
+        #[cfg(test)]
+        let duplicate_target = target.clone();
         let (returned, call) = self.call_declared_unit_target(
             builder,
-            target.clone(),
+            target,
             &inputs,
             None,
             #[cfg(test)]
@@ -11656,7 +11662,8 @@ impl<'a> Lowering<'a> {
         #[cfg(not(test))]
         let record = true;
         if record {
-            self.function_local.continuation_emissions
+            self.function_local
+                .continuation_emissions
                 .entry(identity.clone())
                 .or_default()
                 .insert(call);
@@ -11667,11 +11674,16 @@ impl<'a> Lowering<'a> {
         #[cfg(test)]
         if mutation == ContinuationEmissionMutation::DuplicateDirectCall {
             let (_, second) = self.call_declared_unit_target(
-                builder, target, &inputs, None, None,
+                builder, duplicate_target, &inputs, None, None,
             )?;
-            self.function_local.continuation_emissions
-                .entry(identity.clone()).or_default().insert(second);
-            self.record_checked_call_token_inst(builder.func, FrameEventKind::Receipt, &identity, second)?;
+            self.function_local
+                .continuation_emissions
+                .entry(identity.clone())
+                .or_default()
+                .insert(second);
+            self.record_checked_call_token_inst(
+                builder.func, FrameEventKind::Receipt, &identity, second,
+            )?;
         }
         #[cfg(test)]
         d5a_trace("  CLAIM outcome=CallEmitted".to_string());

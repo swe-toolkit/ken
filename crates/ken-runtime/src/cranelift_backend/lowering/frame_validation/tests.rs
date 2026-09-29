@@ -26,9 +26,7 @@ enum Shape {
 }
 
 fn event(builder: &FunctionBuilder<'_>, events: &mut FrameEvents, kind: FrameEventKind) {
-    events
-        .record(builder, kind, KEY)
-        .expect("event position");
+    events.record(builder, kind, KEY).expect("event position");
 }
 
 fn ret(
@@ -264,9 +262,16 @@ const TOKEN: TokenTestKey = ("complete planner identity", 1);
 fn token_fixture() -> (FrameEvents<TokenTestKey>, Function) {
     let (frames, func) = build(Shape::ExclusiveActivations);
     let tokens = FrameEvents {
-        events: frames.events.into_iter().map(|event| FrameEvent {
-            kind: event.kind, key: TOKEN, block: event.block, after: event.after,
-        }).collect(),
+        events: frames
+            .events
+            .into_iter()
+            .map(|event| FrameEvent {
+                kind: event.kind,
+                key: TOKEN,
+                block: event.block,
+                after: event.after,
+            })
+            .collect(),
         terminals: frames.terminals,
     };
     (tokens, func)
@@ -274,7 +279,9 @@ fn token_fixture() -> (FrameEvents<TokenTestKey>, Function) {
 
 fn token_rule(events: &FrameEvents<TokenTestKey>, func: &Function, expected: &[FrameRule]) {
     let expected: BTreeSet<_> = expected.iter().copied().collect();
-    let actual = events.rule_violations(func).expect("finished token Function");
+    let actual = events
+        .rule_violations(func)
+        .expect("finished token Function");
     assert_eq!(actual.len(), 1, "no other identity may hide a rule");
     assert_eq!(actual.get(&TOKEN), Some(&expected));
     let checked = events.validate_named(func, "continuation call token");
@@ -283,7 +290,10 @@ fn token_rule(events: &FrameEvents<TokenTestKey>, func: &Function, expected: &[F
     } else {
         let reason = format!("{:?}", checked.expect_err("same-path token must refuse"));
         assert!(reason.contains("continuation call token violations:"));
-        assert!(reason.contains(&format!("{expected:?}")), "wrong refusal: {reason}");
+        assert!(
+            reason.contains(&format!("{expected:?}")),
+            "wrong refusal: {reason}"
+        );
     }
 }
 
@@ -291,16 +301,20 @@ fn token_rule(events: &FrameEvents<TokenTestKey>, func: &Function, expected: &[F
 fn token_exclusive_arms_pass_and_flat_restoration_would_refuse() {
     let (mut events, func) = token_fixture();
     token_rule(&events, &func, &[]);
-    let flat_activations = events.events.iter().filter(|event| {
-        event.key == TOKEN && event.kind == FrameEventKind::Activation
-    }).count();
+    let flat_activations = events
+        .events
+        .iter()
+        .filter(|event| event.key == TOKEN && event.kind == FrameEventKind::Activation)
+        .count();
     assert_eq!(flat_activations, 2, "both exclusive arms must claim");
     // Restoring the old compile-wide insertion test rejects the same key on
     // its second visit despite the CFG witness above admitting both paths.
-    assert!(!events.events.iter().filter(|event| {
-        event.key == TOKEN && event.kind == FrameEventKind::Activation
-    }).map(|event| event.key).collect::<Vec<_>>().windows(2)
-      .all(|window| window[0] != window[1]));
+    let mut flat_seen = BTreeSet::new();
+    assert!(!events
+        .events
+        .iter()
+        .filter(|event| event.kind == FrameEventKind::Activation)
+        .all(|event| flat_seen.insert(event.key)));
     // Population-side perturbation: one arm no longer discharges at all.
     events.events.remove(3);
     token_rule(&events, &func, &[FrameRule::N1]);
@@ -356,7 +370,9 @@ fn token_recursive_position_remains_part_of_the_key() {
     token_rule(&events, &func, &[]);
     let other = (TOKEN.0, TOKEN.1 + 1);
     events.events[1].key = other;
-    let actual = events.rule_violations(&func).expect("finished token Function");
+    let actual = events
+        .rule_violations(&func)
+        .expect("finished token Function");
     assert_eq!(actual.get(&TOKEN), Some(&BTreeSet::from([FrameRule::N1])));
     assert_eq!(actual.get(&other), Some(&BTreeSet::from([FrameRule::R1])));
 }

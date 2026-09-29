@@ -1,5 +1,6 @@
-//! Finished-function checked-frame accounting. Compiler traversal order is not
-//! runtime path order: distinct successors may consume the same checked key.
+//! Finished-function per-key accounting for checked frames and continuation
+//! call tokens. Compiler traversal order is not runtime path order: exclusive
+//! successors may consume the same complete checked key.
 
 #[cfg(test)]
 mod tests;
@@ -147,9 +148,19 @@ impl<K: Ord + Clone + Debug> FrameEvents<K> {
         key: K,
         inst: Inst,
     ) -> Result<(), CraneliftBackendError> {
-        let block = func.layout.blocks().find(|block| func.layout.block_insts(*block).any(|item| item == inst))
-            .ok_or_else(|| refusal("checked Runtime event names an instruction outside its Function"))?;
-        self.events.push(FrameEvent { kind, key, block, after: Some(inst) });
+        let block = func
+            .layout
+            .blocks()
+            .find(|block| func.layout.block_insts(*block).any(|item| item == inst))
+            .ok_or_else(|| {
+                refusal("checked Runtime event names an instruction outside its Function")
+            })?;
+        self.events.push(FrameEvent {
+            kind,
+            key,
+            block,
+            after: Some(inst),
+        });
         Ok(())
     }
 
@@ -278,7 +289,7 @@ impl<K: Ord + Clone + Debug> FrameEvents<K> {
         }
     }
 
-    // Forward possible-state dataflow, per unchanged checked frame key. Each
+    // Forward possible-state dataflow, per unchanged key in its own scope. Each
     // element represents a path that can arrive at a program point: Inactive,
     // Active, or Discharged. Union at joins preserves skipped-arm obligations.
     pub(super) fn rule_violations(
