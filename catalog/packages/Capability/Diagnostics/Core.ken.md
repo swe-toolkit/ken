@@ -139,6 +139,19 @@ pub fn ValidDiagnostic (diagnostic : Diagnostic) : Prop =
   ValidOrigin (diagnostic_origin diagnostic)
 ```
 
+The checked examples keep the private source identifier constructor and the
+origin helpers in their defining module. Clients construct source identifiers
+with `source_id_from_nat` and match the public origin variants.
+
+```ken example
+const diagnostics_example_source_id_four : SourceId = MkSourceId (Suc (Suc (Suc (Suc Zero))))
+
+const diagnostics_example_environment_origin_path : Origin = environment_origin "PATH"
+
+const diagnostics_example_config_key_origin_path : Origin =
+  config_key_origin (Cons String "PATH" (Nil String))
+```
+
 ## 4. Trust and derivation
 
 All declarations are transparent kernel-checked terms over landed data. The

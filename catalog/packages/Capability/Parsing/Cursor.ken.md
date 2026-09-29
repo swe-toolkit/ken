@@ -932,6 +932,23 @@ Pass raw argument bytes directly to `arg_cursor_start`. It normalizes empty
 arguments; ordinary `cursor_advance` then crosses argument boundaries while
 preserving exact argument and byte positions.
 
+A checked example uses the public diagnostic constructor function for source
+identifiers. The argument-origin bridge stays local to this package, where its
+location fields can be checked without exposing its private operation.
+
+```ken example
+import Capability.Diagnostics.Core (SourceOrigin, source_id_from_nat)
+
+const cursor_example_source_origin_span : Origin =
+  SourceOrigin
+    (source_id_from_nat (Suc (Suc (Suc (Suc Zero)))))
+    (MkByteRange (Suc (Suc Zero)) (Suc (Suc (Suc (Suc (Suc Zero))))))
+
+const cursor_example_argument_origin_range : Origin =
+  arg_location_origin
+    (MkArgLocation (Suc (Suc Zero)) (Suc (Suc (Suc Zero))) (Suc (Suc (Suc Zero))))
+```
+
 ## 4. Design notes
 
 Lengths and elements are computed from the structural byte view. Repetition
