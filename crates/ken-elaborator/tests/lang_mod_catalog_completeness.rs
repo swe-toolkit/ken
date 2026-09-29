@@ -6,6 +6,9 @@ use std::path::PathBuf;
 use ken_elaborator::ElabEnv;
 use ken_kernel::{Decl, GlobalId, Term};
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 const ORD_RESULT_MODULE: &str = "Core.Logic.OrdResult";
 const COMPARE_MODULE: &str = "Core.Logic.Compare";
 const DERIVED_MODULE: &str = "Data.Collections.Derived";
@@ -45,6 +48,112 @@ fn trusted_delta_qualified_names(
             other => panic!("new trusted entry {id:?} must be named and opaque, got {other:?}"),
         })
         .collect()
+}
+
+fn named_axiom_trust_id(env: &ElabEnv, named: GlobalId) -> GlobalId {
+    let (_, body) = env
+        .env
+        .transparent_body(named)
+        .expect("named axiom must be transparent");
+    let opaque = match body {
+        Term::Const { id, .. } => id,
+        other => panic!("named axiom must directly cite one opaque: {other:?}"),
+    };
+    assert_eq!(
+        body,
+        Term::const_(opaque, vec![]),
+        "no wrapper or level arguments"
+    );
+    assert!(matches!(env.env.lookup(opaque), Some(Decl::Opaque { .. })));
+    opaque
+}
+
+fn owned_ord_int_law_ids(env: &ElabEnv, lawful_owned: &[GlobalId]) -> BTreeSet<GlobalId> {
+    let ord = env
+        .class_env
+        .class("Ord")
+        .expect("registered Ord class")
+        .projection
+        .type_id;
+    assert!(
+        lawful_owned.contains(&ord),
+        "the Ord class must belong to LawfulClasses"
+    );
+    let class = env.class_env.class_by_id(ord).expect("owned Ord class");
+    assert_eq!(
+        class.projection.field_names,
+        ["leq", "refl", "antisym", "trans", "total"]
+    );
+    let ord_int_type = Term::app(
+        Term::const_(ord, vec![]),
+        Term::const_(env.numeric_env.int_id, vec![]),
+    );
+    let instances: Vec<_> = lawful_owned
+        .iter()
+        .copied()
+        .filter(|id| matches!(env.env.lookup(*id), Some(Decl::Transparent { ty, .. }) if *ty == ord_int_type))
+        .collect();
+    assert_eq!(
+        instances.len(),
+        1,
+        "one owned Ord Int dictionary by checked class/head IDs"
+    );
+    let (_, body) = env
+        .env
+        .transparent_body(instances[0])
+        .expect("owned Ord Int record");
+    let mut laws = BTreeSet::new();
+    for (idx, name) in [
+        "ord_int_refl",
+        "ord_int_antisym",
+        "ord_int_trans",
+        "ord_int_total",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut field = &body;
+        for _ in 0..idx + 1 {
+            field = match field {
+                Term::Pair(_, tail) => tail,
+                other => panic!("Ord Int record must contain law {name}: {other:?}"),
+            };
+        }
+        let field_id = match field {
+            Term::Pair(value, _) => match value.as_ref() {
+                Term::Const { id, .. } => *id,
+                other => panic!("Ord Int law {name} must be a named constant: {other:?}"),
+            },
+            other => panic!("Ord Int law {name} must have a record field: {other:?}"),
+        };
+        let named = catalog_or::provider_owned_id(env, lawful_owned, LAWFUL_MODULE, name)
+            .unwrap_or_else(|error| panic!("LawfulClasses axiom {name}: {error}"));
+        assert_eq!(
+            field_id, named,
+            "Ord Int law {name} must use its owned axiom"
+        );
+        let opaque = named_axiom_trust_id(env, named);
+        let aliases: BTreeSet<_> = lawful_owned
+            .iter()
+            .copied()
+            .filter(|id| {
+                env.env
+                    .transparent_body(*id)
+                    .is_some_and(|(_, body)| body == Term::const_(opaque, vec![]))
+            })
+            .collect();
+        assert_eq!(
+            aliases,
+            BTreeSet::from([named]),
+            "one owned name per Ord Int axiom"
+        );
+        assert!(
+            laws.insert(opaque),
+            "the four Ord Int trust IDs must be distinct"
+        );
+    }
+    assert_eq!(laws.len(), 4, "exactly four Ord Int law identities");
+    laws
 }
 
 /// Promise class: durable invariant.
@@ -221,7 +330,8 @@ fn real_derived_consumer_reuses_canonical_logic_providers() {
 fn lawful_local_pair_proofs_do_not_extend_the_derived_subject_namespace() {
     let mut env = ElabEnv::new().expect("base environment");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_module_from_roots(&[catalog_root()], LAWFUL_MODULE)
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], LAWFUL_MODULE)
         .expect("LawfulClasses must load through its real provider closure");
 
     let eq_sound = env.globals["Core.Classes.LawfulClasses.pair_compare_eq_sound"];
@@ -265,24 +375,25 @@ fn lawful_local_pair_proofs_do_not_extend_the_derived_subject_namespace() {
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert!(!after.contains(&eq_sound));
     assert!(!after.contains(&lt_asym));
-    let added_opaque_names: BTreeSet<_> = after
-        .difference(&before)
-        .map(|id| match env.env.lookup(*id) {
-            Some(Decl::Opaque { name, .. }) => name.as_str(),
-            other => panic!(
-                "every LawfulClasses trust addition must have opaque provenance, got {other:?}"
-            ),
-        })
-        .collect();
+    let bijection_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Data.Text.StringBijection")
+        .expect("the existing retraction provider must remain loaded");
+    let retraction = catalog_or::provider_owned_id(
+        &env,
+        &bijection_owned,
+        "Data.Text.StringBijection",
+        "string_to_list_char_retraction",
+    )
+    .expect("the retraction must retain its own provider identity");
+    let mut expected = owned_ord_int_law_ids(&env, &lawful_owned);
+    assert!(
+        expected.insert(named_axiom_trust_id(&env, retraction)),
+        "the retraction is separate from Ord Int"
+    );
+    assert_eq!(expected.len(), 5, "four Ord Int axioms plus the retraction");
+    let added: BTreeSet<_> = after.difference(&before).copied().collect();
     assert_eq!(
-        added_opaque_names,
-        BTreeSet::from([
-            "Data.Text.StringBijection.string_to_list_char_retraction",
-            "Ord.Int.antisym",
-            "Ord.Int.refl",
-            "Ord.Int.total",
-            "Ord.Int.trans",
-        ]),
-        "LawfulClasses may add only its existing audited provider assumptions"
+        added, expected,
+        "the full trusted-base delta must be the exact owned ID set"
     );
 }

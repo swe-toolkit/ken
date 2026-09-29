@@ -15,6 +15,9 @@ use ken_elaborator::modules::PRELUDE_FLOOR_NAMES;
 use ken_elaborator::{literate, parser, Decl, ElabEnv, ElabError, ExportForm};
 use ken_kernel::{GlobalId, Term};
 
+#[path = "../../tests/support/catalog_or.rs"]
+mod catalog_or;
+
 const ORDER: &str = "Data.Numeric.Nat.Order";
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const COMPARE: &str = "Core.Logic.Compare";
@@ -358,6 +361,115 @@ fn bool_or_bridge_has_only_the_provider_identity() {
     );
 }
 
+fn named_axiom_trust_id(env: &ElabEnv, named: GlobalId) -> GlobalId {
+    let (_, body) = env
+        .env
+        .transparent_body(named)
+        .expect("named axiom must be transparent");
+    let opaque = match body {
+        Term::Const { id, .. } => id,
+        other => panic!("named axiom must directly cite one opaque: {other:?}"),
+    };
+    assert_eq!(
+        body,
+        Term::const_(opaque, vec![]),
+        "no wrapper or level arguments"
+    );
+    assert!(matches!(
+        env.env.lookup(opaque),
+        Some(ken_kernel::Decl::Opaque { .. })
+    ));
+    opaque
+}
+
+fn owned_ord_int_law_ids(env: &ElabEnv, lawful_owned: &[GlobalId]) -> BTreeSet<GlobalId> {
+    let ord = env
+        .class_env
+        .class("Ord")
+        .expect("registered Ord class")
+        .projection
+        .type_id;
+    assert!(
+        lawful_owned.contains(&ord),
+        "the Ord class must belong to LawfulClasses"
+    );
+    let class = env.class_env.class_by_id(ord).expect("owned Ord class");
+    assert_eq!(
+        class.projection.field_names,
+        ["leq", "refl", "antisym", "trans", "total"]
+    );
+    let ord_int_type = Term::app(
+        Term::const_(ord, vec![]),
+        Term::const_(env.numeric_env.int_id, vec![]),
+    );
+    let instances: Vec<_> = lawful_owned
+        .iter()
+        .copied()
+        .filter(|id| matches!(env.env.lookup(*id), Some(ken_kernel::Decl::Transparent { ty, .. }) if *ty == ord_int_type))
+        .collect();
+    assert_eq!(
+        instances.len(),
+        1,
+        "one owned Ord Int dictionary by checked class/head IDs"
+    );
+    let (_, body) = env
+        .env
+        .transparent_body(instances[0])
+        .expect("owned Ord Int record");
+    let mut laws = BTreeSet::new();
+    for (idx, name) in [
+        "ord_int_refl",
+        "ord_int_antisym",
+        "ord_int_trans",
+        "ord_int_total",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut field = &body;
+        for _ in 0..idx + 1 {
+            field = match field {
+                Term::Pair(_, tail) => tail,
+                other => panic!("Ord Int record must contain law {name}: {other:?}"),
+            };
+        }
+        let field_id = match field {
+            Term::Pair(value, _) => match value.as_ref() {
+                Term::Const { id, .. } => *id,
+                other => panic!("Ord Int law {name} must be a named constant: {other:?}"),
+            },
+            other => panic!("Ord Int law {name} must have a record field: {other:?}"),
+        };
+        let named = catalog_or::provider_owned_id(env, lawful_owned, LAWFUL, name)
+            .unwrap_or_else(|error| panic!("LawfulClasses axiom {name}: {error}"));
+        assert_eq!(
+            field_id, named,
+            "Ord Int law {name} must use its owned axiom"
+        );
+        let opaque = named_axiom_trust_id(env, named);
+        let aliases: BTreeSet<_> = lawful_owned
+            .iter()
+            .copied()
+            .filter(|id| {
+                env.env
+                    .transparent_body(*id)
+                    .is_some_and(|(_, body)| body == Term::const_(opaque, vec![]))
+            })
+            .collect();
+        assert_eq!(
+            aliases,
+            BTreeSet::from([named]),
+            "one owned name per Ord Int axiom"
+        );
+        assert!(
+            laws.insert(opaque),
+            "the four Ord Int trust IDs must be distinct"
+        );
+    }
+    assert_eq!(laws.len(), 4, "exactly four Ord Int law identities");
+    laws
+}
+
 /// MEASURED: the ownership closure adds the pre-existing audited Ord Int
 /// postulates and the existing String structural-view retraction imported by the
 /// class owner, while the Nat relation, bridge, and dictionary are transparent
@@ -372,22 +484,29 @@ fn ownership_move_preserves_trust_posture_and_behavior() {
     env.elaborate_module_from_roots(&[catalog_root()], ORDER)
         .expect("compatibility roots build Order");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    let added_names: BTreeSet<_> = after
-        .difference(&before)
-        .map(|id| match env.env.lookup(*id) {
-            Some(ken_kernel::Decl::Opaque { name, .. }) => name.as_str(),
-            other => panic!("new trusted entry must retain opaque provenance: {other:?}"),
-        })
-        .collect();
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], LAWFUL)
+        .expect("the canonical class owner must remain loaded");
+    let bijection_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Data.Text.StringBijection")
+        .expect("the existing retraction provider must remain loaded");
+    let retraction = catalog_or::provider_owned_id(
+        &env,
+        &bijection_owned,
+        "Data.Text.StringBijection",
+        "string_to_list_char_retraction",
+    )
+    .expect("the retraction must retain its own provider identity");
+    let mut expected = owned_ord_int_law_ids(&env, &lawful_owned);
+    assert!(
+        expected.insert(named_axiom_trust_id(&env, retraction)),
+        "the retraction is separate from Ord Int"
+    );
+    assert_eq!(expected.len(), 5, "four Ord Int axioms plus the retraction");
+    let added: BTreeSet<_> = after.difference(&before).copied().collect();
     assert_eq!(
-        added_names,
-        BTreeSet::from([
-            "Data.Text.StringBijection.string_to_list_char_retraction",
-            "Ord.Int.antisym",
-            "Ord.Int.refl",
-            "Ord.Int.total",
-            "Ord.Int.trans",
-        ])
+        added, expected,
+        "ownership closure must add exactly the owned ID set"
     );
 
     let leq = env.globals[&format!("{LAWFUL}.leq_nat")];
