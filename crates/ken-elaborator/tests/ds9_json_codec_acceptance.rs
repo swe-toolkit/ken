@@ -611,22 +611,29 @@ fn json_size_consumes_array_and_pair_nested_object_results() {
         .env
         .transparent_body(example_id)
         .expect("the checked Json example must have a transparent body");
+    let argument = match &body {
+        Term::App(function, argument) if matches!(function.as_ref(), Term::Const { id, .. } if *id == json_size) => {
+            argument.as_ref()
+        }
+        other => {
+            panic!("the checked example must return the owned json_size application, got {other:?}")
+        }
+    };
     assert!(
-        mentions(&body, json_size),
-        "the example must call the owned json_size"
+        mentions(argument, object),
+        "the fold argument must contain an object"
     );
     assert!(
-        mentions(&body, object),
-        "the example must construct an object"
-    );
-    assert!(
-        mentions(&body, array),
-        "the example must construct a nested array"
+        mentions(argument, array),
+        "the fold argument must contain an array"
     );
     for scalar in ["JsonNull", "JsonBool", "JsonString"] {
         let id = catalog_or::provider_owned_id(&env, &constructors, JSON_MODULE, scalar)
             .unwrap_or_else(|error| panic!("{scalar} must belong to Json: {error}"));
-        assert!(mentions(&body, id), "the example must include {scalar}");
+        assert!(
+            mentions(argument, id),
+            "the fold argument must include {scalar}"
+        );
     }
 
     for private in ["json_size", example] {
