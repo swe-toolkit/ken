@@ -23559,6 +23559,8 @@ theorem relation_converse_does_not_keep_direction
         False =
   Proved
 
+const relation_unreversed_control : Tree Nat (Tree Nat Unit) = relation_chain
+
 theorem relation_unreversed_converse_direction_refuted
     : Not
         (rel_member
@@ -23566,13 +23568,13 @@ theorem relation_unreversed_converse_direction_refuted
           leq_nat
           Zero
           (Suc Zero)
-          relation_chain
+          relation_unreversed_control
           → rel_member
           Nat
           leq_nat
           Zero
           (Suc Zero)
-          (converse Nat leq_nat relation_chain)) =
+          (converse Nat leq_nat relation_unreversed_control)) =
   λclaim. absurd (claim Proved)
 
 const relation_duplicate_right : Tree Nat (Tree Nat Unit) =
