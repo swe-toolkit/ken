@@ -37,8 +37,9 @@ built-ins, and its two normative properties are proved in that package.
   normative:
   - `RetryAdvised` comes only from `(Transient, Idempotent)`;
   - `error_transience Revoked = Permanent`.
-  A catalog package with that module name matches the spec. It is not a spec
-  change.
+  It names the surface once, in prose; it does not fix a catalog path. The
+  existing System family (`System.IO`, `Buffer`, `Resource`) lives under
+  `Capability/System/`.
 - **Consumers by spelling (to be confirmed by identity at AC-0).**
   - `crates/ken-elaborator/tests/px9_system_error_classification.rs`,
     `px9_file_error_to_system.rs` and `px9_revoked_unification.rs`;
@@ -51,8 +52,10 @@ built-ins, and its two normative properties are proved in that package.
 ## Deliverable
 
 The eleven declarations move, unchanged in meaning, to a new catalog package
-whose module path is `System.Error` (the package location is the owner's
-call). The package proves the two §1.8 properties as checked theorems, not
+that serves the spec's `System.Error` surface. It sits inside the chartered
+Sections (`06-catalog-campaign.md`), beside the existing `System.IO` at
+`catalog/packages/Capability/System/`. The Architect rules the exact path, and
+there is no new top-level Section (Steward `evt_7k4ntmc8xem5y`). The package proves the two §1.8 properties as checked theorems, not
 tests. The prelude registers none of the eleven, and its PX9 bracket goes
 with them; the package keeps the zero-trust property as its AC-1 row. Each
 reader imports the package or is re-keyed to its owned ids.
