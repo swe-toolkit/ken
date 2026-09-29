@@ -2,8 +2,8 @@
 //! (`conformance/surface/numbers/seed-decimal-char-demote.md`).
 //!
 //! Covers AC-D1/D2 (Decimal exact derivation, the F4 flip), AC-C1/C2/C3
-//! (Char refinement, derived ops, surrogate/OOR rejection), and pin-1 (the
-//! `isScalar` Ω-encoding's codepoint-collapse). AC-D3 (`Num`/`DecEq Decimal`
+//! (Char refinement, derived ops, Unicode scalar boundary behavior). AC-D3
+//! (`Num`/`DecEq Decimal`
 //! law instances) and `Ord Char` antisymmetry are re-homed to the
 //! lawful-classes lane (Steward ruling) — not covered here. Pin-2 (`String`
 //! → `Char` extraction computing the scalar proof) is deferred to the
@@ -169,46 +169,36 @@ fn char_eq_and_ord_on_projection() {
 
 // ── AC-C3 — surrogate/OOR reject, flips vs isScalar:=true (soundness) ──────
 
-/// surface/numbers/int-to-char-rejects-surrogate-and-oor (soundness)
+/// surface/numbers/char-unicode-scalar-boundaries (normative compatibility
+/// vector). Replaces the source-text oracle in
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 13.
+///
+/// MEASURED: the real `intToChar` elaboration and evaluator produce the `Some`
+/// or `None` constructor at each codepoint. CLAIMED: the six Unicode scalar
+/// boundaries have the specified accept/reject results. THE GAP: this vector
+/// covers these edges, not every interior value or negative integer.
 #[test]
-fn int_to_char_rejects_surrogate_and_oor() {
-    // The non-degenerate PAIR: reject surrogate/OOR *while* a valid scalar
-    // accepts — a single valid-accept case is green-vs-green under a stub
-    // `isScalar := true` ([[two-arm-producer-needs-a-case-per-arm]]).
-    let surrogate = eval_view("const t = intToChar 55296"); // 0xD800
-    let oor = eval_view("const t = intToChar 1114112"); // 0x110000
-    let valid = eval_view("const t = intToChar 65"); // 'A'
-
-    let (surrogate_id, oor_id, valid_id) = match (&surrogate, &oor, &valid) {
-        (
-            EvalVal::Ctor { id: s, .. },
-            EvalVal::Ctor { id: o, .. },
-            EvalVal::Ctor { id: v, .. },
-        ) => (*s, *o, *v),
-        other => panic!("expected Ctor (Option) results, got {:?}", other),
-    };
-    assert_eq!(surrogate_id, oor_id, "surrogate and OOR must both reduce to the same ctor (None)");
-    assert_ne!(valid_id, surrogate_id, "a valid scalar must reduce to a DIFFERENT ctor (Some)");
-}
-
-// ── Char pin 1 — the Ω-encoding is structural, not a naive disjunction ─────
-
-/// surface/numbers/char-deceq-collapses-on-codepoint (soundness, hard-AC) —
-/// structural half: `isScalar`'s definition head is `IsTrue (<computed
-/// Bool>)`, never a raw `∨`/`∃`/multi-ctor form. Grepped directly against
-/// the producer source (not a value witness — no value can prove a sort is
-/// absent).
-#[test]
-fn char_deceq_pin1_structural_encoding() {
-    let src = include_str!("../src/decimal_char.rs");
-    assert!(
-        src.contains("fn isScalar (c : Int) : Prop = IsTrue (inRangeBool c)"),
-        "isScalar's definition head must be `IsTrue (<computed Bool>)` — \
-         never a raw `∨`/`∃`/multi-ctor form as its own Ω-sort (`16 §1.3`); \
-         the required value-level `or_bool`/`and_bool` inside `inRangeBool` \
-         is a distinct, permitted layer (composing the Bool computation \
-         that IsTrue then wraps), not the forbidden sort-level disjunction"
-    );
+fn int_to_char_unicode_scalar_boundaries() {
+    let cases = [
+        (0xD7FF_u32, true),
+        (0xE000, true),
+        (0xD800, false),
+        (0xDFFF, false),
+        (0x10FFFF, true),
+        (0x110000, false),
+    ];
+    for (codepoint, accepted) in cases {
+        let result = eval_view(&format!("const t = intToChar {codepoint}"));
+        let is_some = match result {
+            EvalVal::Ctor { args, .. } if args.len() == 2 => true,
+            EvalVal::Ctor { args, .. } if args.len() == 1 => false,
+            other => panic!("intToChar U+{codepoint:04X} must return Option, got {other:?}"),
+        };
+        assert_eq!(
+            is_some, accepted,
+            "intToChar U+{codepoint:04X} accept/reject boundary"
+        );
+    }
 }
 
 /// Value-consequence of pin 1: `eqChar` (which routes through `eq_int` on
