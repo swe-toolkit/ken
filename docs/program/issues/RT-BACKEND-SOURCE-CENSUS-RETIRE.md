@@ -31,8 +31,8 @@ census guarded stay protected, each by its named replacement.
   |---|---|---|
   | A `correspondence_adds_no_emitted_unit_to_the_production_census` (`:2709`) | emission only at census-listed units | replace with the behavioural counters `units::b2f_last_unit_emission` (`units.rs:210`) and `seed_material::b2f_last_seed_material_emission` (`seed_material.rs:118`). Its own doc calls the text census fail-open |
   | B `the_backend_production_surface_inventory_is_closed` (`:3869`) | the roster is the whole surface | retire; it exists only to close A, C, D and E |
-  | C `the_entry_carrying_types_are_module_private` (`:4297`) | `PlannedExpr` and `StaticNodeId` stay private to `static_transition` | the planner's (b) and (c) controls if AC-0 measures them sufficient, otherwise a compile-fail privacy pin |
-  | D `no_collection_is_keyed_by_a_scheduling_entry` (`:4373`) | no production collection is keyed by a scheduling entry | as C |
+  | C `the_entry_carrying_types_are_module_private` (`:4297`) | `PlannedExpr` and `StaticNodeId` stay private to `static_transition` | retire to Architect review (AC-0 ruling `evt_170pr1hbj2e8s`); no compile-fail pin |
+  | D `no_collection_is_keyed_by_a_scheduling_entry` (`:4373`) | no body is selected, and no occurrence filed, by scheduling entry | narrowed to that hazard and carried by the planner's (b) `keying_selection_by_the_scheduling_entry_does_not_resolve_the_body` and (c) `filing_two_occurrences_under_one_origin_is_refused`, once AC-2 shows each reddens (`evt_170pr1hbj2e8s`) |
   | E `the_owner_classification_has_a_closed_production_naming_inventory` (`:4499`) | closed inventory of files naming `SemanticOwner` | retire; ownership moves to Architect review |
 
 - **Rule.** Operator 2026-07-26: "Test oracles that assert facts about source
@@ -45,31 +45,43 @@ stop and report the mismatch; do not build around it.
 ## Deliverable
 
 `BACKEND_PRODUCTION_SOURCES` and its five consumers are deleted. A becomes a
-behavioural test over the emission counters. C and D are carried by the
-controls AC-0 selects. B and E retire, and each retirement is recorded in
+behavioural test over the emission counters. D is carried by the planner's
+(b) and (c) controls. B, C and E retire, and each retirement is recorded in
 the test file's comments with a pointer to this frame. There is no
 production change.
 
 ## Acceptance
 
-- **AC-0 (measure, then ruling; no edit).** Show that the planner's (b) and
-  (c) controls fail under a mutation that breaks C's property (widen
-  `PlannedExpr` or `StaticNodeId` visibility) and one that breaks D's (key a
-  collection by a scheduling entry). If one does not fail, propose a
-  compile-fail pin for it. The Architect rules before any build.
+- **AC-0 (done).** Measured at `18d969847` (`evt_7x68hrt71693a`): (b) and
+  (c) stay green when `StaticNodeId` is widened and when an unused
+  entry-keyed map is added. Architect ruling `evt_170pr1hbj2e8s`: C retires
+  to review; D narrows to its behavioural hazard.
 - **AC-1.** A behaviour-neutral production module addition, such as an empty
   `mod` in `lowering/` on a scratch branch, leaves every `ken-runtime` test
   green.
 - **AC-2 (controls).**
   - A new production emitter outside the census reddens A's behavioural
     replacement.
-  - Each AC-0 mutation reddens its selected control.
+  - Routing body selection through a map keyed by `StaticNodeId` reddens
+    (b).
+  - Filing occurrences by entry instead of by origin, so two collide under
+    one entry, reddens (c).
+  - If either stays green, stop: the planner controls do not carry D.
+
+## Limitations
+
+Owned by Architect review, not by any test (`evt_170pr1hbj2e8s`):
+- `PlannedExpr`/`StaticNodeId` module privacy is a review-owned property:
+  widening either is a design change the Architect reviews on the merge
+  Decision.
+- A production collection keyed by a scheduling entry that neither selects a
+  body nor files an occurrence is not test-observed; review owns it.
 
 ## Stop conditions
 
 - Any production, kernel, spec or `trusted_base()` change (an operator
   question).
-- A replacement for C or D needs production code: stop to the Architect.
+- The D replacement needs production code: stop to the Architect.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, or the parked
   `wp/RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE`. `wp/RT-FRAME-MARKER-ONCE` is
