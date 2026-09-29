@@ -55,10 +55,11 @@ The eleven declarations move, unchanged in meaning, to a new catalog package
 that serves the spec's `System.Error` surface. It sits inside the chartered
 Sections (`06-catalog-campaign.md`), beside the existing `System.IO` at
 `catalog/packages/Capability/System/`. The Architect rules the exact path, and
-there is no new top-level Section (Steward `evt_7k4ntmc8xem5y`). The package proves the two §1.8 properties as checked theorems, not
-tests. The prelude registers none of the eleven, and its PX9 bracket goes
-with them; the package keeps the zero-trust property as its AC-1 row. Each
-reader imports the package or is re-keyed to its owned ids.
+there is no new top-level Section (Steward `evt_7k4ntmc8xem5y`). The package
+proves the two §1.8 properties as checked theorems, not tests. The prelude
+registers none of the eleven, and its PX9 bracket goes with them; the package
+keeps the zero-trust property as its AC-1 row. Each reader imports the package
+or is re-keyed to its owned ids.
 
 ## Acceptance
 
