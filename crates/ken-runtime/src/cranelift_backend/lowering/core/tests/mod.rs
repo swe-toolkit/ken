@@ -1181,133 +1181,13 @@ fn perturbing_a_borrowed_address_does_not_move_any_derived_origin() {
 // cannot construct the plane, mutate a descriptor, or reach the pre-emission
 // validator to bypass it. No live control states that today.
 
-#[test]
-fn every_source_term_carrier_holds_an_occurrence_and_never_a_bare_expression() {
-    // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` moved `SourceContinuation` and
-    // `SourceMachineState` into `source.rs`; `SourcePrefixTemplate` stayed at
-    // the `mod.rs` hub (shared with retained checked-invocation/continuation-
-    // frame machinery). Each header is read from its own current file, per
-    // AC-3's source-text-oracle-relocation rule -- the property below is
-    // unchanged, only which buffer names its declaration.
-    let mod_source = include_str!("../../mod.rs");
-    let source_source = include_str!("../../source.rs");
-    for header in [
-        ("enum SourceContinuation<'a> {", source_source),
-        ("enum SourcePrefixTemplate {", mod_source),
-        ("enum SourceMachineState<'a> {", source_source),
-    ] {
-        let (header, source) = header;
-        let span = declaration_span(source, header);
-        let bare: Vec<&str> = span
-            .iter()
-            .copied()
-            .filter(|line| is_bare_source_term_field(line))
-            .collect();
-        assert!(
-            bare.is_empty(),
-            "AC-1: {header} still carries a bare source term without its origin: {bare:?}"
-        );
+// Retired under `TEST-SOURCE-TEXT-ORACLE-RETIRE` AC-0 item 5: source-term
+// carrier representation remains Architect-review-owned, not source-scanned.
+// See `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`.
 
-        // Every `cases`-bearing variant declares its parent origin. The variant
-        // boundary is a field list, so scan forward from each `cases:` line to
-        // the variant's closing brace.
-        let mut index = 0;
-        while index < span.len() {
-            if span[index].trim().starts_with("cases: Vec<") {
-                let variant_tail = span[index..]
-                    .iter()
-                    .take_while(|line| !line.trim().starts_with("},"))
-                    .any(|line| line.trim() == "static_origin: StaticOriginId,");
-                assert!(
-                    variant_tail,
-                    "AC-1: {header} has a `cases` variant with no `static_origin`; \
-                     its case bodies would have no parent to derive from"
-                );
-            }
-            index += 1;
-        }
-    }
-}
-
-#[test]
-fn retained_closures_carry_a_static_origin_and_no_body_term() {
-    let source = include_str!("../../mod.rs");
-
-    // AC-6, the COVERED population: both variants that retained a body. Pinned as
-    // a complete field inventory, so ANY added field -- term-bearing or not --
-    // reddens and has to be justified here.
-    assert_eq!(
-        declared_fields(source, "    Closure {"),
-        vec![
-            // ⚠ `D7` widened this field from `Vec<Lowered>`, and the pin's own
-            // property is UNCHANGED by it: a capture is not a body carrier. It
-            // is argued, not absorbed — a retained callable is an
-            // invocation-local capsule whose captures reached it at their own
-            // phases, and demanding a compile-time template for every one of
-            // them left a lawfully mixed environment with no representation at
-            // all. The frame's `Row: the closure-capture cell` supersedes `C1`'s
-            // "every child stays `Lowered`" for capture edges only. `body`
-            // remains the sole body authority, which is what this equality
-            // protects. ⛔ What would still red it is an added field, or a
-            // capture edge acquiring a `StaticOriginId`/`RuntimeExpr`.
-            "captures: Vec<LoweringOperand>,",
-            "params: Vec<String>,",
-            "body: StaticOriginId,",
-            // M4 carries only the planner-issued positional ENVIRONMENT
-            // identity. It holds no term and no body origin; `body` above stays
-            // the sole code authority, and the descriptor resolver checks the
-            // environment record agrees with it before static dispatch.
-            "boundary_environment: Option<AggregateOccurrenceId>,",
-        ],
-        "AC-1: `Lowered::Closure`'s field inventory changed. A second body \
-         authority beside the tag is exactly what this WP removed, so an added \
-         field must be argued, not absorbed"
-    );
-    assert_eq!(
-        declared_fields(source, "    DeclarationClosure {"),
-        vec![
-            // `RT-DECL-CLOSURE-PORT` `D4` added `reference`. It is argued, not
-            // absorbed: it names the planner-issued `DeclarationRef` occurrence
-            // this binding was produced at, which is the key the resolved call
-            // record is looked up by. `body` remains the sole body authority --
-            // the property this inventory protects is unchanged.
-            "reference: StaticOriginId,",
-            "symbol: RuntimeSymbol,",
-            // ⚠ `D7`, for the same reason and on the same authority as
-            // `Closure::captures` above. A declaration closure's LEXICAL
-            // captures reach it at their own phases; its SEED captures resolve
-            // to JIT-time ground values and are constructed as explicit
-            // `Specialized`, so the widening costs the seed lane nothing.
-            "captures: Vec<LoweringOperand>,",
-            "params: Vec<String>,",
-            "body: StaticOriginId,",
-        ],
-        "AC-1: `Lowered::DeclarationClosure`'s field inventory changed"
-    );
-
-    // AC-6, the EXCLUDED variant, and why — a fact about the declaration rather
-    // than a judgement call: it carries no source term at all. Pinned as an
-    // inventory for the same reason as above, so it cannot quietly acquire one.
-    assert_eq!(
-        declared_fields(source, "    ComputationalRecursorClosure {"),
-        vec![
-            // ⚠ `RT-FNSPLIT-C1 AC-C4` widened this field from `Box<Lowered>` on
-            // the Architect's SINGLE-FIELD license, and the pin's own property
-            // is UNCHANGED by that: a `LoweringOperand` residual is still not a
-            // body carrier — no `StaticOriginId`, no `RuntimeExpr`, nothing this
-            // variant could be re-lowered from. It stays out of the covered
-            // population for exactly the reason stated below. ⛔ What would move
-            // it in is a field naming a source body, and that is still what this
-            // inventory equality catches.
-            "residual: Box<LoweringOperand>,",
-            "activation: ContinuationActivationId,",
-            "invocation: RecursorInvocationSegment,",
-        ],
-        "AC-6: ComputationalRecursorClosure is out of the covered population \
-         because it declares no body carrier. If it acquires one it JOINS the \
-         population, and this test is where that has to be said"
-    );
-}
+// Retired under `TEST-SOURCE-TEXT-ORACLE-RETIRE` AC-0 item 6: retained-closure
+// representation remains Architect-review-owned, not source-scanned. See
+// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`.
 
 /// **`RT-FNSPLIT-B2A-S` `AC-4` — every `origin -> expression` resolution goes
 /// through the single route.**

@@ -3584,12 +3584,11 @@ fn d8f_moved_application_origins() -> (StaticOriginId, StaticOriginId) {
 /// With the marker on the ordinary call and the plan following it, the keyed
 /// relation shows the **moved** occurrence bound and `ConsumedHere`, and the
 /// checked application's own occurrence unbound. Those are lowering facts,
-/// recorded before the affine closeout refuses, so the refusal is attributed to
-/// a consumption that demonstrably happened at the wrong call rather than
-/// inferred from the error.
+/// recorded before token-lattice E2 refuses, so the refusal is attributed to
+/// a consumption at the wrong call rather than inferred from the error.
 ///
-/// ⚠ The law that refuses is the AFFINE CAUSAL one, not a marker law. The
-/// marker-plane defence is the occupancy gate, whose always-admit mutation is
+/// The refusing law is the Function-local causal-token lattice, not a marker
+/// law. The marker-plane defence is the occupancy gate, whose mutation is
 /// established at `20b0d6be` and is not re-run.
 ///
 /// ## Duplicate and transplant — population relations, not errors
@@ -3697,8 +3696,8 @@ fn d8f_the_remaining_checked_marker_refusals() {
          lawful program: {moved:?}"
     );
     assert!(
-        wrong.contains("one causal identity was discharged twice in a single function"),
-        "supplementary: the plane that catches it is the AFFINE CAUSAL law, not a marker law. The \
+        wrong.contains("}: {E2}"),
+        "supplementary: the token lattice's E2 catches the same-path duplicate, not a marker law. The \
          marker-plane defence is the occupancy gate, established at 20b0d6be: {wrong}"
     );
 

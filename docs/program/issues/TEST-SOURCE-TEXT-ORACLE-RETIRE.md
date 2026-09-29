@@ -1,6 +1,6 @@
 ---
 id: TEST-SOURCE-TEXT-ORACLE-RETIRE
-title: "Retire the remaining source-text test oracles: 21 test functions in 16 files read Rust source with include_str! and assert on its text, so behaviour-neutral edits redden them; the Architect disposes each function first, then each is dropped, replaced by a behavioural control, or retired to review"
+title: "Retire the remaining source-text test oracles: 22 test functions in 16 files read Rust source with include_str! and assert on its text, so behaviour-neutral edits redden them; the Architect disposes each function first, then each is dropped, replaced by a behavioural control, or retired to review"
 status: ready
 owner: verify
 size: M
@@ -28,11 +28,12 @@ Architect review.
   delay. Tests should focus on behavior."
   (`agent/playbooks/build/qa-test-design.md`).
 - **Population.** `grep -rnE 'include_str!\("[^"]*\.rs"\)' crates` finds 32
-  uses in 21 test functions across 16 files:
+  uses in 22 test functions across 16 files (Steward correction
+  `evt_20r190bdzkk3d`):
 
   | Crate | Test functions |
   |---|---|
-  | ken-runtime | `boundary_value_clif.rs` `b2v_every_class_guard_call_site_takes_its_set_from_the_plan`; `lowering/boundary.rs` `b2v_ac3_the_lowered_boundary_disposition_has_no_wildcard_arm`; `lowering/core/tests/control.rs` `LOWERING_IMPL_SOURCES` and its consumer; `lowering/core/tests/host_call_carrier.rs` `every_generated_root_and_unit_signature_is_two_pointers_to_one_word`; `lowering/core/tests/mod.rs` `every_source_term_carrier_holds_an_occurrence_and_never_a_bare_expression`, `retained_closures_carry_a_static_origin_and_no_body_term`; `static_transition/closure.rs` `b2r_ac6_the_abi_plane_declares_no_emission_construct`, `b2r_ac7_the_abi_plane_adds_no_parser_and_no_dependency_edge`; `static_transition/occurrences.rs` `the_semantic_seed_api_accepts_only_occurrence_origins` |
+  | ken-runtime | `boundary_value_clif.rs` `b2v_every_class_guard_call_site_takes_its_set_from_the_plan`; `lowering/boundary.rs` `b2v_ac3_the_lowered_boundary_disposition_has_no_wildcard_arm`; `lowering/core/tests/control.rs` `the_retained_body_helper_is_visible_only_inside_lowering` (reads `LOWERING_IMPL_SOURCES`); `lowering/core/tests/host_call_carrier.rs` `every_generated_root_and_unit_signature_is_two_pointers_to_one_word`; `lowering/core/tests/mod.rs` `every_source_term_carrier_holds_an_occurrence_and_never_a_bare_expression`, `retained_closures_carry_a_static_origin_and_no_body_term`; `static_transition/closure.rs` `b2r_ac6_the_abi_plane_declares_no_emission_construct`, `b2r_ac7_the_abi_plane_adds_no_parser_and_no_dependency_edge`; `static_transition/occurrences.rs` `the_semantic_seed_api_accepts_only_occurrence_origins` |
   | ken-elaborator | `tests/b2_acceptance.rs` `no_modal_construct_in_kernel`, `inert_to_conversion`, `obligation_not_dischargeable_in_ken`; `tests/decimal_char_acceptance.rs` `char_deceq_pin1_structural_encoding`; `r_layer_tests/ds1_empty_dec_acceptance.rs` `ac3_trusted_base_delta_is_ordinary_inductive_admission_only` |
   | ken-host | `lib.rs` `producer_inventory_is_bidirectional_and_sync_drift_is_discriminating`, `public_surface_contains_only_ken_owned_semantic_types`; `effect_v1.rs` `resource_owner_and_close_allowance_are_structurally_confined` |
   | ken-cli | `tests/px4b_native_production.rs` `linked_console_broken_pipe_reaches_ken_instead_of_signal_termination`, `naked_process_ir_helpers_are_not_public_production_api`; `tests/console_exec.rs` `closed_stdout_is_an_io_failure_not_sigpipe_termination` |
@@ -59,7 +60,12 @@ ken-runtime first.
 
 ## Acceptance
 
-- **AC-0 (disposition; no edit).** For each function, name the property it
+- **AC-0 (done).** Architect ruling `evt_c18ftz9zda91`: 16 dispositions as
+  proposed, 6 modified. Scope confirmed `evt_6y63g4fa6t3rn`; the four stale
+  comments, including two production doc comments, are comment-only edits
+  (`evt_7b28tvh259c8`).
+
+- **AC-0 as framed (disposition; no edit).** For each function, name the property it
   guards and propose one disposition:
   1. drop the text assertion, because the test already runs the behaviour
      (for example, `console_exec.rs` checks `main.rs` text before a real

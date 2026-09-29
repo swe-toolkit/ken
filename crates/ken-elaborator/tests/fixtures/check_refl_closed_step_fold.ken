@@ -1,0 +1,18 @@
+data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
+
+fn fold (k : Type) (v : Type) (b : Type) (f : k → v → b → b) (z : b) (m : Tree k v) : b =
+  match m {
+    Leaf ↦ z;
+    Node l key val r ↦ fold k v b f (f key val (fold k v b f z l)) r
+  }
+
+fn wrapped_fixed (k : Type) (v : Type) (b : Type) (m : Tree k v) (acc : b) : b =
+  fold k v b (λkey. λval. λbefore. before) acc m
+
+theorem wrapped_fixed_node
+      (k : Type) (v : Type) (b : Type)
+      (left : Tree k v) (key : k) (val : v) (right : Tree k v) (acc : b)
+    : Equal b
+        (wrapped_fixed k v b (Node k v left key val right) acc)
+        (wrapped_fixed k v b right (wrapped_fixed k v b left acc)) =
+  Refl

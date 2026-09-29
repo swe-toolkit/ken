@@ -2,7 +2,7 @@
 id: CHECK-REFL-CLOSED-STEP-FOLD-DIVERGENCE
 title: "The checker exhausts stack and memory on a true 669-byte Refl goal: a Node equation for a fold wrapper with a closed step lambda. Classify the phase (elaboration whnf or kernel convert) first, then repair it in its owner, with no stack increase as the repair"
 status: ready
-owner: language
+owner: kernel
 size: M
 gate: architect
 tier: T1
@@ -22,8 +22,9 @@ acceptance.
 
 ## Fixed inputs (read at `30e9f2081`)
 
-- **The repro.** This is 669 bytes, SHA-256 `a97ea96fd974f081…`, as
-  minimized by the foundation implementer:
+- **The repro.** This is 682 bytes as a file (the fence dedented by two
+  spaces), SHA-256 `a97ea96fd974f081…`, as minimized by the foundation
+  implementer:
 
   ```ken
   data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
@@ -70,7 +71,13 @@ and bounded memory. The three controls stay as they are.
 
 ## Acceptance
 
-- **AC-0 (classify, then ruling; no edit).** Run the repro instrumented and
+- **AC-0 (done): kernel `convert`.** Measured at `22093cfcd`
+  (`evt_40sdhwvwtjhbg`): `whnf` returns, then `convert` never returns and
+  the 8 MiB stack overflows. The growing term inside `convert` is not yet
+  observed. The kernel-convert stop fired. Operator 2026-09-29: "one wp for
+  checker crash, yes"; the Kernel ring owns the repair (kickoff
+  `evt_32bdq2a3gjj33`).
+- **AC-0 as framed (classify, then ruling; no edit).** Run the repro instrumented and
   name the diverging call: elaboration `whnf` or kernel `convert`. Give the
   term shape that grows, for example an unfolding that re-exposes the same
   redex. The Architect rules the repair before any build.

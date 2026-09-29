@@ -8670,105 +8670,10 @@ pub(crate) mod tests {
         );
     }
 
-    /// **`RECUT 2`, structural — EVERY `class_guard` call site takes its set
-    /// from the plan, including the ones no probe reaches.**
-    ///
-    /// ⛔ **Why a source scan, when `pin-a-property` says reach for one last.**
-    /// The behavioural pin below covers the three call sites this harness's
-    /// probe shapes can reach. Four cannot: `store_int_limbs` takes five
-    /// parameters, `store_int_tag` three, and `store_int_limb` /
-    /// `store_bytes_len` take a value where `Probe::Binary` passes an out
-    /// pointer. Leaving four of seven sites to review, after a mutation proved
-    /// exactly this kind of site can silently defect, is the overclaim — so
-    /// they get a mechanism whose limits are stated instead.
-    ///
-    /// **This pins the ALLOWED form, not a forbidden list:** every argument
-    /// must come from `plan`. A new guard spelled any other way reddens,
-    /// including one nobody imagined.
-    ///
-    /// **MEASURED:** the third argument of every `class_guard(...)` call in
-    /// this module is a `plan.` expression. **CLAIMED:** no emitted class guard
-    /// enumerates classes by hand. ⛔ **THE GAP:** a helper that *launders* a
-    /// literal — `fn my_classes() -> &'static [BoundaryClass]` passed as
-    /// `plan.foo()`-shaped text — is not detectable here and is not detectable
-    /// by the behavioural pin either for the four unreachable sites. That arm
-    /// is review-enforced, and saying so is the point of writing it down.
-    #[test]
-    fn b2v_every_class_guard_call_site_takes_its_set_from_the_plan() {
-        let source = include_str!("boundary_value_clif.rs");
-        let needle = "class_guard(";
-        let mut sites = 0usize;
-        let mut cursor = 0usize;
-
-        while let Some(found) = source[cursor..].find(needle) {
-            let at = cursor + found;
-            cursor = at + needle.len();
-            // Skip the definition itself and any doc-comment mention: only a
-            // CALL has a `(` immediately followed by arguments on the same
-            // logical expression, and only a call is preceded by whitespace.
-            let before = source[..at]
-                .rfind('\n')
-                .map(|n| &source[n + 1..at])
-                .unwrap_or("");
-            // ⚠ This scan reads its OWN source, so it matches its own needle
-            // literal and its own doc comment. Skip the definition, doc lines,
-            // and any occurrence inside a string.
-            if before.trim_start().starts_with("fn ")
-                || before.contains("///")
-                || before.ends_with('"')
-            {
-                continue;
-            }
-
-            // Take the balanced argument list.
-            let mut depth = 1usize;
-            let mut end = cursor;
-            for (offset, ch) in source[cursor..].char_indices() {
-                match ch {
-                    '(' => depth += 1,
-                    ')' => {
-                        depth -= 1;
-                        if depth == 0 {
-                            end = cursor + offset;
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            assert!(
-                depth == 0,
-                "RECUT 2: could not find the end of a `class_guard` argument \
-                 list at byte {at} -- an undetermined parse FAILS rather than \
-                 passing, or every gap in this scan is a silent green"
-            );
-            let args = &source[cursor..end];
-            let third = args
-                .rsplit(',')
-                .next()
-                .expect("a comma-separated argument list has a last element")
-                .trim();
-            assert!(
-                third.starts_with("plan."),
-                "RECUT 2: a `class_guard` call takes `{third}`, which does not \
-                 come from the plan -- an emitted class guard that enumerates \
-                 its own classes is the hand-maintained table beside the helper \
-                 bodies that RULING R3 excludes"
-            );
-            sites += 1;
-        }
-
-        // ⛔ Positive control: a scan that matched nothing passes for any
-        // reason at all. Seven is the count the mutation table was run
-        // against; fewer means the scan stopped seeing sites, more means new
-        // ones appeared and were checked.
-        assert!(
-            sites >= 7,
-            "RECUT 2: the scan found {sites} `class_guard` call sites, fewer \
-             than the seven this module has -- it is no longer looking at the \
-             surface it claims to cover"
-        );
-    }
+    // Retired under `TEST-SOURCE-TEXT-ORACLE-RETIRE` AC-0 item 1:
+    // the four unprobed class-guard sites remain Architect-review-owned; the
+    // existing runtime control reaches only its supported probe shapes. See
+    // `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`.
 
     /// **`RECUT 2`, causal and PER-SITE — every emitted CLASS guard is the
     /// plan's.**

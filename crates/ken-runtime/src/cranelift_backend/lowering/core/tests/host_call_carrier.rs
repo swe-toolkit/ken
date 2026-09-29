@@ -371,30 +371,77 @@ fn the_generated_root_translates_a_runtime_reached_trap_exactly() {
     assert_eq!(report.observation, fixture.observation);
 }
 
+/// Reads the generated root and retained units from a real compiled module.
+/// The ABI literal is independently built from the target pointer type and the
+/// carrier-word return type, not from the production signature helper.
 #[test]
-fn every_generated_root_and_unit_signature_is_two_pointers_to_one_word() {
-    let module = new_jit_module().expect("JIT module");
-    let signature = crate::cranelift_backend::lowering::units::unit_signature(&module);
-    let pointer = module.target_config().pointer_type();
-    assert_eq!(signature.params.len(), 2);
-    assert!(
-        signature
-            .params
-            .iter()
-            .all(|parameter| parameter.value_type == pointer)
-    );
-    assert_eq!(signature.returns.len(), 1);
-    assert_eq!(signature.returns[0].value_type, types::I64);
+fn compiled_root_and_unit_signatures_match_the_closed_abi() {
+    let root_name = "compiled_signature_root";
+    let expr = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: Vec::new(),
+            body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+        }),
+        args: Vec::new(),
+    };
+    let compiled = compile_expr_into_module(
+        new_jit_module().expect("JIT module"),
+        root_name,
+        Linkage::Local,
+        &expr,
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
+        BTreeMap::new(),
+        None,
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("the called-closure fixture compiles through the real module path");
 
-    let units = include_str!("../../units.rs");
-    assert!(
-        units.contains("let sig = unit_signature(module);"),
-        "the adapter or unit definitions stopped sharing the closed signature"
+    let module = &compiled.module;
+    let pointer = module.target_config().pointer_type();
+    let mut expected = module.make_signature();
+    expected
+        .params
+        .push(cranelift_codegen::ir::AbiParam::new(pointer));
+    expected
+        .params
+        .push(cranelift_codegen::ir::AbiParam::new(pointer));
+    expected
+        .returns
+        .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+
+    let mut root_signature = None;
+    let mut unit_signatures = Vec::new();
+    for (id, declaration) in module.declarations().get_functions() {
+        let name = declaration.linkage_name(id);
+        if name.as_ref() == root_name {
+            assert!(root_signature
+                .replace(declaration.signature.clone())
+                .is_none());
+        }
+        if name.starts_with("ken_unit_") {
+            unit_signatures.push(declaration.signature.clone());
+        }
+    }
+
+    assert_eq!(
+        root_signature.as_ref(),
+        Some(&expected),
+        "the caller-named generated root has the closed two-pointer-to-I64 ABI"
     );
     assert!(
-        !units.contains("GeneratedRootIngressV1"),
-        "a launch-ingress type entered the internal unit implementation"
+        !unit_signatures.is_empty(),
+        "the called-closure fixture must declare at least one retained unit"
     );
+    for (index, signature) in unit_signatures.iter().enumerate() {
+        assert_eq!(
+            signature, &expected,
+            "compiled unit {index} must use the same closed ABI as the root"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -678,14 +725,13 @@ fn rtfp_header_drift_after_identity_selection_rejects_by_fingerprint() {
 /// **`AC-2`'s real property, defended by an oracle that source text cannot
 /// move.**
 ///
-/// ⭐ **Why this test exists next to a census that already "covers" `AC-2`.**
-/// `correspondence_adds_no_emitted_unit_to_the_production_census` counts how
-/// many times three spellings occur in seven files. That is a claim about
-/// *repository text*: splitting a call across lines evades every needle, a
-/// mention inside a comment inflates them, and in no configuration does it
-/// observe a single emitted function. ⇒ It is a **tripwire**. This test is the
-/// evidence: it counts units at the point of emission, so the number it asserts
-/// is a property of the compiled module.
+/// This test observes the generated-unit counters for its leaf and called-
+/// closure fixtures; it is not a full module-declaration inventory. The old
+/// source-text census was retired under `RT-BACKEND-SOURCE-CENSUS-RETIRE` (see
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`). The separate
+/// `compiled_module_declarations_account_for_every_fixture_emitter` control
+/// measures Local/Export declarations in its listed fixtures only. An emitter
+/// reached outside that fixture set remains Architect-review-owned.
 ///
 /// **MEASURED:** for two programs that differ *only* in whether they contain a
 /// retained closure body, the `(declared, defined)` unit counts `B2F` actually
@@ -3175,12 +3221,22 @@ fn d4_failing_to_accumulate_emissions_reds_the_closeout_set_equality() {
     );
 }
 
-/// **`D3` affine seam — claiming one causal token twice reds.**
+/// **`D3` token seam — same-path double claim reaches the E1 lattice rule.**
 #[test]
-fn d4_claiming_the_same_causal_token_twice_reds_the_ledger() {
+fn d4_claiming_the_same_causal_token_twice_reds_token_e1() {
     assert_emission_mutation_reds(
         ContinuationEmissionMutation::ClaimTokenTwice,
-        "claimed twice",
+        "}: {E1}",
+    );
+}
+
+/// Both actual direct call instructions are emitted and recorded. A second
+/// receipt on the same path must reach R2, not a one-Inst map insertion stop.
+#[test]
+fn d4_second_direct_call_on_one_path_reds_token_r2() {
+    assert_emission_mutation_reds(
+        ContinuationEmissionMutation::DuplicateDirectCall,
+        "}: {R2}",
     );
 }
 

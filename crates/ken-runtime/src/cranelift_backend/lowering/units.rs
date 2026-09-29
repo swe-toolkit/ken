@@ -22,7 +22,7 @@
 //! filter here to get wrong.
 
 use super::*;
-use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope};
+use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope, CheckedTokenFunctionScope};
 // `close_host_effect_seat_ledger`'s own `#[cfg(test)]` mutation check reaches
 // these directly; moved to `effects.rs` at `RT-EMITTER-EFFECTS-SPLIT` `D1`.
 #[cfg(test)]
@@ -4139,6 +4139,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             Ok((successor.row.id(), target))
         }).collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+        let token_scope = CheckedTokenFunctionScope::open(compiler)?;
         let ambient = AmbientBodyAuthority::bind(
             compiler,
             emission.owner.base_owner(),
@@ -4634,6 +4635,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         }
         ambient.release(compiler);
         frame_scope.close(compiler, &func)?;
+        token_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
         // The test-only Vis ingress bypasses finished-body verification as a
@@ -5120,6 +5122,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
         // transaction, spanning the specialization body exactly. ⛔ Opened before the builder and
         // closed after it, so every branch scope inside nests within it.
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+        let token_scope = CheckedTokenFunctionScope::open(compiler)?;
         // ⭐⭐ `D8o` — THE BINDING THIS PASS NEVER HAD. A specialization body
         // used to run with whatever the previously defined body left in both
         // ambient fields. The owner is exactly the planner's identity for this
@@ -5279,6 +5282,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
         }
         ambient.release(compiler);
         frame_scope.close(compiler, &func)?;
+        token_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         // Verify, then define THIS function -- a fresh context here would
         // define an empty body and silently discard everything emitted above.
@@ -5646,6 +5650,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         // transaction, spanning the generated-context body exactly. ⛔ Opened before the builder and
         // closed after it, so every branch scope inside nests within it.
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+        let token_scope = CheckedTokenFunctionScope::open(compiler)?;
         let mut func_ctx = FunctionBuilderContext::new();
         {
             let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
@@ -5946,6 +5951,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 emission_owner,
             )?;
         }
+        token_scope.close(compiler, &func)?;
         let response_owner_calls = verified_response_owner_calls(
             &compiler.static_transition_plan,
             bundle,
@@ -6366,6 +6372,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             .continuation_result_edges_owned_by(causal_owner)?;
 
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+        let token_scope = CheckedTokenFunctionScope::open(compiler)?;
         let mut func_ctx = FunctionBuilderContext::new();
         {
             let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
@@ -6580,6 +6587,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 causal_owner,
             )?;
         }
+        token_scope.close(compiler, &func)?;
         let response_owner_calls = verified_response_owner_calls(
             &compiler.static_transition_plan,
             bundle,
@@ -6999,25 +7007,22 @@ pub(super) struct RootUnitResult {
     pub(super) trap: Option<RuntimeTrap>,
 }
 
-/// **`RT-CONTSPEC-ACTIVATE` `D3` — the affine claim ledger over the exact
+/// **`RT-CONTSPEC-ACTIVATE` `D3` — the artifact-wide claim set over exact
 /// planned continuation-call tokens.**
 ///
-/// Each projected causal identity is claimed **exactly once**, by the exact
-/// producer unit the token itself names. This is affine on the *causal token*,
-/// which is a different object from `RT-WORKER-BIND`'s worker binding -- that
-/// one is deliberately NOT affine, and nothing here changes it.
+/// Each projected causal identity is claimed during lowering by the exact
+/// emission owner the token itself names. The separate
+/// finished-Function token lattice checks path-wise affinity; this ledger
+/// retains artifact-wide membership and the resolved target.
+/// The causal token differs from `RT-WORKER-BIND`'s worker binding, and
+/// nothing here changes that binding domain.
 ///
-/// ⛔ There is no `active_emission_owner`, no lowering-minted arm token, and no
-/// second owner authority: the owner compared against is the token's own
-/// immutable `producer_owner`, and the unit compared to it is the one
-/// currently being defined.
+/// There is no lowering-minted arm token or second owner authority: the
+/// defining unit is compared with the token's immutable `emission_owner`.
 ///
-/// ⚠ An affine rejection from here is **not self-explaining**. The identity is
-/// four-field -- producer construct, alternative, call-site sequence, and
-/// `recursive_position`. A key that lost `recursive_position` collides two
-/// distinct tokens at one source position and this ledger will report a
-/// double-consumption of the *right* token while the real defect is the key's
-/// arity. Check the arity before believing the report.
+/// The key is the unchanged full `ContinuationCallIdentity`, including
+/// `recursive_position`: weakening it would merge distinct causal tokens.
+/// No traversal-order insertion rejection decides path-wise duplication.
 pub(super) struct ContinuationClaimLedger {
     /// The RESOLVED target for each planned causal identity. Previously this
     /// kept only the keys and threw the `FuncId` away through `into_keys`,
@@ -7193,7 +7198,7 @@ pub(in crate::cranelift_backend) enum D3Event {
         pending_composed: bool,
     },
     /// A settlement was ATTEMPTED at a named seat. Recorded before the ledger
-    /// call, so a refused second settlement still leaves its seat in the trace.
+    /// call, so a conflicting settlement still leaves its seat in the trace.
     Settle {
         identity: ContinuationCallIdentity,
         disposition: CandidateDisposition,
@@ -7368,11 +7373,9 @@ impl ContinuationCandidateLedger {
         })
     }
 
-    /// Settle one candidate, once.
-    ///
-    /// A second settlement is refused **here**, at the seat that makes it, and
-    /// not deferred to closeout: the refusal names which two dispositions
-    /// collided, which a set-difference at close cannot.
+    /// Settle one candidate to one artifact-wide disposition. Repeating an
+    /// identical disposition is idempotent for exclusive paths; a conflicting
+    /// disposition refuses here, naming both alternatives before closeout.
     pub(super) fn settle(
         &mut self,
         identity: &ContinuationCallIdentity,
@@ -7383,16 +7386,17 @@ impl ContinuationCandidateLedger {
                 "lowering settled a disposition for an identity the planner never minted a                  binding candidate for, so the candidate population and the settling seats                  disagree about which edges exist: {disposition:?}"
             )));
         }
-        if let Some(existing) = self.settled.insert(identity.clone(), disposition) {
-            if existing != disposition {
+        if let Some(existing) = self.settled.get(identity) {
+            if *existing != disposition {
                 return Err(backend_module(format!(
                     "one binding candidate was settled twice, as {existing:?} and then as                      {disposition:?}; a candidate has exactly one disposition"
                 )));
             }
-            return Err(backend_module(format!(
-                "one binding candidate was settled twice, both times as {disposition:?}; a                  candidate is settled exactly once"
-            )));
+            // Two exclusive arms may settle the same disposition. The
+            // function-local token lattice decides whether both can run.
+            return Ok(());
         }
+        self.settled.insert(identity.clone(), disposition);
         Ok(())
     }
 
@@ -7403,9 +7407,8 @@ impl ContinuationCandidateLedger {
     /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D2` — totality first, then the
     /// derived call-obligation subset. The ORDER is the mechanism.**
     ///
-    /// Disjointness is already structural: [`Self::settle`] refuses a second
-    /// settlement at the seat that makes it, so a candidate cannot hold two
-    /// dispositions and reach here. What is checked here is **totality** — that
+    /// Disjointness is structural: [`Self::settle`] refuses a conflicting
+    /// disposition, so a candidate cannot hold two forms and reach here. What is checked here is **totality** — that
     /// every minted candidate was settled by some seat.
     ///
     /// **Totality is checked BEFORE the subset is derived, and deriving
@@ -7685,8 +7688,8 @@ impl ContinuationClaimLedger {
     /// from one that did not, so it would have reported a clean ledger for a
     /// program that emitted no continuation call at all.
     ///
-    /// Rejects an **absent** token, a **duplicate** claim, and a **wrong
-    /// owner** -- and unlike the previous shape the owner check is reachable
+    /// Rejects an **absent** token and a **wrong owner**; duplicate claims
+    /// are validated by the Function-local token lattice. The owner check is reachable
     /// here, because the caller supplies the unit currently being defined
     /// rather than the token's own owner being used to select it.
     ///
@@ -7712,14 +7715,8 @@ impl ContinuationClaimLedger {
                 "a continuation call token was claimed that this ledger never planned".to_string(),
             )
         })?;
-        if let Some(previous) = consumed {
-            return Err(backend_module(format!(
-                "a continuation call token was claimed twice, first by {previous:?}; before \
-                 reading this as a real double-consumption, confirm the causal identity still \
-                 carries all four fields including recursive_position, because a collided key \
-                 reports this against the right token"
-            )));
-        }
+        // The per-Function token lattice owns same-path duplicate claims (E1).
+        // The whole-artifact set still records which planned identity was claimed.
         *consumed = Some(defining);
         self.resolved.get(identity).copied().ok_or_else(|| {
             backend_module("a claimed causal token has no resolved target".to_string())
@@ -7746,9 +7743,10 @@ impl ContinuationClaimLedger {
     /// lawful `ComposedCall` obligation is answered by verified composed
     /// consumption and never becomes a direct call, so an "every obligation
     /// became one direct call" reading would exclude a legal member of the very
-    /// representation this documents. What the union equality says is "every
-    /// call obligation was answered exactly once, in exactly one of the two
-    /// forms, and nothing that was not an obligation was answered at all."
+    /// representation this documents. Set equality says each obligation is
+    /// answered in one of the two forms somewhere in the artifact, and no
+    /// non-obligation is answered. The separate Function-local token lattice
+    /// enforces at most one enter/receipt on each reachable runtime path.
     ///
     /// ⛔ Equality is asserted between sets, not between counts. Two sets of the
     /// same size can differ, and a length comparison here would pass for a
@@ -9079,6 +9077,7 @@ fn define_unit_body<M: Module>(
     // transaction, spanning the ordinary unit body exactly. ⛔ Opened before the builder and
     // closed after it, so every branch scope inside nests within it.
     let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+    let token_scope = CheckedTokenFunctionScope::open(compiler)?;
     let mut func_ctx = FunctionBuilderContext::new();
     let root_outcome;
     {
@@ -9512,6 +9511,7 @@ fn define_unit_body<M: Module>(
             ContinuationEmissionOwner::Predeclared(unit.function),
         )?;
     }
+    token_scope.close(compiler, &func)?;
     // `4b` closeout control: verify this function's emissions but never
     // accumulate them, so whole-pass set equality has a population to miss.
     #[cfg(test)]
