@@ -214,7 +214,13 @@ mod tests {
             )),
         );
 
-        let motive = Term::Lam(Box::new(nat_ty()), Box::new(Term::pi(nat_ty(), nat_ty())));
+        let motive = Term::Ascript(
+            Box::new(Term::Lam(
+                Box::new(nat_ty()),
+                Box::new(Term::pi(nat_ty(), nat_ty())),
+            )),
+            Box::new(Term::pi(nat_ty(), Term::Type(Level::zero()))),
+        );
 
         // add_body = λ n. elim_Nat motive [base,step] n
         let add_body = Term::Lam(
