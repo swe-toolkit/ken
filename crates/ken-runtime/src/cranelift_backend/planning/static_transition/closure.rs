@@ -6459,158 +6459,16 @@ mod tests {
         );
     }
 
-
-    /// `AC-6` — **inert.** The ABI plane declares and validates; it never emits.
-    ///
-    /// ⚠ MEASURED: the production region of `abi.rs` contains no emission
-    /// construct. CLAIMED: exactly that. THE GAP: a source census cannot see an
-    /// executable edge, and inertness is pinned BEHAVIOURALLY by
-    /// `correspondence_adds_no_emitted_unit_to_the_production_census`. This is a
-    /// declaration inventory that makes a new emission construct loud.
-    ///
-    /// Promise class: **durable invariant.**
-    #[test]
-    fn b2r_ac6_the_abi_plane_declares_no_emission_construct() {
-        let abi = include_str!("abi.rs");
-        let production = abi
-            .split_once("\n#[cfg(test)]\nmod tests {")
-            .map_or(abi, |(before, _)| before);
-
-        // ⚠ POSITIVE CONTROL FIRST. Every assertion below is a NEGATIVE check,
-        // and a negative check passes for any reason -- including a broken
-        // comment-stripper that returns 0 for everything. So prove the
-        // instrument can SEE before trusting what it does not see.
-        assert!(
-            b2r_code_identifier_occurrences(production, "AbiCarrier") > 0,
-            "AC-6: the instrument reports zero occurrences of a token that is \
-             certainly present in the production region, so its zeros below mean \
-             nothing"
-        );
-        // And prove it reads CODE rather than comments: `FunctionBuilder` appears
-        // in this module's doc comments (denying that it emits one), so a
-        // stripper that failed to strip would report a non-zero count for it and
-        // the real assertion below would redden for the wrong reason.
-        assert!(
-            abi.contains("FunctionBuilder"),
-            "AC-6: the module no longer MENTIONS the construct it disclaims, so \
-             the comment-stripping half of this instrument is untested"
-        );
-
-        // Comment-stripped and tokenized, so the doc comments that DENY emitting
-        // (and must keep saying so) do not fire the oracle that checks it.
-        for forbidden in [
-            "FunctionBuilder",
-            "define_function",
-            "declare_function",
-            "ins",
-            "Signature",
-        ] {
-            assert_eq!(
-                b2r_code_identifier_occurrences(production, forbidden),
-                0,
-                "AC-6: `{forbidden}` appears in the ABI plane's production code. \
-                 This node is INERT: no new callable target unit, call edge, \
-                 dispatch edge, callback, flag, alternate entry, encoder or \
-                 decoder lands here -- `RT-FNSPLIT-B2F` performs the atomic \
-                 switch-over."
-            );
-        }
-    }
-
-    /// `AC-7` — no oracle, no dependency. The ABI plane parses no source text.
-    ///
-    /// Promise class: **durable invariant.**
-    #[test]
-    fn b2r_ac7_the_abi_plane_adds_no_parser_and_no_dependency_edge() {
-        let abi = include_str!("abi.rs");
-        let production = abi
-            .split_once("\n#[cfg(test)]\nmod tests {")
-            .map_or(abi, |(before, _)| before);
-
-        // ⚠ POSITIVE CONTROL. Same reasoning as `AC-6`: without it, a broken
-        // instrument reports a clean bill of health it never measured.
-        assert!(
-            b2r_code_identifier_occurrences(production, "AbiPlane") > 0,
-            "AC-7: the instrument reports zero occurrences of a token that is \
-             certainly present, so its zeros below mean nothing"
-        );
-
-        for forbidden in ["syn", "proc_macro2", "quote", "include_str"] {
-            assert_eq!(
-                b2r_code_identifier_occurrences(production, forbidden),
-                0,
-                "AC-7: `{forbidden}` appears in the ABI plane. The population is \
-                 the owner partition consumed as DATA; a source-parsing oracle \
-                 is exactly the mechanism `B2O` spent four candidate SHAs ruling \
-                 out."
-            );
-        }
-    }
-
-
-    /// Whole-token occurrences of `needle` in `source`'s **code**, with line and
-    /// block comments stripped.
-    ///
-    /// ⛔ Tokenized rather than substring-matched: `line.contains("ins")` is a
-    /// claim about formatting and fires on `instruction`, `against`, and every
-    /// other word containing those letters.
-    pub(in crate::cranelift_backend::planning::static_transition) fn b2r_code_identifier_occurrences(source: &str, needle: &str) -> usize {
-        let mut code = String::with_capacity(source.len());
-        let mut rest = source;
-        let mut depth = 0usize;
-        while !rest.is_empty() {
-            if depth > 0 {
-                if let Some(open) = rest.find("/*") {
-                    if rest.find("*/").is_none_or(|close| open < close) {
-                        depth += 1;
-                        rest = &rest[open + 2..];
-                        continue;
-                    }
-                }
-                match rest.find("*/") {
-                    Some(close) => {
-                        depth -= 1;
-                        rest = &rest[close + 2..];
-                    }
-                    None => break,
-                }
-                continue;
-            }
-            let block = rest.find("/*");
-            let line = rest.find("//");
-            match (block, line) {
-                (Some(b), None) => {
-                    code.push_str(&rest[..b]);
-                    code.push(' ');
-                    depth = 1;
-                    rest = &rest[b + 2..];
-                }
-                (Some(b), l) if l.is_none_or(|l| b < l) => {
-                    code.push_str(&rest[..b]);
-                    code.push(' ');
-                    depth = 1;
-                    rest = &rest[b + 2..];
-                }
-                (_, Some(l)) => {
-                    code.push_str(&rest[..l]);
-                    code.push(' ');
-                    rest = match rest[l..].find('\n') {
-                        Some(nl) => &rest[l + nl..],
-                        None => "",
-                    };
-                }
-                (None, None) => {
-                    code.push_str(rest);
-                    rest = "";
-                }
-            }
-        }
-        code.split(|c: char| !c.is_alphanumeric() && c != '_')
-            .filter(|token| *token == needle)
-            .count()
-    }
-
-
+    // Retired under `TEST-SOURCE-TEXT-ORACLE-RETIRE` AC-0 item 7: no source-
+    // text emission inventory remains. The existing
+    // `compiled_module_declarations_account_for_every_fixture_emitter` control
+    // in `lowering/core/tests/control.rs` covers only its listed compiled
+    // fixtures; any ABI-plane emission outside them remains Architect-review-
+    // owned. See `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`.
+    // Retired under `TEST-SOURCE-TEXT-ORACLE-RETIRE` AC-0 item 8: whether the
+    // ABI plane gains a parser or dependency edge remains Architect-review-
+    // owned, not guarded by a source-text scan. See
+    // `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`.
     /// Promise class: durable invariant — process mode changes only the
     /// explicitly recorded root scheduling entry's declared source ingress.
     #[test]
