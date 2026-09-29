@@ -17047,6 +17047,133 @@ theorem reachable_within_bounded_correspondence
           (reachable_within_sound k d r fuel x y outer inner)
           (reachable_within_complete k d r fuel x y outer inner)
 
+theorem bounded_walk_forget
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (fuel : Nat) (x : k) (y : k)
+    : bounded_walk k leq r fuel x y → positive_walk k leq r x y =
+  λbounded.
+    elim_trunc
+      (positive_walk k leq r x y)
+      (λwitness.
+        match witness {
+          MkBoundedRelationWalk vertices valid length_bound ↦
+            trunc_intro (MkRelationWalk k leq r x y vertices valid)
+        })
+      bounded
+
+theorem bounded_walk_raise
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (smaller : Nat)
+      (larger : Nat)
+      (x : k)
+      (y : k)
+    : Equal Bool (leq_nat smaller larger) True
+      → bounded_walk k leq r smaller x y
+      → bounded_walk k leq r larger x y =
+  λincreasing.
+    λbounded.
+      elim_trunc
+        (bounded_walk k leq r larger x y)
+        (λwitness.
+          match witness {
+            MkBoundedRelationWalk vertices valid fits ↦
+              trunc_intro
+                (MkBoundedRelationWalk
+                  k
+                  leq
+                  r
+                  larger
+                  x
+                  y
+                  vertices
+                  valid
+                  ((Ord_instance_Nat).trans (length k vertices) smaller larger fits increasing))
+          })
+        bounded
+
+theorem leq_nat_right_successor
+      (a : Nat) (b : Nat)
+    : Equal Bool (leq_nat a b) True → Equal Bool (leq_nat a (Suc b)) True =
+  match a {
+    Zero ↦ λbounded. Proved;
+    Suc earlier ↦
+      match b {
+        Zero ↦ λbounded. absurd bounded;
+        Suc later ↦ λbounded. leq_nat_right_successor earlier later bounded
+      }
+  }
+
+theorem leq_nat_add_right (a : Nat) (extra : Nat) : Equal Bool (leq_nat a (add a extra)) True =
+  match extra {
+    Zero ↦ (Ord_instance_Nat).refl a;
+    Suc rest ↦ leq_nat_right_successor a (add a rest) (leq_nat_add_right a rest)
+  }
+
+theorem reachable_within_monotone
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (smaller : Nat)
+      (larger : Nat)
+      (x : k)
+      (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → Equal Bool (leq_nat smaller larger) True
+      → Equal Bool (reachable_within k (relation_ord_leq k d) smaller x y r) True
+      → Equal Bool (reachable_within k (relation_ord_leq k d) larger x y r) True =
+  λouter.
+    λinner.
+      λincreasing.
+        λreaches.
+          reachable_within_complete
+            k
+            d
+            r
+            larger
+            x
+            y
+            outer
+            inner
+            (bounded_walk_raise
+              k
+              (relation_ord_leq k d)
+              r
+              smaller
+              larger
+              x
+              y
+              increasing
+              (reachable_within_sound k d r smaller x y outer inner reaches))
+
+theorem reachable_plus_sound
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (x : k) (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → reachable_plus k (relation_ord_leq k d) x y r
+      → positive_walk k (relation_ord_leq k d) r x y =
+  λouter.
+    λinner.
+      λreaches.
+        bounded_walk_forget
+          k
+          (relation_ord_leq k d)
+          r
+          (size k Unit (dom k (Tree k Unit) r))
+          x
+          y
+          (reachable_within_sound
+            k
+            d
+            r
+            (size k Unit (dom k (Tree k Unit) r))
+            x
+            y
+            outer
+            inner
+            reaches)
+
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
     : Tree k (Tree k Unit) =
@@ -18663,6 +18790,53 @@ const relation_duplicate_ordered_view : RelationEdgeMembership Nat =
     relation_duplicate_outer
     relation_duplicate_outer_ordered
     relation_duplicate_outer_successors_ordered
+
+const relation_single_edge : Tree Nat (Tree Nat Unit) =
+  Node
+    Nat
+    (Tree Nat Unit)
+    (Leaf Nat (Tree Nat Unit))
+    Zero
+    (Node Nat Unit (Leaf Nat Unit) (Suc Zero) MkUnit (Leaf Nat Unit))
+    (Leaf Nat (Tree Nat Unit))
+
+theorem relation_single_edge_bound_is_one
+    : Equal Nat (size Nat Unit (dom Nat (Tree Nat Unit) relation_single_edge)) (Suc Zero) =
+  Proved
+
+theorem relation_single_edge_fuel_zero_rejects
+    : Equal Bool
+        (reachable_within Nat leq_nat Zero Zero (Suc Zero) relation_single_edge)
+        False =
+  Proved
+
+theorem relation_single_edge_fuel_one_accepts
+    : Equal Bool
+        (reachable_within Nat leq_nat (Suc Zero) Zero (Suc Zero) relation_single_edge)
+        True =
+  Proved
+
+theorem relation_single_edge_closure_accepts
+    : reachable_plus Nat leq_nat Zero (Suc Zero) relation_single_edge =
+  Proved
+
+theorem relation_duplicate_closure_walk_agree
+    : And
+        (reachable_plus Nat leq_nat Zero (Suc (Suc Zero)) relation_duplicate_outer)
+        (positive_walk Nat leq_nat relation_duplicate_outer Zero (Suc (Suc Zero))) =
+  and_intro
+    (reachable_plus Nat leq_nat Zero (Suc (Suc Zero)) relation_duplicate_outer)
+    (positive_walk Nat leq_nat relation_duplicate_outer Zero (Suc (Suc Zero)))
+    Proved
+    (trunc_intro
+      (MkRelationWalk
+        Nat
+        leq_nat
+        relation_duplicate_outer
+        Zero
+        (Suc (Suc Zero))
+        (Cons Nat (Suc (Suc Zero)) (Nil Nat))
+        Proved))
 
 theorem relation_duplicate_lookup_misses_right_duplicate
     : Equal Bool
