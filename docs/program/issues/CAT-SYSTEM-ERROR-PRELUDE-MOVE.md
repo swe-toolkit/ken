@@ -98,5 +98,6 @@ or is re-keyed to its owned ids.
   `evt_5vmakg3p8qb7d`). `conformance/surface/ffi-io/seed-error-classification.md`
   still carries `RED-UNTIL-BUILT` and `BLOCKED-ON-PX9-INC1` labels. When
   this WP lands, the Steward routes the refresh to the Spec enclave: clear
-  the stale labels and name the `System.Error` module. That path belongs to
-  the enclave; Foundation does not edit it.
+  the stale labels and name the `Capability.System.Error` module (Architect
+  `evt_1qk0gkr2tysw2`). That path belongs to the enclave; Foundation does not
+  edit it.
