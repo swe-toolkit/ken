@@ -1,15 +1,16 @@
-//! List combinator acceptance: `fold`/`zip` live in the prelude; structural
-//! `map`/`filter` are checked exports of `Data.Collections.Derived`.
+//! List combinator acceptance: `zip` lives in the prelude; structural
+//! `map`/`filter`/`length` are checked exports of `Data.Collections.Derived`.
 //! The four compose over the same List identities (`37 §4.1`, §9).
 
 use std::path::PathBuf;
 
 use ken_elaborator::ElabEnv;
-use ken_kernel::{whnf, Context, GlobalId, Term};
+use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_kernel::{whnf, Context, Decl, GlobalId, Term};
 
 fn with_derived_combinators() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    for name in ["map", "filter"] {
+    for name in ["map", "filter", "length"] {
         assert!(
             !env.globals.contains_key(name),
             "{name} must not be prelude-owned"
@@ -20,7 +21,7 @@ fn with_derived_combinators() -> ElabEnv {
         .join("catalog/packages");
     env.elaborate_module_from_roots(&[root], "Data.Collections.Derived")
         .expect("Derived must roots-load with real provider imports");
-    for name in ["map", "filter"] {
+    for name in ["map", "filter", "length"] {
         let id = env.globals[&format!("Data.Collections.Derived.{name}")];
         assert!(
             env.env.transparent_body(id).is_some(),
@@ -35,23 +36,64 @@ fn with_derived_combinators() -> ElabEnv {
     env
 }
 
+/// Promise class: durable prelude-surface invariant.
+/// MEASURED: a fresh prelude has no fold binding and still provides a checked,
+/// zero-trust zip. CLAIMED: the removed list fold is not registered at the
+/// prelude boundary. THE GAP: this probes a fresh ElabEnv, not future imports;
+/// provider ownership is checked separately by the Map fixture.
+#[test]
+fn prelude_registers_zip_without_a_list_fold() {
+    let env = ElabEnv::new().expect("base env");
+    assert!(
+        !env.globals.contains_key("fold"),
+        "the prelude must not register the removed list fold"
+    );
+    let zip = env.globals["zip"];
+    assert!(
+        matches!(env.env.lookup(zip), Some(Decl::Transparent { .. })),
+        "zip remains a checked transparent prelude operation"
+    );
+    assert!(
+        !env.env.trusted_base().contains(&zip),
+        "zip adds no trusted-base assumption"
+    );
+}
+
 /// Promise class: durable checked integration.
-/// MEASURED: the bare prelude provides fold/zip, Derived provides map/filter,
-/// and the one declaration composes all four with the exact checked identities.
-/// CLAIMED: clients can compose these structural List combinators after
-/// loading Derived. THE GAP: the fixture exposes exact qualified identities
-/// as flat aliases; real catalog client selective imports have separate gates.
+/// MEASURED: the bare prelude provides zip, Derived provides map/filter/length,
+/// and the one declaration composes all four with checked identities and
+/// evaluates to one for its singleton input. CLAIMED: clients can compose
+/// these structural List combinators after loading Derived. THE GAP: this
+/// fixture exposes exact qualified identities as flat aliases; real catalog
+/// client selective imports have separate gates.
 #[test]
 fn list_combinators_compose_with_checked_derived_providers() {
     let mut env = with_derived_combinators();
-    env.elaborate_decl(
-        "const uses_all_four_combinators : Nat = \
-         fold Nat Nat (\\h acc. Suc acc) Zero \
+    let id = env
+        .elaborate_decl(
+            "const uses_all_four_combinators : Nat = \
+         length Nat \
            (filter Nat (\\n. match n { Zero |-> True ; Suc m |-> False }) \
              (map (Prod Nat Nat) Nat (\\p. match p { MkProd x y |-> x }) \
                (zip Nat Nat (Cons Nat Zero (Nil Nat)) (Cons Nat Zero (Nil Nat)))))",
-    )
-    .expect("map/filter from Derived and fold/zip from the prelude must compose");
+        )
+        .expect("zip from the prelude and map/filter/length from Derived must compose");
+    let body = match env.env.lookup(id) {
+        Some(Decl::Transparent { body, .. }) => body,
+        other => panic!("composition must be checked and transparent: {other:?}"),
+    };
+    let mut store = EvalStore::new();
+    let value = eval(&[], body, &env.env, &mut store);
+    match value {
+        EvalVal::Ctor { id, args, .. } if id == env.prelude_env.suc_id && args.len() == 1 => {
+            assert!(
+                matches!(&args[0], EvalVal::Ctor { id, args, .. }
+                    if *id == env.prelude_env.zero_id && args.is_empty()),
+                "singleton composition must count exactly one; got {args:?}"
+            );
+        }
+        other => panic!("singleton composition must count exactly one; got {other:?}"),
+    }
 }
 
 /// Peel a fully-applied `App` spine to its head `GlobalId` (constructor or
@@ -149,20 +191,20 @@ fn ac2_filter_computes_and_rejects_at_least_one_element() {
 }
 
 /// Promise class: durable trust invariant.
-/// MEASURED: the exact fold/zip and qualified Derived.map/filter identities
-/// are transparent and absent from `trusted_base()`. CLAIMED: moving map and
-/// filter adds no assumptions. THE GAP: this per-name check cannot detect a
-/// separately named assumption; the full bare-env trust enumeration below
+/// MEASURED: prelude zip and qualified Derived.map/filter/length identities
+/// are transparent and absent from `trusted_base()`. CLAIMED: using these
+/// checked combinators adds no assumptions. THE GAP: this per-name check cannot
+/// detect a separately named assumption; the full bare-env trust enumeration below
 /// guards inherited membership, and the Derived package gate checks its delta.
 #[test]
 fn ac5_new_combinators_add_zero_trusted_base_entries() {
     let env = with_derived_combinators();
     let trusted = env.env.trusted_base();
     for name in [
-        "fold",
         "zip",
         "Data.Collections.Derived.map",
         "Data.Collections.Derived.filter",
+        "Data.Collections.Derived.length",
     ] {
         let id = env.globals[name];
         assert!(
@@ -276,8 +318,8 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 ///
 /// `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D3` -- this enumeration and the
 /// block delta above are not redundant, and neither retires the other: the
-/// block delta is `GlobalId`-keyed and covers only fold/zip's
-/// contribution, while this enumeration is label-keyed and covers the
+/// block delta is `GlobalId`-keyed and covers only zip's contribution,
+/// while this enumeration is label-keyed and covers the
 /// *whole* 107-entry trusted base, carrying census value the block delta
 /// does not (the shape-of-the-trusted-base finding two paragraphs up is a
 /// property of this list specifically). Seeing an id-keyed delta land next

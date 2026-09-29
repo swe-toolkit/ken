@@ -7,7 +7,7 @@
 //! equality), AC6 (verified `sort` emits the conjoined `is_sorted ∧ Perm`
 //! obligation). Spec: `spec/30-surface/37-strings-collections.md`.
 //!
-//! `fold`/`zip` remain in the prelude; `map`/`filter` belong to Derived.
+//! `zip` remains in the prelude; `map`/`filter`/`length` belong to Derived.
 //! `unfoldUpTo` / `sort` views remain declared
 //! here (driving the recursive-view-through-SCT wiring in `elab.rs`), since
 //! `unfoldUpTo` is the no-coinduction infinitude idiom rather than a

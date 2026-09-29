@@ -73,6 +73,68 @@ fn checked_map_host_read_ignores_forged_flat_aliases() {
     }
 }
 
+/// Promise class: durable checked-owner preservation invariant.
+/// MEASURED: the real Map loader owns a private fold and every Map-owned
+/// declaration referring to it retains that exact GlobalId, not another
+/// registered declaration called fold. CLAIMED: removing the prelude's fold
+/// preserves Map's owner-scope resolution. THE GAP: this row reads the same
+/// before and after removal; the prelude registration test is the discriminator.
+#[test]
+fn map_owner_scope_readers_preserve_the_private_fold_id() {
+    let (env, owned) = checked_map_env();
+    let map_fold = catalog_or::provider_owned_id(&env, &owned, MAP_MODULE, "fold")
+        .expect("Map's private fold must have a checked owner ID");
+    assert!(matches!(
+        env.env.lookup(map_fold),
+        Some(Decl::Transparent { .. })
+    ));
+
+    // Include bare and module-qualified names. A same-spelled prelude fold
+    // exists under the AC-2 restore mutation but has a different checked ID.
+    let other_fold_ids: BTreeSet<GlobalId> = env
+        .globals
+        .iter()
+        .filter(|(name, id)| {
+            name.split(|c| c == '.' || c == ':').last() == Some("fold") && **id != map_fold
+        })
+        .map(|(_, id)| *id)
+        .collect();
+    eprintln!("Map.fold {map_fold:?}; other registered fold IDs: {other_fold_ids:?}");
+    let prefix = format!("{MAP_MODULE}.");
+    let mut readers = BTreeSet::new();
+    for id in &owned {
+        if *id == map_fold {
+            continue;
+        }
+        let declaration = env.env.lookup(*id).expect("Map-owned ID must resolve");
+        let references = catalog_or::declaration_references(declaration);
+        if !references.contains(&map_fold) {
+            continue;
+        }
+        let name = env
+            .globals
+            .iter()
+            .find_map(|(name, candidate)| {
+                (*candidate == *id)
+                    .then(|| name.strip_prefix(&prefix))
+                    .flatten()
+            })
+            .unwrap_or_else(|| panic!("Map reader {id:?} must have a qualified owner name"));
+        for other in &other_fold_ids {
+            assert!(
+                !references.contains(other),
+                "Map owner-scope reader {name} also refers to another fold ID {other:?}"
+            );
+        }
+        readers.insert(name.to_owned());
+    }
+    assert!(
+        readers.contains("fold_insert_preserves_ordered"),
+        "Map's fold_insert_preserves_ordered must reach the owned fold"
+    );
+    eprintln!("Map owner-scope readers of private fold: {readers:?}");
+}
+
 /// The stated stack for the D1 legacy-frame budget instrument. Two MiB remains
 /// the fixed boundary at base `d23a65021359741c59809ec9d24de9af6fe262e1`;
 /// recalibration changed only the live reservation below. An explicit
