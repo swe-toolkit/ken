@@ -35,9 +35,10 @@ told apart, cited or discharged one at a time.
   (`IsTrue`, `bool_or`), so they are named catalog axioms, not kernel
   certificates. `IsTrue` and `bool_or` have zero occurrences in
   `crates/ken-kernel/src/`.
-- **Known consumers of `Ord Int`**: ES4's Derived owner-local examples,
-  `Capability.System.Error`, and the other LawfulClasses instances
-  (Architect `evt_5f1ewknxv3m6h`).
+- **Known consumers of `Ord Int`**: ES4's Derived owner-local examples and
+  the other LawfulClasses instances. This is a starting list, not the
+  population. `Capability.System.Error` is a measured zero (Architect
+  `evt_vqs91q7y15vz`, correcting `evt_5f1ewknxv3m6h`).
 
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.
