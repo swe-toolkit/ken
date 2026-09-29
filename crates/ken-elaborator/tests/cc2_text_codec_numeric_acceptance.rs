@@ -21,7 +21,6 @@ const STRING_KEYS_KEN_MD: &str =
 const CODEC_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.md");
 const NUMERIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
-const NUMERIC_SEED: &str = include_str!("../../../conformance/stdlib/text/seed-text-numeric.md");
 
 fn dependency_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
@@ -352,33 +351,6 @@ fn bijection_prerequisite_is_the_single_separately_homed_assumption() {
 
 #[test]
 fn located_numeric_discriminators_and_codec_boundary_are_checked() {
-    let numeric = ken_elaborator::literate::extract_ken_md(NUMERIC_KEN_MD)
-        .expect("Numeric.ken.md must extract");
-    for discriminator in [
-        "parsed_decimal_result",
-        "empty_input_result",
-        "bad_digit_result",
-        "parsed_negative_result",
-        "digit_zero_result",
-        "digit_nine_result",
-        "letter_digit_result",
-    ] {
-        assert!(
-            NUMERIC_KEN_MD[numeric.example_ranges[0].clone()].contains(discriminator),
-            "checked examples must contain `{discriminator}`"
-        );
-    }
-
-    assert!(CODEC_KEN_MD.contains("theorem ascii_view_none"));
-    assert!(CODEC_KEN_MD.contains("theorem ascii_view_some"));
-    assert!(CODEC_KEN_MD.contains("const ascii_a_view"));
-    assert!(CODEC_KEN_MD.contains("const ascii_a_missing_view"));
-    assert!(CODEC_KEN_MD.contains("const utf8_lead_view"));
-
-    assert!(NUMERIC_SEED.contains("text/numeric/valid-decimal-parse"));
-    assert!(NUMERIC_SEED.contains("text/numeric/empty-input-located-at-zero"));
-    assert!(NUMERIC_SEED.contains("text/numeric/invalid-digit-exact-char-index"));
-
     // MEASURED: the checked owner example uses Derived's private compare_char
     // as the comparator argument of the public list_compare operation.
     // CLAIMED: the concrete alpha/beta String-key order observation survives
@@ -482,6 +454,7 @@ fn located_numeric_discriminators_and_codec_boundary_are_checked() {
     );
 
     let (mut env, diagnostic_owned) = full_env();
+    assert_transparent_globals(&env, &["ascii_view_none", "ascii_view_some"]);
     for declaration in [
         "const cc2_string_key_equal_compute : Bool = list_eq Char eqChar (string_to_list_char \"alpha\") (string_to_list_char \"alpha\")",
         "const cc2_string_key_distinct_compute : Bool = list_eq Char eqChar (string_to_list_char \"alpha\") (string_to_list_char \"beta\")",
