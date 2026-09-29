@@ -1,7 +1,7 @@
 ---
 id: CAT-PRELUDE-FOLD-REMOVAL
 title: "Delete the prelude's list fold, a convenience name with no catalog consumer that collides by spelling with Data.Collections.Map's own fold; move it into Data.Collections.Derived only if the consumer census finds a list-fold user; fourth L3 slice of the minimal-prelude program"
-status: active
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -76,3 +76,19 @@ structural op, and that reader imports it.
   key, is a stop to the Architect with its site.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed at `412de0190` (candidate `5b41da0f2`; Foundation QA
+`evt_q83rx441r62y`, Architect `evt_6bqrw9n9xxmwp`, Decision
+`dec_5hj9mvgwxf30b`).
+- The prelude no longer declares `fold`. The combinator bracket covers `zip`
+  alone, with its zero-trust check.
+- The one census reader was the prelude-surface test itself. It is re-keyed
+  to Derived's `length`, and its composition now evaluates to 1. No Derived
+  home was needed (`evt_5a6k12bpb2g5j`).
+- Map's private `fold` is pinned in owner scope by owned id across its seven
+  readers, as a preservation row.
+- The mutation that restores the declaration reddens the "no `fold`
+  registered" row.
+- The Decoder recursive-equation sentence now matches the `Suc` seed.

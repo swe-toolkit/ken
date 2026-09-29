@@ -1,7 +1,7 @@
 ---
 id: CAT-SYSTEM-ERROR-PRELUDE-MOVE
 title: "Move the PX9 System.Error classification model (SystemError, Operation, ResourceRef, SafeContext, Transience, Idempotence, RetryGuidance, file_error_to_system, error_transience, operation_idempotence, retry_guidance) out of the prelude into a catalog package, with its two spec-normative laws as kernel-checked proofs; fifth L3 slice of the minimal-prelude program"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: architect
