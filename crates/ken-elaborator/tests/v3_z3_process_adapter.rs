@@ -69,12 +69,25 @@ fn two_binder_equality(elab: &mut ElabEnv) -> ObligationTriple {
     }
 }
 
-fn stub(dir: &TempDir, body: &str) -> Z3ProcessConfig {
-    let path = dir.path().join("z3-stub");
-    fs::write(&path, format!("#!/bin/sh\ncat >/dev/null\n{body}\n")).expect("write stub");
-    let mut permissions = fs::metadata(&path).expect("stub metadata").permissions();
+fn write_executable_stub(dir: &TempDir, name: &str, contents: &str) -> std::path::PathBuf {
+    let path = dir.path().join(name);
+    let temporary_path = dir.path().join(format!("{name}.tmp"));
+    fs::write(&temporary_path, contents).expect("write temporary stub");
+    let mut permissions = fs::metadata(&temporary_path)
+        .expect("temporary stub metadata")
+        .permissions();
     permissions.set_mode(0o755);
-    fs::set_permissions(&path, permissions).expect("make stub executable");
+    fs::set_permissions(&temporary_path, permissions).expect("make temporary stub executable");
+    fs::rename(&temporary_path, &path).expect("publish stub atomically");
+    path
+}
+
+fn stub(dir: &TempDir, body: &str) -> Z3ProcessConfig {
+    let path = write_executable_stub(
+        dir,
+        "z3-stub",
+        &format!("#!/bin/sh\ncat >/dev/null\n{body}\n"),
+    );
     Z3ProcessConfig {
         program: path,
         timeout: STARTUP_SAFE_STUB_TIMEOUT,
@@ -82,17 +95,11 @@ fn stub(dir: &TempDir, body: &str) -> Z3ProcessConfig {
 }
 
 fn delayed_valid_stub(dir: &TempDir) -> Z3ProcessConfig {
-    let path = dir.path().join("z3-delayed-stub");
-    fs::write(
-        &path,
+    let path = write_executable_stub(
+        dir,
+        "z3-delayed-stub",
         "#!/usr/bin/python3\nimport sys, time\nsys.stdin.read()\ntime.sleep(1)\nprint('sat')\nprint('((k0 1))')\n",
-    )
-    .expect("write delayed stub");
-    let mut permissions = fs::metadata(&path)
-        .expect("delayed stub metadata")
-        .permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&path, permissions).expect("make delayed stub executable");
+    );
     Z3ProcessConfig {
         program: path,
         timeout: DELIBERATE_TIMEOUT_PROBE,
@@ -127,7 +134,19 @@ fn parsed_model_is_candidate_not_verdict() {
     let refuting = stub(&dir, "printf 'sat\\n((k0 1))\\n'");
     let before = elab.env.trusted_base().len();
     let verdict = attempt_d_with_z3_process(&mut elab.env, &obligation, &refuting);
-    assert!(matches!(verdict, Verdict::Disproved { .. }));
+    let process_probe = if matches!(&verdict, Verdict::Disproved { .. }) {
+        None
+    } else {
+        Some(
+            Command::new(&refuting.program)
+                .args(["-in", "-smt2"])
+                .output(),
+        )
+    };
+    assert!(
+        matches!(&verdict, Verdict::Disproved { .. }),
+        "expected kernel-checked refutation, got {verdict:?}; direct stub spawn probe: {process_probe:?}"
+    );
     assert_eq!(elab.env.trusted_base().len(), before);
 
     let wrong = stub(&dir, "printf 'sat\\n((k0 0))\\n'");
