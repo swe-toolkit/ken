@@ -17037,13 +17037,15 @@ theorem reachable_within_bounded_correspondence
           True) =
   λouter.
     λinner.
-      and_intro
-        (Equal Bool (reachable_within k (relation_ord_leq k d) fuel x y r) True
-        → bounded_walk k (relation_ord_leq k d) r fuel x y)
-        (bounded_walk k (relation_ord_leq k d) r fuel x y
-        → Equal Bool (reachable_within k (relation_ord_leq k d) fuel x y r) True)
-        (reachable_within_sound k d r fuel x y outer inner)
-        (reachable_within_complete k d r fuel x y outer inner)
+      let
+        reached = Equal Bool (reachable_within k (relation_ord_leq k d) fuel x y r) True;
+        bounded = bounded_walk k (relation_ord_leq k d) r fuel x y
+      in
+        and_intro
+          (reached → bounded)
+          (bounded → reached)
+          (reachable_within_sound k d r fuel x y outer inner)
+          (reachable_within_complete k d r fuel x y outer inner)
 
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
