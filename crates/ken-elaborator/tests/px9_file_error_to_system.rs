@@ -8,6 +8,18 @@
 use ken_elaborator::ElabEnv;
 use ken_kernel::{inductive::peel_app, inductive::peel_pi, Decl, GlobalId, Term};
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
+const SYSTEM_ERROR: &str = "System.Error";
+const SYSTEM_ERROR_IMPORT: &str = "import System.Error (SystemError, MkSystemError, \
+    FilesystemOp, FilesystemResource, NoSafeContext, file_error_to_system)";
+
+fn system_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
+    catalog_or::provider_owned_id(env, owned, SYSTEM_ERROR, name)
+        .unwrap_or_else(|error| panic!("System.Error owner {name}: {error}"))
+}
+
 fn former(id: GlobalId) -> Term {
     Term::indformer(id, vec![])
 }
@@ -24,11 +36,14 @@ fn head_global(term: &Term) -> Option<GlobalId> {
 
 #[test]
 fn bridge_is_total_transparent_and_preserves_every_file_error_field() {
-    let mut env = ElabEnv::new().expect("PX9-INC2A prelude");
+    let mut env = ElabEnv::new().expect("prelude");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], SYSTEM_ERROR)
+        .expect("System.Error must roots-load");
 
     let file_error = env.globals["FileError"];
-    let system_error = env.globals["SystemError"];
-    let bridge = env.globals["file_error_to_system"];
+    let system_error = system_id(&env, &owned, "SystemError");
+    let bridge = system_id(&env, &owned, "file_error_to_system");
     let bridge_decl = env.env.lookup(bridge).expect("bridge declaration");
     let bridge_ty = match bridge_decl {
         Decl::Transparent { ty, .. } => ty,
@@ -65,7 +80,8 @@ fn bridge_is_total_transparent_and_preserves_every_file_error_field() {
         "FileError remains the unchanged filesystem-domain carrier"
     );
 
-    env.elaborate_file(
+    env.elaborate_file(&format!(
+        "{SYSTEM_ERROR_IMPORT}\n{}",
         r#"
 theorem px9_file_error_injection
   (operation : FileOperation)
@@ -78,7 +94,7 @@ theorem px9_file_error_injection
       (FilesystemResource resource)
       identity
       NoSafeContext) = Refl
-"#,
-    )
+"#
+    ))
     .expect("the bridge must compute for every FileError and preserve all fields");
 }
