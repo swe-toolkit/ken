@@ -131,44 +131,41 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
     );
 }
 
-// Ignored pending RT-FRAME-MARKER-ONCE.
+// Ignored pending RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
 //
-// Observed signature, exactly:
-//   OrientedSubcontinuationPlanV1: checked Runtime frame marker was
-//     consumed more than once
-//
-// Owner node: RT-FRAME-MARKER-ONCE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// The Ok twin of nested_err_payload_reaches_both_real_executors in this
-// same file, and it refuses identically.
-// Annotation only -- test body and expectations are unchanged.
+// Observed first refusal after RT-FRAME-MARKER-ONCE: native execution reaches
+// the root result guard at units.rs:9389, which expects ImmediateExitStatus
+// tag 2 but receives PersistentGround tag 5 (terminal status -1). The
+// ExitCode constructor reaches that boundary through a CarrierWord join;
+// it is not decoded there. The interpreter produces seed:ok-payload, exit 0,
+// two ConsoleWrites and one ConsoleFlush; native parity is NOT established.
+// Owner node: RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
+// The earlier frame-marker refusal blocked object emission and is cleared by
+// RT-FRAME-MARKER-ONCE, not by a bind-order change. This row and the Err twin
+// retain their source and expected parity observation unchanged.
 #[test]
-#[ignore = "RT-FRAME-MARKER-ONCE: after RT-IGNORED-ROWS-NEXT-GROUP occurrence repair, first refusal is checked Runtime frame marker was consumed more than once; stays ignored until the frame-marker repair and native/interpreter differential"]
+#[ignore = "RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN: root result guard at units.rs:9389 expects ImmediateExitStatus tag 2, receives PersistentGround tag 5 (native terminal -1); no native/interpreter parity"]
 fn nested_ok_payload_reaches_both_real_executors() {
     assert_case(&[], b"seed:ok-payload", 0);
 }
 
-// Ignored pending RT-FRAME-MARKER-ONCE.
+// Ignored pending RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
 //
-// Observed signature, exactly:
-//   OrientedSubcontinuationPlanV1: checked Runtime frame marker was consumed more than once
-//
-// Owner node: RT-FRAME-MARKER-ONCE.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
+// Observed first refusal after RT-FRAME-MARKER-ONCE: native execution reaches
+// the root result guard at units.rs:9389, which expects ImmediateExitStatus
+// tag 2 but receives PersistentGround tag 5 (terminal status -1). The
+// ExitCode constructor reaches that boundary through a CarrierWord join;
+// it is not decoded there. The interpreter produces seed:err-payload, exit 7,
+// two ConsoleWrites and one ConsoleFlush; native parity is NOT established.
+// Owner node: RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
+// This refusal is downstream of the earlier frame-marker object-emission
+// refusal; neither observation is a bind-order regression.
 // px7o_heterogeneous_eliminator_frames.rs defines a test of the SAME NAME.
 // It is a different binary with a different cause and a different owner
 // (RT-ENTRY-TRAP-PX7O) -- do not read the two annotations as copies.
-// Annotation only -- test body and expectations are unchanged.
+// Source and expected parity observation are unchanged.
 #[test]
-#[ignore = "RT-FRAME-MARKER-ONCE: after RT-IGNORED-ROWS-NEXT-GROUP occurrence repair, first refusal is checked Runtime frame marker was consumed more than once; stays ignored until the frame-marker repair and native/interpreter differential"]
+#[ignore = "RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN: root result guard at units.rs:9389 expects ImmediateExitStatus tag 2, receives PersistentGround tag 5 (native terminal -1); no native/interpreter parity"]
 fn nested_err_payload_reaches_both_real_executors() {
     assert_case(&["err"], b"seed:err-payload", 7);
 }
