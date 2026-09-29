@@ -1,7 +1,7 @@
 ---
 id: CAT-ORD-INT-AXIOM-NAMING
 title: "Name the four anonymous law Axioms of instance Ord Int (refl, antisym, trans, total) as named catalog axioms in LawfulClasses.ken.md, consumed by the instance fields, with trusted_base() cardinality unchanged; first L3 proof-backfill slice"
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -75,3 +75,23 @@ enumerates the anonymous fields is updated to match.
   `string_ord_leq`'s laws, which are proved and must not become axioms.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed `df12ec034` (PR #4352; candidate `a1196b34f`; Foundation QA
+`evt_7e6d54ttj4hbj`, Architect APPROVE and Decision `dec_7b4anytve48rt`).
+- `instance Ord Int` consumes four named catalog axioms, `ord_int_refl`,
+  `ord_int_antisym`, `ord_int_trans` and `ord_int_total`, each at its `Ord`
+  field's type. No field is `= Axiom`.
+- Trust cardinality is unchanged. Named axioms lower in two stages: each is
+  a `Decl::Transparent` theorem whose body is exactly `Const(O_f)`, and
+  `O_f` is a distinct `Decl::Opaque` in `trusted_base()`. Both exact-set
+  readers pin that relation (Architect `evt_75kg1yst45hfe`). The field ID
+  and the owner-lookup ID must agree, and the trust set is exactly the four
+  `O_f` plus the StringBijection retraction's opaque.
+- The AC-0 census (567 paths, 240 rows) found no law-field consumer whose
+  elaborated term changed. `Capability.System.Error` was a measured zero.
+- The design rationale is narrowed: the four old entries were distinct host
+  metadata but not Ken-addressable. Old and new `GlobalId`s are
+  environment-local, so no cross-version ID equality is claimed (QA
+  `evt_3c6rq4sdzhrqv`).
