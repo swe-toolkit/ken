@@ -72,6 +72,7 @@ fn run_checked_bounded_nat_fixture(
         oriented_subcontinuation_plan: None,
         consumed_subcontinuation_frames: BTreeSet::new(),
         checked_frame_events: None,
+        checked_call_token_events: None,
         active_subcontinuation_frame: None,
         consumed_recursive_call_templates: BTreeSet::new(),
         pending_recursive_call: None,

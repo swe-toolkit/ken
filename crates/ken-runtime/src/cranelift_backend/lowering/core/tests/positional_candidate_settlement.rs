@@ -2380,20 +2380,16 @@ fn ced_d3_m4_omitting_the_direct_settlement_preserves_the_call_and_fails_candida
     );
 }
 
-/// **`D3` `AC-6` row 5 — settling the same direct candidate twice.**
+/// **`D3` row 5 — identical direct candidate settlement is idempotent.**
 ///
-/// The second settlement is refused **at the seat that makes it**, not deferred
-/// to closeout — which is why its message can name the collision, and why this
-/// row's terminal differs from row 4's even though both mutate the same funnel.
-///
-/// **It is also the both-times-the-SAME-disposition arm of that refusal**,
-/// which rows 2 and 3 do not reach: they collide `InlineNoCall` against
-/// `ComposedCall`. So `settle`'s two refusal arms are both covered by this
-/// node, by different rows, rather than one arm standing in for both.
+/// Two attempts on one identity at the direct funnel settle one artifact-wide
+/// disposition. The token lattice, not the candidate ledger, owns the separate
+/// question whether two actual calls can run on the same Function path.
+/// Conflicting dispositions remain refused by rows 2 and 3.
 ///
 /// **Promise class: durable invariant.**
 #[test]
-fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settlement() {
+fn ced_d3_m5_identical_direct_candidate_settlement_is_idempotent() {
     use crate::cranelift_backend::lowering::units::{
         CandidateDisposition, D3Mutation, D3Seat,
     };
@@ -2448,35 +2444,24 @@ fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settle
         "and the arm attempts nothing else anywhere: {:?}",
         armed.settle_seats()
     );
-    assert!(
-        armed.dispositions.is_empty(),
-        "and the artifact never closes, so no disposition tally survives: {:?}",
+    assert_eq!(armed.outcome, "Ok", "identical settlement is idempotent");
+    assert_eq!(
+        armed.dispositions.get(&CandidateDisposition::DirectCall).copied(),
+        Some(1),
+        "two same-disposition attempts must close as one candidate: {:?}",
         armed.dispositions
     );
-
-    // Clause 5 — refused immediately, and on the SAME-disposition arm.
-    assert!(
-        armed.outcome.contains(D3_DOUBLE_SETTLEMENT),
-        "the second settlement must be refused: {}",
-        armed.outcome
-    );
-    assert!(
-        armed.outcome.contains("both times as DirectCall"),
-        "and on the both-times-the-SAME-disposition arm of that refusal, which rows 2 and 3 do \
-         not reach -- they collide InlineNoCall against ComposedCall. This is what keeps the two \
-         arms of `settle`'s refusal separately witnessed: {}",
-        armed.outcome
-    );
+    assert_eq!(armed.dispositions, baseline.dispositions);
 }
 
-/// **`D3` `AC-6` — the five rows are FIVE proofs, and this is the residue of
-/// proving it.**
+/// **`D3` — the five rows discriminate four refusals and one idempotent
+/// settlement, not a shared terminal.**
 ///
 /// **Why this exists as a committed test rather than a verified claim.**
-/// The five rows above were each shown to red when their own mutation is not
-/// armed — a clean 5×5 diagonal. That is necessary and it is **not
-/// sufficient**, because it does not rule out the one failure the ruling
-/// actually forbids: rows 2 and 3 share a terminal refusal, so a control keyed
+/// Rows 1–4 were previously mutation-proved on their own refusal boundaries;
+/// row 5 now measures idempotence under the token-lattice ruling. Their
+/// distinctness matters because rows 2 and 3 share a terminal refusal, so a
+/// control keyed
 /// on that refusal plus "something settled inline" would be green under
 /// **either** mutation and would supply one proof while appearing to supply
 /// two.
@@ -2666,7 +2651,8 @@ fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
         under_m5.settle_seats()
     );
 
-    // Row 5's discriminator is two attempts at one seat. Mutation 4 makes none.
+    // Row 5's idempotence witness has two attempts at one seat. Mutation 4
+    // makes none.
     let under_m4 = d3_contspec_arm(D3Mutation::OmitFinalDisposition);
     assert_ne!(
         under_m4.settle_seats().len(),
@@ -2677,9 +2663,8 @@ fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
     );
     assert!(
         !under_m4.outcome.contains(D3_DOUBLE_SETTLEMENT),
-        "and it must not reach the double-settlement terminal at all -- unlike rows 2, 3 and 5, \
-         row 4's terminal is candidate totality, and that separation is what makes its row \
-         attributable without a causal clause doing all the work: {}",
+        "row 4 must reach candidate totality instead of the conflicting-disposition guard \
+         reached by rows 2 and 3: {}",
         under_m4.outcome
     );
 }

@@ -3221,12 +3221,22 @@ fn d4_failing_to_accumulate_emissions_reds_the_closeout_set_equality() {
     );
 }
 
-/// **`D3` affine seam — claiming one causal token twice reds.**
+/// **`D3` token seam — same-path double claim reaches the E1 lattice rule.**
 #[test]
-fn d4_claiming_the_same_causal_token_twice_reds_the_ledger() {
+fn d4_claiming_the_same_causal_token_twice_reds_token_e1() {
     assert_emission_mutation_reds(
         ContinuationEmissionMutation::ClaimTokenTwice,
-        "claimed twice",
+        "}: {E1}",
+    );
+}
+
+/// Both actual direct call instructions are emitted and recorded. A second
+/// receipt on the same path must reach R2, not a one-Inst map insertion stop.
+#[test]
+fn d4_second_direct_call_on_one_path_reds_token_r2() {
+    assert_emission_mutation_reds(
+        ContinuationEmissionMutation::DuplicateDirectCall,
+        "}: {R2}",
     );
 }
 

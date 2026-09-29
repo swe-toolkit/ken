@@ -1,7 +1,7 @@
 ---
 id: CHECK-REFL-CLOSED-STEP-FOLD-DIVERGENCE
 title: "The checker exhausts stack and memory on a true 669-byte Refl goal: a Node equation for a fold wrapper with a closed step lambda. Classify the phase (elaboration whnf or kernel convert) first, then repair it in its owner, with no stack increase as the repair"
-status: ready
+status: active
 owner: kernel
 size: M
 gate: architect
@@ -100,3 +100,20 @@ and bounded memory. The three controls stay as they are.
   growth. That is not a repair.
 - Any change to what the kernel accepts beyond deciding this goal promptly:
   stop to the Architect.
+
+## Increments
+
+- **Increment 1, landed `b9840913e`** (PR #4375; candidate `f9ee9d4b7`;
+  Kernel QA `evt_g7cka5dp2x5v`, Architect APPROVE and Decision
+  `dec_6t8hwnnghxv18`). Head δ is deferred in kernel conversion. The
+  682-byte repro checks at the default stack, and all 57 catalog packages keep
+  their verdicts.
+- **Increment 2, released `evt_kab4esnr78a6`.** Increment 1 records
+  same-head pairs for every transparent constant, so three nested calls to a
+  non-recursive wrapper are refused (Adversary `evt_9s2j10ap3pxc`). The
+  Architect ruled the repair (`evt_7bkmcjy3a77z9`): the ledger records a pair
+  only when a head is recursive, meaning on a cycle of the transparent-body
+  reference graph. That also closes the distinct non-recursive sibling.
+- **Filed residual.** Two distinct recursive heads under a closed ι-redex
+  still do not halt. That predates increment 1 (`evt_7jp6sqvgp6kcx`) and is
+  `KERNEL-CONV-IOTA-DISCHARGE-DESCENT`.
