@@ -5596,23 +5596,6 @@ fn PrintedBoolSpecAt
 fn PrintedBoolSpec (cur : ByteCursor) (syntax : Syntax BoolExpr) (next : ByteCursor) : Prop =
   PrintedBoolSpecAt (erase_spans syntax) cur syntax next
 
-theorem source_suffix_positive_prefix
-      (prefix : List UInt8)
-    : (cur : ByteCursor)
-      → (rest : List UInt8)
-      → Equal (List UInt8) (source_suffix cur) (list_append UInt8 prefix rest)
-      → ListNonempty UInt8 prefix
-      → Equal Bool (cursor_nat_lt Zero (byte_cursor_remaining cur)) True =
-  match prefix {
-    Nil ↦ λcur. λrest. λstarts_with. λnonempty. absurd nonempty;
-    Cons first more ↦
-      λcur.
-        λrest.
-          λstarts_with.
-            λnonempty.
-              source_suffix_positive cur first (list_append UInt8 more rest) starts_with
-  }
-
 theorem cursor_after_nonempty_strict
       (codes : List UInt8)
     : (cur : ByteCursor)
@@ -7701,6 +7684,21 @@ theorem parse_bool_expr_succeeds_printed_source
         (Decoded ByteCursor Span (Syntax BoolExpr) (printed_syntax cur e) (printed_end cur e))
         (parsed_bool_outcome s Zero)
         decoded)
+```
+
+These checked examples exercise the private Boolean comparison and syntax-leaf
+constructor in their defining module. Clients use the public parser and syntax
+accessors rather than importing either helper.
+
+```ken example
+const parsing_example_bool_expr_eq_same : Bool =
+  bool_expr_eq (BAnd BTrue (BNot BFalse)) (BAnd BTrue (BNot BFalse))
+
+const parsing_example_bool_expr_eq_other : Bool =
+  bool_expr_eq (BAnd BTrue (BNot BFalse)) (BAnd BFalse (BNot BFalse))
+
+fn parsing_example_syntax_leaf (s : Source) : Syntax BoolExpr =
+  syntax_leaf s Zero (Suc Zero) BTrue
 ```
 
 ## 5. Design notes

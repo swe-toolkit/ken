@@ -9,8 +9,7 @@ mod catalog_or;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::Decl;
-use ken_kernel::GlobalId;
+use ken_kernel::{Decl, GlobalId, Term};
 use std::collections::{BTreeSet, HashSet};
 
 const PARSING_KEN_MD: &str =
@@ -84,6 +83,29 @@ fn mk_env() -> ElabEnv {
     env
 }
 
+// Each CAT5 client unit declares its own public imports; an earlier file's
+// roots load or flat test alias cannot silently supply the client surface.
+trait Cat5ClientElaboration {
+    fn elaborate_cat5_client(&mut self, source: &str) -> Result<Vec<GlobalId>, ElabError>;
+}
+
+impl Cat5ClientElaboration for ElabEnv {
+    fn elaborate_cat5_client(&mut self, source: &str) -> Result<Vec<GlobalId>, ElabError> {
+        self.elaborate_file(&format!(
+            "import Capability.Diagnostics.Core (SourceId, source_id_from_nat)\n\
+             import Capability.Parsing.Parsing \
+             (BoolExpr, BAnd, BNot, BTrue, BFalse, Parser, ParseResult, Parsed, Failed, \
+              Source, IsUtf8, LessEqNat, Span, MkSpan, Located, MkLocated, \
+              ParseError, MkParseError, Syntax, MkSyntax, parse_bool_expr, format_bool_expr, print_bool_expr, \
+              print_bool_expr_utf8, source_length, source_bytes, erase_spans, ValidSpan, \
+              ValidLocated, ValidSyntax, valid_zero_width_span, ParserLaws, ParserValid, \
+              ParserTotal, ParserSourceLocal, parser_pure, parser_fail, source_id, \
+              span_start, span_end, located_source, located_span, error_source, error_span)\n\
+             {source}"
+        ))
+    }
+}
+
 fn lit_to_eval(v: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
     match v {
         NumericLitVal::Int(n) => EvalVal::from(n.clone()),
@@ -134,20 +156,77 @@ fn nat_count(env: &ElabEnv, v: &EvalVal) -> u64 {
     }
 }
 
-fn ctor_args<'a>(env: &ElabEnv, v: &'a EvalVal, ctor: &str) -> &'a [EvalVal] {
-    let expected = env
-        .globals
-        .get(ctor)
-        .copied()
-        .unwrap_or_else(|| panic!("{ctor} should be in scope"));
-    match v {
-        EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
-        other => panic!("expected {ctor}, got {other:?}"),
+fn checked_constructor(
+    env: &ElabEnv,
+    owned: &[GlobalId],
+    provider: &str,
+    family: &str,
+    name: &str,
+) -> GlobalId {
+    let family_id = catalog_or::provider_owned_id(env, owned, provider, family)
+        .unwrap_or_else(|error| panic!("{provider} must own {family}: {error}"));
+    let constructors = env
+        .env
+        .inductive(family_id)
+        .unwrap_or_else(|| panic!("{provider}.{family} must be a checked family"))
+        .constructors
+        .iter()
+        .map(|constructor| constructor.id)
+        .collect::<Vec<_>>();
+    catalog_or::provider_owned_id(env, &constructors, provider, name)
+        .unwrap_or_else(|error| panic!("{provider}.{name} must belong to {family}: {error}"))
+}
+
+struct Cat5Constructors {
+    mk_source_id: GlobalId,
+    mk_span: GlobalId,
+    mk_located: GlobalId,
+    mk_syntax: GlobalId,
+    parsed: GlobalId,
+    failed: GlobalId,
+    b_and: GlobalId,
+    b_not: GlobalId,
+    b_true: GlobalId,
+    b_false: GlobalId,
+}
+
+impl Cat5Constructors {
+    fn checked(env: &ElabEnv, diagnostics: &[GlobalId], parsing: &[GlobalId]) -> Self {
+        let dc = "Capability.Diagnostics.Core";
+        let owner = "Capability.Parsing.Parsing";
+        let parsing_ctor = |family, name| checked_constructor(env, parsing, owner, family, name);
+        Self {
+            mk_source_id: checked_constructor(env, diagnostics, dc, "SourceId", "MkSourceId"),
+            mk_span: parsing_ctor("Span", "MkSpan"),
+            mk_located: parsing_ctor("Located", "MkLocated"),
+            mk_syntax: parsing_ctor("Syntax", "MkSyntax"),
+            parsed: parsing_ctor("ParseResult", "Parsed"),
+            failed: parsing_ctor("ParseResult", "Failed"),
+            b_and: parsing_ctor("BoolExpr", "BAnd"),
+            b_not: parsing_ctor("BoolExpr", "BNot"),
+            b_true: parsing_ctor("BoolExpr", "BTrue"),
+            b_false: parsing_ctor("BoolExpr", "BFalse"),
+        }
     }
 }
 
-fn span_bounds(env: &ElabEnv, v: &EvalVal) -> (u64, u64) {
-    let args = ctor_args(env, v, "MkSpan");
+fn checked_example_body(env: &ElabEnv, name: &str) -> Term {
+    let id = env.globals[name];
+    env.env
+        .transparent_body(id)
+        .unwrap_or_else(|| panic!("{name} must be a checked transparent example"))
+        .1
+}
+
+fn ctor_args<'a>(v: &'a EvalVal, expected: GlobalId, ctor: &str) -> &'a [EvalVal] {
+    match v {
+        EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
+        other => panic!("expected checked {ctor}, got {other:?}"),
+    }
+}
+
+fn span_bounds(env: &ElabEnv, ids: &Cat5Constructors, v: &EvalVal) -> (u64, u64) {
+    let args = ctor_args(v, ids.mk_span, "MkSpan");
     assert_eq!(
         args.len(),
         2,
@@ -156,8 +235,8 @@ fn span_bounds(env: &ElabEnv, v: &EvalVal) -> (u64, u64) {
     (nat_count(env, &args[0]), nat_count(env, &args[1]))
 }
 
-fn located_span<'a>(env: &ElabEnv, v: &'a EvalVal) -> &'a EvalVal {
-    let args = ctor_args(env, v, "MkLocated");
+fn located_span<'a>(ids: &Cat5Constructors, v: &'a EvalVal) -> &'a EvalVal {
+    let args = ctor_args(v, ids.mk_located, "MkLocated");
     assert!(
         args.len() >= 3,
         "MkLocated must carry type/source/span/value args, got {args:?}"
@@ -165,8 +244,11 @@ fn located_span<'a>(env: &ElabEnv, v: &'a EvalVal) -> &'a EvalVal {
     &args[2]
 }
 
-fn syntax_root_and_children<'a>(env: &ElabEnv, v: &'a EvalVal) -> (&'a EvalVal, &'a EvalVal) {
-    let args = ctor_args(env, v, "MkSyntax");
+fn syntax_root_and_children<'a>(
+    ids: &Cat5Constructors,
+    v: &'a EvalVal,
+) -> (&'a EvalVal, &'a EvalVal) {
+    let args = ctor_args(v, ids.mk_syntax, "MkSyntax");
     assert!(
         args.len() >= 3,
         "MkSyntax must carry type/root/children args, got {args:?}"
@@ -174,9 +256,14 @@ fn syntax_root_and_children<'a>(env: &ElabEnv, v: &'a EvalVal) -> (&'a EvalVal, 
     (&args[1], &args[2])
 }
 
-fn collect_located_list_spans(env: &ElabEnv, v: &EvalVal, out: &mut Vec<(u64, u64)>) {
-    let nil_id = env.globals["Nil"];
-    let cons_id = env.globals["Cons"];
+fn collect_located_list_spans(
+    env: &ElabEnv,
+    ids: &Cat5Constructors,
+    v: &EvalVal,
+    out: &mut Vec<(u64, u64)>,
+) {
+    let nil_id = env.prelude_env.nil_id;
+    let cons_id = env.prelude_env.cons_id;
     match v {
         EvalVal::Ctor { id, .. } if *id == nil_id => {}
         EvalVal::Ctor { id, args, .. } if *id == cons_id => {
@@ -184,17 +271,17 @@ fn collect_located_list_spans(env: &ElabEnv, v: &EvalVal, out: &mut Vec<(u64, u6
                 args.len() >= 3,
                 "Cons must carry type/head/tail args, got {args:?}"
             );
-            out.push(span_bounds(env, located_span(env, &args[1])));
-            collect_located_list_spans(env, &args[2], out);
+            out.push(span_bounds(env, ids, located_span(ids, &args[1])));
+            collect_located_list_spans(env, ids, &args[2], out);
         }
         other => panic!("expected List (Located _), got {other:?}"),
     }
 }
 
-fn syntax_spans(env: &ElabEnv, v: &EvalVal) -> Vec<(u64, u64)> {
-    let (root, children) = syntax_root_and_children(env, v);
-    let mut out = vec![span_bounds(env, located_span(env, root))];
-    collect_located_list_spans(env, children, &mut out);
+fn syntax_spans(env: &ElabEnv, ids: &Cat5Constructors, v: &EvalVal) -> Vec<(u64, u64)> {
+    let (root, children) = syntax_root_and_children(ids, v);
+    let mut out = vec![span_bounds(env, ids, located_span(ids, root))];
+    collect_located_list_spans(env, ids, children, &mut out);
     out
 }
 
@@ -541,6 +628,7 @@ fn parsing_reuses_the_canonical_nat_providers() {
 
 #[test]
 fn cat5_d2_parser_result_surface_is_total_and_located() {
+    // Promise class: durable invariant (CAT-5 total located result shape).
     // CLAIM LEDGER (Q-CLAIM-CLOSURE AC-3): ParseResult exposes Parsed/Failed
     // with the pinned arg counts (evaluated); Parser is total over a well-formed
     // (Source, in-bounds start) pair; ParsedValid/FailedValid/ParserLaws are
@@ -559,13 +647,47 @@ fn cat5_d2_parser_result_surface_is_total_and_located() {
     // elaborates_zero_delta` above already proves zero new trusted-base delta
     // across the whole package, a strictly stronger semantic proof that no
     // Axiom was introduced.
-    let mut env = mk_env();
+    let (mut env, providers) = dependency_env_with_provider_owned();
+    let parsing_owned = load_parsing_module(&mut env);
+    let ids = Cat5Constructors::checked(&env, &providers.diagnostics, &parsing_owned);
+    let dc = "Capability.Diagnostics.Core";
+    let constructor_example = "diagnostics_example_source_id_four";
+    assert!(!env.globals.contains_key(constructor_example));
+    let trust_before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    env.execute_loaded_entry_checked_fences(dc)
+        .expect("the private SourceId constructor example must check in Diagnostics.Core");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before
+    );
+    let constructor_example_id = env.globals[constructor_example];
+    assert!(!providers.diagnostics.contains(&constructor_example_id));
+    assert!(!env
+        .globals
+        .contains_key(&format!("{dc}.{constructor_example}")));
+    let example_body = checked_example_body(&env, constructor_example);
+    fn constructor_head(term: &Term) -> Option<GlobalId> {
+        match term {
+            Term::App(function, _) => constructor_head(function),
+            Term::Constructor { id, .. } => Some(*id),
+            _ => None,
+        }
+    }
+    assert_eq!(
+        constructor_head(&example_body),
+        Some(ids.mk_source_id),
+        "the checked owner example must directly construct the private SourceId carrier"
+    );
     let mut store = make_store(&env);
+    let example_value = eval(&[], &example_body, &env.env, &mut store);
+    let example_fields = ctor_args(&example_value, ids.mk_source_id, "MkSourceId");
+    assert_eq!(example_fields.len(), 1);
+    assert_eq!(nat_count(&env, &example_fields[0]), 4);
 
     // ParseError carries a SourceId and Span, both recoverable by accessor.
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
-        const parse_error_probe : ParseError = MkParseError (MkSourceId (Suc Zero)) (MkSpan Zero (Suc Zero))
+        const parse_error_probe : ParseError = MkParseError (source_id_from_nat (Suc Zero)) (MkSpan Zero (Suc Zero))
         const parse_error_probe_source : SourceId = error_source parse_error_probe
         const parse_error_probe_span : Span = error_span parse_error_probe
         "#,
@@ -573,20 +695,20 @@ fn cat5_d2_parser_result_surface_is_total_and_located() {
     .expect("ParseError must carry source identity and a span with accessors");
     let probe_source = eval_def(&env, &mut store, "parse_error_probe_source");
     assert_eq!(
-        ctor_args(&env, &probe_source, "MkSourceId").len(),
+        ctor_args(&probe_source, ids.mk_source_id, "MkSourceId").len(),
         1,
         "SourceId must be recoverable from a ParseError by error_source"
     );
     let probe_span = eval_def(&env, &mut store, "parse_error_probe_span");
     assert_eq!(
-        span_bounds(&env, &probe_span),
+        span_bounds(&env, &ids, &probe_span),
         (0, 1),
         "Span must be recoverable from a ParseError by error_span"
     );
 
     // ParseResult is the total Parsed/Failed surface: constructed and
     // evaluated, not read off the data declaration's spelling.
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         const parsed_probe : ParseResult Bool = Parsed Bool True (MkSpan Zero (Suc Zero)) (Suc Zero)
         const failed_probe : ParseResult Bool = Failed Bool parse_error_probe
@@ -595,13 +717,13 @@ fn cat5_d2_parser_result_surface_is_total_and_located() {
     .expect("ParseResult must expose both the Parsed and Failed outcomes");
     let parsed_probe = eval_def(&env, &mut store, "parsed_probe");
     assert_eq!(
-        ctor_args(&env, &parsed_probe, "Parsed").len(),
+        ctor_args(&parsed_probe, ids.parsed, "Parsed").len(),
         4,
         "Parsed must carry type/value/span/next args"
     );
     let failed_probe = eval_def(&env, &mut store, "failed_probe");
     assert_eq!(
-        ctor_args(&env, &failed_probe, "Failed").len(),
+        ctor_args(&failed_probe, ids.failed, "Failed").len(),
         2,
         "Failed must carry type/ParseError args"
     );
@@ -612,7 +734,7 @@ fn cat5_d2_parser_result_surface_is_total_and_located() {
     // FailedValid/ParserLaws content is exercised as real proof obligations
     // by the sibling law tests below (`cat5_d2_success_parser_carries_valid_
     // consumed_span_from_start` et al.), not duplicated here.
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         fn total_parser_shape_probe (s : Source) (start : Nat) (h : LessEqNat start (source_length s)) : ParseResult Bool =
           (parser_pure Bool True) s start h
@@ -620,7 +742,13 @@ fn cat5_d2_parser_result_surface_is_total_and_located() {
     )
     .expect("Parser must be total over (Source, in-bounds start)");
     for law_prop in ["ParsedValid", "FailedValid", "ParserLaws"] {
-        let id = env.globals[law_prop];
+        let id = catalog_or::provider_owned_id(
+            &env,
+            &parsing_owned,
+            "Capability.Parsing.Parsing",
+            law_prop,
+        )
+        .unwrap_or_else(|error| panic!("Parsing must own {law_prop}: {error}"));
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "{law_prop} must be a checked declaration"
@@ -630,15 +758,22 @@ fn cat5_d2_parser_result_surface_is_total_and_located() {
     // D2 must specialize the shared Decoder and retire CAT-5's bespoke fuel
     // recursion -- real name-resolution facts against the elaborated env.
     for retired in ["parse_bool_expr_at_fuel", "skip_spaces_fuel"] {
+        let import = format!("import Capability.Parsing.Parsing ({retired})");
         assert!(
-            !env.globals.contains_key(retired),
+            matches!(
+                env.elaborate_file(&import),
+                Err(ElabError::UnboundName { .. })
+            ),
             "{retired} must not survive as a package export"
         );
     }
-    assert!(
-        env.globals.contains_key("parser_from_decoder"),
-        "D2 must specialize the shared Decoder via parser_from_decoder"
-    );
+    catalog_or::provider_owned_id(
+        &env,
+        &parsing_owned,
+        "Capability.Parsing.Parsing",
+        "parser_from_decoder",
+    )
+    .expect("D2 must specialize the shared Decoder via checked parser_from_decoder");
 
     // R4 (Q-CLAIM-CLOSURE): Q-RESIDUE dropped D2's type-argument pins on
     // `decoder_recursive` and `decoder_many` (the shared Decoder's recursion
@@ -676,49 +811,51 @@ fn cat5_d3_bool_expression_surface_is_package_owned() {
     // net than grepping the decoder's Rust-side token literals. This test
     // pins only the package-owned data/type shape. The `!contains("= Axiom")`
     // check is dropped for the same reason as in D2.
-    let mut env = mk_env();
+    let (mut env, providers) = dependency_env_with_provider_owned();
+    let parsing_owned = load_parsing_module(&mut env);
+    let ids = Cat5Constructors::checked(&env, &providers.diagnostics, &parsing_owned);
     let mut store = make_store(&env);
 
     // BoolExpr is the package-owned four-constructor surface.
-    env.elaborate_file("const bool_expr_probe : BoolExpr = BAnd BTrue (BNot BFalse)")
+    env.elaborate_cat5_client("const bool_expr_probe : BoolExpr = BAnd BTrue (BNot BFalse)")
         .expect("BoolExpr's four constructors must compose as declared");
     let probe = eval_def(&env, &mut store, "bool_expr_probe");
-    let and_args = ctor_args(&env, &probe, "BAnd");
+    let and_args = ctor_args(&probe, ids.b_and, "BAnd");
     assert_eq!(and_args.len(), 2, "BAnd must carry two BoolExpr args");
     assert!(
-        matches!(&and_args[0], EvalVal::Ctor { id, args, .. } if *id == env.globals["BTrue"] && args.is_empty())
+        matches!(&and_args[0], EvalVal::Ctor { id, args, .. } if *id == ids.b_true && args.is_empty())
     );
-    let not_args = ctor_args(&env, &and_args[1], "BNot");
+    let not_args = ctor_args(&and_args[1], ids.b_not, "BNot");
     assert_eq!(not_args.len(), 1, "BNot must carry one BoolExpr arg");
     assert!(
-        matches!(&not_args[0], EvalVal::Ctor { id, args, .. } if *id == env.globals["BFalse"] && args.is_empty())
+        matches!(&not_args[0], EvalVal::Ctor { id, args, .. } if *id == ids.b_false && args.is_empty())
     );
 
     // Syntax a is package-owned located syntax (a Located root + a List of
     // Located children), not a compiler AST.
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         const syntax_probe : Syntax BoolExpr =
           MkSyntax
             BoolExpr
-            (MkLocated BoolExpr (MkSourceId Zero) (MkSpan Zero (Suc Zero)) BTrue)
+            (MkLocated BoolExpr (source_id_from_nat Zero) (MkSpan Zero (Suc Zero)) BTrue)
             (Nil (Located BoolExpr))
         "#,
     )
     .expect("Syntax must be constructible from a Located root and a List of Located children");
     let syntax_probe = eval_def(&env, &mut store, "syntax_probe");
-    let (root, children) = syntax_root_and_children(&env, &syntax_probe);
-    let root_args = ctor_args(&env, root, "MkLocated");
+    let (root, children) = syntax_root_and_children(&ids, &syntax_probe);
+    let root_args = ctor_args(root, ids.mk_located, "MkLocated");
     assert_eq!(
         root_args.len(),
         4,
         "MkLocated must carry type/source/span/value args"
     );
     assert!(
-        matches!(&root_args[3], EvalVal::Ctor { id, args, .. } if *id == env.globals["BTrue"] && args.is_empty())
+        matches!(&root_args[3], EvalVal::Ctor { id, args, .. } if *id == ids.b_true && args.is_empty())
     );
     assert!(
-        matches!(children, EvalVal::Ctor { id, args, .. } if *id == env.globals["Nil"] && args.len() == 1)
+        matches!(children, EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.nil_id && args.len() == 1)
     );
     // R4 (Q-CLAIM-CLOSURE): these two were narrowed from signature-pinning to a
     // bare `contains_key` presence check -- strictly weaker than the parser/
@@ -726,7 +863,7 @@ fn cat5_d3_bool_expression_surface_is_package_owned() {
     // presence check passes even if the signature drifts. Restore type-pinning
     // so the narrowing is undone rather than merely acknowledged, consistent
     // with the neighbours.
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         fn erase_spans_shape_probe (x : Syntax BoolExpr) : BoolExpr = erase_spans x
         fn valid_syntax_shape_probe (s : Source) (x : Syntax BoolExpr) : Prop =
@@ -741,7 +878,7 @@ fn cat5_d3_bool_expression_surface_is_package_owned() {
     // parser/printer/formatter exist with exactly the pinned types; the
     // roundtrip behavior is proven by the sibling test below, not restated
     // here.
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         const parse_bool_expr_shape_probe : Parser (Syntax BoolExpr) = parse_bool_expr
         fn print_bool_expr_shape_probe (e : BoolExpr) : Bytes = print_bool_expr e
@@ -780,24 +917,42 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
     //     `LessEqNat start (source_length s)` bound in the D2 surface test.
     // `source_length` is shape-pinned only. Neither test pins its dynamic value,
     // and the concrete test documents why.
-    let mut env = mk_env();
+    let (mut env, providers) = dependency_env_with_provider_owned();
+    let parsing_owned = load_parsing_module(&mut env);
+    let is_utf8 =
+        catalog_or::provider_owned_id(&env, &parsing_owned, "Capability.Parsing.Parsing", "IsUtf8")
+            .expect("Parsing must own checked IsUtf8");
+    let source_id = catalog_or::provider_owned_id(
+        &env,
+        &providers.diagnostics,
+        "Capability.Diagnostics.Core",
+        "SourceId",
+    )
+    .expect("Diagnostics.Core must own checked SourceId");
 
     assert!(matches!(
-        env.env.lookup(env.globals["IsUtf8"]),
+        env.env.lookup(is_utf8),
         Some(Decl::Transparent { .. })
     ));
-    env.elaborate_file("fn source_bytes_type_probe (s : Source) : Bytes = source_bytes s")
+    env.elaborate_cat5_client("fn source_bytes_type_probe (s : Source) : Bytes = source_bytes s")
         .expect("source_bytes must return Bytes, not a String-based view");
 
     // Source carries exactly id/bytes/UTF-8-evidence: its class field list is
     // read straight from the class registry, not grepped from a field-name
     // substring. A 4th field (a cached length carrier) would show up here.
+    let source_classes = parsing_owned
+        .iter()
+        .filter_map(|id| env.class_env.class_by_id(*id))
+        .filter(|class| class.projection.owner_name == "Source")
+        .collect::<Vec<_>>();
+    let [source_class] = source_classes.as_slice() else {
+        panic!(
+            "Parsing must own exactly one checked Source class, got {}",
+            source_classes.len()
+        );
+    };
     assert_eq!(
-        env.class_env
-            .class("Source")
-            .unwrap()
-            .projection
-            .field_names,
+        source_class.projection.field_names,
         vec!["source_id_field", "source_bytes_field", "source_utf8_field"],
         "Source must carry exactly id/bytes/utf8-proof, no cached length field"
     );
@@ -806,7 +961,7 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
         "the old unconstrained MkSource constructor must not be an exported global"
     );
 
-    env.elaborate_file("const span_probe : Span = MkSpan Zero Zero")
+    env.elaborate_cat5_client("const span_probe : Span = MkSpan Zero Zero")
         .expect("Span must be constructible from two Nat endpoints");
 
     // SourceId lives in Capability.Diagnostics.Core (already elaborated by
@@ -832,10 +987,7 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
     // redeclaration; that measurement was an isolated post-hoc `elaborate_file`
     // on the built env, not the package source in situ -- QA caught the
     // mismatch, and it is corrected here.)
-    let source_id_inductive = env
-        .env
-        .inductive(env.globals["SourceId"])
-        .expect("SourceId inductive");
+    let source_id_inductive = env.env.inductive(source_id).expect("SourceId inductive");
     assert_eq!(source_id_inductive.constructors.len(), 1);
     let source_id_ctor_type = &source_id_inductive.constructors[0].type_;
     // R3 (Q-CLAIM-CLOSURE): `pi_arity` counts the Pi-telescope depth and
@@ -865,13 +1017,11 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
         "span_origin_source_faithful",
         "ValidLocated",
     ] {
-        assert!(
-            env.globals.contains_key(&format!("Capability.Parsing.Parsing.{name}")),
-            "{name} must be checked by the Parsing package"
-        );
+        catalog_or::provider_owned_id(&env, &parsing_owned, "Capability.Parsing.Parsing", name)
+            .unwrap_or_else(|error| panic!("{name} must be checked by Parsing: {error}"));
     }
-    env.elaborate_file(
-        "const located_probe : Located BoolExpr = MkLocated BoolExpr (MkSourceId Zero) (MkSpan Zero Zero) BTrue",
+    env.elaborate_cat5_client(
+        "const located_probe : Located BoolExpr = MkLocated BoolExpr (source_id_from_nat Zero) (MkSpan Zero Zero) BTrue",
     )
     .expect("Located must carry SourceId, Span, and a value");
 
@@ -927,7 +1077,7 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
 #[test]
 fn cat5_d1_valid_half_open_bounds_and_zero_width_offsets_check() {
     let mut env = mk_env();
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         fn zero_width_span_at_start (s : Source) : Span = MkSpan Zero Zero
 
@@ -970,7 +1120,7 @@ fn cat5_d1_concrete_nonempty_source_constructs_and_projects() {
     // noncomputational proof field manufactures no evidence). Add an eval+assert
     // -> add its claim here.
     let mut env = mk_env();
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         data ConcreteByteSource = MkConcreteByteSource
 
@@ -978,7 +1128,7 @@ fn cat5_d1_concrete_nonempty_source_constructs_and_projects() {
         theorem sample_utf8_valid : IsUtf8 sample_abc_bytes = Axiom
 
         instance Source ConcreteByteSource {
-          source_id_field = MkSourceId Zero ;
+          source_id_field = source_id_from_nat Zero ;
           source_bytes_field = sample_abc_bytes ;
           source_utf8_field = sample_utf8_valid
         }
@@ -1084,7 +1234,7 @@ fn cat5_d1_concrete_nonempty_source_constructs_and_projects() {
 fn cat5_d1_end_past_source_length_rejected() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
             const invalid_span : Span = MkSpan Zero (Suc (Suc (Suc Zero)))
             theorem invalid_span_valid (s : Source) : ValidSpan s invalid_span =
@@ -1109,7 +1259,7 @@ fn cat5_d1_end_past_source_length_rejected() {
 fn cat5_d1_start_after_end_rejected() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
             const invalid_span : Span = MkSpan (Suc (Suc Zero)) (Suc Zero)
             theorem invalid_span_valid (s : Source) : ValidSpan s invalid_span =
@@ -1134,9 +1284,9 @@ fn cat5_d1_start_after_end_rejected() {
 fn cat5_d1_old_unconstrained_source_constructor_rejected() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
-            const sample_source_id : SourceId = MkSourceId Zero
+            const sample_source_id : SourceId = source_id_from_nat Zero
             const invalid_source : Source =
               MkSource sample_source_id (bytes_encode "abc") (Suc (Suc (Suc Zero)))
             "#,
@@ -1155,7 +1305,7 @@ fn cat5_d1_old_unconstrained_source_constructor_rejected() {
 fn cat5_d1_reflexive_utf8_proof_rejected() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
             const sample_bytes : Bytes = bytes_encode "abc"
             theorem fake_utf8 : IsUtf8 sample_bytes = Refl
@@ -1175,7 +1325,7 @@ fn cat5_d1_reflexive_utf8_proof_rejected() {
 #[test]
 fn cat5_d2_success_parser_carries_valid_consumed_span_from_start() {
     let mut env = mk_env();
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         const success_parser : Parser Bool =
           parser_pure Bool True
@@ -1212,7 +1362,7 @@ fn cat5_d2_success_parser_carries_valid_consumed_span_from_start() {
 #[test]
 fn cat5_d2_failed_parser_carries_same_source_valid_span() {
     let mut env = mk_env();
-    env.elaborate_file(
+    env.elaborate_cat5_client(
         r#"
         const failed_parser : Parser Bool =
           parser_fail Bool
@@ -1236,17 +1386,17 @@ fn cat5_d2_failed_parser_carries_same_source_valid_span() {
 fn cat5_d2_failure_with_wrong_source_rejected_by_law() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
             const wrong_source_failed_parser : Parser Bool =
               \s. \start. \h.
-                Failed Bool (MkParseError (MkSourceId (Suc Zero)) (MkSpan start start))
+                Failed Bool (MkParseError (source_id_from_nat (Suc Zero)) (MkSpan start start))
 
             theorem wrong_source_failed_parser_valid : ParserValid Bool wrong_source_failed_parser =
               \s. \start. \h.
                 and_intro
-                  (Equal SourceId (error_source (MkParseError (MkSourceId (Suc Zero)) (MkSpan start start))) (source_id s))
-                  (ValidSpan s (error_span (MkParseError (MkSourceId (Suc Zero)) (MkSpan start start))))
+                  (Equal SourceId (error_source (MkParseError (source_id_from_nat (Suc Zero)) (MkSpan start start))) (source_id s))
+                  (ValidSpan s (error_span (MkParseError (source_id_from_nat (Suc Zero)) (MkSpan start start))))
                   Refl
                   (valid_zero_width_span s start h)
             "#,
@@ -1267,7 +1417,7 @@ fn cat5_d2_failure_with_wrong_source_rejected_by_law() {
 fn cat5_d2_failure_with_invalid_span_rejected_by_law() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
             const invalid_span_failed_parser : Parser Bool =
               \s. \start. \h.
@@ -1300,7 +1450,7 @@ fn cat5_d2_failure_with_invalid_span_rejected_by_law() {
 fn cat5_d2_legacy_unguarded_repeat_is_not_exported() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
             const zero_width_parser : Parser Bool =
               parser_pure Bool True
@@ -1323,7 +1473,7 @@ fn cat5_d2_legacy_unguarded_repeat_is_not_exported() {
 fn cat5_d2_legacy_caller_budget_repetition_is_not_exported() {
     let mut env = mk_env();
     let err = env
-        .elaborate_file(
+        .elaborate_cat5_client(
             r#"
             const one_byte_parser : Parser Bool =
               \s. \start. \h.
@@ -1345,8 +1495,104 @@ fn cat5_d2_legacy_caller_budget_repetition_is_not_exported() {
 
 #[test]
 fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
-    let mut env = mk_env();
-    env.elaborate_file(
+    // Promise class: durable invariant (CAT-5 Boolean grammar and module privacy).
+    // MEASURED: the owner examples directly use both checked private helpers;
+    // the public client round-trips a nested tree and rejects an infix input.
+    // CLAIMED: checked private behavior stays owner-local without an alias door.
+    // THE GAP: these finite values do not prove every possible Boolean tree.
+    let (mut env, providers) = dependency_env_with_provider_owned();
+    let parsing_owned = load_parsing_module(&mut env);
+    let ids = Cat5Constructors::checked(&env, &providers.diagnostics, &parsing_owned);
+    let owner = "Capability.Parsing.Parsing";
+    let bool_expr_eq = catalog_or::provider_owned_id(&env, &parsing_owned, owner, "bool_expr_eq")
+        .expect("Parsing must own its private Boolean comparison");
+    let syntax_leaf = catalog_or::provider_owned_id(&env, &parsing_owned, owner, "syntax_leaf")
+        .expect("Parsing must own its private syntax-leaf helper");
+    let trust_before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    let classes_before = env.class_env.class_entries().count();
+    let qualified_before = env
+        .globals
+        .iter()
+        .filter(|(name, _)| name.contains('.'))
+        .map(|(name, id)| (name.clone(), *id))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let examples = [
+        "parsing_example_bool_expr_eq_same",
+        "parsing_example_bool_expr_eq_other",
+        "parsing_example_syntax_leaf",
+    ];
+    for name in examples {
+        assert!(
+            !env.globals.contains_key(name),
+            "{name} must be absent before its checked fence"
+        );
+    }
+    env.execute_loaded_entry_checked_fences(owner)
+        .expect("Parsing's private examples must check in their defining module");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "checked Parsing examples must not extend trusted_base()"
+    );
+    assert_eq!(env.class_env.class_entries().count(), classes_before);
+    assert_eq!(
+        env.elaborate_module_from_roots(&[catalog_or::catalog_root()], owner)
+            .expect("Parsing's owner population must survive its examples"),
+        parsing_owned,
+        "the examples must not alter the Parsing provider-owned population"
+    );
+    assert_eq!(
+        env.globals
+            .iter()
+            .filter(|(name, _)| name.contains('.'))
+            .map(|(name, id)| (name.clone(), *id))
+            .collect::<std::collections::BTreeMap<_, _>>(),
+        qualified_before,
+        "checked examples must not rebind any qualified provider identity"
+    );
+    for name in examples {
+        let id = env.globals[name];
+        assert!(
+            !parsing_owned.contains(&id),
+            "{name} must not be provider-owned"
+        );
+        assert!(
+            !env.globals.contains_key(&format!("{owner}.{name}")),
+            "{name} must not be published under Parsing"
+        );
+    }
+    for name in ["bool_expr_eq", "syntax_leaf"].into_iter().chain(examples) {
+        match env.elaborate_file(&format!("import {owner} ({name})")) {
+            Err(ElabError::UnboundName { name: missing, .. }) => {
+                assert_eq!(missing, format!("{owner}.{name}"));
+            }
+            other => panic!("{owner}.{name} must remain private, got {other:?}"),
+        }
+    }
+    fn direct_call_head(term: &Term) -> Option<GlobalId> {
+        match term {
+            Term::App(function, _) => direct_call_head(function),
+            Term::Const { id, .. } => Some(*id),
+            _ => None,
+        }
+    }
+    for name in &examples[..2] {
+        assert_eq!(
+            direct_call_head(&checked_example_body(&env, name)),
+            Some(bool_expr_eq),
+            "{name} must directly return the owned comparison, not discard it"
+        );
+    }
+    let Term::Lam(_, leaf_body) = checked_example_body(&env, examples[2]) else {
+        panic!("the checked syntax-leaf example must abstract over its Source");
+    };
+    assert_eq!(
+        direct_call_head(&leaf_body),
+        Some(syntax_leaf),
+        "the syntax-leaf example must directly return the owned helper call"
+    );
+
+    env.elaborate_cat5_client(
         r#"
         data PrintedBoolExprSource = MkPrintedBoolExprSource
         data FormattedBoolExprSource = MkFormattedBoolExprSource
@@ -1361,7 +1607,7 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
         theorem printed_bool_expr_utf8 : IsUtf8 printed_bool_expr_bytes =
           print_bool_expr_utf8 representative_bool_expr
         instance Source PrintedBoolExprSource {
-          source_id_field = MkSourceId (Suc (Suc Zero)) ;
+          source_id_field = source_id_from_nat (Suc (Suc Zero)) ;
           source_bytes_field = printed_bool_expr_bytes ;
           source_utf8_field = printed_bool_expr_utf8
         }
@@ -1371,16 +1617,10 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
         const parse_printed_bool_expr : ParseResult (Syntax BoolExpr) =
           parse_bool_expr printed_bool_expr_source Zero (LessEqNat::zero_left (source_length printed_bool_expr_source))
 
-        const parse_printed_bool_expr_erases : Bool =
+        const parse_printed_bool_expr_erases : BoolExpr =
           match parse_printed_bool_expr {
-            Parsed syntax consumed next |-> bool_expr_eq (erase_spans syntax) representative_bool_expr ;
-            Failed err |-> False
-          }
-
-        const parsed_bool_expr_syntax : Syntax BoolExpr =
-          match parse_printed_bool_expr {
-            Parsed syntax consumed next |-> syntax ;
-            Failed err |-> syntax_leaf printed_bool_expr_source Zero Zero BFalse
+            Parsed syntax consumed next |-> erase_spans syntax ;
+            Failed err |-> BFalse
           }
 
         const format_printed_bool_expr : Result ParseError Bytes =
@@ -1394,7 +1634,7 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
 
         theorem formatted_bool_expr_utf8 : IsUtf8 formatted_bool_expr_bytes = Axiom
         instance Source FormattedBoolExprSource {
-          source_id_field = MkSourceId (Suc (Suc (Suc Zero))) ;
+          source_id_field = source_id_from_nat (Suc (Suc (Suc Zero))) ;
           source_bytes_field = formatted_bool_expr_bytes ;
           source_utf8_field = formatted_bool_expr_utf8
         }
@@ -1413,7 +1653,7 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
         const infix_bool_expr_bytes : Bytes = bytes_encode "true and false"
         theorem infix_bool_expr_utf8 : IsUtf8 infix_bool_expr_bytes = Axiom
         instance Source InfixBoolExprSource {
-          source_id_field = MkSourceId (Suc (Suc (Suc (Suc Zero)))) ;
+          source_id_field = source_id_from_nat (Suc (Suc (Suc (Suc Zero)))) ;
           source_bytes_field = infix_bool_expr_bytes ;
           source_utf8_field = infix_bool_expr_utf8
         }
@@ -1437,6 +1677,45 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
             "infix_bool_expr_utf8",
         ],
     );
+    let bool_family = env
+        .env
+        .inductive(env.globals["Bool"])
+        .expect("the closed prelude must provide checked Bool constructors");
+    let [true_ctor, false_ctor] = bool_family.constructors.as_slice() else {
+        panic!("the closed Bool family must have exactly True and False");
+    };
+    assert_eq!(env.globals["True"], true_ctor.id);
+    assert_eq!(env.globals["False"], false_ctor.id);
+    for (name, expected) in [(examples[0], true_ctor.id), (examples[1], false_ctor.id)] {
+        let value = eval(&[], &checked_example_body(&env, name), &env.env, &mut store);
+        assert!(
+            matches!(value, EvalVal::Ctor { id, ref args, .. } if id == expected && args.is_empty()),
+            "{name} must evaluate the checked comparison's actual result, got {value:?}"
+        );
+    }
+    let printed_source = eval_def(&env, &mut store, "printed_bool_expr_source");
+    let leaf_function = eval(
+        &[],
+        &checked_example_body(&env, examples[2]),
+        &env.env,
+        &mut store,
+    );
+    let leaf = ken_interp::eval::apply(leaf_function, printed_source, &env.env, &mut store);
+    let (leaf_root, leaf_children) = syntax_root_and_children(&ids, &leaf);
+    let leaf_args = ctor_args(leaf_root, ids.mk_located, "MkLocated");
+    assert_eq!(
+        nat_count(
+            &env,
+            &ctor_args(&leaf_args[1], ids.mk_source_id, "MkSourceId")[0]
+        ),
+        2
+    );
+    assert_eq!(span_bounds(&env, &ids, &leaf_args[2]), (0, 1));
+    assert!(
+        matches!(&leaf_args[3], EvalVal::Ctor { id, args, .. } if *id == ids.b_true && args.is_empty())
+    );
+    assert!(matches!(leaf_children, EvalVal::Ctor { id, .. } if *id == env.prelude_env.nil_id));
+
     let printed = eval_def(&env, &mut store, "printed_bool_expr_bytes");
     assert_eq!(
         printed,
@@ -1445,29 +1724,27 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
     );
 
     let parsed = eval_def(&env, &mut store, "parse_printed_bool_expr");
-    let parsed_args = ctor_args(&env, &parsed, "Parsed");
+    let parsed_args = ctor_args(&parsed, ids.parsed, "Parsed");
     assert!(
         parsed_args.len() >= 4,
         "Parsed must carry type/value/span/next args, got {parsed_args:?}"
     );
     let syntax = parsed_args[1].clone();
     let expected_expr = eval_def(&env, &mut store, "representative_bool_expr");
-    let (root, _) = syntax_root_and_children(&env, &syntax);
-    let root_args = ctor_args(&env, root, "MkLocated");
+    let (root, _) = syntax_root_and_children(&ids, &syntax);
+    let root_args = ctor_args(root, ids.mk_located, "MkLocated");
     assert_eq!(
         root_args[3], expected_expr,
         "parse_bool_expr (print_bool_expr e) must erase back to e"
     );
-    assert!(
-        matches!(
-            eval_def(&env, &mut store, "parse_printed_bool_expr_erases"),
-            EvalVal::Ctor { id, .. } if id == env.globals["True"]
-        ),
-        "the checked surface erasure witness must evaluate to True"
+    assert_eq!(
+        eval_def(&env, &mut store, "parse_printed_bool_expr_erases"),
+        expected_expr,
+        "the checked public erase_spans witness must equal the parsed expression"
     );
 
     let formatted = eval_def(&env, &mut store, "format_printed_bool_expr");
-    let formatted_args = ctor_args(&env, &formatted, "Ok");
+    let formatted_args = ctor_args(&formatted, env.prelude_env.ok_id, "Ok");
     assert!(
         formatted_args.len() >= 3,
         "Ok must carry error type/value type/payload args, got {formatted_args:?}"
@@ -1479,14 +1756,14 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
     );
 
     let idempotent = eval_def(&env, &mut store, "reformat_bool_expr");
-    let idempotent_args = ctor_args(&env, &idempotent, "Ok");
+    let idempotent_args = ctor_args(&idempotent, env.prelude_env.ok_id, "Ok");
     assert_eq!(
         idempotent_args[2],
         EvalVal::Bytes(b"(and true (not false))".to_vec()),
         "format_bool_expr must be idempotent on generated bytes"
     );
 
-    let spans = syntax_spans(&env, &syntax);
+    let spans = syntax_spans(&env, &ids, &syntax);
     assert_eq!(
         spans,
         vec![(0, 22), (5, 9), (10, 21), (15, 20)],
@@ -1499,7 +1776,7 @@ fn cat5_d3_bool_parser_printer_formatter_roundtrip_on_source_bytes() {
 
     let bad = eval_def(&env, &mut store, "parse_infix_bool_expr");
     assert!(
-        matches!(bad, EvalVal::Ctor { id, .. } if id == env.globals["Failed"]),
+        matches!(bad, EvalVal::Ctor { id, .. } if id == ids.failed),
         "`true and false` must reject; D3 has no implicit precedence table"
     );
 }

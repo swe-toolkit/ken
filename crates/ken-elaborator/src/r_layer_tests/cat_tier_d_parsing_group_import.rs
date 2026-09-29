@@ -61,10 +61,6 @@ fn module_ids(env: &ElabEnv, module: &str) -> BTreeSet<GlobalId> {
         .collect()
 }
 
-fn expose(env: &mut ElabEnv, module: &str) {
-    catalog_or::expose_module(env, module);
-}
-
 fn term_refs(term: &Term, refs: &mut BTreeSet<GlobalId>) {
     match term {
         Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. } => {
@@ -150,30 +146,23 @@ fn loaded_numeric() -> LoadedNumeric {
     let mut env = ElabEnv::new().expect("base environment");
     load(&mut env, TRANSPORT);
     let transport = module_ids(&env, TRANSPORT);
-    expose(&mut env, TRANSPORT);
     for module in [
         "Core.Classes.LawfulClasses",
         "Data.Collections.Derived",
         "Data.Numeric.Nat.Order",
     ] {
         load(&mut env, module);
-        expose(&mut env, module);
     }
     load(&mut env, DC);
     let diagnostics = module_ids(&env, DC);
-    expose(&mut env, DC);
     load(&mut env, CURSOR);
     let cursor = module_ids(&env, CURSOR);
-    expose(&mut env, CURSOR);
     load(&mut env, DECODER);
     let decoder = module_ids(&env, DECODER);
-    expose(&mut env, DECODER);
     load(&mut env, PARSING);
     let parsing_sibling = module_ids(&env, PARSING);
-    expose(&mut env, PARSING);
     load(&mut env, ARGUMENTS);
     let arguments_sibling = module_ids(&env, ARGUMENTS);
-    expose(&mut env, ARGUMENTS);
     let before_trust = env.env.trusted_base();
     let before_classes = env.class_env.class_entries().count();
     let before_instances = env.class_env.instances.len();
@@ -232,13 +221,6 @@ fn direct_parsing() -> DirectParsing {
     assert_eq!(env.env.trusted_base(), before_trust);
     assert_eq!(env.class_env.class_entries().count(), before_classes + 1);
     assert_eq!(env.class_env.instances.len(), before_instances);
-    for module in [
-        "Core.Classes.LawfulClasses",
-        "Data.Collections.Derived",
-        CURSOR,
-    ] {
-        expose(&mut env, module);
-    }
     let arguments_sibling = load(&mut env, ARGUMENTS);
     DirectParsing {
         env,
