@@ -99,7 +99,7 @@ import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.Transport (cong, trans, sym)
 
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, length)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
@@ -15403,6 +15403,477 @@ pub fn reachable_plus
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
     : Prop =
   Equal Bool (reachable_within k leq (size k Unit (dom k (Tree k Unit) r)) x y r) True
+
+fn reachable_within_successor_rhs
+      (k : Type) (leq : k → k → Bool) (n : Nat) (x : k) (y : k) (r : Tree k (Tree k Unit))
+    : Bool =
+  cat4_bool_or
+    (set_member k leq y (succ k leq x r))
+    (fold
+      k
+      Unit
+      Bool
+      (λz. λu. λacc. cat4_bool_or (reachable_within k leq n z y r) acc)
+      False
+      (succ k leq x r))
+
+theorem reachable_within_successor_unfold
+      (k : Type) (leq : k → k → Bool) (n : Nat) (x : k) (y : k) (r : Tree k (Tree k Unit))
+    : Equal Bool
+        (reachable_within k leq (Suc n) x y r)
+        (reachable_within_successor_rhs k leq n x y r) =
+  Refl
+
+fn cat4_bool_or_true_cases
+      (a : Bool) (b : Bool)
+    : Equal Bool (cat4_bool_or a b) True → Or (Equal Bool a True) (Equal Bool b True) =
+  match a {
+    True ↦ λwhole. Inl (Equal Bool True True) (Equal Bool b True) Proved;
+    False ↦
+      match b {
+        True ↦ λwhole. Inr (Equal Bool False True) (Equal Bool True True) Proved;
+        False ↦ λwhole. absurd whole
+      }
+  }
+
+theorem cat4_bool_or_right_true
+      (a : Bool) (b : Bool)
+    : Equal Bool b True → Equal Bool (cat4_bool_or a b) True =
+  match a {
+    True ↦ λprevious. Proved;
+    False ↦ λprevious. previous
+  }
+
+theorem fold_preserves_true
+      (k : Type)
+      (v : Type)
+      (f : k → v → Bool → Bool)
+      (m : Tree k v)
+      (before : Bool)
+      (step : (key : k)
+        → (val : v)
+        → (seen : Bool)
+        → Equal
+        Bool
+        seen
+        True
+        → Equal
+        Bool
+        (f key val seen)
+        True)
+    : Equal Bool before True → Equal Bool (fold k v Bool f before m) True =
+  match m {
+    Leaf ↦ λprevious. previous;
+    Node left key val right ↦
+      λprevious.
+        let
+          after_left = fold k v Bool f before left;
+          left_true = fold_preserves_true k v f left before step previous;
+          after_key = f key val after_left;
+          key_true = step key val after_left left_true
+        in
+          fold_preserves_true k v f right after_key step key_true
+  }
+
+fn relation_reach_fold_step
+      (k : Type)
+      (leq : k → k → Bool)
+      (n : Nat)
+      (y : k)
+      (r : Tree k (Tree k Unit))
+      (z : k)
+      (unit : Unit)
+      (seen : Bool)
+    : Bool =
+  cat4_bool_or (reachable_within k leq n z y r) seen
+
+fn relation_reach_fold_closed
+      (k : Type)
+      (leq : k → k → Bool)
+      (n : Nat)
+      (y : k)
+      (r : Tree k (Tree k Unit))
+      (targets : Tree k Unit)
+    : Bool =
+  fold
+    k
+    Unit
+    Bool
+    (λz. λu. λacc. cat4_bool_or (reachable_within k leq n z y r) acc)
+    False
+    targets
+
+fn relation_reach_fold_param
+      (k : Type)
+      (leq : k → k → Bool)
+      (n : Nat)
+      (y : k)
+      (r : Tree k (Tree k Unit))
+      (targets : Tree k Unit)
+    : Bool =
+  fold k Unit Bool (relation_reach_fold_step k leq n y r) False targets
+
+theorem relation_reach_fold_open_bridge
+      (k : Type)
+      (leq : k → k → Bool)
+      (n : Nat)
+      (y : k)
+      (r : Tree k (Tree k Unit))
+      (targets : Tree k Unit)
+    : Equal Bool
+        (relation_reach_fold_closed k leq n y r targets)
+        (relation_reach_fold_param k leq n y r targets) =
+  Refl
+
+fn relation_walk_bool
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (vertices : List k)
+    : Bool =
+  match vertices {
+    Nil ↦ False;
+    Cons next rest ↦
+      bool_and
+        (set_member k leq next (succ k leq source r))
+        (match rest {
+          Nil ↦ order_equiv_key k leq next target;
+          Cons following tail ↦ relation_walk_bool k leq r next target rest
+        })
+  }
+
+theorem relation_walk_prefix
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (x : k)
+      (z : k)
+      (y : k)
+      (vertices : List k)
+    : rel_member k leq x z r
+      → Equal Bool (relation_walk_bool k leq r z y vertices) True
+      → Equal Bool (relation_walk_bool k leq r x y (Cons k z vertices)) True =
+  match vertices {
+    Nil ↦ λedge. λtail. absurd tail;
+    Cons next rest ↦
+      λedge.
+        λtail.
+          (proof intro for bool_and)
+            (set_member k leq z (succ k leq x r))
+            (relation_walk_bool k leq r z y (Cons k next rest))
+            edge
+            tail
+  }
+
+theorem relation_walk_singleton
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (x : k) (y : k)
+    : rel_member k d.leq x y r
+      → Equal Bool (relation_walk_bool k d.leq r x y (Cons k y (Nil k))) True =
+  λedge.
+    (proof intro for bool_and)
+      (set_member k d.leq y (succ k d.leq x r))
+      (order_equiv_key k d.leq y y)
+      edge
+      ((proof intro for bool_and) (d.leq y y) (d.leq y y) (d.refl y) (d.refl y))
+
+data RelationWalk
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (x : k) (y : k)
+    : Type
+    where {
+  MkRelationWalk :
+    (vertices : List k)
+    → Equal Bool (relation_walk_bool k leq r x y vertices) True
+    → RelationWalk k leq r x y
+}
+
+fn positive_walk
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (x : k) (y : k)
+    : Omega =
+  ‖ RelationWalk k leq r x y ‖
+
+theorem relation_walk_prefix_length
+      (k : Type) (z : k) (vertices : List k) (n : Nat)
+    : Equal Bool (leq_nat (length k vertices) n) True
+      → Equal Bool (leq_nat (length k (Cons k z vertices)) (Suc n)) True =
+  λbounded. bounded
+
+theorem singleton_length_fits_successor
+      (k : Type) (x : k) (n : Nat)
+    : Equal Bool (leq_nat (length k (Cons k x (Nil k))) (Suc n)) True =
+  Proved
+
+data BoundedRelationWalk
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (fuel : Nat) (x : k) (y : k)
+    : Type
+    where {
+  MkBoundedRelationWalk :
+    (vertices : List k)
+    → Equal Bool (relation_walk_bool k leq r x y vertices) True
+    → Equal Bool (leq_nat (length k vertices) fuel) True
+    → BoundedRelationWalk k leq r fuel x y
+}
+
+fn bounded_walk
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (fuel : Nat) (x : k) (y : k)
+    : Omega =
+  ‖ BoundedRelationWalk k leq r fuel x y ‖
+
+theorem bounded_walk_prefix
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (n : Nat)
+      (x : k)
+      (z : k)
+      (y : k)
+    : rel_member k leq x z r → bounded_walk k leq r n z y → bounded_walk k leq r (Suc n) x y =
+  λedge.
+    λtail.
+      elim_trunc
+        (bounded_walk k leq r (Suc n) x y)
+        (λwitness.
+          match witness {
+            MkBoundedRelationWalk vertices valid bounded ↦
+              trunc_intro
+                (MkBoundedRelationWalk
+                  k
+                  leq
+                  r
+                  (Suc n)
+                  x
+                  y
+                  (Cons k z vertices)
+                  (relation_walk_prefix k leq r x z y vertices edge valid)
+                  (relation_walk_prefix_length k z vertices n bounded))
+          })
+        tail
+
+theorem relation_reach_fold_after_hit
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (n : Nat)
+      (x : k)
+      (y : k)
+      (key : k)
+      (unit : Unit)
+      (seen : Bool)
+      (edge : rel_member k leq x key r)
+      (tail_sound : Equal
+        Bool
+        (reachable_within k leq n key y r)
+        True
+        → bounded_walk
+        k
+        leq
+        r
+        n
+        key
+        y)
+      (previous : Equal Bool seen True → bounded_walk k leq r (Suc n) x y)
+    : Equal Bool (relation_reach_fold_step k leq n y r key unit seen) True
+      → bounded_walk k leq r (Suc n) x y =
+  λwhole.
+    match cat4_bool_or_true_cases (reachable_within k leq n key y r) seen whole {
+      Inl tail ↦ bounded_walk_prefix k leq r n x key y edge (tail_sound tail);
+      Inr earlier ↦ previous earlier
+    }
+
+theorem relation_reach_fold_after_hit_param
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (n : Nat)
+      (x : k)
+      (y : k)
+      (f : k → Unit → Bool → Bool)
+      (key : k)
+      (unit : Unit)
+      (seen : Bool)
+      (step_agrees : Equal
+        Bool
+        (f key unit seen)
+        (relation_reach_fold_step k leq n y r key unit seen))
+      (edge : rel_member k leq x key r)
+      (tail_sound : Equal
+        Bool
+        (reachable_within k leq n key y r)
+        True
+        → bounded_walk
+        k
+        leq
+        r
+        n
+        key
+        y)
+      (previous : Equal Bool seen True → bounded_walk k leq r (Suc n) x y)
+    : Equal Bool (f key unit seen) True → bounded_walk k leq r (Suc n) x y =
+  λwhole.
+    relation_reach_fold_after_hit
+      k
+      leq
+      r
+      n
+      x
+      y
+      key
+      unit
+      seen
+      edge
+      tail_sound
+      previous
+      (trans
+        Bool
+        (relation_reach_fold_step k leq n y r key unit seen)
+        (f key unit seen)
+        True
+        (sym
+          Bool
+          (f key unit seen)
+          (relation_reach_fold_step k leq n y r key unit seen)
+          step_agrees)
+        whole)
+
+fn relation_reach_source_edge
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : Prop =
+  rel_member k leq source target r
+
+theorem relation_reach_fold_sound
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (n : Nat)
+      (x : k)
+      (y : k)
+      (f : k → Unit → Bool → Bool)
+      (step_agrees : (key : k)
+        → (unit : Unit)
+        → (seen : Bool)
+        → Equal
+        Bool
+        (f key unit seen)
+        (relation_reach_fold_step k leq n y r key unit seen))
+      (tail_sound : (z : k)
+        → Equal
+        Bool
+        (reachable_within k leq n z y r)
+        True
+        → bounded_walk
+        k
+        leq
+        r
+        n
+        z
+        y)
+      (targets : Tree k Unit)
+      (before : Bool)
+    : all_keys k Unit (relation_reach_source_edge k leq r x) targets
+      → (Equal Bool before True → bounded_walk k leq r (Suc n) x y)
+      → Equal Bool (fold k Unit Bool f before targets) True
+      → bounded_walk k leq r (Suc n) x y =
+  match targets {
+    Leaf ↦ λedges. λprevious. λwhole. previous whole;
+    Node left key unit right ↦
+      λedges.
+        λprevious.
+          λwhole.
+            let
+              left_edges =
+                and_fst
+                  (all_keys k Unit (relation_reach_source_edge k leq r x) left)
+                  (all_keys k Unit (relation_reach_source_edge k leq r x) right)
+                  (and_snd
+                    (relation_reach_source_edge k leq r x key)
+                    (And
+                      (all_keys k Unit (relation_reach_source_edge k leq r x) left)
+                      (all_keys k Unit (relation_reach_source_edge k leq r x) right))
+                    edges);
+              right_edges =
+                and_snd
+                  (all_keys k Unit (relation_reach_source_edge k leq r x) left)
+                  (all_keys k Unit (relation_reach_source_edge k leq r x) right)
+                  (and_snd
+                    (relation_reach_source_edge k leq r x key)
+                    (And
+                      (all_keys k Unit (relation_reach_source_edge k leq r x) left)
+                      (all_keys k Unit (relation_reach_source_edge k leq r x) right))
+                    edges);
+              edge =
+                and_fst
+                  (relation_reach_source_edge k leq r x key)
+                  (And
+                    (all_keys k Unit (relation_reach_source_edge k leq r x) left)
+                    (all_keys k Unit (relation_reach_source_edge k leq r x) right))
+                  edges;
+              after_left = fold k Unit Bool f before left;
+              left_sound =
+                relation_reach_fold_sound
+                  k
+                  leq
+                  r
+                  n
+                  x
+                  y
+                  f
+                  step_agrees
+                  tail_sound
+                  left
+                  before
+                  left_edges
+                  previous;
+              after_key = f key unit after_left;
+              key_sound =
+                relation_reach_fold_after_hit_param
+                  k
+                  leq
+                  r
+                  n
+                  x
+                  y
+                  f
+                  key
+                  unit
+                  after_left
+                  (step_agrees key unit after_left)
+                  edge
+                  (tail_sound key)
+                  left_sound
+            in
+              relation_reach_fold_sound
+                k
+                leq
+                r
+                n
+                x
+                y
+                f
+                step_agrees
+                tail_sound
+                right
+                after_key
+                right_edges
+                key_sound
+                whole
+  }
+
+theorem reachable_within_direct_sound
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (n : Nat) (x : k) (y : k)
+    : rel_member k d.leq x y r → bounded_walk k d.leq r (Suc n) x y =
+  λedge.
+    trunc_intro
+      (MkBoundedRelationWalk
+        k
+        d.leq
+        r
+        (Suc n)
+        x
+        y
+        (Cons k y (Nil k))
+        (relation_walk_singleton k d r x y edge)
+        (singleton_length_fits_successor k y n))
 
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
