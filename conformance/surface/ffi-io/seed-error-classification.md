@@ -9,12 +9,11 @@ reds a plausible non-conforming implementation — not the prose.
 
 The classification model (`error_transience`, `retry_guidance`, and the verdicts
 `RetryAdvised`/`RetryUnsafeNonIdempotent`, the transience `Transient`/`Permanent`,
-the idempotence `Idempotent`/`NonIdempotent`) is the foundation deliverable
-**PX9-INC1**; its kernel-checked laws are the executable witness of §1.8. Until
-PX9-INC1 lands, every case here is **RED-UNTIL-BUILT** — the model types do not
-yet exist, so the fixtures cannot elaborate. The seed is the control that makes
-§1.8's negative properties testable rather than decorative, staged now so
-PX9-INC1's law ACs cite it.
+the idempotence `Idempotent`/`NonIdempotent`) is in the landed module
+`Capability.System.Error` (`catalog/packages/Capability/System/Error.ken.md`).
+Its checked §1.8 theorems are
+`retry_advised_only_for_transient_idempotent` and
+`error_transience_revoked_permanent`.
 
 ## Reading disciplines
 
@@ -25,11 +24,6 @@ implementation that advises retry from transience alone. The property is the
 operation's idempotence, and on `Revoked` it must be `Permanent` regardless.
 Each case below carries the non-conforming implementation it must red.
 
-**Verdict, not build state.** These cases assert the normative verdicts the
-model must satisfy; they do not assert PX9-INC1 is built. When PX9-INC1 lands the
-fixtures elaborate and its laws witness these verdicts, and the RED-UNTIL-BUILT
-tag lifts then.
-
 ### surface/ffi-io/retry-guidance-requires-idempotence (orthogonality)
 
 - promise class: **normative property** — transience ⊥ idempotence; no
@@ -39,13 +33,10 @@ tag lifts then.
   under an `Idempotent` operation and, unchanged otherwise, under a
   `NonIdempotent` operation — a non-degenerate pair on a shared transience
   differing only in the operation's idempotence.
-- expect: **RED-UNTIL-BUILT** — `retry_guidance Transient Idempotent =
-  RetryAdvised` while `retry_guidance Transient NonIdempotent =
-  RetryUnsafeNonIdempotent`; the verdict flips on the shared `Transient`, keyed
-  only by idempotence, and `RetryAdvised` arises from no other pairing.
-- fixture: **BLOCKED-ON-PX9-INC1** — `error_transience`, `retry_guidance`, and
-  the verdict/idempotence types are the PX9-INC1 foundation deliverable, not yet
-  landed.
+- expect: `retry_guidance Transient Idempotent = RetryAdvised` while
+  `retry_guidance Transient NonIdempotent = RetryUnsafeNonIdempotent`; the
+  verdict flips on the shared `Transient`, keyed only by idempotence, and
+  `RetryAdvised` arises from no other pairing.
 - control (the one that makes it net): a `retryable : error → Bool`
   implementation — retry decided from the error alone — returns the **same**
   verdict for both arms, so the pair cannot flip and the case reds. A lone
@@ -62,10 +53,9 @@ tag lifts then.
 - given: the `Revoked` error identity under `error_transience`, and
   `retry_guidance` for `Revoked` under an `Idempotent` operation (the arm that
   would advise retry for a transient error).
-- expect: **RED-UNTIL-BUILT** — `error_transience Revoked = Permanent`, and
-  `retry_guidance` for `Revoked` is never `RetryAdvised` even under `Idempotent`,
-  because permanence dominates: a revoked authority is gone.
-- fixture: **BLOCKED-ON-PX9-INC1**.
+- expect: `error_transience Revoked = Permanent`, and `retry_guidance` for
+  `Revoked` is never `RetryAdvised` even under `Idempotent`, because permanence
+  dominates: a revoked authority is gone.
 - control: a `Revoked = Transient` classification reds — it makes
   `error_transience Revoked = Transient`, so the idempotent arm reaches
   `RetryAdvised`, wrongly advising retry on a revoked authority, against the
@@ -86,11 +76,15 @@ tag lifts then.
 - given: the revocation observable reached through a path/capability operation
   (`IOError.Revoked`), a resource-token operation (`ResourceError.Revoked`), and
   the host-boundary progress/error partition.
-- expect: **RED-UNTIL-BUILT** — all three resolve to **one** `Revoked` semantic
-  identity, classified `Permanent`; the conforming surface exposes exactly one
-  `Revoked`, and the check names that single identity.
-- fixture: **BLOCKED-ON-PX9-INC1** — the unification is PX9-INC1's, sequenced
-  after `ABI-REVOKE` (`../../../docs/program/10-linux-abi-completion.md §7`).
+- fixture: **GATED on source/spec shape mismatch** — this seed and `38 §1.3.1`
+  name nullary `ResourceError.Revoked`; landed
+  `crates/ken-elaborator/src/prelude.rs:1664` and
+  `crates/ken-elaborator/tests/px9_revoked_unification.rs:127` use
+  `ResourceHostIO Revoked`. Keep this case gated until the spec and source
+  agree on the resource revocation constructor.
+- expect: all three resolve to **one** `Revoked` semantic identity, classified
+  `Permanent`; the conforming surface exposes exactly one `Revoked`, and the
+  check names that single identity.
 - control: a triplicated-revoked surface — three distinct `Revoked` constructors
   — is non-conformant and reds the single-identity check. Unification is not
   collapse: the check must equally red a surface that maps `Revoked` into
@@ -99,3 +93,9 @@ tag lifts then.
 - why: three carriers for one observable is the pre-PX9 state; a client cannot
   match one `Revoked` if the surface names three, and cannot trust a single one
   if it silently aliases a neighbour.
+
+## Provenance
+
+This as-built update is grounded in the landed Ken source at
+`e5cd36c5432d1af8b62aba988ef93d159d481ffd`. No external prior-art reference,
+`local/refs/` implementation, or excluded prototype was consulted.
