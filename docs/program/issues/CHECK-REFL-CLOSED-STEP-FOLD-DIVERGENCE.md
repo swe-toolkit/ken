@@ -1,7 +1,7 @@
 ---
 id: CHECK-REFL-CLOSED-STEP-FOLD-DIVERGENCE
 title: "The checker exhausts stack and memory on a true 669-byte Refl goal: a Node equation for a fold wrapper with a closed step lambda. Classify the phase (elaboration whnf or kernel convert) first, then repair it in its owner, with no stack increase as the repair"
-status: active
+status: merged
 owner: kernel
 size: M
 gate: architect
@@ -108,12 +108,33 @@ and bounded memory. The three controls stay as they are.
   `dec_6t8hwnnghxv18`). Head δ is deferred in kernel conversion. The
   682-byte repro checks at the default stack, and all 57 catalog packages keep
   their verdicts.
-- **Increment 2, released `evt_kab4esnr78a6`.** Increment 1 records
-  same-head pairs for every transparent constant, so three nested calls to a
-  non-recursive wrapper are refused (Adversary `evt_9s2j10ap3pxc`). The
-  Architect ruled the repair (`evt_7bkmcjy3a77z9`): the ledger records a pair
-  only when a head is recursive, meaning on a cycle of the transparent-body
-  reference graph. That also closes the distinct non-recursive sibling.
+- **Increment 2, landed `768448f25`** (PR #4380; candidate `689762d5e`;
+  Kernel QA `evt_66f6kg2dq902d`, Architect APPROVE `evt_68m8fpndkyj1k` and
+  Decision `dec_5gd246vcqqzsm`). Increment 1 recorded same-head pairs for
+  every transparent constant, so three nested calls to a non-recursive
+  wrapper were refused (Adversary `evt_9s2j10ap3pxc`). Per the Architect's
+  ruling (`evt_7bkmcjy3a77z9`), the ledger now records a pair only when a
+  head is recursive, meaning on a cycle of the transparent-body reference
+  graph. That also closes the distinct non-recursive sibling. The timing gate
+  was discharged in `evt_6g14xv7ajsz3z`.
 - **Filed residual.** Two distinct recursive heads under a closed ι-redex
   still do not halt. That predates increment 1 (`evt_7jp6sqvgp6kcx`) and is
   `KERNEL-CONV-IOTA-DISCHARGE-DESCENT`.
+
+## Closeout
+
+Merged in two increments: `b9840913e` and `768448f25`.
+- **AC-0.** The divergence is in kernel `convert`. The Kernel ring owned the
+  repair under the operator's "one wp for checker crash, yes".
+- **AC-1.** The 682-byte repro checks at the default stack in 241 ms, with a
+  maximum RSS of 24,768 KiB, on the final CLI.
+- **AC-2.** `proved_still_rejects` and the swapped-children,
+  distinct-step and distinct-accumulator rejections pass in
+  `check_refl_closed_step_fold` (8/8 at the final SHA).
+  - Reverting to an eager head brought the divergence back (increment 1
+    QA).
+  - Exempting recursive same-head pairs revives the depth-90 abort on the
+    open-recursive negative.
+- **Residual.** `KERNEL-CONV-IOTA-DISCHARGE-DESCENT` (the closed-scrutinee
+  ι discharge, plus the `(recursive, non-recursive)` pair still refused)
+  opens next with its AC-0 design stop to the Architect.
