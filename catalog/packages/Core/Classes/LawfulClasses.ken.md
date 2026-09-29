@@ -165,8 +165,8 @@ kernel decidable-equality certificate for `Int` (`ken-kernel::env::
 DecEqCert`, registered once against `eq_int` during numeric-tower
 bootstrap, `docs/adr/0013-int-decidable-equality-kernel-posture.md` Layer
 1), not a fresh `Decl::Opaque` minted by elaborating this file. `Ord Int`'s
-own laws are untouched here (still `Axiom`, out of scope — `Int`'s
-ordering is not part of this certificate).
+ordering laws are separate from that equality certificate: each has its
+own named catalog axiom below, with a distinct trusted-base entry.
 
 `Eq Int`'s `refl`/`sym`/`trans` are then ordinary, REAL, kernel-checked
 proofs — not postulates at all — derived from `DecEq Int`'s `sound`/
@@ -212,12 +212,27 @@ instance Eq Int {
     (J (λz' _.Equal Int x z') (int_eq_sound x y p) (int_eq_sound y z q))
 }
 
+axiom ord_int_refl : (x : Int) → IsTrue (int_leq x x)
+
+axiom ord_int_antisym
+    : (x : Int) → (y : Int) → IsTrue (int_leq x y) → IsTrue (int_leq y x) → Equal Int x y
+
+axiom ord_int_trans
+    : (x : Int)
+      → (y : Int)
+      → (z : Int)
+      → IsTrue (int_leq x y)
+      → IsTrue (int_leq y z)
+      → IsTrue (int_leq x z)
+
+axiom ord_int_total : (x : Int) → (y : Int) → IsTrue (bool_or (int_leq x y) (int_leq y x))
+
 instance Ord Int {
   leq = int_leq;
-  refl = Axiom;
-  antisym = Axiom;
-  trans = Axiom;
-  total = Axiom
+  refl = ord_int_refl;
+  antisym = ord_int_antisym;
+  trans = ord_int_trans;
+  total = ord_int_total
 }
 ```
 
@@ -610,7 +625,7 @@ qualified-name token — `Ord_instance_Int` alone is a `ConId` and
 `parse_dotted` would otherwise swallow the whole `Ord_instance_Int.refl` as
 one qualified reference). So this instance's own `trusted_base_delta` mints
 nothing new: zero-NEW-delta by transport, NOT zero-delta (the referenced
-`Axiom`s are still there, honestly, on `Ord Int`) — see `§5` for why `leq`
+named axioms remain in `Ord Int`) — see `§5` for why `leq`
 is also transported rather than using the separately-defined `leqChar` view.
 
 ```ken
@@ -2778,8 +2793,9 @@ Ken-native; no external reference implementation informed its source.
    types (`33 §5.2`, right-nested Σ over `13 §3`), built from `Bool`
    (prelude, `30 §4`) + the kernel's `Eq`/logic vocabulary (`15`/`16`) + the
    Σ/record machinery. No new kernel former. `Ord Int` wraps the audited
-   `leq_int` primitive with visible `Axiom` law fields (untouched by the
-   Int-equality certificate below, out of scope). `Eq Int`/`DecEq Int` wrap
+   `leq_int` primitive with four individually named catalog axioms in its
+   law fields (separate from the Int-equality certificate below). `Eq Int`/
+   `DecEq Int` wrap
    `eq_int` and derive their laws from the ONE named kernel decidable-equality
    certificate (`ken-kernel::declare_deceq_certificate`, registered once
    against `eq_int` in `crates/ken-elaborator/src/numbers.rs`, ADR 0013 Layer
@@ -2794,10 +2810,13 @@ Ken-native; no external reference implementation informed its source.
    `.`-projection off `Ord_instance_Int`/`DecEq_instance_Int`. The
    `UInt8`, `Bytes`, and `String` instances transport through their existing
    injective views and structural dictionaries.
-5. **`trusted_base()` delta.** `Ord Int`: 4 `Axiom` entries (`refl`/
-   `antisym`/`trans`/`total`), each a real, grep-able `Decl::Opaque` —
-   illustrative-only, not claimed zero-delta, untouched by the Int-equality
-   certificate. `Eq Int`/`DecEq Int`: **zero catalog `Axiom`** — `sound`/
+5. **`trusted_base()` delta.** `Ord Int`: four named catalog axioms
+   (`ord_int_refl`, `ord_int_antisym`, `ord_int_trans`, `ord_int_total`).
+   Each instance field cites its named `Decl::Transparent` theorem; each
+   theorem's body directly cites one distinct `Decl::Opaque` trust entry.
+   These state properties of `leq_int`, not zero-delta proofs or parts of
+   the Int-equality certificate. `Eq Int`/`DecEq Int`: **zero catalog
+   `Axiom`** — `sound`/
    `complete` reference the
    pre-existing kernel certificate (registered once during numeric-tower
    bootstrap, BEFORE this file is ever elaborated, so elaborating this file
@@ -2812,7 +2831,7 @@ Ken-native; no external reference implementation informed its source.
    structural relation, attached laws, totality program, bridge, and dictionary
    contain no postulate. `Ord Char`/`DecEq Char`: **zero-NEW-delta** — mint no
    new postulate, transport `Ord Int`'s
-   `Axiom`s / `DecEq Int`'s certificate reference via projection.
+   named axioms / `DecEq Int`'s certificate reference via projection.
 6. **Proof families.** `Bool` instances: full case-split on every
    quantified variable (`x`, `y`, and for `trans`, `z`), 4–8 branches per
    law field depending on arity, each closing with `Proved` (collapsed-`Top`
