@@ -587,17 +587,29 @@ pub fn reachable_plus (k : Type) (leq : k -> k -> Bool)
 ### stdlib/collections/converse-and-compose-membership
 - spec: `58 §7` D4 (landed `compose`/`converse` definitions; general membership
   proofs and the full paired controls remain residual), `16 §1.1`.
-- given: over `Nat` relations (adjacency `Map Nat (Set Nat)`), the required
-  `converse` characterization
+- given: over `Nat` relations (adjacency `Map Nat (Set Nat)`) with one
+  lawful shared order, `Ordered` outer maps and successor sets, and `Distinct`
+  outer keys of `R` and `S`, the required `converse` characterization
   `rel_member y x (converse R) ⇔ rel_member x y R`, and the required `compose`
   characterization in which `rel_member x z (compose R S)` reflects
-  `succ x (compose R S) = ⋃ { succ y S : y ∈ succ x R }`.
+  `succ x (compose R S) = ⋃ { succ y S : y ∈ succ x R }`. The `Distinct`
+  condition is a law premise, not an extra function argument; successor-set
+  distinctness is not required for Boolean membership. For the value-flip
+  fixtures below, choose pairwise-distinct `Nat` keys `a`, `b`, and `c`, so
+  neither positive/negative query pair collapses to the same membership check;
+  this is a fixture discriminator, not a premise of the general laws.
 - expect: **value-flip on relation membership.** With `R = {a→b}`:
   `rel_member b a (converse R)` holds while `rel_member a b (converse R)`
   reduces to `IsTrue False`. With `R = {a→b}`, `S = {b→c}`:
   `rel_member a c (compose R S)` holds while
   `rel_member a b (compose R S)` does not. A failed transpose or a compose that
   mis-unions the `S`-images flips the paired observation.
+- premise control (not an executing conformance fixture): the ordered raw tree
+  `R = Node Leaf 0 {2} (Node Leaf 0 {1} Leaf)` violates outer `Distinct`.
+  `succ 0 R` excludes `1`; with `S = {1→1, 2→2}`, `succ 0 (compose R S)` includes
+  `1`, and `succ 1 (converse R)` includes `0`. Without the outer-key premise,
+  **both** claimed general characterizations fail on the same relation; this
+  counterexample is not an allowed input to the positive law.
 - why: the definitions reuse landed `fold`/`union`/`member`, but definition
   presence is not a general membership proof. The current reaching test
   `cat4_relations_compose_and_converse_over_adjacency_maps` observes only the
