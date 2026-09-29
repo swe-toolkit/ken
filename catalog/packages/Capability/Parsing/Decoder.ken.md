@@ -238,9 +238,10 @@ derived remaining bound is zero.
 The private equation suite states each combinator directly over its existing
 result representation. The equations quantify over every cursor and every
 first-decoder outcome: they do not assume a normalized cursor, positive
-remaining input, or eventual acceptance. The recursive equation also exposes
-both the zero-fuel failure and successor layer selected by the cursor's actual
-remaining value.
+remaining input, or eventual acceptance. The recursive equation exposes the
+`Suc (cursor_remaining ...)` seed: the initial call selects the layer even at
+zero remaining. The private worker still fails if explicitly called with zero
+fuel; the public decoder does not start there.
 
 The repetition proof is structural on the derived fuel. At zero fuel, a
 successful result transports the matched `remaining = Zero` fact to its end
