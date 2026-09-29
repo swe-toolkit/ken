@@ -101,6 +101,20 @@ second consumer still refuses.
   occurrence still refuses. Rows outside the three keep their current
   refusal.
 
+## Limitations
+
+No checked source route activates a frame before a fanout at this base
+(measured: paired activation/receipt sites in px7n and a bypass variant). N1
+is pinned by a hand-built finished-Function negative and its mutation. It
+protects against future lowering that separates those events; no current
+source fixture reaches its refusal (Architect `evt_2ne7q6fn12wm2`).
+
+The largest checked-key Function in the targeted green suites, escape
+`u3:61`, had four keys, four activations, four receipts, 8,848 blocks, 9,228
+edges and an 84.2 ms validator time. Two keys needed extra fixpoint passes;
+none of its eight frame events lay on a CFG cycle. This is a measured cost,
+not a workspace-wide bound or a native-parity claim.
+
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change (an operator question).

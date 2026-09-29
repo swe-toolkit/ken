@@ -371,6 +371,12 @@ impl FrameEvents {
                             Some(kind) => *kind,
                             None => classify_unregistered_terminal(func, block)?,
                         };
+                        // No checked source route activates a frame before a
+                        // fanout at this base (measured: paired activation/
+                        // receipt sites in px7n and a bypass variant). N1 is
+                        // pinned by a hand-built finished-Function negative
+                        // and its mutation. A future lowering may separate
+                        // these events; its normal-return skip must refuse.
                         if kind == FrameTerminalKind::Normal && state & A != 0 {
                             rules.insert(FrameRule::N1);
                         }
