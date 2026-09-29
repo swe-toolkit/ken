@@ -36,8 +36,16 @@ checked `GlobalId`, never on a bare spelling. Two modules that each declare
   Import-selected references already carry an id.
 - **No catalog collision today.** `grep` over `catalog/` finds each class
   spelling declared once (`Functor`, `Eq` and `Traversable` repeat only in
-  `conformance/` fixtures). The hazard is latent, so this is a guard, not a
-  repair of a live wrong answer.
+  `conformance/` fixtures). The collision hazard is latent.
+- **A live over-accept, no collision needed** (Adversary
+  `evt_74q93v76f92ws`, at `c6e0578e7`). Under `import
+  Core.Classes.LawfulClasses (IsTrue)`, the unselected class `Ord` resolves
+  in a `where Ord Int` constraint and as the type `Ord Int`, both through the
+  fallbacks above. An unselected value in the same module is refused, which
+  is the spec's rule (`spec/30-surface/33-declarations.md:127-128`). No real
+  catalog module was measured using a class it does not select. A repair
+  that kept a unique-spelling fallback would pass the collision rows and keep
+  this leak.
 
 Re-measure before building. If a settled input is false, stop and report.
 
@@ -59,8 +67,14 @@ has no remaining consumers.
   across `crates/*/src`, `crates/*/tests`, `r_layer_tests`, `conformance/`
   and `examples/` (Check 3). The Architect rules the `globals` disposition.
 - **AC-1.** On the candidate, C's three references select A's id, and a
-  C' importing B's selects B's. Restoring any one spelling fallback turns
-  its row red.
+  C' importing B's selects B's. A client that imports a module but not its
+  class is refused when it names the class in a `where` constraint and in a
+  type position, while a selected class in the same shape is admitted.
+  Restoring any one spelling fallback turns its row red.
+- **AC-1 carry.** `es4_classes_acceptance.rs:161-165` asserts that the ES4
+  owner example imports `Ord`, but today deleting that import
+  (`Derived.ken.md:2089`) leaves the test green. On the candidate, deleting
+  it must turn the test red.
 - **AC-2.** The `conformance/` class seeds and the catalog class suites
   stay green (Full CI).
 
