@@ -1937,7 +1937,12 @@ impl CheckedFrameFunctionScope {
 }
 
 impl CheckedFrameBranchScope {
+    #[track_caller]
     pub(super) fn capture(consumed: &BTreeSet<ConsumedSubcontinuationFrame>) -> Self {
+        if std::env::var_os("KEN_FRAME_CENSUS").is_some() {
+            let caller = std::panic::Location::caller();
+            eprintln!("KEN_FRAME_SCOPE site={}:{}", caller.file(), caller.line());
+        }
         Self {
             baseline: consumed.clone(),
             union: consumed.clone(),

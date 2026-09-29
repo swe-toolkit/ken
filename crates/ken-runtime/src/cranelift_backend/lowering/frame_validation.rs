@@ -202,7 +202,48 @@ impl FrameEvents {
     }
 
     pub fn validate(&self, func: &Function) -> Result<(), CraneliftBackendError> {
+        let started = std::time::Instant::now();
         let violations = self.rule_violations(func)?;
+        if std::env::var_os("KEN_FRAME_CENSUS").is_some() {
+            let cfg = ControlFlowGraph::with_function(func);
+            let blocks = func.layout.blocks().count();
+            let edges: usize = func
+                .layout
+                .blocks()
+                .map(|block| cfg.succ_iter(block).count())
+                .sum();
+            let activations = self
+                .events
+                .iter()
+                .filter(|event| event.kind == FrameEventKind::Activation)
+                .count();
+            let receipts = self.events.len() - activations;
+            let mut normal = 0usize;
+            let mut abort = 0usize;
+            let mut unclassified = 0usize;
+            for block in func.layout.blocks() {
+                let Some(inst) = func.layout.last_inst(block) else {
+                    continue;
+                };
+                if !matches!(func.dfg.insts[inst].opcode(), Opcode::Return | Opcode::Trap) {
+                    continue;
+                }
+                let kind = self
+                    .terminals
+                    .iter()
+                    .find(|terminal| terminal.block == block)
+                    .map(|terminal| terminal.kind)
+                    .map(Ok)
+                    .unwrap_or_else(|| classify_unregistered_terminal(func, block));
+                match kind {
+                    Ok(FrameTerminalKind::Normal) => normal += 1,
+                    Ok(FrameTerminalKind::Abort) => abort += 1,
+                    Err(_) => unclassified += 1,
+                }
+            }
+            eprintln!("KEN_FRAME_METRICS function={} keys={} activations={activations} receipts={receipts} blocks={blocks} edges={edges} normal_terminals={normal} abort_terminals={abort} unclassified_terminals={unclassified} validator_micros={}",
+                func.name, violations.len(), started.elapsed().as_micros());
+        }
         if violations.values().all(BTreeSet::is_empty) {
             Ok(())
         } else {
@@ -224,7 +265,9 @@ impl FrameEvents {
                 "checked Runtime frame Function must return exactly one I64 status",
             ));
         }
-        if std::env::var_os("KEN_FRAME_TERMINAL_CENSUS").is_some() {
+        if std::env::var_os("KEN_FRAME_TERMINAL_CENSUS").is_some()
+            || std::env::var_os("KEN_FRAME_CENSUS").is_some()
+        {
             self.trace_dynamic_status_returns(func);
         }
         if self.events.is_empty() {
@@ -350,7 +393,9 @@ impl FrameEvents {
             }
             violations.insert(key, rules);
         }
-        if std::env::var_os("KEN_FRAME_TERMINAL_CENSUS").is_some() {
+        if std::env::var_os("KEN_FRAME_TERMINAL_CENSUS").is_some()
+            || std::env::var_os("KEN_FRAME_CENSUS").is_some()
+        {
             eprintln!("KEN_FRAME_FIXPOINT function={} keys_needing_extra_passes={keys_needing_extra_passes} total_keys={}", func.name, violations.len());
         }
         Ok(violations)

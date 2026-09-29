@@ -2375,6 +2375,8 @@ impl<'a> Lowering<'a> {
                     builder
                         .ins()
                         .store(MemFlags::trusted(), trap_word, slots, trap_offset);
+                    // Status zero is still a trap here: the unit-frame slot now
+                    // holds TrapWord, and the caller reads that slot before Result.
                     let no_result = builder.ins().iconst(types::I64, 0);
                     builder.ins().return_(&[no_result]);
                     self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
