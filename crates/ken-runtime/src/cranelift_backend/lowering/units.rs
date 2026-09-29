@@ -3296,6 +3296,7 @@ fn emit_pending_vis_owner_loop(
     let result_store = builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
     let success = builder.ins().iconst(types::I64, 0);
     builder.ins().return_(&[success]);
+    compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
     builder.switch_to_block(vis);
     let member = builder.ins().load(types::I64, MemFlags::trusted(), frame, region.discriminant);
     let cranelift_codegen::ir::ValueDef::Result(member_load, _) = builder.func.dfg.value_def(member) else {
@@ -3329,6 +3330,7 @@ fn emit_pending_vis_owner_loop(
         builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
         let success = builder.ins().iconst(types::I64, 0);
         builder.ins().return_(&[success]);
+        compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
     } else {
         let invalid = builder.ins().iconst(types::I64, -1);
         builder.ins().return_(&[invalid]);
@@ -4614,6 +4616,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             };
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().return_(&[zero]);
+            compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
             finished_body = Some(StaticResponseFinishedBody {
                 input_frame: frame,
                 placeholder_offset,
@@ -4630,7 +4633,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             builder.finalize();
         }
         ambient.release(compiler);
-        frame_scope.close(compiler)?;
+        frame_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
         // The test-only Vis ingress bypasses finished-body verification as a
@@ -5270,11 +5273,12 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 .store(MemFlags::trusted(), word, frame, result_offset);
             let zero = builder.ins().iconst(types::I64, 0);
             builder.ins().return_(&[zero]);
+            compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
             builder.seal_all_blocks();
             builder.finalize();
         }
         ambient.release(compiler);
-        frame_scope.close(compiler)?;
+        frame_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         // Verify, then define THIS function -- a fresh context here would
         // define an empty body and silently discard everything emitted above.
@@ -5916,11 +5920,12 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             }
             let status = builder.ins().iconst(types::I64, 0);
             builder.ins().return_(&[status]);
+            compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
             builder.seal_all_blocks();
             builder.finalize();
             ambient.release(compiler);
         }
-        frame_scope.close(compiler)?;
+        frame_scope.close(compiler, &func)?;
         // The same emission-seam gate every other generated function passes: the
         // callee of each recorded causal emission is decoded back out of THIS
         // finished CLIF and compared with the planner-issued target.
@@ -6558,10 +6563,11 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             }
             let status = builder.ins().iconst(types::I64, 0);
             builder.ins().return_(&[status]);
+            compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
             builder.seal_all_blocks();
             builder.finalize();
         }
-        frame_scope.close(compiler)?;
+        frame_scope.close(compiler, &func)?;
         compiler.verify_emitted_continuation_calls(&func, bundle)?;
         compiler.verify_recorded_composed_discharges(&func, bundle)?;
         #[cfg(test)]
@@ -9473,11 +9479,12 @@ fn define_unit_body<M: Module>(
         }
         let status = builder.ins().iconst(types::I64, 0);
         builder.ins().return_(&[status]);
+        compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
         builder.seal_all_blocks();
         builder.finalize();
     }
     ambient.release(compiler);
-    frame_scope.close(compiler)?;
+    frame_scope.close(compiler, &func)?;
     #[cfg(test)]
     d5a_trace(format!(
         "UNIT-BODY done function={:?} origin={:?} root={:?}",

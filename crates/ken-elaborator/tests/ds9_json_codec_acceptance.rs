@@ -655,15 +655,27 @@ fn json_size_consumes_array_and_pair_nested_object_results() {
 
 #[test]
 fn decoder_recursive_reaches_array_and_object_many_branches() {
-    let (mut env, _) = json_env();
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+    // Transition sentinel (D3-probe; retire when the full DS-9 decoder lands).
+    // MEASURED: public Decoder composition feeds a recursive decoder over
+    // explicit List Char input; the array and object branches execute
+    // decoder_many and produce one nested JsonNull each with no input left.
+    // CLAIMED: both recursive Json branches are reachable through the public
+    // Decoder client surface. THE GAP: these two finite fixtures do not prove
+    // a complete codec, a general law, or decoder_map's private behavior.
+    let (mut env, trusted_before) = json_env();
+    let decoder_module = "Capability.Parsing.Decoder";
+    let decoder_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], decoder_module)
         .expect("Capability.Parsing.Decoder dependency must roots-load");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
-
-    // Transition sentinel (D3-probe; retire when the full DS-9 decoder lands):
-    // this is a real recursive decoder over explicit List Char input. Its
-    // array and object paths each build and execute decoder_many at the nested
-    // Json result type; neither path is a source-only or unreachable stub.
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trusted_before,
+        "the Decoder client must not extend the trusted base"
+    );
+    let decoder_public_import = r#"import Capability.Parsing.Decoder
+      (Decoder, DecoderResult, Decoded, DecoderFailed,
+        decoder_bind, decoder_pure, decoder_satisfy, decoder_many,
+        decoder_alt, decoder_recursive)"#;
     let recursive_decoder_source = r#"
         fn ds9_probe_token (code : Int) : Decoder (List Char) Nat Char =
           decoder_satisfy
@@ -674,13 +686,13 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
             (\actual. eq_int actual code)
 
         const ds9_probe_null_decoder : Decoder (List Char) Nat Json =
-          decoder_map
+          decoder_bind
             (List Char)
             Nat
             Char
             Json
-            (\ignored. JsonNull)
             (ds9_probe_token (110 : Int))
+            (\ignored. decoder_pure (List Char) Nat Json JsonNull)
 
         fn ds9_probe_array_decoder
               (recur : Decoder (List Char) Nat Json)
@@ -820,8 +832,31 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
         const ds9_probe_object_result : DecoderResult (List Char) Nat Json =
           ds9_probe_decoder ds9_probe_object_input
         "#;
-    env.elaborate_file(&format!("{JSON_PUBLIC_IMPORT}\n{recursive_decoder_source}"))
-        .expect("real recursive array/object decoder probe must elaborate");
+    env.elaborate_file(&format!(
+        "{JSON_PUBLIC_IMPORT}\n{decoder_public_import}\n{recursive_decoder_source}"
+    ))
+    .expect("real recursive array/object decoder probe must elaborate");
+
+    let decoder_result =
+        catalog_or::provider_owned_id(&env, &decoder_owned, decoder_module, "DecoderResult")
+            .expect("the Decoder provider must own its result carrier");
+    let decoded_constructors = env
+        .env
+        .inductive(decoder_result)
+        .expect("DecoderResult must be an inductive family")
+        .constructors
+        .iter()
+        .map(|constructor| constructor.id)
+        .collect::<Vec<_>>();
+    let decoded =
+        catalog_or::provider_owned_id(&env, &decoded_constructors, decoder_module, "Decoded")
+            .expect("Decoded must belong to the owned DecoderResult carrier");
+    fn decoded_args(value: &EvalVal, decoded: GlobalId) -> &[EvalVal] {
+        match value {
+            EvalVal::Ctor { id, args, .. } if *id == decoded => args.as_ref().as_slice(),
+            other => panic!("expected owned Decoder.Decoded, got {other:?}"),
+        }
+    }
 
     for name in [
         "ds9_probe_array_decoder",
@@ -835,7 +870,7 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
 
     let mut store = make_store(&env);
     let array_result = eval_global(&env, &mut store, "ds9_probe_array_result");
-    let array_decoded = ctor_args(&env, &array_result, "Decoded");
+    let array_decoded = decoded_args(&array_result, decoded);
     assert!(
         matches!(&array_decoded[3], EvalVal::Ctor { id, .. } if *id == global_id(&env, "JsonArray")),
         "array fixture must reach the JsonArray decoder_many branch"
@@ -846,6 +881,12 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
         1,
         "array decoder_many must construct one recursive Json element"
     );
+    let null = global_id(&env, "JsonNull");
+    let array_child = &ctor_args(&env, &array_value[0], "Cons")[1];
+    assert!(
+        matches!(array_child, EvalVal::Ctor { id, args, .. } if *id == null && args.is_empty()),
+        "array's consumed null token must become JsonNull"
+    );
     assert_eq!(
         list_char_codepoints(&env, &array_decoded[4]),
         Vec::<u32>::new(),
@@ -853,7 +894,7 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
     );
 
     let object_result = eval_global(&env, &mut store, "ds9_probe_object_result");
-    let object_decoded = ctor_args(&env, &object_result, "Decoded");
+    let object_decoded = decoded_args(&object_result, decoded);
     assert!(
         matches!(&object_decoded[3], EvalVal::Ctor { id, .. } if *id == global_id(&env, "JsonObject")),
         "object fixture must reach the JsonObject decoder_many branch"
@@ -863,6 +904,17 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
         list_count(&env, &object_value[0]),
         1,
         "object decoder_many must construct one recursive key/value member"
+    );
+    let object_member = &ctor_args(&env, &object_value[0], "Cons")[1];
+    let EvalVal::Pair {
+        snd: object_child, ..
+    } = object_member
+    else {
+        panic!("object member must contain a Json value, got {object_member:?}");
+    };
+    assert!(
+        matches!(object_child.as_ref(), EvalVal::Ctor { id, args, .. } if *id == null && args.is_empty()),
+        "object's consumed null token must become JsonNull"
     );
     assert_eq!(
         list_char_codepoints(&env, &object_decoded[4]),

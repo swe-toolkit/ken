@@ -794,7 +794,7 @@ impl<'a> Lowering<'a> {
                     expr
                 } {
                     RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
-                        self.enter_checked_subcontinuation_frame(frame_id)?;
+                        self.enter_checked_subcontinuation_frame(builder, frame_id)?;
                         SourceMachineState::Eval {
                             expr: self.owned_child_occurrence(static_origin, 0, *body)?,
                             env,
@@ -1236,7 +1236,7 @@ impl<'a> Lowering<'a> {
                         default,
                     } => {
                         let checked_frame_id =
-                            self.consume_checked_subcontinuation_frame(&cases, &default)?;
+                            self.consume_checked_subcontinuation_frame(builder, &cases, &default)?;
                         control.continuation = SourceContinuation::ComputationalMatchScrutinee {
                             cases,
                             default,
@@ -1365,6 +1365,7 @@ impl<'a> Lowering<'a> {
                             if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
                                 let failure = builder.ins().iconst(types::I64, -4);
                                 builder.ins().return_(&[failure]);
+                                self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                                 return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
                             }
                             let value = if edge.target.terminal_active_prefix.is_empty() {
@@ -3685,6 +3686,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             .ins()
             .iconst(types::I64, CARRIED_REPRESENTATION_MISMATCH_STATUS);
         builder.ins().return_(&[mismatch]);
+        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
 
         // ── PHASE 3 — LOWER ONLY THE PREALLOCATED SEMANTIC LEAVES ──
         let mut frame_scope =
@@ -3899,6 +3901,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     Err(_) => {
                         let failure = builder.ins().iconst(types::I64, -4);
                         builder.ins().return_(&[failure]);
+                        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                         test_block = next;
                         continue;
                     }
@@ -3938,6 +3941,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             .ins()
             .iconst(types::I64, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
         builder.ins().return_(&[malformed]);
+        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
         Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge))
     }
 
@@ -4009,6 +4013,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     Err(_) => {
                         let failure = builder.ins().iconst(types::I64, -4);
                         builder.ins().return_(&[failure]);
+                        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                         test_block = next;
                         continue;
                     }
@@ -4050,6 +4055,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             .ins()
             .iconst(types::I64, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
         builder.ins().return_(&[malformed]);
+        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
         let merged = self.finish_planned_join(
             builder,
             merge,

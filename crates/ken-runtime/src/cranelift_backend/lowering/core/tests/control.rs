@@ -65,6 +65,7 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
         active_join_site: None,
         oriented_subcontinuation_plan: None,
         consumed_subcontinuation_frames: BTreeSet::new(),
+        checked_frame_events: None,
         active_subcontinuation_frame: None,
         consumed_recursive_call_templates: BTreeSet::new(),
         pending_recursive_call: None,
@@ -250,6 +251,7 @@ fn run_px8j_malformed_recursor_consumer(
         active_join_site: None,
         oriented_subcontinuation_plan: None,
         consumed_subcontinuation_frames: BTreeSet::new(),
+        checked_frame_events: None,
         active_subcontinuation_frame: None,
         consumed_recursive_call_templates: BTreeSet::new(),
         pending_recursive_call: None,
@@ -827,34 +829,51 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
     compiler.root_terminal_authority = None;
     compiler.process_object = false;
     compiler.oriented_subcontinuation_plan = Some(plan);
+    let frame_scope = CheckedFrameFunctionScope::open(&mut compiler).expect("frame scope");
+    let mut func = Function::new();
+    func.signature.returns.push(AbiParam::new(types::I64));
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut func, &mut context);
+    let entry = builder.create_block();
+    builder.switch_to_block(entry);
+    builder.seal_block(entry);
 
     // First consume on the path succeeds.
     compiler
-        .enter_checked_subcontinuation_frame(frame_id)
+        .enter_checked_subcontinuation_frame(&builder, frame_id)
         .expect("first enter of the checked frame");
     assert_eq!(
         compiler
-            .consume_checked_subcontinuation_frame(&cases, &default)
+            .consume_checked_subcontinuation_frame(&builder, &cases, &default)
             .expect("first consume of the checked frame succeeds"),
         Some(frame_id)
     );
 
-    // A second enter + consume of the same frame on the same path rejects.
+    // The second activation follows a discharge, so E2 alone refuses at close.
     compiler
-        .enter_checked_subcontinuation_frame(frame_id)
+        .enter_checked_subcontinuation_frame(&builder, frame_id)
         .expect("second enter re-marks the active frame");
-    let err = compiler
-        .consume_checked_subcontinuation_frame(&cases, &default)
-        .expect_err("a same-path duplicate consume must reject before CFG");
+    compiler
+        .consume_checked_subcontinuation_frame(&builder, &cases, &default)
+        .expect("second consume is deferred until completed CFG validation");
+    let zero = builder.ins().iconst(types::I64, 0);
+    builder.ins().return_(&[zero]);
+    compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)
+        .expect("register normal return");
+    builder.finalize();
+    let err = frame_scope.close(&mut compiler, &func)
+        .expect_err("a same-path duplicate consume must reject at close");
     assert!(
         matches!(
             err,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "OrientedSubcontinuationPlanV1",
                 ref reason,
-            }) if reason.contains("consumed more than once")
+            }) if reason == &format!(
+                "checked Runtime frame violations: {{(0, {frame_id}): {{E2}}}}"
+            )
         ),
-        "expected 'consumed more than once', got {err:?}"
+        "expected exactly E2, got {err:?}"
     );
 }
 
@@ -2291,6 +2310,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         active_join_site: Some(41),
         oriented_subcontinuation_plan: None,
         consumed_subcontinuation_frames: BTreeSet::new(),
+        checked_frame_events: None,
         active_subcontinuation_frame: None,
         consumed_recursive_call_templates: BTreeSet::new(),
         pending_recursive_call: None,
