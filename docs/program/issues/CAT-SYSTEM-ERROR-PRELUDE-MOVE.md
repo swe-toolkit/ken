@@ -51,11 +51,11 @@ built-ins, and its two normative properties are proved in that package.
 ## Deliverable
 
 The eleven declarations move, unchanged in meaning, to a new catalog package
-whose module path is `System.Error` (the package location is the owner's call).
-The package proves the two §1.8 properties as checked theorems, not tests.
-The prelude registers none of the eleven, and its PX9 bracket goes with them.
-The package keeps the zero-trust property as its AC-1 row. Each reader imports the package or
-is re-keyed to its owned ids.
+whose module path is `System.Error` (the package location is the owner's
+call). The package proves the two §1.8 properties as checked theorems, not
+tests. The prelude registers none of the eleven, and its PX9 bracket goes
+with them; the package keeps the zero-trust property as its AC-1 row. Each
+reader imports the package or is re-keyed to its owned ids.
 
 ## Acceptance
 
