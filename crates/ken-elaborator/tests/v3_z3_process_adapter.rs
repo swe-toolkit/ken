@@ -1,7 +1,16 @@
 #![cfg(feature = "z3-process")]
 
 use std::{
-    fs, io::ErrorKind, os::unix::fs::PermissionsExt, path::Path, process::Command, time::Duration,
+    fs,
+    io::{ErrorKind, Read, Write},
+    os::{
+        fd::AsRawFd,
+        unix::{net::UnixStream, process::CommandExt},
+    },
+    path::Path,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 use ken_elaborator::{
@@ -16,9 +25,28 @@ use num_bigint::BigInt;
 use tempfile::TempDir;
 
 const STARTUP_SAFE_STUB_TIMEOUT: Duration = Duration::from_secs(5);
+const STUB_WRITER_READY_TIMEOUT: Duration = Duration::from_secs(5);
 // The delayed stub sleeps for one second and emits a valid refuting model;
 // this shorter deadline makes enforced timeout the only Unknown outcome.
 const DELIBERATE_TIMEOUT_PROBE: Duration = Duration::from_millis(100);
+const STUB_WRITER_SCRIPT: &str = r#"
+import os, sys
+
+temporary_path, path, contents, ready_path = sys.argv[1:]
+with open(temporary_path, "wb") as stub:
+    stub.write(contents.encode("utf-8"))
+    os.fchmod(stub.fileno(), 0o755)
+    with open(ready_path, "wb") as ready:
+        ready.write(b"open")
+    if sys.stdin.readline().strip() != "publish":
+        raise RuntimeError("parent did not release stub writer")
+os.replace(temporary_path, path)
+"#;
+
+extern "C" {
+    #[link_name = "write"]
+    fn raw_write(fd: i32, buf: *const u8, count: usize) -> isize;
+}
 
 fn equality(elab: &mut ElabEnv) -> ObligationTriple {
     let int_ty = Term::const_(elab.numeric_env.int_id, vec![]);
@@ -70,16 +98,105 @@ fn two_binder_equality(elab: &mut ElabEnv) -> ObligationTriple {
 }
 
 fn write_executable_stub(dir: &TempDir, name: &str, contents: &str) -> std::path::PathBuf {
+    write_executable_stub_inner(dir, name, contents, None)
+}
+
+fn write_executable_stub_inner(
+    dir: &TempDir,
+    name: &str,
+    contents: &str,
+    mut during_open: Option<&mut dyn FnMut()>,
+) -> std::path::PathBuf {
     let path = dir.path().join(name);
+    // Keep writable descriptors out of this multi-threaded test process: a
+    // sibling's fork would otherwise inherit the stub inode before rename.
     let temporary_path = dir.path().join(format!("{name}.tmp"));
-    fs::write(&temporary_path, contents).expect("write temporary stub");
-    let mut permissions = fs::metadata(&temporary_path)
-        .expect("temporary stub metadata")
-        .permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&temporary_path, permissions).expect("make temporary stub executable");
-    fs::rename(&temporary_path, &path).expect("publish stub atomically");
+    let ready_path = dir.path().join(format!("{name}.writer-ready"));
+    if let Err(error) = fs::remove_file(&ready_path) {
+        assert_eq!(error.kind(), ErrorKind::NotFound);
+    }
+
+    let mut writer = Command::new("/usr/bin/python3")
+        .args(["-c", STUB_WRITER_SCRIPT])
+        .arg(&temporary_path)
+        .arg(&path)
+        .arg(contents)
+        .arg(&ready_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn isolated stub writer");
+    let mut writer_stdin = writer.stdin.take().expect("stub writer stdin");
+
+    let started = Instant::now();
+    while !ready_path.exists() {
+        assert!(
+            started.elapsed() < STUB_WRITER_READY_TIMEOUT,
+            "isolated stub writer did not open its temporary file"
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
+
+    let hook_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if let Some(hook) = during_open.as_mut() {
+            (*hook)();
+        }
+    }));
+    writer_stdin
+        .write_all(b"publish\n")
+        .expect("release isolated stub writer");
+    drop(writer_stdin);
+    let output = writer
+        .wait_with_output()
+        .expect("wait for isolated stub writer");
+    assert!(
+        output.status.success(),
+        "isolated stub writer failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    fs::remove_file(&ready_path).expect("remove stub-writer ready marker");
+    if let Err(panic) = hook_result {
+        std::panic::resume_unwind(panic);
+    }
     path
+}
+
+fn spawn_fork_blocker() -> thread::JoinHandle<()> {
+    let (mut parent_signal, child_signal) = UnixStream::pair().expect("fork marker pipe");
+    let signal_fd = child_signal.as_raw_fd();
+    let blocker = thread::spawn(move || {
+        let _keep_signal_fd_open = child_signal;
+        let mut command = Command::new("/bin/true");
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        unsafe {
+            command.pre_exec(move || {
+                let marker = b"F";
+                let written = raw_write(signal_fd, marker.as_ptr(), marker.len());
+                if written != marker.len() as isize {
+                    return Err(std::io::Error::last_os_error());
+                }
+                thread::sleep(Duration::from_secs(2));
+                Ok(())
+            });
+        }
+        let mut child = command.spawn().expect("spawn fork-inheritance blocker");
+        assert!(
+            child
+                .wait()
+                .expect("wait for fork-inheritance blocker")
+                .success(),
+            "fork-inheritance blocker failed"
+        );
+    });
+    let mut marker = [0];
+    parent_signal
+        .read_exact(&mut marker)
+        .expect("blocker reached pre-exec after fork");
+    blocker
 }
 
 fn stub(dir: &TempDir, body: &str) -> Z3ProcessConfig {
@@ -117,6 +234,45 @@ fn assert_unknown(config: Z3ProcessConfig) {
     let after = elab.env.trusted_base();
     assert_eq!(after.len(), before + 1);
     assert!(after.contains(&hole_id));
+}
+
+/// Promise class: durable process-isolation invariant.
+///
+/// MEASURED: while the stub writer subprocess holds its temporary file open, a
+/// sibling child forks and pauses before exec; after publication, the adapter
+/// reaches Disproved. CLAIMED: that fork cannot inherit the writer descriptor.
+/// THE GAP: the writer subprocess, rather than the test process, owns the fd.
+#[test]
+fn sibling_fork_during_stub_write_does_not_inherit_writer_descriptor() {
+    let dir = TempDir::new().expect("stub directory");
+    let mut elab = ElabEnv::new().expect("numeric environment");
+    let obligation = equality(&mut elab);
+    let contents = "#!/bin/sh\ncat >/dev/null\nprintf 'sat\\n((k0 1))\\n'\n";
+    let mut blocker = None;
+    let path = {
+        let mut fork_while_open = || blocker = Some(spawn_fork_blocker());
+        write_executable_stub_inner(&dir, "z3-fork-stub", contents, Some(&mut fork_while_open))
+    };
+    let blocker = blocker.expect("fork blocker started in the writer-open window");
+    let config = Z3ProcessConfig {
+        program: path.clone(),
+        timeout: STARTUP_SAFE_STUB_TIMEOUT,
+    };
+    let before = elab.env.trusted_base().len();
+    let started = Instant::now();
+    let verdict = attempt_d_with_z3_process(&mut elab.env, &obligation, &config);
+    let adapter_elapsed = started.elapsed();
+    let direct_probe = Command::new(&path).args(["-in", "-smt2"]).output();
+    blocker.join().expect("fork blocker thread");
+
+    assert!(
+        matches!(&verdict, Verdict::Disproved { .. }),
+        "published stub should execute after sibling fork; verdict={verdict:?}; elapsed={adapter_elapsed:?}; direct probe={direct_probe:?}"
+    );
+    assert_eq!(elab.env.trusted_base().len(), before);
+    let output = direct_probe.expect("direct spawn of published stub");
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "sat\n((k0 1))\n");
 }
 
 /// Promise class: durable soundness invariant.
