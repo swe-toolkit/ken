@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-SOURCE-CENSUS-RETIRE
 title: "Retire the backend's source-text census family in core/tests/control.rs: the five consumers of BACKEND_PRODUCTION_SOURCES assert facts about Rust source text, so any behaviour-neutral module addition reddens them; replace each with its named behavioural control or retire it to Architect review, per the Architect's per-consumer ruling"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -103,3 +103,22 @@ Owned by Architect review, not by any test (`evt_170pr1hbj2e8s`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, or the parked
   `wp/RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE`. `wp/RT-FRAME-MARKER-ONCE` is
   in review: do not move it here.
+
+## Closeout
+
+Landed `43015b699` (PR #4359; candidate `df9147cfe`; Runtime QA
+`evt_2skwxxhjgh4hp`, Architect APPROVE and Decision `dec_5wbqe9tzq5p1e`).
+Test only, one path, no production change.
+- `BACKEND_PRODUCTION_SOURCES` and its five consumers are deleted.
+- A became `compiled_module_declarations_account_for_every_fixture_emitter`.
+  It compiles the `host_call_carrier.rs` fixtures and a multi-unit program
+  with seed material through the real backend, and accounts for every Local
+  or Export definition in `ModuleDeclarations`. Imports are listed apart.
+- D is carried by the planner's controls (b) and (c). B, C and E retired.
+- Controls: an empty production `mod` leaves `ken-runtime` green. An extra
+  Local emitter and an unused extra declaration each redden A's replacement.
+  Entry-keyed body selection reddens (b), and filing by entry reddens (c).
+- Residuals are the three Limitations above, owned by Architect review.
+- The Architect noted other `include_str!` source-text oracles outside this
+  family (`evt_4zwm5v35gnk7j`). They are not in scope here.
+- `RT-FRAME-MARKER-ONCE` is unblocked: it rebases and drops its census row.
