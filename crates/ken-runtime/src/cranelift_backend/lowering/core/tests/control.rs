@@ -2952,103 +2952,10 @@ fn compiled_module_inventory_reports_an_unused_local_declaration() {
 #[cfg(test)]
 /// **Every production source carrying an `impl Lowering` block.**
 ///
-/// ⛔ `core.rs` alone is NOT the routing surface, and assuming it was is the
-/// defect this constant exists to prevent: `lowering/mod.rs:2473` carries a
-/// **second** `impl<'a> Lowering<'a>` block. A retained-body route added there
-/// would have sat entirely outside a `core.rs`-scoped inventory.
-///
-/// ⛔ **An earlier revision of this comment continued: *"today `mod.rs` cannot
-/// reach `retained_body_occurrence` … that privacy is therefore load-bearing …
-/// this list is what makes the inventory still correct after a deliberate
-/// widening."* That is the REACHABILITY entailment the Architect ruling
-/// (`evt_5yxjd1zqnyvcq`) struck, and it is withdrawn here too.**
-///
-/// The list is now a **declaration inventory only**: it names the files that
-/// carry an `impl Lowering` block, so a declaration appearing in a second one is
-/// *visible*. It supports no claim about who can **call** anything — that is the
-/// plan graph's to answer, via an occurrence's `SemanticOwner` and the planned
-/// edge kind.
-const LOWERING_IMPL_SOURCES: &[(&str, &str)] = &[
-    ("lowering/core.rs", include_str!("../../core.rs")),
-    ("lowering/mod.rs", include_str!("../../mod.rs")),
-];
-
-/// Is the retained-body helper exposed only to the `lowering` parent and its
-/// children?
-///
-/// `B2F` deliberately moved unit emission into sibling `units.rs`, so the
-/// narrow `pub(super)` qualifier is now required. Any wider qualifier remains
-/// a review-visible change.
-fn retained_body_helper_has_lowering_only_visibility(core: &str) -> bool {
-    core.lines()
-        .any(|line| line.trim() == "pub(super) fn retained_body_occurrence(")
-}
-
-/// **`RT-FNSPLIT-B2O` `AC-12` split row — the DECLARATION survives, the
-/// REACHABILITY entailment does not.** Architect ruling `evt_5yxjd1zqnyvcq`.
-///
-/// This pin is what remains of the withdrawn route oracle, and the boundary is
-/// the point of it:
-///
-/// - **MEASURED:** `retained_body_occurrence` is declared in `lowering/core.rs`
-///   with the narrow `pub(super)` visibility needed by sibling `units.rs`.
-/// - **CLAIMED:** exactly that, and nothing further.
-/// - **THE GAP:** ⛔ this does **not** establish which functions can *reach* the
-///   helper. The withdrawn oracle made that inference — *"`mod.rs` therefore
-///   cannot reach it, so the route inventory is still correct"* — and
-///   reachability is not a property of declaration text. Name resolution, macro
-///   expansion, and indirect calls all sit outside what any source scan sees.
-///
-/// ⇒ **The authority for boundaries is the plan graph** — an occurrence's
-/// `StaticOriginId`, its validated `SemanticOwner`, and the planned edge kind —
-/// **not this file's text.** A Rust wrapper or a same-named method in another
-/// `impl` creates no Ken function-unit boundary, so no pin here should redden
-/// when one is added; see `b2o_ac10c_repointing_a_static_body_edge_changes_the_
-/// disposition` for the axis that *is* authority.
-///
-/// Promise class: **normative compatibility vector** — `pub(super)` is the
-/// contract, and widening it further is a deliberate review event.
-#[test]
-fn the_retained_body_helper_is_visible_only_inside_lowering() {
-    let core = LOWERING_IMPL_SOURCES
-        .iter()
-        .find(|(file, _)| *file == "lowering/core.rs")
-        .map(|(_, source)| *source)
-        .expect("the impl-source list must carry core.rs");
-    assert!(
-        retained_body_helper_has_lowering_only_visibility(core),
-        "`retained_body_occurrence` no longer declares with the exact narrow \
-         `pub(super)` visibility in `lowering/core.rs`.\n\
-         A wider qualifier is a DELIBERATE widening and belongs in review.\n\
-         ⚠ This pin makes NO claim about who can reach the helper; that is the \
-         plan graph's to answer, not this file's."
-    );
-
-    // The helper is declared in exactly one of the `impl Lowering` sources. This
-    // is a DECLARATION inventory over both files -- it says where the helper is
-    // written, never who can call it.
-    let declaring = LOWERING_IMPL_SOURCES
-        .iter()
-        .filter(|(_, source)| retained_body_helper_has_lowering_only_visibility(source))
-        .map(|(file, _)| *file)
-        .collect::<Vec<_>>();
-    assert_eq!(
-        declaring,
-        vec!["lowering/core.rs"],
-        "the retained-body helper's DECLARING file set changed. ⚠ A declaration \
-         in a second `impl Lowering` source is a review event; this pin reports \
-         it and draws no conclusion about reachability."
-    );
-
-    // Non-vacuity: the needles must be real files, or both assertions above are
-    // satisfied by an empty read.
-    for (file, source) in LOWERING_IMPL_SOURCES {
-        assert!(
-            source.len() > 10_000,
-            "`{file}` did not load; the assertions above would pass vacuously"
-        );
-    }
-}
+// Retired under `TEST-SOURCE-TEXT-ORACLE-RETIRE` AC-0 item 3: visibility of
+// `retained_body_occurrence` is Architect-review-owned; no compiler visibility
+// control is appropriate for this in-crate `pub(super)` boundary. See
+// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`.
 
 pub(super) fn identifier_occurrences(source: &str, identifier: &str) -> usize {
     source

@@ -1220,37 +1220,109 @@ mod tests {
             .expect("the declaration occurrence resolves its scrutinee position");
     }
 
-    /// **AC-12 — every semantic child position consumes `.occurrence`.**
+    /// Both planner seed paths preserve the identity-to-child association.
+    /// The ordinary Record goes through `expression_node`; the
+    /// ComputationalMatch occurrence is recorded by the separate
+    /// `expression_seed` path on its resume node.
     ///
-    /// Pinned at the type rather than by auditing call sites: both seed entry
-    /// points take `&[StaticOriginId]`, and `StaticOriginId` can only be formed
-    /// by `origin_of` inside this module, so a `StaticNodeId` cannot reach a
-    /// child position at all.
+    /// Promise class: durable invariant. Reordering or adding unrelated
+    /// children preserves the contract; swapping a parent's distinct child
+    /// associations must fail.
+    ///
+    /// MEASURED: each real plan exposes distinct child origins that resolve to
+    /// the corresponding source children through `source_occurrence`.
+    /// CLAIMED: the semantic seed paths retain occurrence identity at each
+    /// child position rather than conflating it with a scheduling node.
+    /// THE GAP: this exercises ordinary Record and ComputationalMatch shapes;
+    /// other source forms share the planner's seed machinery but are not
+    /// individually enumerated here.
     #[test]
-    fn the_semantic_seed_api_accepts_only_occurrence_origins() {
-        // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — `expression_node` and
-        // `expression_seed` moved into `construction.rs` with the rest of
-        // `Planner`'s own impl; this oracle follows them.
-        let source = include_str!("../static_transition/construction.rs");
-        // ⚠ Count DECLARATION lines, not substring hits: this test's own
-        // assertion text mentions both spellings, and a substring oracle would
-        // fire on the prose that denies them.
-        let declarations = source
-            .lines()
-            .filter(|line| line.trim() == "children: &[StaticOriginId],")
-            .count();
-        assert_eq!(
-            declarations, 2,
-            "AC-12: `expression_node` and `expression_seed` must both take \
-             occurrence origins; a `&[StaticNodeId]` parameter here is the exact \
-             conflation this parameter type exists to prevent"
+    fn semantic_seed_paths_preserve_distinct_child_origins() {
+        let ordinary = RuntimeExpr::Record {
+            fields: vec![
+                (
+                    "left".to_string(),
+                    RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::SeedChildren::Left".to_string(),
+                        args: Vec::new(),
+                    },
+                ),
+                (
+                    "right".to_string(),
+                    RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::SeedChildren::Right".to_string(),
+                        args: Vec::new(),
+                    },
+                ),
+            ],
+        };
+        let ordinary_plan =
+            plan_static_transition_graph(&ordinary, &BTreeMap::new()).expect("Record plans");
+        let ordinary_root = ordinary_plan.root_static_origin().expect("Record root");
+        let ordinary_children = ordinary_plan
+            .semantic
+            .child_origins(ordinary_root)
+            .expect("Record child origins");
+        assert_eq!(ordinary_children.len(), 2);
+        assert_ne!(ordinary_children[0], ordinary_children[1]);
+        assert!(matches!(
+            ordinary_plan.source_occurrence(ordinary_children[0]).unwrap(),
+            RuntimeExpr::Construct { constructor, args }
+                if constructor == "ctor:fixture::SeedChildren::Left" && args.is_empty()
+        ));
+        assert!(matches!(
+            ordinary_plan.source_occurrence(ordinary_children[1]).unwrap(),
+            RuntimeExpr::Construct { constructor, args }
+                if constructor == "ctor:fixture::SeedChildren::Right" && args.is_empty()
+        ));
+
+        let computational = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::SeedChildren::Scrutinee".to_string(),
+                args: Vec::new(),
+            }),
+            cases: vec![crate::RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::SeedChildren::Case".to_string(),
+                argument_binders: 0,
+                recursive_positions: Vec::new(),
+                body: RuntimeExpr::Value(RuntimeValue::Bool(true)),
+            }],
+            default: trap("seed-child origin default"),
+        };
+        let computational_plan = plan_static_transition_graph(&computational, &BTreeMap::new())
+            .expect("ComputationalMatch plans");
+        let computational_root = computational_plan
+            .root_static_origin()
+            .expect("ComputationalMatch occurrence");
+        assert_ne!(
+            computational_root,
+            origin_of(
+                *computational_plan
+                    .entries
+                    .first()
+                    .expect("scheduling entry")
+            ),
+            "the ComputationalMatch occurrence is distinct from its scheduling entry"
         );
-        assert!(
-            !source
-                .lines()
-                .any(|line| line.trim() == "children: &[StaticNodeId],"),
-            "AC-12: no semantic child list may be typed as scheduling nodes"
-        );
+        let computational_children = computational_plan
+            .semantic
+            .child_origins(computational_root)
+            .expect("ComputationalMatch child origins");
+        assert_eq!(computational_children.len(), 2);
+        assert_ne!(computational_children[0], computational_children[1]);
+        assert!(matches!(
+            computational_plan
+                .source_occurrence(computational_children[0])
+                .unwrap(),
+            RuntimeExpr::Construct { constructor, args }
+                if constructor == "ctor:fixture::SeedChildren::Scrutinee" && args.is_empty()
+        ));
+        assert!(matches!(
+            computational_plan
+                .source_occurrence(computational_children[1])
+                .unwrap(),
+            RuntimeExpr::Value(RuntimeValue::Bool(true))
+        ));
     }
 
     /// MEASURED: equal case spellings at two distinct Match occurrences retain

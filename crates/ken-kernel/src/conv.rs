@@ -64,6 +64,14 @@ pub fn whnf(env: &GlobalEnv, ctx: &Context, t: &Term) -> Term {
     whnf_progress(env, ctx, t).0
 }
 
+/// Conversion's first pass: reduce β/ι/etc. but leave a transparent global
+/// application folded at the head, so congruence can inspect its spine first.
+/// Nested reductions (scrutinees, projections, observation types) still use
+/// the ordinary, eager-δ [`whnf_progress`].
+fn whnf_defer_head_delta(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgress) {
+    whnf_progress_mode(env, ctx, t, true)
+}
+
 /// The sole weak-head reducer, additionally reporting [`WhnfProgress`]. The
 /// reduced `Term` is exactly what the historical `whnf` produced; the only
 /// addition is the `iota` flag — set iff an `iota_reduct` was successfully
@@ -74,12 +82,24 @@ pub fn whnf(env: &GlobalEnv, ctx: &Context, t: &Term) -> Term {
 /// context); K1's head reduction does not consult it, hence the allow.
 #[allow(clippy::only_used_in_recursion)]
 fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgress) {
+    whnf_progress_mode(env, ctx, t, false)
+}
+
+/// `defer_head_delta` applies along the function spine only. All non-head
+/// reductions call [`whnf_progress`] and retain ordinary eager δ.
+#[allow(clippy::only_used_in_recursion)]
+fn whnf_progress_mode(
+    env: &GlobalEnv,
+    ctx: &Context,
+    t: &Term,
+    defer_head_delta: bool,
+) -> (Term, WhnfProgress) {
     let mut cur = t.clone();
     let mut iota = false;
     loop {
         match &cur {
             Term::App(f, a) => {
-                let (f_w, fp) = whnf_progress(env, ctx, f);
+                let (f_w, fp) = whnf_progress_mode(env, ctx, f, defer_head_delta);
                 iota |= fp.iota;
                 // K3: only the registered String -> List Char operation on
                 // an immutable checked String literal. No other primitive
@@ -130,7 +150,9 @@ fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgres
                         cur = subst0(body, a);
                         continue;
                     }
-                    Term::Const { id, level_args } if env.transparent_body(*id).is_some() => {
+                    Term::Const { id, level_args }
+                        if !defer_head_delta && env.transparent_body(*id).is_some() =>
+                    {
                         if let Some(body) = unfold_const(env, *id, level_args) {
                             cur = Term::app(body, (**a).clone());
                             continue;
@@ -192,9 +214,9 @@ fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgres
                 if let Term::Constructor { id, .. } = head {
                     if let Some((ind, k)) = env.constructor(id) {
                         if ind.id == *fam {
-                            if let Ok(reduct) =
-                                iota_reduct(env, ind, k, level_args, params, motive, methods, &all_args)
-                            {
+                            if let Ok(reduct) = iota_reduct(
+                                env, ind, k, level_args, params, motive, methods, &all_args,
+                            ) {
                                 // The sole ι-progress site (`14 §7.2`).
                                 iota = true;
                                 probe_iota();
@@ -219,7 +241,9 @@ fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgres
                     WhnfProgress { iota },
                 );
             }
-            Term::Const { id, level_args } if env.transparent_body(*id).is_some() => {
+            Term::Const { id, level_args }
+                if !defer_head_delta && env.transparent_body(*id).is_some() =>
+            {
                 if let Some(body) = unfold_const(env, *id, level_args) {
                     cur = body;
                     continue;
@@ -433,39 +457,28 @@ fn is_omega_type(env: &GlobalEnv, ctx: &Context, ty: &Term) -> bool {
 
 // ===== Path-local no-progress δ-origin ledger (recursive-head totality) =====
 //
-// `convert`/`convert_type` on two DISTINCT transparent recursive definitions
-// can δ-unfold forever: each side unfolds to a body still headed by its own
-// recursive `Const`, and when the recursion's eliminator sits on a neutral
-// scrutinee no ι ever fires to bottom the unfolding out. The SCT gate certifies
-// each definition's OWN δ-termination, but not the lock-step structural
-// comparison of two distinct ones — that is the gap this ledger closes
-// (`d0_distinct_recursive_map_*`).
+// At each structural edge, first weak-head reduce while deferring δ at the
+// head (`17 §3.3`, §3.5). Equal transparent heads can compare their argument
+// spines without unfolding. If congruence fails, or the heads differ, full δ
+// is retried. The retry's origin is a canonical pair of transparent heads,
+// including (c, c): the same head can reappear after β has exposed a fresh
+// symbolic recursive call. One no-progress lap is allowed. On a recurring
+// origin with no head ι-progress, return false before comparing another copy.
+// A real ι-step discharges the pair for descendants. This only refuses
+// previously nonterminating comparisons, never concludes equality from a
+// cyclic hypothesis. Each edge either descends on a proper subterm of its
+// deferred-whnf inputs or retries δ at an origin pair; a pair may recur only
+// after ι-progress. A closed-scrutinee ι loop remains a known residual.
 //
-// The guard, applied at each structural conversion edge: BEFORE whnf, note the
-// canonical unordered pair of the two sides' DISTINCT transparent-`Const`
-// application heads, and thread that observation down the private recursion. If
-// a side's whnf makes real ι-progress the pair is discharged for descendants
-// (genuine reduction — SCT bounds it); otherwise the first sighting of a pair
-// is recorded and one structural lap is allowed, and a SECOND sighting of the
-// SAME pair with still no ι-progress returns `false` — the two heads are
-// looping without converging, so they are not definitionally equal. Refusing is
-// fail-closed: it can only under-accept (a completeness boundary), never admit
-// a false equality, so it cannot weaken the trust root. Public signatures are
-// unchanged and start from an empty ledger.
-//
-// Governing spec: `17 §3.5` "Distinct recursive-identity boundary" (a `GlobalId`
-// is a declaration's identity; conversion MUST halt with `false` where two
-// distinct self `GlobalId`s meet beneath a stuck eliminator, and MUST NOT keep
-// unfolding to recreate the comparison on a fresh neutral argument) and `17 §5`
-// obligation 3 (cross-identity symbolic retry is NOT an SCT-certified call
-// sequence — SCT (§4) bounds re-entry within ONE admitted group, not the
-// lock-step comparison of two). This mechanism realises that boundary. The
-// black-box conformance twin is
-// `conformance/kernel/conversion/seed-conversion.md`,
-// `delta-distinct-recursive-heads-stuck` (promise class: durable invariant).
+// Governing spec: `17 §3.3` step (5) and `17 §3.5` require head-δ deferral
+// before congruence; the distinct-identity boundary also forbids unbounded
+// cross-identity symbolic retries. SCT (`17 §4`) certifies each admitted
+// recursive group, not a lock-step comparison of different groups. The
+// black-box twin is `conformance/kernel/conversion/seed-conversion.md`,
+// `delta-distinct-recursive-heads-stuck` (durable invariant).
 
-/// A canonical unordered pair of two DISTINCT transparent-`Const` GlobalIds —
-/// the δ-origin of a structural conversion edge.
+/// A canonical unordered pair of transparent-`Const` GlobalIds (possibly
+/// equal) at a δ retry; the origin of a structural conversion edge.
 type ConstPair = (GlobalId, GlobalId);
 
 /// Canonicalise so `(x, y)` and `(y, x)` denote the same δ-origin.
@@ -477,20 +490,20 @@ fn canonical_pair(x: GlobalId, y: GlobalId) -> ConstPair {
     }
 }
 
-/// The pre-whnf δ-origin of a structural edge: `Some((min, max))` iff both
-/// sides are (possibly nullary) applications whose heads are DISTINCT
-/// transparent `Const`s. Same-`Const` heads are closed by the spine fast path
-/// and are never a divergence origin, so they are excluded here; an opaque /
-/// primitive / inductive head (no δ) cannot drive the unfold loop and is
-/// likewise excluded.
+/// The deferred-whnf δ-origin of a structural retry: `Some((min, max))`
+/// iff both sides are applications (possibly nullary) headed by transparent
+/// constants. Equal heads are included when their spine comparison failed.
+/// An opaque, primitive or inductive head has no δ-retry pair.
+fn is_transparent(env: &GlobalEnv, id: GlobalId) -> bool {
+    matches!(env.lookup(id), Some(crate::env::Decl::Transparent { .. }))
+}
+
 fn delta_origin_pair(env: &GlobalEnv, a: &Term, b: &Term) -> Option<ConstPair> {
     let (ha, _) = peel_app(a);
     let (hb, _) = peel_app(b);
     match (&ha, &hb) {
         (Term::Const { id: ia, .. }, Term::Const { id: ib, .. })
-            if ia != ib
-                && env.transparent_body(*ia).is_some()
-                && env.transparent_body(*ib).is_some() =>
+            if is_transparent(env, *ia) && is_transparent(env, *ib) =>
         {
             Some(canonical_pair(*ia, *ib))
         }
@@ -499,7 +512,7 @@ fn delta_origin_pair(env: &GlobalEnv, a: &Term, b: &Term) -> Option<ConstPair> {
 }
 
 /// Test-only observation of the δ-ledger events — a reached δ unfold (the
-/// causal count, at the `unfold_const` edge), pre-whnf distinct-head capture, a
+/// causal count, at the `unfold_const` edge), deferred-head retry capture, a
 /// successful ι-reduction, and a refusal. Compiled to nothing outside
 /// `cfg(test)`, so the production conversion path carries zero instrumentation.
 #[cfg(test)]
@@ -586,8 +599,8 @@ fn probe_refusal() {}
 /// changing the signature (`13 §6.3`). K2 adds the Ω-PI shortcut (`16 §8.2`).
 ///
 /// The path-local no-progress δ-origin ledger (empty here at the public entry)
-/// is threaded through the private recursion to keep conversion total on
-/// distinct recursive transparent heads; see [`conv_struct_path`].
+/// is threaded through the private recursion to bound no-progress δ retries;
+/// see [`conv_struct_path`].
 pub fn convert(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term) -> bool {
     convert_path(env, ctx, ty, a, b, &[])
 }
@@ -670,60 +683,88 @@ pub fn convert_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> bool 
 /// structurally, recursing. Used when the type is not Π/Σ (`13 §6.2` step 4
 /// and the congruence closure).
 ///
-/// `path` is the path-local no-progress δ-origin ledger. At this edge we
-/// capture the pre-whnf δ-origin pair (distinct transparent-`Const` heads),
-/// whnf both sides tracking ι-progress, and either discharge the pair (real
-/// ι-progress), record a first sighting (one lap allowed), or refuse a
-/// recurring no-progress pair — before recursing structurally with the ledger
-/// the descendants inherit.
-fn conv_struct_path(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term, path: &[ConstPair]) -> bool {
+/// `path` is the path-local no-progress δ-origin ledger. Reduce both sides
+/// with head δ deferred first. Compare same transparent heads by congruence;
+/// otherwise retry full δ if a head is transparent, and record the pair of
+/// deferred transparent heads (including equal heads) on the retry. Head
+/// ι-progress discharges the pair; recurring no-progress retries refuse
+/// before another structural copy is compared.
+fn conv_struct_path(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a: &Term,
+    b: &Term,
+    path: &[ConstPair],
+) -> bool {
     // Syntactic-identity fast path (pre-δ, `13 §6.2` step 1): identical
     // de Bruijn terms are convertible with no reduction and no ledger touch.
     if a == b {
         return true;
     }
 
-    // Congruence-first / lazy-δ fast path (`obs-eq-termination`): `whnf`
-    // below unconditionally δ-unfolds a transparent head `Const` before any
-    // congruence dispatch runs. When both sides are ALREADY (pre-whnf) an
-    // application of the SAME constant to the SAME number of arguments,
-    // try congruence on the argument spine FIRST, without ever unfolding
-    // the head — application congruence for a deterministic function is
-    // always sound regardless of whether its body would normalize, and
-    // this avoids manufacturing an ever-deeper unfolded form when the
-    // constant is itself recursive and its scrutinee is neutral (so ι never
-    // fires to bottom out the δ-unfold). Falls through to the existing
-    // whnf-based path, completely unchanged, whenever this doesn't apply or
-    // any argument fails to convert (fallback preserves completeness: a
-    // constant that ignores an argument, or two constants that only agree
-    // after unfolding, still get the full treatment below). Same-`Const`
-    // heads are never a divergence origin, so this path does not capture.
-    if let (Term::Const { id: id1, level_args: la1 }, args1) = peel_app(a) {
-        if let (Term::Const { id: id2, level_args: la2 }, args2) = peel_app(b) {
-            if id1 == id2
-                && level_args_eq(&la1, &la2)
-                && args1.len() == args2.len()
-                && args1
-                    .iter()
-                    .zip(args2.iter())
-                    .all(|(x, y)| conv_struct_path(env, ctx, x, y, path))
-            {
-                return true;
-            }
+    let (a_deferred, ad) = whnf_defer_head_delta(env, ctx, a);
+    let (b_deferred, bd) = whnf_defer_head_delta(env, ctx, b);
+    if a_deferred == b_deferred {
+        return true;
+    }
+
+    // Head identity is observed AFTER β/let/ascription reduction. A head
+    // hidden under β in the source is just as eligible for spine congruence
+    // as one visible before weak-head reduction. A failed spine comparison
+    // falls through to δ retry (e.g. a constant ignoring that argument).
+    let (ha, args_a) = peel_app(&a_deferred);
+    let (hb, args_b) = peel_app(&b_deferred);
+    if let (
+        Term::Const {
+            id: ia,
+            level_args: la,
+        },
+        Term::Const {
+            id: ib,
+            level_args: lb,
+        },
+    ) = (&ha, &hb)
+    {
+        if ia == ib
+            && is_transparent(env, *ia)
+            && level_args_eq(la, lb)
+            && args_a.len() == args_b.len()
+            && args_a
+                .iter()
+                .zip(&args_b)
+                .all(|(x, y)| conv_struct_path(env, ctx, x, y, path))
+        {
+            return true;
         }
     }
 
-    // δ-origin capture (BEFORE whnf): the canonical pair of DISTINCT
-    // transparent-`Const` application heads, if the edge has one. This is the
-    // pre-whnf observation the no-progress guard is keyed on.
-    let origin = delta_origin_pair(env, a, b);
+    // The ledger's origin belongs to the deferred plane, which reveals a
+    // transparent head even if β hid it in the original terms. Same-head
+    // retries are recorded too: a failed spine can recur one binder deeper.
+    let transparent_head = |head: &Term| match head {
+        Term::Const { id, .. } => is_transparent(env, *id),
+        _ => false,
+    };
+    let retry = transparent_head(&ha) || transparent_head(&hb);
+    let origin = if retry {
+        delta_origin_pair(env, &a_deferred, &b_deferred)
+    } else {
+        None
+    };
     if origin.is_some() {
         probe_capture();
     }
-
-    let (a, ap) = whnf_progress(env, ctx, a);
-    let (b, bp) = whnf_progress(env, ctx, b);
-    let iota_progress = ap.iota || bp.iota;
+    let (a, ap) = if retry {
+        whnf_progress(env, ctx, &a_deferred)
+    } else {
+        (a_deferred, WhnfProgress::default())
+    };
+    let (b, bp) = if retry {
+        whnf_progress(env, ctx, &b_deferred)
+    } else {
+        (b_deferred, WhnfProgress::default())
+    };
+    let iota_progress = ad.iota || bd.iota || ap.iota || bp.iota;
 
     if a == b {
         return true;
@@ -1484,7 +1525,9 @@ mod tests {
     // each checked well-typed by `assert_typed` before conversion. This is
     // authored traceability, not an executable scan of repository text.
 
-    use crate::check::{declare_def, declare_inductive, declare_recursive_group, CtorSpec, InductiveSpec};
+    use crate::check::{
+        declare_def, declare_inductive, declare_recursive_group, CtorSpec, InductiveSpec,
+    };
 
     const LU: LevelVar = LevelVar(0);
 
@@ -1578,7 +1621,10 @@ mod tests {
         // The self/delegated recursion on the tail (`rec_target A B f xs`).
         let rec_call = Term::app(
             Term::app(
-                Term::app(Term::app(cref_at(rec_target, lu()), Term::var(6)), Term::var(5)),
+                Term::app(
+                    Term::app(cref_at(rec_target, lu()), Term::var(6)),
+                    Term::var(5),
+                ),
                 Term::var(4),
             ),
             Term::var(1),
@@ -1662,8 +1708,13 @@ mod tests {
         target: GlobalId,
     ) -> GlobalId {
         let ty = map_type(list);
-        declare_def(env, vec![LU], ty, map_body_gen(list, nil, cons, target, false))
-            .expect("delegating map admission")
+        declare_def(
+            env,
+            vec![LU],
+            ty,
+            map_body_gen(list, nil, cons, target, false),
+        )
+        .expect("delegating map admission")
     }
 
     /// `Nil` at element-type `ty`, monomorphic at level 0.
@@ -1776,7 +1827,13 @@ mod tests {
         let not = declare_not(&mut env, bool_id, false_id, true_id);
         let bt = bool_ty(bool_id);
         let ctx = Context::new();
-        let a = map_apply(map_f, bt.clone(), bt.clone(), cref0(not), nil_val(nil, bt.clone()));
+        let a = map_apply(
+            map_f,
+            bt.clone(),
+            bt.clone(),
+            cref0(not),
+            nil_val(nil, bt.clone()),
+        );
         // Same spine (same `map_f`, same `not`), differing only in the list
         // argument by a type ASCRIPTION — convertible via the ascription arm
         // (α/strip, no δ), and both well-typed. This keeps the pair off the raw
@@ -1799,10 +1856,191 @@ mod tests {
         assert_eq!(
             delta_probe::captures(),
             0,
-            "same-Const spine captures no distinct-head δ-origin"
+            "successful same-Const spine captures no δ-retry origin"
         );
         assert_eq!(delta_probe::iotas(), 0, "case 2 performs no ι reduction");
         assert_eq!(delta_probe::refusals(), 0);
+    }
+
+    /// Durable invariant (`17 §3.3`, §3.5): β can reveal the same recursive
+    /// head after the old pre-whnf spine check. Compare its arguments before
+    /// unfolding δ; this is the closed-Nil instance of the public conversion
+    /// path, not a source-shape assertion.
+    #[test]
+    fn beta_reveals_same_head_and_spine_converts_without_delta() {
+        let mut env = GlobalEnv::new();
+        let (list, nil, cons) = declare_list(&mut env);
+        let map = declare_map(&mut env, list, nil, cons);
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let not = declare_not(&mut env, bool_id, false_id, true_id);
+        let bt = bool_ty(bool_id);
+        let list_bool = list_at(list, zero(), bt.clone());
+        let original = map_apply(map, bt.clone(), bt.clone(), cref0(not), nil_val(nil, bt));
+        let beta_hidden = Term::app(
+            Term::Ascript(
+                Box::new(Term::lam(list_bool.clone(), Term::var(0))),
+                Box::new(Term::pi(list_bool.clone(), list_bool.clone())),
+            ),
+            original.clone(),
+        );
+        let ascribed = Term::Ascript(Box::new(original), Box::new(list_bool));
+        let ctx = Context::new();
+        assert_typed(&env, &ctx, &beta_hidden);
+        assert_typed(&env, &ctx, &ascribed);
+        delta_probe::reset();
+        assert!(convert_type(&env, &ctx, &beta_hidden, &ascribed));
+        assert_eq!(
+            delta_probe::unfolds(),
+            0,
+            "β-revealed shared head must retain δ deferral"
+        );
+        assert_eq!(delta_probe::refusals(), 0);
+    }
+
+    /// Deferred δ applies only at the outer head: a transparent function
+    /// inside an ι scrutinee must still unfold and expose its constructor.
+    #[test]
+    fn deferred_outer_head_keeps_full_delta_in_eliminator_scrutinee() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let not = declare_not(&mut env, bool_id, false_id, true_id);
+        let bt = bool_ty(bool_id);
+        let motive = Term::Ascript(
+            Box::new(Term::lam(bt.clone(), bt.clone())),
+            Box::new(Term::pi(bt.clone(), Term::Type(Level::zero()))),
+        );
+        let scrut = Term::app(cref0(not), bool_ctor(true_id));
+        let elim = Term::Elim {
+            fam: bool_id,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(motive),
+            methods: vec![bool_ctor(true_id), bool_ctor(false_id)],
+            indices: vec![],
+            scrut: Box::new(scrut),
+        };
+        let ctx = Context::new();
+        assert_typed(&env, &ctx, &elim);
+        delta_probe::reset();
+        let (reduced, progress) = whnf_defer_head_delta(&env, &ctx, &elim);
+        assert_eq!(reduced, bool_ctor(true_id));
+        assert!(progress.iota);
+        assert!(
+            delta_probe::unfolds() >= 1,
+            "nested `not` must still δ-unfold"
+        );
+        assert_eq!(whnf(&env, &ctx, &elim), bool_ctor(true_id));
+    }
+
+    /// SCT-admitted `ignore f z n`: the base is `true`, and the Suc method
+    /// passes both otherwise-unused inputs unchanged to the recursive call.
+    /// On an open `n`, unequal `f` or `z` must be refused at the SAME-head
+    /// origin after spine conversion fails, not equated by a cyclic premise.
+    fn declare_unused_recursive_inputs(
+        env: &mut GlobalEnv,
+        nat: GlobalId,
+        true_id: GlobalId,
+        bool_id: GlobalId,
+    ) -> GlobalId {
+        let bt = bool_ty(bool_id);
+        let nt = Term::indformer(nat, vec![]);
+        let ft = Term::pi(bt.clone(), bt.clone());
+        let ty = Term::pi(
+            ft.clone(),
+            Term::pi(bt.clone(), Term::pi(nt.clone(), bt.clone())),
+        );
+        declare_recursive_group(env, vec![(vec![], ty)], |ids| {
+            let recursive_call = Term::app(
+                Term::app(Term::app(cref0(ids[0]), Term::var(4)), Term::var(3)),
+                Term::var(1),
+            );
+            let suc_method = Term::lam(nt.clone(), Term::lam(bt.clone(), recursive_call));
+            let motive = Term::Ascript(
+                Box::new(Term::lam(nt.clone(), bt.clone())),
+                Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+            );
+            vec![Term::lam(
+                ft.clone(),
+                Term::lam(
+                    bt.clone(),
+                    Term::lam(
+                        nt.clone(),
+                        Term::Elim {
+                            fam: nat,
+                            level_args: vec![],
+                            params: vec![],
+                            motive: Box::new(motive),
+                            methods: vec![bool_ctor(true_id), suc_method],
+                            indices: vec![],
+                            scrut: Box::new(Term::var(0)),
+                        },
+                    ),
+                ),
+            )]
+        })
+        .expect("structural recursion ignoring two carried inputs must be admitted")[0]
+    }
+
+    fn unused_recursive_apply(id: GlobalId, f: Term, z: Term, n: Term) -> Term {
+        Term::app(Term::app(Term::app(cref0(id), f), z), n)
+    }
+
+    #[test]
+    fn same_head_open_recursive_retry_refuses_nonconvertible_function_and_accumulator() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let bt = bool_ty(bool_id);
+        let nat = declare_inductive(&mut env, |nat| InductiveSpec {
+            level_params: vec![],
+            params: vec![],
+            indices: vec![],
+            level: Level::zero(),
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![Term::indformer(nat, vec![])],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .expect("Nat admission");
+        let id = declare_unused_recursive_inputs(&mut env, nat, true_id, bool_id);
+        let not = declare_not(&mut env, bool_id, false_id, true_id);
+        let identity = declare_def(
+            &mut env,
+            vec![],
+            Term::pi(bt.clone(), bt.clone()),
+            Term::lam(bt.clone(), Term::var(0)),
+        )
+        .expect("Bool identity admission");
+        let nt = Term::indformer(nat, vec![]);
+        let mut ctx = Context::new();
+        ctx.push(nt);
+        let left = unused_recursive_apply(id, cref0(not), bool_ctor(true_id), Term::var(0));
+        let changed_function =
+            unused_recursive_apply(id, cref0(identity), bool_ctor(true_id), Term::var(0));
+        let changed_accumulator =
+            unused_recursive_apply(id, cref0(not), bool_ctor(false_id), Term::var(0));
+        for term in [&left, &changed_function, &changed_accumulator] {
+            assert_typed(&env, &ctx, term);
+        }
+        for other in [&changed_function, &changed_accumulator] {
+            delta_probe::reset();
+            assert!(!convert_type(&env, &ctx, &left, other));
+            assert_eq!(delta_probe::iotas(), 0, "open Nat cannot ι-reduce");
+            assert!(
+                delta_probe::captures() >= 1,
+                "same transparent head must reach a retry"
+            );
+            assert_eq!(
+                delta_probe::refusals(),
+                1,
+                "same-head no-progress recurrence must refuse"
+            );
+        }
     }
 
     /// Case 3 (finite δ retry, nonzero δ, zero refusal, true): two DISTINCT
@@ -1969,9 +2207,15 @@ mod tests {
             indices: vec![],
             level: zero(),
             constructors: vec![
-                CtorSpec { args: vec![], target_indices: vec![] },
                 CtorSpec {
-                    args: vec![Term::var(0), Term::app(Term::indformer(list, vec![]), Term::var(1))],
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![
+                        Term::var(0),
+                        Term::app(Term::indformer(list, vec![]), Term::var(1)),
+                    ],
                     target_indices: vec![],
                 },
             ],
@@ -1979,14 +2223,31 @@ mod tests {
         let nil = env.inductive(list).unwrap().constructors[0].id;
         let cons = env.inductive(list).unwrap().constructors[1].id;
         let list_char = Term::app(Term::indformer(list, vec![]), char_ty.clone());
-        let view = declare_primitive(&mut env, vec![], Term::pi(str_ty.clone(), list_char.clone()),
-            PrimReduction::Op { symbol: "string_to_list_char" }).unwrap();
-        let inverse = declare_primitive(&mut env, vec![], Term::pi(list_char.clone(), str_ty.clone()),
-            PrimReduction::Op { symbol: "list_char_to_string" }).unwrap();
+        let view = declare_primitive(
+            &mut env,
+            vec![],
+            Term::pi(str_ty.clone(), list_char.clone()),
+            PrimReduction::Op {
+                symbol: "string_to_list_char",
+            },
+        )
+        .unwrap();
+        let inverse = declare_primitive(
+            &mut env,
+            vec![],
+            Term::pi(list_char.clone(), str_ty.clone()),
+            PrimReduction::Op {
+                symbol: "list_char_to_string",
+            },
+        )
+        .unwrap();
         register_literal_char_view(&mut env, string_id, char_id, view, list, nil, cons).unwrap();
         let (bool_id, _, true_id) = declare_bool(&mut env);
         let bool_type = bool_ty(bool_id);
-        let neutral_string = Term::app(cref0(inverse), Term::app(Term::constructor(nil, vec![]), char_ty.clone()));
+        let neutral_string = Term::app(
+            cref0(inverse),
+            Term::app(Term::constructor(nil, vec![]), char_ty.clone()),
+        );
         let motive = Term::Ascript(
             Box::new(Term::lam(bool_type.clone(), str_ty)),
             Box::new(Term::pi(bool_type, type0())),
@@ -2049,33 +2310,44 @@ mod tests {
         let declare_self_map = |env: &mut GlobalEnv| {
             let list_char = list_char.clone();
             let char_ty = char_ty.clone();
-            declare_recursive_group(env, vec![(vec![], Term::pi(list_char.clone(), list_char.clone()))], |ids| {
-                let recur = Term::app(cref0(ids[0]), Term::var(1));
-                let cons_result = Term::app(
-                    Term::app(
-                        Term::app(Term::constructor(cons, vec![]), char_ty.clone()),
-                        Term::var(2),
-                    ),
-                    recur,
-                );
-                let method = Term::lam(
-                    char_ty.clone(),
-                    Term::lam(list_char.clone(), Term::lam(list_char.clone(), cons_result)),
-                );
-                let motive = Term::Ascript(
-                    Box::new(Term::lam(list_char.clone(), list_char.clone())),
-                    Box::new(Term::pi(list_char.clone(), type0())),
-                );
-                vec![Term::lam(list_char.clone(), Term::Elim {
-                    fam: list,
-                    level_args: vec![],
-                    params: vec![char_ty.clone()],
-                    motive: Box::new(motive),
-                    methods: vec![Term::app(Term::constructor(nil, vec![]), char_ty), method],
-                    indices: vec![],
-                    scrut: Box::new(Term::var(0)),
-                })]
-            }).expect("self-map must pass SCT")[0]
+            declare_recursive_group(
+                env,
+                vec![(vec![], Term::pi(list_char.clone(), list_char.clone()))],
+                |ids| {
+                    let recur = Term::app(cref0(ids[0]), Term::var(1));
+                    let cons_result = Term::app(
+                        Term::app(
+                            Term::app(Term::constructor(cons, vec![]), char_ty.clone()),
+                            Term::var(2),
+                        ),
+                        recur,
+                    );
+                    let method = Term::lam(
+                        char_ty.clone(),
+                        Term::lam(list_char.clone(), Term::lam(list_char.clone(), cons_result)),
+                    );
+                    let motive = Term::Ascript(
+                        Box::new(Term::lam(list_char.clone(), list_char.clone())),
+                        Box::new(Term::pi(list_char.clone(), type0())),
+                    );
+                    vec![Term::lam(
+                        list_char.clone(),
+                        Term::Elim {
+                            fam: list,
+                            level_args: vec![],
+                            params: vec![char_ty.clone()],
+                            motive: Box::new(motive),
+                            methods: vec![
+                                Term::app(Term::constructor(nil, vec![]), char_ty),
+                                method,
+                            ],
+                            indices: vec![],
+                            scrut: Box::new(Term::var(0)),
+                        },
+                    )]
+                },
+            )
+            .expect("self-map must pass SCT")[0]
         };
         let f = declare_self_map(&mut env);
         let g = declare_self_map(&mut env);
@@ -2107,7 +2379,13 @@ mod tests {
         let _ = cons;
         let bt = bool_ty(bool_id);
         let ctx = Context::new();
-        let lhs = map_apply(map_f, bt.clone(), bt.clone(), cref0(not), nil_val(nil, bt.clone()));
+        let lhs = map_apply(
+            map_f,
+            bt.clone(),
+            bt.clone(),
+            cref0(not),
+            nil_val(nil, bt.clone()),
+        );
         let rhs = map_apply(map_g, bt.clone(), bt.clone(), cref0(not), nil_val(nil, bt));
         assert_typed(&env, &ctx, &lhs);
         assert_typed(&env, &ctx, &rhs);

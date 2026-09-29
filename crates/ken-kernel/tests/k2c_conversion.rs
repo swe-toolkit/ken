@@ -300,12 +300,10 @@ fn sct_accept_lexicographic() {
 // Composed self-loop: compose(↓, ↓) = ↓ → ACCEPT.
 // ---------------------------------------------------------------------------
 
-#[test]
-fn sct_accept_mutual() {
-    let (mut env, nb) = mk_env();
+fn declare_even_odd(env: &mut GlobalEnv, nb: &NB) -> Vec<GlobalId> {
     let nat = nb.nat;
-    let ty = Term::pi(nat_t(&nb), bool_t(&nb));
-    let ids = declare_recursive_group(&mut env, vec![(vec![], ty.clone()), (vec![], ty)], |ids| {
+    let ty = Term::pi(nat_t(nb), bool_t(nb));
+    let ids = declare_recursive_group(env, vec![(vec![], ty.clone()), (vec![], ty)], |ids| {
         let is_even = ids[0];
         let is_odd = ids[1];
         let nat_t = Term::indformer(nat, vec![]);
@@ -361,6 +359,13 @@ fn sct_accept_mutual() {
         vec![is_even_body, is_odd_body]
     })
     .expect("sct-accept-mutual must be admitted");
+    ids
+}
+
+#[test]
+fn sct_accept_mutual() {
+    let (mut env, nb) = mk_env();
+    let ids = declare_even_odd(&mut env, &nb);
     assert!(env.transparent_body(ids[0]).is_some());
     assert!(env.transparent_body(ids[1]).is_some());
 }
@@ -383,12 +388,10 @@ fn sct_accept_mutual() {
 // Self-loop[0,0] = max(compose(?,?), compose(↓,↓)) = ↓ → ACCEPT.
 // ---------------------------------------------------------------------------
 
-#[test]
-fn sct_accept_permuted() {
-    let (mut env, nb) = mk_env();
+fn declare_permuted_pair(env: &mut GlobalEnv, nb: &NB) -> Vec<GlobalId> {
     let nat = nb.nat;
-    let ty = Term::pi(nat_t(&nb), Term::pi(nat_t(&nb), nat_t(&nb)));
-    let ids = declare_recursive_group(&mut env, vec![(vec![], ty.clone()), (vec![], ty)], |ids| {
+    let ty = Term::pi(nat_t(nb), Term::pi(nat_t(nb), nat_t(nb)));
+    let ids = declare_recursive_group(env, vec![(vec![], ty.clone()), (vec![], ty)], |ids| {
         let foo_id = ids[0];
         let bar_id = ids[1];
         let nat_t = Term::indformer(nat, vec![]);
@@ -486,8 +489,43 @@ fn sct_accept_permuted() {
         vec![foo_body, bar_body]
     })
     .expect("sct-accept-permuted must be admitted");
+    ids
+}
+
+#[test]
+fn sct_accept_permuted() {
+    let (mut env, nb) = mk_env();
+    let ids = declare_permuted_pair(&mut env, &nb);
     assert!(env.transparent_body(ids[0]).is_some());
     assert!(env.transparent_body(ids[1]).is_some());
+}
+
+/// Open neutral-argument termination on the same two SCT-admitted shapes.
+/// Identical applications close without δ; separately admitted source twins
+/// must stop without treating structural body similarity as an equality rule.
+#[test]
+fn mutual_and_permuted_pairs_terminate_against_self_and_distinct_twins() {
+    let (mut env, nb) = mk_env();
+    let even_odd = declare_even_odd(&mut env, &nb);
+    let other_even_odd = declare_even_odd(&mut env, &nb);
+    let permuted = declare_permuted_pair(&mut env, &nb);
+    let other_permuted = declare_permuted_pair(&mut env, &nb);
+    let mut ctx = Context::new();
+    ctx.push(nat_t(&nb));
+    let bool_ty = bool_t(&nb);
+    let nat_ty = nat_t(&nb);
+    for (one, twin) in even_odd.iter().zip(&other_even_odd) {
+        let a = Term::app(cref(*one), Term::var(0));
+        let b = Term::app(cref(*twin), Term::var(0));
+        assert!(convert(&env, &ctx, &bool_ty, &a, &a));
+        assert!(!convert(&env, &ctx, &bool_ty, &a, &b));
+    }
+    for (one, twin) in permuted.iter().zip(&other_permuted) {
+        let a = Term::app(Term::app(cref(*one), Term::var(0)), Term::var(0));
+        let b = Term::app(Term::app(cref(*twin), Term::var(0)), Term::var(0));
+        assert!(convert(&env, &ctx, &nat_ty, &a, &a));
+        assert!(!convert(&env, &ctx, &nat_ty, &a, &b));
+    }
 }
 
 // ---------------------------------------------------------------------------
