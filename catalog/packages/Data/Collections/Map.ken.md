@@ -277,8 +277,9 @@ definitions. Under outer `Ordered` and `Distinct` on the left relation, with
 reflexivity and transitivity witnesses for the shared comparator, §4.7.12
 proves the successor-set union characterization of `compose` and its membership
 corollary. A checked `Nat` chain refutes transitivity until its missing `0→2`
-edge is added. General converse membership and closure faithfulness and
-saturation proofs remain separate obligations.
+edge is added. Under the same lawful comparator and ordered-representation
+premises, the closure laws now prove positive-walk faithfulness and saturation.
+General converse membership remains a separate obligation.
 
 ## 4. Laws & proofs
 
@@ -15127,9 +15128,17 @@ path that is absent from the lookup-defined relation. The checked
 `reachable_within_sound` and `reachable_within_complete` laws relate the
 worker, at every fuel, to a private positive walk through stored edges. That
 bounded correspondence is stated under the shared lawful comparator, outer
-`Ordered`, and ordered successor trees. It does not yet show that the public
-`size (dom r)` bound reaches every positive walk; full-closure faithfulness
-and saturation remain separate obligations.
+`Ordered`, and ordered successor trees. `reachable_plus_sound` erases a
+bounded witness. For completeness, the private walker removes repeated
+nonterminal vertices by a strictly decreasing list-length argument, retaining
+at least one edge even when source and target coincide. Every remaining
+nonterminal source has an outgoing edge and therefore occurs among the raw
+nodes of `dom r`. Removing one matched raw node for each pairwise
+non-order-equivalent source proves that the walk length fits `size (dom r)`;
+duplicate outer nodes only increase that bound, and a target-only terminal is
+not counted. `reachable_plus_complete` applies bounded completeness at that
+fuel, while `reachable_within_saturates` proves that adding any further fuel
+cannot change the Boolean result. No outer `Distinct` premise is used.
 
 ```ken
 pub fn size (k : Type) (v : Type) (m : Tree k v) : Nat =
@@ -17899,68 +17908,6 @@ theorem source_repeat_shortens_strict
           })
         splits
 
-theorem source_repeat_shortens_walk
-      (k : Type)
-      (d : Ord k)
-      (r : Tree k (Tree k Unit))
-      (source : k)
-      (target : k)
-      (vertices : List k)
-    : ‖ SourceRepeatSplit k (relation_ord_leq k d) source vertices ‖
-      → Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
-      → positive_walk k (relation_ord_leq k d) r source target =
-  λsplits.
-    λvalid.
-      elim_trunc
-        (positive_walk k (relation_ord_leq k d) r source target)
-        (λsplit.
-          match split {
-            MkSourceRepeatSplit prefix repeat next rest equation equivalent ↦
-              trunc_intro
-                (MkRelationWalk
-                  k
-                  (relation_ord_leq k d)
-                  r
-                  source
-                  target
-                  (Cons k next rest)
-                  (relation_walk_splice_source
-                    k
-                    d
-                    r
-                    prefix
-                    source
-                    repeat
-                    next
-                    rest
-                    target
-                    equivalent
-                    (trans
-                      Bool
-                      (relation_walk_bool
-                        k
-                        (relation_ord_leq k d)
-                        r
-                        source
-                        target
-                        (list_append k prefix (Cons k repeat (Cons k next rest))))
-                      (relation_walk_bool k (relation_ord_leq k d) r source target vertices)
-                      True
-                      (cong
-                        (List k)
-                        Bool
-                        (list_append k prefix (Cons k repeat (Cons k next rest)))
-                        vertices
-                        (λxs. relation_walk_bool k (relation_ord_leq k d) r source target xs)
-                        (sym
-                          (List k)
-                          vertices
-                          (list_append k prefix (Cons k repeat (Cons k next rest)))
-                          equation))
-                      valid)))
-          })
-        splits
-
 fn walk_repeats_nonterminal
       (k : Type) (leq : k → k → Bool) (source : k) (vertices : List k)
     : Bool =
@@ -18075,35 +18022,6 @@ theorem walk_repeat_split
     Nil ↦ λfound. absurd found;
     Cons at rest ↦ walk_repeat_split_cons k rest leq source at (walk_repeat_split k leq at rest)
   }
-
-theorem positive_walk_prefix
-      (k : Type)
-      (leq : k → k → Bool)
-      (r : Tree k (Tree k Unit))
-      (source : k)
-      (at : k)
-      (target : k)
-    : rel_member k leq source at r
-      → positive_walk k leq r at target
-      → positive_walk k leq r source target =
-  λedge.
-    λtail.
-      elim_trunc
-        (positive_walk k leq r source target)
-        (λwalk.
-          match walk {
-            MkRelationWalk vertices valid ↦
-              trunc_intro
-                (MkRelationWalk
-                  k
-                  leq
-                  r
-                  source
-                  target
-                  (Cons k at vertices)
-                  (relation_walk_prefix k leq r source at target vertices edge valid))
-          })
-        tail
 
 theorem walk_repeat_shorten_tail
       (k : Type)
@@ -18343,22 +18261,16 @@ theorem positive_walk_shortens_to_simple
         })
       path
 
-fn relation_option_targets (k : Type) (found : Option (Tree k Unit)) : Tree k Unit =
+fn relation_option_or_empty (k : Type) (found : Option (Tree k Unit)) : Tree k Unit =
   match found {
     None ↦ empty k Unit;
     Some targets ↦ targets
   }
 
-fn relation_option_present (k : Type) (found : Option (Tree k Unit)) : Bool =
-  match found {
-    None ↦ False;
-    Some targets ↦ True
-  }
-
 theorem relation_source_member_case
       (k : Type) (leq : k → k → Bool) (target : k) (found : Option (Tree k Unit))
-    : Equal Bool (set_member k leq target (relation_option_targets k found)) True
-      → Equal Bool (relation_option_present k found) True =
+    : Equal Bool (set_member k leq target (relation_option_or_empty k found)) True
+      → Equal Bool (is_some (Tree k Unit) found) True =
   match found {
     None ↦ λedge. absurd edge;
     Some targets ↦ λedge. Proved
@@ -18381,6 +18293,1259 @@ theorem relation_source_in_dom
       True
       (dom_preserves_membership k (Tree k Unit) leq source r)
       (relation_source_member k leq r source target edge)
+
+fn key_list_contains (k : Type) (leq : k → k → Bool) (query : k) (keys : List k) : Bool =
+  match keys {
+    Nil ↦ False;
+    Cons stored rest ↦
+      cat4_bool_or (order_equiv_key k leq query stored) (key_list_contains k leq query rest)
+  }
+
+fn key_list_repeats (k : Type) (leq : k → k → Bool) (keys : List k) : Bool =
+  match keys {
+    Nil ↦ False;
+    Cons key rest ↦
+      cat4_bool_or (key_list_contains k leq key rest) (key_list_repeats k leq rest)
+  }
+
+fn walk_sources (k : Type) (source : k) (vertices : List k) : List k =
+  match vertices {
+    Nil ↦ Nil k;
+    Cons next rest ↦ Cons k source (walk_sources k next rest)
+  }
+
+theorem walk_sources_length
+      (k : Type) (source : k) (vertices : List k)
+    : Equal Nat (length k (walk_sources k source vertices)) (length k vertices) =
+  match vertices {
+    Nil ↦ Proved;
+    Cons next rest ↦
+      cong
+        Nat
+        Nat
+        (length k (walk_sources k next rest))
+        (length k rest)
+        Suc
+        (walk_sources_length k next rest)
+  }
+
+theorem source_repeats_matches_sources_step
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (first : k)
+      (next : k)
+      (tail : List k)
+      (previous : Equal
+        Bool
+        (source_repeats_nonterminal k leq source (Cons k next tail))
+        (key_list_contains k leq source (walk_sources k next tail)))
+    : Equal Bool
+        (source_repeats_nonterminal k leq source (Cons k first (Cons k next tail)))
+        (key_list_contains k leq source (walk_sources k first (Cons k next tail))) =
+  cong
+    Bool
+    Bool
+    (source_repeats_nonterminal k leq source (Cons k next tail))
+    (key_list_contains k leq source (walk_sources k next tail))
+    (λfound. cat4_bool_or (order_equiv_key k leq source first) found)
+    previous
+
+theorem source_repeats_matches_sources
+      (k : Type) (leq : k → k → Bool) (source : k) (first : k) (rest : List k)
+    : Equal Bool
+        (source_repeats_nonterminal k leq source (Cons k first rest))
+        (key_list_contains k leq source (walk_sources k first rest)) =
+  match rest {
+    Nil ↦ Proved;
+    Cons next tail ↦
+      source_repeats_matches_sources_step
+        k
+        leq
+        source
+        first
+        next
+        tail
+        (source_repeats_matches_sources k leq source next tail)
+  }
+
+theorem walk_repeats_matches_sources_step
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (first : k)
+      (next : k)
+      (tail : List k)
+      (head_eq : Equal
+        Bool
+        (source_repeats_nonterminal k leq source (Cons k first (Cons k next tail)))
+        (key_list_contains k leq source (walk_sources k first (Cons k next tail))))
+      (tail_eq : Equal
+        Bool
+        (walk_repeats_nonterminal k leq first (Cons k next tail))
+        (key_list_repeats k leq (walk_sources k first (Cons k next tail))))
+    : Equal Bool
+        (walk_repeats_nonterminal k leq source (Cons k first (Cons k next tail)))
+        (key_list_repeats k leq (walk_sources k source (Cons k first (Cons k next tail)))) =
+  trans
+    Bool
+    (cat4_bool_or
+      (source_repeats_nonterminal k leq source (Cons k first (Cons k next tail)))
+      (walk_repeats_nonterminal k leq first (Cons k next tail)))
+    (cat4_bool_or
+      (key_list_contains k leq source (walk_sources k first (Cons k next tail)))
+      (walk_repeats_nonterminal k leq first (Cons k next tail)))
+    (cat4_bool_or
+      (key_list_contains k leq source (walk_sources k first (Cons k next tail)))
+      (key_list_repeats k leq (walk_sources k first (Cons k next tail))))
+    (cong
+      Bool
+      Bool
+      (source_repeats_nonterminal k leq source (Cons k first (Cons k next tail)))
+      (key_list_contains k leq source (walk_sources k first (Cons k next tail)))
+      (λfound. cat4_bool_or found (walk_repeats_nonterminal k leq first (Cons k next tail)))
+      head_eq)
+    (cong
+      Bool
+      Bool
+      (walk_repeats_nonterminal k leq first (Cons k next tail))
+      (key_list_repeats k leq (walk_sources k first (Cons k next tail)))
+      (λfound.
+        cat4_bool_or
+          (key_list_contains k leq source (walk_sources k first (Cons k next tail)))
+          found)
+      tail_eq)
+
+theorem walk_repeats_matches_sources_cons
+      (k : Type) (leq : k → k → Bool) (source : k) (first : k) (rest : List k)
+    : Equal Bool
+        (walk_repeats_nonterminal k leq source (Cons k first rest))
+        (key_list_repeats k leq (walk_sources k source (Cons k first rest))) =
+  match rest {
+    Nil ↦ Proved;
+    Cons next tail ↦
+      walk_repeats_matches_sources_step
+        k
+        leq
+        source
+        first
+        next
+        tail
+        (source_repeats_matches_sources k leq source first (Cons k next tail))
+        (walk_repeats_matches_sources_cons k leq first next tail)
+  }
+
+theorem walk_repeats_matches_sources
+      (k : Type) (leq : k → k → Bool) (source : k) (vertices : List k)
+    : Equal Bool
+        (walk_repeats_nonterminal k leq source vertices)
+        (key_list_repeats k leq (walk_sources k source vertices)) =
+  match vertices {
+    Nil ↦ Proved;
+    Cons first rest ↦ walk_repeats_matches_sources_cons k leq source first rest
+  }
+
+fn raw_outer_keys (k : Type) (tree : Tree k Unit) : List k =
+  match tree {
+    Leaf ↦ Nil k;
+    Node left key value right ↦
+      Cons k key (list_append k (raw_outer_keys k right) (raw_outer_keys k left))
+  }
+
+theorem list_append_length_swapped
+      (k : Type) (left : List k) (right : List k)
+    : Equal Nat (length k (list_append k left right)) (add (length k right) (length k left)) =
+  match left {
+    Nil ↦ Refl;
+    Cons head tail ↦
+      cong
+        Nat
+        Nat
+        (length k (list_append k tail right))
+        (add (length k right) (length k tail))
+        Suc
+        (list_append_length_swapped k tail right)
+  }
+
+theorem raw_outer_keys_length
+      (k : Type) (tree : Tree k Unit)
+    : Equal Nat (length k (raw_outer_keys k tree)) (size k Unit tree) =
+  match tree {
+    Leaf ↦ Proved;
+    Node left key value right ↦
+      cong
+        Nat
+        Nat
+        (length k (list_append k (raw_outer_keys k right) (raw_outer_keys k left)))
+        (add (size k Unit left) (size k Unit right))
+        Suc
+        (trans
+          Nat
+          (length k (list_append k (raw_outer_keys k right) (raw_outer_keys k left)))
+          (add (length k (raw_outer_keys k left)) (length k (raw_outer_keys k right)))
+          (add (size k Unit left) (size k Unit right))
+          (list_append_length_swapped k (raw_outer_keys k right) (raw_outer_keys k left))
+          (trans
+            Nat
+            (add (length k (raw_outer_keys k left)) (length k (raw_outer_keys k right)))
+            (add (size k Unit left) (length k (raw_outer_keys k right)))
+            (add (size k Unit left) (size k Unit right))
+            (cong
+              Nat
+              Nat
+              (length k (raw_outer_keys k left))
+              (size k Unit left)
+              (λn. add n (length k (raw_outer_keys k right)))
+              (raw_outer_keys_length k left))
+            (cong
+              Nat
+              Nat
+              (length k (raw_outer_keys k right))
+              (size k Unit right)
+              (λn. add (size k Unit left) n)
+              (raw_outer_keys_length k right))))
+  }
+
+theorem key_list_contains_append_left
+      (k : Type) (leq : k → k → Bool) (query : k) (left : List k) (right : List k)
+    : Equal Bool (key_list_contains k leq query left) True
+      → Equal Bool (key_list_contains k leq query (list_append k left right)) True =
+  match left {
+    Nil ↦ λfound. absurd found;
+    Cons stored rest ↦
+      λfound.
+        match cat4_bool_or_true_cases
+          (order_equiv_key k leq query stored)
+          (key_list_contains k leq query rest)
+          found {
+          Inl at_head ↦
+            cat4_bool_or_left_true
+              (order_equiv_key k leq query stored)
+              (key_list_contains k leq query (list_append k rest right))
+              at_head;
+          Inr later ↦
+            cat4_bool_or_right_true
+              (order_equiv_key k leq query stored)
+              (key_list_contains k leq query (list_append k rest right))
+              (key_list_contains_append_left k leq query rest right later)
+        }
+  }
+
+theorem key_list_contains_append_right
+      (k : Type) (leq : k → k → Bool) (query : k) (left : List k) (right : List k)
+    : Equal Bool (key_list_contains k leq query right) True
+      → Equal Bool (key_list_contains k leq query (list_append k left right)) True =
+  match left {
+    Nil ↦ λfound. found;
+    Cons stored rest ↦
+      λfound.
+        cat4_bool_or_right_true
+          (order_equiv_key k leq query stored)
+          (key_list_contains k leq query (list_append k rest right))
+          (key_list_contains_append_right k leq query rest right found)
+  }
+
+theorem raw_outer_keys_member_node
+      (k : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (left : Tree k Unit)
+      (stored : k)
+      (value : Unit)
+      (right : Tree k Unit)
+      (left_member : Equal
+        Bool
+        (member k Unit leq query left)
+        True
+        → Equal
+        Bool
+        (key_list_contains k leq query (raw_outer_keys k left))
+        True)
+      (right_member : Equal
+        Bool
+        (member k Unit leq query right)
+        True
+        → Equal
+        Bool
+        (key_list_contains k leq query (raw_outer_keys k right))
+        True)
+    : Equal Bool (member k Unit leq query (Node k Unit left stored value right)) True
+      → Equal Bool
+        (key_list_contains k leq query (raw_outer_keys k (Node k Unit left stored value right)))
+        True =
+  match bool_dichotomy (leq query stored) {
+    Inl below ↦
+      match bool_dichotomy (leq stored query) {
+        Inl above ↦
+          λfound.
+            cat4_bool_or_left_true
+              (order_equiv_key k leq query stored)
+              (key_list_contains
+                k
+                leq
+                query
+                (list_append k (raw_outer_keys k right) (raw_outer_keys k left)))
+              ((proof intro for bool_and) (leq query stored) (leq stored query) below above);
+        Inr not_above ↦
+          λfound.
+            cat4_bool_or_right_true
+              (order_equiv_key k leq query stored)
+              (key_list_contains
+                k
+                leq
+                query
+                (list_append k (raw_outer_keys k right) (raw_outer_keys k left)))
+              (key_list_contains_append_right
+                k
+                leq
+                query
+                (raw_outer_keys k right)
+                (raw_outer_keys k left)
+                (left_member
+                  (member_node_left_when_selected
+                    k
+                    Unit
+                    leq
+                    query
+                    left
+                    stored
+                    value
+                    right
+                    below
+                    not_above
+                    found)))
+      };
+    Inr not_below ↦
+      λfound.
+        cat4_bool_or_right_true
+          (order_equiv_key k leq query stored)
+          (key_list_contains
+            k
+            leq
+            query
+            (list_append k (raw_outer_keys k right) (raw_outer_keys k left)))
+          (key_list_contains_append_left
+            k
+            leq
+            query
+            (raw_outer_keys k right)
+            (raw_outer_keys k left)
+            (right_member
+              (member_node_right_when_selected
+                k
+                Unit
+                leq
+                query
+                left
+                stored
+                value
+                right
+                not_below
+                found)))
+  }
+
+theorem raw_outer_keys_contains_member
+      (k : Type) (leq : k → k → Bool) (query : k) (tree : Tree k Unit)
+    : Equal Bool (member k Unit leq query tree) True
+      → Equal Bool (key_list_contains k leq query (raw_outer_keys k tree)) True =
+  match tree {
+    Leaf ↦ λfound. absurd found;
+    Node left stored value right ↦
+      raw_outer_keys_member_node
+        k
+        leq
+        query
+        left
+        stored
+        value
+        right
+        (raw_outer_keys_contains_member k leq query left)
+        (raw_outer_keys_contains_member k leq query right)
+  }
+
+theorem relation_source_in_raw_nodes
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : rel_member k leq source target r
+      → Equal Bool
+        (key_list_contains k leq source (raw_outer_keys k (dom k (Tree k Unit) r)))
+        True =
+  λedge.
+    raw_outer_keys_contains_member
+      k
+      leq
+      source
+      (dom k (Tree k Unit) r)
+      (relation_source_in_dom k leq r source target edge)
+
+fn all_keys_in_list
+      (k : Type) (leq : k → k → Bool) (queries : List k) (available : List k)
+    : Prop =
+  match queries {
+    Nil ↦ Top;
+    Cons head tail ↦
+      And
+        (Equal Bool (key_list_contains k leq head available) True)
+        (all_keys_in_list k leq tail available)
+  }
+
+fn relation_walk_rest_test
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (next : k)
+      (target : k)
+      (rest : List k)
+    : Bool =
+  match rest {
+    Nil ↦ order_equiv_key k leq next target;
+    Cons following tail ↦ relation_walk_bool k leq r next target rest
+  }
+
+theorem relation_walk_first_edge
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (next : k)
+      (target : k)
+      (rest : List k)
+    : Equal Bool (relation_walk_bool k leq r source target (Cons k next rest)) True
+      → rel_member k leq source next r =
+  λvalid.
+    (proof left for bool_and)
+      (set_member k leq next (succ k leq source r))
+      (relation_walk_rest_test k leq r next target rest)
+      valid
+
+theorem walk_sources_raw_suffix
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (next : k)
+      (target : k)
+      (rest : List k)
+    : (Equal
+        Bool
+        (relation_walk_bool k (relation_ord_leq k d) r next target rest)
+        True
+        → all_keys_in_list
+        k
+        (relation_ord_leq k d)
+        (walk_sources k next rest)
+        (raw_outer_keys k (dom k (Tree k Unit) r)))
+      → Equal Bool
+        (relation_walk_bool k (relation_ord_leq k d) r source target (Cons k next rest))
+        True
+      → all_keys_in_list k
+        (relation_ord_leq k d)
+        (walk_sources k next rest)
+        (raw_outer_keys k (dom k (Tree k Unit) r)) =
+  match rest {
+    Nil ↦ λtail_complete. λvalid. Proved;
+    Cons following tail ↦
+      λtail_complete.
+        λvalid.
+          tail_complete
+            (relation_walk_tail
+              k
+              (relation_ord_leq k d)
+              r
+              source
+              next
+              following
+              tail
+              target
+              valid)
+  }
+
+theorem walk_sources_in_raw_nodes
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (vertices : List k)
+    : Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
+      → all_keys_in_list k
+        (relation_ord_leq k d)
+        (walk_sources k source vertices)
+        (raw_outer_keys k (dom k (Tree k Unit) r)) =
+  match vertices {
+    Nil ↦ λvalid. absurd valid;
+    Cons next rest ↦
+      λvalid.
+        and_intro
+          (Equal
+            Bool
+            (key_list_contains
+              k
+              (relation_ord_leq k d)
+              source
+              (raw_outer_keys k (dom k (Tree k Unit) r)))
+            True)
+          (all_keys_in_list
+            k
+            (relation_ord_leq k d)
+            (walk_sources k next rest)
+            (raw_outer_keys k (dom k (Tree k Unit) r)))
+          (relation_source_in_raw_nodes
+            k
+            (relation_ord_leq k d)
+            r
+            source
+            next
+            (relation_walk_first_edge k (relation_ord_leq k d) r source next target rest valid))
+          (walk_sources_raw_suffix
+            k
+            d
+            r
+            source
+            next
+            target
+            rest
+            (walk_sources_in_raw_nodes k d r next target rest)
+            valid)
+  }
+
+theorem cat4_bool_or_false_left
+      (a : Bool) (b : Bool)
+    : Equal Bool (cat4_bool_or a b) False → Equal Bool a False =
+  match a {
+    True ↦ λnone. absurd none;
+    False ↦ λnone. Proved
+  }
+
+theorem cat4_bool_or_false_right
+      (a : Bool) (b : Bool)
+    : Equal Bool (cat4_bool_or a b) False → Equal Bool b False =
+  match a {
+    True ↦ λnone. absurd none;
+    False ↦ λnone. none
+  }
+
+theorem cat4_bool_or_right_if_left_false
+      (a : Bool) (b : Bool)
+    : Equal Bool a False → Equal Bool (cat4_bool_or a b) True → Equal Bool b True =
+  match a {
+    True ↦ λabsent. λfound. absurd absent;
+    False ↦ λabsent. λfound. found
+  }
+
+theorem order_equiv_key_sym
+      (k : Type) (leq : k → k → Bool) (a : k) (b : k)
+    : Equal Bool (order_equiv_key k leq a b) True
+      → Equal Bool (order_equiv_key k leq b a) True =
+  λsame.
+    (proof intro for bool_and)
+      (leq b a)
+      (leq a b)
+      ((proof right for bool_and) (leq a b) (leq b a) same)
+      ((proof left for bool_and) (leq a b) (leq b a) same)
+
+theorem order_equiv_key_trans
+      (k : Type) (d : Ord k) (a : k) (b : k) (c : k)
+    : Equal Bool (order_equiv_key k (relation_ord_leq k d) a b) True
+      → Equal Bool (order_equiv_key k (relation_ord_leq k d) b c) True
+      → Equal Bool (order_equiv_key k (relation_ord_leq k d) a c) True =
+  λab.
+    λbc.
+      let
+        leq = relation_ord_leq k d;
+        ab_forward = (proof left for bool_and) (leq a b) (leq b a) ab;
+        ab_backward = (proof right for bool_and) (leq a b) (leq b a) ab;
+        bc_forward = (proof left for bool_and) (leq b c) (leq c b) bc;
+        bc_backward = (proof right for bool_and) (leq b c) (leq c b) bc
+      in
+        (proof intro for bool_and)
+          (leq a c)
+          (leq c a)
+          (relation_ord_trans k d a b c ab_forward bc_forward)
+          (relation_ord_trans k d c b a bc_backward ab_backward)
+
+theorem order_equiv_key_other_false
+      (k : Type) (d : Ord k) (removed : k) (stored : k) (other : k)
+    : Equal Bool (order_equiv_key k (relation_ord_leq k d) removed stored) True
+      → Equal Bool (order_equiv_key k (relation_ord_leq k d) removed other) False
+      → Equal Bool (order_equiv_key k (relation_ord_leq k d) other stored) False =
+  λsame.
+    λdistinct.
+      match bool_dichotomy (order_equiv_key k (relation_ord_leq k d) other stored) {
+        Inl other_same ↦
+          absurd
+            (trans
+              Bool
+              True
+              (order_equiv_key k (relation_ord_leq k d) removed other)
+              False
+              (sym
+                Bool
+                (order_equiv_key k (relation_ord_leq k d) removed other)
+                True
+                (order_equiv_key_trans
+                  k
+                  d
+                  removed
+                  stored
+                  other
+                  same
+                  (order_equiv_key_sym k (relation_ord_leq k d) other stored other_same)))
+              distinct);
+        Inr other_distinct ↦ other_distinct
+      }
+
+data KeyOccurrence
+      (k : Type) (leq : k → k → Bool) (query : k) (available : List k)
+    : Type
+    where {
+  MkKeyOccurrence :
+    (prefix : List k)
+    → (stored : k)
+    → (suffix : List k)
+    → Equal (List k) available (list_append k prefix (Cons k stored suffix))
+    → Equal Bool (order_equiv_key k leq query stored) True
+    → KeyOccurrence k leq query available
+}
+
+theorem key_occurrence_direct
+      (k : Type) (leq : k → k → Bool) (query : k) (stored : k) (rest : List k)
+    : Equal Bool (order_equiv_key k leq query stored) True
+      → ‖ KeyOccurrence k leq query (Cons k stored rest) ‖ =
+  λsame.
+    trunc_intro (MkKeyOccurrence k leq query (Cons k stored rest) (Nil k) stored rest Refl same)
+
+theorem key_occurrence_lift
+      (k : Type) (leq : k → k → Bool) (query : k) (head : k) (tail : List k)
+    : ‖ KeyOccurrence k leq query tail ‖ → ‖ KeyOccurrence k leq query (Cons k head tail) ‖ =
+  λprior.
+    elim_trunc
+      (‖ KeyOccurrence k leq query (Cons k head tail) ‖)
+      (λoccurrence.
+        match occurrence {
+          MkKeyOccurrence prefix stored suffix equation same ↦
+            trunc_intro
+              (MkKeyOccurrence
+                k
+                leq
+                query
+                (Cons k head tail)
+                (Cons k head prefix)
+                stored
+                suffix
+                (cong
+                  (List k)
+                  (List k)
+                  tail
+                  (list_append k prefix (Cons k stored suffix))
+                  (λxs. Cons k head xs)
+                  equation)
+                same)
+        })
+      prior
+
+theorem key_occurrence_cases
+      (k : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (head : k)
+      (tail : List k)
+      (later : Equal
+        Bool
+        (key_list_contains k leq query tail)
+        True
+        → ‖ KeyOccurrence
+        k
+        leq
+        query
+        tail ‖)
+    : Equal Bool (key_list_contains k leq query (Cons k head tail)) True
+      → ‖ KeyOccurrence k leq query (Cons k head tail) ‖ =
+  λfound.
+    match cat4_bool_or_true_cases
+      (order_equiv_key k leq query head)
+      (key_list_contains k leq query tail)
+      found {
+      Inl same ↦ key_occurrence_direct k leq query head tail same;
+      Inr after ↦ key_occurrence_lift k leq query head tail (later after)
+    }
+
+theorem key_occurrence_from_contains
+      (k : Type) (leq : k → k → Bool) (query : k) (available : List k)
+    : Equal Bool (key_list_contains k leq query available) True
+      → ‖ KeyOccurrence k leq query available ‖ =
+  match available {
+    Nil ↦ λfound. absurd found;
+    Cons head tail ↦
+      key_occurrence_cases k leq query head tail (key_occurrence_from_contains k leq query tail)
+  }
+
+theorem key_list_contains_remove_other
+      (k : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (prefix : List k)
+      (stored : k)
+      (suffix : List k)
+    : Equal Bool (order_equiv_key k leq query stored) False
+      → Equal Bool
+        (key_list_contains k leq query (list_append k prefix (Cons k stored suffix)))
+        True
+      → Equal Bool (key_list_contains k leq query (list_append k prefix suffix)) True =
+  match prefix {
+    Nil ↦
+      λaway.
+        λfound.
+          cat4_bool_or_right_if_left_false
+            (order_equiv_key k leq query stored)
+            (key_list_contains k leq query suffix)
+            away
+            found;
+    Cons head tail ↦
+      λaway.
+        λfound.
+          match cat4_bool_or_true_cases
+            (order_equiv_key k leq query head)
+            (key_list_contains k leq query (list_append k tail (Cons k stored suffix)))
+            found {
+            Inl at_head ↦
+              cat4_bool_or_left_true
+                (order_equiv_key k leq query head)
+                (key_list_contains k leq query (list_append k tail suffix))
+                at_head;
+            Inr later ↦
+              cat4_bool_or_right_true
+                (order_equiv_key k leq query head)
+                (key_list_contains k leq query (list_append k tail suffix))
+                (key_list_contains_remove_other k leq query tail stored suffix away later)
+          }
+  }
+
+theorem all_keys_in_list_transport
+      (k : Type) (leq : k → k → Bool) (queries : List k) (before : List k) (after : List k)
+    : Equal (List k) before after
+      → all_keys_in_list k leq queries before
+      → all_keys_in_list k leq queries after =
+  match queries {
+    Nil ↦ λequation. λall. Proved;
+    Cons query rest ↦
+      λequation.
+        λall.
+          and_intro
+            (Equal Bool (key_list_contains k leq query after) True)
+            (all_keys_in_list k leq rest after)
+            (trans
+              Bool
+              (key_list_contains k leq query after)
+              (key_list_contains k leq query before)
+              True
+              (cong
+                (List k)
+                Bool
+                after
+                before
+                (λkeys. key_list_contains k leq query keys)
+                (sym (List k) before after equation))
+              (and_fst
+                (Equal Bool (key_list_contains k leq query before) True)
+                (all_keys_in_list k leq rest before)
+                all))
+            (all_keys_in_list_transport
+              k
+              leq
+              rest
+              before
+              after
+              equation
+              (and_snd
+                (Equal Bool (key_list_contains k leq query before) True)
+                (all_keys_in_list k leq rest before)
+                all))
+  }
+
+theorem all_keys_in_list_remove_other_cons
+      (k : Type)
+      (d : Ord k)
+      (removed : k)
+      (stored : k)
+      (query : k)
+      (rest : List k)
+      (prefix : List k)
+      (suffix : List k)
+      (rest_complete : Equal
+        Bool
+        (order_equiv_key k (relation_ord_leq k d) removed stored)
+        True
+        → Equal
+        Bool
+        (key_list_contains k (relation_ord_leq k d) removed rest)
+        False
+        → all_keys_in_list
+        k
+        (relation_ord_leq k d)
+        rest
+        (list_append k prefix (Cons k stored suffix))
+        → all_keys_in_list
+        k
+        (relation_ord_leq k d)
+        rest
+        (list_append k prefix suffix))
+    : Equal Bool (order_equiv_key k (relation_ord_leq k d) removed stored) True
+      → Equal Bool
+        (key_list_contains k (relation_ord_leq k d) removed (Cons k query rest))
+        False
+      → all_keys_in_list k
+        (relation_ord_leq k d)
+        (Cons k query rest)
+        (list_append k prefix (Cons k stored suffix))
+      → all_keys_in_list k
+        (relation_ord_leq k d)
+        (Cons k query rest)
+        (list_append k prefix suffix) =
+  λsame.
+    λavoid.
+      λall.
+        let
+          leq = relation_ord_leq k d;
+          original = list_append k prefix (Cons k stored suffix);
+          remaining = list_append k prefix suffix;
+          query_away =
+            cat4_bool_or_false_left
+              (order_equiv_key k leq removed query)
+              (key_list_contains k leq removed rest)
+              avoid;
+          rest_away =
+            cat4_bool_or_false_right
+              (order_equiv_key k leq removed query)
+              (key_list_contains k leq removed rest)
+              avoid;
+          head_found =
+            and_fst
+              (Equal Bool (key_list_contains k leq query original) True)
+              (all_keys_in_list k leq rest original)
+              all;
+          tail_found =
+            and_snd
+              (Equal Bool (key_list_contains k leq query original) True)
+              (all_keys_in_list k leq rest original)
+              all
+        in
+          and_intro
+            (Equal Bool (key_list_contains k leq query remaining) True)
+            (all_keys_in_list k leq rest remaining)
+            (key_list_contains_remove_other
+              k
+              leq
+              query
+              prefix
+              stored
+              suffix
+              (order_equiv_key_other_false k d removed stored query same query_away)
+              head_found)
+            (rest_complete same rest_away tail_found)
+
+theorem all_keys_in_list_remove_other
+      (k : Type)
+      (d : Ord k)
+      (removed : k)
+      (stored : k)
+      (queries : List k)
+      (prefix : List k)
+      (suffix : List k)
+    : Equal Bool (order_equiv_key k (relation_ord_leq k d) removed stored) True
+      → Equal Bool (key_list_contains k (relation_ord_leq k d) removed queries) False
+      → all_keys_in_list k
+        (relation_ord_leq k d)
+        queries
+        (list_append k prefix (Cons k stored suffix))
+      → all_keys_in_list k (relation_ord_leq k d) queries (list_append k prefix suffix) =
+  match queries {
+    Nil ↦ λsame. λavoid. λall. Proved;
+    Cons query rest ↦
+      all_keys_in_list_remove_other_cons
+        k
+        d
+        removed
+        stored
+        query
+        rest
+        prefix
+        suffix
+        (all_keys_in_list_remove_other k d removed stored rest prefix suffix)
+  }
+
+theorem list_append_remove_length
+      (k : Type) (prefix : List k) (stored : k) (suffix : List k)
+    : Equal Nat
+        (length k (list_append k prefix (Cons k stored suffix)))
+        (Suc (length k (list_append k prefix suffix))) =
+  match prefix {
+    Nil ↦ Refl;
+    Cons head tail ↦
+      cong
+        Nat
+        Nat
+        (length k (list_append k tail (Cons k stored suffix)))
+        (Suc (length k (list_append k tail suffix)))
+        Suc
+        (list_append_remove_length k tail stored suffix)
+  }
+
+theorem key_list_count_bound_occurrence
+      (k : Type)
+      (d : Ord k)
+      (head : k)
+      (tail : List k)
+      (available : List k)
+      (prefix : List k)
+      (stored : k)
+      (suffix : List k)
+      (equation : Equal (List k) available (list_append k prefix (Cons k stored suffix)))
+      (same : Equal Bool (order_equiv_key k (relation_ord_leq k d) head stored) True)
+      (away : Equal Bool (key_list_contains k (relation_ord_leq k d) head tail) False)
+      (unique_tail : Equal Bool (key_list_repeats k (relation_ord_leq k d) tail) False)
+      (all_tail : all_keys_in_list k (relation_ord_leq k d) tail available)
+      (tail_bound : (smaller : List k)
+        → Equal
+        Bool
+        (key_list_repeats k (relation_ord_leq k d) tail)
+        False
+        → all_keys_in_list
+        k
+        (relation_ord_leq k d)
+        tail
+        smaller
+        → Equal
+        Bool
+        (leq_nat (length k tail) (length k smaller))
+        True)
+    : Equal Bool (leq_nat (length k (Cons k head tail)) (length k available)) True =
+  let
+    leq = relation_ord_leq k d;
+    prior = list_append k prefix (Cons k stored suffix);
+    remaining = list_append k prefix suffix;
+    all_prior = all_keys_in_list_transport k leq tail available prior equation all_tail;
+    all_remaining =
+      all_keys_in_list_remove_other k d head stored tail prefix suffix same away all_prior;
+    bound_remaining = tail_bound remaining unique_tail all_remaining;
+    before_length = list_append_remove_length k prefix stored suffix;
+    bound_prior =
+      trans
+        Bool
+        (leq_nat (Suc (length k tail)) (length k prior))
+        (leq_nat (Suc (length k tail)) (Suc (length k remaining)))
+        True
+        (cong
+          Nat
+          Bool
+          (length k prior)
+          (Suc (length k remaining))
+          (λbound. leq_nat (Suc (length k tail)) bound)
+          before_length)
+        bound_remaining
+  in
+    trans
+      Bool
+      (leq_nat (Suc (length k tail)) (length k available))
+      (leq_nat (Suc (length k tail)) (length k prior))
+      True
+      (cong
+        (List k)
+        Bool
+        available
+        prior
+        (λkeys. leq_nat (Suc (length k tail)) (length k keys))
+        equation)
+      bound_prior
+
+theorem key_list_count_bound_step
+      (k : Type)
+      (d : Ord k)
+      (head : k)
+      (tail : List k)
+      (available : List k)
+      (tail_bound : (smaller : List k)
+        → Equal
+        Bool
+        (key_list_repeats k (relation_ord_leq k d) tail)
+        False
+        → all_keys_in_list
+        k
+        (relation_ord_leq k d)
+        tail
+        smaller
+        → Equal
+        Bool
+        (leq_nat (length k tail) (length k smaller))
+        True)
+    : Equal Bool (key_list_repeats k (relation_ord_leq k d) (Cons k head tail)) False
+      → all_keys_in_list k (relation_ord_leq k d) (Cons k head tail) available
+      → Equal Bool (leq_nat (length k (Cons k head tail)) (length k available)) True =
+  λunique.
+    λall.
+      let
+        leq = relation_ord_leq k d;
+        found_head =
+          and_fst
+            (Equal Bool (key_list_contains k leq head available) True)
+            (all_keys_in_list k leq tail available)
+            all;
+        found_tail =
+          and_snd
+            (Equal Bool (key_list_contains k leq head available) True)
+            (all_keys_in_list k leq tail available)
+            all;
+        head_away =
+          cat4_bool_or_false_left
+            (key_list_contains k leq head tail)
+            (key_list_repeats k leq tail)
+            unique;
+        tail_unique =
+          cat4_bool_or_false_right
+            (key_list_contains k leq head tail)
+            (key_list_repeats k leq tail)
+            unique
+      in
+        elim_trunc
+          (Equal Bool (leq_nat (length k (Cons k head tail)) (length k available)) True)
+          (λoccurrence.
+            match occurrence {
+              MkKeyOccurrence prefix stored suffix equation same ↦
+                key_list_count_bound_occurrence
+                  k
+                  d
+                  head
+                  tail
+                  available
+                  prefix
+                  stored
+                  suffix
+                  equation
+                  same
+                  head_away
+                  tail_unique
+                  found_tail
+                  tail_bound
+            })
+          (key_occurrence_from_contains k leq head available found_head)
+
+theorem key_list_count_bound
+      (k : Type) (d : Ord k) (queries : List k)
+    : (available : List k)
+      → Equal Bool (key_list_repeats k (relation_ord_leq k d) queries) False
+      → all_keys_in_list k (relation_ord_leq k d) queries available
+      → Equal Bool (leq_nat (length k queries) (length k available)) True =
+  match queries {
+    Nil ↦ λavailable. λunique. λall. Proved;
+    Cons head tail ↦
+      λavailable.
+        key_list_count_bound_step k d head tail available (key_list_count_bound k d tail)
+  }
+
+theorem simple_walk_length_bound
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (vertices : List k)
+    : Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
+      → Equal Bool (walk_repeats_nonterminal k (relation_ord_leq k d) source vertices) False
+      → Equal Bool (leq_nat (length k vertices) (size k Unit (dom k (Tree k Unit) r))) True =
+  λvalid.
+    λsimple.
+      let
+        leq = relation_ord_leq k d;
+        sources = walk_sources k source vertices;
+        raw = raw_outer_keys k (dom k (Tree k Unit) r);
+        fuel = size k Unit (dom k (Tree k Unit) r);
+        unique_sources =
+          trans
+            Bool
+            (key_list_repeats k leq sources)
+            (walk_repeats_nonterminal k leq source vertices)
+            False
+            (sym
+              Bool
+              (walk_repeats_nonterminal k leq source vertices)
+              (key_list_repeats k leq sources)
+              (walk_repeats_matches_sources k leq source vertices))
+            simple;
+        all_sources = walk_sources_in_raw_nodes k d r source target vertices valid;
+        count_bound = key_list_count_bound k d sources raw unique_sources all_sources;
+        sources_length = walk_sources_length k source vertices;
+        raw_length = raw_outer_keys_length k (dom k (Tree k Unit) r);
+        bound_sources =
+          trans
+            Bool
+            (leq_nat (length k sources) fuel)
+            (leq_nat (length k sources) (length k raw))
+            True
+            (cong
+              Nat
+              Bool
+              fuel
+              (length k raw)
+              (λn. leq_nat (length k sources) n)
+              (sym Nat (length k raw) fuel raw_length))
+            count_bound
+      in
+        trans
+          Bool
+          (leq_nat (length k vertices) fuel)
+          (leq_nat (length k sources) fuel)
+          True
+          (cong
+            Nat
+            Bool
+            (length k vertices)
+            (length k sources)
+            (λn. leq_nat n fuel)
+            (sym Nat (length k sources) (length k vertices) sources_length))
+          bound_sources
+
+theorem positive_walk_fits_raw_bound
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : positive_walk k (relation_ord_leq k d) r source target
+      → bounded_walk k
+        (relation_ord_leq k d)
+        r
+        (size k Unit (dom k (Tree k Unit) r))
+        source target =
+  λpath.
+    elim_trunc
+      (bounded_walk
+        k
+        (relation_ord_leq k d)
+        r
+        (size k Unit (dom k (Tree k Unit) r))
+        source
+        target)
+      (λwalk.
+        match walk {
+          MkSimpleRelationWalk vertices valid simple ↦
+            trunc_intro
+              (MkBoundedRelationWalk
+                k
+                (relation_ord_leq k d)
+                r
+                (size k Unit (dom k (Tree k Unit) r))
+                source
+                target
+                vertices
+                valid
+                (simple_walk_length_bound k d r source target vertices valid simple))
+        })
+      (positive_walk_shortens_to_simple k d r source target path)
+
+theorem reachable_plus_complete
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (x : k) (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → positive_walk k (relation_ord_leq k d) r x y
+      → reachable_plus k (relation_ord_leq k d) x y r =
+  λouter.
+    λinner.
+      λpath.
+        reachable_within_complete
+          k
+          d
+          r
+          (size k Unit (dom k (Tree k Unit) r))
+          x
+          y
+          outer
+          inner
+          (positive_walk_fits_raw_bound k d r x y path)
+
+theorem reachable_within_after_bound_complete
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (extra : Nat) (x : k) (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → Equal Bool
+        (reachable_within
+          k
+          (relation_ord_leq k d)
+          (add (size k Unit (dom k (Tree k Unit) r)) extra)
+          x
+          y
+          r)
+        True
+      → Equal Bool
+        (reachable_within k (relation_ord_leq k d) (size k Unit (dom k (Tree k Unit) r)) x y r)
+        True =
+  λouter.
+    λinner.
+      λreached.
+        reachable_plus_complete
+          k
+          d
+          r
+          x
+          y
+          outer
+          inner
+          (bounded_walk_forget
+            k
+            (relation_ord_leq k d)
+            r
+            (add (size k Unit (dom k (Tree k Unit) r)) extra)
+            x
+            y
+            (reachable_within_sound
+              k
+              d
+              r
+              (add (size k Unit (dom k (Tree k Unit) r)) extra)
+              x
+              y
+              outer
+              inner
+              reached))
+
+theorem reachable_within_saturates
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (extra : Nat) (x : k) (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → Equal Bool
+        (reachable_within
+          k
+          (relation_ord_leq k d)
+          (add (size k Unit (dom k (Tree k Unit) r)) extra)
+          x
+          y
+          r)
+        (reachable_within
+          k
+          (relation_ord_leq k d)
+          (size k Unit (dom k (Tree k Unit) r))
+          x
+          y
+          r) =
+  λouter.
+    λinner.
+      let
+        leq = relation_ord_leq k d;
+        fuel = size k Unit (dom k (Tree k Unit) r);
+        after = reachable_within k leq (add fuel extra) x y r;
+        at_bound = reachable_within k leq fuel x y r
+      in
+        bool_value_eq_from_biimpl
+          after
+          at_bound
+          (reachable_within_after_bound_complete k d r extra x y outer inner)
+          (reachable_within_monotone
+            k
+            d
+            r
+            fuel
+            (add fuel extra)
+            x
+            y
+            outer
+            inner
+            (leq_nat_add_right fuel extra))
+          (bool_dichotomy after)
+          (bool_dichotomy at_bound)
 
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
@@ -19420,12 +20585,6 @@ theorem fold_insert_value_lookup_characterization
           }
   }
 
-fn relation_option_or_empty (k : Type) (found : Option (Tree k Unit)) : Tree k Unit =
-  match found {
-    None ↦ empty k Unit;
-    Some targets ↦ targets
-  }
-
 fn relation_compose_image
       (k : Type) (leq : k → k → Bool) (s : Tree k (Tree k Unit)) (targets : Tree k Unit)
     : Tree k Unit =
@@ -20046,6 +21205,48 @@ theorem relation_duplicate_closure_walk_agree
         (Cons Nat (Suc (Suc Zero)) (Nil Nat))
         Proved))
 
+theorem relation_duplicate_closure_rejects_shadowed_target
+    : Equal Bool
+        (reachable_within
+          Nat
+          leq_nat
+          (size Nat Unit (dom Nat (Tree Nat Unit) relation_duplicate_outer))
+          Zero
+          (Suc Zero)
+          relation_duplicate_outer)
+        False =
+  Proved
+
+theorem relation_duplicate_closure_complete_without_outer_distinct
+    : reachable_plus Nat leq_nat Zero (Suc (Suc Zero)) relation_duplicate_outer =
+  reachable_plus_complete
+    Nat
+    Ord_instance_Nat
+    relation_duplicate_outer
+    Zero
+    (Suc (Suc Zero))
+    relation_duplicate_outer_ordered
+    relation_duplicate_outer_successors_ordered
+    (and_snd
+      (reachable_plus Nat leq_nat Zero (Suc (Suc Zero)) relation_duplicate_outer)
+      (positive_walk Nat leq_nat relation_duplicate_outer Zero (Suc (Suc Zero)))
+      relation_duplicate_closure_walk_agree)
+
+theorem relation_duplicate_closure_sound_without_outer_distinct
+    : positive_walk Nat leq_nat relation_duplicate_outer Zero (Suc (Suc Zero)) =
+  reachable_plus_sound
+    Nat
+    Ord_instance_Nat
+    relation_duplicate_outer
+    Zero
+    (Suc (Suc Zero))
+    relation_duplicate_outer_ordered
+    relation_duplicate_outer_successors_ordered
+    (and_fst
+      (reachable_plus Nat leq_nat Zero (Suc (Suc Zero)) relation_duplicate_outer)
+      (positive_walk Nat leq_nat relation_duplicate_outer Zero (Suc (Suc Zero)))
+      relation_duplicate_closure_walk_agree)
+
 theorem relation_duplicate_lookup_misses_right_duplicate
     : Equal Bool
         (set_member Nat leq_nat (Suc Zero) (succ Nat leq_nat Zero relation_duplicate_outer))
@@ -20491,15 +21692,21 @@ Type-level `RelationWalk`/`BoundedRelationWalk` constructors and exposing only
 their truncations as propositions. `reachable_within_sound` and
 `reachable_within_complete` establish both directions at every fuel, and
 `reachable_within_bounded_correspondence` assembles their exact propositions.
-The ordered-successor lookup, all-keys membership, and parameter-step fold lemmas
-relate each visited successor to the same lookup-defined edge. This bounded
-correspondence does not prove full-closure faithfulness or saturation at
-`size (dom r)`; those obligations remain separate.
+The ordered-successor lookup, all-keys membership, and parameter-step fold
+lemmas relate each visited successor to the same lookup-defined edge.
+`walk_repeat_shortens` constructs a strictly shorter positive path from a
+repeated nonterminal source; list-length fuel yields a repeat-free witness.
+`raw_outer_keys` lists every node, including duplicates, and its length equals
+`size (dom r)`. The private key-occurrence removal proof injects the
+non-order-equivalent source keys into those raw nodes. This closes
+`reachable_plus_complete` at the public bound and the Boolean equality in
+`reachable_within_saturates` for any extra fuel, without outer `Distinct`.
+Only the general converse membership equivalence remains deferred.
 
 **Consumers.** The selectively importable closure surface serves programs
 parameterized over abstract `Tree` values. The broader checked theory remains
 module-private; this surface neither constructs trees nor supplies the
-representation premises needed by the remaining converse and closure proofs.
+representation premises needed by the remaining converse proof.
 
 **Validation evidence.** `ken check` elaborates this entry's tangled source
 fences; the catalog checks its capstone laws and keyed operations.
