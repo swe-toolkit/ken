@@ -11981,7 +11981,6 @@ impl<'a> Lowering<'a> {
         &mut self,
         builder: &FunctionBuilder<'_>,
         frame_id: u64,
-        origin: Option<StaticOriginId>,
     ) -> Result<(), CraneliftBackendError> {
         if self.active_subcontinuation_frame.is_some() {
             return Err(unsupported(
@@ -11994,7 +11993,7 @@ impl<'a> Lowering<'a> {
         self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
             "OrientedSubcontinuationPlanV1",
             "checked Runtime frame marker entered outside a generated Function scope",
-        ))?.record(builder, FrameEventKind::Activation, (invocation_id, frame_id), origin)?;
+        ))?.record(builder, FrameEventKind::Activation, (invocation_id, frame_id))?;
         self.active_subcontinuation_frame = Some(frame_id);
         Ok(())
     }
@@ -12707,7 +12706,6 @@ impl<'a> Lowering<'a> {
         builder: &FunctionBuilder<'_>,
         cases: &[crate::RuntimeComputationalMatchCase],
         default: &RuntimeTrap,
-        origin: Option<StaticOriginId>,
     ) -> Result<Option<u64>, CraneliftBackendError> {
         let Some(frame_id) = self.active_subcontinuation_frame.take() else {
             return Ok(None);
@@ -12749,7 +12747,7 @@ impl<'a> Lowering<'a> {
         self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
             "OrientedSubcontinuationPlanV1",
             "checked Runtime frame receipt emitted outside a generated Function scope",
-        ))?.record(builder, FrameEventKind::Receipt, (invocation_id, frame_id), origin)?;
+        ))?.record(builder, FrameEventKind::Receipt, (invocation_id, frame_id))?;
         // Preserve the branch-scope ledger until its separately owned cleanup;
         // traversal-order membership no longer decides runtime-path uniqueness.
         self.consumed_subcontinuation_frames.insert((invocation_id, frame_id));
@@ -12788,9 +12786,8 @@ impl<'a> Lowering<'a> {
         builder: &FunctionBuilder<'_>,
         cases: &[crate::RuntimeComputationalMatchCase],
         default: &RuntimeTrap,
-        origin: StaticOriginId,
     ) -> Result<CheckedComputationalFrame, CraneliftBackendError> {
-        let id = self.consume_checked_subcontinuation_frame(builder, cases, default, Some(origin))?;
+        let id = self.consume_checked_subcontinuation_frame(builder, cases, default)?;
         Ok(CheckedComputationalFrame {
             id,
             invocation_id: id.map(|_| {

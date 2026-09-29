@@ -794,7 +794,7 @@ impl<'a> Lowering<'a> {
                     expr
                 } {
                     RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
-                        self.enter_checked_subcontinuation_frame(builder, frame_id, Some(static_origin))?;
+                        self.enter_checked_subcontinuation_frame(builder, frame_id)?;
                         SourceMachineState::Eval {
                             expr: self.owned_child_occurrence(static_origin, 0, *body)?,
                             env,
@@ -1236,7 +1236,7 @@ impl<'a> Lowering<'a> {
                         default,
                     } => {
                         let checked_frame_id =
-                            self.consume_checked_subcontinuation_frame(builder, &cases, &default, Some(static_origin))?;
+                            self.consume_checked_subcontinuation_frame(builder, &cases, &default)?;
                         control.continuation = SourceContinuation::ComputationalMatchScrutinee {
                             cases,
                             default,

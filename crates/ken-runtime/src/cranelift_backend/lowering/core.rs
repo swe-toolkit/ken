@@ -3278,7 +3278,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         // `D8m` — the shared derivation. ⛔ Not re-spelled here: the checked
         // bridge must carry this exact tuple, and two spellings is how they part.
-        let checked = self.checked_computational_frame(builder, cases, default, static_origin)?;
+        let checked = self.checked_computational_frame(builder, cases, default)?;
         let provenance = self.mint_recursor_frame_provenance();
         self.lower_computational_producer_expr(
             builder,
@@ -3529,7 +3529,7 @@ impl<'a> Lowering<'a> {
                     default,
                 } => {
                     self.enter_source_occurrence_plan(current.static_origin)?;
-                    let checked = self.checked_computational_frame(builder, cases, default, current.static_origin)?;
+                    let checked = self.checked_computational_frame(builder, cases, default)?;
                     let provenance = self.mint_recursor_frame_provenance();
                     composed_eliminators.insert(
                         0,
@@ -3561,7 +3561,7 @@ impl<'a> Lowering<'a> {
         self.enter_source_occurrence_plan(static_origin)?;
         match scrutinee {
             RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
-                self.enter_checked_subcontinuation_frame(builder, *frame_id, Some(static_origin))?;
+                self.enter_checked_subcontinuation_frame(builder, *frame_id)?;
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 let result = self.lower_computational_producer_expr(
                     builder,
@@ -3776,7 +3776,7 @@ impl<'a> Lowering<'a> {
                 // no intermediate aggregate is materialized or exit-lowered.
                 let mut composed = Vec::with_capacity(eliminators.len() + 1);
                 let provenance = self.mint_recursor_frame_provenance();
-                let checked = self.checked_computational_frame(builder, inner_cases, inner_default, static_origin)?;
+                let checked = self.checked_computational_frame(builder, inner_cases, inner_default)?;
                 composed.push(EliminatorFrame::Computational(
                     ComputationalEliminatorFrame {
                         cases: inner_cases,
@@ -4071,8 +4071,8 @@ impl<'a> Lowering<'a> {
         // The scope's `close` still requires the frame to have been consumed:
         // if the suffix somehow did not consume it, the fused body ends with a
         // marker active and is refused rather than silently emitting.
-        self.enter_checked_subcontinuation_frame(builder, checked_frame_id, Some(continuation_origin))?;
-        let checked = self.checked_computational_frame(builder, cases, default, continuation_origin)?;
+        self.enter_checked_subcontinuation_frame(builder, checked_frame_id)?;
+        let checked = self.checked_computational_frame(builder, cases, default)?;
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE SPLICE CAPABILITY IS
         // ---- RETIRED HERE, NOT RE-SEATED. Architect `evt_6bm54j10w1n88`.
         //
@@ -7012,7 +7012,7 @@ impl<'a> Lowering<'a> {
                         self.defining_function_id,
                         crate::cranelift_backend::lowering::D8mBridgeArm::CheckedComputational,
                     );
-                    self.enter_checked_subcontinuation_frame(builder, frame_id, Some(static_origin))?;
+                    self.enter_checked_subcontinuation_frame(builder, frame_id)?;
                     // ⛔ `D8m` — CONSUME WITH A SHAPE THE SOURCE MATCH
                     // DOES NOT CARRY, under test only. Same marker, same
                     // cases, one field of the default changed: the
@@ -7034,7 +7034,7 @@ impl<'a> Lowering<'a> {
                     };
                     // ⭐ `D8m` — the SAME derivation the direct path
                     // uses, whole. All four facts, not the id alone.
-                    let checked = self.checked_computational_frame(builder, cases, consumed_default, static_origin)?;
+                    let checked = self.checked_computational_frame(builder, cases, consumed_default)?;
                     // ⛔ `D8m` — SUPPRESS THE TRANSPORTED TUPLE, under
                     // test only. The marker is still entered and
                     // consumed above, so the plan side is untouched and
@@ -15381,7 +15381,7 @@ impl<'a> Lowering<'a> {
                 result
             }
             RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
-                self.enter_checked_subcontinuation_frame(builder, *frame_id, Some(static_origin))?;
+                self.enter_checked_subcontinuation_frame(builder, *frame_id)?;
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 let result = self.lower_expr(builder, body, env);
                 if self.active_subcontinuation_frame.take().is_some() {

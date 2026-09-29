@@ -27,7 +27,7 @@ enum Shape {
 
 fn event(builder: &FunctionBuilder<'_>, events: &mut FrameEvents, kind: FrameEventKind) {
     events
-        .record(builder, kind, KEY, None)
+        .record(builder, kind, KEY)
         .expect("event position");
 }
 

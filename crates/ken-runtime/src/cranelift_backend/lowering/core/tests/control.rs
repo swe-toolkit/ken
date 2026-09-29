@@ -840,21 +840,21 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
 
     // First consume on the path succeeds.
     compiler
-        .enter_checked_subcontinuation_frame(&builder, frame_id, None)
+        .enter_checked_subcontinuation_frame(&builder, frame_id)
         .expect("first enter of the checked frame");
     assert_eq!(
         compiler
-            .consume_checked_subcontinuation_frame(&builder, &cases, &default, None)
+            .consume_checked_subcontinuation_frame(&builder, &cases, &default)
             .expect("first consume of the checked frame succeeds"),
         Some(frame_id)
     );
 
     // The second activation follows a discharge, so E2 alone refuses at close.
     compiler
-        .enter_checked_subcontinuation_frame(&builder, frame_id, None)
+        .enter_checked_subcontinuation_frame(&builder, frame_id)
         .expect("second enter re-marks the active frame");
     compiler
-        .consume_checked_subcontinuation_frame(&builder, &cases, &default, None)
+        .consume_checked_subcontinuation_frame(&builder, &cases, &default)
         .expect("second consume is deferred until completed CFG validation");
     let zero = builder.ins().iconst(types::I64, 0);
     builder.ins().return_(&[zero]);

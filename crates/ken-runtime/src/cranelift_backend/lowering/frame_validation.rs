@@ -10,7 +10,7 @@ use cranelift_codegen::flowgraph::ControlFlowGraph;
 use cranelift_codegen::ir::{types, Block, Function, Inst, InstructionData, Opcode, ValueDef};
 use cranelift_frontend::FunctionBuilder;
 
-use super::{unsupported, CraneliftBackendError, StaticOriginId};
+use super::{unsupported, CraneliftBackendError};
 
 pub(super) type FrameKey = (u64, u64);
 
@@ -26,7 +26,6 @@ pub(super) struct FrameEvent {
     pub key: FrameKey,
     pub block: Block,
     pub after: Option<Inst>,
-    pub origin: Option<StaticOriginId>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -115,7 +114,6 @@ impl FrameEvents {
         builder: &FunctionBuilder<'_>,
         kind: FrameEventKind,
         key: FrameKey,
-        origin: Option<StaticOriginId>,
     ) -> Result<(), CraneliftBackendError> {
         let block = builder.current_block().ok_or_else(|| {
             refusal("checked Runtime frame marker event has no current Function block")
@@ -125,7 +123,6 @@ impl FrameEvents {
             key,
             block,
             after: builder.func.layout.last_inst(block),
-            origin,
         });
         Ok(())
     }
