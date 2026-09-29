@@ -17097,7 +17097,12 @@ theorem bounded_walk_raise
                   y
                   vertices
                   valid
-                  ((Ord_instance_Nat).trans (length k vertices) smaller larger fits increasing))
+                  ((proof trans for leq_nat)
+                    (length k vertices)
+                    smaller
+                    larger
+                    fits
+                    increasing))
           })
         bounded
 
@@ -17115,7 +17120,7 @@ theorem leq_nat_right_successor
 
 theorem leq_nat_add_right (a : Nat) (extra : Nat) : Equal Bool (leq_nat a (add a extra)) True =
   match extra {
-    Zero ↦ (Ord_instance_Nat).refl a;
+    Zero ↦ (proof refl for leq_nat) a;
     Suc rest ↦ leq_nat_right_successor a (add a rest) (leq_nat_add_right a rest)
   }
 
@@ -17723,7 +17728,7 @@ theorem strict_source_splice_length
           (length k (list_append k prefix (Cons k repeat (Cons k next rest)))))
         True =
   match prefix {
-    Nil ↦ (Ord_instance_Nat).refl (Suc (length k (Cons k next rest)));
+    Nil ↦ (proof refl for leq_nat) (Suc (length k (Cons k next rest)));
     Cons at tail ↦
       leq_nat_right_successor
         (Suc (length k (Cons k next rest)))
@@ -18183,7 +18188,7 @@ theorem walk_simple_with_fuel_repeat
                 tail_complete
                   shortened
                   short_valid
-                  ((Ord_instance_Nat).trans
+                  ((proof trans for leq_nat)
                     (Suc (length k shortened))
                     (length k vertices)
                     (Suc fuel)
@@ -18257,7 +18262,7 @@ theorem positive_walk_shortens_to_simple
               (length k vertices)
               vertices
               valid
-              ((Ord_instance_Nat).refl (length k vertices))
+              ((proof refl for leq_nat) (length k vertices))
         })
       path
 
