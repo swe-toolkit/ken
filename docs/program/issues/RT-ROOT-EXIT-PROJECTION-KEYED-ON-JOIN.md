@@ -72,9 +72,15 @@ arms must produce scalar Int or Bool values" refusal.
   - An Option-armed join under the root flag now refuses with the existing
     message.
   - A green exit-status join (Success and Failure n arms) keeps its codes.
+  - Third witness (Architect `evt_215bv807te16m`): the TREE-MATCH byte-1
+    row, a carried ExitCode constructor delivered by a
+    continuation-specialization result edge, passes un-ignored with native
+    parity. It exists once TREE-MATCH lands, as an ignored row whose reason
+    names this WP.
 - **AC-2 (control).**
   - Reverting the repair returns px7n to the `units.rs:9389` tag-5 refusal
-    and re-admits the Option row as `-2`.
+    and re-admits the Option row as `-2`. The byte-1 row returns to the
+    same tag-5 refusal at the root guard.
   - Every test the census names stays green, or it is reported with its
     verbatim refusal.
 
