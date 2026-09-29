@@ -17008,6 +17008,43 @@ theorem reachable_within_complete
               bounded
   }
 
+theorem reachable_within_bounded_correspondence
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (fuel : Nat) (x : k) (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → And
+        (Equal
+          Bool
+          (reachable_within k (relation_ord_leq k d) fuel x y r)
+          True
+          → bounded_walk
+          k
+          (relation_ord_leq k d)
+          r
+          fuel
+          x
+          y)
+        (bounded_walk
+          k
+          (relation_ord_leq k d)
+          r
+          fuel
+          x
+          y
+          → Equal
+          Bool
+          (reachable_within k (relation_ord_leq k d) fuel x y r)
+          True) =
+  λouter.
+    λinner.
+      and_intro
+        (Equal Bool (reachable_within k (relation_ord_leq k d) fuel x y r) True
+        → bounded_walk k (relation_ord_leq k d) r fuel x y)
+        (bounded_walk k (relation_ord_leq k d) r fuel x y
+        → Equal Bool (reachable_within k (relation_ord_leq k d) fuel x y r) True)
+        (reachable_within_sound k d r fuel x y outer inner)
+        (reachable_within_complete k d r fuel x y outer inner)
+
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
     : Tree k (Tree k Unit) =
@@ -19068,8 +19105,9 @@ The bounded-reachability family (§4.7.12) independently checks a nonempty
 vertex list with `relation_walk_bool`, carrying its certificate in the private
 Type-level `RelationWalk`/`BoundedRelationWalk` constructors and exposing only
 their truncations as propositions. `reachable_within_sound` and
-`reachable_within_complete` establish both directions at every fuel. The
-ordered-successor lookup, all-keys membership, and parameter-step fold lemmas
+`reachable_within_complete` establish both directions at every fuel, and
+`reachable_within_bounded_correspondence` assembles their exact propositions.
+The ordered-successor lookup, all-keys membership, and parameter-step fold lemmas
 relate each visited successor to the same lookup-defined edge. This bounded
 correspondence does not prove full-closure faithfulness or saturation at
 `size (dom r)`; those obligations remain separate.
