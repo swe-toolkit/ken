@@ -594,7 +594,10 @@ pub fn reachable_plus (k : Type) (leq : k -> k -> Bool)
   characterization in which `rel_member x z (compose R S)` reflects
   `succ x (compose R S) = ⋃ { succ y S : y ∈ succ x R }`. The `Distinct`
   condition is a law premise, not an extra function argument; successor-set
-  distinctness is not required for Boolean membership.
+  distinctness is not required for Boolean membership. For the value-flip
+  fixtures below, choose pairwise-distinct `Nat` keys `a`, `b`, and `c`, so
+  neither positive/negative query pair collapses to the same membership check;
+  this is a fixture discriminator, not a premise of the general laws.
 - expect: **value-flip on relation membership.** With `R = {a→b}`:
   `rel_member b a (converse R)` holds while `rel_member a b (converse R)`
   reduces to `IsTrue False`. With `R = {a→b}`, `S = {b→c}`:
