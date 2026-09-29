@@ -272,10 +272,13 @@ and a small binary-relations library (`succ`/`compose`/`converse`/
 `reachable_plus`/`is_equivalence`, …) built on `Tree k (Tree k Unit)` as an
 adjacency-map representation. These operations use the same `Ordered`/`lookup`
 vocabulary as the capstone. The keyed-collection subsections provide the stated
-preservation and lookup proofs. The relation operations are transparent
-checked definitions with concrete computation tests; general compose/converse
-membership results and closure faithfulness and saturation proofs remain
-separate obligations.
+preservation and lookup proofs. The relation operations are transparent checked
+definitions. Under outer `Ordered` and `Distinct` on the left relation, with
+reflexivity and transitivity witnesses for the shared comparator, §4.7.12
+proves the successor-set union characterization of `compose` and its membership
+corollary. A checked `Nat` chain refutes transitivity until its missing `0→2`
+edge is added. General converse membership and closure faithfulness and
+saturation proofs remain separate obligations.
 
 ## 4. Laws & proofs
 
@@ -17451,12 +17454,17 @@ comparison-independent structural induction
 (`insert_preserves_all_keys`/`all_keys_trans_*`, §4.3) → the convoy-idiom
 recursive assembly (every law's own top-level `fn`, §4.1–§4.6, §4.7.5–§4.7.10)
 → `member`-extensionality against a lookup-table characterization (the
-`Set`-level algebraic laws, §4.7.11).
+`Set`-level algebraic laws, §4.7.11) → fold-insert lookup characterization
+and successor-set equality for composition (`compose_successors_union` and
+`compose_member_union`, §4.7.12). The composition proof uses outer `Ordered`
+and `Distinct` plus reflexivity and transitivity witnesses for the shared
+comparator; it does not establish the general converse membership equivalence
+or closure faithfulness and saturation.
 
 **Consumers.** The selectively importable closure surface serves programs
 parameterized over abstract `Tree` values. The broader checked theory remains
 module-private; this surface neither constructs trees nor supplies the
-representation premises needed by the deferred correspondence proofs.
+representation premises needed by the remaining converse and closure proofs.
 
 **Validation evidence.** `ken check` elaborates this entry's tangled source
 fences; the catalog checks its capstone laws and keyed operations.
