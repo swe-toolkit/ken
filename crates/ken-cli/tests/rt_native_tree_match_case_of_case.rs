@@ -51,6 +51,52 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   }
 "#;
 
+// The shared ExitCode bind from the checked R2 fixture at 4f101bba0. Unlike
+// SOURCE, its two effectful arms return through one continuation; the D1
+// producer-local route must be taken rather than the ordinary Match emitter.
+#[cfg(target_os = "linux")]
+const SHARED_BIND_SOURCE: &str = r#"program capabilities FS APartial
+proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
+  bind (Coproduct (FSOp APartial) AmbientOp)
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+    ExitCode ExitCode
+    (match (match eq_int (uint8_to_int byte) 1 {
+      True |-> Success;
+      False |-> Failure 7
+    }) {
+      Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
+        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+        Unit ExitCode
+        (host_console APartial Unit (print_line "accepted"))
+        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+          ExitCode Success);
+      Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
+        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+        Unit ExitCode
+        (host_console APartial Unit (print_line "rejected"))
+        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+          ExitCode (Failure code))
+    })
+    (\code. host_exit APartial code)
+
+proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit APartial (Failure 90);
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit APartial (Failure 91);
+        Cons argument _more |-> match bytes_at argument 0 {
+          None |-> host_exit APartial (Failure 92);
+          Some byte |-> decide byte
+        }
+      }
+    }
+  }
+"#;
+
 #[cfg(target_os = "linux")]
 #[test]
 fn console_direct_exit_nested_match_uses_existing_route() {
@@ -135,6 +181,106 @@ fn console_direct_exit_nested_match_uses_existing_route() {
                 ken_runtime::HostOpV1::ConsoleWrite
             ]
         );
+        assert_eq!(
+            native_ops, interp_ops,
+            "the effects must agree for byte {byte}"
+        );
+    }
+}
+
+// Spec: 42 §3.3 and §6 (one selected arm, ordered effects); 45 §4
+// (native/interpreter agreement). Promise class: durable invariant.
+// MEASURED: one checked fixture's D1 route hits and both interpreter/native
+// ground observations on the same byte inputs. CLAIMED: D1 preserves both
+// effectful ExitCode branches through the shared continuation. THE GAP: route
+// hits alone cannot prove either branch ran, and build-only success is not
+// parity; the distinct Console zero-hit pin above checks the other route.
+#[cfg(target_os = "linux")]
+#[test]
+fn shared_bind_exit_code_matches_both_arms_on_d1_route() {
+    let dir = tempfile::tempdir().unwrap();
+    let arms = [
+        (1_u8, b"accepted\n".as_slice(), 0),
+        (2_u8, b"rejected\n".as_slice(), 7),
+    ];
+    let mut reference = Vec::new();
+    for (byte, stdout, exit) in arms {
+        let mut host = ken_interp::PosixHost::new_at(dir.path());
+        let interpreted = ken_cli::run_program_effect_observation(
+            SHARED_BIND_SOURCE,
+            ken_cli::SourceFormat::Ken,
+            &[b"ken".to_vec(), vec![byte]],
+            &[],
+            dir.path().as_os_str().as_encoded_bytes(),
+            &mut host,
+        )
+        .expect("shared-bind source runs in the interpreter for this byte");
+        let interp_ops: Vec<_> = interpreted
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect();
+        assert_eq!(
+            interpreted.stdout, stdout,
+            "interpreter arm for byte {byte}"
+        );
+        assert_eq!(
+            interpreted.exit_status, exit,
+            "interpreter exit for byte {byte}"
+        );
+        assert_eq!(interp_ops, vec![ken_runtime::HostOpV1::ConsoleWrite]);
+        reference.push((byte, stdout, exit, interpreted));
+    }
+
+    let (artifact, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
+        ken_cli::build_native_program(
+            SHARED_BIND_SOURCE,
+            ken_cli::SourceFormat::Ken,
+            "rt-tree-exit-shared-bind",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    eprintln!("RT_TREE_ROUTE_CENSUS shared_bind_hits={d1_hits}");
+    assert!(
+        d1_hits > 0,
+        "the shared bind must execute D1, not only compile"
+    );
+    let artifact = artifact.expect("the D1 shared-bind ExitCode fixture emits a native artifact");
+    for (byte, stdout, exit, interpreted) in reference {
+        let native = ken_runtime::run_bound_process_effect_observation(
+            &artifact.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: vec![std::ffi::OsString::from_vec(vec![byte])],
+                environment: Vec::new(),
+                cwd: dir.path().to_owned(),
+                plan_hash: artifact.plan_transport_hash,
+            },
+        )
+        .expect("the checked native artifact runs on this byte");
+        let native_ops: Vec<_> = native
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect();
+        let interp_ops: Vec<_> = interpreted
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect();
+        assert_eq!(
+            native.stdout, stdout,
+            "wrong native branch for byte {byte}: {native:?}"
+        );
+        assert_eq!(
+            native.exit_status, exit,
+            "wrong native exit for byte {byte}: {native:?}"
+        );
+        assert_eq!(native.stdout, interpreted.stdout);
+        assert_eq!(native.exit_status, interpreted.exit_status);
+        assert_eq!(native.terminal_error, interpreted.terminal_error);
+        assert_eq!(native.terminal_exit, interpreted.terminal_exit);
+        assert_eq!(native_ops, vec![ken_runtime::HostOpV1::ConsoleWrite]);
         assert_eq!(
             native_ops, interp_ops,
             "the effects must agree for byte {byte}"
