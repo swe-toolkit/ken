@@ -397,18 +397,205 @@ fn checked_cc4_chain_has_zero_trusted_base_delta() {
 
 #[test]
 fn exact_non_degenerate_injections_preserve_every_location_field() {
+    fn owned_constructor(
+        env: &ElabEnv,
+        owned: &[GlobalId],
+        module: &str,
+        family: &str,
+        name: &str,
+    ) -> GlobalId {
+        let family_id = catalog_or::provider_owned_id(env, owned, module, family)
+            .unwrap_or_else(|error| panic!("{module} must own {family}: {error}"));
+        let constructors = env
+            .env
+            .inductive(family_id)
+            .expect("an owned constructor parent must be an inductive")
+            .constructors
+            .iter()
+            .map(|constructor| constructor.id)
+            .collect::<Vec<_>>();
+        catalog_or::provider_owned_id(env, &constructors, module, name)
+            .unwrap_or_else(|error| panic!("{module}.{name} must belong to {family}: {error}"))
+    }
+    fn owned_ctor_args(value: &EvalVal, expected: GlobalId) -> &[EvalVal] {
+        match value {
+            EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
+            other => panic!("expected checked constructor {expected:?}, got {other:?}"),
+        }
+    }
+    fn checked_owner_example(env: &ElabEnv, owned: &[GlobalId], module: &str, name: &str) -> Term {
+        let id = *env
+            .globals
+            .get(name)
+            .unwrap_or_else(|| panic!("{module} checked example {name} must elaborate"));
+        assert!(!owned.contains(&id), "{name} must not be provider-owned");
+        assert!(
+            !env.globals.contains_key(&format!("{module}.{name}")),
+            "{name} must not be a qualified provider declaration"
+        );
+        let (_, body) = env
+            .env
+            .transparent_body(id)
+            .expect("owner example must be a checked transparent definition");
+        body
+    }
+    let root = catalog_or::catalog_root();
+    let dc = "Capability.Diagnostics.Core";
+    let cursor = "Capability.Parsing.Cursor";
+    let mut dc_owner = ElabEnv::new().expect("DC owner base environment");
+    let dc_owned = dc_owner
+        .elaborate_module_from_roots(std::slice::from_ref(&root), dc)
+        .expect("Diagnostics.Core must roots-load");
+    let dc_trust_before: BTreeSet<_> = dc_owner.env.trusted_base().into_iter().collect();
+    dc_owner
+        .execute_loaded_entry_checked_fences(dc)
+        .expect("Diagnostics.Core's private examples must check in owner scope");
+    assert_eq!(
+        dc_owner
+            .env
+            .trusted_base()
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
+        dc_trust_before,
+        "DC examples must add no trust"
+    );
+    let dc_source_id = owned_constructor(&dc_owner, &dc_owned, dc, "SourceId", "MkSourceId");
+    let dc_env_origin =
+        catalog_or::provider_owned_id(&dc_owner, &dc_owned, dc, "environment_origin")
+            .expect("DC must own its private environment-origin helper");
+    let dc_config_origin =
+        catalog_or::provider_owned_id(&dc_owner, &dc_owned, dc, "config_key_origin")
+            .expect("DC must own its private config-origin helper");
+    let dc_source_body = checked_owner_example(
+        &dc_owner,
+        &dc_owned,
+        dc,
+        "diagnostics_example_source_id_four",
+    );
+    let dc_environment_body = checked_owner_example(
+        &dc_owner,
+        &dc_owned,
+        dc,
+        "diagnostics_example_environment_origin_path",
+    );
+    let dc_config_body = checked_owner_example(
+        &dc_owner,
+        &dc_owned,
+        dc,
+        "diagnostics_example_config_key_origin_path",
+    );
+    assert!(term_mentions(&dc_source_body, dc_source_id));
+    assert!(term_mentions(&dc_environment_body, dc_env_origin));
+    assert!(term_mentions(&dc_config_body, dc_config_origin));
+
+    let mut cursor_owner = ElabEnv::new().expect("Cursor owner base environment");
+    let cursor_owned = cursor_owner
+        .elaborate_module_from_roots(std::slice::from_ref(&root), cursor)
+        .expect("Cursor must roots-load with its public DC dependency");
+    let cursor_trust_before: BTreeSet<_> = cursor_owner.env.trusted_base().into_iter().collect();
+    cursor_owner
+        .execute_loaded_entry_checked_fences(cursor)
+        .expect("Cursor's private example must check in owner scope");
+    assert_eq!(
+        cursor_owner
+            .env
+            .trusted_base()
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
+        cursor_trust_before,
+        "Cursor examples must add no trust"
+    );
+    let cursor_origin =
+        catalog_or::provider_owned_id(&cursor_owner, &cursor_owned, cursor, "arg_location_origin")
+            .expect("Cursor must own its private argument-origin bridge");
+    let cursor_dc_owned = cursor_owner
+        .elaborate_module_from_roots(std::slice::from_ref(&root), dc)
+        .expect("Cursor's public DC dependency must retain its checked owner");
+    let public_source_id =
+        catalog_or::provider_owned_id(&cursor_owner, &cursor_dc_owned, dc, "source_id_from_nat")
+            .expect("DC must own its public source identifier constructor function");
+    let cursor_source_body = checked_owner_example(
+        &cursor_owner,
+        &cursor_owned,
+        cursor,
+        "cursor_example_source_origin_span",
+    );
+    let cursor_argument_body = checked_owner_example(
+        &cursor_owner,
+        &cursor_owned,
+        cursor,
+        "cursor_example_argument_origin_range",
+    );
+    let cursor_private_dc_source = owned_constructor(
+        &cursor_owner,
+        &cursor_dc_owned,
+        dc,
+        "SourceId",
+        "MkSourceId",
+    );
+    assert!(term_mentions(&cursor_source_body, public_source_id));
+    assert!(!term_mentions(
+        &cursor_source_body,
+        cursor_private_dc_source
+    ));
+    assert!(term_mentions(&cursor_argument_body, cursor_origin));
+    assert!(!term_mentions(
+        &cursor_argument_body,
+        cursor_private_dc_source
+    ));
+
+    for (module, examples) in [
+        (
+            dc,
+            &[
+                "diagnostics_example_source_id_four",
+                "diagnostics_example_environment_origin_path",
+                "diagnostics_example_config_key_origin_path",
+            ][..],
+        ),
+        (
+            cursor,
+            &[
+                "cursor_example_source_origin_span",
+                "cursor_example_argument_origin_range",
+            ][..],
+        ),
+    ] {
+        let mut client = ElabEnv::new().expect("example privacy client");
+        client
+            .elaborate_module_from_roots(std::slice::from_ref(&root), module)
+            .expect("example privacy provider must roots-load");
+        for name in examples {
+            let error = client
+                .elaborate_file(&format!("import {module} ({name})"))
+                .expect_err("owner examples must not be public imports");
+            assert!(
+                matches!(error, ElabError::UnboundName { .. }),
+                "{module}.{name} must refuse selective import, got {error:?}"
+            );
+        }
+    }
+
     let mut env = full_env();
+    env.elaborate_file(
+        r#"import Capability.Diagnostics.Core
+          (SourceId, Origin, SourceOrigin, ArgumentOrigin, EnvironmentOrigin,
+           ConfigKeyOrigin, MkByteRange, MkDiagnostic, MkDiagnosticCode,
+           ValidByteRange, ValidOrigin, source_id_from_nat)
+        import Capability.Parsing.Cursor (ArgLocation, MkArgLocation)"#,
+    )
+    .expect("CC4's public DC and Cursor prerequisites must import");
     env.elaborate_file(
         r#"
         const cc4_source_origin : Origin =
           span_origin
-            (MkSourceId (Suc (Suc (Suc (Suc Zero)))))
+            (source_id_from_nat (Suc (Suc (Suc (Suc Zero)))))
             (MkSpan (Suc (Suc Zero)) (Suc (Suc (Suc (Suc (Suc Zero))))))
 
         const cc4_argument_origin : Origin =
-          arg_location_origin
-            (MkArgLocation
-              (Suc (Suc Zero))
+          ArgumentOrigin
+            (Suc (Suc Zero))
+            (MkByteRange
               (Suc (Suc (Suc Zero)))
               (Suc (Suc (Suc Zero))))
 
@@ -420,9 +607,11 @@ fn exact_non_degenerate_injections_preserve_every_location_field() {
           Proved
 
         const cc4_environment_name : String = "PATH"
+        const cc4_environment_origin : Origin = EnvironmentOrigin cc4_environment_name
+        const cc4_config_origin : Origin = ConfigKeyOrigin (Cons String "PATH" (Nil String))
 
         theorem cc4_valid_environment :
-            ValidOrigin (environment_origin cc4_environment_name) =
+            ValidOrigin (EnvironmentOrigin cc4_environment_name) =
           Proved
         "#,
     )
@@ -436,43 +625,146 @@ fn exact_non_degenerate_injections_preserve_every_location_field() {
         "start > end must fail specifically at kernel checking, got {invalid:?}"
     );
     let empty_config = env.elaborate_decl(
-        "theorem cc4_empty_config : ValidOrigin (config_key_origin (Nil String)) = Proved",
+        "theorem cc4_empty_config : ValidOrigin (ConfigKeyOrigin (Nil String)) = Proved",
     );
     assert!(
         matches!(empty_config, Err(ElabError::KernelRejected { .. })),
         "an empty config key path must fail at kernel checking, got {empty_config:?}"
     );
 
+    let client_dc_owned = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), dc)
+        .expect("DC owner identities must remain available to the CC4 host");
+    let client_source_id = owned_constructor(&env, &client_dc_owned, dc, "SourceId", "MkSourceId");
+    let source_origin_id = owned_constructor(&env, &client_dc_owned, dc, "Origin", "SourceOrigin");
+    let argument_origin_id =
+        owned_constructor(&env, &client_dc_owned, dc, "Origin", "ArgumentOrigin");
+    let environment_origin_id =
+        owned_constructor(&env, &client_dc_owned, dc, "Origin", "EnvironmentOrigin");
+    let config_origin_id =
+        owned_constructor(&env, &client_dc_owned, dc, "Origin", "ConfigKeyOrigin");
+    let byte_range_id = owned_constructor(&env, &client_dc_owned, dc, "ByteRange", "MkByteRange");
+    let diagnostic_id = owned_constructor(&env, &client_dc_owned, dc, "Diagnostic", "MkDiagnostic");
+    let diagnostic_code_id = owned_constructor(
+        &env,
+        &client_dc_owned,
+        dc,
+        "DiagnosticCode",
+        "MkDiagnosticCode",
+    );
     let mut store = make_store(&env);
 
     let source = eval_global(&env, &mut store, "cc4_source_origin");
-    let source_fields = ctor_args(&env, &source, "SourceOrigin");
-    let source_id = ctor_args(&env, &source_fields[0], "MkSourceId");
+    let source_fields = owned_ctor_args(&source, source_origin_id);
+    let source_id = owned_ctor_args(&source_fields[0], client_source_id);
     assert_eq!(nat_count(&env, &source_id[0]), 4);
-    let source_range = ctor_args(&env, &source_fields[1], "MkByteRange");
+    let source_range = owned_ctor_args(&source_fields[1], byte_range_id);
     assert_eq!(nat_count(&env, &source_range[0]), 2);
     assert_eq!(nat_count(&env, &source_range[1]), 5);
 
     let argument = eval_global(&env, &mut store, "cc4_argument_origin");
-    let argument_fields = ctor_args(&env, &argument, "ArgumentOrigin");
+    let argument_fields = owned_ctor_args(&argument, argument_origin_id);
     assert_eq!(nat_count(&env, &argument_fields[0]), 2);
-    let argument_range = ctor_args(&env, &argument_fields[1], "MkByteRange");
+    let argument_range = owned_ctor_args(&argument_fields[1], byte_range_id);
     assert_eq!(nat_count(&env, &argument_range[0]), 3);
     assert_eq!(nat_count(&env, &argument_range[1]), 3);
 
     let numeric = eval_global(&env, &mut store, "bad_digit_result");
     let diagnostic = ctor_args(&env, &numeric, "Err").last().unwrap();
-    let diagnostic_fields = ctor_args(&env, diagnostic, "MkDiagnostic");
-    let numeric_origin = ctor_args(&env, &diagnostic_fields[0], "ArgumentOrigin");
+    let diagnostic_fields = owned_ctor_args(diagnostic, diagnostic_id);
+    let numeric_origin = owned_ctor_args(&diagnostic_fields[0], argument_origin_id);
     assert_eq!(nat_count(&env, &numeric_origin[0]), 2);
-    let numeric_range = ctor_args(&env, &numeric_origin[1], "MkByteRange");
+    let numeric_range = owned_ctor_args(&numeric_origin[1], byte_range_id);
     assert_eq!(nat_count(&env, &numeric_range[0]), 2);
     assert_eq!(nat_count(&env, &numeric_range[1]), 2);
-    let code = ctor_args(&env, &diagnostic_fields[1], "MkDiagnosticCode");
+    let code = owned_ctor_args(&diagnostic_fields[1], diagnostic_code_id);
     assert_eq!(
         code.last(),
         Some(&EvalVal::Str("text.numeric.invalid-digit".into()))
     );
+
+    let environment = eval_global(&env, &mut store, "cc4_environment_origin");
+    assert_eq!(
+        owned_ctor_args(&environment, environment_origin_id),
+        &[EvalVal::Str("PATH".into())]
+    );
+    let config = eval_global(&env, &mut store, "cc4_config_origin");
+    let config_fields = owned_ctor_args(&config, config_origin_id);
+    let config_head = ctor_args(&env, &config_fields[0], "Cons");
+    assert_eq!(config_head[1], EvalVal::Str("PATH".into()));
+    ctor_args(&env, &config_head[2], "Nil");
+
+    let mut dc_store = make_store(&dc_owner);
+    let dc_source = eval(&[], &dc_source_body, &dc_owner.env, &mut dc_store);
+    let dc_id_fields = owned_ctor_args(&dc_source, dc_source_id);
+    assert_eq!(nat_count(&dc_owner, &dc_id_fields[0]), 4);
+    let dc_environment = eval(&[], &dc_environment_body, &dc_owner.env, &mut dc_store);
+    let dc_environment_id =
+        owned_constructor(&dc_owner, &dc_owned, dc, "Origin", "EnvironmentOrigin");
+    assert_eq!(
+        owned_ctor_args(&dc_environment, dc_environment_id),
+        &[EvalVal::Str("PATH".into())]
+    );
+    let dc_config = eval(&[], &dc_config_body, &dc_owner.env, &mut dc_store);
+    let dc_config_id = owned_constructor(&dc_owner, &dc_owned, dc, "Origin", "ConfigKeyOrigin");
+    let dc_config_fields = owned_ctor_args(&dc_config, dc_config_id);
+    let dc_config_head = ctor_args(&dc_owner, &dc_config_fields[0], "Cons");
+    assert_eq!(dc_config_head[1], EvalVal::Str("PATH".into()));
+    ctor_args(&dc_owner, &dc_config_head[2], "Nil");
+
+    let mut cursor_store = make_store(&cursor_owner);
+    let cursor_source = eval(
+        &[],
+        &cursor_source_body,
+        &cursor_owner.env,
+        &mut cursor_store,
+    );
+    let cursor_source_origin_id = owned_constructor(
+        &cursor_owner,
+        &cursor_dc_owned,
+        dc,
+        "Origin",
+        "SourceOrigin",
+    );
+    let cursor_source_fields = owned_ctor_args(&cursor_source, cursor_source_origin_id);
+    let cursor_source_id = owned_constructor(
+        &cursor_owner,
+        &cursor_dc_owned,
+        dc,
+        "SourceId",
+        "MkSourceId",
+    );
+    let cursor_source_value = owned_ctor_args(&cursor_source_fields[0], cursor_source_id);
+    assert_eq!(nat_count(&cursor_owner, &cursor_source_value[0]), 4);
+    let cursor_range_id = owned_constructor(
+        &cursor_owner,
+        &cursor_dc_owned,
+        dc,
+        "ByteRange",
+        "MkByteRange",
+    );
+    let cursor_range = owned_ctor_args(&cursor_source_fields[1], cursor_range_id);
+    assert_eq!(nat_count(&cursor_owner, &cursor_range[0]), 2);
+    assert_eq!(nat_count(&cursor_owner, &cursor_range[1]), 5);
+
+    let cursor_argument = eval(
+        &[],
+        &cursor_argument_body,
+        &cursor_owner.env,
+        &mut cursor_store,
+    );
+    let cursor_argument_id = owned_constructor(
+        &cursor_owner,
+        &cursor_dc_owned,
+        dc,
+        "Origin",
+        "ArgumentOrigin",
+    );
+    let cursor_argument_fields = owned_ctor_args(&cursor_argument, cursor_argument_id);
+    assert_eq!(nat_count(&cursor_owner, &cursor_argument_fields[0]), 2);
+    let cursor_argument_range = owned_ctor_args(&cursor_argument_fields[1], cursor_range_id);
+    assert_eq!(nat_count(&cursor_owner, &cursor_argument_range[0]), 3);
+    assert_eq!(nat_count(&cursor_owner, &cursor_argument_range[1]), 3);
 }
 
 /// Promise class: normative compatibility vector.
