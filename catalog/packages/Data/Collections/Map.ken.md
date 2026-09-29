@@ -89,6 +89,8 @@ import Core.Classes.LawfulClasses (bool_and)
 
 import Core.Classes.LawfulClasses (Ord)
 
+import Core.Classes.LawfulClasses (leq_nat)
+
 import Core.Classes.Membership (Membership)
 
 import Core.Logic.Not (Not)
@@ -270,10 +272,13 @@ and a small binary-relations library (`succ`/`compose`/`converse`/
 `reachable_plus`/`is_equivalence`, …) built on `Tree k (Tree k Unit)` as an
 adjacency-map representation. These operations use the same `Ordered`/`lookup`
 vocabulary as the capstone. The keyed-collection subsections provide the stated
-preservation and lookup proofs. The relation operations are transparent
-checked definitions with concrete computation tests; general compose/converse
-membership results and closure faithfulness and saturation proofs remain
-separate obligations.
+preservation and lookup proofs. The relation operations are transparent checked
+definitions. Under outer `Ordered` and `Distinct` on the left relation, with
+reflexivity and transitivity witnesses for the shared comparator, §4.7.12
+proves the successor-set union characterization of `compose` and its membership
+corollary. A checked `Nat` chain refutes transitivity until its missing `0→2`
+edge is added. General converse membership and closure faithfulness and
+saturation proofs remain separate obligations.
 
 ## 4. Laws & proofs
 
@@ -15007,6 +15012,13 @@ successors: `succ`/`rel_member`/`add_edge` for the raw relation,
 `is_reflexive`/`is_symmetric`/`is_transitive`/`is_equivalence` as the standard
 relation-property predicates stated directly against `rel_member`.
 
+The chain `0 → 1 → 2` refutes transitivity because it has no `0 → 2` edge.
+Adding that single missing edge completes this finite relation. Its transitivity
+proof covers every `Nat` endpoint, including sources beyond the two stored
+keys: those sources have no outgoing edges, and the only two-step path starts
+at zero, passes through one, and ends at two. Both propositions use the same
+`Ord Nat` comparator as the relation operations; neither assumes a law.
+
 ```ken
 fn pair_vals (k : Type) (v : Type) (xs : List (Pair k v)) : List v =
   match xs {
@@ -15455,9 +15467,1644 @@ fn is_transitive (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) 
 
 fn is_equivalence (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) : Prop =
   And (is_reflexive k leq r) (And (is_symmetric k leq r) (is_transitive k leq r))
+
+theorem all_in_list_to_all_keys
+      (k : Type) (v : Type) (p : k → Prop) (m : Tree k v)
+    : all_in_list k v p (to_list k v m) → all_keys k v p m =
+  match m {
+    Leaf ↦ λh. Proved;
+    Node left key val right ↦
+      λh.
+        let
+          left_list = to_list k v left;
+          right_list = to_list k v right;
+          head_tail =
+            all_in_list_append_elim_right
+              k
+              v
+              p
+              left_list
+              (Cons (Pair k v) (mk_pair k v key val) right_list)
+              h;
+          head_fact = and_fst (p key) (all_in_list k v p right_list) head_tail;
+          right_facts = and_snd (p key) (all_in_list k v p right_list) head_tail;
+          left_facts =
+            all_in_list_append_elim_left
+              k
+              v
+              p
+              left_list
+              (Cons (Pair k v) (mk_pair k v key val) right_list)
+              h
+        in
+          and_intro
+            (p key)
+            (And (all_keys k v p left) (all_keys k v p right))
+            head_fact
+            (and_intro
+              (all_keys k v p left)
+              (all_keys k v p right)
+              (all_in_list_to_all_keys k v p left left_facts)
+              (all_in_list_to_all_keys k v p right right_facts))
+  }
+
+theorem all_keys_map
+      (k : Type)
+      (v : Type)
+      (p : k → Prop)
+      (q : k → Prop)
+      (m : Tree k v)
+      (step : (key : k) → p key → q key)
+    : all_keys k v p m → all_keys k v q m =
+  match m {
+    Leaf ↦ λh. Proved;
+    Node left key val right ↦
+      λh.
+        let
+          children = and_snd (p key) (And (all_keys k v p left) (all_keys k v p right)) h;
+          left_fact = and_fst (all_keys k v p left) (all_keys k v p right) children;
+          right_fact = and_snd (all_keys k v p left) (all_keys k v p right) children;
+          head_fact = and_fst (p key) (And (all_keys k v p left) (all_keys k v p right)) h
+        in
+          and_intro
+            (q key)
+            (And (all_keys k v q left) (all_keys k v q right))
+            (step key head_fact)
+            (and_intro
+              (all_keys k v q left)
+              (all_keys k v q right)
+              (all_keys_map k v p q left step left_fact)
+              (all_keys_map k v p q right step right_fact))
+  }
+
+fn fold_insert_values_step
+      (k : Type)
+      (v : Type)
+      (w : Type)
+      (leq : k → k → Bool)
+      (transform : k → v → w)
+      (key : k)
+      (val : v)
+      (acc : Tree k w)
+    : Tree k w =
+  insert k w leq key (transform key val) acc
+
+fn fold_insert_value_map
+      (k : Type) (v : Type) (w : Type) (transform : v → w) (key : k) (val : v)
+    : w =
+  transform val
+
+fn fold_insert_value_result
+      (v : Type) (w : Type) (transform : v → w) (found : Option v) (fallback : Option w)
+    : Option w =
+  match found {
+    None ↦ fallback;
+    Some val ↦ Some w (transform val)
+  }
+
+fn fold_insert_away_pred (k : Type) (leq : k → k → Bool) (query : k) (key : k) : Prop =
+  not_order_equiv_to_key k leq query key
+
+theorem fold_insert_values_lookup_away
+      (k : Type)
+      (v : Type)
+      (w : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (transform : k → v → w)
+      (query : k)
+      (source : Tree k v)
+      (acc : Tree k w)
+    : all_keys k v (fold_insert_away_pred k leq query) source
+      → Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold k v (Tree k w) (fold_insert_values_step k v w leq transform) acc source))
+        (lookup k w leq query acc) =
+  match source {
+    Leaf ↦ λhall. Refl;
+    Node left key val right ↦
+      λhall.
+        let
+          left_acc = fold k v (Tree k w) (fold_insert_values_step k v w leq transform) acc left;
+          next_acc = insert k w leq key (transform key val) left_acc;
+          right_acc =
+            fold k v (Tree k w) (fold_insert_values_step k v w leq transform) next_acc right;
+          children =
+            and_snd
+              (fold_insert_away_pred k leq query key)
+              (And
+                (all_keys k v (fold_insert_away_pred k leq query) left)
+                (all_keys k v (fold_insert_away_pred k leq query) right))
+              hall;
+          left_away =
+            and_fst
+              (all_keys k v (fold_insert_away_pred k leq query) left)
+              (all_keys k v (fold_insert_away_pred k leq query) right)
+              children;
+          right_away =
+            and_snd
+              (all_keys k v (fold_insert_away_pred k leq query) left)
+              (all_keys k v (fold_insert_away_pred k leq query) right)
+              children;
+          key_away =
+            and_fst
+              (fold_insert_away_pred k leq query key)
+              (And
+                (all_keys k v (fold_insert_away_pred k leq query) left)
+                (all_keys k v (fold_insert_away_pred k leq query) right))
+              hall
+        in
+          trans
+            (Option w)
+            (lookup k w leq query right_acc)
+            (lookup k w leq query next_acc)
+            (lookup k w leq query acc)
+            (fold_insert_values_lookup_away
+              k
+              v
+              w
+              leq
+              transLeq
+              transform
+              query
+              right
+              next_acc
+              right_away)
+            (trans
+              (Option w)
+              (lookup k w leq query next_acc)
+              (lookup k w leq query left_acc)
+              (lookup k w leq query acc)
+              (lookup_locality
+                k
+                w
+                leq
+                transLeq
+                key
+                query
+                (transform key val)
+                left_acc
+                ((proof not_swap for order_equiv) k leq query key key_away))
+              (fold_insert_values_lookup_away
+                k
+                v
+                w
+                leq
+                transLeq
+                transform
+                query
+                left
+                acc
+                left_away))
+  }
+
+theorem fold_insert_values_away_below
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (bound : k)
+      (m : Tree k v)
+      (not_below : Equal Bool (leq query bound) False)
+    : all_keys k v (le_below k v leq bound) m
+      → all_keys k v (fold_insert_away_pred k leq query) m =
+  all_keys_map
+    k
+    v
+    (le_below k v leq bound)
+    (fold_insert_away_pred k leq query)
+    m
+    (λentry.
+      λhbound. not_match_from_bound_below k leq transLeq query bound not_below entry hbound)
+
+theorem fold_insert_values_away_above
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (bound : k)
+      (m : Tree k v)
+      (not_above : Equal Bool (leq bound query) False)
+    : all_keys k v (le_above k v leq bound) m
+      → all_keys k v (fold_insert_away_pred k leq query) m =
+  all_keys_map
+    k
+    v
+    (le_above k v leq bound)
+    (fold_insert_away_pred k leq query)
+    m
+    (λentry.
+      λhbound. not_match_from_bound_above k leq transLeq query bound not_above entry hbound)
+
+theorem fold_insert_values_right_away_from_distinct
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (left : Tree k v)
+      (key : k)
+      (val : v)
+      (right : Tree k v)
+      (distinct : Distinct k v leq (Node k v left key val right))
+      (heq : order_equiv k leq query key)
+    : all_keys k v (fold_insert_away_pred k leq query) right =
+  let
+    left_list = to_list k v left;
+    right_list = to_list k v right;
+    root_entry = mk_pair k v key val;
+    tail_distinct =
+      no_dup_append_right k v leq left_list (Cons (Pair k v) root_entry right_list) distinct;
+    root_excludes_right =
+      and_fst
+        (all_in_list k v (not_order_equiv_to_key k leq key) right_list)
+        (NoDup k v leq right_list)
+        tail_distinct;
+    q1 = and_fst (Equal Bool (leq query key) True) (Equal Bool (leq key query) True) heq;
+    q2 = and_snd (Equal Bool (leq query key) True) (Equal Bool (leq key query) True) heq;
+    query_excludes_right =
+      all_in_list_map_not_match_transfer
+        k
+        v
+        leq
+        transLeq
+        query
+        key
+        q1
+        q2
+        right_list
+        root_excludes_right
+  in
+    all_in_list_to_all_keys k v (fold_insert_away_pred k leq query) right query_excludes_right
+
+theorem fold_insert_values_lookup_root
+      (k : Type)
+      (v : Type)
+      (w : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (transform : k → v → w)
+      (query : k)
+      (left : Tree k v)
+      (key : k)
+      (val : v)
+      (right : Tree k v)
+      (acc : Tree k w)
+      (heq : order_equiv k leq query key)
+      (right_away : all_keys k v (fold_insert_away_pred k leq query) right)
+    : Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold
+            k
+            v
+            (Tree k w)
+            (fold_insert_values_step k v w leq transform)
+            acc
+            (Node k v left key val right)))
+        (Some w (transform key val)) =
+  let
+    left_acc = fold k v (Tree k w) (fold_insert_values_step k v w leq transform) acc left;
+    next_acc = insert k w leq key (transform key val) left_acc
+  in
+    trans
+      (Option w)
+      (lookup
+        k
+        w
+        leq
+        query
+        (fold k v (Tree k w) (fold_insert_values_step k v w leq transform) next_acc right))
+      (lookup k w leq query next_acc)
+      (Some w (transform key val))
+      (fold_insert_values_lookup_away
+        k
+        v
+        w
+        leq
+        transLeq
+        transform
+        query
+        right
+        next_acc
+        right_away)
+      (insert_lookup_hit k w leq reflLeq transLeq key query (transform key val) left_acc heq)
+
+theorem fold_insert_value_lookup_root_case
+      (k : Type)
+      (v : Type)
+      (w : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (transform : v → w)
+      (query : k)
+      (left : Tree k v)
+      (key : k)
+      (val : v)
+      (right : Tree k v)
+      (acc : Tree k w)
+      (distinct : Distinct k v leq (Node k v left key val right))
+      (q1 : Equal Bool (leq query key) True)
+      (q2 : Equal Bool (leq key query) True)
+    : Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold
+            k
+            v
+            (Tree k w)
+            (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+            acc
+            (Node k v left key val right)))
+        (fold_insert_value_result
+          v
+          w
+          transform
+          (lookup k v leq query (Node k v left key val right))
+          (lookup k w leq query acc)) =
+  let
+    source_lookup = lookup k v leq query (Node k v left key val right);
+    fallback = lookup k w leq query acc;
+    expected_lookup = fold_insert_value_result v w transform source_lookup fallback;
+    heq = and_intro (Equal Bool (leq query key) True) (Equal Bool (leq key query) True) q1 q2;
+    right_away =
+      fold_insert_values_right_away_from_distinct
+        k
+        v
+        leq
+        transLeq
+        query
+        left
+        key
+        val
+        right
+        distinct
+        heq
+  in
+    trans
+      (Option w)
+      (lookup
+        k
+        w
+        leq
+        query
+        (fold
+          k
+          v
+          (Tree k w)
+          (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+          acc
+          (Node k v left key val right)))
+      (Some w (transform val))
+      expected_lookup
+      (fold_insert_values_lookup_root
+        k
+        v
+        w
+        leq
+        reflLeq
+        transLeq
+        (fold_insert_value_map k v w transform)
+        query
+        left
+        key
+        val
+        right
+        acc
+        heq
+        right_away)
+      (sym
+        (Option w)
+        expected_lookup
+        (Some w (transform val))
+        (cong
+          (Option v)
+          (Option w)
+          source_lookup
+          (Some v val)
+          (λfound. fold_insert_value_result v w transform found fallback)
+          (lookup_stop_bridge k v leq query left key val right q1 q2)))
+
+theorem fold_insert_value_lookup_left_case
+      (k : Type)
+      (v : Type)
+      (w : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (transform : v → w)
+      (query : k)
+      (left : Tree k v)
+      (key : k)
+      (val : v)
+      (right : Tree k v)
+      (acc : Tree k w)
+      (ordered : Ordered k v leq (Node k v left key val right))
+      (q1 : Equal Bool (leq query key) True)
+      (q2 : Equal Bool (leq key query) False)
+      (ih : Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold
+            k
+            v
+            (Tree k w)
+            (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+            acc
+            left))
+        (fold_insert_value_result
+          v
+          w
+          transform
+          (lookup k v leq query left)
+          (lookup k w leq query acc)))
+    : Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold
+            k
+            v
+            (Tree k w)
+            (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+            acc
+            (Node k v left key val right)))
+        (fold_insert_value_result
+          v
+          w
+          transform
+          (lookup k v leq query (Node k v left key val right))
+          (lookup k w leq query acc)) =
+  let
+    step = fold_insert_values_step k v w leq (fold_insert_value_map k v w transform);
+    left_acc = fold k v (Tree k w) step acc left;
+    next_acc = insert k w leq key (transform val) left_acc;
+    right_acc = fold k v (Tree k w) step next_acc right;
+    fallback = lookup k w leq query acc;
+    left_lookup = lookup k v leq query left;
+    node_lookup = lookup k v leq query (Node k v left key val right);
+    left_expected = fold_insert_value_result v w transform left_lookup fallback;
+    node_expected = fold_insert_value_result v w transform node_lookup fallback;
+    right_bound = get_above_r k v leq left key val right ordered;
+    right_away = fold_insert_values_away_above k v leq transLeq query key right q2 right_bound;
+    root_away = not_order_equiv_from_right_false k leq query key q2
+  in
+    trans
+      (Option w)
+      (lookup k w leq query right_acc)
+      (lookup k w leq query next_acc)
+      node_expected
+      (fold_insert_values_lookup_away
+        k
+        v
+        w
+        leq
+        transLeq
+        (fold_insert_value_map k v w transform)
+        query
+        right
+        next_acc
+        right_away)
+      (trans
+        (Option w)
+        (lookup k w leq query next_acc)
+        (lookup k w leq query left_acc)
+        node_expected
+        (lookup_locality
+          k
+          w
+          leq
+          transLeq
+          key
+          query
+          (transform val)
+          left_acc
+          ((proof not_swap for order_equiv) k leq query key root_away))
+        (trans
+          (Option w)
+          (lookup k w leq query left_acc)
+          left_expected
+          node_expected
+          ih
+          (sym
+            (Option w)
+            node_expected
+            left_expected
+            (cong
+              (Option v)
+              (Option w)
+              node_lookup
+              left_lookup
+              (λfound. fold_insert_value_result v w transform found fallback)
+              (lookup_into_l_bridge k v leq query left key val right q1 q2)))))
+
+theorem fold_insert_value_lookup_right_case
+      (k : Type)
+      (v : Type)
+      (w : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (transform : v → w)
+      (query : k)
+      (left : Tree k v)
+      (key : k)
+      (val : v)
+      (right : Tree k v)
+      (acc : Tree k w)
+      (ordered : Ordered k v leq (Node k v left key val right))
+      (q1 : Equal Bool (leq query key) False)
+      (ih : Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold
+            k
+            v
+            (Tree k w)
+            (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+            (insert
+              k
+              w
+              leq
+              key
+              (transform val)
+              (fold
+                k
+                v
+                (Tree k w)
+                (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+                acc
+                left))
+            right))
+        (fold_insert_value_result
+          v
+          w
+          transform
+          (lookup k v leq query right)
+          (lookup
+            k
+            w
+            leq
+            query
+            (insert
+              k
+              w
+              leq
+              key
+              (transform val)
+              (fold
+                k
+                v
+                (Tree k w)
+                (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+                acc
+                left)))))
+    : Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold
+            k
+            v
+            (Tree k w)
+            (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+            acc
+            (Node k v left key val right)))
+        (fold_insert_value_result
+          v
+          w
+          transform
+          (lookup k v leq query (Node k v left key val right))
+          (lookup k w leq query acc)) =
+  let
+    step = fold_insert_values_step k v w leq (fold_insert_value_map k v w transform);
+    left_acc = fold k v (Tree k w) step acc left;
+    next_acc = insert k w leq key (transform val) left_acc;
+    fallback = lookup k w leq query acc;
+    right_lookup = lookup k v leq query right;
+    node_lookup = lookup k v leq query (Node k v left key val right);
+    right_expected = fold_insert_value_result v w transform right_lookup fallback;
+    next_expected =
+      fold_insert_value_result v w transform right_lookup (lookup k w leq query next_acc);
+    node_expected = fold_insert_value_result v w transform node_lookup fallback;
+    left_bound = get_below_l k v leq left key val right ordered;
+    left_away = fold_insert_values_away_below k v leq transLeq query key left q1 left_bound;
+    root_away = not_order_equiv_from_left_false k leq query key q1;
+    fallback_preserved =
+      trans
+        (Option w)
+        (lookup k w leq query next_acc)
+        (lookup k w leq query left_acc)
+        fallback
+        (lookup_locality
+          k
+          w
+          leq
+          transLeq
+          key
+          query
+          (transform val)
+          left_acc
+          ((proof not_swap for order_equiv) k leq query key root_away))
+        (fold_insert_values_lookup_away
+          k
+          v
+          w
+          leq
+          transLeq
+          (fold_insert_value_map k v w transform)
+          query
+          left
+          acc
+          left_away)
+  in
+    trans
+      (Option w)
+      (lookup k w leq query (fold k v (Tree k w) step next_acc right))
+      next_expected
+      node_expected
+      ih
+      (trans
+        (Option w)
+        next_expected
+        right_expected
+        node_expected
+        (cong
+          (Option w)
+          (Option w)
+          (lookup k w leq query next_acc)
+          fallback
+          (λremainder. fold_insert_value_result v w transform right_lookup remainder)
+          fallback_preserved)
+        (sym
+          (Option w)
+          node_expected
+          right_expected
+          (cong
+            (Option v)
+            (Option w)
+            node_lookup
+            right_lookup
+            (λfound. fold_insert_value_result v w transform found fallback)
+            (lookup_into_r_bridge k v leq query left key val right q1))))
+
+theorem fold_insert_value_lookup_characterization
+      (k : Type)
+      (v : Type)
+      (w : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (transform : v → w)
+      (query : k)
+      (source : Tree k v)
+      (acc : Tree k w)
+    : Ordered k v leq source
+      → Distinct k v leq source
+      → Equal
+        (Option w)
+        (lookup
+          k
+          w
+          leq
+          query
+          (fold
+            k
+            v
+            (Tree k w)
+            (fold_insert_values_step k v w leq (fold_insert_value_map k v w transform))
+            acc
+            source))
+        (fold_insert_value_result
+          v
+          w
+          transform
+          (lookup k v leq query source)
+          (lookup k w leq query acc)) =
+  match source {
+    Leaf ↦ λordered. λdistinct. Refl;
+    Node left key val right ↦
+      λordered.
+        λdistinct.
+          match bool_dichotomy (leq query key) {
+            Inl q1 ↦
+              match bool_dichotomy (leq key query) {
+                Inl q2 ↦
+                  fold_insert_value_lookup_root_case
+                    k
+                    v
+                    w
+                    leq
+                    reflLeq
+                    transLeq
+                    transform
+                    query
+                    left
+                    key
+                    val
+                    right
+                    acc
+                    distinct
+                    q1
+                    q2;
+                Inr q2 ↦
+                  fold_insert_value_lookup_left_case
+                    k
+                    v
+                    w
+                    leq
+                    transLeq
+                    transform
+                    query
+                    left
+                    key
+                    val
+                    right
+                    acc
+                    ordered
+                    q1
+                    q2
+                    (fold_insert_value_lookup_characterization
+                      k
+                      v
+                      w
+                      leq
+                      reflLeq
+                      transLeq
+                      transform
+                      query
+                      left
+                      acc
+                      (get_ordered_l k v leq left key val right ordered)
+                      (law5_distinct_l k v leq left key val right distinct))
+              };
+            Inr q1 ↦
+              fold_insert_value_lookup_right_case
+                k
+                v
+                w
+                leq
+                transLeq
+                transform
+                query
+                left
+                key
+                val
+                right
+                acc
+                ordered
+                q1
+                (fold_insert_value_lookup_characterization
+                  k
+                  v
+                  w
+                  leq
+                  reflLeq
+                  transLeq
+                  transform
+                  query
+                  right
+                  (insert
+                    k
+                    w
+                    leq
+                    key
+                    (transform val)
+                    (fold
+                      k
+                      v
+                      (Tree k w)
+                      (fold_insert_values_step
+                        k
+                        v
+                        w
+                        leq
+                        (fold_insert_value_map k v w transform))
+                      acc
+                      left))
+                  (get_ordered_r k v leq left key val right ordered)
+                  (law5_distinct_r k v leq left key val right distinct))
+          }
+  }
+
+fn relation_option_or_empty (k : Type) (found : Option (Tree k Unit)) : Tree k Unit =
+  match found {
+    None ↦ empty k Unit;
+    Some targets ↦ targets
+  }
+
+fn relation_compose_image
+      (k : Type) (leq : k → k → Bool) (s : Tree k (Tree k Unit)) (targets : Tree k Unit)
+    : Tree k Unit =
+  compose_succ k leq targets s
+
+theorem relation_compose_image_bridge
+      (k : Type) (leq : k → k → Bool) (s : Tree k (Tree k Unit)) (found : Option (Tree k Unit))
+    : Equal
+        (Tree k Unit)
+        (relation_option_or_empty
+          k
+          (fold_insert_value_result
+            (Tree k Unit)
+            (Tree k Unit)
+            (relation_compose_image k leq s)
+            found
+            (None (Tree k Unit))))
+        (compose_succ k leq (relation_option_or_empty k found) s) =
+  match found {
+    None ↦ Proved;
+    Some targets ↦ Refl
+  }
+
+theorem fold_congruent
+      (k : Type)
+      (v : Type)
+      (b : Type)
+      (f : k → v → b → b)
+      (g : k → v → b → b)
+      (acc : b)
+      (m : Tree k v)
+      (step : (key : k)
+        → (val : v)
+        → (before : b)
+        → Equal
+        b
+        (f key val before)
+        (g key val before))
+    : Equal b (fold k v b f acc m) (fold k v b g acc m) =
+  match m {
+    Leaf ↦ Refl;
+    Node left key val right ↦
+      let
+        left_f = fold k v b f acc left;
+        left_g = fold k v b g acc left;
+        after_f = f key val left_f;
+        after_g = g key val left_g;
+        left_agrees = fold_congruent k v b f g acc left step;
+        after_agrees =
+          trans
+            b
+            after_f
+            (f key val left_g)
+            after_g
+            (cong b b left_f left_g (f key val) left_agrees)
+            (step key val left_g);
+        right_agrees = fold_congruent k v b f g after_f right step
+      in
+        trans
+          b
+          (fold k v b f after_f right)
+          (fold k v b g after_f right)
+          (fold k v b g after_g right)
+          right_agrees
+          (cong b b after_f after_g (λbefore. fold k v b g before right) after_agrees)
+  }
+
+theorem relation_compose_step_same
+      (k : Type)
+      (leq : k → k → Bool)
+      (s : Tree k (Tree k Unit))
+      (key : k)
+      (targets : Tree k Unit)
+      (before : Tree k (Tree k Unit))
+    : Equal
+        (Tree k (Tree k Unit))
+        (insert k (Tree k Unit) leq key (compose_succ k leq targets s) before)
+        (fold_insert_values_step
+          k
+          (Tree k Unit)
+          (Tree k Unit)
+          leq
+          (fold_insert_value_map k (Tree k Unit) (Tree k Unit) (relation_compose_image k leq s))
+          key
+          targets
+          before) =
+  Refl
+
+theorem relation_compose_fold_agrees
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (s : Tree k (Tree k Unit))
+    : Equal
+        (Tree k (Tree k Unit))
+        (compose k leq r s)
+        (fold
+          k
+          (Tree k Unit)
+          (Tree k (Tree k Unit))
+          (fold_insert_values_step
+            k
+            (Tree k Unit)
+            (Tree k Unit)
+            leq
+            (fold_insert_value_map
+              k
+              (Tree k Unit)
+              (Tree k Unit)
+              (relation_compose_image k leq s)))
+          (empty k (Tree k Unit))
+          r) =
+  let compose_step : k → Tree k Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit) =
+    λkey.
+      λtargets. λbefore. insert k (Tree k Unit) leq key (compose_succ k leq targets s) before
+  in
+    fold_congruent
+      k
+      (Tree k Unit)
+      (Tree k (Tree k Unit))
+      compose_step
+      (fold_insert_values_step
+        k
+        (Tree k Unit)
+        (Tree k Unit)
+        leq
+        (fold_insert_value_map k (Tree k Unit) (Tree k Unit) (relation_compose_image k leq s)))
+      (empty k (Tree k Unit))
+      r
+      (relation_compose_step_same k leq s)
+
+theorem compose_successors_union
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (x : k)
+      (r : Tree k (Tree k Unit))
+      (s : Tree k (Tree k Unit))
+    : Ordered k (Tree k Unit) leq r
+      → Distinct k (Tree k Unit) leq r
+      → Equal
+        (Tree k Unit)
+        (succ k leq x (compose k leq r s))
+        (compose_succ k leq (succ k leq x r) s) =
+  λordered.
+    λdistinct.
+      let
+        found = lookup k (Tree k Unit) leq x r;
+        folded = lookup k (Tree k Unit) leq x (compose k leq r s);
+        mapped =
+          fold_insert_value_result
+            (Tree k Unit)
+            (Tree k Unit)
+            (relation_compose_image k leq s)
+            found
+            (None (Tree k Unit));
+        canonical_fold =
+          fold
+            k
+            (Tree k Unit)
+            (Tree k (Tree k Unit))
+            (fold_insert_values_step
+              k
+              (Tree k Unit)
+              (Tree k Unit)
+              leq
+              (fold_insert_value_map
+                k
+                (Tree k Unit)
+                (Tree k Unit)
+                (relation_compose_image k leq s)))
+            (empty k (Tree k Unit))
+            r;
+        canonical_lookup = lookup k (Tree k Unit) leq x canonical_fold;
+        looked_up =
+          trans
+            (Option (Tree k Unit))
+            folded
+            canonical_lookup
+            mapped
+            (cong
+              (Tree k (Tree k Unit))
+              (Option (Tree k Unit))
+              (compose k leq r s)
+              canonical_fold
+              (lookup k (Tree k Unit) leq x)
+              (relation_compose_fold_agrees k leq r s))
+            (fold_insert_value_lookup_characterization
+              k
+              (Tree k Unit)
+              (Tree k Unit)
+              leq
+              reflLeq
+              transLeq
+              (relation_compose_image k leq s)
+              x
+              r
+              (empty k (Tree k Unit))
+              ordered
+              distinct)
+      in
+        trans
+          (Tree k Unit)
+          (relation_option_or_empty k folded)
+          (relation_option_or_empty k mapped)
+          (compose_succ k leq (relation_option_or_empty k found) s)
+          (cong
+            (Option (Tree k Unit))
+            (Tree k Unit)
+            folded
+            mapped
+            (relation_option_or_empty k)
+            looked_up)
+          (relation_compose_image_bridge k leq s found)
+
+theorem compose_member_union
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (x : k)
+      (z : k)
+      (r : Tree k (Tree k Unit))
+      (s : Tree k (Tree k Unit))
+    : Ordered k (Tree k Unit) leq r
+      → Distinct k (Tree k Unit) leq r
+      → Equal Bool
+        (set_member k leq z (succ k leq x (compose k leq r s)))
+        (set_member k leq z (compose_succ k leq (succ k leq x r) s)) =
+  λordered.
+    λdistinct.
+      cong
+        (Tree k Unit)
+        Bool
+        (succ k leq x (compose k leq r s))
+        (compose_succ k leq (succ k leq x r) s)
+        (set_member k leq z)
+        (compose_successors_union k leq reflLeq transLeq x r s ordered distinct)
+
+const relation_chain : Tree Nat (Tree Nat Unit) =
+  add_edge
+    Nat
+    leq_nat
+    (Suc Zero)
+    (Suc (Suc Zero))
+    (add_edge Nat leq_nat Zero (Suc Zero) (empty Nat (Tree Nat Unit)))
+
+const relation_chain_completion : Tree Nat (Tree Nat Unit) =
+  add_edge Nat leq_nat Zero (Suc (Suc Zero)) relation_chain
+
+theorem relation_chain_refutes_transitivity : Not (is_transitive Nat leq_nat relation_chain) =
+  λh. absurd (h Zero (Suc Zero) (Suc (Suc Zero)) Proved Proved)
+
+theorem relation_chain_completion_no_outgoing
+      (n : Nat) (z : Nat)
+    : rel_member Nat leq_nat (Suc (Suc n)) z relation_chain_completion → Bottom =
+  λh. absurd h
+
+theorem relation_chain_completion_step
+      (z : Nat)
+    : rel_member Nat leq_nat (Suc Zero) z relation_chain_completion
+      → rel_member Nat leq_nat Zero z relation_chain_completion =
+  match z {
+    Zero ↦ λh. absurd h;
+    Suc z1 ↦
+      match z1 {
+        Zero ↦ λh. absurd h;
+        Suc z2 ↦
+          match z2 {
+            Zero ↦ λh. Proved;
+            Suc z3 ↦ λh. absurd h
+          }
+      }
+  }
+
+theorem relation_chain_completion_is_transitive
+    : is_transitive Nat leq_nat relation_chain_completion =
+  λx.
+    match x {
+      Zero ↦
+        λy.
+          match y {
+            Zero ↦ λz. λhxy. λhyz. absurd hxy;
+            Suc y1 ↦
+              match y1 {
+                Zero ↦ λz. λhxy. λhyz. relation_chain_completion_step z hyz;
+                Suc y2 ↦ λz. λhxy. λhyz. absurd (relation_chain_completion_no_outgoing y2 z hyz)
+              }
+          };
+      Suc x1 ↦
+        match x1 {
+          Zero ↦
+            λy.
+              match y {
+                Zero ↦ λz. λhxy. λhyz. absurd hxy;
+                Suc y1 ↦
+                  match y1 {
+                    Zero ↦ λz. λhxy. λhyz. absurd hxy;
+                    Suc y2 ↦
+                      match y2 {
+                        Zero ↦
+                          λz.
+                            λhxy.
+                              λhyz. absurd (relation_chain_completion_no_outgoing Zero z hyz);
+                        Suc y3 ↦ λz. λhxy. λhyz. absurd hxy
+                      }
+                  }
+              };
+          Suc x2 ↦ λy. λz. λhxy. λhyz. absurd (relation_chain_completion_no_outgoing x2 y hxy)
+        }
+    }
 ```
 
 ```ken example
+theorem relation_compose_has_two_step
+    : Equal Bool
+        (set_member
+          Nat
+          leq_nat
+          (Suc (Suc Zero))
+          (succ Nat leq_nat Zero (compose Nat leq_nat relation_chain relation_chain)))
+        True =
+  Proved
+
+theorem relation_compose_has_no_one_step
+    : Equal Bool
+        (set_member
+          Nat
+          leq_nat
+          (Suc Zero)
+          (succ Nat leq_nat Zero (compose Nat leq_nat relation_chain relation_chain)))
+        False =
+  Proved
+
+theorem relation_converse_reverses_edge
+    : Equal Bool
+        (set_member
+          Nat
+          leq_nat
+          Zero
+          (succ Nat leq_nat (Suc Zero) (converse Nat leq_nat relation_chain)))
+        True =
+  Proved
+
+theorem relation_converse_does_not_keep_direction
+    : Equal Bool
+        (set_member
+          Nat
+          leq_nat
+          (Suc Zero)
+          (succ Nat leq_nat Zero (converse Nat leq_nat relation_chain)))
+        False =
+  Proved
+
+const relation_duplicate_right : Tree Nat (Tree Nat Unit) =
+  Node
+    Nat
+    (Tree Nat Unit)
+    (Leaf Nat (Tree Nat Unit))
+    Zero
+    (Node Nat Unit (Leaf Nat Unit) (Suc Zero) MkUnit (Leaf Nat Unit))
+    (Leaf Nat (Tree Nat Unit))
+
+const relation_duplicate_outer : Tree Nat (Tree Nat Unit) =
+  Node
+    Nat
+    (Tree Nat Unit)
+    (Leaf Nat (Tree Nat Unit))
+    Zero
+    (Node Nat Unit (Leaf Nat Unit) (Suc (Suc Zero)) MkUnit (Leaf Nat Unit))
+    relation_duplicate_right
+
+const relation_duplicate_identity : Tree Nat (Tree Nat Unit) =
+  add_edge
+    Nat
+    leq_nat
+    (Suc Zero)
+    (Suc Zero)
+    (add_edge Nat leq_nat (Suc (Suc Zero)) (Suc (Suc Zero)) (empty Nat (Tree Nat Unit)))
+
+theorem relation_singleton_successors_ordered
+      (n : Nat)
+    : Ordered Nat Unit leq_nat (Node Nat Unit (Leaf Nat Unit) n MkUnit (Leaf Nat Unit)) =
+  and_intro
+    (all_keys Nat Unit (λq. Equal Bool (leq_nat q n) True) (Leaf Nat Unit))
+    (And
+      (all_keys Nat Unit (λq. Equal Bool (leq_nat n q) True) (Leaf Nat Unit))
+      (And
+        (Ordered Nat Unit leq_nat (Leaf Nat Unit))
+        (Ordered Nat Unit leq_nat (Leaf Nat Unit))))
+    Proved
+    (and_intro
+      (all_keys Nat Unit (λq. Equal Bool (leq_nat n q) True) (Leaf Nat Unit))
+      (And
+        (Ordered Nat Unit leq_nat (Leaf Nat Unit))
+        (Ordered Nat Unit leq_nat (Leaf Nat Unit)))
+      Proved
+      (and_intro
+        (Ordered Nat Unit leq_nat (Leaf Nat Unit))
+        (Ordered Nat Unit leq_nat (Leaf Nat Unit))
+        Proved
+        Proved))
+
+theorem relation_duplicate_right_ordered
+    : Ordered Nat (Tree Nat Unit) leq_nat relation_duplicate_right =
+  and_intro
+    (all_keys
+      Nat
+      (Tree Nat Unit)
+      (λq. Equal Bool (leq_nat q Zero) True)
+      (Leaf Nat (Tree Nat Unit)))
+    (And
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        (Leaf Nat (Tree Nat Unit)))
+      (And
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))))
+    Proved
+    (and_intro
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        (Leaf Nat (Tree Nat Unit)))
+      (And
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit))))
+      Proved
+      (and_intro
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))
+        Proved
+        Proved))
+
+fn relation_duplicate_zero_above (q : Nat) : Prop = Equal Bool (leq_nat Zero q) True
+
+theorem relation_duplicate_right_below_root
+    : all_keys Nat (Tree Nat Unit) relation_duplicate_zero_above relation_duplicate_right =
+  and_intro
+    (Equal Bool (leq_nat Zero Zero) True)
+    (And
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        (Leaf Nat (Tree Nat Unit)))
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        (Leaf Nat (Tree Nat Unit))))
+    Proved
+    (and_intro
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        (Leaf Nat (Tree Nat Unit)))
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        (Leaf Nat (Tree Nat Unit)))
+      Proved
+      Proved)
+
+theorem relation_duplicate_outer_ordered
+    : Ordered Nat (Tree Nat Unit) leq_nat relation_duplicate_outer =
+  and_intro
+    (all_keys
+      Nat
+      (Tree Nat Unit)
+      (λq. Equal Bool (leq_nat q Zero) True)
+      (Leaf Nat (Tree Nat Unit)))
+    (And
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        relation_duplicate_right)
+      (And
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) leq_nat relation_duplicate_right)))
+    Proved
+    (and_intro
+      (all_keys
+        Nat
+        (Tree Nat Unit)
+        (λq. Equal Bool (leq_nat Zero q) True)
+        relation_duplicate_right)
+      (And
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) leq_nat relation_duplicate_right))
+      relation_duplicate_right_below_root
+      (and_intro
+        (Ordered Nat (Tree Nat Unit) leq_nat (Leaf Nat (Tree Nat Unit)))
+        (Ordered Nat (Tree Nat Unit) leq_nat relation_duplicate_right)
+        Proved
+        relation_duplicate_right_ordered))
+
+theorem relation_duplicate_right_successors_ordered
+    : successors_ordered Nat Ord_instance_Nat relation_duplicate_right =
+  and_intro
+    (ordered_by
+      Nat
+      Unit
+      Ord_instance_Nat
+      (Node Nat Unit (Leaf Nat Unit) (Suc Zero) MkUnit (Leaf Nat Unit)))
+    (And
+      (successors_ordered Nat Ord_instance_Nat (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat Ord_instance_Nat (Leaf Nat (Tree Nat Unit))))
+    (relation_singleton_successors_ordered (Suc Zero))
+    (and_intro
+      (successors_ordered Nat Ord_instance_Nat (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat Ord_instance_Nat (Leaf Nat (Tree Nat Unit)))
+      Proved
+      Proved)
+
+theorem relation_duplicate_outer_successors_ordered
+    : successors_ordered Nat Ord_instance_Nat relation_duplicate_outer =
+  and_intro
+    (ordered_by
+      Nat
+      Unit
+      Ord_instance_Nat
+      (Node Nat Unit (Leaf Nat Unit) (Suc (Suc Zero)) MkUnit (Leaf Nat Unit)))
+    (And
+      (successors_ordered Nat Ord_instance_Nat (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat Ord_instance_Nat relation_duplicate_right))
+    (relation_singleton_successors_ordered (Suc (Suc Zero)))
+    (and_intro
+      (successors_ordered Nat Ord_instance_Nat (Leaf Nat (Tree Nat Unit)))
+      (successors_ordered Nat Ord_instance_Nat relation_duplicate_right)
+      Proved
+      relation_duplicate_right_successors_ordered)
+
+const relation_duplicate_ordered_view : RelationEdgeMembership Nat =
+  MkRelationEdgeMembership
+    Nat
+    Ord_instance_Nat
+    relation_duplicate_outer
+    relation_duplicate_outer_ordered
+    relation_duplicate_outer_successors_ordered
+
+theorem relation_duplicate_lookup_misses_right_duplicate
+    : Equal Bool
+        (set_member Nat leq_nat (Suc Zero) (succ Nat leq_nat Zero relation_duplicate_outer))
+        False =
+  Proved
+
+theorem relation_duplicate_compose_reads_right_duplicate
+    : Equal Bool
+        (set_member
+          Nat
+          leq_nat
+          (Suc Zero)
+          (succ
+            Nat
+            leq_nat
+            Zero
+            (compose Nat leq_nat relation_duplicate_outer relation_duplicate_identity)))
+        True =
+  Proved
+
+theorem relation_duplicate_converse_reads_right_duplicate
+    : Equal Bool
+        (set_member
+          Nat
+          leq_nat
+          Zero
+          (succ Nat leq_nat (Suc Zero) (converse Nat leq_nat relation_duplicate_outer)))
+        True =
+  Proved
+
+theorem relation_duplicate_expected_union_misses_right_duplicate
+    : Equal Bool
+        (set_member
+          Nat
+          leq_nat
+          (Suc Zero)
+          (compose_succ
+            Nat
+            leq_nat
+            (succ Nat leq_nat Zero relation_duplicate_outer)
+            relation_duplicate_identity))
+        False =
+  Proved
+
+theorem relation_duplicate_refutes_compose_membership
+    : Not
+        (Equal
+          Bool
+          (set_member
+            Nat
+            leq_nat
+            (Suc Zero)
+            (succ
+              Nat
+              leq_nat
+              Zero
+              (compose Nat leq_nat relation_duplicate_outer relation_duplicate_identity)))
+          (set_member
+            Nat
+            leq_nat
+            (Suc Zero)
+            (compose_succ
+              Nat
+              leq_nat
+              (succ Nat leq_nat Zero relation_duplicate_outer)
+              relation_duplicate_identity))) =
+  λh. absurd h
+
+theorem relation_duplicate_refutes_converse_backward
+    : Not
+        (rel_member
+          Nat
+          leq_nat
+          (Suc Zero)
+          Zero
+          (converse Nat leq_nat relation_duplicate_outer)
+          → rel_member
+          Nat
+          leq_nat
+          Zero
+          (Suc Zero)
+          relation_duplicate_outer) =
+  λh. absurd (h Proved)
+
 theorem map_example_size_node
       (k : Type) (v : Type) (left : Tree k v) (key : k) (val : v) (right : Tree k v)
     : Equal Nat
@@ -15807,12 +17454,17 @@ comparison-independent structural induction
 (`insert_preserves_all_keys`/`all_keys_trans_*`, §4.3) → the convoy-idiom
 recursive assembly (every law's own top-level `fn`, §4.1–§4.6, §4.7.5–§4.7.10)
 → `member`-extensionality against a lookup-table characterization (the
-`Set`-level algebraic laws, §4.7.11).
+`Set`-level algebraic laws, §4.7.11) → fold-insert lookup characterization
+and successor-set equality for composition (`compose_successors_union` and
+`compose_member_union`, §4.7.12). The composition proof uses outer `Ordered`
+and `Distinct` plus reflexivity and transitivity witnesses for the shared
+comparator; it does not establish the general converse membership equivalence
+or closure faithfulness and saturation.
 
 **Consumers.** The selectively importable closure surface serves programs
 parameterized over abstract `Tree` values. The broader checked theory remains
 module-private; this surface neither constructs trees nor supplies the
-representation premises needed by the deferred correspondence proofs.
+representation premises needed by the remaining converse and closure proofs.
 
 **Validation evidence.** `ken check` elaborates this entry's tangled source
 fences; the catalog checks its capstone laws and keyed operations.
