@@ -114,6 +114,26 @@ values. Its object branch consumes the recursive result associated with each
 whole member, preserving the `Pair String Json` carrier without projecting a
 second recursive call from it.
 
+This checked example counts five JSON nodes: the object, its nested array, and
+three scalar leaves. Object keys do not contribute to the count.
+
+```ken example
+const json_example_nested_structure_size : Nat =
+  json_size
+    (JsonObject
+      (Cons
+        (Pair String Json)
+        (mk_pair
+          String
+          Json
+          "array"
+          (JsonArray (Cons Json JsonNull (Cons Json (JsonBool True) (Nil Json)))))
+        (Cons
+          (Pair String Json)
+          (mk_pair String Json "leaf" (JsonString "x"))
+          (Nil (Pair String Json)))))
+```
+
 The character cursor treats the unconsumed suffix as its carrier. Its location
 is the remaining character count, so a parser can report the exact suffix
 position without routing the proof-bearing core through a byte cursor.
