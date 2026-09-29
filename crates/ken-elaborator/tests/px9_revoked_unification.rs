@@ -10,6 +10,16 @@ use std::collections::BTreeSet;
 use ken_elaborator::ElabEnv;
 use ken_kernel::{GlobalId, Term};
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
+const SYSTEM_ERROR: &str = "Capability.System.Error";
+
+fn system_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
+    catalog_or::provider_owned_id(env, owned, SYSTEM_ERROR, name)
+        .unwrap_or_else(|error| panic!("System.Error owner {name}: {error}"))
+}
+
 fn former(id: GlobalId) -> Term {
     Term::indformer(id, vec![])
 }
@@ -113,18 +123,33 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
     );
 
     let before = env.env.trusted_base();
-    env.elaborate_file(
-        r#"
-const px9_canonical_resource_error : ResourceError = ResourceHostIO Revoked
-
-theorem px9_canonical_revoked_is_permanent :
-  Equal Transience (error_transience Revoked) Permanent = Proved
-"#,
+    env.elaborate_decl(
+        "const px9_canonical_resource_error : ResourceError = ResourceHostIO Revoked",
     )
-    .expect("canonical ResourceHostIO Revoked must elaborate and classify Permanent");
+    .expect("canonical ResourceHostIO Revoked must elaborate without a package");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], SYSTEM_ERROR)
+        .expect("System.Error must roots-load for the classifier proof");
+    let proofs = env
+        .elaborate_file(
+            "import Capability.System.Error (Transience, error_transience, Permanent)\n\
+             theorem px9_canonical_revoked_is_permanent :\n\
+               Equal Transience (error_transience Revoked) Permanent = Proved",
+        )
+        .expect("the package classifier must prove canonical Revoked Permanent");
+    let theorem = *proofs.last().expect("classifier theorem must be checked");
+    let references = catalog_or::declaration_references(
+        env.env.lookup(theorem).expect("checked classifier proof"),
+    );
+    assert!(references.contains(&system_id(&env, &owned, "Transience")));
+    assert!(references.contains(&system_id(&env, &owned, "error_transience")));
+    assert!(
+        references.contains(&revoked),
+        "IOError.Revoked identity must be retained"
+    );
     assert_eq!(
         env.env.trusted_base(),
         before,
-        "using the canonical revoked identity must add no trust"
+        "using the canonical revoked identity and checked package adds no trust"
     );
 }
