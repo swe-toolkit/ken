@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ADMIT-BODIES-CHECKED-UPGRADE
 title: "A body can leave trusted_base() without SCT or a cycle check: discharge_hole accepts the hole itself as its certificate, because the raw pub upgrade_to_transparent is gated only by its callers. Move the gate into the kernel as one checked admit_bodies and make the raw upgrade crate-private"
-status: draft
+status: active
 owner: kernel
 size: M
 tier: T1
