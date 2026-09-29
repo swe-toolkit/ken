@@ -73,56 +73,65 @@ fn checked_map_host_read_ignores_forged_flat_aliases() {
     }
 }
 
-/// Promise class: durable checked-identity invariant.
-/// MEASURED: the roots loader authenticates Map.fold by its owned GlobalId;
-/// a separate flat fixture loads that same Map source and its client retains
-/// the newly Map-owned fold ID. CLAIMED: the prelude's same-spelled list fold
-/// cannot supply this client's tree fold. THE GAP: these are environment-local
-/// IDs; the flat client does not establish public selective-import visibility
-/// for Map's private fold.
+/// Promise class: durable checked-owner preservation invariant.
+/// MEASURED: the real Map loader owns a private fold and every Map-owned
+/// declaration referring to it retains that exact GlobalId, not another
+/// registered declaration called fold. CLAIMED: removing the prelude's fold
+/// preserves Map's owner-scope resolution. THE GAP: this row reads the same
+/// before and after removal; the prelude registration test is the discriminator.
 #[test]
-fn map_loaded_fold_client_uses_the_checked_map_owner() {
-    let (roots_env, roots_owned) = checked_map_env();
-    let rooted_fold = checked_map_id(&roots_env, &roots_owned, "fold");
+fn map_owner_scope_readers_preserve_the_private_fold_id() {
+    let (env, owned) = checked_map_env();
+    let map_fold = catalog_or::provider_owned_id(&env, &owned, MAP_MODULE, "fold")
+        .expect("Map's private fold must have a checked owner ID");
     assert!(matches!(
-        roots_env.env.lookup(rooted_fold),
+        env.env.lookup(map_fold),
         Some(Decl::Transparent { .. })
     ));
 
-    let (mut env, _) = mk_map_dependency_env_with_provider_owned();
-    let flat_owned = env
-        .elaborate_ken_md_file(MAP_KEN_MD)
-        .expect("Map's real dependency/import closure must elaborate");
-    let map_fold = env.globals["fold"];
+    // Include bare and module-qualified names. A same-spelled prelude fold
+    // exists under the AC-2 restore mutation but has a different checked ID.
+    let other_fold_ids: BTreeSet<GlobalId> = env
+        .globals
+        .iter()
+        .filter(|(name, id)| {
+            name.split(|c| c == '.' || c == ':').last() == Some("fold") && **id != map_fold
+        })
+        .map(|(_, id)| *id)
+        .collect();
+    let prefix = format!("{MAP_MODULE}.");
+    let mut readers = BTreeSet::new();
+    for id in &owned {
+        if *id == map_fold {
+            continue;
+        }
+        let declaration = env.env.lookup(*id).expect("Map-owned ID must resolve");
+        let references = catalog_or::declaration_references(declaration);
+        if !references.contains(&map_fold) {
+            continue;
+        }
+        let name = env
+            .globals
+            .iter()
+            .find_map(|(name, candidate)| {
+                (*candidate == *id)
+                    .then(|| name.strip_prefix(&prefix))
+                    .flatten()
+            })
+            .unwrap_or_else(|| panic!("Map reader {id:?} must have a qualified owner name"));
+        for other in &other_fold_ids {
+            assert!(
+                !references.contains(other),
+                "Map owner-scope reader {name} also refers to another fold ID {other:?}"
+            );
+        }
+        readers.insert(name.to_owned());
+    }
     assert!(
-        flat_owned.contains(&map_fold),
-        "the flat client's selected fold must be owned by this Map load"
+        readers.contains("fold_insert_preserves_ordered"),
+        "Map's fold_insert_preserves_ordered must reach the owned fold"
     );
-    let checked_body = match env.env.lookup(map_fold) {
-        Some(Decl::Transparent { body, .. }) => body,
-        other => panic!("Map.fold must be checked and transparent: {other:?}"),
-    };
-    assert!(
-        term_reference_count(checked_body, map_fold) > 0,
-        "the owned tree fold must recursively refer to itself"
-    );
-
-    let client = env
-        .elaborate_decl(
-            "const map_loaded_fold_client : List Nat = \
-             fold Nat Nat (List Nat) (\\k. \\v. \\acc. Cons Nat k acc) \
-               (Nil Nat) (empty Nat Nat)",
-        )
-        .expect("unqualified fold in the Map-loaded client must elaborate");
-    let client_body = match env.env.lookup(client) {
-        Some(Decl::Transparent { body, .. }) => body,
-        other => panic!("Map client must be checked and transparent: {other:?}"),
-    };
-    assert_eq!(
-        term_reference_count(client_body, map_fold),
-        1,
-        "client must retain Map.fold's owned GlobalId, not a flat-name stand-in"
-    );
+    eprintln!("Map owner-scope readers of private fold: {readers:?}");
 }
 
 /// The stated stack for the D1 legacy-frame budget instrument. Two MiB remains
