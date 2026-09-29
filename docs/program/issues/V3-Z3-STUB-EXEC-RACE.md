@@ -1,7 +1,7 @@
 ---
 id: V3-Z3-STUB-EXEC-RACE
 title: "Make the z3 process-adapter stub tests deterministic: parsed_model_is_candidate_not_verdict intermittently gets Unknown instead of Disproved in CI even after the 5 s stub timeout, so the cause is not the timeout; measure the stub's actual process error, then remove that race in the test harness"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: architect
@@ -81,3 +81,28 @@ assertion does not count as a fix.
   defect in `prover.rs`. Stop to the Architect with the error text.
 - No reproduction after a bounded stress run. Stop with the loop and its
   counts. Do not land a speculative fix.
+
+## Closeout
+
+Landed `6c2d27e0f` (PR #4355; candidate `b9f4ba608`; Verify QA
+`evt_5txn2gqsweq8b`, Architect APPROVE and Decision `dec_2pgwcvh92bfge`).
+The cause is `ETXTBSY` on the test's stub executable, in two variants:
+- **In-place rewrite:** a descriptor held on the old inode. The fix is an
+  atomic temp-write and rename.
+- **Fork inheritance:** a sibling test thread forks while the stub is open
+  for writing, and its child holds the descriptor until exec. `O_CLOEXEC`
+  does not close this, and a rename keeps the inode. The fix is that a
+  separate writer subprocess writes the stub bytes, so the test process never
+  holds a writable descriptor to the stub. Publication is a rename after the
+  writer exits.
+- Controls: a forced in-place case and a forced sibling fork (paused 500 ms
+  in pre-exec) each reproduce `ETXTBSY` on the old harness, pass with the
+  fix, and redden when their half of the fix is reverted. The failing
+  assertion names its cause through a direct spawn probe. `prover.rs` is
+  unchanged.
+- Residuals (Architect):
+  - The original CI failure was not captured at its failing child, so the
+    fix is validated against the forced mechanism.
+  - `FORCED_FORK_HOLD` (500 ms) adds bounded latency to concurrent process
+    tests. Revisit it if any deadline in this file drops below about 1 s.
+  - The writer depends on `/usr/bin/python3`.
