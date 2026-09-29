@@ -18,7 +18,7 @@
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::Decl;
+use ken_kernel::{convert, convert_type, infer, whnf, Context, Decl, Term};
 
 /// Elaborate and evaluate a single top-level `view` declaration, seeding the
 /// literal side-table from the elaborator's own `num_values` (never a
@@ -34,7 +34,7 @@ fn eval_view(src: &str) -> EvalVal {
             NumericLitVal::Float(f) => EvalVal::Float(*f),
             NumericLitVal::Float32(f) => EvalVal::Float32(*f),
             NumericLitVal::Decimal { coeff, exp } => {
-            ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
+                ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
             }
             NumericLitVal::Str(s) => EvalVal::Str(s.clone()),
             NumericLitVal::Bytes(b) => EvalVal::Bytes(b.clone()),
@@ -43,7 +43,10 @@ fn eval_view(src: &str) -> EvalVal {
     }
     match env.env.lookup(r.def_id) {
         Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, &mut store),
-        other => panic!("expected a checked Transparent def, got {:?}", other.map(|_| ())),
+        other => panic!(
+            "expected a checked Transparent def, got {:?}",
+            other.map(|_| ())
+        ),
     }
 }
 
@@ -82,7 +85,11 @@ fn decimal_mul_exact_flips_vs_saturating() {
         EvalVal::Ctor { args, .. } => {
             match &args[0] {
                 EvalVal::BigInt(n) => {
-                    assert_eq!(n.to_string(), "100000000000000000000", "exact 10^20, no saturation");
+                    assert_eq!(
+                        n.to_string(),
+                        "100000000000000000000",
+                        "exact 10^20, no saturation"
+                    );
                 }
                 EvalVal::Int(n) => panic!("10^20 must widen to BigInt, got Int({})", n),
                 other => panic!("expected Int/BigInt coeff, got {:?}", other),
@@ -169,14 +176,16 @@ fn char_eq_and_ord_on_projection() {
 
 // ── AC-C3 — surrogate/OOR reject, flips vs isScalar:=true (soundness) ──────
 
-/// surface/numbers/char-unicode-scalar-boundaries (normative compatibility
-/// vector). Replaces the source-text oracle in
+/// surface/numbers/int-to-char-rejects-surrogate-and-oor (soundness)
+///
+/// Replaces the source-text oracle in
 /// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 13.
+/// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the real `intToChar` elaboration and evaluator produce the `Some`
-/// or `None` constructor at each codepoint. CLAIMED: the six Unicode scalar
-/// boundaries have the specified accept/reject results. THE GAP: this vector
-/// covers these edges, not every interior value or negative integer.
+/// or `None` constructor at each codepoint. CLAIMED: the row's surrogate and
+/// out-of-range cases reject while U+0041 accepts. THE GAP: this vector covers
+/// these edges, not every interior value or negative integer.
 #[test]
 fn int_to_char_unicode_scalar_boundaries() {
     let cases = [
@@ -186,6 +195,7 @@ fn int_to_char_unicode_scalar_boundaries() {
         (0xDFFF, false),
         (0x10FFFF, true),
         (0x110000, false),
+        (0x41_u32, true),
     ];
     for (codepoint, accepted) in cases {
         let result = eval_view(&format!("const t = intToChar {codepoint}"));
@@ -199,6 +209,71 @@ fn int_to_char_unicode_scalar_boundaries() {
             "intToChar U+{codepoint:04X} accept/reject boundary"
         );
     }
+}
+
+/// surface/numbers/char-deceq-collapses-on-codepoint (soundness, hard-AC)
+///
+/// Replaces the source-text oracle in
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 13 (structural half).
+/// Promise class: durable invariant. MEASURED: `isScalar 97` is Ω-sorted, and
+/// two distinct neutral proofs of it are definitionally equal in the kernel.
+/// CLAIMED: `isScalar` is proof-irrelevant, so no scalar proof can distinguish
+/// two `Char`s with one codepoint. THE GAP: only codepoint 97 is instantiated;
+/// `Char` itself erases to `Int`, so the value half is pinned by the eqChar test.
+#[test]
+fn is_scalar_proofs_are_irrelevant() {
+    let mut env = ElabEnv::new().expect("prelude init");
+    let empty = Context::new();
+    let int97 = Term::IntLit(97u32.into());
+    let is_scalar = Term::const_(env.globals["isScalar"], vec![]);
+    let pred = Term::app(is_scalar, int97.clone());
+
+    let pred_sort = infer(&env.env, &empty, &pred).expect("isScalar 97 is well typed");
+    let reduced_pred_sort = whnf(&env.env, &empty, &pred_sort);
+    let omega_sort = match &reduced_pred_sort {
+        Term::Omega(level) => Term::Omega(level.clone()),
+        other => panic!("isScalar 97 must reduce to an Ω sort, got {other:?}"),
+    };
+    assert!(convert_type(&env.env, &empty, &pred_sort, &omega_sort));
+
+    let mut ctx = Context::new();
+    ctx.push(pred.clone());
+    ctx.push(pred.clone());
+    let proof_left = Term::var(1);
+    let proof_right = Term::var(0);
+    let proof_left_ty = infer(&env.env, &ctx, &proof_left).expect("left proof variable");
+    let proof_right_ty = infer(&env.env, &ctx, &proof_right).expect("right proof variable");
+    assert!(convert_type(&env.env, &ctx, &proof_left_ty, &pred));
+    assert!(convert_type(&env.env, &ctx, &proof_right_ty, &pred));
+    assert!(
+        convert(&env.env, &ctx, &pred, &proof_left, &proof_right),
+        "distinct neutral proofs of an Ω predicate must convert"
+    );
+
+    env.elaborate_decl("fn tag97 (c : Int) : Type 0 = Bool")
+        .expect("Type-sorted fixture predicate elaborates");
+    let type_pred = Term::app(Term::const_(env.globals["tag97"], vec![]), int97);
+    let type_sort =
+        infer(&env.env, &empty, &type_pred).expect("Type-sorted fixture predicate is well typed");
+    let reduced_type_sort = whnf(&env.env, &empty, &type_sort);
+    assert!(
+        matches!(&reduced_type_sort, Term::Type(_)),
+        "fixture predicate must be Type-sorted, got {reduced_type_sort:?}"
+    );
+
+    let mut type_ctx = Context::new();
+    type_ctx.push(type_pred.clone());
+    type_ctx.push(type_pred.clone());
+    assert!(
+        !convert(
+            &env.env,
+            &type_ctx,
+            &type_pred,
+            &Term::var(1),
+            &Term::var(0)
+        ),
+        "distinct neutral Bool values must remain proof-relevant"
+    );
 }
 
 /// Value-consequence of pin 1: `eqChar` (which routes through `eq_int` on
