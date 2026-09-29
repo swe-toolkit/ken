@@ -89,6 +89,8 @@ import Core.Classes.LawfulClasses (bool_and)
 
 import Core.Classes.LawfulClasses (Ord)
 
+import Core.Classes.LawfulClasses (leq_nat)
+
 import Core.Classes.Membership (Membership)
 
 import Core.Logic.Not (Not)
@@ -15007,6 +15009,13 @@ successors: `succ`/`rel_member`/`add_edge` for the raw relation,
 `is_reflexive`/`is_symmetric`/`is_transitive`/`is_equivalence` as the standard
 relation-property predicates stated directly against `rel_member`.
 
+The chain `0 → 1 → 2` refutes transitivity because it has no `0 → 2` edge.
+Adding that single missing edge completes this finite relation. Its transitivity
+proof covers every `Nat` endpoint, including sources beyond the two stored
+keys: those sources have no outgoing edges, and the only two-step path starts
+at zero, passes through one, and ends at two. Both propositions use the same
+`Ord Nat` comparator as the relation operations; neither assumes a law.
+
 ```ken
 fn pair_vals (k : Type) (v : Type) (xs : List (Pair k v)) : List v =
   match xs {
@@ -15455,6 +15464,79 @@ fn is_transitive (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) 
 
 fn is_equivalence (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) : Prop =
   And (is_reflexive k leq r) (And (is_symmetric k leq r) (is_transitive k leq r))
+
+const relation_chain : Tree Nat (Tree Nat Unit) =
+  add_edge
+    Nat
+    leq_nat
+    (Suc Zero)
+    (Suc (Suc Zero))
+    (add_edge Nat leq_nat Zero (Suc Zero) (empty Nat (Tree Nat Unit)))
+
+const relation_chain_completion : Tree Nat (Tree Nat Unit) =
+  add_edge Nat leq_nat Zero (Suc (Suc Zero)) relation_chain
+
+theorem relation_chain_refutes_transitivity : Not (is_transitive Nat leq_nat relation_chain) =
+  λh. absurd (h Zero (Suc Zero) (Suc (Suc Zero)) Proved Proved)
+
+theorem relation_chain_completion_no_outgoing
+      (n : Nat) (z : Nat)
+    : rel_member Nat leq_nat (Suc (Suc n)) z relation_chain_completion → Bottom =
+  λh. absurd h
+
+theorem relation_chain_completion_step
+      (z : Nat)
+    : rel_member Nat leq_nat (Suc Zero) z relation_chain_completion
+      → rel_member Nat leq_nat Zero z relation_chain_completion =
+  match z {
+    Zero ↦ λh. absurd h;
+    Suc z1 ↦
+      match z1 {
+        Zero ↦ λh. absurd h;
+        Suc z2 ↦
+          match z2 {
+            Zero ↦ λh. Proved;
+            Suc z3 ↦ λh. absurd h
+          }
+      }
+  }
+
+theorem relation_chain_completion_is_transitive
+    : is_transitive Nat leq_nat relation_chain_completion =
+  λx.
+    match x {
+      Zero ↦
+        λy.
+          match y {
+            Zero ↦ λz. λhxy. λhyz. absurd hxy;
+            Suc y1 ↦
+              match y1 {
+                Zero ↦ λz. λhxy. λhyz. relation_chain_completion_step z hyz;
+                Suc y2 ↦ λz. λhxy. λhyz. absurd (relation_chain_completion_no_outgoing y2 z hyz)
+              }
+          };
+      Suc x1 ↦
+        match x1 {
+          Zero ↦
+            λy.
+              match y {
+                Zero ↦ λz. λhxy. λhyz. absurd hxy;
+                Suc y1 ↦
+                  match y1 {
+                    Zero ↦ λz. λhxy. λhyz. absurd hxy;
+                    Suc y2 ↦
+                      match y2 {
+                        Zero ↦
+                          λz.
+                            λhxy.
+                              λhyz. absurd (relation_chain_completion_no_outgoing Zero z hyz);
+                        Suc y3 ↦ λz. λhxy. λhyz. absurd hxy
+                      }
+                  }
+              };
+          Suc x2 ↦ λy. λz. λhxy. λhyz. absurd (relation_chain_completion_no_outgoing x2 y hxy)
+        }
+    }
 ```
 
 ```ken example
