@@ -460,15 +460,20 @@ fn is_omega_type(env: &GlobalEnv, ctx: &Context, ty: &Term) -> bool {
 // At each structural edge, first weak-head reduce while deferring δ at the
 // head (`17 §3.3`, §3.5). Equal transparent heads can compare their argument
 // spines without unfolding. If congruence fails, or the heads differ, full δ
-// is retried. The retry's origin is a canonical pair of transparent heads,
-// including (c, c): the same head can reappear after β has exposed a fresh
-// symbolic recursive call. One no-progress lap is allowed. On a recurring
-// origin with no head ι-progress, return false before comparing another copy.
-// A real ι-step discharges the pair for descendants. This only refuses
-// previously nonterminating comparisons, never concludes equality from a
-// cyclic hypothesis. Each edge either descends on a proper subterm of its
-// deferred-whnf inputs or retries δ at an origin pair; a pair may recur only
-// after ι-progress. A closed-scrutinee ι loop remains a known residual.
+// is retried. An origin is recorded only if BOTH deferred heads are
+// transparent and at least one belongs to a cycle in the transparent-body
+// graph, including (c, c) for recursive c. One no-progress lap is allowed.
+// On a recurring origin with no head ι-progress, return false before
+// comparing another copy. A real ι-step discharges the pair for descendants.
+// This never concludes equality from a cyclic hypothesis. Each edge either
+// descends on a proper subterm of its deferred-whnf inputs or retries δ.
+// Pure non-recursive δ terminates down the condensation DAG: if a
+// non-recursive g recurred indefinitely by regeneration from recursive f,
+// then g reaches f and f reaches g, contradicting g's non-recursiveness.
+// Thus infinitely many retries contain a recursive head; finite constant
+// pairs force a repeated recorded origin without ι, which is refused. SCT
+// bounds ι-progress on admitted recursion. A closed-scrutinee ι loop remains
+// a known residual.
 //
 // Governing spec: `17 §3.3` step (5) and `17 §3.5` require head-δ deferral
 // before congruence; the distinct-identity boundary also forbids unbounded
@@ -492,8 +497,9 @@ fn canonical_pair(x: GlobalId, y: GlobalId) -> ConstPair {
 
 /// The deferred-whnf δ-origin of a structural retry: `Some((min, max))`
 /// iff both sides are applications (possibly nullary) headed by transparent
-/// constants. Equal heads are included when their spine comparison failed.
-/// An opaque, primitive or inductive head has no δ-retry pair.
+/// constants and at least one head lies on a transparent-body cycle. Equal
+/// recursive heads are included when their spine comparison failed. A pair
+/// of non-recursive heads (or any opaque head) has no δ-retry origin.
 fn is_transparent(env: &GlobalEnv, id: GlobalId) -> bool {
     matches!(env.lookup(id), Some(crate::env::Decl::Transparent { .. }))
 }
@@ -503,7 +509,9 @@ fn delta_origin_pair(env: &GlobalEnv, a: &Term, b: &Term) -> Option<ConstPair> {
     let (hb, _) = peel_app(b);
     match (&ha, &hb) {
         (Term::Const { id: ia, .. }, Term::Const { id: ib, .. })
-            if is_transparent(env, *ia) && is_transparent(env, *ib) =>
+            if is_transparent(env, *ia)
+                && is_transparent(env, *ib)
+                && (env.is_recursive_transparent(*ia) || env.is_recursive_transparent(*ib)) =>
         {
             Some(canonical_pair(*ia, *ib))
         }
@@ -686,7 +694,7 @@ pub fn convert_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> bool 
 /// `path` is the path-local no-progress δ-origin ledger. Reduce both sides
 /// with head δ deferred first. Compare same transparent heads by congruence;
 /// otherwise retry full δ if a head is transparent, and record the pair of
-/// deferred transparent heads (including equal heads) on the retry. Head
+/// deferred transparent heads only if at least one is recursive. Head
 /// ι-progress discharges the pair; recurring no-progress retries refuse
 /// before another structural copy is compared.
 fn conv_struct_path(
@@ -739,8 +747,8 @@ fn conv_struct_path(
     }
 
     // The ledger's origin belongs to the deferred plane, which reveals a
-    // transparent head even if β hid it in the original terms. Same-head
-    // retries are recorded too: a failed spine can recur one binder deeper.
+    // transparent head even if β hid it in the original terms. A recursive
+    // same-head retry is recorded too: it can recur one binder deeper.
     let transparent_head = |head: &Term| match head {
         Term::Const { id, .. } => is_transparent(env, *id),
         _ => false,
@@ -2044,11 +2052,10 @@ mod tests {
     }
 
     /// Case 3 (finite δ retry, nonzero δ, zero refusal, true): two DISTINCT
-    /// transparent constants that ARE convertible — the heads genuinely δ-unfold
-    /// (`unfolds() >= 1`), a δ-origin is captured, but they converge, so the
-    /// ledger records the pair and never refuses. This is the completeness guard
-    /// AND the nonzero-δ counterpart to case 2's zero: a distinct-const pair that
-    /// converges must not be over-rejected, and it must actually have unfolded.
+    /// transparent non-recursive constants that ARE convertible. They genuinely
+    /// δ-unfold (`unfolds() >= 1`) without a ledger origin. This is the
+    /// nonzero-δ counterpart to case 2's zero: a finite convergent pair must
+    /// not be refused or mistaken for a recursive retry.
     #[test]
     fn framed_case3_distinct_convertible_consts_unfold_but_never_refuse() {
         let mut env = GlobalEnv::new();
@@ -2066,9 +2073,10 @@ mod tests {
             delta_probe::unfolds() >= 1,
             "distinct convertible heads must actually δ-unfold (nonzero, vs case 2's zero)"
         );
-        assert!(
-            delta_probe::captures() >= 1,
-            "distinct transparent heads must capture a δ-origin"
+        assert_eq!(
+            delta_probe::captures(),
+            0,
+            "two acyclic heads never create a recursion-keyed δ-origin"
         );
         assert_eq!(delta_probe::iotas(), 0, "aliases converge by δ/β, not ι");
         assert_eq!(

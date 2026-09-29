@@ -300,10 +300,14 @@ fn sct_accept_lexicographic() {
 // Composed self-loop: compose(↓, ↓) = ↓ → ACCEPT.
 // ---------------------------------------------------------------------------
 
-fn declare_even_odd(env: &mut GlobalEnv, nb: &NB) -> Vec<GlobalId> {
+fn declare_even_odd(env: &mut GlobalEnv, nb: &NB, off_cycle: bool) -> Vec<GlobalId> {
     let nat = nb.nat;
     let ty = Term::pi(nat_t(nb), bool_t(nb));
-    let ids = declare_recursive_group(env, vec![(vec![], ty.clone()), (vec![], ty)], |ids| {
+    let mut signatures = vec![(vec![], ty.clone()), (vec![], ty.clone())];
+    if off_cycle {
+        signatures.push((vec![], ty));
+    }
+    let ids = declare_recursive_group(env, signatures, |ids| {
         let is_even = ids[0];
         let is_odd = ids[1];
         let nat_t = Term::indformer(nat, vec![]);
@@ -356,7 +360,12 @@ fn declare_even_odd(env: &mut GlobalEnv, nb: &NB) -> Vec<GlobalId> {
             ),
         );
 
-        vec![is_even_body, is_odd_body]
+        let mut bodies = vec![is_even_body, is_odd_body];
+        if off_cycle {
+            // Third group member calls isEven but is not on its mutual cycle.
+            bodies.push(Term::lam(nat_t, Term::app(cref(ids[0]), Term::var(0))));
+        }
+        bodies
     })
     .expect("sct-accept-mutual must be admitted");
     ids
@@ -365,9 +374,22 @@ fn declare_even_odd(env: &mut GlobalEnv, nb: &NB) -> Vec<GlobalId> {
 #[test]
 fn sct_accept_mutual() {
     let (mut env, nb) = mk_env();
-    let ids = declare_even_odd(&mut env, &nb);
+    let ids = declare_even_odd(&mut env, &nb, false);
     assert!(env.transparent_body(ids[0]).is_some());
     assert!(env.transparent_body(ids[1]).is_some());
+    assert!(env.is_recursive_transparent(ids[0]));
+    assert!(env.is_recursive_transparent(ids[1]));
+}
+
+#[test]
+fn mutual_group_member_outside_cycle_is_not_recursive() {
+    let (mut env, nb) = mk_env();
+    let ids = declare_even_odd(&mut env, &nb, true);
+    assert_eq!(ids.len(), 3);
+    assert!(env.is_recursive_transparent(ids[0]));
+    assert!(env.is_recursive_transparent(ids[1]));
+    assert!(env.transparent_body(ids[2]).is_some());
+    assert!(!env.is_recursive_transparent(ids[2]));
 }
 
 // ---------------------------------------------------------------------------
@@ -506,8 +528,8 @@ fn sct_accept_permuted() {
 #[test]
 fn mutual_and_permuted_pairs_terminate_against_self_and_distinct_twins() {
     let (mut env, nb) = mk_env();
-    let even_odd = declare_even_odd(&mut env, &nb);
-    let other_even_odd = declare_even_odd(&mut env, &nb);
+    let even_odd = declare_even_odd(&mut env, &nb, false);
+    let other_even_odd = declare_even_odd(&mut env, &nb, false);
     let permuted = declare_permuted_pair(&mut env, &nb);
     let other_permuted = declare_permuted_pair(&mut env, &nb);
     let mut ctx = Context::new();
@@ -680,6 +702,155 @@ fn declare_def_non_recursive_admitted() {
     )
     .expect("non-recursive identity must be admitted");
     assert!(env.transparent_body(id).is_some());
+    assert!(!env.is_recursive_transparent(id));
+}
+
+/// `declare_def` uses the same opaque-then-transparent mutator as non-recursive
+/// admission. A structurally decreasing self-edge must enter the cycle set.
+#[test]
+fn declare_def_self_recursive_is_cycle_member() {
+    let (mut env, nb) = mk_env();
+    let nt = nat_t(&nb);
+    let predicted = env.next_global_id();
+    let suc_method = Term::lam(
+        nt.clone(),
+        Term::lam(nt.clone(), Term::app(cref(predicted), Term::var(1))),
+    );
+    let body = Term::lam(
+        nt.clone(),
+        nat_elim(
+            &nb,
+            asc_motive(&nb, nt.clone()),
+            Term::constructor(nb.zero, vec![]),
+            suc_method,
+            Term::var(0),
+        ),
+    );
+    let id = declare_def(&mut env, vec![], Term::pi(nt.clone(), nt), body)
+        .expect("decreasing self-recursion must be admitted");
+    assert_eq!(id, predicted);
+    assert!(env.is_recursive_transparent(id));
+}
+
+/// Shared input for the completeness controls. `skip_first x y = S y`
+/// ignores an argument, so head-spine comparison fails even when ordinary
+/// β/δ reduces the two sides to the same nested successor of open `z`.
+fn nested_ignored_arg_pair(
+    nt: &Term,
+    id_left: GlobalId,
+    id_right: GlobalId,
+    depth: usize,
+) -> (Context, Term, Term) {
+    let mut ctx = Context::new();
+    for _ in 0..(2 * depth + 1) {
+        ctx.push(nt.clone());
+    }
+    let mut left = Term::var(0);
+    let mut right = Term::var(0);
+    for i in (0..depth).rev() {
+        left = Term::app(Term::app(cref(id_left), Term::var(2 * depth - i)), left);
+        right = Term::app(Term::app(cref(id_right), Term::var(depth - i)), right);
+    }
+    (ctx, left, right)
+}
+
+fn declare_ignore_first(
+    env: &mut GlobalEnv,
+    nb: &NB,
+    recursive_callee: Option<GlobalId>,
+) -> GlobalId {
+    let nt = nat_t(nb);
+    let result = match recursive_callee {
+        Some(f) => Term::app(cref(f), Term::var(0)),
+        None => Term::app(suc_c(nb), Term::var(0)),
+    };
+    declare_def(
+        env,
+        vec![],
+        Term::pi(nt.clone(), Term::pi(nt.clone(), nt.clone())),
+        Term::lam(nt.clone(), Term::lam(nt, result)),
+    )
+    .expect("acyclic ignored-argument wrapper admission")
+}
+
+/// Durable invariant (§3.5): a finite δ chain of a same non-recursive head
+/// cannot be refused just because the failed ignored-argument spine recurs.
+#[test]
+fn nonrecursive_same_head_three_and_six_levels_convert() {
+    let (mut env, nb) = mk_env();
+    let c = declare_ignore_first(&mut env, &nb, None);
+    assert!(!env.is_recursive_transparent(c));
+    for depth in [3, 6] {
+        let nt = nat_t(&nb);
+        let (ctx, left, right) = nested_ignored_arg_pair(&nt, c, c, depth);
+        assert_eq!(ken_kernel::infer(&env, &ctx, &left).unwrap(), nt);
+        assert_eq!(ken_kernel::infer(&env, &ctx, &right).unwrap(), nt);
+        assert!(
+            convert(&env, &ctx, &nt, &left, &right),
+            "same acyclic head at depth {depth} must reach the finite common reduct"
+        );
+    }
+}
+
+#[test]
+fn nonrecursive_distinct_heads_three_levels_convert() {
+    let (mut env, nb) = mk_env();
+    let c = declare_ignore_first(&mut env, &nb, None);
+    let d = declare_ignore_first(&mut env, &nb, None);
+    assert_ne!(c, d);
+    assert!(!env.is_recursive_transparent(c));
+    assert!(!env.is_recursive_transparent(d));
+    let nt = nat_t(&nb);
+    let (ctx, left, right) = nested_ignored_arg_pair(&nt, c, d, 3);
+    assert_eq!(ken_kernel::infer(&env, &ctx, &left).unwrap(), nt);
+    assert_eq!(ken_kernel::infer(&env, &ctx, &right).unwrap(), nt);
+    assert!(convert(&env, &ctx, &nt, &left, &right));
+}
+
+#[test]
+fn nonrecursive_wrapper_over_recursive_callee_three_levels_converts() {
+    let (mut env, nb) = mk_env();
+    let nt = nat_t(&nb);
+    let ids = declare_recursive_group(
+        &mut env,
+        vec![(vec![], Term::pi(nt.clone(), nt.clone()))],
+        |ids| {
+            // f n = (λ unused. S n) (elim_Nat ... n). Its recursive call
+            // on the predecessor is SCT-admitted, but beta never forces the
+            // eliminator argument. Thus `f y` reduces to `S y` even when
+            // `y` is neutral, without an iota step discharging the c ledger.
+            let method = Term::lam(
+                nt.clone(),
+                Term::lam(nt.clone(), Term::app(cref(ids[0]), Term::var(1))),
+            );
+            let delayed = nat_elim(
+                &nb,
+                asc_motive(&nb, nt.clone()),
+                Term::constructor(nb.zero, vec![]),
+                method,
+                Term::var(0),
+            );
+            vec![Term::lam(
+                nt.clone(),
+                Term::app(
+                    Term::Ascript(
+                        Box::new(Term::lam(nt.clone(), Term::app(suc_c(&nb), Term::var(1)))),
+                        Box::new(Term::pi(nt.clone(), nt.clone())),
+                    ),
+                    delayed,
+                ),
+            )]
+        },
+    )
+    .expect("structurally decreasing f is admitted");
+    let f = ids[0];
+    let c = declare_ignore_first(&mut env, &nb, Some(f));
+    assert!(env.is_recursive_transparent(f));
+    assert!(!env.is_recursive_transparent(c));
+    let (ctx, left, right) = nested_ignored_arg_pair(&nt, c, c, 3);
+    assert_eq!(ken_kernel::infer(&env, &ctx, &left).unwrap(), nt);
+    assert_eq!(ken_kernel::infer(&env, &ctx, &right).unwrap(), nt);
+    assert!(convert(&env, &ctx, &nt, &left, &right));
 }
 
 // ---------------------------------------------------------------------------
