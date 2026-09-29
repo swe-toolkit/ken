@@ -36,15 +36,6 @@ fn system_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
         .unwrap_or_else(|error| panic!("System.Error owner {name}: {error}"))
 }
 
-fn system_constructor(env: &ElabEnv, owned: &[GlobalId], family: &str, name: &str) -> GlobalId {
-    let owner = system_id(env, owned, family);
-    let qualified = format!("{SYSTEM_ERROR}.{name}");
-    let id = env.globals[&qualified];
-    let (inductive, _) = env.env.constructor(id).expect("System.Error constructor");
-    assert_eq!(inductive.id, owner, "{qualified} must belong to {family}");
-    id
-}
-
 fn system_inductive<'a>(
     env: &'a ElabEnv,
     owned: &[GlobalId],
@@ -75,24 +66,26 @@ fn constructor_names(env: &ElabEnv, family: &str) -> Vec<String> {
 }
 
 fn system_constructor_names(env: &ElabEnv, owned: &[GlobalId], family: &str) -> Vec<String> {
-    system_inductive(env, owned, family)
+    let owner = system_inductive(env, owned, family);
+    let prefix = format!("{SYSTEM_ERROR}.");
+    owner
         .constructors
         .iter()
         .map(|constructor| {
+            let (checked_parent, _) = env
+                .env
+                .constructor(constructor.id)
+                .expect("owned family constructor must resolve");
+            assert_eq!(checked_parent.id, owner.id, "{family} constructor owner");
             let name = env
                 .globals
                 .iter()
                 .find_map(|(name, id)| {
                     (*id == constructor.id)
-                        .then(|| name.strip_prefix("Capability.System.Error."))
+                        .then(|| name.strip_prefix(&prefix))
                         .flatten()
                 })
                 .unwrap_or_else(|| panic!("constructor {:?} has no provider name", constructor.id));
-            assert_eq!(
-                system_constructor(env, owned, family, name),
-                constructor.id,
-                "{family}.{name} must resolve by checked constructor identity"
-            );
             name.to_owned()
         })
         .collect()
