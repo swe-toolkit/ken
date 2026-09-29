@@ -15436,6 +15436,14 @@ fn cat4_bool_or_true_cases
       }
   }
 
+theorem cat4_bool_or_left_true
+      (a : Bool) (b : Bool)
+    : Equal Bool a True → Equal Bool (cat4_bool_or a b) True =
+  match a {
+    True ↦ λpresent. Proved;
+    False ↦ λpresent. absurd present
+  }
+
 theorem cat4_bool_or_right_true
       (a : Bool) (b : Bool)
     : Equal Bool b True → Equal Bool (cat4_bool_or a b) True =
@@ -15525,6 +15533,15 @@ theorem relation_reach_fold_open_bridge
         (relation_reach_fold_param k leq n y r targets) =
   Refl
 
+theorem reachable_within_rhs_split
+      (k : Type) (leq : k → k → Bool) (n : Nat) (x : k) (y : k) (r : Tree k (Tree k Unit))
+    : Equal Bool
+        (reachable_within_successor_rhs k leq n x y r)
+        (cat4_bool_or
+          (set_member k leq y (succ k leq x r))
+          (relation_reach_fold_closed k leq n y r (succ k leq x r))) =
+  Refl
+
 fn relation_walk_bool
       (k : Type)
       (leq : k → k → Bool)
@@ -15566,6 +15583,52 @@ theorem relation_walk_prefix
             edge
             tail
   }
+
+fn relation_ord_leq (k : Type) (d : Ord k) : k → k → Bool = d.leq
+
+theorem relation_ord_refl
+      (k : Type) (d : Ord k) (query : k)
+    : Equal Bool (relation_ord_leq k d query query) True =
+  d.refl query
+
+theorem relation_ord_trans
+      (k : Type) (d : Ord k) (a : k) (b : k) (c : k)
+    : Equal Bool (relation_ord_leq k d a b) True
+      → Equal Bool (relation_ord_leq k d b c) True
+      → Equal Bool (relation_ord_leq k d a c) True =
+  d.trans a b c
+
+theorem relation_walk_singleton_complete
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (x : k) (y : k) (stored : k)
+    : Equal Bool
+        (relation_walk_bool k (relation_ord_leq k d) r x y (Cons k stored (Nil k)))
+        True
+      → rel_member k (relation_ord_leq k d) x y r =
+  λvalid.
+    let
+      leq = relation_ord_leq k d;
+      targets = succ k leq x r;
+      edge_stored = set_member k leq stored targets;
+      edge_target = set_member k leq y targets;
+      same_key = order_equiv_key k leq stored y;
+      stored_edge = (proof left for bool_and) edge_stored same_key valid;
+      same = (proof right for bool_and) edge_stored same_key valid;
+      equivalent =
+        and_intro
+          (Equal Bool (leq stored y) True)
+          (Equal Bool (leq y stored) True)
+          ((proof left for bool_and) (leq stored y) (leq y stored) same)
+          ((proof right for bool_and) (leq stored y) (leq y stored) same);
+      same_member =
+        set_member_order_equiv_agree k leq (relation_ord_trans k d) stored y targets equivalent
+    in
+      trans
+        Bool
+        edge_target
+        edge_stored
+        True
+        (sym Bool edge_stored edge_target same_member)
+        stored_edge
 
 theorem relation_walk_singleton
       (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (x : k) (y : k)
@@ -15741,6 +15804,430 @@ fn relation_reach_source_edge
     : Prop =
   rel_member k leq source target r
 
+fn tree_member_pred (k : Type) (leq : k → k → Bool) (tree : Tree k Unit) (query : k) : Prop =
+  Equal Bool (set_member k leq query tree) True
+
+theorem ordered_member_root
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (query : k) → Equal Bool (leq query query) True)
+      (left : Tree k Unit)
+      (key : k)
+      (unit : Unit)
+      (right : Tree k Unit)
+    : tree_member_pred k leq (Node k Unit left key unit right) key =
+  cong
+    (Option Unit)
+    Bool
+    (lookup k Unit leq key (Node k Unit left key unit right))
+    (Some Unit unit)
+    (is_some Unit)
+    (lookup_stop_bridge k Unit leq key left key unit right (reflLeq key) (reflLeq key))
+
+theorem ordered_member_left_lift
+      (k : Type)
+      (leq : k → k → Bool)
+      (left : Tree k Unit)
+      (key : k)
+      (unit : Unit)
+      (right : Tree k Unit)
+      (query : k)
+    : Equal Bool (leq query key) True
+      → tree_member_pred k leq left query
+      → tree_member_pred k leq (Node k Unit left key unit right) query =
+  λbelow.
+    λpresent.
+      match bool_dichotomy (leq key query) {
+        Inl above ↦
+          cong
+            (Option Unit)
+            Bool
+            (lookup k Unit leq query (Node k Unit left key unit right))
+            (Some Unit unit)
+            (is_some Unit)
+            (lookup_stop_bridge k Unit leq query left key unit right below above);
+        Inr not_above ↦
+          trans
+            Bool
+            (set_member k leq query (Node k Unit left key unit right))
+            (set_member k leq query left)
+            True
+            (cong
+              (Option Unit)
+              Bool
+              (lookup k Unit leq query (Node k Unit left key unit right))
+              (lookup k Unit leq query left)
+              (is_some Unit)
+              (lookup_into_l_bridge k Unit leq query left key unit right below not_above))
+            present
+      }
+
+theorem ordered_member_right_lift
+      (k : Type)
+      (leq : k → k → Bool)
+      (left : Tree k Unit)
+      (key : k)
+      (unit : Unit)
+      (right : Tree k Unit)
+      (query : k)
+    : Equal Bool (leq key query) True
+      → tree_member_pred k leq right query
+      → tree_member_pred k leq (Node k Unit left key unit right) query =
+  λabove.
+    λpresent.
+      match bool_dichotomy (leq query key) {
+        Inl below ↦
+          cong
+            (Option Unit)
+            Bool
+            (lookup k Unit leq query (Node k Unit left key unit right))
+            (Some Unit unit)
+            (is_some Unit)
+            (lookup_stop_bridge k Unit leq query left key unit right below above);
+        Inr not_below ↦
+          trans
+            Bool
+            (set_member k leq query (Node k Unit left key unit right))
+            (set_member k leq query right)
+            True
+            (cong
+              (Option Unit)
+              Bool
+              (lookup k Unit leq query (Node k Unit left key unit right))
+              (lookup k Unit leq query right)
+              (is_some Unit)
+              (lookup_into_r_bridge k Unit leq query left key unit right not_below))
+            present
+      }
+
+theorem all_keys_binary
+      (k : Type)
+      (v : Type)
+      (p : k → Prop)
+      (q : k → Prop)
+      (out : k → Prop)
+      (m : Tree k v)
+      (step : (key : k) → p key → q key → out key)
+    : all_keys k v p m → all_keys k v q m → all_keys k v out m =
+  match m {
+    Leaf ↦ λleft. λright. Proved;
+    Node l key val r ↦
+      λleft.
+        λright.
+          let
+            p_left = all_keys k v p l;
+            p_right = all_keys k v p r;
+            q_left = all_keys k v q l;
+            q_right = all_keys k v q r;
+            out_left = all_keys k v out l;
+            out_right = all_keys k v out r;
+            p_children = and_snd (p key) (And p_left p_right) left;
+            q_children = and_snd (q key) (And q_left q_right) right
+          in
+            and_intro
+              (out key)
+              (And out_left out_right)
+              (step
+                key
+                (and_fst (p key) (And p_left p_right) left)
+                (and_fst (q key) (And q_left q_right) right))
+              (and_intro
+                out_left
+                out_right
+                (all_keys_binary
+                  k
+                  v
+                  p
+                  q
+                  out
+                  l
+                  step
+                  (and_fst p_left p_right p_children)
+                  (and_fst q_left q_right q_children))
+                (all_keys_binary
+                  k
+                  v
+                  p
+                  q
+                  out
+                  r
+                  step
+                  (and_snd p_left p_right p_children)
+                  (and_snd q_left q_right q_children)))
+  }
+
+fn tree_left_bound (k : Type) (leq : k → k → Bool) (pivot : k) (query : k) : Prop =
+  Equal Bool (leq query pivot) True
+
+fn tree_right_bound (k : Type) (leq : k → k → Bool) (pivot : k) (query : k) : Prop =
+  Equal Bool (leq pivot query) True
+
+theorem ordered_tree_transport
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : Tree k Unit)
+      (target : Tree k Unit)
+      (same : Equal (Tree k Unit) source target)
+    : Ordered k Unit leq source → Ordered k Unit leq target =
+  λordered. J (λtree _. Ordered k Unit leq tree) ordered same
+
+theorem succ_node_hit
+      (k : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (left : Tree k (Tree k Unit))
+      (key : k)
+      (successors : Tree k Unit)
+      (right : Tree k (Tree k Unit))
+      (below : Equal Bool (leq x key) True)
+      (above : Equal Bool (leq key x) True)
+    : Equal
+        (Tree k Unit)
+        (succ k leq x (Node k (Tree k Unit) left key successors right))
+        successors =
+  cong
+    (Option (Tree k Unit))
+    (Tree k Unit)
+    (lookup k (Tree k Unit) leq x (Node k (Tree k Unit) left key successors right))
+    (Some (Tree k Unit) successors)
+    (λfound.
+      match found {
+        None ↦ empty k Unit;
+        Some values ↦ values
+      })
+    (lookup_stop_bridge k (Tree k Unit) leq x left key successors right below above)
+
+theorem succ_node_left
+      (k : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (left : Tree k (Tree k Unit))
+      (key : k)
+      (successors : Tree k Unit)
+      (right : Tree k (Tree k Unit))
+      (below : Equal Bool (leq x key) True)
+      (not_above : Equal Bool (leq key x) False)
+    : Equal
+        (Tree k Unit)
+        (succ k leq x (Node k (Tree k Unit) left key successors right))
+        (succ k leq x left) =
+  cong
+    (Option (Tree k Unit))
+    (Tree k Unit)
+    (lookup k (Tree k Unit) leq x (Node k (Tree k Unit) left key successors right))
+    (lookup k (Tree k Unit) leq x left)
+    (λfound.
+      match found {
+        None ↦ empty k Unit;
+        Some values ↦ values
+      })
+    (lookup_into_l_bridge k (Tree k Unit) leq x left key successors right below not_above)
+
+theorem succ_node_right
+      (k : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (left : Tree k (Tree k Unit))
+      (key : k)
+      (successors : Tree k Unit)
+      (right : Tree k (Tree k Unit))
+      (not_below : Equal Bool (leq x key) False)
+    : Equal
+        (Tree k Unit)
+        (succ k leq x (Node k (Tree k Unit) left key successors right))
+        (succ k leq x right) =
+  cong
+    (Option (Tree k Unit))
+    (Tree k Unit)
+    (lookup k (Tree k Unit) leq x (Node k (Tree k Unit) left key successors right))
+    (lookup k (Tree k Unit) leq x right)
+    (λfound.
+      match found {
+        None ↦ empty k Unit;
+        Some values ↦ values
+      })
+    (lookup_into_r_bridge k (Tree k Unit) leq x left key successors right not_below)
+
+theorem successors_ordered_lookup
+      (k : Type) (d : Ord k) (adjacency : Tree k (Tree k Unit)) (x : k)
+    : successors_ordered k d adjacency
+      → Ordered k Unit (relation_ord_leq k d) (succ k (relation_ord_leq k d) x adjacency) =
+  match adjacency {
+    Leaf ↦ λall_ordered. Proved;
+    Node left key successors right ↦
+      λall_ordered.
+        let
+          left_ordered = successors_ordered k d left;
+          right_ordered = successors_ordered k d right;
+          children = And left_ordered right_ordered;
+          subtrees = and_snd (ordered_by k Unit d successors) children all_ordered;
+          from_left = and_fst left_ordered right_ordered subtrees;
+          from_right = and_snd left_ordered right_ordered subtrees;
+          stored_ordered = and_fst (ordered_by k Unit d successors) children all_ordered;
+          node_tree = Node k (Tree k Unit) left key successors right;
+          observed = succ k (relation_ord_leq k d) x node_tree
+        in
+          match bool_dichotomy ((relation_ord_leq k d) x key) {
+            Inl below ↦
+              match bool_dichotomy ((relation_ord_leq k d) key x) {
+                Inl above ↦
+                  ordered_tree_transport
+                    k
+                    (relation_ord_leq k d)
+                    successors
+                    observed
+                    (sym
+                      (Tree k Unit)
+                      observed
+                      successors
+                      (succ_node_hit
+                        k
+                        (relation_ord_leq k d)
+                        x
+                        left
+                        key
+                        successors
+                        right
+                        below
+                        above))
+                    stored_ordered;
+                Inr not_above ↦
+                  ordered_tree_transport
+                    k
+                    (relation_ord_leq k d)
+                    (succ k (relation_ord_leq k d) x left)
+                    observed
+                    (sym
+                      (Tree k Unit)
+                      observed
+                      (succ k (relation_ord_leq k d) x left)
+                      (succ_node_left
+                        k
+                        (relation_ord_leq k d)
+                        x
+                        left
+                        key
+                        successors
+                        right
+                        below
+                        not_above))
+                    (successors_ordered_lookup k d left x from_left)
+              };
+            Inr not_below ↦
+              ordered_tree_transport
+                k
+                (relation_ord_leq k d)
+                (succ k (relation_ord_leq k d) x right)
+                observed
+                (sym
+                  (Tree k Unit)
+                  observed
+                  (succ k (relation_ord_leq k d) x right)
+                  (succ_node_right
+                    k
+                    (relation_ord_leq k d)
+                    x
+                    left
+                    key
+                    successors
+                    right
+                    not_below))
+                (successors_ordered_lookup k d right x from_right)
+          }
+  }
+
+theorem ordered_self_members
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (query : k) → Equal Bool (leq query query) True)
+      (tree : Tree k Unit)
+    : Ordered k Unit leq tree → all_keys k Unit (tree_member_pred k leq tree) tree =
+  match tree {
+    Leaf ↦ λordered. Proved;
+    Node left key unit right ↦
+      λordered.
+        let
+          node_tree = Node k Unit left key unit right;
+          left_bound = all_keys k Unit (tree_left_bound k leq key) left;
+          right_bound = all_keys k Unit (tree_right_bound k leq key) right;
+          ordered_left = Ordered k Unit leq left;
+          ordered_right = Ordered k Unit leq right;
+          children_ordered = And ordered_left ordered_right;
+          node_remainder = And right_bound children_ordered;
+          bound_left = and_fst left_bound node_remainder ordered;
+          remainder = and_snd left_bound node_remainder ordered;
+          bound_right = and_fst right_bound children_ordered remainder;
+          ordered_children = and_snd right_bound children_ordered remainder;
+          left_self =
+            ordered_self_members
+              k
+              leq
+              reflLeq
+              left
+              (and_fst ordered_left ordered_right ordered_children);
+          right_self =
+            ordered_self_members
+              k
+              leq
+              reflLeq
+              right
+              (and_snd ordered_left ordered_right ordered_children);
+          left_in_node =
+            all_keys_binary
+              k
+              Unit
+              (tree_left_bound k leq key)
+              (tree_member_pred k leq left)
+              (tree_member_pred k leq node_tree)
+              left
+              (λquery.
+                λbelow.
+                  λpresent.
+                    ordered_member_left_lift k leq left key unit right query below present)
+              bound_left
+              left_self;
+          right_in_node =
+            all_keys_binary
+              k
+              Unit
+              (tree_right_bound k leq key)
+              (tree_member_pred k leq right)
+              (tree_member_pred k leq node_tree)
+              right
+              (λquery.
+                λabove.
+                  λpresent.
+                    ordered_member_right_lift k leq left key unit right query above present)
+              bound_right
+              right_self
+        in
+          and_intro
+            (tree_member_pred k leq node_tree key)
+            (And
+              (all_keys k Unit (tree_member_pred k leq node_tree) left)
+              (all_keys k Unit (tree_member_pred k leq node_tree) right))
+            (ordered_member_root k leq reflLeq left key unit right)
+            (and_intro
+              (all_keys k Unit (tree_member_pred k leq node_tree) left)
+              (all_keys k Unit (tree_member_pred k leq node_tree) right)
+              left_in_node
+              right_in_node)
+  }
+
+theorem relation_reach_source_edges
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (x : k)
+    : successors_ordered k d r
+      → all_keys k Unit
+        (relation_reach_source_edge k (relation_ord_leq k d) r x)
+        (succ k (relation_ord_leq k d) x r) =
+  λinner.
+    ordered_self_members
+      k
+      (relation_ord_leq k d)
+      (relation_ord_refl k d)
+      (succ k (relation_ord_leq k d) x r)
+      (successors_ordered_lookup k d r x inner)
+
 theorem relation_reach_fold_sound
       (k : Type)
       (leq : k → k → Bool)
@@ -15874,6 +16361,166 @@ theorem reachable_within_direct_sound
         (Cons k y (Nil k))
         (relation_walk_singleton k d r x y edge)
         (singleton_length_fits_successor k y n))
+
+theorem bounded_walk_zero_excluded
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (x : k)
+      (y : k)
+      (vertices : List k)
+    : Equal Bool (relation_walk_bool k leq r x y vertices) True
+      → Equal Bool (leq_nat (length k vertices) Zero) True
+      → Bottom =
+  match vertices {
+    Nil ↦ λvalid. λbounded. absurd valid;
+    Cons next rest ↦ λvalid. λbounded. absurd bounded
+  }
+
+theorem bounded_walk_zero_impossible
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (x : k) (y : k)
+    : bounded_walk k leq r Zero x y → Bottom =
+  λbounded.
+    elim_trunc
+      Bottom
+      (λwitness.
+        match witness {
+          MkBoundedRelationWalk vertices valid length_bound ↦
+            bounded_walk_zero_excluded k leq r x y vertices valid length_bound
+        })
+      bounded
+
+theorem reachable_within_sound_successor
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (n : Nat)
+      (x : k)
+      (y : k)
+      (tail_sound : (z : k)
+        → Equal
+        Bool
+        (reachable_within k (relation_ord_leq k d) n z y r)
+        True
+        → bounded_walk
+        k
+        (relation_ord_leq k d)
+        r
+        n
+        z
+        y)
+    : successors_ordered k d r
+      → Equal Bool (reachable_within k (relation_ord_leq k d) (Suc n) x y r) True
+      → bounded_walk k (relation_ord_leq k d) r (Suc n) x y =
+  λinner.
+    λwhole.
+      let
+        leq = relation_ord_leq k d;
+        targets = succ k leq x r;
+        direct = set_member k leq y targets;
+        closed = relation_reach_fold_closed k leq n y r targets;
+        param = relation_reach_fold_param k leq n y r targets;
+        recurrence = reachable_within_successor_rhs k leq n x y r;
+        unfolding = reachable_within_successor_unfold k leq n x y r;
+        step_rhs = reachable_within_rhs_split k leq n x y r;
+        recurrence_true =
+          trans
+            Bool
+            recurrence
+            (reachable_within k leq (Suc n) x y r)
+            True
+            (sym Bool (reachable_within k leq (Suc n) x y r) recurrence unfolding)
+            whole;
+        disjunction_true =
+          trans
+            Bool
+            (cat4_bool_or direct closed)
+            recurrence
+            True
+            (sym Bool recurrence (cat4_bool_or direct closed) step_rhs)
+            recurrence_true
+      in
+        match cat4_bool_or_true_cases direct closed disjunction_true {
+          Inl edge ↦ reachable_within_direct_sound k d r n x y edge;
+          Inr folded ↦
+            let param_true =
+              trans
+                Bool
+                param
+                closed
+                True
+                (sym Bool closed param (relation_reach_fold_open_bridge k leq n y r targets))
+                folded
+            in
+              relation_reach_fold_sound
+                k
+                leq
+                r
+                n
+                x
+                y
+                (relation_reach_fold_step k leq n y r)
+                (λkey. λunit. λseen. Refl)
+                tail_sound
+                targets
+                False
+                (relation_reach_source_edges k d r x inner)
+                (λimpossible. absurd impossible)
+                param_true
+        }
+
+theorem reachable_within_sound
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (fuel : Nat) (x : k) (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → Equal Bool (reachable_within k (relation_ord_leq k d) fuel x y r) True
+      → bounded_walk k (relation_ord_leq k d) r fuel x y =
+  match fuel {
+    Zero ↦ λouter. λinner. λimpossible. absurd impossible;
+    Suc n ↦
+      λouter.
+        λinner.
+          λwhole.
+            reachable_within_sound_successor
+              k
+              d
+              r
+              n
+              x
+              y
+              (λz. λtail. reachable_within_sound k d r n z y outer inner tail)
+              inner
+              whole
+  }
+
+theorem reachable_within_direct_complete
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (n : Nat) (x : k) (y : k)
+    : rel_member k (relation_ord_leq k d) x y r
+      → Equal Bool (reachable_within k (relation_ord_leq k d) (Suc n) x y r) True =
+  λedge.
+    let
+      leq = relation_ord_leq k d;
+      targets = succ k leq x r;
+      direct = set_member k leq y targets;
+      closed = relation_reach_fold_closed k leq n y r targets;
+      recurrence = reachable_within_successor_rhs k leq n x y r;
+      disjunction_true = cat4_bool_or_left_true direct closed edge;
+      recurrence_true =
+        trans
+          Bool
+          recurrence
+          (cat4_bool_or direct closed)
+          True
+          (reachable_within_rhs_split k leq n x y r)
+          disjunction_true
+    in
+      trans
+        Bool
+        (reachable_within k leq (Suc n) x y r)
+        recurrence
+        True
+        (reachable_within_successor_unfold k leq n x y r)
+        recurrence_true
 
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
