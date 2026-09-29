@@ -9,7 +9,9 @@
 //! F3: the legacy unregistered `add`/`sub`/`mul` (wrapping i64) arms are
 //! retired — unregistered and unreduced.
 
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{prim_reduce, EvalVal};
+use ken_kernel::{GlobalId, Term};
 
 // ── AC3/AC4 — bare op degrades, `+%` on the SAME operands still wraps ──────
 
@@ -101,17 +103,83 @@ fn f3_legacy_add_sub_mul_unreduced() {
     }
 }
 
-/// The other half of the F3 guard: `"add"`/`"sub"`/`"mul"` mint no primitive
-/// in the elaborator's registration tables — grep the real producer source,
-/// not just this test's own behavior (a mint elsewhere would make the arm
-/// above reachable from real surface programs again).
+fn application_head_id(term: &Term) -> Option<GlobalId> {
+    let mut cursor = term;
+    loop {
+        match cursor {
+            Term::App(function, _) => cursor = function,
+            Term::Const { id, .. } => return Some(*id),
+            _ => return None,
+        }
+    }
+}
+
+fn elaborated_operation_head(
+    env: &mut ElabEnv,
+    declaration: &str,
+) -> Result<Option<GlobalId>, ElabError> {
+    let result = env.elaborate_decl_v1(declaration)?;
+    let (_, body) = env
+        .env
+        .transparent_body(result.def_id)
+        .expect("checked constant has a transparent body");
+    Ok(application_head_id(&body))
+}
+
+fn legacy_name_is_refused_or_canonical(
+    env: &mut ElabEnv,
+    legacy: &str,
+    canonical_id: GlobalId,
+) -> bool {
+    let declaration = format!("const legacy_probe_{legacy} = {legacy} 1 2");
+    match elaborated_operation_head(env, &declaration) {
+        Err(ElabError::UnboundName { name, .. })
+        | Err(ElabError::UnresolvedCon { name, .. }) => name == legacy,
+        Ok(head) => head == Some(canonical_id),
+        Err(error) => panic!("{legacy} failed for an unrelated reason: {error:?}"),
+    }
+}
+
+/// Replaces the source-text oracle in
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 21. This
+/// measures whether each surface name is refused or resolves to the canonical
+/// non-legacy identity through real elaboration, not a registration scan.
+///
+/// Promise class: durable invariant. MEASURED: modern operations resolve to
+/// their canonical IDs; legacy names are either refused or resolve to those
+/// IDs. CLAIMED: no legacy name exposes a separate identity. THE GAP: this
+/// measures the default prelude, not every possible imported namespace.
 #[test]
-fn f3_legacy_add_sub_mul_unregistered_in_elaborator() {
-    let numbers_src = include_str!("../../ken-elaborator/src/numbers.rs");
-    for op in ["\"add\"", "\"sub\"", "\"mul\""] {
+fn f3_legacy_names_are_refused_or_use_canonical_int_operations() {
+    let mut env = ElabEnv::new().expect("prelude init");
+    for (legacy, canonical) in [("add", "add_int"), ("sub", "sub_int"), ("mul", "mul_int")] {
+        let canonical_id = env.globals[canonical];
+        let modern = format!("const canonical_probe_{legacy} = {canonical} 1 2");
+        assert_eq!(
+            elaborated_operation_head(&mut env, &modern).expect("canonical op elaborates"),
+            Some(canonical_id),
+            "{canonical} must resolve to its registered identity"
+        );
         assert!(
-            !numbers_src.contains(&format!("reg_binop!({op}")),
-            "elaborator must not register a reg_binop! for the legacy {op} symbol"
+            legacy_name_is_refused_or_canonical(&mut env, legacy, canonical_id),
+            "{legacy} must be unbound or resolve to {canonical}'s identity"
         );
     }
+
+    // Population control at the resolver's real global-identity input: an
+    // opaque function under a legacy spelling is not the canonical operation.
+    let mut wrong = ElabEnv::new().expect("prelude init");
+    let int = Term::const_(wrong.globals["Int"], vec![]);
+    let wrong_type = Term::pi(int.clone(), Term::pi(int.clone(), int));
+    let wrong_id = wrong
+        .declare_postulate_raw("WrongLegacyAdd", wrong_type)
+        .expect("wrong legacy fixture admits");
+    wrong.globals.insert("add".into(), wrong_id);
+    assert!(wrong.env.trusted_base().contains(&wrong_id));
+    let wrong_canonical_id = wrong.globals["add_int"];
+    assert!(!legacy_name_is_refused_or_canonical(
+        &mut wrong,
+        "add",
+        wrong_canonical_id,
+    ));
 }

@@ -8,10 +8,9 @@
 //! - **TE-A** — the real `declare_inductive` + `check_positivity` (the kernel
 //!   that exists now) admit the first-order `Temporal` and reject the HOAS
 //!   variant (the non-degenerate positivity pair).
-//! - **TE-B** — the no-kernel-modality absence net, pinned on the **structural
-//!   signature** (the `Term` enum variant / `▷`), not the lexeme — `later` is
-//!   plain English in kernel prose (`obs.rs` "reduces lazily by later whnf
-//!   calls", `subst.rs` "by a later iteration"); a lexeme grep is bistable.
+//! - **TE-B** — temporal formulas remain ordinary data. A transition sentinel
+//!   makes every new kernel `Term` form require review; a separate behavioral
+//!   control exercises generic kernel conversion on a `Temporal` eliminator.
 //! - **TE-C** — the derived operators elaborate to the `until`/`not` core (a
 //!   structural assertion on the elaborated `Temporal` term head).
 //! - **TE-D** — a surface `temporal{}` block elaborates to the §3 constructors,
@@ -73,9 +72,9 @@ proc {target_name} (_value : Unit)
     emit_checked_target_export(&denotation, results, trusted_base, generators, temporal)
 }
 use ken_kernel::{
-    declare_inductive,
+    convert, convert_type, declare_inductive,
     inductive::{check_positivity, method_type, peel_app, peel_pi, recursive_args},
-    CtorSpec, GlobalEnv, GlobalId, InductiveSpec, KernelError, Level, Term,
+    infer, Context, CtorSpec, GlobalEnv, GlobalId, InductiveSpec, KernelError, Level, Term,
 };
 
 // ─── TE-A. `Temporal` is ordinary inert data — admitted by K1 (AC1) ──────────
@@ -235,67 +234,150 @@ fn hoas_foil_reaches_positivity_violation_not_universe_gate() {
     );
 }
 
-// ─── TE-B. No kernel modality — the structural absence (AC1, soundness) ──────
+// ─── TE-B. Temporal values remain ordinary kernel data (AC1) ────────────────
 
-/// TE-B1: temporal/no-modal-construct-in-kernel (AC1, soundness)
+/// Transition sentinel for kernel `Term` extensions.
 ///
-/// The data-only decision (`OQ-temporal`) is realized as an **absence in the
-/// kernel**: no `▷`/later/tick/Löb/clock construct exists in the term language.
-/// The net is pinned on the **structural signature** — the `Term` enum variant
-/// — not the lexeme. **Collision named verbatim:** the English word "later"
-/// appears in kernel prose (`obs.rs` "reduces lazily by later `whnf` calls",
-/// `subst.rs` "by a later iteration") and is NOT a modal construct; a lexeme
-/// grep for "later" would false-alarm on that prose (or, tuned to pass, be
-/// permissive enough to miss a real `Term::Later`). The net targets the
-/// construct signature, so the English "later" in `obs.rs` does not trip it.
-///
-/// **Disconfirming check:** a kernel that grew a `Term::Later` variant would
-/// make `term_src` contain `"Later"` → red. It does not → the absence is
-/// guard-gated, not coincidental.
+/// Replaces the source-text oracle in
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 10.
+/// Adding any term form intentionally fails the exhaustive match until review
+/// classifies the extension. The Architect reviews each new kernel form.
 #[test]
-fn no_modal_construct_in_kernel() {
-    let term_src = include_str!("../../ken-kernel/src/term.rs");
-
-    // The construct signature is absent from the term-language definition.
-    // (`Term::Later`/`Tick`/`Clock`/`Lob`/`Modality` would be variants here.)
-    assert!(!term_src.contains("Later"), "no `Term::Later` modality");
-    assert!(!term_src.contains("Tick"), "no tick-variable construct");
-    assert!(!term_src.contains("Clock"), "no clock-structure construct");
-    assert!(!term_src.contains("Modality"), "no modality construct");
-    assert!(!term_src.contains("▷"), "no `▷`/later modality symbol");
-
-    // Collision named verbatim: the English word "later" IS in kernel prose
-    // (incidental, not a construct) — the net is robust to this lexeme.
-    let obs_src = include_str!("../../ken-kernel/src/obs.rs");
-    assert!(
-        obs_src.contains("later"),
-        "the lexeme collision is real: `later` is plain English in `obs.rs` prose"
-    );
-    // And that prose does not make `term.rs` contain a construct — the net
-    // targets the construct signature, not the lexeme.
-    assert!(
-        !term_src.contains("later"),
-        "the term language has no `later` construct (the prose collision is in `obs.rs`, not `term.rs`)"
-    );
+fn kernel_term_extension_requires_review() {
+    // Promise class: transition sentinel. Any new Term form intentionally
+    // fails this exhaustive match until review classifies the extension.
+    let form = match &Term::var(0) {
+        Term::Type(_) => "Type",
+        Term::Omega(_) => "Omega",
+        Term::Var(_) => "Var",
+        Term::Const { .. } => "Const",
+        Term::IntLit(_) => "IntLit",
+        Term::IndFormer { .. } => "IndFormer",
+        Term::Constructor { .. } => "Constructor",
+        Term::Elim { .. } => "Elim",
+        Term::Pi(..) => "Pi",
+        Term::Lam(..) => "Lam",
+        Term::App(..) => "App",
+        Term::Sigma(..) => "Sigma",
+        Term::Pair(..) => "Pair",
+        Term::Proj1(..) => "Proj1",
+        Term::Proj2(..) => "Proj2",
+        Term::Let { .. } => "Let",
+        Term::Ascript(..) => "Ascript",
+        Term::Eq(..) => "Eq",
+        Term::Refl(..) => "Refl",
+        Term::Cast(..) => "Cast",
+        Term::J(..) => "J",
+        Term::Quot(..) => "Quot",
+        Term::QuotClass(..) => "QuotClass",
+        Term::QuotElim { .. } => "QuotElim",
+        Term::Trunc(..) => "Trunc",
+        Term::TruncProj(..) => "TruncProj",
+        Term::Absurd(..) => "Absurd",
+    };
+    assert_eq!(form, "Var");
 }
 
-/// TE-B2: temporal/inert-to-conversion (AC1, soundness)
+fn constant_method(ty: &Term, value: &Term) -> Term {
+    match ty {
+        Term::Pi(domain, codomain) => {
+            Term::lam((**domain).clone(), constant_method(codomain, value))
+        }
+        _ => value.clone(),
+    }
+}
+
+/// Temporal constructor elimination reduces through the generic kernel rule.
 ///
-/// `Temporal` is inert to conversion: a program with a `Temporal` value has
-/// the **same** conversion algorithm and typing judgments as one without. The
-/// kernel's conversion (`conv.rs`) has no `Temporal`-specific branch — adding
-/// `Temporal` adds an inductive type and its ordinary ι-rule, nothing more.
-///
-/// **Disconfirming check:** a kernel that added a `Temporal`-specific conv/η
-/// rule would make `conv_src` contain `"Temporal"` → red. It does not →
-/// conversion is byte-for-byte unchanged.
+/// Replaces the source-text oracle in
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 11.
+/// Promise class: durable invariant. MEASURED: generic conversion reduces a
+/// real `Temporal` atom eliminator to its selected method result. CLAIMED:
+/// `Temporal` atoms use ordinary kernel conversion. THE GAP: other constructor
+/// eliminators are not exercised by this control.
 #[test]
-fn inert_to_conversion() {
-    let conv_src = include_str!("../../ken-kernel/src/conv.rs");
-    assert!(
-        !conv_src.contains("Temporal") && !conv_src.contains("temporal"),
-        "conversion has no `Temporal`-specific branch — adding `Temporal` leaves conv unchanged"
+fn temporal_eliminator_uses_ordinary_kernel_conversion() {
+    let mut env = GlobalEnv::new();
+    let bool_id = declare_inductive(&mut env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+        ],
+    })
+    .expect("Bool fixture admits");
+    let bool_constructors = env.inductive(bool_id).unwrap().constructors.clone();
+    let true_term = Term::constructor(bool_constructors[0].id, vec![]);
+    let false_term = Term::constructor(bool_constructors[1].id, vec![]);
+    let temporal_id = declare_inductive(&mut env, temporal_inductive_spec)
+        .expect("the real first-order Temporal admits");
+    let temporal = env.inductive(temporal_id).unwrap().clone();
+    let bool_ty = Term::indformer(bool_id, vec![]);
+    let temporal_ty = Term::app(
+        Term::app(Term::indformer(temporal_id, vec![]), bool_ty.clone()),
+        bool_ty.clone(),
     );
+    let motive = Term::Ascript(
+        Box::new(Term::lam(temporal_ty.clone(), bool_ty.clone())),
+        Box::new(Term::pi(temporal_ty, Term::Type(Level::zero()))),
+    );
+    let methods = temporal
+        .constructors
+        .iter()
+        .enumerate()
+        .map(|(index, _)| {
+            let ty = method_type(
+                &env,
+                &temporal,
+                index,
+                &motive,
+                &[bool_ty.clone(), bool_ty.clone()],
+                &[],
+            )
+            .expect("ordinary Temporal method type");
+            if index == 0 {
+                Term::lam(bool_ty.clone(), Term::var(0))
+            } else {
+                constant_method(&ty, &true_term)
+            }
+        })
+        .collect::<Vec<_>>();
+    let atom_id = temporal.constructors[0].id;
+    let atom = |value: Term| {
+        Term::app(
+            Term::app(
+                Term::app(Term::constructor(atom_id, vec![]), bool_ty.clone()),
+                bool_ty.clone(),
+            ),
+            value,
+        )
+    };
+    let eliminate = |scrut: Term| Term::Elim {
+        fam: temporal_id,
+        level_args: vec![],
+        params: vec![bool_ty.clone(), bool_ty.clone()],
+        motive: Box::new(motive.clone()),
+        methods: methods.clone(),
+        indices: vec![],
+        scrut: Box::new(scrut),
+    };
+    let ctx = Context::new();
+    let reduced_true = eliminate(atom(true_term.clone()));
+    let reduced_false = eliminate(atom(false_term.clone()));
+    let inferred = infer(&env, &ctx, &reduced_true).expect("well-typed Temporal eliminator");
+    assert!(convert_type(&env, &ctx, &inferred, &bool_ty));
+    assert!(convert(&env, &ctx, &bool_ty, &reduced_true, &true_term));
+    assert!(convert(&env, &ctx, &bool_ty, &reduced_false, &false_term));
+    assert!(!convert(&env, &ctx, &bool_ty, &reduced_false, &true_term));
 }
 
 // ─── TE-C. Derived operators elaborate to the core (AC2) ────────────────────
@@ -649,17 +731,17 @@ fn closedness_metatheorem_typechecks_via_elim() {
     );
 }
 
-/// TE-F2: temporal/obligation-not-dischargeable-in-ken (AC5, soundness)
+/// TE-F2: temporal/obligation-export-remains-delegated (AC5).
 ///
-/// There is **no way** to discharge a temporal obligation `□(req → ◇resp)`
-/// inside Ken — no `▷`/modality, no internal model-check, no kernel decision
-/// procedure over a system's infinite traces. The only outcomes are (a)
-/// reason **about** the formula as data (TE-F1) or (b) **export + delegate** to
-/// `Ward` (TE-E). The impossibility is the composition of TE-B1 (no modality)
-/// + the delegated-only export path + the absence of any internal discharge
-/// function (`sat`/`compile` are deferred to the Ward encoding pass).
+/// Replaces the source-text oracle in
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 12.
+///
+/// Promise class: durable invariant. MEASURED: this export puts the obligation
+/// in T as `delegated` and leaves Q empty. CLAIMED: the tested export path does
+/// not promote this temporal obligation. THE GAP: internal evaluator presence
+/// or absence remains Architect-review-owned.
 #[test]
-fn obligation_not_dischargeable_in_ken() {
+fn temporal_obligation_export_remains_delegated() {
     // `□(req → ◇resp)` = `always (not req or eventually resp)`.
     let req = Temporal::Atom(Pred::Event("ConsoleFlush".into()));
     let resp = Temporal::Atom(Pred::Event("ClockWallNow".into()));
@@ -668,19 +750,12 @@ fn obligation_not_dischargeable_in_ken() {
         Box::new(Temporal::eventually(&resp)),
     ));
 
-    // (a) No kernel modality to discharge it with (TE-B1): the term language
-    // has no `▷`/later/tick/Modality construct.
-    let term_src = include_str!("../../ken-kernel/src/term.rs");
-    assert!(
-        !term_src.contains("Later")
-            && !term_src.contains("Tick")
-            && !term_src.contains("Modality")
-            && !term_src.contains("▷"),
-        "no modal construct exists to discharge a temporal obligation in Ken"
-    );
+    // Modal Term additions are review-gated by
+    // `kernel_term_extension_requires_review`; the absence of internal
+    // evaluators remains Architect-review-owned, not a source-text assertion.
 
-    // (b) Its only projection is `delegated`/`T` (TE-E): route through the real
-    // emitter — it lands in T, never Q (Ken did not discharge it).
+    // The real export path projects this temporal obligation to `delegated`/T,
+    // never Q.
     let tentry = TEntry {
         obligation_id: "sys.liveness.0".into(),
         formula: liveness.clone(),
@@ -701,7 +776,7 @@ fn obligation_not_dischargeable_in_ken() {
     );
     assert!(
         export.guarantees.is_empty(),
-        "never Q — the obligation is not dischargeable in Ken"
+        "this export keeps the delegated obligation out of Q"
     );
     assert_eq!(
         serialize_export(&export)["obligations"][0]["status"]
@@ -711,21 +786,9 @@ fn obligation_not_dischargeable_in_ken() {
         "the discharge arrives only out-of-band (delegated)"
     );
 
-    // (c) No internal model-check / discharge function exists — `sat`/`compile`
-    // are deferred to the joint Ward encoding pass (`72 §6.2`/§6.3). The
-    // about-operation `closed` IS present (reason-about works, TE-F1).
-    let temporal_src = include_str!("../src/temporal.rs");
-    assert!(
-        !temporal_src.contains("fn sat")
-            && !temporal_src.contains("fn compile")
-            && !temporal_src.contains("fn model_check")
-            && !temporal_src.contains("fn discharge"),
-        "no internal discharge path — `sat`/`compile`/`model_check` are deferred to Ward"
-    );
-    assert!(
-        temporal_src.contains("fn closed"),
-        "the about-operation `closed` is present (reason-about works); reason-with does not"
-    );
+    // The no-internal-evaluator boundary (`sat`/`compile`/`model_check`/
+    // `discharge`) is Architect-review-owned. TE-F1 tests the existing
+    // reason-about behavior through its bound/free result flip.
 }
 
 // ─── Cross-case sweep — the constant verdict mapping (`72 §5`) ───────────────

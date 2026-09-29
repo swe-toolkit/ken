@@ -4,9 +4,9 @@
 //! - **AC1** — `Dec` admits and `elim_Dec` large-eliminates into a `Type0`
 //!   motive (the build-step-1 smoke test).
 //! - **AC2** — `Empty`/`absurdEmpty` (surface-authored) elaborate.
-//! - **AC3** — the `trusted_base()` delta is exactly the two new inductive
-//!   admissions (`Empty`, `Dec`), grounded on the Rust emission
-//!   (`prelude.rs`), not a `.ken` view.
+//! - **AC3** — the bootstrapped `Empty` and `Dec` identities are ordinary
+//!   inductive declarations, and neither their IDs nor constructor IDs enter
+//!   `trusted_base()`.
 //! - **AC4** — the `DecEq -> Dec` bridge is demonstrated over `DecEq Bool`
 //!   (inductive carrier, honest via K7), not only `DecEq Int` (`Axiom`).
 //! - **AC5** — the catalog entry's `` ```ken ``/`` ```ken example ``/
@@ -228,53 +228,44 @@ fn ac2_empty_and_absurd_empty_elaborate() {
         .expect("absurdEmpty must elaborate (large elim via ordinary surface match)");
 }
 
-// Transition sentinel for L2-4: this measures the prelude's still-
-// registered identities, not Core.Logic.EmptyDec's catalog identities.
-// AC3 — ground the `trusted_base()` delta on the Rust EMISSION, not a
-// `.ken` view: `Empty`/`Dec` are ordinary `declare_inductive` admissions,
-// never `declare_primitive`/`declare_postulate`.
+fn prelude_inductives_are_outside_trusted_base(env: &ElabEnv) -> bool {
+    let trusted = env.env.trusted_base();
+    ["Empty", "Dec"].into_iter().all(|name| {
+        let Some(id) = env.globals.get(name).copied() else {
+            return false;
+        };
+        let Some(inductive) = env.env.inductive(id) else {
+            return false;
+        };
+        !trusted.contains(&id)
+            && inductive
+                .constructors
+                .iter()
+                .all(|constructor| !trusted.contains(&constructor.id))
+    })
+}
+
+/// Replaces the source-text oracle in
+/// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`, item 14.
+///
+/// Promise class: durable invariant. MEASURED: the bootstrapped names resolve
+/// to kernel inductives, and the family/constructor identities are checked
+/// against `trusted_base()`. CLAIMED: these admissions add no trusted axiom.
+/// THE GAP: this observes only `Empty` and `Dec`, not the rest of the prelude.
 #[test]
-fn ac3_trusted_base_delta_is_ordinary_inductive_admission_only() {
-    let prelude_src = include_str!("../prelude.rs");
+fn ac3_prelude_inductives_add_no_trusted_base_entries() {
+    let mut env = ElabEnv::new().expect("prelude bootstrap");
+    assert!(prelude_inductives_are_outside_trusted_base(&env));
 
-    // `Empty` is admitted via `data::elab_data_decl` (the same surface-data
-    // machinery every other prelude `data` uses), NEVER a primitive/postulate.
-    assert!(
-        prelude_src.contains("crate::data::elab_data_decl(") && prelude_src.contains("\"Empty\""),
-        "Empty must be admitted via elab_data_decl (ordinary data admission), not a primitive"
-    );
-    // `Dec` is admitted via `declare_inductive` (kernel-direct), never a
-    // primitive/postulate.
-    let dec_block_start = prelude_src
-        .find("`Dec (P : Omega) : Type0 = Yes P | No (P -> Empty)`")
-        .expect("Dec's declaration comment must be present");
-    let dec_tail = &prelude_src[dec_block_start..];
-    let dec_block_end = dec_tail
-        .char_indices()
-        .nth(2000)
-        .map(|(index, _)| index)
-        .unwrap_or(dec_tail.len());
-    let dec_block = &dec_tail[..dec_block_end];
-    assert!(
-        dec_block.contains("ken_kernel::declare_inductive"),
-        "Dec must be admitted via declare_inductive (kernel-direct), not a primitive"
-    );
-    assert!(
-        !dec_block.contains("declare_primitive") && !dec_block.contains("declare_postulate"),
-        "Dec's admission must carry zero declare_primitive/declare_postulate delta"
-    );
-
-    // `Empty` is registered via `elab_data_decl`'s own internal
-    // `globals.insert` (not a separate call site here) — confirm via the
-    // FUNCTIONAL check (AC2 already does this) plus the textual call-site
-    // grep above; `Dec` gets an explicit `globals.insert` right after its
-    // `declare_inductive` call.
-    assert!(
-        prelude_src.contains("globals.insert(\"Dec\""),
-        "Dec must be a registered global"
-    );
-    let env = ElabEnv::empty().expect("prelude bootstrap");
-    assert!(env.globals.contains_key("Empty"), "Empty must be a registered global");
+    // Fixture-side negative control: redirect the observed `Empty` spelling
+    // to a real opaque declaration and prove the observer rejects it.
+    let bad_empty = env
+        .declare_postulate_raw("Ac3BadEmpty", Term::Type(lv0()))
+        .expect("negative-control postulate admits");
+    let original_empty = env.globals.insert("Empty".into(), bad_empty).unwrap();
+    assert!(env.env.trusted_base().contains(&bad_empty));
+    assert!(!prelude_inductives_are_outside_trusted_base(&env));
+    env.globals.insert("Empty".into(), original_empty);
 }
 
 /// Promise class: durable invariant. MEASURED: the real EmptyDec entry loads
