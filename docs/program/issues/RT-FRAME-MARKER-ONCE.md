@@ -1,7 +1,7 @@
 ---
 id: RT-FRAME-MARKER-ONCE
 title: "Native execution of a host-effect tree that one checked frame marker serves more than once: the two px7n nested-eliminator rows and the checked double bind build and run natively and agree with the interpreter, instead of refusing in object emission because the oriented subcontinuation plan consumes one checked Runtime frame marker more than once"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -122,3 +122,27 @@ not a workspace-wide bound or a native-parity claim.
   the one repair clears, relabel the rest, and report.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed `f136c9396` (PR #4367; candidate `505d7c48e`; Runtime QA
+`evt_2dcqrmzgm943j`, Architect APPROVE and Decision `dec_5at10k054yjyh`).
+It lands narrow, as a boundary increment (Steward `evt_77f647ed6x03g`).
+- **Delivered.** A per-key frame typestate over the CFG, computed to a
+  fixpoint in `lowering/frame_validation.rs`. It rejects E1 (enter twice),
+  E2 (enter after discharge), R1 (a receipt without an enter), R2 (a double
+  receipt) and N1 (an arm that skips its frame). Terminal blocks are
+  classified by scoped ABI status. Dropping each detector reddens its
+  exact-set control.
+- **Objective, reconciled.** The two `px7n` rows stay ignored on the separate
+  root-exit refusal. They move to `RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN`,
+  which owns both rows. The checked double bind stops at the call-token
+  refusal, a transition sentinel owned by `RT-CONTINUATION-CALL-TOKEN-ONCE`.
+  No native parity is claimed here.
+- **Residuals (Architect `evt_236m9t4qt35de`):**
+  - N1 is pinned only by a hand-built negative; no checked source fixture
+    reaches it.
+  - The env-gated census `eprintln` still wants a `cfg(test)` gate in a
+    later runtime WP.
+- The stale census-guard comments dropped from this candidate moved to
+  `TEST-SOURCE-TEXT-ORACLE-RETIRE`.
