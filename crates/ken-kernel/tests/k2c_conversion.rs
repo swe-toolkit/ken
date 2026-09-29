@@ -815,21 +815,29 @@ fn nonrecursive_wrapper_over_recursive_callee_three_levels_converts() {
         &mut env,
         vec![(vec![], Term::pi(nt.clone(), nt.clone()))],
         |ids| {
+            // f n = (λ unused. S n) (elim_Nat ... n). Its recursive call
+            // on the predecessor is SCT-admitted, but beta never forces the
+            // eliminator argument. Thus `f y` reduces to `S y` even when
+            // `y` is neutral, without an iota step discharging the c ledger.
             let method = Term::lam(
                 nt.clone(),
-                Term::lam(
-                    nt.clone(),
-                    Term::app(suc_c(&nb), Term::app(cref(ids[0]), Term::var(1))),
-                ),
+                Term::lam(nt.clone(), Term::app(cref(ids[0]), Term::var(1))),
+            );
+            let delayed = nat_elim(
+                &nb,
+                asc_motive(&nb, nt.clone()),
+                Term::constructor(nb.zero, vec![]),
+                method,
+                Term::var(0),
             );
             vec![Term::lam(
                 nt.clone(),
-                nat_elim(
-                    &nb,
-                    asc_motive(&nb, nt.clone()),
-                    Term::constructor(nb.zero, vec![]),
-                    method,
-                    Term::var(0),
+                Term::app(
+                    Term::Ascript(
+                        Box::new(Term::lam(nt.clone(), Term::app(suc_c(&nb), Term::var(1)))),
+                        Box::new(Term::pi(nt.clone(), nt.clone())),
+                    ),
+                    delayed,
                 ),
             )]
         },
