@@ -5,6 +5,7 @@
 mod tests;
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::fmt::Debug;
 
 use cranelift_codegen::flowgraph::ControlFlowGraph;
 use cranelift_codegen::ir::{types, Block, Function, Inst, InstructionData, Opcode, ValueDef};
@@ -20,10 +21,10 @@ pub(super) enum FrameEventKind {
     Receipt,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(super) struct FrameEvent {
+#[derive(Clone, Debug)]
+pub(super) struct FrameEvent<K = FrameKey> {
     pub kind: FrameEventKind,
-    pub key: FrameKey,
+    pub key: K,
     pub block: Block,
     pub after: Option<Inst>,
 }
@@ -51,10 +52,18 @@ pub(super) struct FrameTerminal {
     pub emitter: &'static std::panic::Location<'static>,
 }
 
-#[derive(Default)]
-pub(super) struct FrameEvents {
-    pub events: Vec<FrameEvent>,
+pub(super) struct FrameEvents<K = FrameKey> {
+    pub events: Vec<FrameEvent<K>>,
     pub terminals: Vec<FrameTerminal>,
+}
+
+impl<K> Default for FrameEvents<K> {
+    fn default() -> Self {
+        Self {
+            events: Vec::new(),
+            terminals: Vec::new(),
+        }
+    }
 }
 
 fn refusal(reason: impl Into<String>) -> CraneliftBackendError {
@@ -108,12 +117,12 @@ fn classify_unregistered_terminal(
     }
 }
 
-impl FrameEvents {
+impl<K: Ord + Clone + Debug> FrameEvents<K> {
     pub fn record(
         &mut self,
         builder: &FunctionBuilder<'_>,
         kind: FrameEventKind,
-        key: FrameKey,
+        key: K,
     ) -> Result<(), CraneliftBackendError> {
         let block = builder.current_block().ok_or_else(|| {
             refusal("checked Runtime frame marker event has no current Function block")
@@ -124,6 +133,23 @@ impl FrameEvents {
             block,
             after: builder.func.layout.last_inst(block),
         });
+        Ok(())
+    }
+
+    // A verified call may have been emitted in a predecessor of the builder's
+    // current block, or be inspected only after the Function is finished.
+    // Anchor its receipt to the actual call instruction, never the current
+    // lowering cursor. This also works for composed calls after frame close.
+    pub fn record_inst(
+        &mut self,
+        func: &Function,
+        kind: FrameEventKind,
+        key: K,
+        inst: Inst,
+    ) -> Result<(), CraneliftBackendError> {
+        let block = func.layout.blocks().find(|block| func.layout.block_insts(*block).any(|item| item == inst))
+            .ok_or_else(|| refusal("checked Runtime event names an instruction outside its Function"))?;
+        self.events.push(FrameEvent { kind, key, block, after: Some(inst) });
         Ok(())
     }
 
@@ -199,6 +225,10 @@ impl FrameEvents {
     }
 
     pub fn validate(&self, func: &Function) -> Result<(), CraneliftBackendError> {
+        self.validate_named(func, "checked Runtime frame")
+    }
+
+    pub fn validate_named(&self, func: &Function, name: &str) -> Result<(), CraneliftBackendError> {
         let started = std::time::Instant::now();
         let violations = self.rule_violations(func)?;
         if std::env::var_os("KEN_FRAME_CENSUS").is_some() {
@@ -244,9 +274,7 @@ impl FrameEvents {
         if violations.values().all(BTreeSet::is_empty) {
             Ok(())
         } else {
-            Err(refusal(format!(
-                "checked Runtime frame violations: {violations:?}"
-            )))
+            Err(refusal(format!("{name} violations: {violations:?}")))
         }
     }
 
@@ -256,7 +284,7 @@ impl FrameEvents {
     pub(super) fn rule_violations(
         &self,
         func: &Function,
-    ) -> Result<BTreeMap<FrameKey, BTreeSet<FrameRule>>, CraneliftBackendError> {
+    ) -> Result<BTreeMap<K, BTreeSet<FrameRule>>, CraneliftBackendError> {
         if func.signature.returns.len() != 1 || func.signature.returns[0].value_type != types::I64 {
             return Err(refusal(
                 "checked Runtime frame Function must return exactly one I64 status",
@@ -275,8 +303,8 @@ impl FrameEvents {
             .layout
             .entry_block()
             .ok_or_else(|| refusal("checked Runtime frame Function has no entry block"))?;
-        let mut events: BTreeMap<Block, Vec<(usize, usize, FrameEvent)>> = BTreeMap::new();
-        for (sequence, event) in self.events.iter().copied().enumerate() {
+        let mut events: BTreeMap<Block, Vec<(usize, usize, FrameEvent<K>)>> = BTreeMap::new();
+        for (sequence, event) in self.events.iter().cloned().enumerate() {
             let mut position = 0;
             if let Some(anchor) = event.after {
                 let mut found = false;
@@ -318,7 +346,7 @@ impl FrameEvents {
         const I: u8 = 0b001;
         const A: u8 = 0b010;
         const D: u8 = 0b100;
-        let keys: BTreeSet<_> = self.events.iter().map(|event| event.key).collect();
+        let keys: BTreeSet<_> = self.events.iter().map(|event| event.key.clone()).collect();
         let mut violations = BTreeMap::new();
         let mut keys_needing_extra_passes = 0usize;
         for key in keys {

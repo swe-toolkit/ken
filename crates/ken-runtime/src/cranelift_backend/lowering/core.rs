@@ -1939,6 +1939,36 @@ impl CheckedFrameFunctionScope {
     }
 }
 
+/// Independent finished-Function token lattice. Frame scopes can close before
+/// the composed-call verifier; token scopes must remain open until its verified
+/// instructions have been recorded against the same Function.
+pub(super) struct CheckedTokenFunctionScope;
+
+impl CheckedTokenFunctionScope {
+    pub(super) fn open(compiler: &mut Lowering<'_>) -> Result<Self, CraneliftBackendError> {
+        if compiler.checked_call_token_events.is_some() {
+            return Err(unsupported(
+                "OrientedSubcontinuationPlanV1",
+                "a generated Function opened a nested continuation call token scope",
+            ));
+        }
+        compiler.checked_call_token_events = Some(FrameEvents::default());
+        Ok(Self)
+    }
+
+    pub(super) fn close(
+        self,
+        compiler: &mut Lowering<'_>,
+        func: &Function,
+    ) -> Result<(), CraneliftBackendError> {
+        let events = compiler.checked_call_token_events.take().ok_or_else(|| unsupported(
+            "OrientedSubcontinuationPlanV1",
+            "a generated Function closed without its continuation call token scope",
+        ))?;
+        events.validate_named(func, "continuation call token")
+    }
+}
+
 impl CheckedFrameBranchScope {
     #[track_caller]
     pub(super) fn capture(consumed: &BTreeSet<ConsumedSubcontinuationFrame>) -> Self {
@@ -2794,6 +2824,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         oriented_subcontinuation_plan,
         consumed_subcontinuation_frames: BTreeSet::new(),
         checked_frame_events: None,
+        checked_call_token_events: None,
         active_subcontinuation_frame: None,
         consumed_recursive_call_templates: BTreeSet::new(),
         pending_recursive_call: None,
@@ -11568,6 +11599,7 @@ impl<'a> Lowering<'a> {
             )
         })?;
         ledger.claim_exact(&identity, claimed_owner)?;
+        self.record_checked_call_token(builder, &identity)?;
         #[cfg(test)]
         d5a_trace(format!(
             "  CLAIM outcome=Claimed target={:?} owner={claimed_owner:?}",
@@ -11575,7 +11607,9 @@ impl<'a> Lowering<'a> {
         ));
         #[cfg(test)]
         if mutation == ContinuationEmissionMutation::ClaimTokenTwice {
-            ledger.claim_exact(&identity, claimed_owner)?;
+            self.continuation_claims.as_mut().expect("claim ledger remains open")
+                .claim_exact(&identity, claimed_owner)?;
+            self.record_checked_call_token(builder, &identity)?;
         }
 
         // `D3` — the operands, through the ONE assembly both realizations share.
@@ -11597,7 +11631,7 @@ impl<'a> Lowering<'a> {
 
         let (returned, call) = self.call_declared_unit_target(
             builder,
-            target,
+            target.clone(),
             &inputs,
             None,
             #[cfg(test)]
@@ -11611,9 +11645,9 @@ impl<'a> Lowering<'a> {
         // would agree with the `D4` redirect, which is precisely the vacuous
         // shape this gate exists to avoid.
         //
-        // ⛔ A second record for one token is a rejection: emission is once per
-        // causal identity, and the claim ledger's affinity does not entail it --
-        // that ledger would be satisfied by a claim with no call at all.
+        // Every direct call instruction is recorded, including mutually
+        // exclusive arms of one identity. The token lattice, not this map's
+        // insertion order, rejects a same-path second receipt (R2).
         // `4b` closure control: emit the call and skip the record, so the
         // finished-CLIF sweep has an emission the records cannot account for.
         #[cfg(test)]
@@ -11621,17 +11655,23 @@ impl<'a> Lowering<'a> {
             != ContinuationEmissionMutation::SuppressEmissionRecord;
         #[cfg(not(test))]
         let record = true;
-        if record
-            && self
-                .function_local
-                .continuation_emissions
-                .insert(identity.clone(), call)
-                .is_some()
-        {
-            return Err(unsupported(
-                "ContinuationSpecialization",
-                "a causal token emitted more than one direct continuation call",
-            ));
+        if record {
+            self.function_local.continuation_emissions
+                .entry(identity.clone())
+                .or_default()
+                .insert(call);
+        }
+        self.record_checked_call_token_inst(builder.func, FrameEventKind::Receipt, &identity, call)?;
+        // Test-only population-side mutation: issue a second real call on this
+        // path, record both Insts, and let only the R2 lattice rule reject.
+        #[cfg(test)]
+        if mutation == ContinuationEmissionMutation::DuplicateDirectCall {
+            let (_, second) = self.call_declared_unit_target(
+                builder, target, &inputs, None, None,
+            )?;
+            self.function_local.continuation_emissions
+                .entry(identity.clone()).or_default().insert(second);
+            self.record_checked_call_token_inst(builder.func, FrameEventKind::Receipt, &identity, second)?;
         }
         #[cfg(test)]
         d5a_trace("  CLAIM outcome=CallEmitted".to_string());

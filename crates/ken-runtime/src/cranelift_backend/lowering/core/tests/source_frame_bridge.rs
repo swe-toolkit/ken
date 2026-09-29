@@ -3697,8 +3697,8 @@ fn d8f_the_remaining_checked_marker_refusals() {
          lawful program: {moved:?}"
     );
     assert!(
-        wrong.contains("one causal identity was discharged twice in a single function"),
-        "supplementary: the plane that catches it is the AFFINE CAUSAL law, not a marker law. The \
+        wrong.contains("}: {E2}"),
+        "supplementary: the token lattice's E2 catches the same-path duplicate, not a marker law. The \
          marker-plane defence is the occupancy gate, established at 20b0d6be: {wrong}"
     );
 

@@ -254,6 +254,113 @@ fn n_r2c_receipt_cycle() {
     expect_rules(Shape::ReceiptCycle, &[FrameRule::R2]);
 }
 
+// Token-shaped keys exercise the exact same finished-Function engine in a
+// separate key space. Production supplies the opaque full
+// ContinuationCallIdentity; the last field here stands for its recursive
+// position, and must participate in ordering rather than be erased.
+type TokenTestKey = (&'static str, u32);
+const TOKEN: TokenTestKey = ("complete planner identity", 1);
+
+fn token_fixture() -> (FrameEvents<TokenTestKey>, Function) {
+    let (frames, func) = build(Shape::ExclusiveActivations);
+    let tokens = FrameEvents {
+        events: frames.events.into_iter().map(|event| FrameEvent {
+            kind: event.kind, key: TOKEN, block: event.block, after: event.after,
+        }).collect(),
+        terminals: frames.terminals,
+    };
+    (tokens, func)
+}
+
+fn token_rule(events: &FrameEvents<TokenTestKey>, func: &Function, expected: &[FrameRule]) {
+    let expected: BTreeSet<_> = expected.iter().copied().collect();
+    let actual = events.rule_violations(func).expect("finished token Function");
+    assert_eq!(actual.len(), 1, "no other identity may hide a rule");
+    assert_eq!(actual.get(&TOKEN), Some(&expected));
+    let checked = events.validate_named(func, "continuation call token");
+    if expected.is_empty() {
+        checked.expect("exclusive token arms must pass");
+    } else {
+        let reason = format!("{:?}", checked.expect_err("same-path token must refuse"));
+        assert!(reason.contains("continuation call token violations:"));
+        assert!(reason.contains(&format!("{expected:?}")), "wrong refusal: {reason}");
+    }
+}
+
+#[test]
+fn token_exclusive_arms_pass_and_flat_restoration_would_refuse() {
+    let (mut events, func) = token_fixture();
+    token_rule(&events, &func, &[]);
+    let flat_activations = events.events.iter().filter(|event| {
+        event.key == TOKEN && event.kind == FrameEventKind::Activation
+    }).count();
+    assert_eq!(flat_activations, 2, "both exclusive arms must claim");
+    // Restoring the old compile-wide insertion test rejects the same key on
+    // its second visit despite the CFG witness above admitting both paths.
+    assert!(!events.events.iter().filter(|event| {
+        event.key == TOKEN && event.kind == FrameEventKind::Activation
+    }).map(|event| event.key).collect::<Vec<_>>().windows(2)
+      .all(|window| window[0] != window[1]));
+    // Population-side perturbation: one arm no longer discharges at all.
+    events.events.remove(3);
+    token_rule(&events, &func, &[FrameRule::N1]);
+}
+
+#[test]
+fn token_e1_second_enter_on_one_arm() {
+    let (mut events, func) = token_fixture();
+    token_rule(&events, &func, &[]);
+    events.events.insert(1, events.events[0].clone());
+    token_rule(&events, &func, &[FrameRule::E1]);
+}
+
+#[test]
+fn token_e2_enter_after_discharge_on_one_arm() {
+    let (mut events, func) = token_fixture();
+    token_rule(&events, &func, &[]);
+    let mut enter = events.events[0].clone();
+    enter.after = events.events[1].after;
+    let mut receipt = enter.clone();
+    receipt.kind = FrameEventKind::Receipt;
+    events.events.extend([enter, receipt]);
+    token_rule(&events, &func, &[FrameRule::E2]);
+}
+
+#[test]
+fn token_r1_receipt_without_enter_on_one_arm() {
+    let (mut events, func) = token_fixture();
+    token_rule(&events, &func, &[]);
+    events.events.remove(0);
+    token_rule(&events, &func, &[FrameRule::R1]);
+}
+
+#[test]
+fn token_r2_second_direct_receipt_on_one_arm() {
+    let (mut events, func) = token_fixture();
+    token_rule(&events, &func, &[]);
+    events.events.insert(2, events.events[1].clone());
+    token_rule(&events, &func, &[FrameRule::R2]);
+}
+
+#[test]
+fn token_n1_normal_path_without_receipt() {
+    let (mut events, func) = token_fixture();
+    token_rule(&events, &func, &[]);
+    events.events.remove(1);
+    token_rule(&events, &func, &[FrameRule::N1]);
+}
+
+#[test]
+fn token_recursive_position_remains_part_of_the_key() {
+    let (mut events, func) = token_fixture();
+    token_rule(&events, &func, &[]);
+    let other = (TOKEN.0, TOKEN.1 + 1);
+    events.events[1].key = other;
+    let actual = events.rule_violations(&func).expect("finished token Function");
+    assert_eq!(actual.get(&TOKEN), Some(&BTreeSet::from([FrameRule::N1])));
+    assert_eq!(actual.get(&other), Some(&BTreeSet::from([FrameRule::R1])));
+}
+
 #[test]
 fn unregistered_zero_status_return_refuses() {
     let (events, func) = build(Shape::UnregisteredZero);

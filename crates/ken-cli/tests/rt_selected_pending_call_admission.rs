@@ -120,17 +120,13 @@ fn owner_vis_join_consumption_refuses_before_dead_subtree_disposition() {
         "the emitted-case check, not a later join error, must refuse: {error:?}");
 }
 
-/// Transition sentinel for RT-CONTINUATION-CALL-TOKEN-ONCE: a checked HostIO
-/// value is run twice. MEASURED: two response-admission rows reach distinct
-/// validated owners. After RT-FRAME-MARKER-ONCE clears the prior refusal,
-/// object emission first refuses when an exclusive successor reclaims the
-/// same four-field call token. The interpreter writes "captured\ncaptured\n"
-/// with two ConsoleWrite events and exits 0.
-/// CLAIMED: the flat call-token claim ledger, not frame-marker accounting,
-/// now blocks native emission. THE GAP: no artifact or native parity exists;
-/// the successor must establish full parity before this sentinel retires.
+/// Durable parity invariant: two executions of the same checked HostIO value
+/// take exclusive token-claim arms, emit one artifact, and preserve both
+/// ConsoleWrite effects and the exit status in native and interpreted runs.
+/// The independent admission rows assert that the intended double-bind route
+/// was reached, not that it executed correctly.
 #[test]
-fn checked_double_bind_admits_then_refuses_at_call_token() {
+fn checked_double_bind_admits_and_runs_with_native_parity() {
     const ORIGINAL: &str = "  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    (body MkUnit)\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      (Result IOError Unit) ExitCode\n      (host_console APartial (Result IOError Unit) (flush Stdout))\n      (\\_. host_exit APartial Success))";
     const DOUBLE_BIND: &str = "  let p : HostIO APartial Unit = body MkUnit in\n  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    p\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      Unit ExitCode\n      p\n      (\\_. host_exit APartial Success))";
     assert_eq!(PX7L.matches(ORIGINAL).count(), 1);
@@ -162,17 +158,24 @@ fn checked_double_bind_admits_then_refuses_at_call_token() {
         }).collect::<Vec<_>>()
     }).collect::<Vec<_>>();
     assert_eq!(owners, vec![vec![(0, 2), (1, 3)], vec![(0, 0), (1, 1)]]);
-    let error = outcome.expect_err("the flat continuation call-token ledger blocks native emission");
-    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(error) = error else {
-        panic!("the first refusal must occur at packaging: {error:?}");
-    };
-    assert_eq!(error.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
-    assert_eq!(error.field, "checked_process_object");
-    assert_eq!(
-        error.reason,
-        "Cranelift backend failure: module operation failed: a continuation call token was claimed twice, first by Predeclared(PredeclaredFunctionId(5)); before reading this as a real double-consumption, confirm the causal identity still carries all four fields including recursive_position, because a collided key reports this against the right token",
-        "this is a call-token transition sentinel, not native parity"
-    );
+    let output = outcome.expect("mutually exclusive token claims must emit a native artifact");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &output.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(), environment: Vec::new(),
+            cwd: dir.path().to_owned(), plan_hash: output.plan_transport_hash,
+        },
+    ).expect("the emitted artifact must run");
+    let mut host = ken_interp::CaptureHost::new(Vec::new());
+    let interpreted = ken_cli::run_program_effect_observation(
+        &source, ken_cli::SourceFormat::Ken, &[b"ken".to_vec()], &[], b"/", &mut host,
+    ).expect("the same checked source must run through the interpreter");
+    assert_eq!(native, interpreted, "both effects must survive native lowering");
+    assert_eq!(native.exit_status, 0);
+    assert_eq!(native.stdout, b"captured\ncaptured\n");
+    assert_eq!(native.effect_trace.iter().filter(|event| {
+        event.operation == ken_runtime::HostOpV1::ConsoleWrite
+    }).count(), 2);
 }
 
 // F1 and its controls change only the selected_body of the landed PX7L
