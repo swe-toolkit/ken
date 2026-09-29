@@ -1,7 +1,7 @@
 ---
 id: CAT-SYSTEM-ERROR-PRELUDE-MOVE
 title: "Move the PX9 System.Error classification model (SystemError, Operation, ResourceRef, SafeContext, Transience, Idempotence, RetryGuidance, file_error_to_system, error_transience, operation_idempotence, retry_guidance) out of the prelude into a catalog package, with its two spec-normative laws as kernel-checked proofs; fifth L3 slice of the minimal-prelude program"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: architect
@@ -101,3 +101,25 @@ or is re-keyed to its owned ids.
   the stale labels and name the `Capability.System.Error` module (Architect
   `evt_1qk0gkr2tysw2`). That path belongs to the enclave; Foundation does not
   edit it.
+
+## Closeout
+
+Landed `e5cd36c54` (PR #4343; candidate `4ad7a039b`; Foundation QA
+`evt_7jwzc7h5nr286`, Architect `evt_6qgpyh2yqeexa`, Decision
+`dec_3633zj9xp2n4w`).
+- The eleven declarations now live in `Capability.System.Error`
+  (`catalog/packages/Capability/System/Error.ken.md`), beside `System.IO`,
+  unchanged in meaning. The prelude registers none of them, and its PX9
+  bracket is gone. The package adds zero trust.
+- Both §1.8 laws are checked theorems. The converse,
+  `retry_advised_only_for_transient_idempotent`, is proved by case analysis;
+  `error_transience_revoked_permanent` keeps the prelude's `Revoked`.
+- The three PX9 readers are re-keyed by owned id, one through a real
+  selective import. The strict-resolution census gains the package's row.
+- Controls: restoring the prelude block reddens the no-registration row. A
+  wrong retry arm fails the converse and case theorems, and `Revoked ↦
+  Transient` fails the Revoked law.
+- Carries: the package's ambient `And`, `and_intro`, `Prod` and `MkProd`
+  join `CAT-AND-SORTED-PRELUDE-MOVE`'s consumer inventory. The conformance
+  seed refresh (above) goes to the Spec enclave. The Revoked law sits before
+  `error_transience` on purpose; forward references to functions check.
