@@ -1401,8 +1401,7 @@ struct FunctionLocalRefs {
     /// ⛔ Populated only by `verify_recorded_composed_discharges`, only from
     /// [`Self::pending_composed_discharges`], and only after all five
     /// verifications pass. `D8k` owns whatever global closure reads it.
-    composed_discharges:
-        BTreeMap<ContinuationCallIdentity, BTreeSet<cranelift_codegen::ir::Inst>>,
+    composed_discharges: BTreeMap<ContinuationCallIdentity, BTreeSet<cranelift_codegen::ir::Inst>>,
     declaration_calls: BTreeMap<StaticOriginId, units::DeclaredUnitCall>,
     /// The current function's closed trap-exit authority. Absence is an error
     /// state, never an implicit Root.

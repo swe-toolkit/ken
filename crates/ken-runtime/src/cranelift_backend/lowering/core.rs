@@ -11668,21 +11668,28 @@ impl<'a> Lowering<'a> {
                 .or_default()
                 .insert(call);
         }
-        self.record_checked_call_token_inst(builder.func, FrameEventKind::Receipt, &identity, call)?;
+        self.record_checked_call_token_inst(
+            builder.func,
+            FrameEventKind::Receipt,
+            &identity,
+            call,
+        )?;
         // Test-only population-side mutation: issue a second real call on this
         // path, record both Insts, and let only the R2 lattice rule reject.
         #[cfg(test)]
         if mutation == ContinuationEmissionMutation::DuplicateDirectCall {
-            let (_, second) = self.call_declared_unit_target(
-                builder, duplicate_target, &inputs, None, None,
-            )?;
+            let (_, second) =
+                self.call_declared_unit_target(builder, duplicate_target, &inputs, None, None)?;
             self.function_local
                 .continuation_emissions
                 .entry(identity.clone())
                 .or_default()
                 .insert(second);
             self.record_checked_call_token_inst(
-                builder.func, FrameEventKind::Receipt, &identity, second,
+                builder.func,
+                FrameEventKind::Receipt,
+                &identity,
+                second,
             )?;
         }
         #[cfg(test)]
