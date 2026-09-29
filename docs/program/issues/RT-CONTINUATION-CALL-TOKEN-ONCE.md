@@ -1,7 +1,7 @@
 ---
 id: RT-CONTINUATION-CALL-TOKEN-ONCE
 title: "Check the continuation call-token exactly-once obligation with RT-FRAME-MARKER-ONCE's per-key state lattice instead of a flat per-Function claim ledger, so claims in mutually exclusive successors no longer collide; census the other flat exactly-once ledgers first"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -73,3 +73,21 @@ rules at AC-0.
   at-most-once, or keyed per path) is a stop to the Architect with its site.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed `a72204203` (PR #4376; candidate `278dbf2e1`; Runtime QA
+`evt_1y7a09gv0zqjt`, Architect APPROVE `evt_1vv3wgf7qgxka` and Decision
+`dec_5bjdy1rbebpry`).
+- **AC-0.** The census ruling (`evt_1rygb71wmh1hr`) admits only the
+  continuation claim ledger to the lattice. The other nine flat ledgers stay
+  distinct. The implementation ruling (`evt_1jkx3gm8kkhs8`) converted the four
+  duplicate-token refusal sites into aggregations the lattice owns.
+- **AC-1.** The double-bind sentinel runs natively with interpreter parity:
+  `captured\ncaptured\n`, exit 0 and two `ConsoleWrite` events.
+- **AC-2.** Restoring the flat claim refusal returns the sentinel to "claimed
+  twice". Each same-path duplicate refuses by exactly one rule (E1, E2 or R2).
+  The `ken-runtime` library passes 1111/1111.
+- **Residuals.** The N1 control is a hand-built Function. The two `px7n` rows
+  stay ignored and belong to `RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN`.
+  TREE-MATCH gains no parity from this WP.
