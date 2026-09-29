@@ -26,6 +26,9 @@ use tempfile::TempDir;
 
 const STARTUP_SAFE_STUB_TIMEOUT: Duration = Duration::from_secs(5);
 const STUB_WRITER_READY_TIMEOUT: Duration = Duration::from_secs(5);
+// Forking also copies unrelated test pipes until exec; keep this control's
+// pause below the installed solver's two-second deadline.
+const FORCED_FORK_HOLD: Duration = Duration::from_millis(500);
 // The delayed stub sleeps for one second and emits a valid refuting model;
 // this shorter deadline makes enforced timeout the only Unknown outcome.
 const DELIBERATE_TIMEOUT_PROBE: Duration = Duration::from_millis(100);
@@ -179,7 +182,7 @@ fn spawn_fork_blocker() -> thread::JoinHandle<()> {
                 if written != marker.len() as isize {
                     return Err(std::io::Error::last_os_error());
                 }
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(FORCED_FORK_HOLD);
                 Ok(())
             });
         }
