@@ -3,16 +3,16 @@
 //! - A [`Context`] is an ordered telescope of term-variable types (de Bruijn:
 //!   the most-recently pushed variable is index `0`). There are no
 //!   interval/cofibration entries (ADR 0005).
-//! - A [`GlobalEnv`] records top-level declarations in dependency order. It is
-//!   **append-only and acyclic** (`11 §4`): a declaration may reference only
-//!   earlier ones, which is what makes δ-unfolding well-founded.
+//! - A [`GlobalEnv`] records top-level declarations and their checked
+//!   transparent bodies (`11 §4`, `17 §4`). Recursive definitions admitted
+//!   by SCT may reference themselves or other members of their group.
 //!
 //! Admission *checks* (signature type-checking, strict positivity, universe
 //! checks) live in [`crate::check`] / [`crate::inductive`]; this module is the
 //! pure data structure, lookup, and the type-former/constructor type generation
 //! that makes `infer` O(1).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::term::{GlobalId, Level, LevelVar, Term};
 
@@ -259,11 +259,15 @@ impl Decl {
     }
 }
 
-/// The global environment `Σ` — append-only, acyclic (`11 §4`).
+/// The global environment `Σ` — checked declarations plus SCT-admitted
+/// recursive bodies (`11 §4`, `17 §4`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GlobalEnv {
     decls: Vec<Decl>,
     by_id: HashMap<GlobalId, usize>,
+    /// Transparent constants on cycles of the current transparent-body graph.
+    /// Derived from bodies, never from the admission route or declaration name.
+    recursive_transparent: BTreeSet<GlobalId>,
     /// Constructor id → (index into `decls`, index into the inductive's
     /// constructors).
     ctor_index: HashMap<GlobalId, (usize, usize)>,
@@ -390,6 +394,9 @@ impl GlobalEnv {
         let idx = self.decls.len();
         self.decls.push(decl);
         self.by_id.insert(id, idx);
+        if self.decls[idx].is_transparent() {
+            self.mark_new_transparent_cycles(id);
+        }
         if let Decl::Inductive(ind) = &self.decls[idx] {
             for (ci, c) in ind.constructors.iter().enumerate() {
                 self.ctor_index.insert(c.id, (idx, ci));
@@ -479,6 +486,9 @@ impl GlobalEnv {
         self.support_edges.remove(&decl.id());
         self.all_supports.retain(|_, family| *family != decl.id());
         self.checked_literals.remove(&decl.id());
+        if self.recursive_transparent.remove(&decl.id()) {
+            self.recompute_transparent_cycles();
+        }
         Some(decl)
     }
 
@@ -498,6 +508,118 @@ impl GlobalEnv {
                 level_params, ty, ..
             } => Some((level_params, ty.clone())),
             Decl::Inductive(ind) => Some((&ind.level_params, ind.former_type.clone())),
+        }
+    }
+
+    /// Whether `id` lies on a cycle of references between transparent bodies.
+    /// This is not an SCT/admission-route flag: an acyclic group member is false.
+    pub fn is_recursive_transparent(&self, id: GlobalId) -> bool {
+        self.recursive_transparent.contains(&id)
+    }
+
+    /// Outgoing edges in the transparent-body graph. Every occurrence of a
+    /// `Const` counts, including occurrences inside binders and eliminators.
+    fn transparent_references(&self, id: GlobalId) -> HashSet<GlobalId> {
+        let Some(Decl::Transparent { body, .. }) = self.lookup(id) else {
+            return HashSet::new();
+        };
+        let mut refs = HashSet::new();
+        let mut terms = vec![body];
+        while let Some(term) = terms.pop() {
+            if let Term::Const { id, .. } = term {
+                if matches!(self.lookup(*id), Some(Decl::Transparent { .. })) {
+                    refs.insert(*id);
+                }
+            }
+            terms.extend(term.children());
+        }
+        refs
+    }
+
+    /// An added transparent body introduces cycles only through its own id.
+    /// Intersect its forward reach with the backwards reach to that id; the
+    /// latter runs over the induced subgraph rather than rescanning all decls.
+    fn mark_new_transparent_cycles(&mut self, id: GlobalId) {
+        let mut forward = HashSet::new();
+        let mut pending: Vec<_> = self.transparent_references(id).into_iter().collect();
+        while let Some(next) = pending.pop() {
+            if forward.insert(next) {
+                pending.extend(self.transparent_references(next));
+            }
+        }
+        if !forward.contains(&id) {
+            return;
+        }
+        let mut reverse: HashMap<GlobalId, Vec<GlobalId>> = HashMap::new();
+        for &node in &forward {
+            for child in self.transparent_references(node) {
+                if forward.contains(&child) {
+                    reverse.entry(child).or_default().push(node);
+                }
+            }
+        }
+        let mut back = HashSet::new();
+        let mut pending = vec![id];
+        while let Some(node) = pending.pop() {
+            if back.insert(node) {
+                pending.extend(reverse.get(&node).into_iter().flatten().copied());
+            }
+        }
+        self.recursive_transparent.extend(back);
+    }
+
+    /// A rare rollback of a cyclic member can split an existing component.
+    /// Rebuild the cycle set by two iterative Kosaraju passes, including
+    /// singleton components only when they have an explicit self-edge.
+    fn recompute_transparent_cycles(&mut self) {
+        let nodes: Vec<_> = self
+            .decls
+            .iter()
+            .filter(|d| d.is_transparent())
+            .map(Decl::id)
+            .collect();
+        let graph: HashMap<_, _> = nodes
+            .iter()
+            .map(|&id| (id, self.transparent_references(id)))
+            .collect();
+        let mut reverse: HashMap<GlobalId, Vec<GlobalId>> = HashMap::new();
+        for (&from, to) in &graph {
+            for &id in to {
+                reverse.entry(id).or_default().push(from);
+            }
+        }
+        let mut seen = HashSet::new();
+        let mut finish = Vec::new();
+        for id in nodes {
+            let mut pending = vec![(id, false)];
+            while let Some((node, expanded)) = pending.pop() {
+                if expanded {
+                    finish.push(node);
+                } else if seen.insert(node) {
+                    pending.push((node, true));
+                    pending.extend(graph[&node].iter().map(|&child| (child, false)));
+                }
+            }
+        }
+        self.recursive_transparent.clear();
+        seen.clear();
+        while let Some(id) = finish.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            let mut component = vec![id];
+            let mut pending = vec![id];
+            while let Some(node) = pending.pop() {
+                for &parent in reverse.get(&node).into_iter().flatten() {
+                    if seen.insert(parent) {
+                        component.push(parent);
+                        pending.push(parent);
+                    }
+                }
+            }
+            if component.len() > 1 || graph[&id].contains(&id) {
+                self.recursive_transparent.extend(component);
+            }
         }
     }
 
@@ -547,6 +669,7 @@ impl GlobalEnv {
                 ty,
                 body,
             };
+            self.mark_new_transparent_cycles(id);
             true
         } else {
             false
@@ -708,6 +831,50 @@ impl InductiveDecl {
             }
             c.type_ = telescope_to_pi(&self.params, telescope_to_pi(&c.args, head));
         }
+    }
+}
+
+#[cfg(test)]
+mod recursive_transparent_tests {
+    use super::*;
+
+    fn add_transparent(env: &mut GlobalEnv, id: GlobalId, body: Term) {
+        env.add_decl(Decl::Transparent {
+            id,
+            level_params: vec![],
+            ty: Term::ty(Level::zero()),
+            body,
+        });
+    }
+
+    #[test]
+    fn direct_add_decl_reads_body_graph_not_declaration_kind() {
+        let mut env = GlobalEnv::new();
+        let plain = env.fresh_id();
+        add_transparent(&mut env, plain, Term::ty(Level::zero()));
+        assert!(!env.is_recursive_transparent(plain));
+        let recursive = env.fresh_id();
+        add_transparent(&mut env, recursive, Term::const_(recursive, vec![]));
+        assert!(env.is_recursive_transparent(recursive));
+        assert!(!env.is_recursive_transparent(plain));
+    }
+
+    #[test]
+    fn remove_last_recomputes_cycles_and_reused_ids_have_no_stale_membership() {
+        let mut env = GlobalEnv::new();
+        let a = env.fresh_id();
+        let b = env.fresh_id();
+        add_transparent(&mut env, a, Term::const_(b, vec![]));
+        assert!(!env.is_recursive_transparent(a));
+        add_transparent(&mut env, b, Term::const_(a, vec![]));
+        assert!(env.is_recursive_transparent(a));
+        assert!(env.is_recursive_transparent(b));
+        assert_eq!(env.remove_last().unwrap().id(), b);
+        assert!(!env.is_recursive_transparent(a));
+        assert!(!env.is_recursive_transparent(b));
+        assert_eq!(env.next_global_id(), b);
+        add_transparent(&mut env, b, Term::ty(Level::zero()));
+        assert!(!env.is_recursive_transparent(b));
     }
 }
 

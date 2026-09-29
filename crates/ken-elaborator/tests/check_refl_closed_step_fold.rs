@@ -38,6 +38,25 @@ fn closed_step_wrapper_node_refl_checks() {
         .expect("closed-step Node equation is definitionally equal");
 }
 
+/// Increment 2: a three-deep ignored-argument wrapper changes a dependent
+/// index. Its finite δ/β common reduct must be accepted during type checking,
+/// not merely by a `Refl` goal whose observational ι can bypass the ledger.
+#[test]
+fn tagged_index_accepts_three_nested_skip_first_calls() {
+    let mut env = ElabEnv::new().expect("prelude admission");
+    env.elaborate_file(
+        r#"
+        data N = Z | S N
+        data Tagged (n : N) : Type where { MkTagged : Tagged n }
+        fn skip_first (x : N) (y : N) : N = S y
+        fn retag (x1 : N) (x2 : N) (x3 : N) (y1 : N) (y2 : N) (y3 : N) (z : N)
+            (t : Tagged (skip_first x1 (skip_first x2 (skip_first x3 z))))
+            : Tagged (skip_first y1 (skip_first y2 (skip_first y3 z))) = t
+        "#,
+    )
+    .expect("same acyclic transparent head must reduce to the equal index");
+}
+
 #[test]
 fn bare_fold_node_equation_checks() {
     let mut env = with_definitions();
