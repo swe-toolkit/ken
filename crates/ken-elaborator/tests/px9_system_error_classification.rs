@@ -14,8 +14,9 @@ use ken_kernel::{inductive::peel_app, inductive::peel_pi, Decl, GlobalId, Term};
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-const SYSTEM_ERROR: &str = "System.Error";
-const SYSTEM_ERROR_IMPORT: &str = "import System.Error (Transience, Transient, Permanent, \
+const SYSTEM_ERROR: &str = "Capability.System.Error";
+const SYSTEM_ERROR_IMPORT: &str =
+    "import Capability.System.Error (Transience, Transient, Permanent, \
     Idempotence, Idempotent, NonIdempotent, RetryGuidance, RetryAdvised, \
     RetryUnsafeNonIdempotent, DoNotRetryPermanent, Operation, FilesystemOp, \
     ResourceRef, FilesystemResource, SafeContext, NoSafeContext, RedactedSafeContext, \
@@ -83,7 +84,7 @@ fn system_constructor_names(env: &ElabEnv, owned: &[GlobalId], family: &str) -> 
                 .iter()
                 .find_map(|(name, id)| {
                     (*id == constructor.id)
-                        .then(|| name.strip_prefix("System.Error."))
+                        .then(|| name.strip_prefix("Capability.System.Error."))
                         .flatten()
                 })
                 .unwrap_or_else(|| panic!("constructor {:?} has no provider name", constructor.id));

@@ -11,8 +11,8 @@ use ken_kernel::{inductive::peel_app, inductive::peel_pi, Decl, GlobalId, Term};
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-const SYSTEM_ERROR: &str = "System.Error";
-const SYSTEM_ERROR_IMPORT: &str = "import System.Error (SystemError, MkSystemError, \
+const SYSTEM_ERROR: &str = "Capability.System.Error";
+const SYSTEM_ERROR_IMPORT: &str = "import Capability.System.Error (SystemError, MkSystemError, \
     FilesystemOp, FilesystemResource, NoSafeContext, file_error_to_system)";
 
 fn system_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {

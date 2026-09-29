@@ -6,6 +6,7 @@ from a transient error paired with an idempotent operation. The checked
 and the [revoked theorem](#classification-laws) proves that
 `error_transience Revoked = Permanent`. The envelope currently wraps
 filesystem errors without changing the canonical `IOError` identities.
+Import this surface as `Capability.System.Error`, beside `Capability.System.IO`.
 
 ## Contents
 
@@ -236,9 +237,9 @@ payload. Classification is pure checked Ken, not a host retry policy.
 
 ## References
 
-- [Ken error-classification contract](../../../spec/30-surface/38-ffi-io.md#18-error-classification-honest-retry-and-the-single-revoked-identity-px9)
+- [Ken error-classification contract](../../../../spec/30-surface/38-ffi-io.md#18-error-classification-honest-retry-and-the-single-revoked-identity-px9)
   — normative retry and revocation properties.
-- [Filesystem error rendering](../Capability/Filesystem/Errors.ken.md) —
+- [Filesystem error rendering](../Filesystem/Errors.ken.md) —
   separate presentation policy for the unchanged `FileError` and `IOError`.
 - [Idempotence](https://en.wikipedia.org/wiki/Idempotence) — general
   orientation; the actual verdicts are the checked definitions above.

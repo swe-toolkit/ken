@@ -13,7 +13,7 @@ use ken_kernel::{GlobalId, Term};
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-const SYSTEM_ERROR: &str = "System.Error";
+const SYSTEM_ERROR: &str = "Capability.System.Error";
 
 fn system_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
     catalog_or::provider_owned_id(env, owned, SYSTEM_ERROR, name)
@@ -132,7 +132,7 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
         .expect("System.Error must roots-load for the classifier proof");
     let proofs = env
         .elaborate_file(
-            "import System.Error (Transience, error_transience, Permanent)\n\
+            "import Capability.System.Error (Transience, error_transience, Permanent)\n\
              theorem px9_canonical_revoked_is_permanent :\n\
                Equal Transience (error_transience Revoked) Permanent = Proved",
         )

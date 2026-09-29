@@ -759,6 +759,52 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Capability.System.Error carries the checked classification ambient row.
+            "Capability.System.Error".to_string(),
+            [
+                "AlreadyExists",
+                "And",
+                "BrokenPipe",
+                "CapabilityDenied",
+                "FileError",
+                "FileOperation",
+                "IOError",
+                "Interrupted",
+                "InvalidInput",
+                "IsDirectory",
+                "MkFileError",
+                "MkProd",
+                "NotDirectory",
+                "NotEmpty",
+                "NotFound",
+                "OpAppendFile",
+                "OpChangeMode",
+                "OpCreateDirectory",
+                "OpDuplicate",
+                "OpGetInheritance",
+                "OpMetadata",
+                "OpReadDirectory",
+                "OpReadFile",
+                "OpRemoveDirectory",
+                "OpRemoveFile",
+                "OpRename",
+                "OpSeek",
+                "OpSetInheritance",
+                "OpSetLength",
+                "OpSync",
+                "OpWriteFile",
+                "Other",
+                "PermissionDenied",
+                "Prod",
+                "Revoked",
+                "Unsupported",
+                "and_intro",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // The standalone theorem no longer shadows its native-prelude
             // subject, so the ordinary package boundary loads. The remaining
             // vector is the exact compiler-native proof vocabulary it uses.
@@ -1048,52 +1094,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
-        ),
-        (
-            // System.Error adds the checked classification package's ambient row.
-            "System.Error".to_string(),
-            [
-                "AlreadyExists",
-                "And",
-                "BrokenPipe",
-                "CapabilityDenied",
-                "FileError",
-                "FileOperation",
-                "IOError",
-                "Interrupted",
-                "InvalidInput",
-                "IsDirectory",
-                "MkFileError",
-                "MkProd",
-                "NotDirectory",
-                "NotEmpty",
-                "NotFound",
-                "OpAppendFile",
-                "OpChangeMode",
-                "OpCreateDirectory",
-                "OpDuplicate",
-                "OpGetInheritance",
-                "OpMetadata",
-                "OpReadDirectory",
-                "OpReadFile",
-                "OpRemoveDirectory",
-                "OpRemoveFile",
-                "OpRename",
-                "OpSeek",
-                "OpSetInheritance",
-                "OpSetLength",
-                "OpSync",
-                "OpWriteFile",
-                "Other",
-                "PermissionDenied",
-                "Prod",
-                "Revoked",
-                "Unsupported",
-                "and_intro",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
         ),
         (
             "Tooling.Testing.Property".to_string(),
