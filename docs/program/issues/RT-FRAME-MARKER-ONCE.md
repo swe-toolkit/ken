@@ -85,9 +85,17 @@ second consumer still refuses.
   - Propose the repair. Name what the interpreter does on the same term, and
     which duplicate consumption the fixed plan must still refuse.
   - The Architect rules before any build.
-- **AC-1.** Both `px7n` rows pass un-ignored on both engines. The double-bind
-  sentinel is replaced by a parity pin: native stdout, exit code and effect
-  count equal the interpreter's (two writes).
+- **AC-1 (amended: Steward `evt_77f647ed6x03g`, on Architect
+  `evt_6cyyg6xz8csab`).** The WP lands as a boundary increment.
+  - Both `px7n` programs build, link and run natively. Their stdout and
+    effect sequences equal the interpreter's up to the root result
+    (`evt_qv8t1jrprwfm`).
+  - Both rows stay ignored with the verbatim `units.rs:9389` root-guard
+    refusal, owned by `RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN`.
+  - The double-bind sentinel is relabelled with its verbatim "call token was
+    claimed twice" refusal, owned by `RT-CONTINUATION-CALL-TOKEN-ONCE`.
+  - The lattice's unit controls and single-rule mutations are as ruled in
+    `evt_erryd8111g8k`.
 - **AC-2 (control).** Reverting the repair returns each program to the AC-0
   refusal. A plan that consumes one marker at two sites serving the same
   occurrence still refuses. Rows outside the three keep their current

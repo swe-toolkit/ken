@@ -1,7 +1,7 @@
 ---
 id: CAT-PRELUDE-FOLD-REMOVAL
 title: "Delete the prelude's list fold, a convenience name with no catalog consumer that collides by spelling with Data.Collections.Map's own fold; move it into Data.Collections.Derived only if the consumer census finds a list-fold user; fourth L3 slice of the minimal-prelude program"
-status: active
+status: merged
 owner: foundation
 size: S
 gate: architect
@@ -26,10 +26,12 @@ catalog definition or has none.
   inside the `combinator_trusted_before`/`after` bracket (`:516`, `:528`),
   whose population is positional and is today exactly `fold` and `zip`.
 - **The collision.** `catalog/packages/Data/Collections/Map.ken.md:120`
-  declares its own `fold` over `Tree k v`, a different function under the
-  same spelling. Under the operator's no-rebinding rule, which the
-  LANG-SESSION-SCOPE flip enforces, that declaration is an error while the
-  prelude keeps `fold`.
+  declares its own private `fold` (`fn`, not `pub fn`) over `Tree k v`, a
+  different function under the same spelling. Under the operator's
+  no-rebinding rule, which the LANG-SESSION-SCOPE flip enforces, that
+  declaration rebinds the prelude spelling inside Map's owner scope while the
+  prelude keeps `fold`. No importer can name it. The hazard is prospective:
+  today the two resolve to distinct ids (Architect `evt_1bsdc787pfc3z`).
 - **Consumers.** `CAT-COLLECTIONS-MAP-FILTER-PRELUDE-MOVE` recorded no catalog
   consumer. Test, r-layer, example and conformance consumers are unmeasured.
   The word `fold` appears widely in prose, so the census is by resolved
@@ -57,13 +59,15 @@ structural op, and that reader imports it.
   `r_layer_tests`, `examples/`, `conformance/` and the CLI fixtures (Check 3).
   Say whether a Derived home is needed. The Architect rules before any edit.
 - **AC-1.** `ElabEnv::new()` registers no `fold`. Map's `fold` elaborates and
-  resolves as Map's own inside Map and in its importers. The combinator
+  resolves as Map's own inside Map's owner scope. The combinator
   bracket's delta assertion still holds over `zip`. Any census reader is
   green on its catalog import.
 - **AC-2 (control).** Restoring the prelude declaration turns the AC-1 "no
-  `fold` registered" row red, and a Map-importing client that names `fold`
-  resolves it to one identity either way. Prelude ids after the deleted one
-  shift by one, and every pin is re-keyed by identity, not by number.
+  `fold` registered" row red. Map's owner-scope readers of its private
+  `fold`, keyed on its owned id, reference no other declaration named `fold`
+  either way. That row is a preservation pin, not a discriminator. Prelude
+  ids after the deleted one shift by one, and every pin is re-keyed by
+  identity, not by number.
 
 ## Stop conditions
 
@@ -72,3 +76,19 @@ structural op, and that reader imports it.
   key, is a stop to the Architect with its site.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Landed at `412de0190` (candidate `5b41da0f2`; Foundation QA
+`evt_q83rx441r62y`, Architect `evt_6bqrw9n9xxmwp`, Decision
+`dec_5hj9mvgwxf30b`).
+- The prelude no longer declares `fold`. The combinator bracket covers `zip`
+  alone, with its zero-trust check.
+- The one census reader was the prelude-surface test itself. It is re-keyed
+  to Derived's `length`, and its composition now evaluates to 1. No Derived
+  home was needed (`evt_5a6k12bpb2g5j`).
+- Map's private `fold` is pinned in owner scope by owned id across its seven
+  readers, as a preservation row.
+- The mutation that restores the declaration reddens the "no `fold`
+  registered" row.
+- The Decoder recursive-equation sentence now matches the `Suc` seed.
