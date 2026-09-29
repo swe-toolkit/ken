@@ -99,6 +99,7 @@ fn map_owner_scope_readers_preserve_the_private_fold_id() {
         })
         .map(|(_, id)| *id)
         .collect();
+    eprintln!("Map.fold {map_fold:?}; other registered fold IDs: {other_fold_ids:?}");
     let prefix = format!("{MAP_MODULE}.");
     let mut readers = BTreeSet::new();
     for id in &owned {
