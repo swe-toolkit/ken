@@ -335,8 +335,15 @@ fn term_mentions(term: &ken_kernel::Term, target: GlobalId) -> bool {
     }
 }
 
-/// Promise class: normative compatibility vector (exact checked-owned Parsing
-/// name list); the same test pins zero trusted-base delta.
+/// Promise class: durable invariant. Elaborating Parsing's D1 package adds
+/// zero entries to `trusted_base()`.
+/// Promise class: transition sentinel. Each selected qualified name resolves
+/// through the flat global table to a transparent body. This is not an
+/// ownership, completeness or public-surface claim: lookups are by spelling
+/// in mutable globals, and QA's foreign-rebind control shows a rebind would
+/// pass. It retires at the LANG-SESSION-SCOPE flip, which removes qualified
+/// flat globals. At that point it is re-keyed to owned IDs
+/// (`provider_owned_id` against the provider population) or deleted.
 #[test]
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
     let (mut env, provider_owned) = dependency_env_with_provider_owned();
