@@ -15123,9 +15123,13 @@ both; it assumes no `Ordered` witness. This is a membership fact about
 
 Comparator lawfulness alone is insufficient: in an unordered successor tree,
 `fold` can visit a misplaced key that `set_member` lookup rejects, creating a
-path that is absent from the lookup-defined relation. The faithfulness and
-saturation proofs under the full representation premises remain separate from
-this computational definition.
+path that is absent from the lookup-defined relation. The checked
+`reachable_within_sound` and `reachable_within_complete` laws relate the
+worker, at every fuel, to a private positive walk through stored edges. That
+bounded correspondence is stated under the shared lawful comparator, outer
+`Ordered`, and ordered successor trees. It does not yet show that the public
+`size (dom r)` bound reaches every positive walk; full-closure faithfulness
+and saturation remain separate obligations.
 
 ```ken
 pub fn size (k : Type) (v : Type) (m : Tree k v) : Nat =
@@ -15483,6 +15487,267 @@ theorem fold_preserves_true
           fold_preserves_true k v f right after_key step key_true
   }
 
+theorem fold_or_step_from_key
+      (k : Type)
+      (v : Type)
+      (p : k → Bool)
+      (f : k → v → Bool → Bool)
+      (step_agrees : (key : k)
+        → (val : v)
+        → (seen : Bool)
+        → Equal
+        Bool
+        (f key val seen)
+        (cat4_bool_or (p key) seen))
+      (key : k)
+      (val : v)
+      (seen : Bool)
+    : Equal Bool (p key) True → Equal Bool (f key val seen) True =
+  λpresent.
+    trans
+      Bool
+      (f key val seen)
+      (cat4_bool_or (p key) seen)
+      True
+      (step_agrees key val seen)
+      (cat4_bool_or_left_true (p key) seen present)
+
+theorem fold_or_step_preserves_true
+      (k : Type)
+      (v : Type)
+      (p : k → Bool)
+      (f : k → v → Bool → Bool)
+      (step_agrees : (key : k)
+        → (val : v)
+        → (seen : Bool)
+        → Equal
+        Bool
+        (f key val seen)
+        (cat4_bool_or (p key) seen))
+      (key : k)
+      (val : v)
+      (seen : Bool)
+    : Equal Bool seen True → Equal Bool (f key val seen) True =
+  λprevious.
+    trans
+      Bool
+      (f key val seen)
+      (cat4_bool_or (p key) seen)
+      True
+      (step_agrees key val seen)
+      (cat4_bool_or_right_true (p key) seen previous)
+
+theorem fold_or_preserves_true
+      (k : Type)
+      (v : Type)
+      (p : k → Bool)
+      (f : k → v → Bool → Bool)
+      (step_agrees : (key : k)
+        → (val : v)
+        → (seen : Bool)
+        → Equal
+        Bool
+        (f key val seen)
+        (cat4_bool_or (p key) seen))
+      (tree : Tree k v)
+      (before : Bool)
+    : Equal Bool before True → Equal Bool (fold k v Bool f before tree) True =
+  fold_preserves_true
+    k
+    v
+    f
+    tree
+    before
+    (λkey. λval. λseen. fold_or_step_preserves_true k v p f step_agrees key val seen)
+
+theorem member_node_left_when_selected
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (left : Tree k v)
+      (key : k)
+      (val : v)
+      (right : Tree k v)
+      (below : Equal Bool (leq query key) True)
+      (not_above : Equal Bool (leq key query) False)
+    : Equal Bool (member k v leq query (Node k v left key val right)) True
+      → Equal Bool (member k v leq query left) True =
+  λpresent.
+    let
+      node_member = member k v leq query (Node k v left key val right);
+      left_member = member k v leq query left;
+      same =
+        cong
+          (Option v)
+          Bool
+          (lookup k v leq query (Node k v left key val right))
+          (lookup k v leq query left)
+          (is_some v)
+          (lookup_into_l_bridge k v leq query left key val right below not_above)
+    in
+      trans Bool left_member node_member True (sym Bool node_member left_member same) present
+
+theorem member_node_right_when_selected
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (left : Tree k v)
+      (key : k)
+      (val : v)
+      (right : Tree k v)
+      (not_below : Equal Bool (leq query key) False)
+    : Equal Bool (member k v leq query (Node k v left key val right)) True
+      → Equal Bool (member k v leq query right) True =
+  λpresent.
+    let
+      node_member = member k v leq query (Node k v left key val right);
+      right_member = member k v leq query right;
+      same =
+        cong
+          (Option v)
+          Bool
+          (lookup k v leq query (Node k v left key val right))
+          (lookup k v leq query right)
+          (is_some v)
+          (lookup_into_r_bridge k v leq query left key val right not_below)
+    in
+      trans Bool right_member node_member True (sym Bool node_member right_member same) present
+
+theorem fold_or_inject_member
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (p : k → Bool)
+      (f : k → v → Bool → Bool)
+      (step_agrees : (key : k)
+        → (val : v)
+        → (seen : Bool)
+        → Equal
+        Bool
+        (f key val seen)
+        (cat4_bool_or (p key) seen))
+      (predicate_equiv : (stored : k)
+        → order_equiv
+        k
+        leq
+        query
+        stored
+        → Equal
+        Bool
+        (p query)
+        (p stored))
+      (tree : Tree k v)
+      (before : Bool)
+    : Equal Bool (member k v leq query tree) True
+      → Equal Bool (p query) True
+      → Equal Bool (fold k v Bool f before tree) True =
+  match tree {
+    Leaf ↦ λmember_true. λpredicate_true. absurd member_true;
+    Node left key val right ↦
+      λmember_true.
+        λpredicate_true.
+          let
+            node_tree = Node k v left key val right;
+            left_value = fold k v Bool f before left;
+            after_key = f key val left_value
+          in
+            match bool_dichotomy (leq query key) {
+              Inl below ↦
+                match bool_dichotomy (leq key query) {
+                  Inl above ↦
+                    let
+                      equivalent =
+                        and_intro
+                          (Equal Bool (leq query key) True)
+                          (Equal Bool (leq key query) True)
+                          below
+                          above;
+                      predicate_same = predicate_equiv key equivalent;
+                      key_true =
+                        trans
+                          Bool
+                          (p key)
+                          (p query)
+                          True
+                          (sym Bool (p query) (p key) predicate_same)
+                          predicate_true;
+                      after_true =
+                        fold_or_step_from_key k v p f step_agrees key val left_value key_true
+                    in
+                      fold_or_preserves_true k v p f step_agrees right after_key after_true;
+                  Inr not_above ↦
+                    let
+                      member_left =
+                        member_node_left_when_selected
+                          k
+                          v
+                          leq
+                          query
+                          left
+                          key
+                          val
+                          right
+                          below
+                          not_above
+                          member_true;
+                      left_true =
+                        fold_or_inject_member
+                          k
+                          v
+                          leq
+                          query
+                          p
+                          f
+                          step_agrees
+                          predicate_equiv
+                          left
+                          before
+                          member_left
+                          predicate_true;
+                      after_true =
+                        fold_or_step_preserves_true
+                          k
+                          v
+                          p
+                          f
+                          step_agrees
+                          key
+                          val
+                          left_value
+                          left_true
+                    in
+                      fold_or_preserves_true k v p f step_agrees right after_key after_true
+                };
+              Inr not_below ↦
+                fold_or_inject_member
+                  k
+                  v
+                  leq
+                  query
+                  p
+                  f
+                  step_agrees
+                  predicate_equiv
+                  right
+                  after_key
+                  (member_node_right_when_selected
+                    k
+                    v
+                    leq
+                    query
+                    left
+                    key
+                    val
+                    right
+                    not_below
+                    member_true)
+                  predicate_true
+            }
+  }
+
 fn relation_reach_fold_step
       (k : Type)
       (leq : k → k → Bool)
@@ -15591,12 +15856,49 @@ theorem relation_ord_refl
     : Equal Bool (relation_ord_leq k d query query) True =
   d.refl query
 
+theorem relation_ord_antisym
+      (k : Type) (d : Ord k) (source : k) (stored : k)
+    : order_equiv k (relation_ord_leq k d) source stored → Equal k source stored =
+  λequivalent.
+    d.antisym
+      source
+      stored
+      (and_fst
+        (Equal Bool (relation_ord_leq k d source stored) True)
+        (Equal Bool (relation_ord_leq k d stored source) True)
+        equivalent)
+      (and_snd
+        (Equal Bool (relation_ord_leq k d source stored) True)
+        (Equal Bool (relation_ord_leq k d stored source) True)
+        equivalent)
+
 theorem relation_ord_trans
       (k : Type) (d : Ord k) (a : k) (b : k) (c : k)
     : Equal Bool (relation_ord_leq k d a b) True
       → Equal Bool (relation_ord_leq k d b c) True
       → Equal Bool (relation_ord_leq k d a c) True =
   d.trans a b c
+
+theorem reachable_within_source_equiv
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (n : Nat)
+      (source : k)
+      (stored : k)
+      (y : k)
+    : order_equiv k (relation_ord_leq k d) source stored
+      → Equal Bool
+        (reachable_within k (relation_ord_leq k d) n source y r)
+        (reachable_within k (relation_ord_leq k d) n stored y r) =
+  λequivalent.
+    cong
+      k
+      Bool
+      source
+      stored
+      (λquery. reachable_within k (relation_ord_leq k d) n query y r)
+      (relation_ord_antisym k d source stored equivalent)
 
 theorem relation_walk_singleton_complete
       (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (x : k) (y : k) (stored : k)
@@ -16493,6 +16795,79 @@ theorem reachable_within_sound
               whole
   }
 
+theorem reachable_within_fold_member_complete
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (n : Nat) (x : k) (y : k) (stored : k)
+    : rel_member k (relation_ord_leq k d) x stored r
+      → Equal Bool (reachable_within k (relation_ord_leq k d) n stored y r) True
+      → Equal Bool
+        (relation_reach_fold_closed
+          k
+          (relation_ord_leq k d)
+          n
+          y
+          r
+          (succ k (relation_ord_leq k d) x r))
+        True =
+  λedge.
+    λtail.
+      let
+        leq = relation_ord_leq k d;
+        targets = succ k leq x r;
+        param_true =
+          fold_or_inject_member
+            k
+            Unit
+            leq
+            stored
+            (λquery. reachable_within k leq n query y r)
+            (relation_reach_fold_step k leq n y r)
+            (λkey. λunit. λseen. Refl)
+            (λother.
+              λequivalent. reachable_within_source_equiv k d r n stored other y equivalent)
+            targets
+            False
+            edge
+            tail
+      in
+        trans
+          Bool
+          (relation_reach_fold_closed k leq n y r targets)
+          (relation_reach_fold_param k leq n y r targets)
+          True
+          (relation_reach_fold_open_bridge k leq n y r targets)
+          param_true
+
+theorem reachable_within_step_true
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (n : Nat) (x : k) (y : k)
+    : Equal Bool
+        (cat4_bool_or
+          (set_member k leq y (succ k leq x r))
+          (relation_reach_fold_closed k leq n y r (succ k leq x r)))
+        True
+      → Equal Bool (reachable_within k leq (Suc n) x y r) True =
+  λdisjunction_true.
+    let
+      targets = succ k leq x r;
+      direct = set_member k leq y targets;
+      closed = relation_reach_fold_closed k leq n y r targets;
+      recurrence = reachable_within_successor_rhs k leq n x y r;
+      recurrence_true =
+        trans
+          Bool
+          recurrence
+          (cat4_bool_or direct closed)
+          True
+          (reachable_within_rhs_split k leq n x y r)
+          disjunction_true
+    in
+      trans
+        Bool
+        (reachable_within k leq (Suc n) x y r)
+        recurrence
+        True
+        (reachable_within_successor_unfold k leq n x y r)
+        recurrence_true
+
 theorem reachable_within_direct_complete
       (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (n : Nat) (x : k) (y : k)
     : rel_member k (relation_ord_leq k d) x y r
@@ -16521,6 +16896,117 @@ theorem reachable_within_direct_complete
         True
         (reachable_within_successor_unfold k leq n x y r)
         recurrence_true
+
+theorem reachable_within_continue_complete
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (n : Nat) (x : k) (y : k) (stored : k)
+    : rel_member k (relation_ord_leq k d) x stored r
+      → Equal Bool (reachable_within k (relation_ord_leq k d) n stored y r) True
+      → Equal Bool (reachable_within k (relation_ord_leq k d) (Suc n) x y r) True =
+  λedge.
+    λtail.
+      let
+        leq = relation_ord_leq k d;
+        targets = succ k leq x r;
+        direct = set_member k leq y targets;
+        closed = relation_reach_fold_closed k leq n y r targets;
+        folded = reachable_within_fold_member_complete k d r n x y stored edge tail
+      in
+        reachable_within_step_true k leq r n x y (cat4_bool_or_right_true direct closed folded)
+
+theorem reachable_within_complete_successor
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (n : Nat)
+      (x : k)
+      (y : k)
+      (vertices : List k)
+      (tail_complete : (stored : k)
+        → bounded_walk
+        k
+        (relation_ord_leq k d)
+        r
+        n
+        stored
+        y
+        → Equal
+        Bool
+        (reachable_within k (relation_ord_leq k d) n stored y r)
+        True)
+    : Equal Bool (relation_walk_bool k (relation_ord_leq k d) r x y vertices) True
+      → Equal Bool (leq_nat (length k vertices) (Suc n)) True
+      → Equal Bool (reachable_within k (relation_ord_leq k d) (Suc n) x y r) True =
+  match vertices {
+    Nil ↦ λvalid. λbounded. absurd valid;
+    Cons stored rest ↦
+      match rest {
+        Nil ↦
+          λvalid.
+            λbounded.
+              reachable_within_direct_complete
+                k
+                d
+                r
+                n
+                x
+                y
+                (relation_walk_singleton_complete k d r x y stored valid);
+        Cons next tail ↦
+          λvalid.
+            λbounded.
+              let
+                leq = relation_ord_leq k d;
+                remaining = Cons k next tail;
+                direct = set_member k leq stored (succ k leq x r);
+                rest_valid = relation_walk_bool k leq r stored y remaining;
+                edge = (proof left for bool_and) direct rest_valid valid;
+                tail_valid = (proof right for bool_and) direct rest_valid valid;
+                tail_bound : Equal Bool (leq_nat (length k remaining) n) True = bounded;
+                tail_path : bounded_walk k leq r n stored y =
+                  trunc_intro
+                    (MkBoundedRelationWalk k leq r n stored y remaining tail_valid tail_bound);
+                tail_reaches = tail_complete stored tail_path
+              in
+                reachable_within_continue_complete k d r n x y stored edge tail_reaches
+      }
+  }
+
+theorem reachable_within_complete
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (fuel : Nat) (x : k) (y : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → bounded_walk k (relation_ord_leq k d) r fuel x y
+      → Equal Bool (reachable_within k (relation_ord_leq k d) fuel x y r) True =
+  match fuel {
+    Zero ↦
+      λouter.
+        λinner.
+          λbounded.
+            absurd (bounded_walk_zero_impossible k (relation_ord_leq k d) r x y bounded);
+    Suc n ↦
+      λouter.
+        λinner.
+          λbounded.
+            elim_trunc
+              (Equal Bool (reachable_within k (relation_ord_leq k d) (Suc n) x y r) True)
+              (λwitness.
+                match witness {
+                  MkBoundedRelationWalk vertices valid length_bound ↦
+                    reachable_within_complete_successor
+                      k
+                      d
+                      r
+                      n
+                      x
+                      y
+                      vertices
+                      (λstored.
+                        λtail. reachable_within_complete k d r n stored y outer inner tail)
+                      valid
+                      length_bound
+                })
+              bounded
+  }
 
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
@@ -18576,8 +19062,17 @@ recursive assembly (every law's own top-level `fn`, §4.1–§4.6, §4.7.5–§4
 and successor-set equality for composition (`compose_successors_union` and
 `compose_member_union`, §4.7.12). The composition proof uses outer `Ordered`
 and `Distinct` plus reflexivity and transitivity witnesses for the shared
-comparator; it does not establish the general converse membership equivalence
-or closure faithfulness and saturation.
+comparator; it does not establish the general converse membership equivalence.
+
+The bounded-reachability family (§4.7.12) independently checks a nonempty
+vertex list with `relation_walk_bool`, carrying its certificate in the private
+Type-level `RelationWalk`/`BoundedRelationWalk` constructors and exposing only
+their truncations as propositions. `reachable_within_sound` and
+`reachable_within_complete` establish both directions at every fuel. The
+ordered-successor lookup, all-keys membership, and parameter-step fold lemmas
+relate each visited successor to the same lookup-defined edge. This bounded
+correspondence does not prove full-closure faithfulness or saturation at
+`size (dom r)`; those obligations remain separate.
 
 **Consumers.** The selectively importable closure surface serves programs
 parameterized over abstract `Tree` values. The broader checked theory remains
