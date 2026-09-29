@@ -76,6 +76,12 @@ Each case below carries the non-conforming implementation it must red.
 - given: the revocation observable reached through a path/capability operation
   (`IOError.Revoked`), a resource-token operation (`ResourceError.Revoked`), and
   the host-boundary progress/error partition.
+- fixture: **GATED on source/spec shape mismatch** — this seed and `38 §1.3.1`
+  name nullary `ResourceError.Revoked`; landed
+  `crates/ken-elaborator/src/prelude.rs:1664` and
+  `crates/ken-elaborator/tests/px9_revoked_unification.rs:127` use
+  `ResourceHostIO Revoked`. Keep this case gated until the spec and source
+  agree on the resource revocation constructor.
 - expect: all three resolve to **one** `Revoked` semantic identity, classified
   `Permanent`; the conforming surface exposes exactly one `Revoked`, and the
   check names that single identity.
