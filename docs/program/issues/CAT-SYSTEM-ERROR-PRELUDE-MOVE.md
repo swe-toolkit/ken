@@ -121,5 +121,8 @@ Landed `e5cd36c54` (PR #4343; candidate `4ad7a039b`; Foundation QA
   Transient` fails the Revoked law.
 - Carries: the package's ambient `And`, `and_intro`, `Prod` and `MkProd`
   join `CAT-AND-SORTED-PRELUDE-MOVE`'s consumer inventory. The conformance
-  seed refresh (above) goes to the Spec enclave. The Revoked law sits before
+  seed refresh landed `0eaf30352` (PR #4349; Spec APPROVE
+  `evt_2rs5ptxrf39gb`, Decision `dec_485sgghjdrwfn`). It is
+  conformance-only, and the revoked-single-identity case is gated on the
+  `ResourceError.Revoked` versus `ResourceHostIO Revoked` question. The Revoked law sits before
   `error_transience` on purpose; forward references to functions check.
