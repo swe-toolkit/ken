@@ -540,45 +540,107 @@ fn json_and_all_six_constructors_are_real_globals() {
 #[test]
 fn json_size_consumes_array_and_pair_nested_object_results() {
     // Durable invariant (D3+ nested-fold floor).
-    // MEASURED: the production Json fold evaluates a mixed object/array value
-    // to the literal five-node result. CLAIMED: both the direct List Json and
-    // nested List (Pair String Json) recursive results are consumed through the
-    // checked carrier. THE GAP: this establishes the unbounded structural fold,
-    // not the separately blocked JsonNumber formatter or the complete codec.
-    let (mut env, _) = json_env();
-    catalog_or::expose_module(&mut env, JSON_MODULE);
-    env.elaborate_file(
-        r#"
-        const ds9_nested_size_value : Json =
-          JsonObject
-            (Cons
-              (Pair String Json)
-              (mk_pair
-                String
-                Json
-                "array"
-                (JsonArray
-                  (Cons
-                    Json
-                    JsonNull
-                    (Cons Json (JsonBool True) (Nil Json)))))
-              (Cons
-                (Pair String Json)
-                (mk_pair String Json "leaf" (JsonString "x"))
-                (Nil (Pair String Json))))
+    // MEASURED: the checked Json-owner example evaluates the real private fold
+    // on a mixed object/array to five nodes. CLAIMED: the direct List Json and
+    // nested List (Pair String Json) results both contribute through the checked
+    // carrier. THE GAP: one concrete nested value does not establish every
+    // recursive case, the blocked JsonNumber formatter, or the complete codec.
+    fn mentions(term: &Term, expected: GlobalId) -> bool {
+        let here = match term {
+            Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. } => {
+                *id == expected
+            }
+            Term::Elim { fam, .. } => *fam == expected,
+            _ => false,
+        };
+        here || term
+            .children()
+            .iter()
+            .any(|child| mentions(child, expected))
+    }
 
-        const ds9_nested_size_result : Nat = json_size ds9_nested_size_value
-        "#,
-    )
-    .expect("production Json array/object fold must elaborate from the package");
+    let (mut env, trusted_before) = json_env();
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], JSON_MODULE)
+        .expect("the checked Json owner must retain its identities");
+    let json_size = catalog_or::provider_owned_id(&env, &owned, JSON_MODULE, "json_size")
+        .expect("the Json provider must own its private size fold");
+    let json = catalog_or::provider_owned_id(&env, &owned, JSON_MODULE, "Json")
+        .expect("the Json provider must own its carrier");
+    let constructors = env
+        .env
+        .inductive(json)
+        .expect("Json must be an inductive family")
+        .constructors
+        .iter()
+        .map(|constructor| constructor.id)
+        .collect::<Vec<_>>();
+    let array = catalog_or::provider_owned_id(&env, &constructors, JSON_MODULE, "JsonArray")
+        .expect("JsonArray must belong to the owned Json carrier");
+    let object = catalog_or::provider_owned_id(&env, &constructors, JSON_MODULE, "JsonObject")
+        .expect("JsonObject must belong to the owned Json carrier");
 
-    assert_transparent_global(&env, "Data.Serialization.Json.json_size");
+    env.execute_loaded_entry_checked_fences(JSON_MODULE)
+        .expect("Json's nested-size example must check in its defining module");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trusted_before,
+        "the Json example must not extend the trusted base"
+    );
+    assert_eq!(
+        env.elaborate_module_from_roots(&[catalog_or::catalog_root()], JSON_MODULE)
+            .expect("Json's owned population must remain available after its examples"),
+        owned,
+        "Json examples must not change its provider-owned population"
+    );
+    let example = "json_example_nested_structure_size";
+    let example_id = *env
+        .globals
+        .get(example)
+        .expect("the checked Json example must elaborate");
+    assert!(
+        !owned.contains(&example_id),
+        "the example must not be owned by Json"
+    );
+    assert!(
+        !env.globals
+            .contains_key(&format!("{JSON_MODULE}.{example}")),
+        "the example must not be published as a Json declaration"
+    );
+    let (_, body) = env
+        .env
+        .transparent_body(example_id)
+        .expect("the checked Json example must have a transparent body");
+    assert!(
+        mentions(&body, json_size),
+        "the example must call the owned json_size"
+    );
+    assert!(
+        mentions(&body, object),
+        "the example must construct an object"
+    );
+    assert!(
+        mentions(&body, array),
+        "the example must construct a nested array"
+    );
+    for scalar in ["JsonNull", "JsonBool", "JsonString"] {
+        let id = catalog_or::provider_owned_id(&env, &constructors, JSON_MODULE, scalar)
+            .unwrap_or_else(|error| panic!("{scalar} must belong to Json: {error}"));
+        assert!(mentions(&body, id), "the example must include {scalar}");
+    }
+
+    for private in ["json_size", example] {
+        match env.elaborate_file(&format!("import {JSON_MODULE} ({private})")) {
+            Err(ElabError::UnboundName { name, .. }) => {
+                assert_eq!(name, format!("{JSON_MODULE}.{private}"));
+            }
+            other => panic!("{JSON_MODULE}.{private} must remain private, got {other:?}"),
+        }
+    }
+
     let mut store = make_store(&env);
     assert_eq!(
-        nat_count(
-            &env,
-            &eval_global(&env, &mut store, "ds9_nested_size_result")
-        ),
+        nat_count(&env, &eval(&[], &body, &env.env, &mut store)),
         5,
         "Json size must count the object, array, and three scalar child nodes"
     );
