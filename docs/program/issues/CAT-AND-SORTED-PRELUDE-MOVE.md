@@ -45,6 +45,9 @@ through the prelude fall-through.
   `And`/`and_fst`/`and_snd` from `CAT-LOGIC-PRELUDE-MOVE`. It is the census's
   baseline-red residual (`lang_mod_strict_resolution_d0.rs`), so the census
   cannot see its names.
+- **Known consumer.** `Capability.System.Error` uses the ambient `And`,
+  `and_intro`, `Prod` and `MkProd` (its strict-resolution census row, from
+  `CAT-SYSTEM-ERROR-PRELUDE-MOVE`; Architect `evt_6qgpyh2yqeexa`).
 - **Out of scope.** The prelude registrations stay until the L2 flip; there
   is no `crates/` change except test expectations. `sort` and its obligation
   also stay out of scope unless D0 rules that they must move with
