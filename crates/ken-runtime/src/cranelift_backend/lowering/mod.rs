@@ -12734,6 +12734,18 @@ impl<'a> Lowering<'a> {
             .active_recursive_invocations
             .last()
             .map_or(0, |instance| instance.invocation_instance_id);
+        // D8n's test-only old-lifecycle control must also restore the old
+        // insert-time detector. Production checks the finished Function's
+        // event paths instead; this is not its runtime-path uniqueness gate.
+        #[cfg(test)]
+        if core::d8n_compile_wide_lifecycle()
+            && !self.consumed_subcontinuation_frames.insert((invocation_id, frame_id))
+        {
+            return Err(unsupported(
+                "OrientedSubcontinuationPlanV1",
+                "checked Runtime frame marker was consumed more than once",
+            ));
+        }
         self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
             "OrientedSubcontinuationPlanV1",
             "checked Runtime frame receipt emitted outside a generated Function scope",

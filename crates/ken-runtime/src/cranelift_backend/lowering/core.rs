@@ -1727,7 +1727,10 @@ fn d8m_foreign_consumed_shape() -> bool {
 
 
 
-/// **`D8n`** — restore the compile-wide consumed-frame lifetime.
+/// **`D8n`** — restore the old compile-wide lifetime and insert-time gate.
+/// Both halves are required: the finished-Function validator deliberately no
+/// longer reads the consumed set, so sharing it without restoring its old
+/// refusal would leave the historical negative mutation inert.
 #[cfg(test)]
 thread_local! {
     static D8N_COMPILE_WIDE_LIFECYCLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -1739,7 +1742,7 @@ pub(in crate::cranelift_backend) fn set_d8n_compile_wide_lifecycle(armed: bool) 
 }
 
 #[cfg(test)]
-fn d8n_compile_wide_lifecycle() -> bool {
+pub(super) fn d8n_compile_wide_lifecycle() -> bool {
     D8N_COMPILE_WIDE_LIFECYCLE.with(std::cell::Cell::get)
 }
 
@@ -1883,10 +1886,10 @@ impl CheckedFrameFunctionScope {
             ));
         }
         compiler.checked_frame_events = Some(FrameEvents::default());
-        // ⛔ `D8n` — the OLD lifecycle, restored under test: the set is shared
-        // compile-wide instead of starting empty per function. It is the exact
-        // pre-`D8n` behaviour, not an invented corruption, so the refusal it
-        // brings back is the one this checkpoint repaired.
+        // ⛔ `D8n` test mutation: share the set compile-wide instead of
+        // starting empty per Function. The same mutation restores the old
+        // insert-time refusal at the central receipt seam; sharing alone no
+        // longer refuses now that the validator reads finished-Function events.
         #[cfg(test)]
         if d8n_compile_wide_lifecycle() {
             return Ok(Self {
