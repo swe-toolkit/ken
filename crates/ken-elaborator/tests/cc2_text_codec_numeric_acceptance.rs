@@ -56,18 +56,18 @@ fn load_derived_dependencies(env: &mut ElabEnv) -> Vec<GlobalId> {
     diagnostic_owned
 }
 
-fn full_env() -> ElabEnv {
+fn full_env() -> (ElabEnv, Vec<GlobalId>) {
     let mut env = dependency_env();
     env.elaborate_ken_md_file(STRING_BIJECTION_KEN_MD)
         .expect("StringBijection prerequisite must elaborate");
     env.elaborate_ken_md_file(STRING_KEYS_KEN_MD)
         .expect("StringKeys must elaborate");
-    load_derived_dependencies(&mut env);
+    let diagnostic_owned = load_derived_dependencies(&mut env);
     env.elaborate_ken_md_file(CODEC_KEN_MD)
         .expect("Codec must elaborate");
     env.elaborate_ken_md_file(NUMERIC_KEN_MD)
         .expect("Numeric must elaborate");
-    env
+    (env, diagnostic_owned)
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -481,13 +481,42 @@ fn located_numeric_discriminators_and_codec_boundary_are_checked() {
         "String ordering must be lexicographic"
     );
 
-    let mut env = full_env();
+    let (mut env, diagnostic_owned) = full_env();
     for declaration in [
         "const cc2_string_key_equal_compute : Bool = list_eq Char eqChar (string_to_list_char \"alpha\") (string_to_list_char \"alpha\")",
         "const cc2_string_key_distinct_compute : Bool = list_eq Char eqChar (string_to_list_char \"alpha\") (string_to_list_char \"beta\")",
     ] {
         env.elaborate_decl(declaration)
             .expect("equivalent String-key discriminator must elaborate");
+    }
+    let diagnostic_provider = "Capability.Diagnostics.Core";
+    let owned_diagnostic_constructor = |family: &str, name: &str| {
+        let family_id =
+            catalog_or::provider_owned_id(&env, &diagnostic_owned, diagnostic_provider, family)
+                .unwrap_or_else(|error| panic!("{family} must be Diagnostics.Core-owned: {error}"));
+        // Constructors inherit ownership from their checked parent data declaration.
+        let constructor_ids: Vec<_> = env
+            .env
+            .inductive(family_id)
+            .expect("the owned constructor parent must be an inductive")
+            .constructors
+            .iter()
+            .map(|constructor| constructor.id)
+            .collect();
+        catalog_or::provider_owned_id(&env, &constructor_ids, diagnostic_provider, name)
+            .unwrap_or_else(|error| {
+                panic!("{name} must be a constructor of provider-owned {family}: {error}")
+            })
+    };
+    let mk_diagnostic_id = owned_diagnostic_constructor("Diagnostic", "MkDiagnostic");
+    let argument_origin_id = owned_diagnostic_constructor("Origin", "ArgumentOrigin");
+    let mk_byte_range_id = owned_diagnostic_constructor("ByteRange", "MkByteRange");
+    let mk_diagnostic_code_id = owned_diagnostic_constructor("DiagnosticCode", "MkDiagnosticCode");
+    fn owned_ctor_args(value: &EvalVal, expected: GlobalId) -> &[EvalVal] {
+        match value {
+            EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
+            other => panic!("expected provider-owned constructor {expected:?}, got {other:?}"),
+        }
     }
     let mut store = make_store(&env);
 
@@ -529,21 +558,13 @@ fn located_numeric_discriminators_and_codec_boundary_are_checked() {
     ] {
         let result = eval_global(&env, &mut store, name);
         let diagnostic = ctor_args(&env, &result, "Err").last().unwrap();
-        let fields = ctor_args(&env, diagnostic, "Capability.Diagnostics.Core.MkDiagnostic");
-        let origin = ctor_args(
-            &env,
-            &fields[0],
-            "Capability.Diagnostics.Core.ArgumentOrigin",
-        );
+        let fields = owned_ctor_args(diagnostic, mk_diagnostic_id);
+        let origin = owned_ctor_args(&fields[0], argument_origin_id);
         assert_eq!(nat_count(&env, &origin[0]), 2);
-        let range = ctor_args(&env, &origin[1], "Capability.Diagnostics.Core.MkByteRange");
+        let range = owned_ctor_args(&origin[1], mk_byte_range_id);
         assert_eq!(nat_count(&env, &range[0]), expected_position);
         assert_eq!(nat_count(&env, &range[1]), expected_position);
-        let code = ctor_args(
-            &env,
-            &fields[1],
-            "Capability.Diagnostics.Core.MkDiagnosticCode",
-        );
+        let code = owned_ctor_args(&fields[1], mk_diagnostic_code_id);
         assert_eq!(code.last(), Some(&EvalVal::Str(expected_code.into())));
     }
 
