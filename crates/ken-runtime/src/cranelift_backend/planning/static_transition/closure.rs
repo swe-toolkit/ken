@@ -1453,16 +1453,17 @@ impl<'src> StaticTransitionPlan<'src> {
     /// ⛔ **Fails closed on a missing descriptor** rather than skipping the
     /// edge: a dropped call edge is a unit that is never called, which is
     /// silent at emission and wrong at run time.
-    /// ⛔ **The owner classification is NOT named here**, and that is enforced:
-    /// `the_owner_classification_has_a_closed_production_naming_inventory` reds
-    /// if this file starts spelling `SemanticOwner`. ⇒ The `StaticBody` walk
-    /// lives in `semantic_ir.rs`, beside the validation that makes it sound, and
-    /// this method only wraps the resulting id pairs in the emitter's view type.
+    /// The owner classification is not named here. The former naming-inventory
+    /// test is retired; this boundary is Architect-review-owned, not guarded by
+    /// a live source-text test. See
+    /// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`. The `StaticBody`
+    /// walk lives in `semantic_ir.rs`, beside the validation that makes it
+    /// sound; this method only wraps the resulting id pairs in the emitter's
+    /// view type.
     ///
-    /// ⭐ That pin caught a real defect in this deliverable's first draft, which
-    /// destructured `SemanticOwner::Function(..)` right here — a third file
-    /// naming the classification is how a second, divergent classification
-    /// authority starts.
+    /// The retired inventory caught a first-draft duplicate classifier here.
+    /// That history explains the review boundary; it is not a claim of a
+    /// surviving mechanical pin.
     /// **`RT-CONTSPEC-ACTIVATE` `D1b` — the source-body binding, beside
     /// `emittable_call_edges` and never widening its filter.**
     ///

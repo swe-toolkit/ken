@@ -2179,11 +2179,11 @@ impl SemanticPlane {
     /// those validated facts; it does not re-decide them, and it must never grow
     /// an arm that competes with the partition.
     ///
-    /// ⛔ **Deliberately kept out of `static_transition.rs`.** Spelling
-    /// `SemanticOwner` in a third production file is how a second classification
-    /// authority begins, and
-    /// `the_owner_classification_has_a_closed_production_naming_inventory`
-    /// reddens on exactly that.
+    /// Keep the owner classification out of `static_transition.rs`: naming
+    /// `SemanticOwner` in another production file risks a second classifier.
+    /// The former source-text naming inventory is retired, so this boundary is
+    /// Architect-review-owned, not guarded by a live source scan. See
+    /// `docs/program/issues/TEST-SOURCE-TEXT-ORACLE-RETIRE.md`.
     ///
     /// ⛔ Fails closed on an endpoint with no descriptor, and on a `StaticBody`
     /// edge that does not join two function units. ⚠ The latter is unreachable
@@ -2196,7 +2196,8 @@ impl SemanticPlane {
     /// ⭐ Exposed from here, and only from here, because the answer is a
     /// statement about the **owner classification** — and that classification
     /// has exactly one home. `static_transition.rs` must not spell
-    /// `SemanticOwner`; the standing source tripwire reds if it starts.
+    /// `SemanticOwner`; the retired tripwire no longer guards that restriction,
+    /// which remains Architect-review-owned.
     pub(super) fn is_declaration_owned_static_body(
         &self,
         edge: &StaticEdge,
