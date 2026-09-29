@@ -651,7 +651,13 @@ fn escape_resource_plus_plain_matches_interpreter() {
 // executing the row does not discharge the skip.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-IGNORED-ROWS-NEXT-GROUP A5: after the occurrence repair, first refusal is unsupported runtime-IR lowering: ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor; stays ignored until that independent blocker is repaired and the native/interpreter differential runs"]
+// RT-NATIVE-TREE-MATCH D1, 2026-09-28: this ignored row overflows its libtest
+// default thread; a scratch-only stated 256 MiB diagnostic (RUST_MIN_STACK
+// removed) instead reaches continuation origin 329 under PredeclaredFunctionId(4).
+// D2 terminated at 16, 64 and 256 MiB; 16 MiB is a termination bound, not a
+// measured peak. No candidate stack is provisioned without a measured peak
+// and numeric headroom. This refusal is not a native-execution observation.
+#[ignore = "RT-NATIVE-TREE-MATCH D1: first ObjectEmission refusal is BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1; continuation origin 329, PredeclaredFunctionId(4); RT-NATIVE-SEQUENTIAL-BRACKETS AC-0 owns this witness, pending site-identity check"]
 fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
     // Pre-fix: this panicked in `build_native_program` with
     // "checked Runtime frame marker was consumed more than once". The fork/union
@@ -711,7 +717,7 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-IGNORED-ROWS-NEXT-GROUP A5: after the occurrence repair, first refusal is unsupported runtime-IR lowering: ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor; stays ignored until that independent blocker is repaired and the native/interpreter differential runs"]
+#[ignore = "RT-NATIVE-TREE-MATCH D1: first ObjectEmission refusal is a carried `Match` arm source join StaticOriginId(1244) planned native scalar lanes but lowering produced a carried boundary word; arm origin 1241, PredeclaredFunctionId(6); RT-JOIN-PHASE-CASE-BINDER-CARRIED AC-0 owns this witness, not native parity"]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     // Closure across the bounded-Nat fanout lowerer: an escaped-resource checked
     // frame in the shared continuation of a `match n {Zero;Suc}` fanout. Pre-fix

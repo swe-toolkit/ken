@@ -33,6 +33,39 @@ use super::calls::{recursive_position_unit_calls, RECURSIVE_POSITION_UNIT_CALLS}
 // production caller in this file -- only its `tests` subtree does -- so it
 // is imported in `tests/mod.rs` instead (AC-8 class 2), not here.
 
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static EXIT_CODE_CASE_OF_CASE_ROUTES: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn note_exit_code_case_of_case_route() {
+    EXIT_CODE_CASE_OF_CASE_ROUTES.with(|routes| {
+        let count = routes.get() + 1;
+        routes.set(count);
+        if std::env::var_os("RT_TREE_ROUTE_CENSUS").is_some() {
+            eprintln!("RT_TREE_ROUTE_CENSUS hit={count}");
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[doc(hidden)]
+pub fn with_exit_code_case_of_case_route_count<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    struct Restore(usize);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            EXIT_CODE_CASE_OF_CASE_ROUTES.with(|routes| routes.set(self.0));
+        }
+    }
+    let prior = EXIT_CODE_CASE_OF_CASE_ROUTES.with(|routes| routes.replace(0));
+    let _restore = Restore(prior);
+    let result = operation();
+    let count = EXIT_CODE_CASE_OF_CASE_ROUTES.with(std::cell::Cell::get);
+    (result, count)
+}
+
 mod primitive;
 
 #[cfg(test)]
@@ -6366,6 +6399,56 @@ impl<'a> Lowering<'a> {
                 &composed,
             );
         }
+        // An inner Match whose outer constructor family cannot survive a
+        // NativeScalarPair join must meet the outer producer while each arm
+        // still carries its constructor. Bool and Nat retain their existing
+        // scalar route; neither an exit projection nor a scalar refusal can
+        // recover the other constructors after a standalone join.
+        if let RuntimeExpr::Match {
+            scrutinee: inner,
+            cases: inner_cases,
+            default: inner_default,
+        } = scrutinee.expr
+        {
+            let symbols = &self.process_symbols;
+            let all_in = |family: &[&RuntimeSymbol]| {
+                producer_cases
+                    .iter()
+                    .all(|case| family.iter().any(|symbol| &case.constructor == *symbol))
+            };
+            let outer_needs_composition = !producer_cases.is_empty()
+                && !all_in(&[&symbols.bool_true, &symbols.bool_false])
+                && !all_in(&[&symbols.nat_zero, &symbols.nat_suc]);
+            if outer_needs_composition {
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                note_exit_code_case_of_case_route();
+                let inner_scrutinee = self.child_occurrence(scrutinee.static_origin, 0, inner)?;
+                let mut composed = Vec::with_capacity(eliminators.len() + 2);
+                composed.push(EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                    cases: inner_cases,
+                    default: inner_default,
+                    env: producer_env,
+                    static_origin: scrutinee.static_origin,
+                    retained_scrutinee_index: None,
+                    deferred_constructor_case: None,
+                }));
+                composed.push(EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                    cases: producer_cases,
+                    default: producer_default,
+                    env: producer_env,
+                    static_origin,
+                    retained_scrutinee_index: None,
+                    deferred_constructor_case: None,
+                }));
+                composed.extend_from_slice(eliminators);
+                return self.lower_computational_producer_expr(
+                    builder,
+                    inner_scrutinee,
+                    producer_env,
+                    &composed,
+                );
+            }
+        }
         let selected = self.lower_expr(builder, scrutinee, producer_env)?;
         if let LoweringOperand::Carried(word) = selected {
             return self.lower_carried_match(
@@ -11881,6 +11964,15 @@ impl<'a> Lowering<'a> {
         } else {
             lowered
         };
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        if std::env::var_os("RT_TREE_DETACHED_CENSUS").is_some() {
+            eprintln!(
+                "RT_TREE_DETACHED_CENSUS residual={} owner={:?} function={:?}",
+                residual.len(),
+                self.defining_emission_owner,
+                self.defining_function_id,
+            );
+        }
         let edge = match residual.as_slice() {
             [] => return Ok(lowered),
             [edge] => *edge,
