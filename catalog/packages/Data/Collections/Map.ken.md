@@ -17706,6 +17706,199 @@ theorem source_repeat_split
       source_repeat_split_cons k rest leq source at (source_repeat_split k leq source rest)
   }
 
+theorem strict_source_splice_length
+      (k : Type) (prefix : List k) (repeat : k) (next : k) (rest : List k)
+    : Equal Bool
+        (leq_nat
+          (Suc (length k (Cons k next rest)))
+          (length k (list_append k prefix (Cons k repeat (Cons k next rest)))))
+        True =
+  match prefix {
+    Nil ↦ (Ord_instance_Nat).refl (Suc (length k (Cons k next rest)));
+    Cons at tail ↦
+      leq_nat_right_successor
+        (Suc (length k (Cons k next rest)))
+        (length k (list_append k tail (Cons k repeat (Cons k next rest))))
+        (strict_source_splice_length k tail repeat next rest)
+  }
+
+data ShorterRelationWalk
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (original : List k)
+    : Type
+    where {
+  MkShorterRelationWalk :
+    (vertices : List k)
+    → Equal Bool (relation_walk_bool k leq r source target vertices) True
+    → Equal Bool (leq_nat (Suc (length k vertices)) (length k original)) True
+    → ShorterRelationWalk k leq r source target original
+}
+
+fn shorter_walk
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (original : List k)
+    : Omega =
+  ‖ ShorterRelationWalk k leq r source target original ‖
+
+theorem shorter_walk_prefix
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (at : k)
+      (target : k)
+      (original_tail : List k)
+    : rel_member k leq source at r
+      → shorter_walk k leq r at target original_tail
+      → shorter_walk k leq r source target (Cons k at original_tail) =
+  λedge.
+    λtail.
+      elim_trunc
+        (shorter_walk k leq r source target (Cons k at original_tail))
+        (λwalk.
+          match walk {
+            MkShorterRelationWalk vertices valid strict ↦
+              trunc_intro
+                (MkShorterRelationWalk
+                  k
+                  leq
+                  r
+                  source
+                  target
+                  (Cons k at original_tail)
+                  (Cons k at vertices)
+                  (relation_walk_prefix k leq r source at target vertices edge valid)
+                  strict)
+          })
+        tail
+
+theorem shorter_walk_original_transport
+      (k : Type)
+      (leq : k → k → Bool)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (vertices : List k)
+      (before : List k)
+    : Equal (List k) vertices before
+      → shorter_walk k leq r source target before
+      → shorter_walk k leq r source target vertices =
+  λequation.
+    λprior.
+      elim_trunc
+        (shorter_walk k leq r source target vertices)
+        (λwalk.
+          match walk {
+            MkShorterRelationWalk shortened valid strict ↦
+              trunc_intro
+                (MkShorterRelationWalk
+                  k
+                  leq
+                  r
+                  source
+                  target
+                  vertices
+                  shortened
+                  valid
+                  (trans
+                    Bool
+                    (leq_nat (Suc (length k shortened)) (length k vertices))
+                    (leq_nat (Suc (length k shortened)) (length k before))
+                    True
+                    (cong
+                      (List k)
+                      Bool
+                      vertices
+                      before
+                      (λxs. leq_nat (Suc (length k shortened)) (length k xs))
+                      equation)
+                    strict))
+          })
+        prior
+
+theorem source_repeat_shortens_strict
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (vertices : List k)
+    : ‖ SourceRepeatSplit k (relation_ord_leq k d) source vertices ‖
+      → Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
+      → shorter_walk k (relation_ord_leq k d) r source target vertices =
+  λsplits.
+    λvalid.
+      elim_trunc
+        (shorter_walk k (relation_ord_leq k d) r source target vertices)
+        (λsplit.
+          match split {
+            MkSourceRepeatSplit prefix repeat next rest equation equivalent ↦
+              let
+                leq = relation_ord_leq k d;
+                tail = Cons k next rest;
+                previous = list_append k prefix (Cons k repeat tail);
+                previous_valid =
+                  trans
+                    Bool
+                    (relation_walk_bool k leq r source target previous)
+                    (relation_walk_bool k leq r source target vertices)
+                    True
+                    (cong
+                      (List k)
+                      Bool
+                      previous
+                      vertices
+                      (λxs. relation_walk_bool k leq r source target xs)
+                      (sym (List k) vertices previous equation))
+                    valid;
+                strict =
+                  trans
+                    Bool
+                    (leq_nat (Suc (length k tail)) (length k vertices))
+                    (leq_nat (Suc (length k tail)) (length k previous))
+                    True
+                    (cong
+                      (List k)
+                      Bool
+                      vertices
+                      previous
+                      (λxs. leq_nat (Suc (length k tail)) (length k xs))
+                      equation)
+                    (strict_source_splice_length k prefix repeat next rest)
+              in
+                trunc_intro
+                  (MkShorterRelationWalk
+                    k
+                    leq
+                    r
+                    source
+                    target
+                    vertices
+                    tail
+                    (relation_walk_splice_source
+                      k
+                      d
+                      r
+                      prefix
+                      source
+                      repeat
+                      next
+                      rest
+                      target
+                      equivalent
+                      previous_valid)
+                    strict)
+          })
+        splits
+
 theorem source_repeat_shortens_walk
       (k : Type)
       (d : Ord k)
@@ -17927,14 +18120,15 @@ theorem walk_repeat_shorten_tail
         Bool
         (relation_walk_bool k (relation_ord_leq k d) r at target (Cons k next rest))
         True
-        → positive_walk
+        → shorter_walk
         k
         (relation_ord_leq k d)
         r
         at
-        target)
+        target
+        (Cons k next rest))
     : Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
-      → positive_walk k (relation_ord_leq k d) r source target =
+      → shorter_walk k (relation_ord_leq k d) r source target vertices =
   λvalid.
     let
       leq = relation_ord_leq k d;
@@ -17960,9 +18154,10 @@ theorem walk_repeat_shorten_tail
           (relation_walk_bool k leq r at target nonempty)
           witnessed;
       later = relation_walk_tail k leq r source at next rest target witnessed;
-      shorter = tail_shorten later
+      shorter = tail_shorten later;
+      prefixed = shorter_walk_prefix k leq r source at target nonempty edge shorter
     in
-      positive_walk_prefix k leq r source at target edge shorter
+      shorter_walk_original_transport k leq r source target vertices original equation prefixed
 
 theorem walk_repeat_shortens
       (k : Type)
@@ -17973,11 +18168,11 @@ theorem walk_repeat_shortens
       (vertices : List k)
       (repeat : WalkRepeat k (relation_ord_leq k d) source vertices)
     : Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
-      → positive_walk k (relation_ord_leq k d) r source target =
+      → shorter_walk k (relation_ord_leq k d) r source target vertices =
   match repeat {
     MkWalkRepeatHead split ↦
       λvalid.
-        source_repeat_shortens_walk k d r source target vertices (trunc_intro split) valid;
+        source_repeat_shortens_strict k d r source target vertices (trunc_intro split) valid;
     MkWalkRepeatTail at next rest equation tail_repeat ↦
       walk_repeat_shorten_tail
         k
@@ -17992,6 +18187,200 @@ theorem walk_repeat_shortens
         equation
         (walk_repeat_shortens k d r at target (Cons k next rest) tail_repeat)
   }
+
+theorem walk_repeat_shorten_detected
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (vertices : List k)
+    : Equal Bool (walk_repeats_nonterminal k (relation_ord_leq k d) source vertices) True
+      → Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
+      → shorter_walk k (relation_ord_leq k d) r source target vertices =
+  λdetected.
+    λvalid.
+      elim_trunc
+        (shorter_walk k (relation_ord_leq k d) r source target vertices)
+        (λrepeat. walk_repeat_shortens k d r source target vertices repeat valid)
+        (walk_repeat_split k (relation_ord_leq k d) source vertices detected)
+
+fn bool_truth_cases (b : Bool) : Or (Equal Bool b False) (Equal Bool b True) =
+  match b {
+    False ↦ Inl (Equal Bool False False) (Equal Bool False True) Proved;
+    True ↦ Inr (Equal Bool True False) (Equal Bool True True) Proved
+  }
+
+data SimpleRelationWalk
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : Type
+    where {
+  MkSimpleRelationWalk :
+    (vertices : List k)
+    → Equal Bool (relation_walk_bool k leq r source target vertices) True
+    → Equal Bool (walk_repeats_nonterminal k leq source vertices) False
+    → SimpleRelationWalk k leq r source target
+}
+
+fn simple_walk
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : Omega =
+  ‖ SimpleRelationWalk k leq r source target ‖
+
+theorem walk_simple_with_fuel_repeat
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (source : k)
+      (target : k)
+      (fuel : Nat)
+      (vertices : List k)
+      (tail_complete : (shortened : List k)
+        → Equal
+        Bool
+        (relation_walk_bool k (relation_ord_leq k d) r source target shortened)
+        True
+        → Equal
+        Bool
+        (leq_nat (length k shortened) fuel)
+        True
+        → simple_walk
+        k
+        (relation_ord_leq k d)
+        r
+        source
+        target)
+    : Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
+      → Equal Bool (leq_nat (length k vertices) (Suc fuel)) True
+      → Equal Bool (walk_repeats_nonterminal k (relation_ord_leq k d) source vertices) True
+      → simple_walk k (relation_ord_leq k d) r source target =
+  λvalid.
+    λbounded.
+      λdetected.
+        elim_trunc
+          (simple_walk k (relation_ord_leq k d) r source target)
+          (λshorter.
+            match shorter {
+              MkShorterRelationWalk shortened short_valid strict ↦
+                tail_complete
+                  shortened
+                  short_valid
+                  ((Ord_instance_Nat).trans
+                    (Suc (length k shortened))
+                    (length k vertices)
+                    (Suc fuel)
+                    strict
+                    bounded)
+            })
+          (walk_repeat_shorten_detected k d r source target vertices detected valid)
+
+theorem walk_simple_with_fuel
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (source : k) (target : k) (fuel : Nat)
+    : (vertices : List k)
+      → Equal Bool (relation_walk_bool k (relation_ord_leq k d) r source target vertices) True
+      → Equal Bool (leq_nat (length k vertices) fuel) True
+      → simple_walk k (relation_ord_leq k d) r source target =
+  match fuel {
+    Zero ↦
+      λvertices.
+        match vertices {
+          Nil ↦ λvalid. λbounded. absurd valid;
+          Cons at rest ↦ λvalid. λbounded. absurd bounded
+        };
+    Suc remaining ↦
+      λvertices.
+        λvalid.
+          λbounded.
+            match bool_truth_cases
+              (walk_repeats_nonterminal k (relation_ord_leq k d) source vertices) {
+              Inl absent ↦
+                trunc_intro
+                  (MkSimpleRelationWalk
+                    k
+                    (relation_ord_leq k d)
+                    r
+                    source
+                    target
+                    vertices
+                    valid
+                    absent);
+              Inr present ↦
+                walk_simple_with_fuel_repeat
+                  k
+                  d
+                  r
+                  source
+                  target
+                  remaining
+                  vertices
+                  (walk_simple_with_fuel k d r source target remaining)
+                  valid
+                  bounded
+                  present
+            }
+  }
+
+theorem positive_walk_shortens_to_simple
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : positive_walk k (relation_ord_leq k d) r source target
+      → simple_walk k (relation_ord_leq k d) r source target =
+  λpath.
+    elim_trunc
+      (simple_walk k (relation_ord_leq k d) r source target)
+      (λwalk.
+        match walk {
+          MkRelationWalk vertices valid ↦
+            walk_simple_with_fuel
+              k
+              d
+              r
+              source
+              target
+              (length k vertices)
+              vertices
+              valid
+              ((Ord_instance_Nat).refl (length k vertices))
+        })
+      path
+
+fn relation_option_targets (k : Type) (found : Option (Tree k Unit)) : Tree k Unit =
+  match found {
+    None ↦ empty k Unit;
+    Some targets ↦ targets
+  }
+
+fn relation_option_present (k : Type) (found : Option (Tree k Unit)) : Bool =
+  match found {
+    None ↦ False;
+    Some targets ↦ True
+  }
+
+theorem relation_source_member_case
+      (k : Type) (leq : k → k → Bool) (target : k) (found : Option (Tree k Unit))
+    : Equal Bool (set_member k leq target (relation_option_targets k found)) True
+      → Equal Bool (relation_option_present k found) True =
+  match found {
+    None ↦ λedge. absurd edge;
+    Some targets ↦ λedge. Proved
+  }
+
+theorem relation_source_member
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : rel_member k leq source target r → Equal Bool (member k (Tree k Unit) leq source r) True =
+  λedge. relation_source_member_case k leq target (lookup k (Tree k Unit) leq source r) edge
+
+theorem relation_source_in_dom
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : rel_member k leq source target r
+      → Equal Bool (set_member k leq source (dom k (Tree k Unit) r)) True =
+  λedge.
+    trans
+      Bool
+      (set_member k leq source (dom k (Tree k Unit) r))
+      (member k (Tree k Unit) leq source r)
+      True
+      (dom_preserves_membership k (Tree k Unit) leq source r)
+      (relation_source_member k leq r source target edge)
 
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
