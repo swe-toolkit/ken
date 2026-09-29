@@ -87,3 +87,12 @@ reader imports the package or is re-keyed to its owned ids.
   ABI or host key, is a stop to the Architect with its site.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## After landing
+
+- **Conformance carry, outside this WP** (Architect AC-0 ruling
+  `evt_5vmakg3p8qb7d`). `conformance/surface/ffi-io/seed-error-classification.md`
+  still carries `RED-UNTIL-BUILT` and `BLOCKED-ON-PX9-INC1` labels. When
+  this WP lands, the Steward routes the refresh to the Spec enclave: clear
+  the stale labels and name the `System.Error` module. That path belongs to
+  the enclave; Foundation does not edit it.
