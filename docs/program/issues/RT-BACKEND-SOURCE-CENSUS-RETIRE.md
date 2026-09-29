@@ -29,7 +29,7 @@ census guarded stay protected, each by its named replacement.
 
   | Consumer | Property | Disposition |
   |---|---|---|
-  | A `correspondence_adds_no_emitted_unit_to_the_production_census` (`:2709`) | emission only at census-listed units | replace with the behavioural counters `units::b2f_last_unit_emission` (`units.rs:210`) and `seed_material::b2f_last_seed_material_emission` (`seed_material.rs:118`). Its own doc calls the text census fail-open |
+  | A `correspondence_adds_no_emitted_unit_to_the_production_census` (`:2709`) | emission only at accounted units | an accounting pin over the compiled module's declarations, modelled on `artifact/tests.rs:87-196`; the two emission counters alone cannot carry it (Architect `evt_7bjtagzmf85ym`, correcting `evt_2ssnqgwmj2bce`) |
   | B `the_backend_production_surface_inventory_is_closed` (`:3869`) | the roster is the whole surface | retire; it exists only to close A, C, D and E |
   | C `the_entry_carrying_types_are_module_private` (`:4297`) | `PlannedExpr` and `StaticNodeId` stay private to `static_transition` | retire to Architect review (AC-0 ruling `evt_170pr1hbj2e8s`); no compile-fail pin |
   | D `no_collection_is_keyed_by_a_scheduling_entry` (`:4373`) | no body is selected, and no occurrence filed, by scheduling entry | narrowed to that hazard and carried by the planner's (b) `keying_selection_by_the_scheduling_entry_does_not_resolve_the_body` and (c) `filing_two_occurrences_under_one_origin_is_refused`, once AC-2 shows each reddens (`evt_170pr1hbj2e8s`) |
@@ -45,7 +45,7 @@ stop and report the mismatch; do not build around it.
 ## Deliverable
 
 `BACKEND_PRODUCTION_SOURCES` and its five consumers are deleted. A becomes a
-behavioural test over the emission counters. D is carried by the planner's
+declaration-accounting pin (AC-1a). D is carried by the planner's
 (b) and (c) controls. B, C and E retire, and each retirement is recorded in
 the test file's comments with a pointer to this frame. There is no
 production change.
@@ -59,23 +59,40 @@ production change.
 - **AC-1.** A behaviour-neutral production module addition, such as an empty
   `mod` in `lowering/` on a scratch branch, leaves every `ken-runtime` test
   green.
+- **AC-1a (A's replacement, `evt_7bjtagzmf85ym`).** Compile the existing
+  counter-reading `host_call_carrier.rs` fixtures (`:701`, `:2641`), plus at
+  least one program with two or more units and seed material, through the
+  real backend entry with a caller-supplied `M: Module` (test-only). Every
+  Local or Export function or data object in `ModuleDeclarations` is
+  accounted for by exactly one of: the unit bodies matching
+  `b2f_last_unit_emission`, the seed-material objects matching its count, or
+  the pinned native-Int and boundary-value helper graphs. Imports are listed
+  separately with their linkage. The test's doc lists the fixture population.
 - **AC-2 (controls).**
-  - A new production emitter outside the census reddens A's behavioural
-    replacement.
+  - A scratch emitter outside both counted paths that defines one extra
+    Local function reddens AC-1a. An unused extra declaration shows up in the
+    inventory (the non-vacuity control, as
+    `b2f_ac8_the_inventory_enumerator_sees_a_second_emitters_declarations`).
   - Routing body selection through a map keyed by `StaticNodeId` reddens
     (b).
   - Filing occurrences by entry instead of by origin, so two collide under
     one entry, reddens (c).
   - If either stays green, stop: the planner controls do not carry D.
+  - Expected green by design, recorded with the reason: AC-0's widened
+    `StaticNodeId` (C is review-owned) and the unused entry-keyed sidecar
+    (not D's hazard).
 
 ## Limitations
 
-Owned by Architect review, not by any test (`evt_170pr1hbj2e8s`):
+Owned by Architect review, not by any test (`evt_170pr1hbj2e8s`,
+`evt_7bjtagzmf85ym`):
 - `PlannedExpr`/`StaticNodeId` module privacy is a review-owned property:
   widening either is a design change the Architect reviews on the merge
   Decision.
 - A production collection keyed by a scheduling entry that neither selects a
   body nor files an occurrence is not test-observed; review owns it.
+- An emitter reached only by programs outside the listed fixtures is not
+  observed; review owns the population beyond them.
 
 ## Stop conditions
 
