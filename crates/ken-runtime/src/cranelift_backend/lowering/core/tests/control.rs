@@ -2646,702 +2646,233 @@ fn an_out_of_range_child_position_is_a_loud_planner_invariant() {
     }
 }
 
-// ─── RT-FNSPLIT-B2A-C N1/N2 — the emission census, pinned mechanically ────
-//
-// AC-7 wants each negative-boundary pin discharged by a committed check rather
-// than by review reading. N1 and N2 are counting properties over the PRODUCTION
-// lowering and planning sources, so they are pinned by counting call
-// expressions in those exact files. The test sources live in a sibling
-// directory, so no `#[cfg(test)]` region has to be parsed out: the partition is
-// at file level.
+// `RT-BACKEND-SOURCE-CENSUS-RETIRE` replaces the source-text emission census
+// with `compiled_module_declarations_account_for_every_fixture_emitter`.
+// The former `correspondence_adds_no_emitted_unit_to_the_production_census`
+// was a prohibited source-text oracle; see the WP frame for its retirement.
 
-/// **`RT-FNSPLIT-B2F` `AC-2` — WHICH POPULATION THIS CENSUS COVERS, and why the
-/// rest is excluded.**
+/// Function and data declarations actually held by the caller-supplied module.
+/// The ordered vectors retain duplicates so even a second root declaration
+/// cannot be concealed by constructing an expected-name map.
+fn rt_census_declared_inventory<M: Module>(
+    module: &M,
+) -> (Vec<(String, Linkage)>, Vec<(String, Linkage)>) {
+    let mut functions = module
+        .declarations()
+        .get_functions()
+        .map(|(id, decl)| (decl.linkage_name(id).into_owned(), decl.linkage))
+        .collect::<Vec<_>>();
+    let mut data = module
+        .declarations()
+        .get_data_objects()
+        .map(|(id, decl)| (decl.linkage_name(id).into_owned(), decl.linkage))
+        .collect::<Vec<_>>();
+    functions.sort_by(|left, right| left.0.cmp(&right.0));
+    data.sort_by(|left, right| left.0.cmp(&right.0));
+    (functions, data)
+}
+
+/// `RT-BACKEND-SOURCE-CENSUS-RETIRE` AC-1a: account for every Local or Export
+/// declaration in the compiled module, never for a spelling in source text.
 ///
-/// ⛔ **The population is the production LOWERING AND PLANNING sources** — the
-/// seven rows below. It is deliberately **not** "every Cranelift emitter in
-/// `ken-runtime`", and stating that boundary is `AC-2`'s second clause: a census
-/// whose scope is implicit reads as covering everything.
+/// The fixture population, compiled through the real `M: Module` entry, is:
+/// the leaf Bool and called lexical-closure Bool programs from
+/// `b2f_emits_one_defined_target_unit_per_planned_function_unit`; the empty
+/// and one-entry seed environments from
+/// `b2f_mints_one_defined_artifact_static_object_per_seed_environment_entry`;
+/// and their called-closure plus one-entry-seed combination (two units and
+/// one data object). A leaf with an Export root checks the second permitted
+/// definition linkage. Each compile names its root independently of the module.
+/// An emitter reached only outside these fixtures is review-owned (WP
+/// Limitations); this test makes no whole-program reachability claim.
 ///
-/// **Excluded, measured at base `6534e4a6`, each with its reason:**
+/// MEASURED: the complete function/data `ModuleDeclarations` inventory for
+/// these compilations, the two counters at their emitting paths, and the
+/// finalized JIT definitions for each declared non-import symbol.
+/// CLAIMED: one caller-named root, one definition per counted unit and seed
+/// object, and only the independently pinned native-Int and boundary-value
+/// helper graphs beyond them. Imports have their own exact linkage inventory.
+/// THE GAP: finalization does not prove each body has the intended instructions
+/// or bytes. The existing unit, seed and helper-graph controls test those
+/// contents; the accounting pin guards an *extra* emitter.
 ///
-/// | emitter | measured | why it is out of scope here |
-/// |---|---|---|
-/// | `native_int_clif.rs` | 5 / 1 / 3 | Θ(1) per native module. Its emitted population is already pinned behaviourally as `LOCAL_HELPER_COUNT = 6` (`artifact/tests.rs:56`) — ⛔ cite that, do not duplicate it |
-/// | `boundary_value_clif.rs` | 23 / 3 / 3 | ⭐ a live production emitter that was in **neither** this census nor `BACKEND_PRODUCTION_SOURCES`; same Θ(1)-per-module shape |
-///
-/// ⭐ **Why they are recorded as reasoned exclusions rather than pinned rows,
-/// which is a judgement and is stated as one:** freezing `23` and `5` here would
-/// redden this file whenever a *sibling* node legitimately changes an emitter it
-/// owns — landing the failure on whoever is unlucky, in a test they have never
-/// read, rather than on whoever changed the thing. Their growth is `AC-G0`/`D8`'s
-/// obligation and is discharged there **behaviourally**, against emitted counts,
-/// not against source spellings.
-///
-/// ⚠ **MEASURED:** how many times five spellings occur in eight files.
-/// **CLAIMED:** exactly that. **THE GAP:** ⛔ this is a source-TEXT oracle and
-/// it is retained as a **tripwire, not as the evidence**. A call split across
-/// lines evades every needle; a mention inside a string or a block comment
-/// inflates them; and nothing here observes what a compiled module actually
-/// contains.
-///
-/// # ⛔⛔ WHICH INSTRUMENT CARRIES THE CLAIM — and they are NOT corroboration
-///
-/// **`AC-2` requires this division of labour to be stated in-source, because two
-/// counts sitting side by side read as corroboration and these two are not: one
-/// of them is fail-open by construction.**
-///
-/// | instrument | what it does | what it carries |
-/// |---|---|---|
-/// | ⭐ the behavioural counters — `units::b2f_last_unit_emission`, `seed_material::b2f_last_seed_material_emission` | count what the compiled module **actually contains**, at the point of emission | ⭐ **the population claim, entirely** |
-/// | ⚠ this census | searches source text for spellings someone enumerated | ⛔ **nothing.** A tripwire only |
-///
-/// ⛔ **This census's default branch is *"needle not found ⇒ nothing
-/// emitted"*, so it fails OPEN for every emission spelling nobody thought of.**
-/// It was repaired three times on this node — missing rows, then missing
-/// sibling emitters, then a missing needle class — and each repair found the
-/// next thing it was not looking for, because a needle-list census can only
-/// ever be one discovery behind the code. ⛔ **Adding `.declare_data(` /
-/// `.define_data(` did not make it sound and nothing here claims it did.** It
-/// is retained, unweakened, because a defeat count never licenses removing a
-/// gate — not because it is evidence.
+/// Promise class: durable invariant over the listed fixture population.
+/// Adding an empty production module or changing comments stays green; an
+/// additional declared function/data object in a compiled fixture turns red.
 #[test]
-fn correspondence_adds_no_emitted_unit_to_the_production_census() {
-    struct Census {
-        file: &'static str,
-        source: &'static str,
-        builders: usize,
-        definitions: usize,
-        declarations: usize,
-        /// ⭐ **`RT-FNSPLIT-B2F` `AC-2`, third population defect.** Data objects
-        /// are declared and defined by `.declare_data(` / `.define_data(`, and
-        /// the three needles above cannot see either. That is a strictly worse
-        /// shape than a missing row: a missing *row* leaves one file unmeasured
-        /// and the gap is visible, while a missing *needle class* leaves the
-        /// census reading **complete across every row** while `n` data objects
-        /// sit in the artifact — `D3`'s entire deliverable, invisible, with
-        /// nothing looking wrong.
-        data_declarations: usize,
-        data_definitions: usize,
-    }
-    let census = [
-        Census {
-            file: "lowering/core.rs",
-            source: include_str!("../../core.rs"),
-            // The recursive-descent root builder and definition retired with
-            // their lane. The functionized root adapter and unit body remain
-            // in `units.rs`; this textual tripwire therefore expects no root
-            // builder or definition in this file.
-            builders: 0,
-            definitions: 0,
-            declarations: 4,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` moves the primitive dispatcher
-        // and its exclusive helpers into this nested production module. The
-        // explicit zero row keeps the whole-roster relation closed while
-        // asserting that the move creates no second emission authority.
-        Census {
-            file: "lowering/core/primitive.rs",
-            source: include_str!("../primitive.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "lowering/mod.rs",
-            source: include_str!("../../mod.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — the values-boundary
-        // disposition/classification/lifecycle-phase vocabulary. A pure
-        // classification module: no `FunctionBuilder`, no declared or
-        // defined function or data object.
-        Census {
-            file: "lowering/boundary.rs",
-            source: include_str!("../../boundary.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — the source machine's own
-        // dispatch, moved verbatim from `core.rs`/`mod.rs`. It emits IR into
-        // the `FunctionBuilder` its caller already owns; it never mints a new
-        // defined function or data object.
-        Census {
-            file: "lowering/source.rs",
-            source: include_str!("../../source.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns
-        // emitter, moved verbatim from `core.rs`/`mod.rs`. It emits IR into
-        // the `FunctionBuilder` its caller already owns; it never mints a new
-        // defined function or data object.
-        Census {
-            file: "lowering/calls.rs",
-            source: include_str!("../../calls.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-EMITTER-CONTROL-JOINS-SPLIT` `D1` — the control and joins
-        // emitter, moved verbatim from `core.rs`/`mod.rs`. It emits IR into
-        // the `FunctionBuilder` its caller already owns; it never mints a
-        // new defined function or data object.
-        Census {
-            file: "lowering/joins.rs",
-            source: include_str!("../../joins.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter's
-        // PRODUCTION code, moved verbatim from `mod.rs`, emits IR into the
-        // `FunctionBuilder` its caller already owns and records into the
-        // already-open `AggregateAllocationLedger`; it never mints a new
-        // defined function or data object -- zero on all five needles.
-        //
-        // `D2` moved the `D7` cluster's TEST code into this same file's own
-        // `#[cfg(test)] mod tests`, and this needle scan is a naive
-        // full-text `str::matches`, not `cfg`-aware (`control.rs`'s own
-        // `correspondence_adds_no_emitted_unit_to_the_production_census`
-        // scans `include_str!` of the whole file). Several `D7` direct-API
-        // tests build a bare rig `FunctionBuilder`/declare a probe function
-        // to test `emit_carrier_alloc`/`source_aggregate_preflight` below
-        // the full compile pipeline -- 4 `builders` + 2 `declarations`,
-        // confirmed by reading each site directly, all inside `mod tests`.
-        // `calls.rs`'s own `D2` test module happens to route entirely
-        // through the shared `compile_expr_into_module`/`new_jit_module`
-        // harness instead, so it never tripped this same needle -- not a
-        // rule that test code must avoid these calls, just a fact about
-        // which fixtures each item's own moved tests happened to use.
-        Census {
-            file: "lowering/aggregates.rs",
-            source: include_str!("../../aggregates.rs"),
-            builders: 4,
-            definitions: 0,
-            declarations: 2,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-EMITTER-EFFECTS-SPLIT` `D1` — a pure lowering-emission module:
-        // it emits into a `FunctionBuilder` passed in by its caller, never
-        // creates its own. No `mod tests` block exists here at `D1` (unlike
-        // `aggregates.rs` above, whose non-zero row is entirely its own
-        // `D2`-landed test rig) — every needle is confirmed zero by direct
-        // grep, not assumed from the row shape.
-        Census {
-            file: "lowering/effects.rs",
-            source: include_str!("../../effects.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "planning.rs",
-            source: include_str!("../../../planning.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "planning/static_transition.rs",
-            source: include_str!("../../../planning/static_transition.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. A
-        // planning module with no emission, so every count is zero.
-        // `RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER` slice 1 -- the plan-independent
-        // classifier. Pure structural dispatch over `RuntimeExpr` with no
-        // emission at all, so every count is zero. ⭐ The zeros are MEASURED,
-        // not assumed: the census test compares them against the file and this
-        // suite is green with them, so a non-zero count would have red here.
-        Census {
-            file: "planning/static_transition/immediate_bridge.rs",
-            source: include_str!("../../../planning/static_transition/immediate_bridge.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "planning/static_transition/occurrences.rs",
-            source: include_str!("../../../planning/static_transition/occurrences.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "planning/static_transition/responses.rs",
-            source: include_str!("../../../planning/static_transition/responses.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "planning/static_transition/returned_vis.rs",
-            source: include_str!("../../../planning/static_transition/returned_vis.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-SELECTED-PENDING-CALL-BUILD` increment 1: read-only admission.
-        // The complete file has zero emission sites for all five needles.
-        Census {
-            file: "planning/static_transition/selected_pending_calls.rs",
-            source: include_str!("../../../planning/static_transition/selected_pending_calls.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "planning/static_transition/semantic_ir.rs",
-            source: include_str!("../../../planning/static_transition/semantic_ir.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the Emittable* vocabulary and
-        // the StaticTransitionPlan projections that derive it. A planning
-        // module with no emission, so every count is zero.
-        Census {
-            file: "planning/static_transition/units.rs",
-            source: include_str!("../../../planning/static_transition/units.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // ⭐ `RT-FNSPLIT-B2F` `AC-2` — THE PREDICTED ROW, and it is predicted
-        // rather than fitted.
-        //
-        // Recorded in `docs/program/rt-fnsplit-b2f-predictions.md` (`P1`) at
-        // base `6534e4a6`, committed BEFORE the module was written, and then
-        // measured: 1 / 1 / 1, exactly as predicted. A census re-fitted to
-        // whatever the output happened to be measures nothing, so the order is
-        // the evidence.
-        //
-        // ⛔ ONE of each spelling, for a population of Θ(n) emitted units. The
-        // needles count SPELLINGS, never units: `declare_unit_bundle` holds one
-        // `declare_function` inside a loop over every unit, and
-        // `define_unit_body` is called once per unit from one site. That gap is
-        // the whole content of `AC-G0`'s narrative — `native_int_clif` emits 6
-        // definitions from 5 builder source sites — and it is why this row
-        // cannot be read as an emitted-unit count. `D8`'s growth verdict is
-        // about `UnitBundle::len`, which this pin cannot see.
-        Census {
-            file: "lowering/units.rs",
-            source: include_str!("../../units.rs"),
-            // One builder/definition for the public root adapter, one for the
-            // loop-defined internal units, one for `RT-CONTSPEC-ACTIVATE`
-            // `D2`'s continuation bodies, and one for `RT-DECL-CLOSURE-PORT`
-            // `D5a`'s generated producer execution contexts.
-            //
-            // ⭐ The `D5a` row moved 3 -> 4 deliberately. That is the sentinel
-            // working: a new *emitting* function class in this file is exactly
-            // the event this row exists to force a reader to look at, and it is
-            // the fourth such class rather than a fourth copy of an existing
-            // one.
-            //
-            // And 4 -> 5 for `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`'s static
-            // continuation fusion bodies, for the same reason and on the same
-            // terms: a **fifth** emitting function class, not a fifth copy of an
-            // existing one. A fused region is a third owner beside the producer
-            // and the consumer, so its body is built by its own pass rather than
-            // by widening one of the four above.
-            //
-            // The row moved while the emitter itself is **un-wired**
-            // (`D2F_EMITTER_ARMED`): the pass is compiled and reachable but
-            // installs no plane, so it defines zero functions on every current
-            // compile. The sixth site defines the validated static response
-            // owners. This row still counts builder SITES, never emitted units.
-            builders: 6,
-            definitions: 6,
-            // Three declaration sites: the emittable unit bundle,
-            // `RT-CONTSPEC-ACTIVATE` `D2`'s forward declaration of one target
-            // per planned continuation specialization, and `D5a`'s forward
-            // declaration of one target per planned generated context. Each is a
-            // deliberate addition and this row is the record of them. `D2f`'s
-            // forward declaration of one target per installed fused region is
-            // the fourth, in the same up-front bundle pass and for the same
-            // reason: a target called from a body defined below must exist
-            // before that body is built.
-            declarations: 5,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-FNSPLIT-B2R`'s ABI plane, added as an explicit ZERO row because
-        // the frame flagged its absence: it is in `BACKEND_PRODUCTION_SOURCES`
-        // and was not in this census, and an absent row and a zero row read
-        // identically to a reader while only one of them is a claim.
-        //
-        // ⭐ The zero is the load-bearing part: `abi.rs` DECLARES the
-        // representation contract and must never emit against it. If this row
-        // ever moves, the planner has started emitting, which is the one thing
-        // the ownership/representation split exists to prevent.
-        Census {
-            file: "planning/static_transition/abi.rs",
-            source: include_str!("../../../planning/static_transition/abi.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates owner. A
-        // planning module with no emission, so every count is zero. The zero
-        // is load-bearing for the same reason as `abi.rs`: the planner mints
-        // aggregate occurrence identities and ownership records and must
-        // never emit against them; the lowering-owned half
-        // (`AggregateAllocationEvent`/`AggregateAllocationLedger`/
-        // `AggregateRelationClosure`) stays in `lowering/mod.rs`.
-        Census {
-            file: "planning/static_transition/aggregates.rs",
-            source: include_str!("../../../planning/static_transition/aggregates.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner. A
-        // planning module with no emission, so every count is zero. The zero
-        // is load-bearing for the same reason as `abi.rs`: the planner mints
-        // keys, seats and evidence and must never emit against them.
-        Census {
-            file: "planning/static_transition/continuations.rs",
-            source: include_str!("../../../planning/static_transition/continuations.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion identity
-        // plane. A planning module with no emission, so every count is zero.
-        Census {
-            file: "planning/static_transition/continuations/fusion.rs",
-            source: include_str!("../../../planning/static_transition/continuations/fusion.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-EFFECTS-SPLIT` `D1` — the host-effect seat authority. A
-        // planning module with no emission, so every count is zero. The zero
-        // is load-bearing for the same reason as `abi.rs`: the planner mints
-        // seat identities and validates them and must never emit against
-        // them; the emitter-owned half (`EffectSeatGroupId`/
-        // `EffectSeatLedger`/`EffectSeatClosure`) stays in `lowering/mod.rs`.
-        Census {
-            file: "planning/static_transition/effects.rs",
-            source: include_str!("../../../planning/static_transition/effects.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — join disposition and trap
-        // identity. A planning module with no emission, so every count is
-        // zero. The zero is load-bearing for the same reason as `abi.rs`:
-        // the planner derives join representations and dedups trap values
-        // and must never emit against them; the emitter-owned half
-        // (`Px8trTrapProvenanceEvent`/`PlannedTrapSeat`) stays in
-        // `lowering/mod.rs`.
-        Census {
-            file: "planning/static_transition/joins_traps.rs",
-            source: include_str!("../../../planning/static_transition/joins_traps.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the construction lifecycle
-        // (minting, relation and seat construction: `Planner`'s own impl).
-        // A planning module with no emission, so every count is zero, for
-        // the same reason as every other planner-owned sibling.
-        Census {
-            file: "planning/static_transition/construction.rs",
-            source: include_str!("../../../planning/static_transition/construction.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the closure lifecycle
-        // (validation and closure, and read-only projections: most of
-        // `StaticTransitionPlan`'s own impl). A planning module with no
-        // emission, so every count is zero, for the same reason as every
-        // other planner-owned sibling.
-        Census {
-            file: "planning/static_transition/closure.rs",
-            source: include_str!("../../../planning/static_transition/closure.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        // ⭐ `RT-FNSPLIT-B2F` `D3`/`AC-2` — THE SECOND PREDICTED ROW, and the
-        // prediction was recorded before the module existed for the same reason
-        // the first one was.
-        //
-        // Recorded in `docs/program/rt-fnsplit-b2f-predictions.md` (`P6`) at
-        // base `6534e4a6`: **1 `declare_data` / 1 `define_data`, every other row
-        // 0/0.** Measured: exactly that.
-        //
-        // ⚠ **AND `P6` WAS WRONG ABOUT WHERE, WHICH IS RECORDED RATHER THAN
-        // QUIETLY CORRECTED.** It named `lowering/units.rs` as the file carrying
-        // the two needles; the material is minted in `lowering/seed_material.rs`
-        // instead, because units and seed material are two populations on two
-        // growth axes (Θ(n) in the program vs Θ(|seed environment|), which the
-        // program does not affect) and one census row cannot carry both. ⇒ The
-        // *counts* held; the *row* moved. A prediction file that only ever
-        // agrees with the outcome is a transcription, and `P4` said in advance
-        // that the row placement was the likeliest thing to move.
-        //
-        // ⛔ ONE of each spelling for a population of Θ(|seed environment|)
-        // objects: `mint_seed_material` holds one `declare_data` and one
-        // `define_data` inside a loop over every entry. Same spellings-not-units
-        // gap as the row above, and the same consequence — ⛔ **this row is not
-        // an object count and must never be read as one.**
-        Census {
-            file: "lowering/seed_material.rs",
-            source: include_str!("../../seed_material.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 1,
-            data_definitions: 1,
-        },
-        // ⭐⭐ `RT-FNSPLIT-B2F` `AC-2`, SECOND CLAUSE — THE REMAINING SEVEN
-        // ROSTER FILES, as explicit zero rows.
-        //
-        // ⛔ **`abi.rs` was not the only absence.** The frame flagged it by
-        // name, it was added, and that read as the clause being discharged.
-        // Re-derived here against the roster rather than against the frame's
-        // sentence: the frame said thirteen files, `BACKEND_PRODUCTION_
-        // SOURCES` had already grown past that by the time this was written,
-        // and it keeps growing with every later split (`D2`, `RT-EMITTER-
-        // EFFECTS-SPLIT`: dropped the literal count here rather than
-        // re-bumping it a second time — the enforced invariant is the
-        // `.len()`-based assertion below, not this sentence, and a literal
-        // count here only drifts stale again at the next split). The census
-        // carried eight of the roster at the time, and **seven** were still
-        // absent with no recorded exclusion. All seven measure `0/0/0/0/0`,
-        // which is why they are rows and not judgements.
-        //
-        // ⭐ **A zero row and an absent row read identically and only one of
-        // them is a claim** — `AC-2`'s own words, and the reason a file that
-        // genuinely emits nothing still needs a line here. ⚠ It is also the
-        // reason these seven cost nothing to carry: the sibling-churn objection
-        // that keeps `native_int_clif.rs`'s `23` out of this table does not
-        // apply to a zero, which moves only when one of these files **starts**
-        // emitting.
-        //
-        // ⚠ What each zero is actually saying, because they are not all the
-        // same claim:
-        //
-        // - `cranelift_backend.rs`, `surface.rs` — a facade and an error
-        //   vocabulary. ⛔ `cranelift_backend.rs` is ATTESTED and is read here,
-        //   never edited; a row over it is a read, not a modification.
-        // - `artifact/api.rs`, `artifact/mod.rs` — module CONSTRUCTION. They
-        //   build `JITModule`/`ObjectModule` and hand them on; ⭐ a nonzero here
-        //   would mean artifact construction had started declaring or defining
-        //   functions on its own, which is a second emission authority in the
-        //   one place nobody looks for it.
-        // - `compiled.rs` — the ARTIFACT and its runner. ⭐ **The most
-        //   load-bearing zero of the seven**: `S6`'s activation-services
-        //   launcher lands here, and this row is what forces that landing to be
-        //   a deliberate re-baseline rather than a silent one. ⚠ Predicted to
-        //   stay `0` through that change — the launcher constructs a Rust
-        //   record and calls compiled code; it declares and defines nothing.
-        //   ⛔ If it moves, the launcher started emitting and that is the
-        //   finding, not the test being stale.
-        // - `test_objects.rs`, `test_support.rs` — ⚠ **named "test" and they
-        //   are PRODUCTION files**, which is exactly why they need rows: a
-        //   reader skipping them by name would leave two production files
-        //   unmeasured and believe the roster was covered.
-        //
-        // ⛔ Still not evidence. These rows inherit every limit stated above —
-        // the census is a source-TEXT tripwire that fails OPEN on any spelling
-        // nobody enumerated, and adding seven rows widens its coverage without
-        // changing what it can carry.
-        Census {
-            file: "cranelift_backend.rs",
-            source: include_str!("../../../../cranelift_backend.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "artifact/api.rs",
-            source: include_str!("../../../artifact/api.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "artifact/mod.rs",
-            source: include_str!("../../../artifact/mod.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "compiled.rs",
-            source: include_str!("../../../compiled.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "grafted_spine_control_graph.rs",
-            source: include_str!("../../../grafted_spine_control_graph.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "surface.rs",
-            source: include_str!("../../../surface.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "test_objects.rs",
-            source: include_str!("../../../test_objects.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
-        Census {
-            file: "test_support.rs",
-            source: include_str!("../../../test_support.rs"),
-            builders: 0,
-            definitions: 0,
-            declarations: 0,
-            data_declarations: 0,
-            data_definitions: 0,
-        },
+fn compiled_module_declarations_account_for_every_fixture_emitter() {
+    const NATIVE_INT_HELPERS: &[&str] = &[
+        "ken_native_int_resolve_local",
+        "ken_native_int_intern_local",
+        "ken_native_int_compare_local",
+        "ken_native_int_narrow_local",
+        "ken_native_int_export_local",
+        "ken_native_int_export_parts_local",
+        "ken_native_int_binop_local",
     ];
-    // ⭐⭐ `AC-2`, SECOND CLAUSE — THE CENSUS COVERS THE WHOLE ROSTER, and this
-    // is what keeps the coverage claim true after this commit rather than at it.
-    //
-    // ⛔ **Without this, "every roster file has a row" is a fact about today,
-    // not a property.** A file added to `BACKEND_PRODUCTION_SOURCES` by any
-    // future node would be invisible to this census while the census still read
-    // as complete — which is precisely how `abi.rs` and then these seven came to
-    // be missing in the first place. ⇒ The relation is asserted, so the next
-    // absence reddens instead of accumulating.
-    //
-    // ⚠ It is a relation between two rosters, ⛔ **not** a count: adding a file
-    // to either list is fine, and adding it to only one is the failure.
-    let censused = census.iter().map(|row| row.file).collect::<BTreeSet<_>>();
-    let roster = BACKEND_PRODUCTION_SOURCES
-        .iter()
-        .map(|(file, _)| *file)
-        .collect::<BTreeSet<_>>();
-    assert_eq!(
-        roster.difference(&censused).copied().collect::<Vec<_>>(),
-        Vec::<&str>::new(),
-        "AC-2: a production roster file has no census row, so the census reads \
-         as complete while that file is unmeasured"
-    );
-    assert_eq!(
-        censused.difference(&roster).copied().collect::<Vec<_>>(),
-        Vec::<&str>::new(),
-        "AC-2: a census row names a file outside the production roster, so one \
-         of the two lists is wrong about what production is"
-    );
-    for row in census {
+
+    fn account_one(
+        root_name: &str,
+        root_linkage: Linkage,
+        expr: &RuntimeExpr,
+        seed_env: &NativeSeedEnvironment,
+    ) -> (usize, usize) {
+        // Root identity is fixed by the caller before compilation, not inferred
+        // from a declaration that could absorb another producer's function.
+        let root = (root_name.to_owned(), root_linkage);
+        let compiled = compile_expr_into_module(
+            new_jit_module().expect("JIT module constructs"),
+            &root.0,
+            root.1,
+            expr,
+            seed_env,
+            BTreeMap::new(),
+            None,
+            false,
+            None,
+            None,
+            None,
+        )
+        .expect("accounting fixture compiles through the generic backend");
+        let units = crate::cranelift_backend::lowering::units::b2f_last_unit_emission();
+        let seed =
+            crate::cranelift_backend::lowering::seed_material::b2f_last_seed_material_emission();
+        assert_eq!(units.0, units.1, "a declared unit must have a body");
+        assert_eq!(seed.0, seed.1, "a declared seed object must have data");
+
+        let (functions, data) = rt_census_declared_inventory(&compiled.module);
+        let (definitions, imports): (Vec<_>, Vec<_>) = functions
+            .into_iter()
+            .partition(|(_, linkage)| *linkage != Linkage::Import);
+        assert!(
+            definitions
+                .iter()
+                .all(|(_, linkage)| matches!(linkage, Linkage::Local | Linkage::Export)),
+            "unaccounted definable linkage in the module: {definitions:?}"
+        );
+        let expected_imports = [
+            "free", "ken_selected_call_v1_consume", "ken_selected_call_v1_issue", "malloc",
+        ]
+        .into_iter()
+        .map(|name| (name.to_owned(), Linkage::Import))
+        .collect::<Vec<_>>();
+        assert_eq!(imports, expected_imports, "import names and linkages are a separate inventory");
         assert_eq!(
-            row.source.matches("FunctionBuilder::new(").count(),
-            row.builders,
-            "{}: N1 -- the production root builder census moved",
-            row.file
+            definitions.iter().filter(|(name, _)| name == &root.0).count(),
+            1,
+            "the caller-named root must have exactly one definition"
+        );
+        assert!(
+            definitions.contains(&root),
+            "the root must use the caller-supplied name and linkage: {root:?}"
+        );
+
+        let mut expected = vec![root];
+        expected.extend((0..units.0).map(|n| (format!("ken_unit_{n}"), Linkage::Local)));
+        expected.extend(
+            NATIVE_INT_HELPERS.iter().map(|name| ((*name).to_owned(), Linkage::Local)),
+        );
+        expected.extend(
+            crate::boundary_value_clif::BOUNDARY_LOCAL_HELPERS
+                .iter()
+                .map(|name| ((*name).to_owned(), Linkage::Local)),
+        );
+        expected.sort_by(|left, right| left.0.cmp(&right.0));
+        assert!(
+            expected.windows(2).all(|pair| pair[0].0 != pair[1].0),
+            "two accounted categories claim one function: {expected:?}"
         );
         assert_eq!(
-            row.source.matches(".define_function(").count(),
-            row.definitions,
-            "{}: N1/N2 -- a definition was added or removed",
-            row.file
+            definitions, expected,
+            "a Local or Export function in the compiled module lacks exactly one producer"
         );
+        let mut expected_data = (0..seed.0)
+            .map(|n| (format!("ken_seed_{n}"), Linkage::Local))
+            .collect::<Vec<_>>();
+        expected_data.sort_by(|left, right| left.0.cmp(&right.0));
         assert_eq!(
-            row.source.matches(".declare_function(").count(),
-            row.declarations,
-            "{}: N2 -- a function declaration was added or removed",
-            row.file
+            data, expected_data,
+            "a module data declaration is not one of the counted seed objects"
         );
-        assert_eq!(
-            row.source.matches(".declare_data(").count(),
-            row.data_declarations,
-            "{}: N3 -- an artifact-static data declaration was added or removed",
-            row.file
-        );
-        assert_eq!(
-            row.source.matches(".define_data(").count(),
-            row.data_definitions,
-            "{}: N3 -- an artifact-static data definition was added or removed",
-            row.file
-        );
+
+        // ModuleDeclarations reports declarations, not whether their bodies
+        // were emitted. Finalize and look up every Local/Export symbol so a
+        // declared-but-undefined root cannot masquerade as the fourth category.
+        let mut module = compiled.module;
+        module
+            .finalize_definitions()
+            .expect("all accounted JIT definitions finalize");
+        for (id, declaration) in module.declarations().get_functions() {
+            if declaration.linkage != Linkage::Import {
+                assert!(
+                    !module.get_finalized_function(id).is_null(),
+                    "accounted function {} has no finalized body",
+                    declaration.linkage_name(id)
+                );
+            }
+        }
+        for (id, declaration) in module.declarations().get_data_objects() {
+            if declaration.linkage != Linkage::Import {
+                assert!(
+                    !module.get_finalized_data(id).0.is_null(),
+                    "accounted data {} has no finalized image",
+                    declaration.linkage_name(id)
+                );
+            }
+        }
+        (units.0, seed.0)
     }
+
+    let leaf = RuntimeExpr::Value(RuntimeValue::Bool(true));
+    let called_closure = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: Vec::new(),
+            body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+        }),
+        args: Vec::new(),
+    };
+    let empty = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let mut seeded = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    seeded.insert("s", RuntimeGroundValue::Int(7i64.into()));
+
+    let leaf_units = account_one("rt_census_leaf", Linkage::Local, &leaf, &empty);
+    let exported_leaf = account_one("rt_census_exported", Linkage::Export, &leaf, &empty);
+    let called_units = account_one("rt_census_called", Linkage::Local, &called_closure, &empty);
+    let seeded_leaf = account_one("rt_census_seeded", Linkage::Local, &leaf, &seeded);
+    let combined = account_one("rt_census_combined", Linkage::Local, &called_closure, &seeded);
+    assert_eq!(leaf_units.1, 0, "empty environment has no seed object");
+    assert_eq!(exported_leaf, leaf_units, "root linkage does not change unit or seed counts");
+    assert!(leaf_units.0 >= 1, "the leaf has a root function unit");
+    assert!(called_units.0 > leaf_units.0, "a called closure adds a unit");
+    assert_eq!(seeded_leaf.1, 1, "a one-entry environment has one seed object");
+    assert!(combined.0 >= 2, "the combined fixture has at least two units");
+    assert_eq!(combined.1, 1, "the combined fixture has seed material");
+}
+
+/// AC-2 positive control: the enumerator observes an unused declaration even
+/// when no body is emitted for it. A constant or returned-ID-based inventory
+/// would report the same contents before and after this real Module mutation.
+#[test]
+fn compiled_module_inventory_reports_an_unused_local_declaration() {
+    let mut module = new_jit_module().expect("JIT module constructs");
+    let before = rt_census_declared_inventory(&module);
+    let signature = module.make_signature();
+    module
+        .declare_function("rt_census_unused", Linkage::Local, &signature)
+        .expect("unused Local function declares");
+    let after = rt_census_declared_inventory(&module);
+    assert!(!before.0.iter().any(|(name, _)| name == "rt_census_unused"));
+    assert_eq!(after.0.len(), before.0.len() + 1);
+    assert!(
+        after.0.contains(&("rt_census_unused".to_owned(), Linkage::Local)),
+        "the enumerator must report a declaration with no definition"
+    );
+    assert_eq!(after.1, before.1, "a function declaration creates no data");
 }
 
 /// **`RT-FNSPLIT-B2A-S` D4/AC-4 — the `origin -> expression` lookup count is
@@ -3540,518 +3071,11 @@ fn the_identifier_census_survives_the_evasions_that_defeated_the_text_scan() {
     );
 }
 
-/// The backend's complete production source surface — the census's **closure
-/// proof**, not a convenience list.
-///
-/// Why this is a proof rather than an enumeration someone must remember: a Rust
-/// file is compiled only if an ancestor module declares it with `mod`. The
-/// structural item-head walk below finds both semicolon and braced module forms,
-/// so another backend file cannot be compiled without reddening
-/// `the_backend_production_surface_inventory_is_closed` and forcing its source
-/// into this roster.
-#[cfg(test)]
-const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
-    (
-        "cranelift_backend.rs",
-        include_str!("../../../../cranelift_backend.rs"),
-    ),
-    ("artifact/api.rs", include_str!("../../../artifact/api.rs")),
-    ("artifact/mod.rs", include_str!("../../../artifact/mod.rs")),
-    ("compiled.rs", include_str!("../../../compiled.rs")),
-    (
-        "grafted_spine_control_graph.rs",
-        include_str!("../../../grafted_spine_control_graph.rs"),
-    ),
-    ("lowering/core.rs", include_str!("../../core.rs")),
-    (
-        "lowering/core/primitive.rs",
-        include_str!("../primitive.rs"),
-    ),
-    ("lowering/mod.rs", include_str!("../../mod.rs")),
-    // `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — registered the moment the
-    // module exists, for the same reason as every sibling below: a production
-    // source absent from this roster is invisible to every pin that iterates
-    // it.
-    ("lowering/boundary.rs", include_str!("../../boundary.rs")),
-    // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — registered the moment the module
-    // exists, for the same reason as `boundary.rs` above: a production source
-    // absent from this roster is invisible to every pin that iterates it.
-    ("lowering/source.rs", include_str!("../../source.rs")),
-    // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns emitter.
-    // Registered here the moment the module exists, for the same reason as
-    // `boundary.rs`/`source.rs` above: a production source absent from this
-    // roster is invisible to every pin that iterates it.
-    ("lowering/calls.rs", include_str!("../../calls.rs")),
-    // `RT-EMITTER-CONTROL-JOINS-SPLIT` `D1` — the control and joins emitter.
-    // Registered here the moment the module exists, for the same reason as
-    // `boundary.rs`/`source.rs`/`calls.rs` above: a production source absent
-    // from this roster is invisible to every pin that iterates it.
-    ("lowering/joins.rs", include_str!("../../joins.rs")),
-    // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter. Registered
-    // here the moment the module exists, for the same reason as
-    // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs` above: a production
-    // source absent from this roster is invisible to every pin that
-    // iterates it.
-    ("lowering/aggregates.rs", include_str!("../../aggregates.rs")),
-    // `RT-EMITTER-EFFECTS-SPLIT` `D1` — the effects emitter. Registered here
-    // the moment the module exists, for the same reason as
-    // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs`/`aggregates.rs` above:
-    // a production source absent from this roster is invisible to every pin
-    // that iterates it.
-    ("lowering/effects.rs", include_str!("../../effects.rs")),
-    // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
-    // here the moment the module exists, because every pin that iterates this
-    // roster is closed only over the files it lists: a production emitter absent
-    // from it is invisible to all of them at once, which is precisely how
-    // `boundary_value_clif.rs` and `native_int_clif.rs` came to sit outside
-    // both this roster and the emitted-unit census.
-    ("lowering/units.rs", include_str!("../../units.rs")),
-    // `RT-FNSPLIT-B2F` `D3` — the artifact-static seed material. Registered for
-    // the same reason as `units.rs` above, and ⭐ **it is the file that made the
-    // reason concrete**: this module mints DATA objects, and until `AC-2` was
-    // amended no needle in the census could see a data object at all. A file
-    // outside this roster is invisible to every pin that iterates it; a file
-    // inside it whose emission spelling nobody enumerated is invisible to the
-    // census while looking fully measured.
-    (
-        "lowering/seed_material.rs",
-        include_str!("../../seed_material.rs"),
-    ),
-    ("planning.rs", include_str!("../../../planning.rs")),
-    (
-        "planning/static_transition.rs",
-        include_str!("../../../planning/static_transition.rs"),
-    ),
-    (
-        "planning/static_transition/abi.rs",
-        include_str!("../../../planning/static_transition/abi.rs"),
-    ),
-    // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates owner. Registered
-    // here the moment the module exists, for the same reason as every
-    // sibling: a production module absent from this roster is invisible to
-    // every pin that iterates it.
-    (
-        "planning/static_transition/aggregates.rs",
-        include_str!("../../../planning/static_transition/aggregates.rs"),
-    ),
-    // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner. Registered
-    // here the moment the module exists, for the same reason as every sibling:
-    // a production module absent from this roster is invisible to every pin
-    // that iterates it.
-    (
-        "planning/static_transition/continuations.rs",
-        include_str!("../../../planning/static_transition/continuations.rs"),
-    ),
-    // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion identity
-    // plane (a child of continuations, declared by continuations.rs via
-    // `mod fusion;`). Registered for the same reason as every sibling.
-    (
-        "planning/static_transition/continuations/fusion.rs",
-        include_str!("../../../planning/static_transition/continuations/fusion.rs"),
-    ),
-    // `RT-PLANNER-EFFECTS-SPLIT` `D1` — the host-effect seat authority.
-    // Registered here the moment the module exists, for the same reason as
-    // every sibling: a production module absent from this roster is
-    // invisible to every pin that iterates it.
-    (
-        "planning/static_transition/effects.rs",
-        include_str!("../../../planning/static_transition/effects.rs"),
-    ),
-    (
-        "planning/static_transition/immediate_bridge.rs",
-        include_str!("../../../planning/static_transition/immediate_bridge.rs"),
-    ),
-    // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — join disposition and trap
-    // identity. Registered here the moment the module exists, for the same
-    // reason as every sibling: a production module absent from this roster
-    // is invisible to every pin that iterates it.
-    (
-        "planning/static_transition/joins_traps.rs",
-        include_str!("../../../planning/static_transition/joins_traps.rs"),
-    ),
-    // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the construction lifecycle.
-    // Registered here the moment the module exists, for the same reason as
-    // every sibling: a production module absent from this roster is
-    // invisible to every pin that iterates it.
-    (
-        "planning/static_transition/construction.rs",
-        include_str!("../../../planning/static_transition/construction.rs"),
-    ),
-    // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the closure lifecycle.
-    // Registered here the moment the module exists, for the same reason as
-    // every sibling: a production module absent from this roster is
-    // invisible to every pin that iterates it.
-    (
-        "planning/static_transition/closure.rs",
-        include_str!("../../../planning/static_transition/closure.rs"),
-    ),
-    // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. Registered
-    // here the moment the module exists, for the same reason as every sibling:
-    // a production module absent from this roster is invisible to every pin
-    // that iterates it.
-    (
-        "planning/static_transition/occurrences.rs",
-        include_str!("../../../planning/static_transition/occurrences.rs"),
-    ),
-    (
-        "planning/static_transition/responses.rs",
-        include_str!("../../../planning/static_transition/responses.rs"),
-    ),
-    (
-        "planning/static_transition/returned_vis.rs",
-        include_str!("../../../planning/static_transition/returned_vis.rs"),
-    ),
-    (
-        "planning/static_transition/selected_pending_calls.rs",
-        include_str!("../../../planning/static_transition/selected_pending_calls.rs"),
-    ),
-    (
-        "planning/static_transition/semantic_ir.rs",
-        include_str!("../../../planning/static_transition/semantic_ir.rs"),
-    ),
-    // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the emitter's read-only view of one
-    // validated function unit. Registered here the moment the module exists,
-    // for the same reason as every sibling: a production module absent from
-    // this roster is invisible to every pin that iterates it.
-    (
-        "planning/static_transition/units.rs",
-        include_str!("../../../planning/static_transition/units.rs"),
-    ),
-    ("surface.rs", include_str!("../../../surface.rs")),
-    ("test_objects.rs", include_str!("../../../test_objects.rs")),
-    ("test_support.rs", include_str!("../../../test_support.rs")),
-];
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum RustItemDelimiter {
-    Brace,
-    Semicolon,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct RustItemHead<'a> {
-    kind: &'a str,
-    name: Option<&'a str>,
-    delimiter: RustItemDelimiter,
-}
-
-/// One Rust item head, classified by its leading keyword after attributes,
-/// visibility, and item modifiers.
-///
-/// This deliberately does not decide from the line's final punctuation. The
-/// punctuation distinguishes an external module from an inline one only after
-/// the item has already been seen; it never decides whether an item exists.
-fn rust_item_head(mut line: &str) -> Option<RustItemHead<'_>> {
-    line = line.split_once("//").map_or(line, |(code, _)| code).trim();
-    while let Some(attribute) = line.strip_prefix("#[") {
-        let close = attribute.find(']')?;
-        line = attribute[close + 1..].trim_start();
-    }
-    if let Some(public) = line.strip_prefix("pub") {
-        if public.starts_with('(') {
-            let close = public.find(')')?;
-            line = public[close + 1..].trim_start();
-        } else if public.starts_with(char::is_whitespace) {
-            line = public.trim_start();
-        }
-    }
-
-    loop {
-        let before = line;
-        for modifier in ["async", "unsafe", "default"] {
-            if let Some(rest) = line.strip_prefix(modifier) {
-                if rest.starts_with(char::is_whitespace) {
-                    line = rest.trim_start();
-                    break;
-                }
-            }
-        }
-        if line == before {
-            break;
-        }
-    }
-    if let Some(extern_item) = line.strip_prefix("extern") {
-        if extern_item.starts_with(char::is_whitespace) {
-            line = extern_item.trim_start();
-            if let Some(abi) = line.strip_prefix('"') {
-                let close = abi.find('"')?;
-                line = abi[close + 1..].trim_start();
-            }
-        }
-    }
-    if let Some(const_item) = line.strip_prefix("const") {
-        if const_item.starts_with(char::is_whitespace) && const_item.trim_start().starts_with("fn ")
-        {
-            line = const_item.trim_start();
-        }
-    }
-
-    let (kind, rest) = [
-        "impl", "mod", "fn", "struct", "trait", "enum", "use", "type", "const", "static",
-    ]
-    .into_iter()
-    .find_map(|kind| {
-        line.strip_prefix(kind).and_then(|rest| {
-            rest.chars()
-                .next()
-                .is_some_and(|next| !next.is_alphanumeric() && next != '_')
-                .then_some((kind, rest))
-        })
-    })?;
-    let name = (kind == "mod").then(|| {
-        rest.trim_start()
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .next()
-            .unwrap_or_default()
-    });
-    let delimiter = if line.trim_end().ends_with(';') {
-        RustItemDelimiter::Semicolon
-    } else if line.contains('{') {
-        RustItemDelimiter::Brace
-    } else {
-        return None;
-    };
-    Some(RustItemHead {
-        kind,
-        name,
-        delimiter,
-    })
-}
-
-#[test]
-fn the_item_head_enumerator_sees_every_ruled_form() {
-    // Promise class: durable structural control. Each row is an explicitly
-    // ruled Rust item class, not a sample whose reader must generalize.
-    for (source, kind, delimiter) in [
-        (
-            "#[cfg(any())] impl Trait for Type {}",
-            "impl",
-            RustItemDelimiter::Brace,
-        ),
-        ("pub(crate) mod nested {}", "mod", RustItemDelimiter::Brace),
-        (
-            "#[inline] pub(in crate::x) fn f() {}",
-            "fn",
-            RustItemDelimiter::Brace,
-        ),
-        ("pub struct S {}", "struct", RustItemDelimiter::Brace),
-        ("unsafe trait T {}", "trait", RustItemDelimiter::Brace),
-        ("pub enum E {}", "enum", RustItemDelimiter::Brace),
-        ("pub use a::{b, c};", "use", RustItemDelimiter::Semicolon),
-        ("pub type T = u8;", "type", RustItemDelimiter::Semicolon),
-        (
-            "pub const C: S = S {};",
-            "const",
-            RustItemDelimiter::Semicolon,
-        ),
-        (
-            "pub static S: u8 = 0;",
-            "static",
-            RustItemDelimiter::Semicolon,
-        ),
-    ] {
-        let head = rust_item_head(source)
-            .unwrap_or_else(|| panic!("the item-head enumerator did not see {source:?}"));
-        assert_eq!((head.kind, head.delimiter), (kind, delimiter));
-    }
-    assert_eq!(
-        rust_item_head("mod sample;"),
-        Some(RustItemHead {
-            kind: "mod",
-            name: Some("sample"),
-            delimiter: RustItemDelimiter::Semicolon,
-        }),
-        "the external-module control must retain the declared module name"
-    );
-}
-
-#[test]
-fn the_backend_production_surface_inventory_is_closed() {
-    // Every production `mod` item reachable in the backend, paired with the
-    // file that declares it. `mod tests {}` is excluded: a sibling test module
-    // is not production surface, and its absence from the census is the point.
-    let mut declared = Vec::new();
-    let mut external_modules = 0usize;
-    for (file, source) in BACKEND_PRODUCTION_SOURCES {
-        let mut test_only_item = false;
-        for line in source.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("#[cfg(") {
-                test_only_item |= identifier_occurrences(trimmed, "test") > 0
-                    || identifier_occurrences(trimmed, "ken_ac10_production_mint_probe") > 0;
-                continue;
-            }
-            if trimmed.starts_with("#[") || trimmed.is_empty() || trimmed.starts_with("//") {
-                continue;
-            }
-            let Some(head) = rust_item_head(line) else {
-                test_only_item = false;
-                continue;
-            };
-            if test_only_item && head.delimiter == RustItemDelimiter::Brace {
-                test_only_item = false;
-                continue;
-            }
-            test_only_item = false;
-            if head.kind != "mod" || head.name == Some("tests") {
-                continue;
-            }
-            let name = head.name.expect("a mod item has a name");
-            declared.push((*file, name));
-            external_modules += usize::from(head.delimiter == RustItemDelimiter::Semicolon);
-        }
-    }
-    assert_eq!(
-        declared,
-        vec![
-            ("cranelift_backend.rs", "artifact"),
-            ("cranelift_backend.rs", "compiled"),
-            ("cranelift_backend.rs", "grafted_spine_control_graph"),
-            ("cranelift_backend.rs", "lowering"),
-            ("cranelift_backend.rs", "planning"),
-            ("cranelift_backend.rs", "surface"),
-            ("cranelift_backend.rs", "test_objects"),
-            ("cranelift_backend.rs", "test_support"),
-            ("artifact/mod.rs", "api"),
-            ("lowering/core.rs", "primitive"),
-            ("lowering/mod.rs", "core"),
-            // `RT-FNSPLIT-B2F` `D1`/`D2`. A sibling of `core` rather than a
-            // region inside it: `core.rs` is the module whose recursive
-            // whole-configuration authority `D6` removes, and putting the
-            // replacement population in the same file would leave the census
-            // that measures the removal unable to tell the two apart.
-            ("lowering/mod.rs", "units"),
-            // `RT-FNSPLIT-B2F` `D3`. A sibling of `units` rather than a region
-            // inside it, because the two mint DIFFERENT POPULATIONS on
-            // different growth axes: `units` mints code, Θ(n) in the program;
-            // this mints data, Θ(|seed environment|) and independent of the
-            // program. Folding them into one file would put two growth axes
-            // behind one census row.
-            ("lowering/mod.rs", "seed_material"),
-            // `RT-LOWERING-VALUES-BOUNDARY-SPLIT` `D1` — the values-boundary
-            // disposition/classification/lifecycle-phase vocabulary. A sibling
-            // of `core`/`units`/`seed_material`: `Lowered`/`LoweringOperand`
-            // and the carrier-emission machinery that consumes this
-            // vocabulary stay SCC-pinned in `mod.rs`/`core.rs`.
-            ("lowering/mod.rs", "boundary"),
-            // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — the source machine's own
-            // state types and dispatch control. A sibling of
-            // `core`/`units`/`seed_material`/`boundary`; the types the moving
-            // methods merely manipulate stay SCC-pinned in `mod.rs`.
-            ("lowering/mod.rs", "source"),
-            // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns
-            // emitter (declared-call emission, residual and recursor call
-            // lowering, return emission, callee-side checks). A sibling of
-            // `core`/`units`/`seed_material`/`boundary`/`source`; the types
-            // the moving methods merely manipulate stay SCC-pinned in
-            // `mod.rs`.
-            ("lowering/mod.rs", "calls"),
-            // `RT-EMITTER-CONTROL-JOINS-SPLIT` `D1` — the control and joins
-            // emitter (branch/match emission, join emission, block/
-            // terminator construction). A sibling of
-            // `core`/`units`/`seed_material`/`boundary`/`source`/`calls`;
-            // the types the moving methods merely manipulate
-            // (`ScalarMergeKind` and siblings) stay SCC-pinned in `mod.rs`.
-            ("lowering/mod.rs", "joins"),
-            // `RT-EMITTER-AGGREGATES-SPLIT` `D1` — the aggregates emitter
-            // (aggregate construction and projection emission, allocation
-            // emission, governed-allocation surfaces). A sibling of
-            // `core`/`units`/`seed_material`/`boundary`/`source`/`calls`/
-            // `joins`; `AggregateAllocationLedger`/`AggregateAllocationEvent`/
-            // `AggregateRelationClosure` move with it (already
-            // `pub(in crate::cranelift_backend)`, zero widen); the planner
-            // types it merely references (`PlannedAggregateShape` and
-            // siblings) stay item 7's.
-            ("lowering/mod.rs", "aggregates"),
-            // `RT-EMITTER-EFFECTS-SPLIT` `D1` — the effects emitter
-            // (effect-seat emission, host-call emission, and the
-            // effect-side operand construction). A sibling of
-            // `core`/`units`/`seed_material`/`boundary`/`source`/`calls`/
-            // `joins`/`aggregates`; `EffectSeatLedger`/`EffectSeatClosure`
-            // move with it (already `pub(in crate::cranelift_backend)`,
-            // zero widen); `ClaimedEffectSeats`/`SiteOperandWitness` (the
-            // Architect's D0 corrections) and the types the moving methods
-            // merely manipulate stay at the `mod.rs` hub.
-            ("lowering/mod.rs", "effects"),
-            // Production inline modules share their parent's file but remain
-            // part of its item surface, so the head inventory records them.
-            ("lowering/mod.rs", "transport_identity"),
-            ("lowering/mod.rs", "safe_byte_span"),
-            ("lowering/effects.rs", "effect_seat_group"),
-            ("lowering/seed_material.rs", "tag"),
-            ("planning.rs", "static_transition"),
-            ("planning/static_transition.rs", "abi"),
-            // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
-            // events, ownership records, and the planner-side aggregate
-            // lifecycle, factored into its own domain module. The
-            // lowering-owned half (`AggregateAllocationEvent`,
-            // `AggregateAllocationLedger`, `AggregateRelationClosure`) stays
-            // in `lowering/mod.rs` for item 15.
-            ("planning/static_transition.rs", "aggregates"),
-            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the closure lifecycle
-            // (validation and closure, and read-only projections: most of
-            // `StaticTransitionPlan`'s own impl), factored into its own
-            // domain module. Alphabetically before `construction` in the
-            // `mod` declaration order this list follows.
-            ("planning/static_transition.rs", "closure"),
-            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the construction
-            // lifecycle (minting, relation and seat construction: `Planner`'s
-            // own impl), factored into its own domain module.
-            ("planning/static_transition.rs", "construction"),
-            // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` — the continuation owner
-            // (keys + seats + evidence surfaces + the fusion identity plane),
-            // factored into its own domain module.
-            ("planning/static_transition.rs", "continuations"),
-            // `RT-PLANNER-EFFECTS-SPLIT` `D1` — the host-effect seat
-            // authority (seat derivation, contract lookup, closed-form
-            // rebuild-equality and uniqueness validation), factored into its
-            // own domain module. The emitter-owned half (`EffectSeatGroupId`,
-            // `EffectSeatLedger`, `EffectSeatClosure`,
-            // `EffectSeatVisitMutation`, `EffectSeatDispatchMutation`) stays
-            // in `lowering/mod.rs` for item 16.
-            ("planning/static_transition.rs", "effects"),
-            ("planning/static_transition.rs", "immediate_bridge"),
-            // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — join disposition (which
-            // representation a source join's result takes) and trap
-            // identity (a value-keyed dedup catalog), factored into its own
-            // domain module. The emitter-owned half
-            // (`Px8trTrapProvenanceEvent`, `PlannedTrapSeat`) already lives
-            // in `lowering/mod.rs` for item 14.
-            ("planning/static_transition.rs", "joins_traps"),
-            // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner
-            // (StaticOriginId + records + validations + read views), factored
-            // into its own domain module.
-            ("planning/static_transition.rs", "occurrences"),
-            ("planning/static_transition.rs", "responses"),
-            ("planning/static_transition.rs", "returned_vis"),
-            ("planning/static_transition.rs", "selected_pending_calls"),
-            ("planning/static_transition.rs", "semantic_ir"),
-            // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — the Emittable* vocabulary and
-            // the StaticTransitionPlan projections that derive it, factored into
-            // their own domain module.
-            ("planning/static_transition.rs", "units"),
-            // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion
-            // identity plane, a child of continuations (declared by
-            // continuations.rs, which the roster scans after static_transition.rs).
-            (
-                "planning/static_transition/aggregates.rs",
-                "required_consumer_destination",
-            ),
-            ("planning/static_transition/continuations.rs", "fusion"),
-        ],
-        "AC-4 -- the backend's module inventory changed, so \
-         BACKEND_PRODUCTION_SOURCES is no longer the whole production surface and \
-         the sole-consumer census above has stopped being closed. Add the new \
-         file to that list."
-    );
-    assert_eq!(
-        external_modules + 1,
-        BACKEND_PRODUCTION_SOURCES.len(),
-        "AC-4 -- every external module must appear in the census list exactly once \
-         (+1 for `cranelift_backend.rs`, the root, which no `mod` item declares). \
-         Inline modules remain visible in `declared` but share their parent's file."
-    );
-}
+// `RT-BACKEND-SOURCE-CENSUS-RETIRE` retires
+// `the_backend_production_surface_inventory_is_closed` and its
+// `BACKEND_PRODUCTION_SOURCES` roster. The generated-artifact accounting test
+// `compiled_module_declarations_account_for_every_fixture_emitter` guards
+// emission; module naming and source structure are review-owned (WP frame).
 
 // ─── RT-FNSPLIT-B2A-C AC-1 — uniform threading, shown not asserted ────────
 //
@@ -4190,494 +3214,22 @@ fn escaping_a_source_borrow_into_the_compiled_artifact_does_not_typecheck() {
     holds_no_borrowed_state::<CompiledModule<cranelift_jit::JITModule>>();
 }
 
-// ─── RT-FNSPLIT-B2A-S AC-5 — nothing is KEYED by a scheduling entry ───────────
-//
-// ⭐ Why this needs a pin even though the resolver takes a `StaticOriginId`:
-// hard-stop #8 was a category error in which a scheduling entry stood in for a
-// source occurrence, and a `ComputationalMatch` SHARES its scheduling entry with
-// its scrutinee chain. So a collection keyed by an entry looks perfectly injective
-// on every fixture without one — the wrong key still looks unique — and then
-// silently merges two occurrences on the fixture that has one.
-//
-// ⛔ **This scan is a tripwire, not a discharge — and neither are the behavioural
-// controls, on their own.** Two Architect blocks established that, and the second
-// (`evt_1p11krxny4wny`) is the one that settles it: a real
-// `Vec<Option<&RuntimeExpr>>` indexed by `usize::try_from(scrutinee.entry.0)` at
-// the `ComputationalMatch` seam **compiles and passes all three nets**.
-//
-// ⇒ The framed property, *"no collection is keyed by `.entry`, and a mutation
-// introducing one reddens,"* is a **global negative over arbitrary code shapes**.
-// No test enforces that: detecting it needs dataflow, not a scan, and a scan can
-// always be spelled around. So the honest split is recorded here rather than
-// papered over with a longer list:
-//
-// The authoritative AC-5 is the Architect's four clauses (`origin/main`
-// `d0b6e064`, transcribed verbatim there); this is what discharges each:
-//
-//   (a) concrete entry-carrying types stay module-private
-//         -> `the_entry_carrying_types_are_module_private`
-//   (b) a non-vacuous split fixture proves entry-keying selects the wrong body
-//         -> `keying_selection_by_the_scheduling_entry_does_not_resolve_the_body`
-//   (c) a compile-preserving re-key of the sanctioned table reddens at the
-//       collision/invariant controls
-//         -> `filing_two_occurrences_under_one_origin_is_refused`
-//   (d) Architect review of the closed two-file planner surface and its exports
-//       confirms the stated residual -- review, not a test.
-//
-// ⛔ **BOTH residual arms, because recording one reads as if the other were
-// covered:**
-//
-//   RESIDUAL 1 — an independently maintained entry-keyed collection INSIDE the
-//     two planner files. Inside the planner, entry-keying is the planner's own
-//     job and is NOT prohibited; what is unenforceable is detecting a *second*
-//     selection authority built from it.
-//   RESIDUAL 2 — exported / inferred / ordinal entry exposure. A future method
-//     could hand out an entry as `impl Ord` (`StaticNodeId` already derives
-//     `Ord`) or as a derived `u32` ordinal, **naming neither private type**, so
-//     (a) would still hold while an outside consumer keyed on an entry anyway.
-//
-// ⛔ **Do not claim that an arbitrary independently maintained entry-keyed
-// collection is mechanically detected.** No test enforces that: detecting it
-// needs dataflow, not a scan, and a scan can always be spelled around.
-
-/// ⚠ Positive control for the AC-5 detector: it must actually recognise the shape
-/// it claims nothing matches, or "no matches" means nothing.
-#[cfg(test)]
-fn declares_collection_keyed_by_node_id(line: &str) -> bool {
-    [
-        "BTreeMap<StaticNodeId",
-        "BTreeSet<StaticNodeId",
-        "HashMap<StaticNodeId",
-        "HashSet<StaticNodeId",
-    ]
-    .iter()
-    .any(|shape| line.contains(shape))
-}
-
-#[test]
-fn the_entry_keyed_collection_detector_catches_the_shape_it_is_looking_for() {
-    assert!(declares_collection_keyed_by_node_id(
-        "    scheduled: BTreeMap<StaticNodeId, RuntimeExpr>,"
-    ));
-    assert!(declares_collection_keyed_by_node_id(
-        "    seen: BTreeSet<StaticNodeId>,"
-    ));
-    // The admissible neighbour: keyed by the OCCURRENCE, which B1R's
-    // `origin.0 == planned_node.0` bijection makes safe.
-    assert!(!declares_collection_keyed_by_node_id(
-        "    occurrences: BTreeMap<StaticOriginId, RuntimeExpr>,"
-    ));
-}
-
-/// **AC-5(a) — the concrete entry-carrying types are module-private.**
-///
-/// `PlannedExpr` and `StaticNodeId` are declared with **no `pub` modifier**, so
-/// they are private to `planning::static_transition` (`StaticNodeId` reaching its
-/// own `semantic_ir` child through `use super::`). The set of production files
-/// that can *name* either type is therefore exactly those two.
-///
-/// ## ⚠ What is measured, and what is NOT claimed
-///
-/// **Measured:** the privacy of two concrete types, i.e. which files can name
-/// them. **Not claimed:** that selection authority is confined, or that no
-/// outside code can key on a scheduling entry.
-///
-/// ⛔ **The implication between those two is invalid, and asserting it was my
-/// defect** (struck by Steward ruling `evt_4dh098a49cbze`; the earlier version of
-/// this test said privacy meant *"none can key on one"* and encoded that claim in
-/// its own name). Privacy of a *name* does not confine a *value*: a future method
-/// could hand an entry out as `impl Ord` — `StaticNodeId` already derives `Ord` —
-/// or as a derived `u32` ordinal, **naming neither private type**, and this test
-/// would still pass while an outside consumer keyed on an entry.
-///
-/// ⇒ This pin is clause **(a)** of four. (b) and (c) are the behavioural and
-/// collision controls in the planner; **(d) is Architect review**, and the two
-/// residual arms above are what that review covers.
-#[test]
-fn the_entry_carrying_types_are_module_private() {
-    let mut naming = Vec::new();
-    for (file, source) in BACKEND_PRODUCTION_SOURCES {
-        let production = source
-            .split_once("\n#[cfg(test)]\nmod tests {")
-            .map_or(*source, |(before, _)| before);
-        // Tokenized with comments stripped, so a doc comment MENTIONING the type
-        // (as `lowering/core.rs` does, twice, while being unable to name it) does
-        // not count.
-        let mentions = identifier_occurrences(production, "PlannedExpr")
-            + identifier_occurrences(production, "StaticNodeId");
-        if mentions > 0 {
-            naming.push(*file);
-        }
-    }
-    assert_eq!(
-        naming,
-        vec![
-            "planning/static_transition.rs",
-            "planning/static_transition/abi.rs",
-            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — `construction.rs` names
-            // `PlannedExpr` because the type's own declaration, and every
-            // construction-phase reader of it, moved here with `Planner`'s
-            // impl. It is `pub(super)` (root itself reads `.entry`/
-            // `.occurrence` off values `plan_static_transition_graph_with_
-            // symbols` receives back from `Planner`), never wider -- the
-            // reach stays inside `static_transition`'s own module family,
-            // the same discipline items 4-9 used for every cross-child
-            // surface. It does not cross into `lowering` or beyond.
-            "planning/static_transition/construction.rs",
-            // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — `closure.rs` names
-            // `StaticNodeId` because `planned_entry_body` and the closure/
-            // validation family's own occurrence-to-node lookups moved here
-            // with most of `StaticTransitionPlan`'s impl. The type remains
-            // module-private; only its naming site moved.
-            "planning/static_transition/closure.rs",
-            // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — `occurrences.rs` names
-            // `StaticNodeId` because `origin_of` maps a node to its occurrence
-            // origin (the sole mint site). The type remains module-private;
-            // only its naming site moved.
-            "planning/static_transition/occurrences.rs",
-            "planning/static_transition/semantic_ir.rs",
-            // `RT-PLANNER-UNITS-ABI-SPLIT` `D1` — `units.rs` names `StaticNodeId`
-            // because `EmittableUnit`'s `planned_node` field moved here from the
-            // parent. The type remains module-private; only its naming site
-            // moved.
-            "planning/static_transition/units.rs",
-        ],
-        "AC-5(a): another backend file now NAMES an entry-carrying type. That is \
-         the measured fact only -- it does not by itself decide whether anything \
-         keys on an entry, which is residual arm 2 and Architect review.\n\
-         `abi.rs` joined this inventory in `RT-FNSPLIT-B2R`: the ABI plane names \
-         `StaticNodeId` because a function unit's frame entry IS its seed node, \
-         and the descriptor records which node that is. It remains module-private \
-         and is not widened."
-    );
-
-    // The naming set is what it is because the declarations stay inside
-    // `static_transition`'s own module family. A `pub` reaching `lowering` or
-    // beyond would widen it without changing any call; `pub(super)` reaching
-    // only root and root's other descendants (exactly `construction.rs`'s
-    // case, below) is the standing discipline, not a violation of it.
-    let construction = include_str!("../../../planning/static_transition/construction.rs");
-    assert!(
-        construction.contains("\npub(super) struct PlannedExpr {"),
-        "AC-5: `PlannedExpr` must stay confined to `static_transition`'s own \
-         module family (`pub(super)` at most), never reach `lowering`"
-    );
-    let planner = include_str!("../../../planning/static_transition.rs");
-    assert!(
-        planner.contains("\nstruct StaticNodeId(u32);"),
-        "AC-5: `StaticNodeId` must stay module-private"
-    );
-}
-
-#[test]
-fn no_collection_is_keyed_by_a_scheduling_entry() {
-    // Over the CLOSED backend surface, not a hand-picked four files: the resolver
-    // and the plan are reachable from every backend sibling, so a tripwire scoped
-    // to `lowering/` and `planning/` would miss `artifact/**` and `compiled.rs`.
-    for (file, source) in BACKEND_PRODUCTION_SOURCES {
-        let production = source
-            .split_once("\n#[cfg(test)]\nmod tests {")
-            .map_or(*source, |(before, _)| before);
-        let keyed: Vec<&str> = production
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .filter(|line| {
-                declares_collection_keyed_by_node_id(line)
-                    // The index form the Architect named: a positional table
-                    // subscripted by a scheduling entry rather than an occurrence.
-                    || line.contains(".entry.0 as usize")
-                    || line.contains("[entry.0 as usize]")
-            })
-            .collect();
-        assert!(
-            keyed.is_empty(),
-            "{file} keys or indexes by a scheduling entry {keyed:?}; a \
-             ComputationalMatch shares its entry with its scrutinee chain, so this \
-             merges two occurrences on exactly the fixture that has one. \
-             ⚠ NOT an AC-5 clause: this is an early tripwire over enumerated \
-             forms, and AC-5 is discharged by (a)-(d) above"
-        );
-    }
-}
+// `RT-BACKEND-SOURCE-CENSUS-RETIRE` retires the source-text controls
+// `the_entry_carrying_types_are_module_private` (C) and
+// `no_collection_is_keyed_by_a_scheduling_entry` (D). C is review-owned.
+// D now concerns selecting a body or filing an occurrence by scheduling
+// entry: planner controls `keying_selection_by_the_scheduling_entry_does_not_
+// resolve_the_body` and `filing_two_occurrences_under_one_origin_is_refused`
+// guard those respective hazards. Unused entry-keyed sidecars are review-owned.
+// See the WP frame for the AC-0 expected-green counterexamples.
 
 // ─── RT-FNSPLIT-B2O D6/D7 — the call population, and inertness ─────────────
 
-// RETIRED by `RT-RETIRED-CENSUS-ROT` `D0`: a retired body is not a record, so
-// the census is deleted rather than kept under `#[cfg(any())]`.
-//
-// It counted tokens of `lower_expr` across `core.rs` and `units.rs` and derived
-// a call total -- a text census of the CALL POPULATION, standing in for a fact
-// about OCCURRENCE OWNERSHIP. The authority is the semantic plane's validated
-// owner partition: an occurrence's `StaticOriginId`, its `SemanticOwner`, and
-// the planned edge kind answer the disposition per occurrence, and a count of
-// textual occurrences observes none of them.
-//
-// Its previous note named the successor BY POSITION ("the owner/edge controls
-// above"). `RT-CONTROL-INTEGRATION-TESTS-SPLIT` has since cut this file, so that
-// reference could no longer be checked -- which is why the convention at this
-// module's root now requires naming a successor by IDENTIFIER. The live controls
-// resting on that authority are
-// `the_owner_classification_has_a_closed_production_naming_inventory` (below,
-// a declaration inventory) and
-// `correspondence_adds_no_emitted_unit_to_the_production_census` (behavioural).
-//
-// The argument this census carried about the live authority is NOT deleted with
-// it -- it is relocated to `the_owner_classification_has_a_closed_production_naming_inventory`
-// below, because prose about a live control belongs at the live control.
-
-/// **`RT-FNSPLIT-B2O` `D7`/`AC-1` — inertness, as reach rather than as a builder
-/// count.**
-///
-/// The emitted-unit census (`correspondence_adds_no_emitted_unit_to_the_production_census`)
-/// already pins `1` builder / `1` definition / `2` declarations in `core.rs` and
-/// zero everywhere else, and it counts **source text**, which is why it discharges
-/// `AC-1`'s "in BOTH configurations" rather than needing a per-`cfg` variant:
-///
-/// > **MEASURED:** text occurrences of the builder/definition/declaration forms
-/// > across each whole production file, `#[cfg(test)]` regions included.
-/// > **CLAIMED:** production emits no new unit under `cfg(test)` or without it.
-/// > **THE GAP:** none in the strict direction — any unit emitted in *either*
-/// > configuration must appear in the text, so a text census is a superset of
-/// > both. It is stricter than the AC, not weaker.
-///
-/// ⛔ **But a builder census cannot see an executable edge, and it was already
-/// zero before this node**, so on its own it is a check that would pass whether
-/// or not `B2O` stayed inert.
-///
-/// ⛔ **Withdrawn:** an earlier revision presented what follows as *"two
-/// mechanisms"* proving *"no emission edge is representable."* Neither
-/// establishes that, and the pin does not claim it. What this pin is:
-///
-/// 1. **A visibility inventory (declaration).** `SemanticOwner` is
-///    `pub(super)`, and this pin asserts the **allowed inventory** of widened
-///    items rather than a forbidden list, so *any* new widening reddens —
-///    including one nobody imagined. ⚠ The hatch is not hypothetical:
-///    `StaticOriginId` went through it deliberately. ⚠ But visibility bounds
-///    **naming**, not reaching: a type is reachable through a method that
-///    returns it, an `impl Trait`, or a re-export without ever being named.
-/// 2. **A naming inventory (declaration).** `SemanticOwner` appears **zero**
-///    times in the production region of every backend source except the file
-///    that defines it. This makes a new mention **visible to review**; it is not
-///    a proof of unreachability.
-///
-/// ⇒ **Inertness itself is pinned BEHAVIORALLY**, by
-/// `correspondence_adds_no_emitted_unit_to_the_production_census` — that is the
-/// mechanism that would actually observe an emission edge. These two are
-/// declaration inventories that make a change loud, and that is their whole
-/// claim.
-/// **The `lower_expr` call population is dispositioned BY OWNER, not by source
-/// site.** Relocated here by `RT-RETIRED-CENSUS-ROT` `D0` from a deleted text
-/// census; the counts went with the census, the argument did not.
-///
-/// The authority is the ownership mapping in the semantic plane -- an
-/// occurrence's `StaticOriginId`, its validated `SemanticOwner`, and the planned
-/// edge kind.
-///
-/// `B2O` makes a `StaticBody` edge the **one and only** owner boundary. So a
-/// call into `lower_expr` crosses an owner boundary **iff the occurrence it
-/// lowers is a `StaticBody` target -- that is, iff it lowers a retained body.**
-/// The test is on the occurrence's owner and the planned edge kind, and on
-/// nothing else.
-///
-/// WITHDRAWN, and kept here because a withdrawal that is deleted reads as though
-/// it had never been made: that retained bodies are *"reachable only through the
-/// single `origin -> expression` route"*, and that the population is
-/// *"characterised structurally, by one pinned route."* The census that was said
-/// to support them constrained the identifier `source_occurrence` ONLY -- it said
-/// nothing about who may call `retained_body_occurrence`, so it never supported
-/// either sentence. (That census has itself since been deleted by the same node.)
-///
-/// This is also the repair for the withdrawn `AC-5`: its two-way site
-/// classification had no cell for *"depends on the reaching path"*, so it could
-/// have been filled in completely and still been wrong. For the 14
-/// caller-dependent sites the answer genuinely *is* a function of the reaching
-/// path -- the same parameter carries both a retained body and ordinary
-/// sub-expressions -- and no per-site row can say that. The validated owner
-/// partition can, per occurrence, which is the only authority here.
-///
-#[test]
-fn the_owner_classification_has_a_closed_production_naming_inventory() {
-    // Promise class: durable invariant — a DECLARATION inventory.
-    //
-    // ⚠ RENAMED AGAIN by `RT-FNSPLIT-B2R`, and the rename is the honest part.
-    // The previous name was `..._is_named_in_production_only_by_the_module_that_
-    // defines_it`, and `B2R` **falsified that claim legitimately**: the ABI plane
-    // consumes the validated owner partition, which is precisely what the `B2R`
-    // frame mandates ("the population is `B2O`'s owner partition, consumed as
-    // data"). A pin whose name asserts sole-consumership cannot survive the node
-    // that adds the second consumer, and quietly widening the expected list while
-    // keeping that name would leave a corrected body under an uncorrected name.
-    //
-    // ⇒ What is pinned now is the **closed allowed inventory** of production
-    // files naming the classification. It still reddens on a *third* consumer —
-    // including one nobody imagined — which is the property worth guarding. What
-    // it no longer claims is that there is only one.
-    //
-    // ⚠ RENAMED under the Architect ruling (`evt_5yxjd1zqnyvcq`). This pin was
-    // called `..._has_no_reach_into_any_emission_path`, and that name asserted an
-    // inference the mechanism cannot make: a type can be *reached* without being
-    // *named* — through a method that returns it, an `impl Trait`, a re-export,
-    // or a derived ordinal. Naming is not capability. The name now states what
-    // is actually measured, because the name is the part future readers quote.
-    let mut naming = Vec::new();
-    for (file, source) in BACKEND_PRODUCTION_SOURCES {
-        // `static_transition.rs` carries its tests inline, and those tests
-        // legitimately name the owner classification to exercise it.
-        let production = source
-            .split_once("\n#[cfg(test)]\nmod tests {")
-            .map_or(*source, |(before, _)| before);
-        let n = identifier_occurrences(production, "SemanticOwner");
-        if n > 0 {
-            naming.push(*file);
-        }
-    }
-    assert_eq!(
-        naming,
-        vec![
-            "planning/static_transition/abi.rs",
-            "planning/static_transition/semantic_ir.rs",
-        ],
-        "D7: the owner classification's production naming inventory changed.\n\
-         The two permitted members are the module that DEFINES it \
-         (`semantic_ir`) and the `B2R` ABI plane (`abi`), which names it to \
-         resolve a static-body boundary's CALLEE unit when deriving that \
-         boundary's caller-side signature. A third file is a review event: say \
-         why that consumer must name the classification rather than take a \
-         descriptor.\n\
-         ⚠ This membership moved twice inside `RT-FNSPLIT-B2R` and the history \
-         is worth one line, because the second move is the load-bearing one. \
-         `abi.rs` first named the type in a redundant edge-agreement check that \
-         `AC-11` measured as unreachable and deleted -- at which point it left \
-         this inventory. The Architect then established that the deleted \
-         composition proved target IDENTITY and never layout AGREEMENT, so a \
-         real per-boundary signature replaced it, and that mechanism genuinely \
-         needs the classification. The name is here now for a live reason, not \
-         a vestigial one.\n\
-         ⚠ MEASURED: which production files mention the identifier. CLAIMED: \
-         exactly that. THE GAP: a mention is not an executable edge and the \
-         absence of one is not proof there is none -- a type can be reached \
-         without being named. Inertness itself is pinned behaviorally by \
-         `correspondence_adds_no_emitted_unit_to_the_production_census`; this \
-         pin is a declaration inventory that makes a new mention VISIBLE to \
-         review, not a proof of unreachability."
-    );
-
-    // The allowed inventory of widened visibility in the plane. ⛔ Asserted as
-    // the exact permitted set, not as a scan for a forbidden spelling, so that
-    // ANY new widening reddens -- including one nobody imagined.
-    //
-    // ⚠ This is a DECLARATION inventory. It records which items are widened; it
-    // does not entail anything about what is representable or reachable, because
-    // visibility bounds NAMING, not reaching.
-    let plane = include_str!("../../../planning/static_transition/semantic_ir.rs");
-    let widened = plane
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.starts_with("//"))
-        .filter(|line| line.contains("pub(in crate"))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        widened,
-        vec![
-            // ⭐ `RT-PLANNER-OCCURRENCES-SPLIT` `D1` moved `StaticOriginId` out
-            // of `semantic_ir.rs` into the new `occurrences.rs` child, so its
-            // widened-visibility row is no longer in this plane's inventory.
-            // The type's visibility is unchanged — it is still
-            // `pub(in crate::cranelift_backend)` with a `pub(super)` field —
-            // only its definition file moved (same shape as the
-            // `PredeclaredFunctionId` note below).
-            "pub(in crate::cranelift_backend) struct ConstructorIdentity(pub(super) DenseRange);",
-            // `RT-CARRIED-BOOL-ELIMINATOR-DISPATCH` adds one opaque result
-            // and two read-only projections. The canonical Bool role enum and
-            // its identity map remain planner-private; lowering can only read
-            // the two ordinals the planner already classified.
-            "pub(in crate::cranelift_backend) struct BoolMatchCaseOrdinals {",
-            "pub(in crate::cranelift_backend) fn false_ordinal(self) -> usize {",
-            "pub(in crate::cranelift_backend) fn true_ordinal(self) -> usize {",
-            "pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {",
-            "pub(in crate::cranelift_backend) struct SynthesizedIoErrorRole(pub(super) u32);",
-            "pub(in crate::cranelift_backend) enum SynthesizedConstructorRole {",
-            "pub(in crate::cranelift_backend) struct FieldIdentity(pub(super) DenseRange);",
-            "pub(in crate::cranelift_backend) fn tag_abi_word(self) -> Result<u64, CraneliftBackendError> {",
-            "pub(in crate::cranelift_backend) fn name_abi_word(self) -> Result<u64, CraneliftBackendError> {",
-            // ⭐ `RT-FNSPLIT-B2F` `D1` added `PredeclaredFunctionId` here; it
-            // moved to `units.rs` under `RT-PLANNER-UNITS-ABI-SPLIT` `D1`, so
-            // the widened-visibility row for it is no longer in this plane's
-            // inventory. The type's visibility is unchanged — it is still
-            // `pub(in crate::cranelift_backend)` with a `pub(super)` field —
-            // only its definition file moved.
-            "pub(in crate::cranelift_backend) fn with_last_io_error_role_omitted<T>(",
-            // ⭐ `RT-DECL-CLOSURE-PORT` `D2a` adds two, and they are the same
-            // shape as `with_last_io_error_role_omitted` above: a `cfg(test)`
-            // scoped-mutation seam and its closed mode sum. ⛔ Neither widens
-            // the plane. `declaration_owned_pairs`,
-            // `partition_function_units` and every population derivation stay
-            // `pub(super)`, so a consumer can ASK for the pre-`D2a` population
-            // inside a scoped control and cannot compute, mint or install one.
-            // ⚠ The source tripwire cannot distinguish `cfg(test)`, so it
-            // records the seam without claiming production reachability.
-            "pub(in crate::cranelift_backend) enum D2aPopulationMutation {",
-            "pub(in crate::cranelift_backend) fn with_d2a_population_mutation<T>(",
-            // `RT-BODY-OCCURRENCE-PROVENANCE` `AC-3` adds a second scoped
-            // mutation seam of exactly the `D2a` shape, and the argument is the
-            // same one: it is a `cfg(test)` SCOPE that restores a prior
-            // population choice for the duration of one control, never a
-            // capability a consumer gains. The enum carries no payload and the
-            // scope restores `Exact` on the way out including on panic, so a
-            // consumer cannot mint, compute or install a body occurrence
-            // through it — it can only ask the planner to re-issue the
-            // pre-correction alias and observe the refusal that follows.
-            // Same `cfg(test)` caveat as `D2a`: the source tripwire cannot
-            // distinguish it, so this records the seam without claiming
-            // production reachability.
-            "pub(in crate::cranelift_backend) enum BodyOccurrenceMutation {",
-            "pub(in crate::cranelift_backend) fn with_body_occurrence_mutation<T>(",
-        ],
-        "D7: the plane's widened-visibility inventory changed. `StaticOriginId` \
-         is widened deliberately so the lowering can carry an occurrence's \
-         static name.\n\
-         ⭐ `RT-FNSPLIT-C1` `D1`/`D2` adds four members, and the argument for \
-         each is the same one that justifies `StaticOriginId`: the widened item \
-         is a NAME the lowering may hold, never a CONSTRUCTOR it may use. Both \
-         identity newtypes wrap a `pub(super)` field, so a consumer can hold, \
-         compare and pass an identity but CANNOT MINT one -- which is what \
-         makes `D2`'s single-authority property a fact about the type system \
-         rather than about reviewer vigilance. `tag_abi_word`/`name_abi_word` \
-         are widened because the carrier's emitted ABI takes a word; they are \
-         METHODS ON THE TYPED IDENTITY rather than a shared `u64` conversion, \
-         so neither namespace can be erased before the tag-vs-name ABI \
-         operation is chosen.\n\
-         ⭐ `RT-FNSPLIT-C2-SYNTH-ID` adds the closed fixed-role sum, the opaque \
-         dynamic-role token, their closed key sum, and a cfg(test) omission \
-         seam. The source tripwire cannot distinguish cfg(test), so it records \
-         that seam without claiming production reachability. The IO token's \
-         field remains parent-private and lowering can only receive one from \
-         the plan.\n\
-         `RT-CARRIED-BOOL-ELIMINATOR-DISPATCH` adds the opaque Bool-case ordinal \
-         pair and its two read-only projections. The canonical role enum and \
-         identity inventory remain `pub(super)`; lowering receives no spelling \
-         or identity resolver and cannot construct the ordinal pair.\n\
-         ⛔ What is NOT widened, and is the thing this pin most needs to keep \
-         catching: `SemanticPlane` and its `names` arena stay `pub(super)`. The \
-         Architect's ruling forbids resolving a consumer's need by widening the \
-         plane, and `D1` is deliberately a capability export instead. A future \
-         `SemanticPlane` or `names` line appearing in this list is the \
-         violation, not an additional plane capability.\n\
-         ⚠ This is a DECLARATION inventory, not a proof of inertness: a \
-         widening of the OWNER surface is a DELIBERATE REVIEW EVENT that must \
-         be argued here, not absorbed. It entails nothing by itself about what \
-         is representable or reachable -- inertness is pinned behaviorally by \
-         `correspondence_adds_no_emitted_unit_to_the_production_census`"
-    );
-
-    // Non-vacuity: the needle must occur somewhere, or both assertions above are
-    // satisfied by a typo.
-    assert!(
-        identifier_occurrences(plane, "SemanticOwner") > 0,
-        "the owner classification is not in the plane at all, so this pin is \
-         measuring nothing"
-    );
-}
+// `RT-BACKEND-SOURCE-CENSUS-RETIRE` retires
+// `the_owner_classification_has_a_closed_production_naming_inventory` (E).
+// Architect review owns production owner-classification naming (WP frame).
+// Ownership itself is checked by the planner's validated `SemanticOwner`
+// partition, not by mentions in source text.
 
 // ── RT-MATCH-FRAME-FP: the identity selector and its permutation net ───────
 //
