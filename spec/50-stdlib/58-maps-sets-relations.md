@@ -395,12 +395,23 @@ truncation):**
 
 **RELATION LAW AND CONFORMANCE RESIDUAL:**
 
-- The normative membership characterizations remain
-  `succ x (compose R S) = ⋃ { succ y S : y ∈ succ x R }` and
-  `y ∈ succ x R ⇔ x ∈ succ y (converse R)`. No corresponding general proof is
-  present in the landed D4 producer. The existing runtime smoke does not test
-  an absent composed edge or the unreversed direction of converse; the paired
-  positive/negative membership cases remain unexecuted conformance obligations.
+- The normative membership characterizations hold under one lawful shared key
+  order, `Ordered` outer maps for the relation operands and `Ordered` successor
+  sets, **and `Distinct` outer keys**: `succ x (compose R S) = ⋃ { succ y S :
+  y ∈ succ x R }` and `y ∈ succ x R ⇔ x ∈ succ y (converse R)`. The outer-key
+  `Distinct` premise is the Map representation invariant already needed for
+  lookup-to-fold agreement (§3.2); it is a premise of these laws, not a new
+  parameter or a change to `compose`/`converse`. Successor-set `Distinct` is
+  not needed for Boolean membership. On the raw ordered tree
+  `R = Node Leaf 0 {2} (Node Leaf 0 {1} Leaf)`, `succ 0 R` does not contain `1`,
+  while `succ 0 (compose R S)` does for `S = {1→1, 2→2}`; `succ 1 (converse R)`
+  contains `0` although `succ 0 R` does not contain `1`. The duplicate outer
+  key satisfies `Ordered`'s weak bounds but violates `Distinct`, so both
+  characterizations fail without the added premise. No corresponding general
+  proof is present in the landed D4 producer. The existing runtime smoke does
+  not test an absent composed edge or the unreversed direction of converse;
+  the paired positive/negative membership cases remain unexecuted conformance
+  obligations.
 - The concrete predicate discriminators remain obligations too. In particular,
   a non-transitive `Nat` relation (`a → b`, `b → c`, no `a → c`) must fail
   `is_transitive`, while its completion must inhabit it. The transparent
