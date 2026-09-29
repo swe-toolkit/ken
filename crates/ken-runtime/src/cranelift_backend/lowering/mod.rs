@@ -1356,9 +1356,9 @@ struct FunctionLocalRefs {
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.
     continuation_calls: BTreeMap<ContinuationCallIdentity, units::DeclaredUnitCall>,
-    /// **`RT-CONTSPEC-ACTIVATE` `4b`** -- the exact `Inst` this Function emitted
-    /// for each causal token, recorded at the `builder.ins().call` that produced
-    /// it.
+    /// **`RT-CONTSPEC-ACTIVATE` `4b`** -- every direct-call `Inst` this
+    /// Function emitted for each causal token, recorded at its call seat.
+    /// Exclusive successors can each emit one instruction for the same key.
     ///
     /// ⭐ This is an **anchor, not an answer**. It records *where* a call was
     /// emitted, never *what* it calls: the callee is decoded back out of the
@@ -1370,7 +1370,8 @@ struct FunctionLocalRefs {
     /// ⛔ An entry exists only because a call instruction exists, so a token
     /// that was claimed and never called leaves no entry -- which is the whole
     /// reason the emission set is kept separately from the claim ledger.
-    continuation_emissions: BTreeMap<ContinuationCallIdentity, cranelift_codegen::ir::Inst>,
+    continuation_emissions:
+        BTreeMap<ContinuationCallIdentity, BTreeSet<cranelift_codegen::ir::Inst>>,
     /// Calls authorized by checked-IH transport edges rather than causal-token
     /// ownership. Multiple instructions may share one edge when mutually
     /// exclusive runtime branches emit the same source occurrence.
@@ -1400,7 +1401,7 @@ struct FunctionLocalRefs {
     /// ⛔ Populated only by `verify_recorded_composed_discharges`, only from
     /// [`Self::pending_composed_discharges`], and only after all five
     /// verifications pass. `D8k` owns whatever global closure reads it.
-    composed_discharges: BTreeMap<ContinuationCallIdentity, cranelift_codegen::ir::Inst>,
+    composed_discharges: BTreeMap<ContinuationCallIdentity, BTreeSet<cranelift_codegen::ir::Inst>>,
     declaration_calls: BTreeMap<StaticOriginId, units::DeclaredUnitCall>,
     /// The current function's closed trap-exit authority. Absence is an error
     /// state, never an implicit Root.
@@ -1673,8 +1674,10 @@ enum ContinuationEmissionMutation {
     /// accumulate them, so the whole-pass set equality must notice the missing
     /// population.
     SuppressEmissionAccumulation,
-    /// `D3` affine seam: claim the same causal token twice.
+    /// Token lattice: claim the same causal token twice on one path (E1).
     ClaimTokenTwice,
+    /// Emit a second actual direct call for the same claim on one path (R2).
+    DuplicateDirectCall,
     /// `D3` owner seam: claim under a producer owner that does not own the
     /// token.
     ClaimUnderWrongOwner,
@@ -3170,6 +3173,7 @@ struct Lowering<'a> {
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
     consumed_subcontinuation_frames: BTreeSet<(u64, u64)>,
     checked_frame_events: Option<FrameEvents>,
+    checked_call_token_events: Option<FrameEvents<ContinuationCallIdentity>>,
     active_subcontinuation_frame: Option<u64>,
     consumed_recursive_call_templates: BTreeSet<u64>,
     pending_recursive_call: Option<CheckedRecursiveInvocationInstance>,
@@ -3180,9 +3184,9 @@ struct Lowering<'a> {
     next_dynamic_splice_edge: u64,
     assumptions: BTreeSet<String>,
     unsupported: Vec<String>,
-    /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- the affine claim ledger, held across
-    /// the whole unit-definition pass so a token claimed at one producer
-    /// occurrence cannot be claimed again at another.
+    /// Artifact-wide planned/claimed set and resolved callee map. Same-path
+    /// duplicate claims are checked by the separate Function-local token
+    /// lattice rather than compile-time visitation order.
     continuation_claims: Option<units::ContinuationClaimLedger>,
     /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3`** — the SIBLING affine ledger for
     /// the fusion-local realizations `F`, held over the same span as
@@ -7867,21 +7871,23 @@ impl<'a> Lowering<'a> {
         bundle: &units::UnitBundle,
     ) -> Result<(), CraneliftBackendError> {
         let mut expected_by_callee: BTreeMap<FuncId, usize> = BTreeMap::new();
-        for (identity, inst) in &self.function_local.continuation_emissions {
+        for (identity, insts) in &self.function_local.continuation_emissions {
             let planned = units::resolved_continuation_call_target(
                 &self.static_transition_plan,
                 bundle,
                 identity,
             )?;
-            let emitted = Self::decode_direct_callee(func, *inst)?;
-            if emitted != planned {
-                return Err(backend_module(format!(
-                    "the emitted direct-call target {emitted:?} disagrees with the planner-issued \
-                     continuation target {planned:?} for a causal token; the call that was built \
-                     is not the call that was planned"
-                )));
+            for inst in insts {
+                let emitted = Self::decode_direct_callee(func, *inst)?;
+                if emitted != planned {
+                    return Err(backend_module(format!(
+                        "the emitted direct-call target {emitted:?} disagrees with the planner-issued \
+                         continuation target {planned:?} for a causal token; the call that was built \
+                         is not the call that was planned"
+                    )));
+                }
+                *expected_by_callee.entry(planned).or_default() += 1;
             }
-            *expected_by_callee.entry(planned).or_default() += 1;
         }
         for (transport, inst) in &self.function_local.checked_ih_transport_emissions {
             if !self
@@ -8001,8 +8007,9 @@ impl<'a> Lowering<'a> {
     ///    instruction — a CLIF fact — and the live source-continuation depth
     ///    must be what it was before the emitter ran.
     ///
-    /// ⛔ Records are promoted one at a time and a duplicate identity refuses:
-    /// one causal obligation cannot be answered twice.
+    /// Verified records are promoted one at a time. Distinct exclusive-arm
+    /// instructions share an identity; the token lattice rejects a same-path
+    /// second composed discharge as E2.
     fn verify_recorded_composed_discharges(
         &mut self,
         func: &Function,
@@ -8170,28 +8177,36 @@ impl<'a> Lowering<'a> {
                 )));
             }
             let settled_identity = record.identity.clone();
-            if self
-                .function_local
+            self.function_local
                 .composed_discharges
-                .insert(record.identity, record.inst)
-                .is_some()
-            {
-                return Err(backend_module(
-                    "one causal identity was discharged twice in a single function".to_string(),
-                ));
-            }
+                .entry(record.identity)
+                .or_default()
+                .insert(record.inst);
+            // The composed call has passed every finished-CLIF verification.
+            // Its enter and receipt are both anchored to that verified call;
+            // two calls on one path become E2 in the token lattice.
+            self.record_checked_call_token_inst(
+                func,
+                FrameEventKind::Activation,
+                &settled_identity,
+                record.inst,
+            )?;
+            self.record_checked_call_token_inst(
+                func,
+                FrameEventKind::Receipt,
+                &settled_identity,
+                record.inst,
+            )?;
             // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — `ComposedCall`, settled
             // at the ONE seat where a composed claim has passed every clause and
             // is admitted to the verified population, so the disposition is
             // downstream of finished-CLIF verification by construction and the
             // composed feed itself is untouched.
             //
-            // ⇒ **AFTER the existing double-discharge refusal, and the order is
-            // load-bearing.** Settling first made this layer refuse a second
-            // arrival before the law did, replacing `d8f`'s expected
-            // "discharged twice in a single function" with a candidate-ledger
-            // message. A layer in front of the law must not preempt the law's
-            // own refusals: it derives from them, it does not speak for them.
+            // The candidate ledger records one artifact-wide disposition. A
+            // repeated identical composed disposition is idempotent; the
+            // Function-local token lattice rejects a same-path repeat as E2.
+            // A conflicting disposition still refuses at the candidate seat.
             // `D3` — the promotion seat, recorded before the ledger call so a
             // REFUSED promotion still leaves its seat in the trace. That is the
             // terminal event both mutation 2's and mutation 3's chains end on,
@@ -12009,7 +12024,44 @@ impl<'a> Lowering<'a> {
         if let Some(events) = self.checked_frame_events.as_mut() {
             events.terminal(builder, kind)?;
         }
+        if let Some(events) = self.checked_call_token_events.as_mut() {
+            events.terminal(builder, kind)?;
+        }
         Ok(())
+    }
+
+    fn record_checked_call_token(
+        &mut self,
+        builder: &FunctionBuilder<'_>,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<(), CraneliftBackendError> {
+        self.checked_call_token_events
+            .as_mut()
+            .ok_or_else(|| {
+                unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "continuation call token claimed outside a generated Function scope",
+                )
+            })?
+            .record(builder, FrameEventKind::Activation, identity.clone())
+    }
+
+    fn record_checked_call_token_inst(
+        &mut self,
+        func: &Function,
+        kind: FrameEventKind,
+        identity: &ContinuationCallIdentity,
+        inst: cranelift_codegen::ir::Inst,
+    ) -> Result<(), CraneliftBackendError> {
+        self.checked_call_token_events
+            .as_mut()
+            .ok_or_else(|| {
+                unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "continuation call token emitted outside a generated Function scope",
+                )
+            })?
+            .record_inst(func, kind, identity.clone(), inst)
     }
 
     fn enter_checked_recursive_invocation(

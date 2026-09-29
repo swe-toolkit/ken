@@ -6314,14 +6314,14 @@ mod tests {
     /// both let it claim its composed causal identity -- so on the two-call witness
     /// the ordinary selected-argument call answered for the identity the planner
     /// issued for the checked application, and the checked application then answered
-    /// for it again. The affine law refused, correctly: *"one causal identity was
-    /// discharged twice in a single function"*.
+    /// for it again. The old flat ledger refused; the finished-Function token
+    /// lattice now rejects this same-path repeat as E2.
     ///
     /// The boundary now matches a closed
     /// [`CheckedApplicationDisposition`](crate::cranelift_backend::lowering::CheckedApplicationDisposition)
     /// exhaustively. Nothing else moved: no identity gained an occurrence, none was
-    /// minted, the binding is still composed, and the Function-local affine ledger
-    /// is untouched. The declined call simply does not answer.
+    /// minted, the binding is still composed, and the declined call simply
+    /// does not answer.
     ///
     /// ## Clause 1 — the live occurrence decision, per body
     ///
@@ -6335,15 +6335,14 @@ mod tests {
     ///
     /// ## Clause 2 — no identity is discharged twice
     ///
-    /// The composed causal identities actually discharged are read from closeout,
-    /// which is a third site and knows nothing about dispositions.
+    /// The composed causal identities actually discharged by this witness are
+    /// read from closeout, which knows nothing about dispositions.
     ///
-    /// ⚠ The claim is **identity-global nonduplication**, not one claim per defining
-    /// body. MEASURED: this witness's two defining bodies share ONE planner-issued
-    /// causal identity, so a per-body count is the wrong shape here and would fail
-    /// on a lawful program. The affine fact is that no identity appears twice in the
-    /// discharged set -- which is exactly what the declined call answering would
-    /// break.
+    /// The claim is specific to this same-path witness: the declined call does
+    /// not answer a causal identity already answered on its route. Its two
+    /// defining bodies share one planner-issued identity, so a per-body count
+    /// would be the wrong shape. Exclusive successors may lawfully record the
+    /// same identity twice; the finished-Function lattice distinguishes them.
     ///
     /// ## Clause 3 — the difference
     ///
@@ -6450,8 +6449,8 @@ mod tests {
             );
         }
 
-        // Clause 2 — no identity is discharged twice, read from closeout. NOT one
-        // claim per defining body: the two bodies share one planner-issued identity.
+        // Clause 2 — this witness has no duplicated discharge in closeout.
+        // NOT one per defining body: the two bodies share one identity.
         let claims = d8j_discharged();
         assert!(
             !claims.is_empty(),
@@ -6463,10 +6462,8 @@ mod tests {
         assert_eq!(
             distinct.len(),
             claims.len(),
-            "and no identity may be discharged twice. MEASURED: this witness's two defining bodies \
-             share ONE planner-issued causal identity, so 'once per body' would be the wrong \
-             expectation here -- the affine fact is that the identity is answered for exactly once, \
-             which is what the declined call answering would break: {claims:?}"
+            "on this same-path witness, the shared identity must be answered once, not once per \
+             defining body. A second answer from the declined call would cause E2: {claims:?}"
         );
 
         // Clause 3 — the difference. Let the declined call answer again.
@@ -6475,8 +6472,8 @@ mod tests {
         set_d8f_declined_call_claims(false);
         let doubled = format!("{doubled:?}");
         assert!(
-            doubled.contains("one causal identity was discharged twice in a single function"),
-            "letting the DECLINED call claim must bring the refusal back. The call itself is unchanged \
+            doubled.contains("}: {E2}"),
+            "letting the DECLINED call claim must bring the token-lattice E2 refusal back. The call itself is unchanged \
              either way -- only the claim moves -- so this is D8f's whole change stated as a \
              difference. Without it, 'it compiles now' and 'the affine law stopped noticing' are the \
              same observation: {doubled}"
