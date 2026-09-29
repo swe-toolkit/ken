@@ -2,13 +2,11 @@
 //!
 //! `modules.rs::expand_scope` now auto-groups a maximal run of non-`pub`
 //! `view`/`let` decls by call-graph SCC and routes any real (size > 1)
-//! cycle through `elab::elaborate_mutual_group` — one `sct_check` over the
-//! whole cycle, no member escapes the termination check.
+//! cycle through `elab::elaborate_mutual_group` — one checked kernel
+//! `admit_bodies` call over the whole cycle, no member escapes the SCT gate.
 //!
-//! - AC1 (kernel untouched) is verified out-of-band (`git diff -- crates/
-//!   ken-kernel/` empty) — `elaborate_mutual_group` reuses the existing
-//!   `Decl::Opaque` pre-admit / `kernel_check` / `sct_check` /
-//!   `upgrade_to_transparent` sequence, no new kernel API.
+//! - AC1 uses `Decl::Opaque` pre-admission followed by `admit_bodies` on the
+//!   entire group, preserving all-or-none upgrade or rollback.
 //! - AC2 — `isEven`/`isOdd` elaborates, SCT-accepts, and computes correct
 //!   values (checked via `Refl`-discharged `Equal Bool` goals — the kernel
 //!   itself must see the two sides as definitionally equal for these to

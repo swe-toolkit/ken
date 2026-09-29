@@ -535,7 +535,8 @@ fn q_p_assertion_points_project_from_export() {
     let q_hole = declare_postulate(&mut env, "test postulate".to_string(), vec![], phi.clone())
         .expect("Q hole");
     let q_cert = Term::lam(Term::Omega(Level::zero()), Term::var(0));
-    env.upgrade_to_transparent(q_hole, q_cert.clone());
+    ken_kernel::check::admit_bodies(&mut env, &[(q_hole, q_cert.clone())])
+        .expect("Q certificate must be admitted");
 
     // P hole: undischarged (still in trusted_base)
     let p_hole = declare_postulate(&mut env, "test postulate".to_string(), vec![], phi.clone())
@@ -596,7 +597,8 @@ fn q_p_assertion_points_project_from_export() {
 
     // Export2: discharge p_hole too → both entries move to Q
     let p_cert = Term::lam(Term::Omega(Level::zero()), Term::var(0));
-    env.upgrade_to_transparent(p_hole, p_cert.clone());
+    ken_kernel::check::admit_bodies(&mut env, &[(p_hole, p_cert.clone())])
+        .expect("P certificate must be admitted");
     let tb2 = trusted_base_set(&env);
     let export2 = emit_export(
         "prog",

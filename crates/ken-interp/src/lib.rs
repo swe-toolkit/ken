@@ -230,16 +230,14 @@ mod tests {
             }),
         );
 
-        // Declare as postulate first (skips type-checking which the interpreter
-        // tests don't need), then upgrade to transparent so δ-reduction works.
-        let add_id = declare_postulate(
+        // A checked transparent definition supplies δ-reduction to the test.
+        let add_id = declare_def(
             &mut env,
-            "interp_test_add".to_string(),
             vec![],
             Term::pi(nat_ty(), Term::pi(nat_ty(), nat_ty())),
+            add_body,
         )
-        .expect("declare add type");
-        env.upgrade_to_transparent(add_id, add_body);
+        .expect("declare add");
 
         let t = Term::app(
             Term::app(
@@ -991,14 +989,13 @@ mod tests {
             "fst(snd(pair zero (pair (suc zero) unknown))) must demand only the selected field"
         );
 
-        let record_id = declare_postulate(
+        let record_id = declare_def(
             &mut env,
-            "interp_test_record".to_string(),
             vec![],
-            nat_ty.clone(),
+            Term::sigma(nat_ty.clone(), Term::sigma(nat_ty.clone(), nat_ty.clone())),
+            pair_with_unknown_tail.clone(),
         )
         .expect("transparent record");
-        env.upgrade_to_transparent(record_id, pair_with_unknown_tail.clone());
         let r = eval(
             &[],
             &Term::Proj1(Box::new(Term::Proj2(Box::new(Term::Const {

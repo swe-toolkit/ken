@@ -8,8 +8,9 @@
 //!
 //! **Honesty discriminator (I1, the load-bearing pin):** a claim is in `Q`
 //! iff its V1 hole is ABSENT from `trusted_base()` (the postulate was
-//! discharged: `upgrade_to_transparent` was called and the cert kernel-
-//! checked). A claim whose hole remains in `trusted_base()` is in `P`.
+//! discharged through kernel `admit_bodies`, which checked the cert, SCT,
+//! and transparent escape paths). A claim whose hole remains in
+//! `trusted_base()` is in `P`.
 //! Checking `trusted_base()` membership is a structural check on the kernel
 //! environment, not a comparison of status strings: a lazy emitter that trusts
 //! a V-layer "proved" string (or buckets by presence of an `ensures` clause)
@@ -83,7 +84,7 @@ impl PStatus {
 /// An entry in `Q` (guarantees) — a proved postcondition (`71 §2.1`, I1).
 ///
 /// Invariant: the corresponding hole is ABSENT from `trusted_base()` at
-/// emission time (discharged via `upgrade_to_transparent`). Only constructible
+/// emission time (discharged via `admit_bodies`). Only constructible
 /// inside the checked-target export transaction — the one-way gate holds structurally.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct QEntry {

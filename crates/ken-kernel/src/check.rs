@@ -22,6 +22,7 @@ use crate::inductive::{
 };
 use crate::subst::{apply_args, subst0, subst_levels, subst_outer, subst_tel, weaken};
 use crate::term::{GlobalId, Level, LevelVar, Term};
+use std::collections::HashSet;
 use unicode_normalization::UnicodeNormalization;
 
 // --- raw well-formedness (`11 §6`) -----------------------------------------
@@ -1115,6 +1116,70 @@ fn validate_inductive_decl_inner(
     Ok(())
 }
 
+/// Check and install a complete group of pre-admitted opaque bodies.
+///
+/// Type-check each body while all group members are still opaque, then run
+/// SCT over the entire group. An external transparent definition may already
+/// refer to one of these opaque placeholders; upgrading a body that reaches
+/// that definition and returns to any group member would create a cycle SCT
+/// cannot see. Refuse that escape before installing any body.
+///
+/// An error leaves the environment untouched, including its trusted base.
+/// Callers that allocated provisional placeholders own their rollback.
+pub fn admit_bodies(env: &mut GlobalEnv, group: &[(GlobalId, Term)]) -> KernelResult<()> {
+    let members: HashSet<GlobalId> = group.iter().map(|(id, _)| *id).collect();
+    if members.len() != group.len() {
+        return Err(KernelError::IllFormedDecl(
+            "duplicate checked-upgrade group member".into(),
+        ));
+    }
+    let empty = Context::new();
+    for (id, body) in group {
+        let Some(Decl::Opaque { ty, .. }) = env.lookup(*id) else {
+            return Err(KernelError::IllFormedDecl(
+                "checked upgrade requires a present opaque member".into(),
+            ));
+        };
+        check(env, &empty, body, ty)?;
+    }
+    crate::sct::sct_check(env, group)?;
+
+    for (_, body) in group {
+        let mut pending = Vec::new();
+        let mut terms = vec![body];
+        while let Some(term) = terms.pop() {
+            if let Term::Const { id, .. } = term {
+                if !members.contains(id) {
+                    pending.push(*id);
+                }
+            }
+            terms.extend(term.children());
+        }
+        let mut seen = HashSet::new();
+        while let Some(id) = pending.pop() {
+            if members.contains(&id) {
+                return Err(KernelError::NotTerminating(
+                    "transparent body escapes the admission group and returns to a member"
+                        .into(),
+                ));
+            }
+            if seen.insert(id) {
+                if let Some(refs) = env.transparent_body_refs(id) {
+                    pending.extend(refs.iter().copied());
+                }
+            }
+        }
+    }
+
+    for (id, body) in group {
+        assert!(
+            env.upgrade_to_transparent(*id, body.clone()),
+            "prechecked opaque group member must upgrade"
+        );
+    }
+    Ok(())
+}
+
 /// `declare_def` — admit a transparent definition `c : A := t` after checking
 /// `· ⊢ A type`, `· ⊢ t ⇐ A`, and the SCT gate (`17 §4`, `18 §4`).
 ///
@@ -1137,15 +1202,9 @@ pub fn declare_def(
         level_params: level_params.clone(),
         ty: ty.clone(),
     });
-    // Type-check (self-calls see c as opaque with type `ty`).
-    let check_result = check(env, &empty, &body, &ty);
-    // SCT gate.
-    let sct_result = check_result.and_then(|_| crate::sct::sct_check(env, &[(id, body.clone())]));
-    match sct_result {
-        Ok(()) => {
-            env.upgrade_to_transparent(id, body);
-            Ok(id)
-        }
+    // All checks run while the provisional declaration is still opaque.
+    match admit_bodies(env, &[(id, body)]) {
+        Ok(()) => Ok(id),
         Err(e) => {
             env.remove_last();
             Err(e)
@@ -1200,28 +1259,11 @@ where
         "bodies_fn must return one body per member"
     );
 
-    // Type-check all bodies.
-    let check_result: KernelResult<()> = (|| {
-        for (i, body) in bodies.iter().enumerate() {
-            let ty = &specs[i].1;
-            check(env, &empty, body, ty)?;
-        }
-        Ok(())
-    })();
-
-    // SCT gate on the whole group.
-    let group_bodies: Vec<(GlobalId, Term)> =
-        ids.iter().cloned().zip(bodies.iter().cloned()).collect();
-    let sct_result = check_result.and_then(|_| crate::sct::sct_check(env, &group_bodies));
-
-    match sct_result {
-        Ok(()) => {
-            // Upgrade all to transparent.
-            for (id, body) in ids.iter().zip(bodies) {
-                env.upgrade_to_transparent(*id, body);
-            }
-            Ok(ids)
-        }
+    // Admission checks SCT once on the entire mutual group and installs it
+    // only after every body and every path outside the group passes its gate.
+    let group_bodies: Vec<(GlobalId, Term)> = ids.iter().copied().zip(bodies).collect();
+    match admit_bodies(env, &group_bodies) {
+        Ok(()) => Ok(ids),
         Err(e) => {
             // Rollback all pre-admitted members (remove in reverse order).
             for _ in 0..ids.len() {
