@@ -53,6 +53,14 @@ jobs:
           echo "conformance suite not yet implemented (WP F2)"
           echo "clean-room provenance scan not yet implemented (WP F1)"
           echo "path-guard not yet implemented (WP F1)"
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   # Run 36285524404 hit the observed 20-job concurrency cap. The first 20
   # started within 12s; three shard jobs started at 19-21s, then two more
@@ -101,6 +109,9 @@ jobs:
     if: needs.classify-paths.outputs.mode == 'full'
     name: test shard ${{ matrix.shard }}/7
     runs-on: ubuntu-latest
+    env:
+      CI_RUSTC_TIMING_WORKSPACE: ${{ github.workspace }}
+      RUSTC_WRAPPER: ${{ github.workspace }}/scripts/ci-rustc-timing.py
     strategy:
       # Do not cancel siblings on first failure — a full picture of which
       # shards failed is worth more than the saved minutes, and shards are
@@ -114,6 +125,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Record checkout end
         run: echo "CI_PHASE_TIMING shard=${{ matrix.shard }} phase=checkout event=end unix_s=$(date -u +%s.%N)"
+      - name: Start resource monitor
+        id: resource_monitor_start
+        run: python3 scripts/ci-resource-monitor.py start
+      - name: Initialize shard build timing log
+        env:
+          CI_TIMING_SHARD: ${{ matrix.shard }}
+        run: |
+          log="$RUNNER_TEMP/ci-rustc-timings-$GITHUB_RUN_ID-$CI_TIMING_SHARD.jsonl"
+          printf 'CI_RUSTC_TIMING_LOG=%s\n' "$log" >> "$GITHUB_ENV"
+          : > "$log"
       # NO dependency cache, deliberately. `Swatinem/rust-cache` was removed
       # (item C8): it never measurably helped and is third-party code with
       # access to the build, i.e. supply-chain surface taken on for nothing.
@@ -175,6 +196,7 @@ jobs:
       # union are checked by scripts/check-ci-shard-union.py.
       - name: Select duration-balanced shard
         run: |
+          : > "$CI_RUSTC_TIMING_LOG"
           phase_timestamp() {
             printf 'CI_PHASE_TIMING shard=%s phase=%s event=%s unix_s=%s\n' "${{ matrix.shard }}" "$1" "$2" "$(date -u +%s.%N)"
           }
@@ -247,6 +269,13 @@ jobs:
           cp duration-filters/assignments.json "realized-shard-${{ matrix.shard }}/assignments.json"
           python3 -c 'import json,sys; shard=int(sys.argv[1]); item=json.load(open("duration-filters/assignments.json"))["bins"][shard-1]; print("CI_SHARD_PLAN shard={} selected_tests={} projected_test_s={:.3f} projected_job_s={:.3f} artifacts=realized-shard-{}/assignments.json,realized-shard-{}/planning-evidence.json".format(shard,len(item["tests"]),item["projected_test_seconds"],item["projected_job_seconds"],shard,shard))' "${{ matrix.shard }}"
           phase_timestamp realize-and-stage end
+      - name: Report shard build timing split
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        env:
+          CI_TIMING_SHARD: ${{ matrix.shard }}
+        run: |
+          python3 scripts/ci-rustc-timing.py report "$CI_RUSTC_TIMING_LOG" "$CI_TIMING_SHARD"
+          cp "$CI_RUSTC_TIMING_LOG" "realized-shard-${CI_TIMING_SHARD}/rustc-timings.jsonl"
       - name: Test
         run: >-
           scripts/run-ci-shard.sh
@@ -277,6 +306,17 @@ jobs:
       - name: Doctests
         if: matrix.shard == 1
         run: cargo test --workspace --doc --locked
+      - name: Report peak disk and memory
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        run: python3 scripts/ci-resource-monitor.py finish
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   # ── Slow native binaries, restored to the gate ─────────────────────────
   #
@@ -297,6 +337,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Start resource monitor
+        id: resource_monitor_start
+        run: python3 scripts/ci-resource-monitor.py start
       # No cache here either — see the note in the sharded job (item C8).
       - name: Build
         run: cargo build --workspace --locked
@@ -326,6 +369,17 @@ jobs:
         run: cargo nextest run --locked -p ken-verify --test px8f_write_partition --no-tests=pass
       - name: Test buffer partition
         run: cargo nextest run --locked -p ken-cli --test px8f_buffer_native --no-tests=pass
+      - name: Report peak disk and memory
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        run: python3 scripts/ci-resource-monitor.py finish
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   # Run 36295180542 adds a complete ten-shard parity source: 185 unique tests
   # passed, with seven auxiliary rows excluded. The six-run upper envelope
@@ -347,6 +401,9 @@ jobs:
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@v4
+      - name: Start resource monitor
+        id: resource_monitor_start
+        run: python3 scripts/ci-resource-monitor.py start
       - name: Build
         run: cargo build --workspace --locked
       - name: Install cargo-nextest
@@ -403,6 +460,17 @@ jobs:
           name: rt-parity-shard-${{ matrix.shard }}
           path: rt-parity-artifact/*
           if-no-files-found: error
+      - name: Report peak disk and memory
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        run: python3 scripts/ci-resource-monitor.py finish
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   z3-process-adapter:
     needs: classify-paths
@@ -412,6 +480,9 @@ jobs:
     container: ghcr.io/swe-toolkit/ken/ci-z3@sha256:4043afa445489c19fa9b6628258134225953354e2bf1766d996558cdf73e38da
     steps:
       - uses: actions/checkout@v4
+      - name: Start resource monitor
+        id: resource_monitor_start
+        run: python3 scripts/ci-resource-monitor.py start
       - name: Verify Z3
         run: z3 -version
       - name: Test feature-on adapter
@@ -421,6 +492,17 @@ jobs:
       - name: Test binary-independent SMT-LIB emission
         run: >-
           cargo test --locked -p ken-elaborator --features z3-process --lib
+      - name: Report peak disk and memory
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        run: python3 scripts/ci-resource-monitor.py finish
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   # ⛔ DO NOT RENAME OR DELETE THIS JOB. `build + test` is a REQUIRED status
   # check in branch protection (docs/ops/github-setup.md §"Required status
@@ -497,6 +579,14 @@ jobs:
             fi
           done
           exit "$failed"
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   # These three names are required status checks. Their placeholder commands
   # run in classify-paths to leave the first wave at 20 jobs; these relay jobs
@@ -521,6 +611,14 @@ jobs:
             exit 1
           fi
           echo "conformance placeholder passed in classify-paths"
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   clean-room:
     needs:
@@ -542,6 +640,14 @@ jobs:
             exit 1
           fi
           echo "clean-room placeholder passed in classify-paths"
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   path-guard:
     needs:
@@ -563,6 +669,14 @@ jobs:
             exit 1
           fi
           echo "path-guard placeholder passed in classify-paths"
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   issue-tracker:
     needs: classify-paths
@@ -570,6 +684,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Start resource monitor
+        id: resource_monitor_start
+        run: python3 scripts/ci-resource-monitor.py start
       # Schema gate: every docs/program/issues/*.md file has all required
       # frontmatter fields, a valid `status`, an `id` matching its filename,
       # no duplicate `id`, and every depends_on/blocks reference resolves.
@@ -613,6 +730,17 @@ jobs:
             ignored-row-list.json ignored-row-sweep.log \
             "$expected" "$run_status" \
             | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Report peak disk and memory
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        run: python3 scripts/ci-resource-monitor.py finish
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
 
   verify-realized-shard-union:
     needs: [classify-paths, test-shard, native-rt-parity]
@@ -628,7 +756,21 @@ jobs:
         with:
           pattern: rt-parity-shard-*
           path: realized-rt-parity
+      - name: Start resource monitor
+        id: resource_monitor_start
+        run: python3 scripts/ci-resource-monitor.py start
       - name: Verify realized partition
         run: |
           test -d realized-rt-parity
           python3 scripts/check-ci-shard-union.py
+      - name: Report peak disk and memory
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        run: python3 scripts/ci-resource-monitor.py finish
+      - name: Snapshot disk and memory on failure
+        if: failure()
+        run: |
+          echo "CI_FAILURE_RESOURCE_SNAPSHOT job=$GITHUB_JOB"
+          echo '--- df -h ---'
+          df -h
+          echo '--- free -m ---'
+          free -m
