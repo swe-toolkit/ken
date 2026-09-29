@@ -57,6 +57,18 @@ stop and report the mismatch.
   current legacy prelude `And` term. The L3 move of the `And` family relies on
   this. It is a property of the implementation during the migration, not a
   spec claim, and it lives only in the Rust test.
+- **AC-1b (nested positions; CAT-REL probe witnesses, Architect
+  `evt_7regb8dbt8j2s`).** Measured at `9c4f0128c` (`evt_2kxy6ejx3sv42`),
+  the parser rejects Σ in each of these expression positions. Each checks
+  after this change:
+  - a `fn … : Type = (vs : List k) × Equal Bool (w vs) True` body, which
+    fails with `expected 'const', 'fn', …, found Times`;
+  - a Σ inside truncation, `fn … : Prop = ‖(vs : List k) × Equal Bool (w vs)
+    True‖`, which fails with `expected TruncBar, found Times`;
+  - the same Σ parenthesized inside the bars, which fails with `expected
+    RParen, found Times`.
+  CAT-REL-CLOSURE-LAWS does not wait on this: it uses a witness `data`
+  truncated into Ω, following `FoKripke.ken`.
 - **AC-2 (negative).** A Σ whose first component is relevant still sorts at
   `Type`, per `sort_sigma`, so ascribing it `Omega` is rejected. Existing
   type-position Σ suites stay green.
