@@ -3073,6 +3073,7 @@ fn build_index_equation_convoy_body(
                         &leaf.index_ty,
                         index_level.clone(),
                         &leaf.target,
+                        &leaf.scrutinee,
                         leaf.proof,
                     );
                     let stable_forward = build_sym(
@@ -3081,6 +3082,7 @@ fn build_index_equation_convoy_body(
                         &leaf.index_ty,
                         index_level,
                         &leaf.scrutinee,
+                        &leaf.target,
                         reverse,
                     );
                     if let Some((cast, cast_ty)) = try_reindex_cast(
@@ -5118,6 +5120,7 @@ fn check_large_convoy_recursive_arm(
         &leaf.index_ty,
         index_level.clone(),
         &leaf.target,
+        &leaf.scrutinee,
         leaf.proof.clone(),
     );
     let stable_forward = build_sym(
@@ -5126,6 +5129,7 @@ fn check_large_convoy_recursive_arm(
         &leaf.index_ty,
         index_level.clone(),
         &leaf.scrutinee,
+        &leaf.target,
         reverse.clone(),
     );
     if !scrut_occurs(expected_here, &stable_forward) {
@@ -5219,6 +5223,7 @@ fn check_large_convoy_recursive_arm(
         &weaken(&leaf.index_ty, 2),
         index_level.clone(),
         &weaken(&leaf.scrutinee, 2),
+        &Term::var(1),
         Term::var(0),
     );
     let mut motive_substitutions = vec![
@@ -5270,6 +5275,7 @@ fn check_large_convoy_recursive_arm(
         &leaf.index_ty,
         index_level,
         &leaf.target,
+        &leaf.scrutinee,
         leaf.proof.clone(),
     );
     let mut transported = Term::J(
@@ -6763,6 +6769,7 @@ fn build_sym(
     idx_ty: &Term,
     idx_level: Level,
     a: &Term,
+    b: &Term,
     h: Term,
 ) -> Term {
     let dom2 = Term::Eq(
@@ -6783,7 +6790,13 @@ fn build_sym(
     let motive_ty = Term::pi(idx_ty.clone(), Term::pi(dom2, Term::omega(idx_level)));
     let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_ty));
     let base = Term::Refl(Box::new(refl_base_arg(env, ctx, idx_ty, a)));
-    Term::J(Box::new(motive), Box::new(base), Box::new(h))
+    let proof_ty = Term::Eq(
+        Box::new(idx_ty.clone()),
+        Box::new(a.clone()),
+        Box::new(b.clone()),
+    );
+    let proof = Term::Ascript(Box::new(h), Box::new(proof_ty));
+    Term::J(Box::new(motive), Box::new(base), Box::new(proof))
 }
 
 /// Build `e : Eq Type cur_ty new_ty` where `new_ty = cur_ty[new_idx/old_idx]`,
@@ -6832,7 +6845,13 @@ fn build_index_type_cong(
         &Term::Type(type_level),
         cur_ty,
     )));
-    let e = Term::J(Box::new(motive), Box::new(base), Box::new(h));
+    let proof_ty = Term::Eq(
+        Box::new(idx_ty.clone()),
+        Box::new(old_idx.clone()),
+        Box::new(new_idx.clone()),
+    );
+    let proof = Term::Ascript(Box::new(h), Box::new(proof_ty));
+    let e = Term::J(Box::new(motive), Box::new(base), Box::new(proof));
     (e, new_ty)
 }
 
@@ -6861,7 +6880,13 @@ fn build_index_omega_transport(
     // ruled explicit sort ascription.
     let motive_ty = Term::pi(idx_ty.clone(), Term::pi(dom2, Term::omega(omega_level)));
     let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_ty));
-    let transported = Term::J(Box::new(motive), Box::new(value), Box::new(h));
+    let proof_ty = Term::Eq(
+        Box::new(idx_ty.clone()),
+        Box::new(old_idx.clone()),
+        Box::new(new_idx.clone()),
+    );
+    let proof = Term::Ascript(Box::new(h), Box::new(proof_ty));
+    let transported = Term::J(Box::new(motive), Box::new(value), Box::new(proof));
     (transported, new_ty)
 }
 
@@ -7085,6 +7110,7 @@ fn install_hidden_result_variable_refinements(
             &leaf.index_ty,
             level,
             &leaf.target,
+            &leaf.scrutinee,
             leaf.proof.clone(),
         );
         symmetric_leaves.push((leaf, proof_sym));
@@ -18532,7 +18558,7 @@ mod omega_index_refinement_tests {
     fn direct_omega_transport_builds_the_ruled_j_motive_exactly() {
         // Promise class: durable invariant. Intended extensions may add more
         // refinement callers or sorts; changing the ruled J motive, base,
-        // scrutinee, or old-to-new orientation must make this control red.
+        // ascribed proof, or old-to-new orientation must make this control red.
         // MEASURED: the private production constructor's complete Term tree.
         // CLAIMED: decision 1 emits the ruled direct-J transport. THE GAP:
         // arm reachability and kernel admission are exercised by integration
@@ -18570,6 +18596,11 @@ mod omega_index_refinement_tests {
             idx_ty.clone(),
             Term::lam(expected_eq_domain.clone(), expected_at_y),
         );
+        let expected_proof_type = Term::Eq(
+            Box::new(idx_ty.clone()),
+            Box::new(old_idx.clone()),
+            Box::new(new_idx.clone()),
+        );
         let expected_motive_type = Term::pi(
             idx_ty,
             Term::pi(expected_eq_domain, Term::omega(Level::Zero)),
@@ -18580,7 +18611,7 @@ mod omega_index_refinement_tests {
                 Box::new(expected_motive_type),
             )),
             Box::new(value),
-            Box::new(h),
+            Box::new(Term::Ascript(Box::new(h), Box::new(expected_proof_type))),
         );
 
         assert_eq!(new_ty, expected_new_ty);
