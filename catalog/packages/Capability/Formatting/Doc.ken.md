@@ -30,6 +30,8 @@ import Data.Collections.Derived (length, list_append)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
+import Data.Numeric.Nat.Order (leq_nat_add_left_bound, leq_nat_add_right_bound)
+
 data Doc : Type where {
   Text : List Char → Doc;
   Line : Doc;
@@ -127,6 +129,104 @@ fn render_mode (flat : Bool) (width : Nat) (indent : Nat) (doc : Doc) : List Cha
 pub fn render (width : Nat) (doc : Doc) : List Char = render_mode False width Zero doc
 ```
 
+A fitting document remains flat even when a nested `Group` or `Alt` makes its
+own choice. The addition bounds pass the fit premise to both `Concat` children;
+length of list append and congruence reassemble their exact flat widths.
+
+```ken
+theorem pretty_add_cong
+      (x : Nat)
+      (x2 : Nat)
+      (y : Nat)
+      (y2 : Nat)
+      (same_x : Equal Nat x x2)
+      (same_y : Equal Nat y y2)
+    : Equal Nat (add x y) (add x2 y2) =
+  trans
+    Nat
+    (add x y)
+    (add x2 y)
+    (add x2 y2)
+    (cong Nat Nat x x2 (λn. add n y) same_x)
+    (cong Nat Nat y y2 (add x2) same_y)
+
+theorem render_flat_fits
+      (width : Nat) (indent : Nat) (doc : Doc)
+    : Equal Bool (doc_fits width doc) True
+      → Equal Nat (length Char (render_mode True width indent doc)) (doc_flat_width doc) =
+  match doc {
+    Text chars ↦ λfit. Refl;
+    Line ↦ λfit. Proved;
+    Concat left right ↦
+      λfit.
+        let
+          left_width = doc_flat_width left;
+          right_width = doc_flat_width right;
+          joined_width = add left_width right_width;
+          left_chars = render_mode True width indent left;
+          right_chars = render_mode True width indent right;
+          left_fit : Equal Bool (doc_fits width left) True =
+            (proof trans for leq_nat)
+              left_width
+              joined_width
+              width
+              (leq_nat_add_left_bound left_width right_width)
+              fit;
+          right_fit : Equal Bool (doc_fits width right) True =
+            (proof trans for leq_nat)
+              right_width
+              joined_width
+              width
+              (leq_nat_add_right_bound left_width right_width)
+              fit
+        in
+          trans
+            Nat
+            (length Char (list_append Char left_chars right_chars))
+            (add (length Char left_chars) (length Char right_chars))
+            joined_width
+            (list_append::length Char left_chars right_chars)
+            (pretty_add_cong
+              (length Char left_chars)
+              left_width
+              (length Char right_chars)
+              right_width
+              (render_flat_fits width indent left left_fit)
+              (render_flat_fits width indent right right_fit));
+    Nest amount body ↦ λfit. render_flat_fits width (add indent amount) body fit;
+    Group body ↦
+      λfit.
+        J
+          (λchoice _.
+            Equal
+              Nat
+              (length
+                Char
+                (match choice {
+                  True ↦ render_mode True width indent body;
+                  False ↦ render_mode False width indent body
+                }))
+              (doc_flat_width body))
+          (render_flat_fits width indent body fit)
+          (sym Bool (doc_fits width body) True fit);
+    Alt first second ↦
+      λfit.
+        J
+          (λchoice _.
+            Equal
+              Nat
+              (length
+                Char
+                (match choice {
+                  True ↦ render_mode True width indent first;
+                  False ↦ render_mode False width indent second
+                }))
+              (doc_flat_width first))
+          (render_flat_fits width indent first fit)
+          (sym Bool (doc_fits width first) True fit)
+  }
+```
+
 The renderer has no ambient inputs: all choices are functions of `width` and
 the `Doc` value. Broken `Line` emits newline followed by the current nesting
 indent; flat `Line` emits one space.
@@ -184,6 +284,144 @@ fn pretty_bool_cases (b : Bool) : Or (Equal Bool b True) (Equal Bool b False) =
   match b {
     True ↦ Inl (Equal Bool True True) (Equal Bool True False) Proved;
     False ↦ Inr (Equal Bool False True) (Equal Bool False False) Proved
+  }
+
+theorem render_group_when_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (body : Doc)
+      (fit : Equal Bool (doc_fits width body) True)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Group body))
+        (render_mode True width indent body) =
+  match pretty_bool_cases (doc_fits width body) {
+    Inl h ↦
+      J
+        (λchoice _.
+          Equal
+            (List Char)
+            (match choice {
+              True ↦ render_mode True width indent body;
+              False ↦ render_mode False width indent body
+            })
+            (render_mode True width indent body))
+        Refl
+        (sym Bool (doc_fits width body) True h);
+    Inr h ↦
+      absurd
+        (trans
+          Bool
+          True
+          (doc_fits width body)
+          False
+          (sym Bool (doc_fits width body) True fit)
+          h)
+  }
+
+theorem render_group_when_not_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (body : Doc)
+      (no_fit : Equal Bool (doc_fits width body) False)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Group body))
+        (render_mode False width indent body) =
+  match pretty_bool_cases (doc_fits width body) {
+    Inl h ↦
+      absurd
+        (trans
+          Bool
+          False
+          (doc_fits width body)
+          True
+          (sym Bool (doc_fits width body) False no_fit)
+          h);
+    Inr h ↦
+      J
+        (λchoice _.
+          Equal
+            (List Char)
+            (match choice {
+              True ↦ render_mode True width indent body;
+              False ↦ render_mode False width indent body
+            })
+            (render_mode False width indent body))
+        Refl
+        (sym Bool (doc_fits width body) False h)
+  }
+
+theorem render_alt_when_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (first : Doc)
+      (second : Doc)
+      (fit : Equal Bool (doc_fits width first) True)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Alt first second))
+        (render_mode True width indent first) =
+  match pretty_bool_cases (doc_fits width first) {
+    Inl h ↦
+      J
+        (λchoice _.
+          Equal
+            (List Char)
+            (match choice {
+              True ↦ render_mode True width indent first;
+              False ↦ render_mode False width indent second
+            })
+            (render_mode True width indent first))
+        Refl
+        (sym Bool (doc_fits width first) True h);
+    Inr h ↦
+      absurd
+        (trans
+          Bool
+          True
+          (doc_fits width first)
+          False
+          (sym Bool (doc_fits width first) True fit)
+          h)
+  }
+
+theorem render_alt_when_not_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (first : Doc)
+      (second : Doc)
+      (no_fit : Equal Bool (doc_fits width first) False)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Alt first second))
+        (render_mode False width indent second) =
+  match pretty_bool_cases (doc_fits width first) {
+    Inl h ↦
+      absurd
+        (trans
+          Bool
+          False
+          (doc_fits width first)
+          True
+          (sym Bool (doc_fits width first) False no_fit)
+          h);
+    Inr h ↦
+      J
+        (λchoice _.
+          Equal
+            (List Char)
+            (match choice {
+              True ↦ render_mode True width indent first;
+              False ↦ render_mode False width indent second
+            })
+            (render_mode False width indent second))
+        Refl
+        (sym Bool (doc_fits width first) False h)
   }
 
 theorem render_content_group_preserves
@@ -356,7 +594,113 @@ proof fixed_point for render
 
 The fixed-point statement is exact: once a rendered `List Char` is embedded as
 one inert `Text` leaf, rendering it again at the same width returns the same
-characters byte-for-byte. It adds no new layout decisions.
+characters byte-for-byte. It adds no new layout decisions. The four choice
+laws above quantify over the incoming flat mode: `Group` and `Alt` ignore it,
+then select from their own fit computation. A false fit premise selects the
+broken branch; no content invariant is required for a layout equality.
+
+These generic consumers keep each fitting and choice statement usable at its
+full parameter and premise types, rather than merely at a closed document.
+
+```ken example
+const doc_fitting_counterexample : Doc =
+  Group (Concat (Text (Cons Char (97 : Int) (Nil Char))) Line)
+
+theorem doc_example_counterexample_does_not_fit
+    : Equal Bool (doc_fits Zero doc_fitting_counterexample) False =
+  Proved
+
+theorem doc_example_counterexample_broken_length
+    : Equal Nat
+        (length Char (render_mode True Zero (Suc (Suc Zero)) doc_fitting_counterexample))
+        (Suc (Suc (Suc (Suc Zero)))) =
+  Proved
+
+theorem doc_example_counterexample_flat_width
+    : Equal Nat (doc_flat_width doc_fitting_counterexample) (Suc (Suc Zero)) =
+  Proved
+```
+
+```ken example
+theorem doc_example_flat_fits
+      (width : Nat) (indent : Nat) (doc : Doc) (fit : Equal Bool (doc_fits width doc) True)
+    : Equal Nat (length Char (render_mode True width indent doc)) (doc_flat_width doc) =
+  render_flat_fits width indent doc fit
+```
+
+```ken example
+theorem doc_example_group_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (body : Doc)
+      (fit : Equal Bool (doc_fits width body) True)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Group body))
+        (render_mode True width indent body) =
+  render_group_when_fits flat width indent body fit
+```
+
+```ken example
+theorem doc_example_group_not_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (body : Doc)
+      (no_fit : Equal Bool (doc_fits width body) False)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Group body))
+        (render_mode False width indent body) =
+  render_group_when_not_fits flat width indent body no_fit
+```
+
+```ken example
+theorem doc_example_alt_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (first : Doc)
+      (second : Doc)
+      (fit : Equal Bool (doc_fits width first) True)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Alt first second))
+        (render_mode True width indent first) =
+  render_alt_when_fits flat width indent first second fit
+```
+
+```ken example
+theorem doc_example_alt_not_fits
+      (flat : Bool)
+      (width : Nat)
+      (indent : Nat)
+      (first : Doc)
+      (second : Doc)
+      (no_fit : Equal Bool (doc_fits width first) False)
+    : Equal
+        (List Char)
+        (render_mode flat width indent (Alt first second))
+        (render_mode False width indent second) =
+  render_alt_when_not_fits flat width indent first second no_fit
+```
+
+The fit premise cannot be dropped. At width zero the one-character `Text`
+followed by `Line` in a `Group` chooses the broken rendering, regardless of
+its incoming flat mode. At indent two that rendering contains four characters,
+while its flat width is two.
+
+```ken reject
+const doc_reject_fitting_counterexample : Doc =
+  Group (Concat (Text (Cons Char (97 : Int) (Nil Char))) Line)
+
+theorem doc_reject_flat_without_fit
+    : Equal Nat
+        (length Char (render_mode True Zero (Suc (Suc Zero)) doc_reject_fitting_counterexample))
+        (doc_flat_width doc_reject_fitting_counterexample) =
+  Proved
+```
 
 ## 4. String boundary
 
@@ -367,6 +711,32 @@ above remains at the structural `List Char` layer.
 pub fn text_string (value : String) : Doc = Text (string_to_list_char value)
 
 fn render_string (width : Nat) (doc : Doc) : String = list_char_to_string (render width doc)
+
+theorem render_string_view
+      (width : Nat)
+      (doc : Doc)
+      (round_trip : Equal
+        (List Char)
+        (string_to_list_char (list_char_to_string (render width doc)))
+        (render width doc))
+    : Equal (List Char) (string_to_list_char (render_string width doc)) (render width doc) =
+  round_trip
+```
+
+The list view of `render_string` agrees with `render` only when encoding and
+then decoding this specific rendered list preserves it. In particular, no
+unconditional String round trip or normalization-free conversion is claimed.
+
+```ken example
+theorem doc_example_render_string_view
+      (width : Nat)
+      (doc : Doc)
+      (round_trip : Equal
+        (List Char)
+        (string_to_list_char (list_char_to_string (render width doc)))
+        (render width doc))
+    : Equal (List Char) (string_to_list_char (render_string width doc)) (render width doc) =
+  render_string_view width doc round_trip
 ```
 
 ## 5. Trust and derivation
@@ -374,4 +744,9 @@ fn render_string (width : Nat) (doc : Doc) : String = list_char_to_string (rende
 Every declaration is transparent ordinary Ken. Recursion is structural on
 `Nat`, `List`, or `Doc`; equality reasoning uses the landed `Transport`
 combinators. The package adds no primitive, postulate, `Axiom`, or trusted-base
-entry, and it has no dependency on `Diagnostic`.
+entry, and it has no dependency on `Diagnostic`. Its flat-width proof uses
+`Data.Numeric.Nat.Order`'s checked addition bounds and Derived's checked
+append-length law. Its four private choice laws follow the renderer's own
+Boolean branch and require no content invariant. The String-view law carries
+the rendered list's explicit round-trip premise: it supplies no unconditional
+claim about the opaque conversion.
