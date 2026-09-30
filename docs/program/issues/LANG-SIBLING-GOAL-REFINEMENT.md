@@ -75,18 +75,20 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
 - **B-AC0 (done).** 10 attempts and 48 dependent binders measured: two
   exclusion mechanisms, so a structural closure. No B row fires one of the
   four kernel witness sites, so all 10 stay in B.
-- **B-D0 (design only, Architect gate).** The representation of a
-  generalized premise binder and the step that resolves it; the sweep of
-  goal-rewriting `subst_term_generalize` callers, each in or out with a
-  reason; the double-refinement control.
+- **B-D0 (design only, Architect gate).** On a base other than
+  `ba2cd314c`, first re-count the 10 rows and 48 binders. Then: the
+  representation of a generalized premise binder and the step that resolves
+  it; the sweep of goal-rewriting `subst_term_generalize` callers, each in
+  or out with a reason; the double-refinement control.
 - **A measurement.** Paused until the kernel WP lands.
 - **AC-1.** Increment 1: all 10 B rows classify. Each of f4, f5 and f6
   checks or fails at a named later site. The 38 unreferenced dependents
   stay untouched. Increment 2: f7 and f4 check. `lookup_zip_with` checks
   unchanged, together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
-- **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A binder
-  already refined by its own enclosing match is transported once, not
-  twice. A's five rows are unchanged by increment 1.
+- **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A
+  committed test pins that a binder already refined by its own enclosing
+  match is transported once, not twice. A's five rows keep their verdicts
+  under increment 1.
 - **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged, plus a
   mutation named in the ruling.
 
