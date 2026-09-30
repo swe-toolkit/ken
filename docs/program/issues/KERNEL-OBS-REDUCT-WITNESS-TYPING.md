@@ -70,17 +70,25 @@ The base is the canonical proof of `Eq Type X X`. It is `Refl x'` if whnf
 gives `Eq _ x' _`, and `tt` if it gives `Top`. Otherwise the reducer
 returns `None` and fabricates no witness.
 
-**J admission reads the Eq formation** (Architect `evt_3qfzytddvnjkn`
-ruling on stop `evt_6kbr8qe24a6sw`). This restores the declarative J rule of
-spec 15 §4.
-- One helper, `check.rs::eq_formation`, head-reduces by β, δ, let and
-  ascription only. It stops at the first `Term::Eq` and never applies
-  `eq_reduce` at the head.
-- If no `Eq` head appears, it falls back to today's whnf-and-shape demand.
-- `infer_j` (`check.rs:742-750`) and `obs.rs::j_nonrefl` both use it, so
-  typing and reduction read the same formation.
-- This widens J admission in the kernel. The merge Decision reviews that
-  widening explicitly.
+**J reads its recorded endpoints** (Architect `evt_143zpap46cmfr`, on
+research `evt_4vn1evrd2cn38`; it replaces the `eq_formation` ruling
+`evt_3qfzytddvnjkn`). A J's endpoints are an input recorded once in the
+term, and no consumer re-derives them from `whnf`.
+- **Kernel.** One reader, `j_endpoints(env, ctx, eq)`, over the eq
+  *term*. If `eq` is `Ascript(_, T)` and `T`'s head is `Eq` after β, δ and
+  let only (never `eq_reduce`), it returns `T`'s `(A, a, b)`. Otherwise it
+  falls back to today's `whnf(infer(eq))` and `Eq` shape demand. `infer_j`
+  (`check.rs:742-750`) and `obs.rs::j_nonrefl` both use it, and nothing
+  else reads J endpoints.
+- **Elaborator.** Surface `infer_j` (`elab.rs` ~9435-9446) derives
+  `(A, a, b)` exactly as today and emits `eq` as `Ascript(eq, Eq A a b)`.
+  Nothing else in the elaborator changes.
+- **Kernel witnesses record their evidence.** Site 1:
+  `Ascript(Var(0), Eq A1 p.1 q.1)`, weakened into the codomain. Site 2:
+  `E_j`, already ascribed. Site 4: `Ascript(e, Eq A a b)` with the
+  `(A, a, b)` that `j_endpoints` gave `j_nonrefl`.
+- This widens J admission to recorded formations whose `Eq` reduces. The
+  merge Decision reviews that widening explicitly.
 
 **Site 3 (`cast_at_inductive` Phase 3) moves to
 `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.** Its `e` has no projections, because
@@ -126,6 +134,15 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
     listed. A change on a typed input is a stop to the Architect.
   - The nested-Cast series at depths 8/16/32/64 is reported beside the AC-0
     baseline. A super-linear jump is a stop to the Architect.
+- **AC-2c (recorded endpoints, `evt_143zpap46cmfr`).** Scope adds
+  `crates/ken-elaborator/src/elab.rs` (surface `infer_j` only).
+  - The 57-package census returns to 57/57 accept, with no verdict change
+    against `65af5c7cd`.
+  - A J recorded at `Eq Nat (suc a) (suc b)` and a J recorded at
+    `Eq Nat a b`, over the same `e`, each infer their own recorded result
+    type.
+  - An unrecorded raw J keeps today's type.
+  - The span-55965 probe is posted with the candidate.
 - **AC-3 (J admission fences).**
   - The committed third-field row (`Nat; Vec Nat x1; Vec Nat x1`) computes,
     and `infer(reduct) ≡ infer(redex)`.
@@ -149,7 +166,7 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 2 (Architect `evt_4sj0kg0kd2qbz`).
+§1a count: 3 (Architect `evt_1m0z85kjtyzbe`; research `evt_4vn1evrd2cn38`).
 
 1. J cannot eliminate a proof whose Eq formation reduces. `infer_j` reads
    `whnf(e_ty)` and demands the `Eq` shape, but `Eq` at Σ reduces to a Σ
@@ -159,3 +176,8 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
 2. `cast_at_pi` projects `e.1` from a Π/Π type equality that has no Σ
    reduct (keyed on the absent structural decomposition of `Eq Type` at a
    same-former compound pair). Recut to `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
+3. J's reading of a proof's `Eq` changed for proofs whose `Eq` reduces to
+   another `Eq`, and 22 catalog packages rejected (keyed on which `Eq`
+   formation, written or reduct, the eliminator reads). Shared predicate
+   with entries 1 and 2: each `Eq` consumer re-derives the proof's `Eq`
+   from `whnf`. Ruled: endpoints recorded once, `evt_143zpap46cmfr`.
