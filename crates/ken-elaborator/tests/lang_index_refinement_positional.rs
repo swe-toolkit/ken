@@ -3,7 +3,12 @@
 
 use ken_elaborator::{ElabEnv, ElabError};
 
-fn mat_identity(nil_second: &str, cons_first: &str, cons_second: &str, body: &str) -> Result<(), ElabError> {
+fn mat_identity(
+    nil_second: &str,
+    cons_first: &str,
+    cons_second: &str,
+    body: &str,
+) -> Result<(), ElabError> {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_decl(&format!(
         "data Mat (a : Type) : Nat -> Nat -> Type where {{ \
@@ -59,5 +64,8 @@ fn genuinely_wrong_constructor_arm_remains_rejected() {
     // kernel rejection class, not arbitrary parse or name errors.
     let failure = mat_identity("(Suc Zero)", "Zero", "Zero", "MCons a k1 r1 x t")
         .expect_err("wrong indexed constructor arm must fail");
-    assert!(matches!(failure, ElabError::KernelRejected { .. }), "{failure:?}");
+    assert!(
+        matches!(failure, ElabError::KernelRejected { .. }),
+        "{failure:?}"
+    );
 }

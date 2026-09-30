@@ -362,7 +362,12 @@ fn generalized_premise_generated_proof_is_consumed_by_body() {
             index_type: nat_ty.clone(),
             old_index: Term::var(1),
             new_index: Term::var(2),
-            source_type: source_type.clone(),
+            family_at_y: subst_term_generalize(
+                &weaken(&source_type, 2),
+                &weaken(&Term::var(1), 2),
+                &Term::var(1),
+            ),
+            target_type: subst_term_generalize(&source_type, &Term::var(1), &Term::var(2)),
             omega_level: Level::Zero,
             equality: h1.clone(),
         }),
