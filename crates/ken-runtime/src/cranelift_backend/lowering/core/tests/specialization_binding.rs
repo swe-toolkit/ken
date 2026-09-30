@@ -2798,9 +2798,9 @@ fn d6a_the_frame_field_must_not_overwrite_an_incoming_checked_route() {
 #[test]
 fn erasing_a_seat_key_axis_or_collapsing_the_contract_rejects() {
     use crate::cranelift_backend::planning::{
-        governed_nested_resource_bracket, set_effect_seat_plan_mutation, EffectSeatPlanMutation,
+        governed_nested_resource_bracket_answering, set_effect_seat_plan_mutation, EffectSeatPlanMutation,
     };
-    let expr = governed_nested_resource_bracket(3);
+    let expr = governed_nested_resource_bracket_answering(3, crate::EXIT_SUCCESS_CONSTRUCTOR);
     set_effect_seat_plan_mutation(EffectSeatPlanMutation::Exact);
     recursive_port_process_compiles(&expr)
         .expect("the unmutated bracket compiles, so the rows below are not vacuous");
@@ -3217,8 +3217,8 @@ fn d3b_the_consumer_refuses_an_index_the_emission_seat_does_not_hold() {
 /// position selection, and return the entry-ABI rows of the seats that satisfy
 /// the Architect's conditions 1 and 2 together.
 ///
-/// ⛔ **No fixture is authored here.** `governed_nested_resource_bracket` is the
-/// existing production planner population that five landed controls already
+/// ⛔ **No fixture is authored here.** The shared bracket's ExitCode-answer
+/// variant is the same planner population that five landed controls already
 /// compile; `D3c` measures it rather than building a shape to exhibit an answer.
 /// The compile is expected to end in an error — this population reaches the
 /// unit-body environment boundary recorded at `D3b` — and the observation is
@@ -3234,7 +3234,10 @@ fn d3c_observe(
     d3c_set_position_selection(selection);
     // The population that reaches a seat under an intervening binder.
     let _ = recursive_port_process_compiles(
-        &crate::cranelift_backend::planning::governed_nested_resource_bracket(3),
+        &crate::cranelift_backend::planning::governed_nested_resource_bracket_answering(
+            3,
+            crate::EXIT_SUCCESS_CONSTRUCTOR,
+        ),
     );
     // ⭐ And the `D5a` witness, which reaches predeclared emission seats at
     // **zero** binder depth and compiles GREEN. It supplies the agreement half:

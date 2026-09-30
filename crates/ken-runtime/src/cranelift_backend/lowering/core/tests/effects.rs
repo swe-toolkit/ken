@@ -5621,7 +5621,7 @@ fn d5_the_two_byte_span_refusals_are_distinct_typed_values_without_dispatch() {
 // module owns, per item 8's own D2 lead and this item's independently
 // re-verified D0 finding: both use `EffectSeatVisitMutation`, the emitter's
 // own type, not the planner's `EffectSeatPlanMutation`).
-// `governed_nested_resource_bracket` stays an explicit import (a
+// The bracket's answer-taking variant stays an explicit import (a
 // planning-domain fixture, not otherwise ambient here);
 // `recursive_port_process_compiles` reaches `core::tests` (promoted from
 // `control` at `RT-CONTROL-INTEGRATION-TESTS-SPLIT` D1) by qualified path;
@@ -5659,8 +5659,8 @@ fn d5_the_two_byte_span_refusals_are_distinct_typed_values_without_dispatch() {
 #[test]
 fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
     use crate::cranelift_backend::lowering::core::tests::recursive_port_process_compiles;
-    use crate::cranelift_backend::planning::governed_nested_resource_bracket;
-    let expr = governed_nested_resource_bracket(3);
+    use crate::cranelift_backend::planning::governed_nested_resource_bracket_answering;
+    let expr = governed_nested_resource_bracket_answering(3, crate::EXIT_SUCCESS_CONSTRUCTOR);
     set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
     recursive_port_process_compiles(&expr)
         .expect("the unmutated bracket compiles, so the rows below are not vacuous");
@@ -5762,8 +5762,8 @@ fn a_discarded_visit_refuses_before_its_body_is_defined() {
     use crate::cranelift_backend::lowering::units::{
         b2f_last_unit_emission, b2f_open_compile_attempt, b2f_units_declared_in_attempt,
     };
-    use crate::cranelift_backend::planning::governed_nested_resource_bracket;
-    let expr = governed_nested_resource_bracket(3);
+    use crate::cranelift_backend::planning::governed_nested_resource_bracket_answering;
+    let expr = governed_nested_resource_bracket_answering(3, crate::EXIT_SUCCESS_CONSTRUCTOR);
 
     // A complete closed group passes the body gate, and bodies really are
     // defined on this route -- so the zero below is a change, not a constant.
@@ -5894,8 +5894,10 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
 fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     const REQUEST: &str = "ctor:fixture::DeadArmRequest::ReadDirectory";
-    const SIBLING: &str = "ctor:fixture::DeadArmRequest::Other";
-    const UNRELATED: &str = "ctor:fixture::DeadArmRequest::Unrelated";
+    // Only these two answer identities change; the request and the arm's
+    // unavailable-lane effect remain the deadness discriminator.
+    const SIBLING: &str = crate::EXIT_SUCCESS_CONSTRUCTOR;
+    const UNRELATED: &str = crate::EXIT_FAILURE_CONSTRUCTOR;
     let exit_success = || RuntimeExpr::Construct {
         constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
         args: Vec::new(),

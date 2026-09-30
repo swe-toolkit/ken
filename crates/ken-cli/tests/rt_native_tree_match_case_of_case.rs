@@ -97,6 +97,34 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   }
 "#;
 
+// AC-1: a closed Failure 5 through a composed Ret and the nearest runtime
+// Failure byte must agree with the interpreter on both selected bytes.
+#[cfg(target_os = "linux")]
+fn root_exit_discriminator_source(runtime_failure: bool) -> String {
+    let source = SHARED_BIND_SOURCE
+        .replace(
+            "proc decide (byte : UInt8)",
+            "proc decide (byte : UInt8) (fallback : ExitCode) (runtime_code : UInt8)",
+        )
+        .replace("False |-> Failure 7", "False |-> fallback")
+        .replace("(print_line \"accepted\")", "(print_line \"ok\")")
+        .replace("ExitCode Success);", "ExitCode (Failure 5));")
+        .replace("(print_line \"rejected\")", "(print_line \"bad\")")
+        .replace(
+            "Some byte |-> decide byte",
+            "Some byte |-> decide byte (Failure 9) byte",
+        );
+    assert_eq!(source.matches("ExitCode (Failure 5));").count(), 1);
+    if runtime_failure {
+        source.replace(
+            "ExitCode (Failure 5));",
+            "ExitCode (Failure runtime_code));",
+        )
+    } else {
+        source
+    }
+}
+
 // The same shared-bind and ProcessInput harness as SHARED_BIND_SOURCE, but the
 // inner result and outer case family are Option. Neither arm has native parity
 // authorization: both remain on the pre-D1 fail-closed build path.
@@ -137,6 +165,34 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
         Cons argument _more |-> match bytes_at argument 0 {
           None |-> host_exit APartial (Failure 92);
           Some byte |-> decide byte
+        }
+      }
+    }
+  }
+"#;
+
+// An ordinary Inner case selects the ExitCode; the root has no authority to
+// project Inner as an exit code. The same-answer variant still executes both
+// Inner arms rather than inferring selection from its terminal code alone.
+#[cfg(target_os = "linux")]
+const CHECKED_INNER_SOURCE: &str = r#"program capabilities FS APartial
+data Inner = Hit | Miss
+fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit APartial (Failure 90);
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit APartial (Failure 91);
+        Cons argument _more |-> match bytes_at argument 0 {
+          None |-> host_exit APartial (Failure 92);
+          Some byte |-> host_exit APartial (match (match eq_int (uint8_to_int byte) 1 {
+            True |-> Hit;
+            False |-> Miss
+          }) {
+            Hit |-> Failure 3;
+            Miss |-> Failure 4
+          })
         }
       }
     }
@@ -384,17 +440,181 @@ fn option_outer_family_refuses_before_artifact_while_exit_code_uses_d1() {
     shared_bind_exit_code_arm_matches_interpreter(2, b"rejected\n", 7);
 }
 
-// ROOT-EXIT AC-1 witness, deliberately ignored until its root-boundary decode
-// accepts the carried Success constructor. The native byte-1 stdout and one
-// ConsoleWrite already match the interpreter, but the checked root guard
-// expects tag 2 and sees tag 5, then emits an unclassified -1 terminal.
-// Promise class: durable invariant when enabled. MEASURED then: D1 hits and
-// full native/interpreter parity for the Success arm (byte 1). CLAIMED: root
-// exit projection accepts this specialization-result edge. THE GAP today:
-// correct pre-guard effects are not terminal parity; an ignored row is no green.
+// Promise class: durable invariant. MEASURED: both selected bytes in each
+// shared-bind variant, with full native/interpreter observation parity and
+// distinct terminal codes. CLAIMED: a closed ExitCode and a runtime ExitCode
+// reach the same checked root boundary. THE GAP: the two fixtures alone do not
+// cover other producer families; the Option refusal is a separate pin.
 #[cfg(target_os = "linux")]
 #[test]
-#[ignore = "RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN: tag-5 Success at root guard expects tag 2; native parity pending"]
+fn root_exit_closed_and_runtime_failure_agree_on_both_bytes() {
+    for (runtime_failure, label) in [(false, "closed"), (true, "runtime")] {
+        let source = root_exit_discriminator_source(runtime_failure);
+        let dir = tempfile::tempdir().unwrap();
+        let (artifact, hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                "rt-root-exit-closed-and-runtime",
+                dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        });
+        assert!(hits > 0, "both ExitCode producers must use D1");
+        let artifact = artifact.expect("both checked variants emit an artifact");
+        for (byte, exit, stdout) in [
+            (
+                1_u8,
+                if runtime_failure { 1 } else { 5 },
+                b"ok\n".as_slice(),
+            ),
+            (2_u8, 9, b"bad\n".as_slice()),
+        ] {
+            let mut host = ken_interp::PosixHost::new_at(dir.path());
+            let interpreted = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &[b"ken".to_vec(), vec![byte]],
+                &[],
+                dir.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .expect("same checked source executes in interpreter");
+            assert_eq!(interpreted.exit_status, exit);
+            assert_eq!(interpreted.stdout, stdout);
+            assert_eq!(interpreted.effect_trace.len(), 1);
+            let native = ken_runtime::run_bound_process_effect_observation(
+                &artifact.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: vec![std::ffi::OsString::from_vec(vec![byte])],
+                    environment: Vec::new(),
+                    cwd: dir.path().to_owned(),
+                    plan_hash: artifact.plan_transport_hash,
+                },
+            );
+            eprintln!("RT_ROOT_EXIT_DISCRIMINATOR {label} byte={byte} native={native:?}");
+            assert_eq!(native.expect("native exit must not trap"), interpreted);
+        }
+    }
+}
+
+// Spec: 42 §3.3 and 45 §4. Promise class: durable invariant. MEASURED:
+// both checked variants (distinct and same-answer) on both bytes with full
+// native/interpreter observation parity. CLAIMED: the Inner match remains an
+// ordinary non-exit result and only the outer ExitCode reaches the root. THE
+// GAP: parity does not itself prove which constructor was projected in the
+// emitter; synthetic refusal pins and the root non-exit negative cover those
+// separate boundaries.
+#[cfg(target_os = "linux")]
+#[test]
+fn checked_inner_nonexit_result_and_outer_exit_match_interpreter() {
+    for (same_answer, exits) in [(false, [3, 4]), (true, [3, 3])] {
+        let source = if same_answer {
+            CHECKED_INNER_SOURCE.replace("Miss |-> Failure 4", "Miss |-> Failure 3")
+        } else {
+            CHECKED_INNER_SOURCE.to_owned()
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            "rt-root-exit-checked-inner",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .expect("both checked Inner programs emit native artifacts");
+        for (byte, exit) in [1_u8, 2_u8].into_iter().zip(exits) {
+            let mut host = ken_interp::PosixHost::new_at(dir.path());
+            let interpreted = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &[b"ken".to_vec(), vec![byte]],
+                &[],
+                dir.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .expect("checked Inner variant runs in the interpreter");
+            assert_eq!(interpreted.exit_status, exit);
+            assert_eq!(interpreted.stdout, b"");
+            let native = ken_runtime::run_bound_process_effect_observation(
+                &artifact.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: vec![std::ffi::OsString::from_vec(vec![byte])],
+                    environment: Vec::new(),
+                    cwd: dir.path().to_owned(),
+                    plan_hash: artifact.plan_transport_hash,
+                },
+            )
+            .expect("checked Inner variant runs natively");
+            assert_eq!(native, interpreted, "same_answer={same_answer} byte={byte}");
+        }
+    }
+}
+
+// Promise class: durable invariant. MEASURED: D1 hits and full observation
+// parity for the Success arm (byte 1). CLAIMED: the root projects a checked
+// Success despite its non-root Ret transfer. THE GAP: it says nothing about
+// the Failure payload mapping; the closed and dynamic Failure pins cover it.
+#[cfg(target_os = "linux")]
+#[test]
 fn shared_bind_success_arm_matches_interpreter_after_root_exit_projection() {
     shared_bind_exit_code_arm_matches_interpreter(1, b"accepted\n", 0);
+}
+
+// Spec: 42 §3.3 and 45 §4. Promise class: durable invariant. MEASURED: a
+// checked Ret field whose closed constructor is either Failure 0 or Success
+// is returned through the same non-root result edge, then compared with the
+// interpreter's terminal status and effects. CLAIMED: root projection uses
+// the shared process_exit_status mapping, including Failure 0 -> status 1,
+// and distinguishes both constructor identities. THE GAP: source checks do
+// not prove all malformed carried payloads refuse; the root negative and
+// separately measured identity-swap mutation constrain that boundary.
+#[cfg(target_os = "linux")]
+#[test]
+fn root_exit_ret_carried_success_and_failure_zero_match_interpreter() {
+    for (result, exit) in [("Success", 0), ("(Failure 0)", 1)] {
+        let source = root_exit_discriminator_source(false).replace(
+            "ExitCode (Failure 5));",
+            &format!("ExitCode {result});"),
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let (build, hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                "rt-root-exit-ret-carried-zero-success",
+                dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        });
+        assert!(
+            hits > 0,
+            "{result} must reach the D1 producer; build={:?}",
+            build.as_ref().map(|_| ()).map_err(|err| format!("{err:?}"))
+        );
+        let artifact = build.expect("checked Ret-carried exit emits an artifact");
+        let mut host = ken_interp::PosixHost::new_at(dir.path());
+        let interpreted = ken_cli::run_program_effect_observation(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            &[b"ken".to_vec(), vec![1]],
+            &[],
+            dir.path().as_os_str().as_encoded_bytes(),
+            &mut host,
+        )
+        .expect("same checked source executes in interpreter");
+        assert_eq!(interpreted.exit_status, exit, "{result} interpreter status");
+        assert_eq!(interpreted.stdout, b"ok\n", "{result} interpreter arm");
+        assert_eq!(interpreted.effect_trace.len(), 1);
+        let native = ken_runtime::run_bound_process_effect_observation(
+            &artifact.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: vec![std::ffi::OsString::from_vec(vec![1])],
+                environment: Vec::new(),
+                cwd: dir.path().to_owned(),
+                plan_hash: artifact.plan_transport_hash,
+            },
+        );
+        assert_eq!(native.expect("root projection must not trap"), interpreted);
+    }
 }

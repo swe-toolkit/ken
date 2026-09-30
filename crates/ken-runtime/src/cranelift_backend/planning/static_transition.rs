@@ -1320,6 +1320,16 @@ fn record_static_response_feasibility_diagnostic(
 /// measuring a trap-free or non-recursive surrogate.
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn governed_nested_resource_bracket(depth: usize) -> RuntimeExpr {
+    governed_nested_resource_bracket_answering(depth, "ctor:prelude::Unit::MkUnit")
+}
+
+/// The same bracket, with only its nullary answer selected by emitter controls.
+/// Planner controls keep the Unit wrapper and its exact structural witness.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn governed_nested_resource_bracket_answering(
+    depth: usize,
+    answer_constructor: &str,
+) -> RuntimeExpr {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum BinderRole {
         AllocatedBuffer,
@@ -1358,17 +1368,17 @@ pub(in crate::cranelift_backend) fn governed_nested_resource_bracket(depth: usiz
         }
     }
 
-    fn unit() -> RuntimeExpr {
+    fn answer(constructor: &str) -> RuntimeExpr {
         RuntimeExpr::Construct {
-            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            constructor: constructor.to_string(),
             args: Vec::new(),
         }
     }
 
     if depth == 0 {
-        return unit();
+        return answer(answer_constructor);
     }
-    let recursive_body = governed_nested_resource_bracket(depth - 1);
+    let recursive_body = governed_nested_resource_bracket_answering(depth - 1, answer_constructor);
     let closure_scope = BinderScope::default().bind(BinderRole::AllocatedBuffer);
     let release_scope = closure_scope.bind(BinderRole::RecursiveResult);
     let release = RuntimeExpr::Match {
@@ -1392,7 +1402,7 @@ pub(in crate::cranelift_backend) fn governed_nested_resource_bracket(depth: usiz
             crate::RuntimeMatchCase {
                 constructor: "ctor:prelude::Result::Ok".to_string(),
                 binders: 1,
-                body: unit(),
+                body: answer(answer_constructor),
             },
         ],
         default: trap("release result"),

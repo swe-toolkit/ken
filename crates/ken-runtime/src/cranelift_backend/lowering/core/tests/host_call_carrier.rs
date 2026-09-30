@@ -909,8 +909,10 @@ fn d4_a_lexical_closure_declaration_retains_a_binding_and_still_runs() {
 #[test]
 fn governed_nested_brackets_n3_through_n7_emit_complete_functionized_bundles() {
     for depth in 3..=7 {
-        let expr =
-            crate::cranelift_backend::planning::governed_nested_resource_bracket(depth);
+        let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket_answering(
+            depth,
+            crate::EXIT_SUCCESS_CONSTRUCTOR,
+        );
         recursive_port_process_compiles(&expr).unwrap_or_else(|error| {
             panic!("governed depth {depth} did not compile: {error}")
         });
@@ -1023,7 +1025,10 @@ fn governed_nested_brackets_n3_through_n7_emit_complete_functionized_bundles() {
 /// and that is a contract decision.
 #[test]
 fn d6a_a_specialization_binds_two_leading_static_workers_for_the_ih_and_its_recursive_argument() {
-    let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket(3);
+    let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket_answering(
+        3,
+        crate::EXIT_SUCCESS_CONSTRUCTOR,
+    );
     reset_d5a_trace();
     recursive_port_process_compiles(&expr)
         .unwrap_or_else(|error| panic!("the governed depth-3 fixture must compile: {error}"));
@@ -1153,7 +1158,10 @@ fn d6b_the_governed_case_environment_is_the_binder_run_it_was_planned_from() {
          `Var(2)` unbound -- the exact reported failure"
     );
 
-    let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket(3);
+    let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket_answering(
+        3,
+        crate::EXIT_SUCCESS_CONSTRUCTOR,
+    );
     reset_d5a_trace();
     recursive_port_process_compiles(&expr)
         .unwrap_or_else(|error| panic!("the governed depth-3 fixture must compile: {error}"));
@@ -1547,8 +1555,9 @@ fn rt_scale_b_governed_n3_through_n7_collect_every_d2_metric() {
         .stack_size(8 * 1024 * 1024)
         .spawn(move || {
             let expr =
-                crate::cranelift_backend::planning::governed_nested_resource_bracket(
+                crate::cranelift_backend::planning::governed_nested_resource_bracket_answering(
                     depth,
+                    crate::EXIT_SUCCESS_CONSTRUCTOR,
                 );
             let started = std::time::Instant::now();
             recursive_port_process_compiles(&expr).unwrap_or_else(|error| {
