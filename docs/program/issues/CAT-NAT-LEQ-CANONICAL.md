@@ -1,6 +1,6 @@
 ---
 id: CAT-NAT-LEQ-CANONICAL
-title: "Five elementary leq_nat facts are proved privately in Map, Gcd and Parsing, each a copy of a law Nat.Order or its provider already owns. Publish the order laws once from Data.Numeric.Nat.Order and retire the private copies"
+title: "Six elementary leq_nat facts are proved privately in Map, Gcd and Parsing, each a copy of a law Nat.Order or its provider already owns. Publish the order laws once from Data.Numeric.Nat.Order and retire the private copies"
 status: ready
 owner: foundation
 size: S
@@ -34,14 +34,17 @@ law instead of a private copy.
   | Copy | Statement | Same fact as |
   |---|---|---|
   | Parsing `leq_nat_suc` (`:3239`) | `leq n (Suc n)` | Order's successor bound |
+  | Parsing `nat_leq_suc` (`:1292`, used once at `:1377`) | `LessEqNat n (Suc n)` | Order's successor bound |
   | Map `leq_nat_add_right` (`:17131`) | `leq a (add a extra)` | `leq_nat_add_left_bound` |
   | Gcd `leq_refl` (`:328`) | `leq a a` | `proof refl for leq_nat` |
   | Map `leq_nat_right_successor` (`:17119`) | `leq a b → leq a (Suc b)` | Gcd's copy; Order has no owner yet |
   | Gcd `leq_weaken_right` (`:315`) | `leq a b → leq a (Suc b)` | Map's copy |
 
-  All five are used only inside their own package.
+  All six are used only inside their own package. Parsing's public alias
+  `LessEqNat m n` is `Equal Bool (leq_nat m n) True` (`Parsing.ken.md:245`),
+  so `nat_leq_suc` is the successor bound under another name (Foundation QA
+  `evt_2rbypzmcd9kv9`, amended by the Steward).
 - **Not duplicates.** These are left alone:
-  - Parsing `nat_leq_suc` is over `LessEqNat`, a different relation;
   - Cursor `cursor_leq_suc_add_right` is a shifted strict bound;
   - Gcd `leq_left_of_sum` and `leq_right_of_positive_sum` are derived facts.
 - **Import edges.** Gcd already imports Order (`Gcd.ken.md:20`), and Parsing
@@ -56,7 +59,7 @@ stop and report the mismatch.
 
 - Order publishes the successor bound, and adds one public weakening law,
   `leq a b → leq a (Suc b)`, under the module's naming convention.
-- The five private copies are deleted. Their uses go through the Order law,
+- The six private copies are deleted. Their uses go through the Order law,
   or through `proof refl for leq_nat` for Gcd's `leq_refl`.
 
 ## Acceptance
@@ -67,8 +70,10 @@ stop and report the mismatch.
   - A statement sweep over `catalog/`, `library/` and `crates/*/tests` finds
     no remaining private proof of any of the four statements above. Search
     by shape, `leq_nat x (Suc _)`, `leq_nat x (add x _)` and `leq_nat x x`
-    equated with `True`, not only by name. Name each surviving hit and why
-    it is not a copy.
+    equated with `True`, not only by name, and unfold any alias of that
+    equation, such as `LessEqNat`. Parsing's public `LessEqNat::refl` and
+    `LessEqNat::zero_left` are that package's attached API and stay.
+    Name each surviving hit and why it is not a copy.
 - **AC-2 (controls).**
   - A typed consumer outside Order applies the weakening law and the
     successor bound at general arguments. Making either law private again
