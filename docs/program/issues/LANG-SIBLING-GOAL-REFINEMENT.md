@@ -81,16 +81,31 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
   it; the sweep of goal-rewriting `subst_term_generalize` callers, each in
   or out with a reason; the double-refinement control.
 - **A measurement.** Paused until the kernel WP lands.
-- **AC-1.** Increment 1: all 10 B rows classify. Each of f4, f5 and f6
-  checks or fails at a named later site. The 38 unreferenced dependents
-  stay untouched. Increment 2: f7 and f4 check. `lookup_zip_with` checks
-  unchanged, together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
+- **AC-1.** Increment 1 (the B-D0 gate `evt_1fbdcqg5127qa`, restoration
+  form `evt_6pqf4vbt8n1f8`):
+  - All 10 B rows classify, and the emitted method re-checks in the kernel
+    at the original unrefined goal.
+  - Each of f4, f5 and f6 checks or fails at a named later site. A later
+    site in the obs.rs Phase 3 sub-cast is a kernel-dependency row.
+  - The 38 unreferenced dependents stay untouched.
+  - A committed row consumes a generalized premise through a generated
+    proof (f6's shape).
+
+  Increment 2: f7 and f4 check. `lookup_zip_with` checks unchanged,
+  together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
 - **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A
-  committed test pins that a binder already refined by its own enclosing
-  match is transported once, not twice. A's five rows keep their verdicts
-  under increment 1.
-- **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged, plus a
-  mutation named in the ruling.
+  committed exactly-once control counts one leaf-keyed whole-Π restoration
+  on the emitted term, and a duplicate-restoration mutation reddens it. A's
+  five rows keep their verdicts under increment 1.
+
+## Residual (carried, not closed)
+
+Potential one-sided rewrite surfaces, unmeasured (`evt_1fbdcqg5127qa`):
+`subst_term_generalize` callers at `elab.rs:3015`, `:3330`, `:3446`, `:3489`,
+`:4271`, `:4461`, `:4615` and `:4931` (read at `ba2cd314c`). They rewrite a
+goal, motive or IH while the context keeps its types, under independent
+producers, with no measured failure. Each needs a measured failure before
+it joins scope.
 
 ## Stop conditions
 
