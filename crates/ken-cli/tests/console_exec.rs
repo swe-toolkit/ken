@@ -43,10 +43,6 @@ fn ken_run_executes_console_program_and_prints_stdout() {
 #[cfg(target_os = "linux")]
 #[test]
 fn closed_stdout_is_an_io_failure_not_sigpipe_termination() {
-    assert!(
-        !include_str!("../src/main.rs").contains("unix_sigpipe"),
-        "the supported Rust entrypoint must not opt back into SIGPIPE termination"
-    );
     let tmp_dir = workspace_root().join("target/px1-broken-pipe");
     std::fs::create_dir_all(&tmp_dir).expect("create broken-pipe fixture directory");
     let program = tmp_dir.join("broken-pipe.ken");

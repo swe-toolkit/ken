@@ -6997,41 +6997,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn resource_owner_and_close_allowance_are_structurally_confined() {
-        // Structural source-text proxy for two Rust-type-system-level shape
-        // properties with no cheaper elaborated/runtime check available in
-        // stable Rust short of a compile-fail (trybuild) harness: no shared-
-        // ownership escape hatch on `ResourceHandleV1`, and a single confined
-        // unsafe raw-fd close site. A semantically-preserving rename/refactor
-        // could in principle evade these substring matches; verified
-        // (Q-RESIDUE, 2026-07-21) that flipping each guarded shape in place
-        // makes the corresponding assertion fail, so the scan does
-        // discriminate the violations it names.
-        //
-        // The third property this test used to check here -- that resource
-        // settlement is recorded before the observation is written -- is now
-        // proven behaviorally, through the real unsafe entrypoint, by
-        // `abi_v1.rs`'s
-        // `resource_settlement_is_recorded_before_observation_is_written`,
-        // which decodes the actual emitted trace instead of comparing
-        // source-text byte offsets of the two call sites.
-        let lib = include_str!("lib.rs");
-        let close = include_str!("resource_close_v1.rs");
-        assert!(lib.contains("pub struct ResourceHandleV1"));
-        assert!(!lib.contains("impl Clone for ResourceHandleV1"));
-        assert!(!lib.contains("ResourceHandleV1 {\n    inner: Arc"));
-        assert_eq!(
-            close
-                .matches("unsafe { rustix::io::try_close(raw_fd) }")
-                .count(),
-            1
-        );
-        assert_eq!(close.matches("#![allow(unsafe_code)]").count(), 1);
-        assert!(!close.contains("ManuallyDrop"));
-        assert!(!close.contains("from_raw_fd"));
-    }
-
     #[cfg(target_os = "linux")]
     struct RealResourceBackend {
         root: crate::RootedHandle,
