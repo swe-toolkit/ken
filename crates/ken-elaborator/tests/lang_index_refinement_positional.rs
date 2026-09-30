@@ -3,16 +3,11 @@
 
 use ken_elaborator::{ElabEnv, ElabError};
 
-fn mat_identity(
-    nil_second: &str,
-    cons_first: &str,
-    cons_second: &str,
-    body: &str,
-) -> Result<(), ElabError> {
+fn mat_identity(first_index: &str, second_index: &str, body: &str) -> Result<(), ElabError> {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_decl(&format!(
         "data Mat (a : Type) : Nat -> Nat -> Type where {{ \
-           MNil : Mat a {cons_first} {nil_second}; \
+           MNil : Mat a {first_index} {second_index}; \
            MCons : (r1 : Nat) -> (k1 : Nat) -> a -> Mat a r1 k1 \
              -> Mat a (Suc r1) k1 \
          }}"
@@ -33,17 +28,18 @@ fn zero_zero_preserves_equal_sibling_index() {
     // at two equal constructor index values. CLAIMED: refining the first
     // index never captures the equal-valued second. THE GAP: the non-overlap
     // control cannot see this capture; this case and the site-only reversal do.
-    mat_identity("Zero", "Zero", "Zero", "MCons a r1 k1 x t")
+    mat_identity("Zero", "Zero", "MCons a r1 k1 x t")
         .expect("equal constructor indices must not alias positions");
 }
 
 #[test]
 fn successor_zero_preserves_index_nested_in_sibling() {
-    // Promise class: durable invariant. MEASURED: the first constructor index
-    // occurs as a proper subterm of the second. CLAIMED: equality of values
-    // inside a sibling does not give it the first index's position.
-    // THE GAP: a direct equal-value fixture does not exercise descent.
-    mat_identity("Zero", "(Suc Zero)", "Zero", "MCons a r1 k1 x t")
+    // Promise class: durable invariant. MEASURED: `MNil` has indices
+    // `(Suc Zero, Zero)`, so the second index's `Zero` is a proper subterm
+    // of its first-index sibling. CLAIMED: refinement does not cross index
+    // positions, even at a proper subterm. THE GAP: the direct equal-value
+    // fixture does not exercise descent.
+    mat_identity("(Suc Zero)", "Zero", "MCons a r1 k1 x t")
         .expect("a subterm in another position must not be captured");
 }
 
@@ -52,7 +48,7 @@ fn distinct_sibling_index_remains_admitted() {
     // Promise class: durable invariant. MEASURED: the existing non-overlap
     // form checks. CLAIMED: the repair does not prevent ordinary refinement.
     // THE GAP: this is a control, not evidence for the overlap repair.
-    mat_identity("(Suc Zero)", "Zero", "Zero", "MCons a r1 k1 x t")
+    mat_identity("Zero", "(Suc Zero)", "MCons a r1 k1 x t")
         .expect("unrelated second index must remain accepted");
 }
 
@@ -62,7 +58,7 @@ fn genuinely_wrong_constructor_arm_remains_rejected() {
     // constructor field indices is rejected. CLAIMED: positional retyping
     // cannot admit a body at the wrong family indices. THE GAP: assert the
     // kernel rejection class, not arbitrary parse or name errors.
-    let failure = mat_identity("(Suc Zero)", "Zero", "Zero", "MCons a k1 r1 x t")
+    let failure = mat_identity("Zero", "(Suc Zero)", "MCons a k1 r1 x t")
         .expect_err("wrong indexed constructor arm must fail");
     assert!(
         matches!(failure, ElabError::KernelRejected { .. }),
