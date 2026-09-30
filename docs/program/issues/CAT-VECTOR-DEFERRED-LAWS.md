@@ -35,6 +35,26 @@ lookup-after-zip evidence becomes general theorems, not Bool examples.
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.
 
+## Symptom inventory
+
+1. Generic `zip_with_vcons` `Refl` rejected; keyed on the tail binder of an
+   index-refined sibling match at an open index (Architect
+   `evt_5p7xx5e6tmegw`; §1a 0 to 1). `zip_with_vcons`, and any law that
+   needs it, is deferred to `LANG-REFINED-SIBLING-MATCH-TAIL`. The rest
+   lands now.
+2. `lookup_zip_with` `ExhaustivenessError` at inner sibling match after
+   i→xs; keyed on the refined sibling binder (Architect
+   `evt_31z4jzrt6v8wf`; §1a stays 1, same family). A later law failing with
+   one of the family's three signatures is deferred without a new stop.
+3. `zip_with_map` as framed puts a lambda in a type position, which the
+   surface grammar does not express, and it also meets the sibling family
+   (Architect `evt_7aem5zqk3dqm8`). **Steward: the resumption statement is
+   the pointwise generalization.** It takes `k : a → a2 → c` and
+   `hk : (u : a) → (v : a2) → Equal c (k u v) (f (g u) (h v))`, and
+   equates `zip_with f (map g xs) (map h ys)` with `zip_with k xs ys`. The
+   lambda instance is recovered at the use site. It stays deferred until
+   `LANG-REFINED-SIBLING-MATCH-TAIL` lands.
+
 ## Deliverable
 
 Checked theorems in `Vector.ken.md`, stated over arbitrary `a`, `b`, `c`,

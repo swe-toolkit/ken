@@ -1,7 +1,7 @@
 ---
 id: RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN
 title: "Decode the root exit status once, at the root result boundary, from the checked answer type (ExitCode), whatever join representation delivers it; joins stop projecting, so an Option arm no longer collapses to -2 and an ExitCode constructor carried through a CarrierWord merge no longer fails the root guard"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect

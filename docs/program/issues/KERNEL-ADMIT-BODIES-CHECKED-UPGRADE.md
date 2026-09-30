@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ADMIT-BODIES-CHECKED-UPGRADE
 title: "A body can leave trusted_base() without SCT or a cycle check: discharge_hole accepts the hole itself as its certificate, because the raw pub upgrade_to_transparent is gated only by its callers. Move the gate into the kernel as one checked admit_bodies and make the raw upgrade crate-private"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -89,3 +89,25 @@ The design is the Architect's ruling:
   certificate: stop to the Architect.
 - Any spec change: an operator question.
 - A `trusted_base()` change beyond keeping a circular-discharged hole in it.
+
+## Closeout
+
+Merged as `84dc2f602` (PR #4384).
+- **AC-0.** The census found 15 call sites, not the 7 named. That stopped
+  to the Architect, whose amended ruling disposed of all 15.
+- **AC-1.** `check::admit_bodies` is the one gate, and
+  `upgrade_to_transparent` is `pub(crate)`.
+  - `admit_bodies.rs` (7 tests): `hole := hole` is refused, and so are the
+    indirect bridge and the cross-member escape. A late invalid member
+    leaves the group opaque. An honest discharge retires only its own id.
+  - In `v1_acceptance.rs`, both circular certificates leave the hole in
+    `trusted_base()` with the env unchanged.
+- **AC-2.** The Kernel QA mutations each redden their row:
+  - omitting SCT reddens the direct case;
+  - truncating reachability reddens the indirect and cross-member cases;
+  - omitting the body check reddens the ill-typed cases.
+
+  The 57-package census shows no verdict change.
+- **Carry (later kernel-API node, not yet filed).** `add_decl` and
+  `remove_last` stay `pub`, and eight tests install `Decl::Transparent`
+  directly. In production, `add_decl` installs only opaque declarations.
