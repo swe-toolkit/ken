@@ -178,6 +178,65 @@ fn scoped_premise_redirects_consumed_proof_and_restores_on_failure() {
 }
 
 #[test]
+fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
+    // Promise class: durable invariant. The nested dependent-match path
+    // infers its scrutinee before constructing a motive. Its inferred type
+    // must come from the same temporary binder as its redirected proof term.
+    // MEASURED: while scoped, a surface alias's type follows the new binder;
+    // before and after it has the old premise type. CLAIMED: nested scrutinee
+    // inference is one-view, not term-only redirection. THE GAP: the separate
+    // exact f4 source additionally reaches the equation-convoy overlap guard.
+    let mut env = ElabEnv::new().expect("prelude");
+    let nat_ty = nat(env.globals["Nat"]);
+    let mut cx = ElabCtx::new(
+        &mut env.env,
+        &env.globals,
+        &mut env.num_values,
+        &env.numeric_env,
+        "nested-premise-inference-control",
+    );
+    cx.ctx.push(nat_ty.clone()); // n
+    cx.ctx.push(nat_ty.clone()); // m
+    cx.ctx.push(eq(nat_ty.clone(), Term::var(1), Term::var(0))); // d
+    let old_ty = eq(nat_ty.clone(), Term::var(2), Term::var(1));
+    let new_ty = eq(nat_ty.clone(), Term::var(1), Term::var(1));
+    let premise = index_refinement_sentinel(4, 0);
+    cx.active_index_premise_frames
+        .push(ActiveIndexPremiseFrame {
+            sentinel_region: 4,
+            premise_domains: vec![old_ty.clone()],
+            install_depth: cx.ctx.len(),
+        });
+    cx.var_refinements
+        .insert(2, (premise.clone(), old_ty.clone(), cx.ctx.len()));
+    let expr = RExpr::RVar(0, "d".into(), Span { start: 0, end: 0 });
+    let (before, before_ty) = infer(&mut cx, &expr).expect("original premise inference");
+    assert_eq!(before, premise);
+    assert_eq!(before_ty, old_ty);
+    cx.ctx.push(new_ty.clone());
+    cx.hidden_positions.push(3);
+    cx.scoped_premise_aliases.insert((4, 0), 3);
+    let (inside, inside_ty) = infer(&mut cx, &expr).expect("generalized premise inference");
+    let generalized_ty = weaken(&new_ty, 1);
+    assert_eq!(
+        inside_ty, generalized_ty,
+        "term and inferred type use one binder"
+    );
+    assert!(!convert_type(
+        cx.env,
+        &cx.ctx,
+        &weaken(&old_ty, 1),
+        &inside_ty,
+    ));
+    kernel_check_current(&cx, &inside, &inside_ty).expect("redirected proof is well-typed");
+    cx.scoped_premise_aliases.clear();
+    cx.ctx.pop();
+    cx.hidden_positions.pop();
+    let (after, after_ty) = infer(&mut cx, &expr).expect("original premise restored");
+    assert_eq!((after, after_ty), (premise, old_ty));
+}
+
+#[test]
 fn generalized_premise_generated_proof_is_consumed_by_body() {
     // Promise class: durable invariant. A generated premise p is reached
     // through a refined variable's proof and consumed at its new binder type

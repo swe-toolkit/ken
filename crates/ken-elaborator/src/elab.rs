@@ -1382,6 +1382,42 @@ fn check_variable_with_index_views(
     Ok(refined_term)
 }
 
+/// The same temporary premise redirection used by contextual kernel queries
+/// must also supply the type returned by inference of a surface alias. A
+/// nested match infers its scrutinee before it checks its method; returning
+/// the original premise type beside a sentinel redirected to the generalized
+/// binder gives the motive a different index from the checked scrutinee.
+fn scoped_premise_inferred_type(
+    cx: &ElabCtx<'_>,
+    term: &Term,
+) -> Result<Option<Term>, ElabError> {
+    let Term::Var(index) = term else {
+        return Ok(None);
+    };
+    for ((region, slot), position) in &cx.scoped_premise_aliases {
+        let frame = cx
+            .active_index_premise_frames
+            .iter()
+            .find(|frame| frame.sentinel_region == *region && *slot < frame.premise_domains.len())
+            .ok_or_else(|| {
+                ElabError::Internal("generalized premise lost its installing frame".into())
+            })?;
+        let growth = cx.ctx.len().checked_sub(frame.install_depth).ok_or_else(|| {
+            ElabError::Internal("generalized premise escaped its installing context".into())
+        })?;
+        let effective_slot = slot.checked_add(growth).ok_or_else(|| {
+            ElabError::Internal("generalized premise slot overflowed at the nested match".into())
+        })?;
+        if *index == checked_index_refinement_sentinel(*region, effective_slot)? {
+            let (_, ty) = cx.binding_term(*position).ok_or_else(|| {
+                ElabError::Internal("generalized premise binder escaped its checking scope".into())
+            })?;
+            return Ok(Some(ty));
+        }
+    }
+    Ok(None)
+}
+
 #[inline(never)]
 fn check_inferred_without_group_transport(
     cx: &mut ElabCtx,
@@ -8800,7 +8836,10 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
                 .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
             if let Some((raw_term, raw_ty, install_depth)) = cx.var_refinements.get(&pos) {
                 let growth = (cx.ctx.len() - install_depth) as i64;
-                return Ok((weaken(raw_term, growth), weaken(raw_ty, growth)));
+                let core = weaken(raw_term, growth);
+                let ty = scoped_premise_inferred_type(cx, &core)?
+                    .unwrap_or_else(|| weaken(raw_ty, growth));
+                return Ok((core, ty));
             }
             let ty_stored = cx
                 .ctx
