@@ -112,7 +112,7 @@ import Data.Binary.BytesPrimitiveContracts
 
 import Data.Collections.Derived (bytes_nat_length, length, list_append, map, nth)
 
-import Data.Numeric.Nat.Order (sub)
+import Data.Numeric.Nat.Order (leq_nat_successor_bound, sub)
 
 pub fn IsUtf8 (bs : Bytes) : Prop =
   match bytes_decode bs {
@@ -3236,12 +3236,6 @@ theorem source_suffix_after_codes
       codes
       starts_with
 
-theorem leq_nat_suc (n : Nat) : Equal Bool (leq_nat n (Suc n)) True =
-  match n {
-    Zero ↦ Proved;
-    Suc n2 ↦ leq_nat_suc n2
-  }
-
 theorem cursor_nat_lt_trans
       (left : Nat)
       (middle : Nat)
@@ -3280,7 +3274,7 @@ theorem cursor_nat_lt_trans
         middle
         (Suc middle)
         left_to_middle
-        (leq_nat_suc middle);
+        (leq_nat_successor_bound middle);
     left_to_right : Equal Bool (leq_nat (Suc left) right) True =
       (proof trans for leq_nat) (Suc left) (Suc middle) right left_to_middle_suc middle_to_right
   in

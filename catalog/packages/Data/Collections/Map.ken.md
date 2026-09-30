@@ -103,6 +103,8 @@ import Data.Collections.Derived (list_append, length)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
+import Data.Numeric.Nat.Order (leq_nat_add_left_bound, leq_nat_weaken_right)
+
 import Data.Sums.Combinators (is_some)
 
 pub data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
@@ -17116,24 +17118,6 @@ theorem bounded_walk_raise
           })
         bounded
 
-theorem leq_nat_right_successor
-      (a : Nat) (b : Nat)
-    : Equal Bool (leq_nat a b) True → Equal Bool (leq_nat a (Suc b)) True =
-  match a {
-    Zero ↦ λbounded. Proved;
-    Suc earlier ↦
-      match b {
-        Zero ↦ λbounded. absurd bounded;
-        Suc later ↦ λbounded. leq_nat_right_successor earlier later bounded
-      }
-  }
-
-theorem leq_nat_add_right (a : Nat) (extra : Nat) : Equal Bool (leq_nat a (add a extra)) True =
-  match extra {
-    Zero ↦ (proof refl for leq_nat) a;
-    Suc rest ↦ leq_nat_right_successor a (add a rest) (leq_nat_add_right a rest)
-  }
-
 theorem reachable_within_monotone
       (k : Type)
       (d : Ord k)
@@ -17740,7 +17724,7 @@ theorem strict_source_splice_length
   match prefix {
     Nil ↦ (proof refl for leq_nat) (Suc (length k (Cons k next rest)));
     Cons at tail ↦
-      leq_nat_right_successor
+      leq_nat_weaken_right
         (Suc (length k (Cons k next rest)))
         (length k (list_append k tail (Cons k repeat (Cons k next rest))))
         (strict_source_splice_length k tail repeat next rest)
@@ -19551,7 +19535,7 @@ theorem reachable_within_saturates
             y
             outer
             inner
-            (leq_nat_add_right fuel extra))
+            (leq_nat_add_left_bound fuel extra))
           (bool_dichotomy after)
           (bool_dichotomy at_bound)
 
