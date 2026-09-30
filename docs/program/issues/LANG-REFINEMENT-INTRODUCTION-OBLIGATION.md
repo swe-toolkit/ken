@@ -126,4 +126,6 @@ base, stop and report the mismatch.
    route through `checked_char_literal` is refused: it misses PosInt and is
    a second scalar derivation. Recut: prerequisite
    `KERNEL-LEQ-INT-LITERAL-REDUCTION`. This WP holds its WIP until that
-   merges, then resumes with AC-1 and AC-2 unchanged.
+   merges, then resumes with AC-1 and AC-2 unchanged. WIP parked at
+   `f4edc461c` on `wp/LANG-REFINEMENT-INTRODUCTION-OBLIGATION` (base
+   `c4f1812f4`).
