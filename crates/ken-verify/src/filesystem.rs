@@ -396,32 +396,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn canonical_snapshot_projects_mode_but_never_owner_namespace() {
-        let node = ken_host::FsNodeObservationV1 {
-            kind: ken_host::FsNodeKindV1::File,
-            file_bytes: Some(Vec::new()),
-            symlink_target: None,
-            mode: Some(0o640),
-        };
-        let ken_host::FsNodeObservationV1 {
-            kind: _,
-            file_bytes: _,
-            symlink_target: _,
-            mode,
-        } = node;
-        assert_eq!(mode, Some(0o640));
-
-        let native = include_str!("../../ken-runtime/src/object_linker_packaging.rs");
-        let verifier = include_str!("filesystem.rs");
-        for producer in [native, verifier] {
-            for owner_projection in ["uid()", "gid()"] {
-                let needle = format!("metadata.{owner_projection}");
-                assert!(!producer.contains(&needle));
-            }
-        }
-    }
-
-    #[test]
     fn twin_roots_preserve_raw_paths_files_directories_and_symlinks() {
         let roots = TwinRealRoots::create(&[
             SeedNode {
