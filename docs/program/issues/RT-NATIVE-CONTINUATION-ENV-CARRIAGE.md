@@ -1,6 +1,6 @@
 ---
 id: RT-NATIVE-CONTINUATION-ENV-CARRIAGE
-title: "A native function-typed recursive position whose closure escapes through a word-only call result gets its captures from a compile-time side slot, so two constructions of the same continuation cannot be told apart. Carry the environment in the value: the closure word is a handle to the captures its construction wrote"
+title: "A native function-typed recursive position whose closure escapes through a word-only call result gets its captures from a compile-time side slot, so two constructions of the same continuation cannot be told apart. Carry the suffix as fields of the residual word, in defunctionalized form"
 status: ready
 owner: runtime
 size: L
@@ -39,52 +39,67 @@ it. No compile-time association between construction and consumer remains.
   is a static association in every form tried: a single slot, a keyed map
   and a scoped stack. So is a runtime "latest slot per key", because W2's
   value can still be pending when W7 executes.
-- **The ruled form.**
-  - The caller allocates a per-call environment buffer in its own stack
-    frame and passes its address across the call.
-  - The callee writes the closure's captures into it, and the closure word
-    is a handle to that buffer.
-  - This holds only while every consumer runs within the caller's frame.
-    The heap or arena form is the fallback.
+- **The residual is not a closure at runtime** (disposable trace
+  `evt_68f9cwzgbakf2`: three `Some(record)` templates, zero environment
+  emissions).
+  - The worker's `LexicalClosure` (700, 793) exists only as a discarded
+    specialized template.
+  - The producer Construct takes the claimed-call return
+    (`core.rs:7407-7440`). The callee runs the checked-IH case body (313,
+    619) under `StaticWorkerBinding`.
+  - The readers' resolver picks the static body, and the captures the
+    planner cannot recover come from the side slot. This is a
+    defunctionalized reference with its environment beside the value.
+- **The ruled form** (Architect `evt_2wywq8pmjerv8`). This is known-best
+  (a) in defunctionalized form.
+  - The residual word carries the captures the planner cannot recover as
+    fields.
+  - The resolver still chooses the body statically. It reads those fields
+    from the word it already holds: the projected `children[1]` at the
+    gate, and the retarget's input.
+  - The side slot retires.
+  - Withdrawn: the caller buffer, the seat-equality handoff, and the
+    `BoundaryClosureEnvironment` extension. All three modeled the carried
+    child as the source closure. Closure-producing forms keep their
+    existing records.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
 
 ## Deliverable
 
-After an Architect-ruled AC-0, the chosen carriage form for every censused
-site, with the side slot retired.
+After an Architect-ruled AC-0, the recursive-position residual carries the
+captures the planner cannot recover as fields of its word. Both readers
+decode them from the word they hold, and the side slot is retired.
 
 ## Acceptance
 
-- **AC-0 (measure and design; no build).**
-  - **Census.** Every native site where a function-typed recursive-position
-    closure with captures is built inside a value that crosses
-    `call_declared_unit_target` or a peer word-only call. Record capture
-    counts, and which consumers later eliminate or call the closure.
-  - **Lifetime.** For each consumer, whether it runs within the calling
-    function's frame, or whether the value can be returned, stored or
-    otherwise outlive it. This decides caller buffer against heap or arena.
-  - **ABI proposal.** How the buffer address crosses the call, and how the
-    closure word encodes the handle. Say how `resolve_recursive_unit_body`
-    and the `BoundaryCarrier` guard sit alongside it, and what retires.
-  - The Architect rules the form and sets the size and increments. The
-    ruling is recorded as an ADR in `docs/adr/`, which lands with the first
-    build increment.
+- **AC-0 (measure; no build).** Done so far: the suffix census, record
+  coverage, the seat relation (a checked parent→child edge, not equality),
+  and the disposable trace. Remaining (`evt_2wywq8pmjerv8`): a compile-time
+  def-use trace from each projected child (`v7461`, `v14221`, `v25769`) and
+  each retarget input (`v9396`, `v16156`, `v27704`) back to the
+  instruction that first materializes the word and the store that wrote
+  `children[1]`. For each suffix operand, state whether it is in hand
+  there, by claim or ordinal provenance and not by value. The Architect
+  sizes from the rows. The ruling is recorded as an ADR in `docs/adr/`,
+  which lands with the first build increment.
 - **AC-1.** The `RT-NATIVE-SEQUENTIAL-BRACKETS` two-bracket witness builds
   and runs natively, and its observation matches the interpreter.
 - **AC-2 (controls).**
   - Two constructions of one continuation (W2 and W7) reach their
-    consumers with their own captures. A mutation that shares one buffer
-    turns that row red.
+    consumers with their own captures. A mutation that shares one set of
+    fields turns that row red. A missing field or a count mismatch
+    refuses.
   - The one-bracket control and the landed native census show no verdict
     change.
   - The IR passes the Cranelift verifier.
 
 ## Stop conditions
 
-- A consumer that outlives the caller's frame, where the ruled form is the
-  caller buffer: stop to the Architect.
+- A suffix operand not in hand where the residual is materialized: the
+  def-use rows name the carriage path, and the Architect sizes it. Do not
+  add a second carriage mechanism.
 - Any kernel, `trusted_base()` or spec change: an operator question.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.

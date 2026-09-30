@@ -88,6 +88,25 @@ stop and report the mismatch; do not build around it.
   shard builds its tests under `--timings` before selection and uploads the
   timing reports. It feeds the 120 s prediction gate and claims no saving.
 
+## Step 1 result (stop condition met)
+
+Measured on main run 36726390202 (`79a6e5ac7`), Verify `evt_6fkmxqx2rwhav`.
+- **Build phase.** 207-304 s per shard. The category intervals overlap.
+  Removing the test-binary intervals does not shorten the measured compiler
+  span, which the third-party and workspace intervals already cover.
+- **Predictions against the 1,110 s baseline:**
+  - (a) ownership, with LPT over build plus run time: about 26 s;
+  - (b) a perfect-hit dependency cache: at most about 6 s;
+  - (c) both: at most about 59 s.
+
+  All three are below 120 s. The cache figures are upper bounds with no
+  restore cost.
+- **Open constraint.** `cargo nextest list --workspace` builds every test
+  target for inventory discovery, so ownership would also need a
+  discovery path that does not.
+
+Step 2 is not built. The rest of the WP returns to the operator.
+
 ## Scope
 
 - Expected: `.github/workflows/ci.yml` and the shard planner and selection

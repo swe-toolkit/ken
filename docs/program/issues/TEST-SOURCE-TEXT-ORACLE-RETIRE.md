@@ -1,7 +1,7 @@
 ---
 id: TEST-SOURCE-TEXT-ORACLE-RETIRE
 title: "Retire the remaining source-text test oracles: 22 test functions in 16 files read Rust source with include_str! and assert on its text, so behaviour-neutral edits redden them; the Architect disposes each function first, then each is dropped, replaced by a behavioural control, or retired to review"
-status: ready
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -92,3 +92,20 @@ ken-runtime first.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, or the parked
   `wp/RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE`.
+
+## Closeout
+
+Merged in four increments, one per crate group:
+- `222c6d75f`: ken-runtime;
+- `d61e1a33f`: elaborator and interpreter;
+- `fe3f08860`: the remaining tests;
+- `46fe123c1` (PR #4407): ken-verify.
+
+Each function followed its AC-0 disposition (`evt_c18ftz9zda91`).
+- **Census.** Across the five source roots, `.rs` `include_str!` reads used
+  as test oracles fall to 0.
+- **Increment 4.** `FsNodeObservationV1` has no owner fields, so the
+  uid/gid text scan was dropped. The shape pin stays structural: both
+  producers build the type as a full struct literal.
+- **Review-owned properties.** Properties retired to Architect review are
+  named in each increment's commit body.

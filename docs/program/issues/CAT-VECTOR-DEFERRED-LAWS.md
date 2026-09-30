@@ -55,6 +55,15 @@ stop and report the mismatch; do not build around it.
    lambda instance is recovered at the use site. It stays deferred until
    `LANG-REFINED-SIBLING-MATCH-TAIL` lands.
 
+## Increments landed
+
+- `10af5f45f`: `lookup_fsuc`, `map_vcons`, `vec_map_compose`, `lookup_map`.
+- `79a6e5ac7`: `zip_with_vcons`, admitted by
+  `LANG-GENERATED-J-PROOF-ASCRIPTION` (`b40f28977`). Inventory item 1 is
+  closed.
+- Open: `lookup_zip_with` (item 2) and the pointwise `zip_with_map`
+  (item 3). Both wait on `LANG-SIBLING-GOAL-REFINEMENT`. The WP stays open.
+
 ## Deliverable
 
 Checked theorems in `Vector.ken.md`, stated over arbitrary `a`, `b`, `c`,

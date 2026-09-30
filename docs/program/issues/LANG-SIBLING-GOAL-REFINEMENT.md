@@ -37,16 +37,25 @@ different scrutinee, is refined consistently. So f7, f4, f5 and f6 check.
 
 Two increments on this thread, each its own candidate (Architect AC-0b
 ruling `evt_bw82kr4k5pm5`; Steward resize):
-1. **Class B (SUBST, 10 rows): f5, f6 and f4's outer `xs`.**
-   - `refine_branch_goal` rewrites the goal from this match's leaves, but
-     the binders re-typed in the context come from separate scans.
-   - The repair establishes that, when a leaf rewrites the goal, every
-     reachable in-scope binder whose type mentions `leaf.scrutinee` is
-     re-typed by the same leaf in the same frame. Otherwise the goal is not
-     rewritten.
+1. **Class B (SUBST, 10 rows): f5, f6 and f4's outer `xs`** (M, T1;
+   Architect B ruling `evt_71bay9b5yf04r`).
+   - The defect: the re-typed context set is computed on the ambient
+     `cx.ctx`, but the candidate goal is classified on the expanded kernel
+     view (`active_premise_kernel_view_for_context`). The binders it
+     references live only on the second plane.
+   - The repair, in `refine_branch_goal`: take the binders free in the
+     candidate goal, on the expanded view, whose types mention
+     `leaf.scrutinee`, closed outer-first. Abstract the goal over them,
+     rewrite with `subst_term_generalize`, and restore through the existing
+     `try_reindex_cast` or Ω transport on the same leaf proof.
+   - Invariant: no goal rewrite without a rewrite of every goal-referenced
+     dependent, in the same step and on the same plane.
 2. **Class A (5 rows): the J-base `Refl` inside a `Cast`, f7 and f4's
-   inner `ys`.** Its scope waits for its classification. A row classified
-   ONE-SIDED joins increment 1.
+   inner `ys`.** This is a kernel reducer defect (Architect
+   `evt_449gyxrrejte1`): the reducer emits ill-typed `Cast` reducts.
+   Increment 2 waits for `KERNEL-OBS-REDUCT-WITNESS-TYPING`, and the five
+   rows may then go green. A B row that involves a reducer-synthesized
+   reduct moves here too.
 
 ## Acceptance
 
@@ -63,19 +72,60 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
   slot). Stop to the Architect with the rows.
 - **AC-0b (done).** The measurements refute one mechanism: Class A is
   OTHER and Class B is SUBST, and the kernel is correct on all 15 rows.
-- **B-AC0 and the A measurement (no fix, same base, one scratch session).**
-  - For each failing B `Var`, and for every binder in those frames whose
-    type mentions `leaf.scrutinee`, name which of the four exclusion paths
-    in `evt_bw82kr4k5pm5` kept it out of the re-typed context.
-  - For each A row, name the `Cast`'s builder and the binder map applied.
-    Classify each row ONE-SIDED, RELOCATED or OTHER.
-  - The Architect rules increment 1 from B-AC0: a single narrowed path, or
-    one leaf set driving both goal and context.
-- **AC-1.** f7, f4, f5 and f6 check. f5 and f6 check after increment 1;
-  f7 and f4 after both increments. `lookup_zip_with` checks unchanged,
+- **B-AC0 (done).** 10 attempts and 48 dependent binders measured: two
+  exclusion mechanisms, so a structural closure. No B row fires one of the
+  four kernel witness sites, so all 10 stay in B.
+- **B-D0 (design only, Architect gate).** On a base other than
+  `ba2cd314c`, first re-count the 10 rows and 48 binders. Then: the
+  representation of a generalized premise binder and the step that resolves
+  it; the sweep of goal-rewriting `subst_term_generalize` callers, each in
+  or out with a reason; the double-refinement control.
+- **A measurement.** Paused until the kernel WP lands.
+- **AC-1.** Increment 1 (the B-D0 gate `evt_1fbdcqg5127qa`, restoration
+  form `evt_6pqf4vbt8n1f8`):
+  - All 10 B rows classify, and the emitted method re-checks in the kernel
+    at the original unrefined goal.
+  - Each of f4, f5 and f6 checks or fails at a named later site. A later
+    site in the obs.rs Phase 3 sub-cast is a kernel-dependency row.
+  - The 38 unreferenced dependents stay untouched.
+  - A committed row consumes a generalized premise through a generated
+    proof (f6's shape).
+
+  Increment 2: f7 and f4 check. `lookup_zip_with` checks unchanged,
   together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
-- **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged, plus a
-  mutation named in the ruling.
+- **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A
+  committed exactly-once control counts one leaf-keyed whole-Π restoration
+  on the emitted term, and a duplicate-restoration mutation reddens it. A's
+  five rows keep their verdicts under increment 1.
+
+## Residual (carried, not closed)
+
+Potential one-sided rewrite surfaces, unmeasured (`evt_1fbdcqg5127qa`):
+`subst_term_generalize` callers at `elab.rs:3015`, `:3330`, `:3446`, `:3489`,
+`:4271`, `:4461`, `:4615` and `:4931` (read at `ba2cd314c`). They rewrite a
+goal, motive or IH while the context keeps its types, under independent
+producers, with no measured failure. Each needs a measured failure before
+it joins scope.
+
+- B residual: surface `Refl` vs an observationally reduced `Eq` goal (f5,
+  f6; Architect `evt_enxtkpcwcad3`). The next increment first measures
+  whether each goal is reflexive up to conversion, before anyone touches
+  the `Refl` sugar.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 2 (Architect `evt_34d247xhy4t9f`).
+
+1. Nested eliminator method binder mismatch under generalized goal (f4,
+   inner match `ys`), keyed on binder source across the generalization
+   boundary (to be measured).
+2. Nested equation-convoy match sees the generalized binder as an ambient
+   convoy sibling of its own redirected scrutinee — keyed on scrutinee
+   identity across the redirect (sentinel spelling vs pushed Var).
+
+Candidate shared predicate: the generalized binder has two spellings across
+the generalization boundary, and each consumer that compares by spelling
+breaks.
 
 ## Stop conditions
 

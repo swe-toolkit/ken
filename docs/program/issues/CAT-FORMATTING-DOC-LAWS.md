@@ -70,6 +70,14 @@ which AC-0 fixes, is:
     flat width of 2.
   - Replacing a law with a reflexive filler reddens its consumer.
 
+## Residual (carried, not in scope)
+
+Nat order leq-add, leq-refl and leq-suc private duplicates in Map
+(`:17119`, `:17131`), Gcd (`:328`) and Parsing (`:3239`) should import from
+`Data.Numeric.Nat.Order` once this WP adds the shared bounds (Architect AC-0
+ruling `evt_2w0bcx37ysnen`, read at `510e25a8d`). A name collision with
+Map's private `leq_nat_add_right` brings Map's migration into this WP.
+
 ## Stop conditions
 
 - A law needing a new postulate, axiom or `trusted_base()` entry: an

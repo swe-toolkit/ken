@@ -6,7 +6,7 @@ owner: kernel
 size: S
 tier: T1
 gate: architect
-depends_on: [KERNEL-CONV-SPINE-RETRY-LINEAR]
+depends_on: [KERNEL-CONV-SPINE-RETRY-LINEAR, KERNEL-OBS-REDUCT-WITNESS-TYPING]
 blocks: []
 github: null
 origin: "Architect carry evt_1fyxdasdg2g79 in the KERNEL-CONV-IOTA-DISCHARGE-DESCENT TCB review: nested Cast types stay exponential in public whnf through obs::cast_reduce, pre-existing and outside that WP. Operator 2026-09-30 ('concur with recs'): file it after KERNEL-CONV-SPINE-RETRY-LINEAR. Steward-filed per COORDINATION section 2."
@@ -30,6 +30,9 @@ same result it gives today.
   `convert_type(env, ctx, a, b)` (`:353`), then dispatches on the endpoint
   heads. `cast_at_inductive` and the `Sigma` arm convert again (`:492`,
   `:516`, `:527`, `:543`, `:608`).
+- **Measure on the repaired reducer.** `KERNEL-OBS-REDUCT-WITNESS-TYPING`
+  rewrites the witnesses at `:614` and at the sibling sites, which changes
+  the cost this node measures.
 - **Unmeasured:** the growth rate, and which conversion repeats. No timing
   or entry count exists yet.
 

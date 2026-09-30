@@ -1,7 +1,7 @@
 ---
 id: CAT-LIST-APPEND-LENGTH-CANONICAL
 title: "The length-of-append law is proved twice in the catalog, once in Derived and once privately in Map. Publish Derived's as the canonical attached law and retire Map's private copy, deriving its one external use through add commutativity"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -96,3 +96,19 @@ base, stop and report the mismatch.
 - Any discharge route for the round-trip premise. It needs a new
   `trusted_base()` entry, which is an operator question, and only after
   `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` lands.
+
+## Closeout
+
+Merged as `510e25a8d` (PR #4408).
+- **Canonical law.** Derived's private `length_append` is now the public
+  attached law `list_append::length`. Map's private duplicate
+  `list_append_length_swapped` is removed, and `raw_outer_keys_length`
+  composes the public law with `add::comm`.
+- **Specializations stay** (AC-2 ruling `evt_2n49gqc2vmzm4`): Derived's
+  `append_length_snoc` and Map's `list_append_remove_length`.
+- **String fence fold** (`evt_xqx26mskfhjv`). The NFC fence is renamed
+  `derived_reject_round_trip_not_definitional`, with an ASCII reject control
+  and an accepted literal-admission example. The prose states that no
+  closed term discharges the round-trip premise.
+- **Controls.** Removing the expected-set entry fails the exact-surface
+  assertion. A reflexive filler reddens an unchanged generic consumer.
