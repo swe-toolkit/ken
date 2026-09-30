@@ -73,6 +73,12 @@ base, stop and report the mismatch.
     discharges.
   - The seeds `seed-def-refinement`, `seed-data-match`, `seed-obligations`
     and `seed-spec-syntax` are swept.
+  - `char-expected-integer-literal-scalar-boundary`
+    (`seed-numbers.md:286`) states its observable as the obligation:
+    `55295` leaves no open refinement obligation, and `55296` elaborates
+    with `isScalar 55296` undischarged. It no longer says "rejects"
+    (Architect `evt_1a3kmh4jf12ga`, spec leader `evt_1x72bcq61qfq3`). The
+    conformance validator reviews this row delta at the exact SHA.
   - `ac7_plain_carrier_no_obligation` stays at zero.
   - **The forgetful direction emits nothing** (`{x:A|φ} ≤ A` is free, 34
     §5). The prelude's `charToInt`, `eqChar` and `leqChar`, and
