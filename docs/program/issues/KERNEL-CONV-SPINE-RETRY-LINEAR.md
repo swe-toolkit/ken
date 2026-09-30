@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-SPINE-RETRY-LINEAR
-title: "Since the iota-discharge change, a false conversion between nested transparent eliminator wrappers takes time exponential in the nesting depth, because the same-head spine comparison and the δ retry each compare the same folded component. Conversion stays linear in the depth"
-status: ready
+title: "Since the iota-discharge change, a false conversion between nested transparent eliminator wrappers takes time exponential in the nesting depth, because the same-head spine comparison and the δ retry each compare the same folded component. Conversion is linear in the depth on empty and hard δ-ledger paths, and quadratic at worst across soft→hard transitions"
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -78,6 +78,20 @@ fixture and its converging counterexamples keep their verdicts.
   - The `9301e09e1` halting fixture still returns false promptly, and its
     converging counterexamples still converge.
   - The 57-package census shows no verdict change.
+
+## Closeout
+
+Merged `aa51bf9d7` (PR #4415), exact `b19da6f73`: Kernel QA
+`evt_2x4kqhzhr31wm`, Architect `evt_2zv3nfepqqd6s`, Decision
+`dec_2d03cmm74wkjy`.
+
+- A retry-scoped failed-spine memo, keyed on context depth, δ path and pair,
+  returns false only when that exact comparison replays.
+- Conversion is linear on the empty and hard ledger paths, pinned across six
+  nested shapes and a hard-ledger row. The soft→hard worst case is about
+  3k² and is pinned (Architect `evt_37g2qxwesq2zz`).
+- Both memo lookup sites have their own controls. Scope is `conv.rs` only,
+  with no trust or verdict change.
 
 ## Stop conditions
 
