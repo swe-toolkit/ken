@@ -17,7 +17,7 @@ use ken_kernel::{
         RecursiveArgumentShape,
     },
     infer as kernel_infer_raw,
-    subst::{subst0, subst_levels, subst_outer, subst_tel, weaken},
+    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
 };
@@ -1092,6 +1092,7 @@ fn make_if_elim(
             "preregistered Bool does not have exactly two constructors".into(),
         ));
     }
+    debug_assert!(bool_decl.indices.is_empty());
     Ok(Term::Elim {
         fam: cx.numeric_env.bool_id,
         level_args: vec![],
@@ -16716,6 +16717,7 @@ fn literal_bool_select(
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
+    debug_assert!(bool_decl.indices.is_empty());
     Ok(Term::Elim {
         fam: cx.numeric_env.bool_id,
         level_args: vec![],
@@ -16813,6 +16815,7 @@ fn build_literal_list_test(
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
+    debug_assert!(list_decl.indices.is_empty());
     Ok(Term::Elim {
         fam: list_id,
         level_args: vec![],
@@ -17871,21 +17874,22 @@ fn compile_match_matrix(
                     })
                 }
             };
-            let motive_ty = Term::pi(col_types[0].clone(), Term::ty(ret_level));
-            let motive = Term::Ascript(
-                Box::new(Term::lam(col_types[0].clone(), codomain)),
-                Box::new(motive_ty),
-            );
             let methods: Vec<Term> = raw_methods.iter().map(|m| weaken(m, 1)).collect();
-            let elim = Term::Elim {
-                fam: d_id0,
-                level_args: vec![],
-                params: params0.iter().map(|p| weaken(p, 1)).collect(),
-                motive: Box::new(motive),
-                methods,
-                indices: vec![],
-                scrut: Box::new(Term::var(0)),
+            let args: Vec<Term> = params0.iter().map(|p| weaken(p, 1)).collect();
+            let Term::IndFormer { level_args, .. } = head else {
+                unreachable!("nested split has an inductive scrutinee")
             };
+            let elim = matrix_family_elim(
+                &ind0,
+                d_id0,
+                &level_args,
+                &args,
+                &col_types[0],
+                codomain,
+                ret_level,
+                methods,
+                Term::var(0),
+            );
             Ok(Term::lam(col_types[0].clone(), elim))
         }
     }
@@ -18012,6 +18016,49 @@ fn build_ctor_buckets(
     }
 
     Ok(methods)
+}
+
+/// One constructor for every matrix-compiler family eliminator. The motive
+/// is constant in the family's indices, but still has the full index
+/// telescope. `motive_body` lives under its scrutinee binder at Var(0):
+/// insert the index binders only above its free variables, not above x.
+#[allow(clippy::too_many_arguments)]
+fn matrix_family_elim(
+    ind: &InductiveDecl,
+    family: GlobalId,
+    level_args: &[Level],
+    args: &[Term],
+    scrut_ty: &Term,
+    motive_body: Term,
+    level: Level,
+    methods: Vec<Term>,
+    scrut: Term,
+) -> Term {
+    let (params, indices) = args.split_at(ind.params.len());
+    debug_assert_eq!(indices.len(), ind.indices.len());
+    let sort = Term::ty(level);
+    let motive = if indices.is_empty() {
+        // This is exactly the previous non-indexed matrix motive.
+        Term::Ascript(
+            Box::new(Term::lam(scrut_ty.clone(), motive_body)),
+            Box::new(Term::pi(scrut_ty.clone(), sort)),
+        )
+    } else {
+        let body = shift(&motive_body, indices.len() as i64, 1);
+        Term::Ascript(
+            Box::new(wrap_motive_lambdas_at(ind, family, params, body, level_args)),
+            Box::new(motive_type_at(ind, family, params, &sort, level_args)),
+        )
+    };
+    Term::Elim {
+        fam: family,
+        level_args: level_args.to_vec(),
+        params: params.to_vec(),
+        motive: Box::new(motive),
+        methods,
+        indices: indices.to_vec(),
+        scrut: Box::new(scrut),
+    }
 }
 
 /// Close one root matrix method against the kernel's constructor method type.
@@ -18747,9 +18794,9 @@ fn infer_match(
         .map(|method| method.expect("complete inferred match has all constructor methods"))
         .collect();
 
-    // 7. Build the constant motive: Ascript(λ(x: D). R, D → Type ℓ)
-    //    The kernel can't infer the type of a bare lambda, so we annotate.
-    //    Determine ℓ from the return type's own type.
+    // 7. Build a constant motive over the family, ascribed at the return
+    //    type's classifier. Indexed families were dispatched above; the
+    //    shared builder also handles nested indexed matrix splits.
     let ret_level = match kernel_infer_current(cx, &ret_ty) {
         Ok(Term::Type(level)) => level,
         Ok(_) => Level::Zero,
@@ -18764,24 +18811,22 @@ fn infer_match(
             })
         }
     };
-    let motive_ty = Term::pi(scrut_ty.clone(), Term::ty(ret_level));
-    let motive = Term::Ascript(
-        Box::new(Term::lam(scrut_ty.clone(), weaken(&ret_ty, 1))),
-        Box::new(motive_ty),
-    );
-
-    // 8. Build Term::Elim (non-indexed: indices = []). The top-level
-    //    scrutinee is already a concrete elaborated value (`scrut_core`), so
-    //    — unlike a nested split — no extra binder/weaken is needed here.
-    let elim = Term::Elim {
-        fam: d_id,
-        level_args: vec![],
-        params: params_terms,
-        motive: Box::new(motive),
-        methods: raw_methods,
-        indices: vec![],
-        scrut: Box::new(scrut_core),
+    // 8. The top-level scrutinee is already a concrete elaborated value;
+    //    unlike a nested split, it needs no extra enclosing binder.
+    let Term::IndFormer { level_args, .. } = head else {
+        unreachable!("inductive scrutinee head checked above")
     };
+    let elim = matrix_family_elim(
+        &ind,
+        d_id,
+        &level_args,
+        &params_terms,
+        &scrut_ty,
+        weaken(&ret_ty, 1),
+        ret_level,
+        raw_methods,
+        scrut_core,
+    );
 
     Ok((elim, ret_ty))
 }
