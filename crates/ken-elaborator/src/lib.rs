@@ -546,16 +546,17 @@ impl ElabEnv {
     /// Try to discharge an obligation hole with a certificate term.
     ///
     /// `cert` is a CLOSED term (no free variables) of type `closed_goal`.
-    /// If `check(env, [], cert, closed_goal)` succeeds, the postulate is
-    /// upgraded to a transparent definition (`trusted_base()` membership removed).
-    /// Returns `true` if the discharge succeeded.
+    /// The closed goal is checked before the kernel's checked-body admission
+    /// verifies the hole's declared type, SCT, and transparent escape paths.
+    /// Only then is the postulate removed from `trusted_base()`. Returns
+    /// `true` if the discharge succeeded.
     pub fn discharge_hole(&mut self, obl: &Obligation, cert: Term) -> bool {
         // Kernel-check the certificate against the closed goal
         if kernel_check(&self.env, &Context::new(), &cert, &obl.goal_closed).is_err() {
             return false;
         }
-        // Retire the hole postulate by upgrading to transparent
-        self.env.upgrade_to_transparent(obl.hole_id, cert)
+        // A circular certificate must not retire its own trusted assumption.
+        ken_kernel::check::admit_bodies(&mut self.env, &[(obl.hole_id, cert)]).is_ok()
     }
 
     /// Returns `true` if `hole_id` is still in `trusted_base()` (status = `unknown`).

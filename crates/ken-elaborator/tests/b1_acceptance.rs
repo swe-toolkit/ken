@@ -166,11 +166,8 @@ fn proved_postcondition_projects_to_q() {
 
     // Discharge the V1 hole: upgrade it to a transparent definition.
     // After this, hole_id is no longer Opaque → absent from trusted_base().
-    let discharged = ke.env.upgrade_to_transparent(hole_id, cert.clone());
-    assert!(
-        discharged,
-        "upgrade_to_transparent must succeed for an Opaque hole"
-    );
+    ken_kernel::check::admit_bodies(&mut ke.env, &[(hole_id, cert.clone())])
+        .expect("upgrade_to_transparent must succeed for an Opaque hole");
     assert!(
         !ke.env.trusted_base().contains(&hole_id),
         "hole must be absent from trusted_base after discharge"
@@ -321,8 +318,8 @@ fn removing_assume_shrinks_p_and_changes_hash() {
 
     // Discharge the assumption: λx:P.x proves P → P.
     let cert = Term::lam(ke.p_term.clone(), Term::var(0));
-    let discharged = ke.env.upgrade_to_transparent(hole_id, cert.clone());
-    assert!(discharged, "upgrade_to_transparent must succeed");
+    ken_kernel::check::admit_bodies(&mut ke.env, &[(hole_id, cert.clone())])
+        .expect("upgrade_to_transparent must succeed");
     assert!(!ke.env.trusted_base().contains(&hole_id));
 
     // WITHOUT the assumption: Proved verdict, hole absent from trusted_base.
@@ -610,8 +607,8 @@ fn same_program_same_export_hash() {
         matches!(verdict_check, Verdict::Proved { .. }),
         "cert must prove phi"
     );
-    let discharged = ke.env.upgrade_to_transparent(hole_id, cert.clone());
-    assert!(discharged);
+    ken_kernel::check::admit_bodies(&mut ke.env, &[(hole_id, cert.clone())])
+        .expect("hole certificate must be admitted");
 
     let verdict = Verdict::Proved { cert };
     let tb = trusted_base_set(&ke.env);

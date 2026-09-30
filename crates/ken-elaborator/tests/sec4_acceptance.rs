@@ -65,7 +65,7 @@ fn new_trusted_entries(
 /// that same id from `trusted_base()`.
 /// CLAIMED: a discharged hole empties its trust-base delta.
 /// THE GAP: the before/after observations entail the claim only because both
-/// transitions use the real elaborator and `upgrade_to_transparent`, rather
+/// transitions use the real elaborator and `admit_bodies`, rather
 /// than a hand-inserted `GlobalId`.
 #[test]
 fn discharged_elaborated_hole_empties_trusted_base_delta() {
@@ -92,10 +92,8 @@ fn discharged_elaborated_hole_empties_trusted_base_delta() {
     let body = Term::IntLit(BigInt::from(0));
     check(&elab.env, &Context::new(), &body, &hole_ty)
         .expect("replacement body must be kernel-checked before discharge");
-    assert!(
-        elab.env.upgrade_to_transparent(hole, body),
-        "the admitted opaque hole must accept the real discharge transition"
-    );
+    ken_kernel::check::admit_bodies(&mut elab.env, &[(hole, body)])
+        .expect("the admitted opaque hole must accept the real discharge transition");
 
     let discharged = trusted_set(&elab.env);
     assert_eq!(

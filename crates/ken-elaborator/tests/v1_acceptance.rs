@@ -312,6 +312,47 @@ fn proved_status_cert_checks_not_in_trusted_base() {
     let _ = (trueprop_id, nat);
 }
 
+/// Durable invariant: a circular certificate does not retire its own trust.
+#[test]
+fn direct_self_certificate_remains_an_open_obligation() {
+    let mut env = mk_env();
+    decl_nat_pred(&mut env, "CircularGoal");
+    let res = env
+        .elaborate_decl_v1("fn circular (n : Nat) : Nat ensures CircularGoal n = n")
+        .expect("creates a real open obligation");
+    let obl = &res.obligations[0];
+    let before = env.env.clone();
+    assert!(env.is_open_hole(obl.hole_id));
+    assert!(!env.discharge_hole(obl, Term::const_(obl.hole_id, vec![])));
+    assert_eq!(env.env, before);
+    assert!(env.is_open_hole(obl.hole_id));
+}
+
+/// Durable invariant: indirect opaque→transparent→opaque certificates remain
+/// trusted assumptions rather than laundering an assumption into a proof.
+#[test]
+fn indirect_certificate_remains_an_open_obligation() {
+    let mut env = mk_env();
+    decl_nat_pred(&mut env, "IndirectGoal");
+    let res = env
+        .elaborate_decl_v1("fn indirect (n : Nat) : Nat ensures IndirectGoal n = n")
+        .expect("creates a real open obligation");
+    let obl = &res.obligations[0];
+    let bridge = ken_kernel::declare_def(
+        &mut env.env,
+        vec![],
+        obl.goal_closed.clone(),
+        Term::const_(obl.hole_id, vec![]),
+    )
+    .expect("bridge may refer to a still-open obligation");
+    assert!(env.env.transparent_body(bridge).is_some());
+    let before = env.env.clone();
+    assert!(env.is_open_hole(obl.hole_id));
+    assert!(!env.discharge_hole(obl, Term::const_(bridge, vec![])));
+    assert_eq!(env.env, before);
+    assert!(env.is_open_hole(obl.hole_id));
+}
+
 /// verify/spec-syntax/bogus-cert-not-proved  (soundness)
 ///
 /// A wrong cert doesn't discharge the hole.

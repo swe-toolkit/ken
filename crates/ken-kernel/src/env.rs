@@ -660,6 +660,12 @@ impl GlobalEnv {
         }
     }
 
+    /// Indexed references from one transparent body, for checked upgrades.
+    /// The index also records edges to targets that are still opaque.
+    pub(crate) fn transparent_body_refs(&self, id: GlobalId) -> Option<&HashSet<GlobalId>> {
+        self.body_refs.get(&id)
+    }
+
     /// The body of a transparent definition, for δ-unfolding (`11 §4`).
     pub fn transparent_body(&self, id: GlobalId) -> Option<(Vec<LevelVar>, Term)> {
         match self.lookup(id)? {
@@ -688,10 +694,10 @@ impl GlobalEnv {
         }
     }
 
-    /// Upgrade a pre-admitted `Opaque` declaration in-place to `Transparent`
-    /// (with a body) after SCT has approved it (`18 §4`). Returns `false` if
-    /// `id` is not present or is not opaque.
-    pub fn upgrade_to_transparent(&mut self, id: GlobalId, body: Term) -> bool {
+    /// Install a checked body after [`crate::check::admit_bodies`] has checked
+    /// the whole group and its escape paths. Internal to the kernel; external
+    /// callers must use the checked admission entry point.
+    pub(crate) fn upgrade_to_transparent(&mut self, id: GlobalId, body: Term) -> bool {
         let Some(&idx) = self.by_id.get(&id) else {
             return false;
         };

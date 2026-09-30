@@ -17,7 +17,6 @@ use ken_kernel::{
         RecursiveArgumentShape,
     },
     infer as kernel_infer_raw,
-    sct::sct_check,
     subst::{subst0, subst_levels, subst_outer, subst_tel, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
@@ -13822,8 +13821,8 @@ fn elaborate_v0(
 
 /// Elaborate a self-recursive `view`/`let` through the SCT gate (Approach A).
 ///
-/// The kernel's `declare_def` already pre-admits an opaque, kernel-checks the
-/// body, runs `sct_check`, and upgrades to transparent — but it allocates the
+/// The kernel's `declare_def` already pre-admits an opaque and calls
+/// `admit_bodies` to check and upgrade it — but it allocates the
 /// id *after* the body is built. A recursive def's body references its own id
 /// during elaboration (the resolver emits `RCon(name)` on a scope miss,
 /// `c3a3f1d`; the elaborator resolves it against `globals`), so the id must be
@@ -13835,17 +13834,16 @@ fn elaborate_v0(
 ///      `globals`, so the body's self-reference resolves to this id.
 ///   3. Elaborate the body checked against `ty_core` (self-calls see the
 ///      opaque's type; the kernel `check` sees the opaque too).
-///   4. Kernel-check the closed body against `ty_core`, then `sct_check` the
-///      singleton recursive group.
-///   5. On SCT acceptance, `upgrade_to_transparent` (δ-unfoldable, leaves
-///      `trusted_base`); on rejection, roll back the pre-admission — the opaque
+///   4. Call `admit_bodies` on the singleton group: the kernel checks the
+///      body, SCT, and paths through other transparent definitions before
+///      upgrading it to transparent (δ-unfoldable, leaves `trusted_base`).
+///   5. On rejection, roll back the pre-admission — the opaque
 ///      plus any literal postulates body elaboration added after it — and
 ///      unbind the name from `globals`.
 ///
-/// **Contained vs deferred (K2c).** This is a contained elaborator-side wiring
-/// of an *existing* kernel capability (`sct_check` + `upgrade_to_transparent`);
-/// the soundness-critical part — verifying structural descent — already lives
-/// in the kernel. The deferred sibling is **K2c general recursive δ** (`11
+/// **Contained vs deferred (K2c).** This elaborator path uses the checked
+/// kernel `admit_bodies` gate; type checking, structural descent, and exclusion
+/// of a cycle escaping through another transparent body all live in the kernel. The deferred sibling is **K2c general recursive δ** (`11
 /// §4`): arbitrary recursive δ-unfolding in conversion. Here the recursive call
 /// is to an *opaque* (δ blocks during checking); only after SCT acceptance does
 /// it become transparent, and termination is by structural descent on an
@@ -13945,14 +13943,11 @@ fn elaborate_recursive_view(
         }
     };
 
-    // 4. Kernel type-check + SCT gate (singleton recursive group).
-    let admit_result = kernel_check_raw(env, &Context::new(), &body_core, &ty_core)
-        .and_then(|_| sct_check(env, &[(id, body_core.clone())]));
+    // 4. Check and install the entire singleton group in the kernel.
+    let admit_result = ken_kernel::check::admit_bodies(env, &[(id, body_core)]);
 
     match admit_result {
         Ok(()) => {
-            // 5. SCT accepted → upgrade opaque to transparent (δ-unfoldable).
-            env.upgrade_to_transparent(id, body_core);
             Ok(ElabResult {
                 name: rdecl.name.clone(),
                 def_id: id,
@@ -13988,9 +13983,9 @@ fn elaborate_recursive_view(
 /// (VAL2 #3) — `members.len() >= 2`, already confirmed to form one strongly-
 /// connected call-graph component (`modules.rs`'s SCC pre-pass). Generalizes
 /// `elaborate_recursive_view`'s singleton pattern (pre-admit as `Opaque`,
-/// elaborate the body against that name-in-scope, kernel-check, `sct_check`,
-/// upgrade-or-rollback) to the whole group at once, so the WHOLE GROUP is one
-/// `sct_check` call — no member escapes the termination check
+/// elaborate the body against that name-in-scope, call `admit_bodies`,
+/// upgrade-or-rollback) to the whole group at once. The kernel checks SCT
+/// on the WHOLE GROUP — no member escapes the termination check
 /// (`[[sct-unapplied-self-reference-over-accepts]]`).
 ///
 /// Each member requires an explicit type annotation (mirrors the existing
@@ -14193,26 +14188,15 @@ pub(crate) fn elaborate_mutual_group(
         return Err(e);
     }
 
-    // 4. Kernel-check every body against its own declared type, THEN run
-    // `sct_check` on the WHOLE GROUP as ONE termination problem — the whole
-    // point of a mutual group is that no member's descent is checked in
-    // isolation (a member could look non-terminating alone but be fine via
-    // the group's cross-cycle measure, or vice versa look terminating alone
-    // while the CYCLE diverges).
-    let group_bodies: Vec<(GlobalId, Term)> =
-        ids.iter().cloned().zip(bodies.iter().cloned()).collect();
-    let admit_result: Result<(), ken_kernel::KernelError> = (|| {
-        for (body, ty_core) in bodies.iter().zip(&ty_cores) {
-            kernel_check_raw(env, &Context::new(), body, ty_core)?;
-        }
-        sct_check(env, &group_bodies)
-    })();
+    // 4. Admit the WHOLE GROUP in one kernel call. Each member remains
+    // opaque during checking and SCT, and escape paths are checked before
+    // any member is upgraded. A per-member call would wrongly reject an
+    // honest mutual cycle through already-transparent siblings.
+    let group_bodies: Vec<(GlobalId, Term)> = ids.iter().copied().zip(bodies).collect();
+    let admit_result = ken_kernel::check::admit_bodies(env, &group_bodies);
 
     match admit_result {
         Ok(()) => {
-            for (id, body) in ids.iter().zip(bodies) {
-                env.upgrade_to_transparent(*id, body);
-            }
             Ok(members
                 .iter()
                 .zip(ids)
@@ -14539,17 +14523,13 @@ fn elaborate_view_with_spec(
     let id = if let Some(pre_id) = pre_admit_id {
         // Recursive: the opaque was pre-admitted with the carrier Pi-chain. For
         // L3a's recursive views (no `requires`), `full_ty` == the carrier
-        // Pi-chain, so the opaque's type is already `full_ty`. Kernel-check +
-        // SCT-gate the singleton group, then upgrade. (A recursive fn WITH
+        // Pi-chain, so the opaque's type is already `full_ty`. The kernel
+        // checks and upgrades the singleton group. (A recursive fn WITH
         // `requires` — `full_ty` ≠ carrier — is a tracked follow-on; see
         // `elaborate_recursive_view`'s K2c note.)
-        let result = kernel_check_raw(env, &Context::new(), &full_body, &full_ty)
-            .and_then(|_| sct_check(env, &[(pre_id, full_body.clone())]));
+        let result = ken_kernel::check::admit_bodies(env, &[(pre_id, full_body)]);
         match result {
-            Ok(()) => {
-                env.upgrade_to_transparent(pre_id, full_body);
-                pre_id
-            }
+            Ok(()) => pre_id,
             Err(e) => {
                 // Roll back the pre-admission + any obligation holes / literal
                 // postulates added after it (ensures holes from Phase 3, etc.).
