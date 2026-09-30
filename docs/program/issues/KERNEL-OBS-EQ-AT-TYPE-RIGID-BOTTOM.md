@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-EQ-AT-TYPE-RIGID-BOTTOM
 title: "P0 soundness: the kernel reduces Eq Type (A → B) (A → B), and any compound type against a neutral type, to Bottom, so a generic refl lemma instantiated at a Π or Σ type checks against Bottom and proves anything. Reduce Eq Type to Bottom only between two rigid, distinct type formers"
-status: ready
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -73,6 +73,21 @@ inductive-headed application, `Quot` and `Trunc`. Every other pair is `None`
   - The level comparisons are checked the same way.
   - The handoff lists each site and its verdict.
 - **AC-4.** The kernel lib and the targeted obs and conv suites stay green.
+
+## Closeout
+
+Merged `65ab19be8` (PR #4417), exact `8583ab1f5`: Kernel QA
+`evt_3t1r7tvmjppww`, Architect `evt_1hszjc262gmb9`, Decision
+`dec_1v79k3tx6ztgd`.
+
+- `eq_at_type` returns `Bottom` only for two rigid formers that differ, or
+  for unequal universe levels. The rigid formers are Π, Σ, Ω, Type, an
+  inductive by `GlobalId` (bare or application-headed), `Quot` and `Trunc`.
+  Every other pair stays neutral.
+- The Π probe, its Σ twin and the neutral-instantiation term fail `check`
+  against `Bottom`, and restoring the old arm reddens each one.
+- Distinct inductive ids reaching `Bottom` is a sound completeness gain. The
+  kernel accepts strictly less, and `trusted_base()` is unchanged.
 
 ## Stop conditions
 
