@@ -211,8 +211,9 @@ collapse; in each successor case, `cong` lifts the recursive equality under
 original lookup result: matching `Fin n`, then its vector, follows the index
 into the successor tail. These laws are private checked proofs, not exports.
 
-These checked examples exercise the private operations at concrete indices.
-The Boolean helpers exist only for these examples and are not package laws.
+The checked examples first use all four private laws at their generic
+propositions, then illustrate the operations at concrete indices. The Boolean
+helpers exist only for those illustrations and are not package laws.
 
 ```ken example
 fn vec_example_not (x : Bool) : Bool =
@@ -226,6 +227,29 @@ fn vec_example_and (x : Bool) (y : Bool) : Bool =
     True ↦ y;
     False ↦ False
   }
+
+theorem use_lookup_fsuc
+      (a : Type) (n : Nat) (x : a) (xs : Vec a n) (i : Fin n)
+    : Equal a (lookup a (Suc n) (VCons a n x xs) (FSuc n i)) (lookup a n xs i) =
+  lookup_fsuc a n x xs i
+
+theorem use_map_vcons
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (x : a) (xs : Vec a n)
+    : Equal
+        (Vec b (Suc n))
+        (map a b (Suc n) f (VCons a n x xs))
+        (VCons b n (f x) (map a b n f xs)) =
+  map_vcons a b n f x xs
+
+theorem use_vec_map_compose
+      (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b) (g : b → c) (xs : Vec a n)
+    : Equal (Vec c n) (map b c n g (map a b n f xs)) (map a c n (comp a b c g f) xs) =
+  vec_map_compose a b c n f g xs
+
+theorem use_lookup_map
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) (i : Fin n)
+    : Equal b (lookup b n (map a b n f xs) i) (f (lookup a n xs i)) =
+  lookup_map a b n f xs i
 
 theorem vec_example_lookup_second
     : Equal Bool
