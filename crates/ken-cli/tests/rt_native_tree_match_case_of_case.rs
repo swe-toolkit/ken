@@ -97,6 +97,52 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   }
 "#;
 
+// The same shared-bind and ProcessInput harness as SHARED_BIND_SOURCE, but the
+// inner result and outer case family are Option. Neither arm has native parity
+// authorization: both remain on the pre-D1 fail-closed build path.
+#[cfg(target_os = "linux")]
+const OPTION_OUTER_SOURCE: &str = r#"program capabilities FS APartial
+proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
+  bind (Coproduct (FSOp APartial) AmbientOp)
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+    ExitCode ExitCode
+    (match (match eq_int (uint8_to_int byte) 1 {
+      True |-> Some UInt8 byte;
+      False |-> None UInt8
+    }) {
+      Some b |-> bind (Coproduct (FSOp APartial) AmbientOp)
+        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+        Unit ExitCode
+        (host_console APartial Unit (print_line "some"))
+        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+          ExitCode (Failure 3));
+      None |-> bind (Coproduct (FSOp APartial) AmbientOp)
+        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+        Unit ExitCode
+        (host_console APartial Unit (print_line "none"))
+        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+          ExitCode (Failure 4))
+    })
+    (\code. host_exit APartial code)
+
+proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit APartial (Failure 90);
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit APartial (Failure 91);
+        Cons argument _more |-> match bytes_at argument 0 {
+          None |-> host_exit APartial (Failure 92);
+          Some byte |-> decide byte
+        }
+      }
+    }
+  }
+"#;
+
 #[cfg(target_os = "linux")]
 #[test]
 fn console_direct_exit_nested_match_uses_existing_route() {
@@ -275,6 +321,66 @@ fn shared_bind_exit_code_arm_matches_interpreter(byte: u8, stdout: &[u8], exit: 
 #[cfg(target_os = "linux")]
 #[test]
 fn shared_bind_failure_arm_matches_interpreter_on_d1_route() {
+    shared_bind_exit_code_arm_matches_interpreter(2, b"rejected\n", 7);
+}
+
+// Promise class: transition sentinel until a separate Option-family parity
+// decision. MEASURED: both Option arms execute in the interpreter, while the
+// native build refuses at the previously checked planned-source-join boundary
+// without an artifact. CLAIMED: D1 no longer admits this untested family; THE
+// GAP: this refusal does not establish native Option parity. The paired
+// ExitCode byte-2 run proves the selected D1 family still emits and agrees.
+#[cfg(target_os = "linux")]
+#[test]
+fn option_outer_family_refuses_before_artifact_while_exit_code_uses_d1() {
+    let dir = tempfile::tempdir().unwrap();
+    for (byte, stdout, exit) in [
+        (1_u8, b"some\n".as_slice(), 3),
+        (2_u8, b"none\n".as_slice(), 4),
+    ] {
+        let mut host = ken_interp::PosixHost::new_at(dir.path());
+        let interpreted = ken_cli::run_program_effect_observation(
+            OPTION_OUTER_SOURCE,
+            ken_cli::SourceFormat::Ken,
+            &[b"ken".to_vec(), vec![byte]],
+            &[],
+            dir.path().as_os_str().as_encoded_bytes(),
+            &mut host,
+        )
+        .expect("the same checked Option source runs in the interpreter");
+        assert_eq!(interpreted.stdout, stdout, "Option byte {byte}");
+        assert_eq!(interpreted.exit_status, exit, "Option byte {byte}");
+        let operations: Vec<_> = interpreted
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect();
+        assert_eq!(operations, vec![ken_runtime::HostOpV1::ConsoleWrite]);
+    }
+
+    let (build, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
+        ken_cli::build_native_program(
+            OPTION_OUTER_SOURCE,
+            ken_cli::SourceFormat::Ken,
+            "rt-tree-option-outer-refusal",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    assert_eq!(d1_hits, 0, "Option must not enter the ExitCode D1 route");
+    let error = build.expect_err("untested Option family must refuse before artifact emission");
+    let message = format!("{error:?}");
+    assert!(
+        message.contains("planned source join")
+            && message.contains("neither emitted nor statically unselected"),
+        "the prior join boundary must refuse: {message}"
+    );
+    assert!(
+        std::fs::read_dir(dir.path()).unwrap().next().is_none(),
+        "no object or executable may be emitted for this build refusal"
+    );
+    eprintln!("RT_TREE_OPTION_REFUSAL {message}");
+
     shared_bind_exit_code_arm_matches_interpreter(2, b"rejected\n", 7);
 }
 

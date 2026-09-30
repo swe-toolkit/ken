@@ -6399,11 +6399,9 @@ impl<'a> Lowering<'a> {
                 &composed,
             );
         }
-        // An inner Match whose outer constructor family cannot survive a
-        // NativeScalarPair join must meet the outer producer while each arm
-        // still carries its constructor. Bool and Nat retain their existing
-        // scalar route; neither an exit projection nor a scalar refusal can
-        // recover the other constructors after a standalone join.
+        // The checked ExitCode outer family needs its constructor in each
+        // inner arm before the standalone NativeScalarPair join. Other families
+        // retain the prior lowering path until each has its own parity case.
         if let RuntimeExpr::Match {
             scrutinee: inner,
             cases: inner_cases,
@@ -6417,8 +6415,7 @@ impl<'a> Lowering<'a> {
                     .all(|case| family.iter().any(|symbol| &case.constructor == *symbol))
             };
             let outer_needs_composition = !producer_cases.is_empty()
-                && !all_in(&[&symbols.bool_true, &symbols.bool_false])
-                && !all_in(&[&symbols.nat_zero, &symbols.nat_suc]);
+                && all_in(&[&symbols.exit_success, &symbols.exit_failure]);
             if outer_needs_composition {
                 #[cfg(any(test, feature = "px8-ds-test-support"))]
                 note_exit_code_case_of_case_route();
