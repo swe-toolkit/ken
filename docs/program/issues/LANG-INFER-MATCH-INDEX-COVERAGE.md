@@ -1,7 +1,7 @@
 ---
 id: LANG-INFER-MATCH-INDEX-COVERAGE
 title: "An unannotated match on an indexed family never discharges an index-impossible constructor, so an empty VNil bucket fails coverage; the matrix path must use the dependent path's one authority for index impossibility"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -53,3 +53,22 @@ Its motive carries the index premise domains.
 
 - Any kernel or trust change.
 - A second index-impossibility rule beside the dependent path's.
+
+## Closeout
+
+Merged as `ba2cd314c` (PR #4402).
+- **AC-0.** The Architect ruled the obligation (`evt_3hty2qzkpr95h`): the
+  gate fires only on an indexed root split with a missing constructor row.
+  The motive comes from `build_checked_dependent_motive` over `weaken(R)`.
+  Present root methods are re-closed over the kernel's `method_type`
+  domains, premises innermost. Omitted constructors go only through
+  `synthesize_omitted_index_method`, so there is one impossibility
+  authority.
+- **AC-1.** The direct inferred `Vec a (Suc n)` control checks with no
+  trust growth, and closed observations at n = 0 and n = 1 pin the VCons
+  method's output. `lookup_zip_with` now fails later, at a
+  `LANG-SIBLING-GOAL-REFINEMENT` site.
+- **AC-2.** A reachable omitted `VNil` still raises the exact
+  `ExhaustivenessError`. Removing the top-premise application fails at
+  kernel check, and a constant VCons method fails the n = 0 observation.
+- **Carried.** Nested-column omission is out of scope and stays refused.

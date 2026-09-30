@@ -1,7 +1,7 @@
 ---
 id: CI-TEST-BUILD-PER-SHARD
 title: "Cut the per-shard test-build phase of Full CI: each workspace test shard builds only the test binaries it runs (whole binaries assigned to shards, balanced by build plus run time), with a first-party dependency cache only if measured to help; measured first, stop if the predicted saving is under two minutes"
-status: ready
+status: active
 owner: verify
 size: M
 gate: verify-qa
@@ -79,6 +79,14 @@ stop and report the mismatch; do not build around it.
 - **AC-4 (recording).** Both runs show per-job peak disk and memory in the
   logs. A deliberately failed step on a scratch branch shows the failure
   snapshot.
+
+## Increments landed
+
+- `22093cfcd`: increment 1, the AC-4 recording (confirmed on the natural
+  failure run 36602785207, `evt_11h2jg4zw9emt`).
+- `a0c194ee8`: increment 2, Step 1 measurement only. Each workspace test
+  shard builds its tests under `--timings` before selection and uploads the
+  timing reports. It feeds the 120 s prediction gate and claims no saving.
 
 ## Scope
 

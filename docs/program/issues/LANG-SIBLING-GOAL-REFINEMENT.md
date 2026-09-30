@@ -1,7 +1,7 @@
 ---
 id: LANG-SIBLING-GOAL-REFINEMENT
 title: "A goal that mentions an indexed sibling binder refined by a match on a different scrutinee fails (BadEliminator, 'could not classify the branch goal'); record each failing leaf's proof, its inferred type and its installing match before any fix"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
@@ -28,6 +28,9 @@ different scrutinee, is refined consistently. So f7, f4, f5 and f6 check.
 - **The compared indices are distinct binders:** the inner VCons field
   index `_` and the outer Fin-branch `m`, related only by generated
   premises.
+- **The predecessor landed** as `ba2cd314c`
+  (`LANG-INFER-MATCH-INDEX-COVERAGE`). There, `lookup_zip_with` gets past
+  inferred-match coverage and fails at sibling-goal refinement.
 
 ## Deliverable
 
