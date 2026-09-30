@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-SIBLING-MATCH-TAIL
 title: "An indexed sibling binder whose index was fixed by matching a different scrutinee is not refined consistently: its tail does not reduce at an open index, a goal mentioning it cannot be classified, and its own match fails coverage. Name the mechanism, then repair match compilation"
-status: ready
+status: closed
 owner: language
 size: M
 tier: T1
@@ -92,3 +92,15 @@ index. The landed `zip_with` definition is unchanged.
 - Any change to the landed `zip_with` definition.
 - Once this lands, `zip_with_vcons` and `lookup_zip_with` resume in
   `CAT-VECTOR-DEFERRED-LAWS` unchanged.
+
+## Closeout (split, not built)
+
+AC-0 returned three mechanisms (Architect `evt_6e58trrr1bnfx`, rows
+`evt_3tsanywqzghge`), so this node closes with no build. Its scope moves
+to three successors, in order:
+1. `LANG-GENERATED-J-PROOF-ASCRIPTION` (e5, e1, e4);
+2. `LANG-INFER-MATCH-INDEX-COVERAGE` (the `lookup_zip_with` coverage);
+3. `LANG-SIBLING-GOAL-REFINEMENT` (f7, f4, f5, f6).
+
+`zip_with_vcons` resumes in `CAT-VECTOR-DEFERRED-LAWS` after 1 lands, and
+`lookup_zip_with` after 2 and 3.

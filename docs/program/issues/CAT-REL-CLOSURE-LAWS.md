@@ -1,7 +1,7 @@
 ---
 id: CAT-REL-CLOSURE-LAWS
 title: "Prove the relation laws spec 58 §7 defers from the landed closure computation: the compose/converse membership characterizations, the relation-predicate proof-flip discriminators, and reachable_plus faithfulness and saturation under a lawful key order; clusters 1-2 as separate increments first, cluster 3 behind an AC-0 design stop the Architect rules"
-status: ready
+status: merged
 owner: foundation
 size: L
 gate: architect
@@ -74,3 +74,26 @@ as increments.
   Architect with the site.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Merged in four increments: `605bdd943`, `51bb0cc47`, `cb576522b` and
+`692a69438`, all in `Map.ken.md`, private, with no trust growth.
+- **Cluster 1.**
+  - `compose_successors_union` and `compose_member_union` landed in
+    `605bdd943`.
+  - `converse_member_characterization` landed in `692a69438`. It waited on
+    `CHECK-REFL-CLOSED-STEP-FOLD-DIVERGENCE`, and no `Refl` ι-reduces a
+    closed-step fold.
+  - The absent-compose and unreversed-converse controls are refuted.
+- **Cluster 2.** `relation_chain_refutes_transitivity` and
+  `relation_chain_completion_is_transitive` hold both arms.
+- **Cluster 3.** The AC-0 rulings are `evt_4y08xcjgzq7wp` and
+  `evt_7regb8dbt8j2s`.
+  - `reachable_within_sound` and `reachable_within_complete` are proved
+    against an independent walk judge.
+  - `reachable_plus_sound`, `reachable_plus_complete`,
+    `reachable_within_monotone` and `reachable_within_saturates` hold
+    under a lawful `Ord`, with no `Distinct` premise.
+  - The AC-2 control: the single-edge chain is rejected at fuel N-1 and
+    accepted at its bound.
