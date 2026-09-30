@@ -36,6 +36,8 @@ single class-owned dictionary available through this path.
 ```ken
 import Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 
+import Data.Numeric.Nat.Arithmetic (add)
+
 export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 ```
 
@@ -236,6 +238,38 @@ pub proof gt_implies_reverse_leq for compare
   }
 ```
 
+Addition recurses on its second argument. The first bound carries an
+induction hypothesis through a successor using the canonical order's
+transitivity; the second bound reduces directly to its induction hypothesis.
+
+```ken
+theorem leq_nat_successor_bound (n : Nat) : Equal Bool (leq_nat n (Suc n)) True =
+  match n {
+    Zero ↦ Proved;
+    Suc rest ↦ leq_nat_successor_bound rest
+  }
+
+pub theorem leq_nat_add_left_bound (a : Nat) (b : Nat) : Equal Bool (leq_nat a (add a b)) True =
+  match b {
+    Zero ↦ (proof refl for leq_nat) a;
+    Suc rest ↦
+      (proof trans for leq_nat)
+        a
+        (add a rest)
+        (Suc (add a rest))
+        (leq_nat_add_left_bound a rest)
+        (leq_nat_successor_bound (add a rest))
+  }
+
+pub theorem leq_nat_add_right_bound
+      (a : Nat) (b : Nat)
+    : Equal Bool (leq_nat b (add a b)) True =
+  match b {
+    Zero ↦ Proved;
+    Suc rest ↦ leq_nat_add_right_bound a rest
+  }
+```
+
 ## 3. Using it
 
 ```ken example
@@ -261,7 +295,26 @@ fn carried_nat_leq (x : Nat) (y : Nat) : Bool where Ord Nat = d.leq x y
 const ord_nat_leq : Bool = carried_nat_leq (Suc Zero) (Suc (Suc Zero))
 ```
 
+The two addition bounds are exported checked facts for generic natural-number
+arguments, with no change to the canonical `Ord Nat` dictionary:
+
+```ken example
+theorem order_example_left_add_bound
+      (a : Nat) (b : Nat)
+    : Equal Bool (leq_nat a (add a b)) True =
+  leq_nat_add_left_bound a b
+
+theorem order_example_right_add_bound
+      (a : Nat) (b : Nat)
+    : Equal Bool (leq_nat b (add a b)) True =
+  leq_nat_add_right_bound a b
+```
+
 ## 4. Laws & proofs
+
+The public addition bounds connect the canonical order to the canonical
+addition operation. For any `a` and `b`, both `a` and `b` are at most
+`add a b`; neither bound needs a new order dictionary.
 
 `min`/`max`/`sub` earn their place with three exported computation facts:
 `min::zero_left`, `max::zero_left`, and `sub::zero_right`.
@@ -329,8 +382,9 @@ canonical `leq_nat`.
 1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
    `leq_nat` with their provider identities. It exports its defined-at `min`,
    `max`, `sub`, and `compare` operations; their three zero computation facts;
-   the four `min`/`max` bounds; the three `compare` agreements; and the four
-   inductive `sub` proofs. `OrdResult` remains package-local.
+   the two addition bounds; the four `min`/`max` bounds; the three `compare`
+   agreements; and the four inductive `sub` proofs. `OrdResult` remains
+   package-local.
 2. **Source map.**
 
    | Task | Section |
@@ -348,9 +402,10 @@ canonical `leq_nat`.
    declaration or trust. The local operations introduce no `Axiom`, primitive,
    or postulate.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
-   package's checked laws use structural recursion for the `min`/`max` bounds
-   and subtraction theory, and case analysis on the canonical relation for the
-   `compare` agreements. The equality arm closes through `leq_nat::antisym`.
+   package's checked laws use structural recursion for the addition bounds,
+   `min`/`max` bounds, and subtraction theory, and case analysis on the canonical
+   relation for the `compare` agreements. The equality arm closes through
+   `leq_nat::antisym`.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can selectively import the local arithmetic and
    comparison operations.
