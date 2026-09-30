@@ -1,8 +1,9 @@
 //! CAT-MIGRATE-TIER-C-DATA-VALUE Vector closeout controls.
 //!
 //! Vector owns checked indexed families, operations, computation theorems,
-//! and one private map identity law. It consumes only Combinators/Transport,
-//! publishes no catalog surface, and adds no trust beyond those providers.
+//! and private map identity, fusion, and lookup-after-map laws. Its only
+//! catalog dependencies are Combinators and Transport. It publishes no
+//! catalog surface and adds no trust beyond those providers.
 //! `cat_vec_acceptance` retains the family-index, computation, and
 //! impossible-call behavior obligations.
 
@@ -42,10 +43,14 @@ fn expected_owned_names() -> BTreeSet<String> {
         "head_vcons",
         "lookup",
         "lookup_fzero",
+        "lookup_fsuc",
+        "lookup_map",
         "map",
+        "map_vcons",
         "map_vnil",
         "tail",
         "tail_vcons",
+        "vec_map_compose",
         "vec_map_identity",
         "zip_with",
         "zip_with_vnil",
@@ -171,7 +176,7 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 /// Promise class: transition sentinel for the owned declarations in this
 /// proof-only increment. Retire or rebaseline at the first separately authorized
 /// Vector declaration extension; this inventory is not a permanent API promise.
-/// MEASURED: ordinary isolated roots loading installs these seventeen checked
+/// MEASURED: ordinary isolated roots loading installs these twenty-one checked
 /// Vector identities, returns only identities from that population, and
 /// executes every checked fence, then retains the same qualified name and ID
 /// populations. Provider-closure trust is unchanged by Vector. CLAIMED: the
@@ -216,7 +221,11 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
         .execute_loaded_entry_checked_fences(VECTOR)
         .expect("Vector Definition and every checked fence must elaborate");
     assert_eq!(
-        via_vector.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        via_vector
+            .env
+            .trusted_base()
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
         pre_fence_trust,
         "Vector checked fences must not add trust"
     );
@@ -232,12 +241,77 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
     );
 }
 
+/// Promise class: durable invariant for spec/50-stdlib/60 §5's checked Vector
+/// equations. MEASURED: a synthetic module-local consumer can use all four
+/// private proofs at their generic expected operational propositions over
+/// open element types, vector lengths, functions, and indices. CLAIMED: these
+/// declarations prove the computations and map/lookup interactions rather
+/// than unrelated reflexive filler. THE GAP: ordinary elaboration compares
+/// each proposition against the checked proof identity; this test bypasses
+/// privacy only for a same-module verification fixture, not a real client.
+#[test]
+fn vector_backfilled_laws_inhabit_the_generic_equations() {
+    let (mut env, _) = load(VECTOR);
+    for name in [
+        "Vec",
+        "VCons",
+        "Fin",
+        "FSuc",
+        "lookup",
+        "map",
+        "lookup_fsuc",
+        "map_vcons",
+        "vec_map_compose",
+        "lookup_map",
+    ] {
+        let id = env.globals[&format!("{VECTOR}.{name}")];
+        env.globals.insert(name.to_owned(), id);
+    }
+    let comp = env.globals["Core.Function.Combinators.comp"];
+    env.globals.insert("comp".to_owned(), comp);
+    env.elaborate_file(
+        r#"
+        theorem use_lookup_fsuc
+            (a : Type) (n : Nat) (x : a) (xs : Vec a n) (i : Fin n)
+          : Equal a
+              (lookup a (Suc n) (VCons a n x xs) (FSuc n i))
+              (lookup a n xs i) =
+          lookup_fsuc a n x xs i
+
+        theorem use_map_vcons
+            (a : Type) (b : Type) (n : Nat) (f : a → b) (x : a) (xs : Vec a n)
+          : Equal (Vec b (Suc n))
+              (map a b (Suc n) f (VCons a n x xs))
+              (VCons b n (f x) (map a b n f xs)) =
+          map_vcons a b n f x xs
+
+        theorem use_vec_map_compose
+            (a : Type) (b : Type) (c : Type) (n : Nat)
+            (f : a → b) (g : b → c) (xs : Vec a n)
+          : Equal (Vec c n)
+              (map b c n g (map a b n f xs))
+              (map a c n (comp a b c g f) xs) =
+          vec_map_compose a b c n f g xs
+
+        theorem use_lookup_map
+            (a : Type) (b : Type) (n : Nat)
+            (f : a → b) (xs : Vec a n) (i : Fin n)
+          : Equal b
+              (lookup b n (map a b n f xs) i)
+              (f (lookup a n xs i)) =
+          lookup_map a b n f xs i
+        "#,
+    )
+    .expect("each backfilled proof must inhabit its general Vector equation");
+}
+
 /// Promise class: transition sentinel for this proof-only dependency edge;
 /// retire at the first separately authorized Vector provider change.
-/// MEASURED: checked Vector references exactly the compiler floor plus the
-/// canonical imported `idf`/`cong` identities; parsed imports list exactly
-/// those two providers, with no public declaration or re-export. CLAIMED:
-/// the private law uses the two authorized providers and Vector publishes no
+/// MEASURED: checked Vector references exactly the compiler floor, including
+/// `Top` in the new inductive proof goals, plus the canonical imported
+/// `comp`/`idf`/`cong` identities; parsed imports list exactly those two
+/// providers, with no public declaration or re-export. CLAIMED:
+/// the private laws use the two authorized providers and Vector publishes no
 /// catalog surface. THE GAP: `Type` and `Refl` elaborate without separate
 /// provider globals; checked GlobalId comparisons close the provider edge.
 #[test]
@@ -254,18 +328,22 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
     for id in &owned_ids {
         external.remove(id);
     }
-    let mut expected_external = ["Proved", "Nat", "Zero", "Suc", "Equal"]
+    let mut expected_external = ["Top", "Proved", "Nat", "Zero", "Suc", "Equal"]
         .into_iter()
         .map(|name| base.globals[name])
         .collect::<BTreeSet<_>>();
-    for name in ["Core.Function.Combinators.idf", "Core.Logic.Transport.cong"] {
+    for name in [
+        "Core.Function.Combinators.comp",
+        "Core.Function.Combinators.idf",
+        "Core.Logic.Transport.cong",
+    ] {
         expected_external.insert(via_vector.globals[name]);
     }
     assert_eq!(
         external, expected_external,
         "Vector's checked external identity inventory changed"
     );
-    for name in ["Proved", "Nat", "Zero", "Suc", "Equal"] {
+    for name in ["Top", "Proved", "Nat", "Zero", "Suc", "Equal"] {
         assert_eq!(
             via_vector.globals[name], base.globals[name],
             "Vector must retain the compiler's canonical `{name}` identity"
@@ -297,6 +375,7 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
     assert_eq!(
         shape.providers,
         [
+            ("Core.Function.Combinators".to_owned(), "comp".to_owned()),
             ("Core.Function.Combinators".to_owned(), "idf".to_owned()),
             ("Core.Logic.Transport".to_owned(), "cong".to_owned()),
         ]
