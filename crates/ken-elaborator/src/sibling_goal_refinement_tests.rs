@@ -219,6 +219,11 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
     let (inside, inside_ty) = infer(&mut cx, &expr).expect("generalized premise inference");
     let generalized_ty = weaken(&new_ty, 1);
     assert_eq!(
+        inside,
+        Term::var(0),
+        "the scrutinee has its binder identity"
+    );
+    assert_eq!(
         inside_ty, generalized_ty,
         "term and inferred type use one binder"
     );
@@ -234,6 +239,76 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
     cx.hidden_positions.pop();
     let (after, after_ty) = infer(&mut cx, &expr).expect("original premise restored");
     assert_eq!((after, after_ty), (premise, old_ty));
+}
+
+#[test]
+fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
+    // Promise class: durable invariant. MEASURED: scrutinee identity skips
+    // itself, while an independent dependent sibling remains in the inner
+    // convoy and reaches the exact equation-convoy overlap refusal. CLAIMED:
+    // the self-skip does not suppress a real ambient binder. THE GAP: this
+    // constructed seam checks the guard; the f4 source supplies the exact
+    // redirected-scrutinee case and its empty convoy separately.
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(
+        "data ConvoyVec (a : Type) : Nat → Type where { \
+         Empty : ConvoyVec a Zero; \
+         Step : (n : Nat) → a → ConvoyVec a n → ConvoyVec a (Suc n) }",
+    )
+    .expect("indexed family");
+    let vec_id = env.globals["ConvoyVec"];
+    let family = env
+        .env
+        .inductive(vec_id)
+        .expect("registered family")
+        .clone();
+    let nat_ty = nat(env.globals["Nat"]);
+    let vec_ty = |index: Term| app2(nat(vec_id), nat_ty.clone(), index);
+    let mut cx = ElabCtx::new(
+        &mut env.env,
+        &env.globals,
+        &mut env.num_values,
+        &env.numeric_env,
+        "real-sibling-convoy-control",
+    );
+    cx.ctx.push(nat_ty.clone()); // n
+    cx.ctx.push(nat_ty.clone()); // m, inside an enclosing field region
+    cx.ctx.push(vec_ty(Term::var(0))); // independent x : ConvoyVec Nat m
+    cx.ctx.push(vec_ty(Term::var(1))); // scrutinee y : ConvoyVec Nat m
+    cx.match_field_regions.push(1..2);
+    let index = Term::var(2);
+    let scrutinee = Term::var(0);
+    let convoy = compute_context_convoy(
+        &cx.ctx,
+        &scrutinee,
+        std::slice::from_ref(&index),
+        &cx.match_field_regions,
+    );
+    assert_eq!(
+        convoy.len(),
+        1,
+        "real dependent sibling is not self-skipped"
+    );
+    assert_eq!(convoy[0].var, 1, "x, not the scrutinee y");
+    let goal = eq(nat_ty.clone(), index.clone(), index.clone());
+    let error = plan_coherent_frame_motive(
+        &cx,
+        &family,
+        &[nat_ty],
+        &scrutinee,
+        &[index],
+        &goal,
+        2,
+        &[Term::var(1)],
+        RecursiveFieldIndexPath::CoupledRefinement,
+        1,
+        false,
+        &Span { start: 0, end: 0 },
+    )
+    .err()
+    .expect("real sibling must be refused");
+    assert!(matches!(error, ElabError::Internal(ref reason)
+        if reason == "index-equation convoy unexpectedly overlaps an ambient context convoy"));
 }
 
 #[test]

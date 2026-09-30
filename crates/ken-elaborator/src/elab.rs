@@ -1364,7 +1364,8 @@ fn check_variable_with_index_views(
         ElabError::Internal("index-refined variable escaped its branch context".into())
     })? as i64;
     let refined_term = weaken(raw_refined_term, growth);
-    let refined_ty = weaken(raw_refined_ty, growth);
+    let (refined_term, refined_ty) = scoped_premise_binding(cx, &refined_term)?
+        .unwrap_or_else(|| (refined_term, weaken(raw_refined_ty, growth)));
     let expected_zonked = cx.metas.zonk_term(expected);
     let refined_ty_zonked = cx.metas.zonk_term(&refined_ty);
     if convert_type(cx.env, &cx.ctx, &refined_ty_zonked, &expected_zonked) {
@@ -1382,15 +1383,14 @@ fn check_variable_with_index_views(
     Ok(refined_term)
 }
 
-/// The same temporary premise redirection used by contextual kernel queries
-/// must also supply the type returned by inference of a surface alias. A
-/// nested match infers its scrutinee before it checks its method; returning
-/// the original premise type beside a sentinel redirected to the generalized
-/// binder gives the motive a different index from the checked scrutinee.
-fn scoped_premise_inferred_type(
+/// Resolve a generalized premise to ONE ambient binder identity. Inference
+/// of a nested-match scrutinee and checking of a body variable must return
+/// the same binder and its type, never the original sentinel with the new
+/// binder's type (or the new binder with the original premise's type).
+fn scoped_premise_binding(
     cx: &ElabCtx<'_>,
     term: &Term,
-) -> Result<Option<Term>, ElabError> {
+) -> Result<Option<(Term, Term)>, ElabError> {
     let Term::Var(index) = term else {
         return Ok(None);
     };
@@ -1409,10 +1409,10 @@ fn scoped_premise_inferred_type(
             ElabError::Internal("generalized premise slot overflowed at the nested match".into())
         })?;
         if *index == checked_index_refinement_sentinel(*region, effective_slot)? {
-            let (_, ty) = cx.binding_term(*position).ok_or_else(|| {
+            let binding = cx.binding_term(*position).ok_or_else(|| {
                 ElabError::Internal("generalized premise binder escaped its checking scope".into())
             })?;
-            return Ok(Some(ty));
+            return Ok(Some(binding));
         }
     }
     Ok(None)
@@ -8837,9 +8837,8 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             if let Some((raw_term, raw_ty, install_depth)) = cx.var_refinements.get(&pos) {
                 let growth = (cx.ctx.len() - install_depth) as i64;
                 let core = weaken(raw_term, growth);
-                let ty = scoped_premise_inferred_type(cx, &core)?
-                    .unwrap_or_else(|| weaken(raw_ty, growth));
-                return Ok((core, ty));
+                return Ok(scoped_premise_binding(cx, &core)?
+                    .unwrap_or_else(|| (core, weaken(raw_ty, growth))));
             }
             let ty_stored = cx
                 .ctx
