@@ -731,6 +731,48 @@ fn motive_expected_type(
 /// Infer the type of `J motive base eq` = `motive b eq` (`15 §4`). Recovers
 /// `A`,`a`,`b` from `eq : Eq A a b`, verifies the motive's first domain is `A`,
 /// checks `base : motive a (refl a)`, and returns `motive b eq`.
+/// Read the Eq *formation* of a proof type before Eq-by-type reduces that
+/// head. An equality at Σ or Π may compute to a conjunction or a function;
+/// J still eliminates the checked formation `Eq A a b` (`15 §4`). Only
+/// β/δ/let/ascription and their function-head spines are traversed here.
+fn eq_formation_head(env: &GlobalEnv, ty: &Term) -> Term {
+    let mut current = ty.clone();
+    loop {
+        current = match current {
+            Term::Ascript(inner, _) => *inner,
+            Term::Let { val, body, .. } => subst0(&body, &val),
+            Term::Const { id, level_args } => {
+                if let Some((params, body)) = env.transparent_body(id) {
+                    subst_levels(&body, &params, &level_args)
+                } else {
+                    return Term::Const { id, level_args };
+                }
+            }
+            Term::App(f, a) => match eq_formation_head(env, &f) {
+                Term::Lam(_, body) => subst0(&body, &a),
+                head => return Term::app(head, *a),
+            },
+            head => return head,
+        };
+    }
+}
+
+/// Return the Eq formation a proof's type denotes. Never reduce an Eq head;
+/// preserve the previous WHNF-and-shape fallback for non-Eq heads.
+pub(crate) fn eq_formation(
+    env: &GlobalEnv,
+    ctx: &Context,
+    ty: &Term,
+) -> Option<(Term, Term, Term)> {
+    match eq_formation_head(env, ty) {
+        Term::Eq(a, x, y) => Some((*a, *x, *y)),
+        other => match whnf(env, ctx, &other) {
+            Term::Eq(a, x, y) => Some((*a, *x, *y)),
+            _ => None,
+        },
+    }
+}
+
 fn infer_j(
     env: &GlobalEnv,
     ctx: &Context,
@@ -740,14 +782,9 @@ fn infer_j(
 ) -> KernelResult<Term> {
     // e : Eq A a b  ⇒  recover A, a, b.
     let e_ty = infer(env, ctx, eq)?;
-    let (a_ty, a_idx, b_idx) = match &whnf(env, ctx, &e_ty) {
-        Term::Eq(at, x, y) => ((**at).clone(), (**x).clone(), (**y).clone()),
-        _ => {
-            return Err(KernelError::BadEliminator(
-                "J's equality argument is not an `Eq`".into(),
-            ))
-        }
-    };
+    let (a_ty, a_idx, b_idx) = eq_formation(env, ctx, &e_ty).ok_or_else(|| {
+        KernelError::BadEliminator("J's equality argument is not an `Eq`".into())
+    })?;
     // motive : (b:A) → (e':Eq A a b) → Type ℓ'. Verify the first domain ≡ A.
     let m_ty = infer(env, ctx, motive)?;
     match &whnf(env, ctx, &m_ty) {

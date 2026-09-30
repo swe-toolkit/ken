@@ -1,7 +1,7 @@
 //! Observational reducts must remain typable at the redex's type (`16 §2.2`, §4.1).
 use ken_kernel::env::Context;
 use ken_kernel::term::{GlobalId, Level, LevelVar, Term};
-use ken_kernel::{convert_type, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, InductiveSpec};
+use ken_kernel::{convert_type, declare_def, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, InductiveSpec, KernelError};
 
 struct Fixture {
     env: GlobalEnv,
@@ -53,6 +53,7 @@ fn eq(ty: Term, a: Term, b: Term) -> Term {
 }
 fn assert_typed_reduction(env: &GlobalEnv, redex: &Term, shape: &str) {
     let ctx = Context::new();
+    let trust_before = env.trusted_base();
     let before = infer(env, &ctx, redex).expect("well-typed redex");
     // J is measured at the reducer seam: subsequent WHNF of a Pi cast
     // can produce a checking-only lambda, which cannot be inferred alone.
@@ -64,6 +65,7 @@ fn assert_typed_reduction(env: &GlobalEnv, redex: &Term, shape: &str) {
     assert_ne!(&after_term, redex, "site must reduce rather than stay neutral");
     let after = infer(env, &ctx, &after_term).unwrap_or_else(|err| panic!("{shape}: reduct lost type: {err:?}; reduct: {after_term:?}"));
     assert!(convert_type(env, &ctx, &before, &after), "reduct inferred {after:?}, redex {before:?}");
+    assert_eq!(env.trusted_base(), trust_before, "reduction must not add trusted declarations");
 }
 
 /// Durable invariant: the first equality conjunct witnesses the dependent
@@ -158,4 +160,67 @@ fn j_nonrefl_dependent_motive_has_typed_pair_equality() {
         let evidence = f.opaque("e", eq(f.nat.clone(), n, m));
         assert_typed_reduction(&f.env, &Term::J(Box::new(motive), Box::new(base), Box::new(evidence)), shape);
     }
+}
+
+/// AC-3: the proof's *formation* is Eq Σ, even though WHNF reduces its
+/// proposition to a Σ of conjuncts. This checks J admission, not reduction:
+/// Refl at a reducible Eq Σ remains outside this WP's scope.
+#[test]
+fn dependent_j_over_variable_sigma_equality_preserves_its_type() {
+    let mut f = Fixture::new();
+    let sigma = Term::sigma(f.nat.clone(), f.vec(Term::var(0)));
+    let p = f.opaque("p", sigma.clone());
+    let q = f.opaque("q", sigma.clone());
+    let eq_ty = eq(sigma.clone(), p.clone(), q.clone());
+    let mut ctx = Context::new();
+    ctx.push(eq_ty.clone());
+    let motive_ty = Term::pi(
+        sigma.clone(),
+        Term::pi(eq(sigma.clone(), p.clone(), Term::var(0)), Term::Type(Level::zero())),
+    );
+    let motive = Term::Ascript(Box::new(Term::lam(sigma.clone(), Term::lam(
+        eq(sigma.clone(), p.clone(), Term::var(0)),
+        Term::pi(f.nat.clone(), f.vec(Term::proj1(Term::var(2)))),
+    ))), Box::new(motive_ty));
+    let base_ty = Term::pi(f.nat.clone(), f.vec(Term::proj1(p)));
+    let base = f.opaque("base", base_ty);
+    let redex = Term::J(Box::new(motive), Box::new(base), Box::new(Term::var(0)));
+    let actual = infer(&f.env, &ctx, &redex).expect("J at an Eq Sigma formation");
+    let expected = Term::pi(f.nat.clone(), f.vec(Term::proj1(q)));
+    assert!(convert_type(&f.env, &ctx, &actual, &expected));
+    assert_ne!(whnf(&f.env, &ctx, &eq_ty), eq_ty,
+        "this control must actually exercise reducible Eq at Sigma");
+}
+
+/// AC-3: a non-Eq proof must not be admitted by the formation reader. The
+/// exact old BadEliminator remains the refusal, not a later motive error.
+#[test]
+fn j_rejects_top_and_other_non_equality_proofs() {
+    let f = Fixture::new();
+    let ctx = Context::new();
+    for proof in [ken_kernel::obs::tt_term(&f.env), Term::Type(Level::zero())] {
+        let redex = Term::J(Box::new(Term::Type(Level::zero())),
+            Box::new(Term::Type(Level::zero())), Box::new(proof));
+        assert_eq!(infer(&f.env, &ctx, &redex),
+            Err(KernelError::BadEliminator("J's equality argument is not an `Eq`".into())));
+    }
+}
+
+/// AC-3: Eq reached only through δ still admits the same J as before the
+/// bounded admission change. This row alone does not prove new Σ admission.
+#[test]
+fn j_delta_alias_to_eq_keeps_prior_verdict() {
+    let mut f = Fixture::new();
+    let n = f.opaque("n", f.nat.clone());
+    let m = f.opaque("m", f.nat.clone());
+    let alias = declare_def(&mut f.env, vec![], Term::Omega(Level::zero()),
+        eq(f.nat.clone(), n.clone(), m.clone())).expect("transparent Eq alias");
+    let e = f.opaque("e", Term::const_(alias, vec![]));
+    let motive_ty = Term::pi(f.nat.clone(), Term::pi(
+        eq(f.nat.clone(), n.clone(), Term::var(0)), Term::Type(Level::zero())
+    ));
+    let motive = f.opaque("P", motive_ty);
+    let base_ty = Term::app(Term::app(motive.clone(), n.clone()), Term::Refl(Box::new(n)));
+    let base = f.opaque("base", base_ty);
+    assert_typed_reduction(&f.env, &Term::J(Box::new(motive), Box::new(base), Box::new(e)), "delta alias");
 }

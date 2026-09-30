@@ -133,6 +133,16 @@ fn eq_at_pi(a1: &Term, b1: &Term, f: &Term, g: &Term) -> Term {
     )
 }
 
+/// Introduce only a canonical, checked-by-shape base; a neutral proposition
+/// has no fabricated witness. The caller constructs `Eq Type X X` itself.
+fn canonical_type_eq_base(env: &GlobalEnv, ctx: &Context, base_ty: &Term) -> Option<Term> {
+    match whnf(env, ctx, base_ty) {
+        Term::Eq(_, x, _) => Some(Term::Refl(x)),
+        head if head == top_term(env) => Some(tt_term(env)),
+        _ => None,
+    }
+}
+
 /// Build `cong F h : Eq Type (F a) (F b)` by `J` over the evidence `h`.
 /// `family_at_y` lives under `y` and its equality proof (Var(1) and Var(0)).
 /// The base must have a canonical introduction after WHNF; otherwise leave
@@ -156,11 +166,7 @@ fn type_eq_by_j(
         Box::new(source.clone()),
         Box::new(source.clone()),
     );
-    let base = match whnf(env, ctx, &base_ty) {
-        Term::Eq(_, x, _) => Term::Refl(x),
-        head if head == top_term(env) => tt_term(env),
-        _ => return None,
-    };
+    let base = canonical_type_eq_base(env, ctx, &base_ty)?;
     let proof_domain = Term::Eq(
         Box::new(weaken(domain, 1)),
         Box::new(weaken(start, 1)),
@@ -189,7 +195,10 @@ fn type_eq_by_j(
         Box::new(source.clone()),
         Box::new(target.clone()),
     );
-    crate::check::check(env, ctx, &result, &expected).ok()?;
+    if let Err(err) = crate::check::check(env, ctx, &result, &expected) {
+        eprintln!("type_eq_by_j mismatch: {err:?}; domain={domain:?}; source={source:?}; target={target:?}");
+        return None;
+    }
     Some(result)
 }
 
@@ -856,10 +865,7 @@ fn j_nonrefl(
     eq: &Term,
 ) -> Option<Term> {
     let eq_ty = crate::check::infer(env, ctx, eq).ok()?;
-    let (a_type, a_idx, b_idx) = match whnf(env, ctx, &eq_ty) {
-        Term::Eq(a_t, x, y) => ((*a_t).clone(), (*x).clone(), (*y).clone()),
-        _ => return None,
-    };
+    let (a_type, a_idx, b_idx) = crate::check::eq_formation(env, ctx, &eq_ty)?;
     let p_a_refl = apply_args(
         motive.clone(),
         &[a_idx.clone(), Term::Refl(Box::new(a_idx.clone()))],
@@ -887,4 +893,32 @@ fn j_nonrefl(
         Box::new(pair_eq),
         Box::new(base.clone()),
     ))
+}
+
+#[cfg(test)]
+mod witness_base_tests {
+    use super::*;
+    use crate::term::Level;
+
+    /// Guard-local control: a raw neutral proposition supplies no witness.
+    /// P0 keeps well-typed `Eq Type X X` neutral or Top, so this tests the
+    /// fallback branch directly, not its reach from a checked reduct.
+    #[test]
+    fn neutral_base_does_not_fabricate_a_type_equality_witness() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        ctx.push(Term::Omega(Level::zero()));
+        assert_eq!(canonical_type_eq_base(&env, &ctx, &Term::var(0)), None);
+        assert_eq!(
+            canonical_type_eq_base(&env, &ctx, &top_term(&env)),
+            Some(tt_term(&env))
+        );
+        let ty = Term::pi(Term::Type(Level::zero()), Term::Type(Level::zero()));
+        let base = Term::Eq(
+            Box::new(Term::Type(Level::zero().suc())),
+            Box::new(ty.clone()),
+            Box::new(ty.clone()),
+        );
+        assert_eq!(canonical_type_eq_base(&env, &ctx, &base), Some(Term::Refl(Box::new(ty))));
+    }
 }
