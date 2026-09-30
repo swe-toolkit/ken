@@ -229,7 +229,10 @@ fn eq_at_sigma(env: &GlobalEnv, ctx: &Context, a1: &Term, b1: &Term, p: &Term, q
         &weaken(&b1_p1, 1),
         &weaken(&b1_q1, 1),
         b1_at_y,
-        Term::var(0),
+        Term::Ascript(
+            Box::new(Term::var(0)),
+            Box::new(weaken(&eq_fst, 1)),
+        ),
     )?;
     let p2_cast = Term::Cast(
         Box::new(weaken(&b1_p1, 1)),
@@ -394,11 +397,10 @@ fn inductive_conjuncts(
         let earlier = (0..j)
             .map(|k| Term::var(j - 1 - k))
             .collect::<Vec<_>>();
-        let evidence = if j == 1 {
-            earlier[0].clone()
-        } else {
-            Term::Ascript(Box::new(telescope_tuple(&earlier)), Box::new(prefix_eq))
-        };
+        let evidence = Term::Ascript(
+            Box::new(if j == 1 { earlier[0].clone() } else { telescope_tuple(&earlier) }),
+            Box::new(prefix_eq),
+        );
         // Shift the outer context past the j constructor positions and the
         // j+2 proof/motive binders; substitute projected tuple components for
         // those constructor positions. The second motive binder is ignored.
@@ -849,7 +851,8 @@ pub fn j_reduce(
         // J-β (`15 §4.2`): J A a P d a (refl a) ≡ d.
         return Some(base.clone());
     }
-    j_nonrefl(env, ctx, motive, base, &eq_w)
+    // Preserve the checked Eq ascription: whnf may erase its formation.
+    j_nonrefl(env, ctx, motive, base, eq)
 }
 
 /// `J` on a non-`refl` equality (`15 §4.3`): `J ≡ cast (P a (refl a)) (P b e)
@@ -864,8 +867,7 @@ fn j_nonrefl(
     base: &Term,
     eq: &Term,
 ) -> Option<Term> {
-    let eq_ty = crate::check::infer(env, ctx, eq).ok()?;
-    let (a_type, a_idx, b_idx) = crate::check::eq_formation(env, ctx, &eq_ty)?;
+    let (a_type, a_idx, b_idx) = crate::check::j_endpoints(env, ctx, eq).ok()?;
     let p_a_refl = apply_args(
         motive.clone(),
         &[a_idx.clone(), Term::Refl(Box::new(a_idx.clone()))],
@@ -885,7 +887,14 @@ fn j_nonrefl(
         &p_a_refl,
         &p_b_e,
         motive_at_y,
-        eq.clone(),
+        Term::Ascript(
+            Box::new(eq.clone()),
+            Box::new(Term::Eq(
+                Box::new(a_type.clone()),
+                Box::new(a_idx.clone()),
+                Box::new(b_idx),
+            )),
+        ),
     )?;
     Some(Term::Cast(
         Box::new(p_a_refl),

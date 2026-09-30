@@ -728,13 +728,11 @@ fn motive_expected_type(
 
 // --- K2 quotient / J inference (`15 §4`, `16 §5`, §6) ---------------------
 
-/// Infer the type of `J motive base eq` = `motive b eq` (`15 §4`). Recovers
-/// `A`,`a`,`b` from `eq : Eq A a b`, verifies the motive's first domain is `A`,
-/// checks `base : motive a (refl a)`, and returns `motive b eq`.
-/// Read the Eq *formation* of a proof type before Eq-by-type reduces that
-/// head. An equality at Σ or Π may compute to a conjunction or a function;
-/// J still eliminates the checked formation `Eq A a b` (`15 §4`). Only
-/// β/δ/let/ascription and their function-head spines are traversed here.
+/// Infer the type of `J motive base eq` = `motive b eq` (`15 §4`). Recover
+/// its endpoints from the proof's recorded Eq, verify the motive's first
+/// domain, check `base : motive a (refl a)`, and return `motive b eq`.
+/// Peel only β/δ/let/ascription/function heads of a recorded Eq formation;
+/// never reduce the Eq head itself when reading the recording.
 fn eq_formation_head(env: &GlobalEnv, ty: &Term) -> Term {
     let mut current = ty.clone();
     loop {
@@ -757,19 +755,26 @@ fn eq_formation_head(env: &GlobalEnv, ty: &Term) -> Term {
     }
 }
 
-/// Return the Eq formation a proof's type denotes. Never reduce an Eq head;
-/// preserve the previous WHNF-and-shape fallback for non-Eq heads.
-pub(crate) fn eq_formation(
+/// Read J's recorded Eq endpoints. A checked ascription is authoritative:
+/// reducing its Eq head could instead expose a different Eq or a Sigma.
+/// For an unrecorded proof, retain the old whnf-and-Eq demand exactly.
+pub(crate) fn j_endpoints(
     env: &GlobalEnv,
     ctx: &Context,
-    ty: &Term,
-) -> Option<(Term, Term, Term)> {
-    match eq_formation_head(env, ty) {
-        Term::Eq(a, x, y) => Some((*a, *x, *y)),
-        other => match whnf(env, ctx, &other) {
-            Term::Eq(a, x, y) => Some((*a, *x, *y)),
-            _ => None,
-        },
+    eq: &Term,
+) -> KernelResult<(Term, Term, Term)> {
+    if let Term::Ascript(_, recorded_ty) = eq {
+        if let Term::Eq(a, x, y) = eq_formation_head(env, recorded_ty) {
+            infer(env, ctx, eq)?; // Check the proof against its recording.
+            return Ok((*a, *x, *y));
+        }
+    }
+    let eq_ty = infer(env, ctx, eq)?;
+    match whnf(env, ctx, &eq_ty) {
+        Term::Eq(a, x, y) => Ok((*a, *x, *y)),
+        _ => Err(KernelError::BadEliminator(
+            "J's equality argument is not an `Eq`".into(),
+        )),
     }
 }
 
@@ -780,11 +785,8 @@ fn infer_j(
     base: &Term,
     eq: &Term,
 ) -> KernelResult<Term> {
-    // e : Eq A a b  ⇒  recover A, a, b.
-    let e_ty = infer(env, ctx, eq)?;
-    let (a_ty, a_idx, b_idx) = eq_formation(env, ctx, &e_ty).ok_or_else(|| {
-        KernelError::BadEliminator("J's equality argument is not an `Eq`".into())
-    })?;
+    // e : Eq A a b ⇒ use its recorded formation, or the old raw fallback.
+    let (a_ty, a_idx, b_idx) = j_endpoints(env, ctx, eq)?;
     // motive : (b:A) → (e':Eq A a b) → Type ℓ'. Verify the first domain ≡ A.
     let m_ty = infer(env, ctx, motive)?;
     match &whnf(env, ctx, &m_ty) {

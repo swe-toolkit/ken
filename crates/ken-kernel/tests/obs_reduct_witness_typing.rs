@@ -162,9 +162,58 @@ fn j_nonrefl_dependent_motive_has_typed_pair_equality() {
     }
 }
 
-/// AC-3: the proof's *formation* is Eq Σ, even though WHNF reduces its
-/// proposition to a Σ of conjuncts. This checks J admission, not reduction:
-/// Refl at a reducible Eq Σ remains outside this WP's scope.
+/// Durable invariant: the SAME proof can record either convertible Eq head.
+/// J reads the recorded endpoints; an unrecorded proof retains WHNF fallback.
+#[test]
+fn recorded_j_endpoints_and_unrecorded_fallback() {
+    let mut f = Fixture::new();
+    let ctx = Context::new();
+    let nat = f.nat.clone();
+    let nat_id = match &nat {
+        Term::IndFormer { id, .. } => *id,
+        _ => unreachable!(),
+    };
+    let suc_id = f.env.inductive(nat_id).unwrap().constructors[1].id;
+    let suc = |v: Term| Term::app(Term::constructor(suc_id, vec![]), v);
+    let n = f.opaque("n", nat.clone());
+    let m = f.opaque("m", nat.clone());
+    let suc_n = suc(n.clone());
+    let suc_m = suc(m.clone());
+    let e = f.opaque("e", eq(nat.clone(), suc_n.clone(), suc_m.clone()));
+    let family = f.opaque("F", Term::pi(nat.clone(), Term::Type(Level::zero())));
+    let mut inferred = vec![];
+    for (source, target) in [(suc_n, suc_m), (n, m)] {
+        let domain = eq(nat.clone(), source.clone(), Term::var(0));
+        let motive = Term::Ascript(
+            Box::new(Term::lam(nat.clone(), Term::lam(
+                domain.clone(), Term::app(family.clone(), Term::var(1)),
+            ))),
+            Box::new(Term::pi(nat.clone(), Term::pi(domain, Term::Type(Level::zero())))),
+        );
+        let base = f.opaque("base", Term::app(family.clone(), source.clone()));
+        let recorded = Term::Ascript(
+            Box::new(e.clone()),
+            Box::new(eq(nat.clone(), source, target.clone())),
+        );
+        let j = Term::J(Box::new(motive.clone()), Box::new(base.clone()), Box::new(recorded));
+        let result_ty = infer(&f.env, &ctx, &j).expect("J reads the recorded Eq head");
+        assert!(convert_type(&f.env, &ctx, &result_ty,
+            &Term::app(family.clone(), target.clone())));
+        inferred.push(result_ty);
+        if inferred.len() == 2 {
+            let raw = Term::J(Box::new(motive), Box::new(base), Box::new(e.clone()));
+            let raw_ty = infer(&f.env, &ctx, &raw).expect("old unrecorded WHNF rule");
+            assert!(convert_type(&f.env, &ctx, &raw_ty,
+                &Term::app(family.clone(), target)));
+        }
+    }
+    assert!(!convert_type(&f.env, &ctx, &inferred[0], &inferred[1]),
+        "recorded suc m and raw m are not interchangeable result types");
+}
+
+/// AC-3: the proof's *recorded* formation is Eq Σ, even though WHNF
+/// reduces its proposition to a Σ of conjuncts. This checks J admission,
+/// not Refl at a reducible Eq Σ (which belongs to the follow-on).
 #[test]
 fn dependent_j_over_variable_sigma_equality_preserves_its_type() {
     let mut f = Fixture::new();
@@ -184,7 +233,9 @@ fn dependent_j_over_variable_sigma_equality_preserves_its_type() {
     ))), Box::new(motive_ty));
     let base_ty = Term::pi(f.nat.clone(), f.vec(Term::proj1(p)));
     let base = f.opaque("base", base_ty);
-    let redex = Term::J(Box::new(motive), Box::new(base), Box::new(Term::var(0)));
+    let redex = Term::J(Box::new(motive), Box::new(base), Box::new(Term::Ascript(
+        Box::new(Term::var(0)), Box::new(eq_ty.clone()),
+    )));
     let actual = infer(&f.env, &ctx, &redex).expect("J at an Eq Sigma formation");
     let expected = Term::pi(f.nat.clone(), f.vec(Term::proj1(q)));
     assert!(convert_type(&f.env, &ctx, &actual, &expected));
