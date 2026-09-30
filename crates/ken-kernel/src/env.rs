@@ -1013,10 +1013,7 @@ mod literal_rollback_tests {
         assert_eq!(env.checked_literals.get(&id).unwrap().as_str(), "zz");
         let popped = env.remove_last().unwrap();
         assert_eq!(popped.id(), id);
-        assert!(
-            env.checked_literals.get(&id).is_none(),
-            "rollback must purge the raw entry, not merely hide it behind the accessor"
-        );
+        assert!(env.checked_literals.get(&id).is_none(), "rollback must purge the raw entry, not merely hide it behind the accessor");
         assert_eq!(env.next_global_id(), id);
         let fresh = declare_checked_string_literal(&mut env, "az").unwrap();
         assert_eq!(fresh, id);
@@ -1057,9 +1054,6 @@ mod literal_rollback_tests {
         .unwrap();
         env.checked_literals
             .insert(wrong_carrier, CheckedStringLiteral("stale".into()));
-        assert!(
-            env.checked_literal(wrong_carrier).is_none(),
-            "convertible is not the exact String carrier"
-        );
+        assert!(env.checked_literal(wrong_carrier).is_none(), "convertible is not the exact String carrier");
     }
 }

@@ -2876,7 +2876,10 @@ mod tests {
         assert!(!mentions_var_below(&Term::lam(nt.clone(), Term::var(0)), 1));
         assert!(mentions_var_below(&Term::lam(nt.clone(), Term::var(1)), 1));
         assert!(!mentions_var_below(&Term::pi(nt.clone(), Term::var(0)), 1));
-        assert!(mentions_var_below(&Term::sigma(nt.clone(), Term::var(1)), 1));
+        assert!(mentions_var_below(
+            &Term::sigma(nt.clone(), Term::var(1)),
+            1
+        ));
         let local_let = Term::Let {
             ty: Box::new(nt.clone()),
             val: Box::new(nt),

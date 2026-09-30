@@ -397,11 +397,7 @@ fn check_app_spine(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> Kerne
         let tf = infer(env, ctx, f)?;
         let (dom, cod) = match whnf(env, ctx, &tf) {
             Term::Pi(dom, cod) => (dom, cod),
-            other => {
-                return Err(KernelError::NotAFunction {
-                    head: Box::new(other),
-                })
-            }
+            other => return Err(KernelError::NotAFunction { head: Box::new(other) }),
         };
         pending.push((expected, subst0(&cod, a)));
         expected = *dom;
@@ -1163,7 +1159,8 @@ pub fn admit_bodies(env: &mut GlobalEnv, group: &[(GlobalId, Term)]) -> KernelRe
         while let Some(id) = pending.pop() {
             if members.contains(&id) {
                 return Err(KernelError::NotTerminating(
-                    "transparent body escapes the admission group and returns to a member".into(),
+                    "transparent body escapes the admission group and returns to a member"
+                        .into(),
                 ));
             }
             if seen.insert(id) {
@@ -1464,12 +1461,7 @@ pub fn checked_char_literal(env: &GlobalEnv, scalar: u32) -> KernelResult<Term> 
         .checked_char_type()
         .ok_or_else(|| KernelError::Msg("literal Char carrier is not registered".into()))?;
     let term = Term::IntLit((c as u32).into());
-    check(
-        env,
-        &Context::new(),
-        &term,
-        &Term::const_(char_type, vec![]),
-    )?;
+    check(env, &Context::new(), &term, &Term::const_(char_type, vec![]))?;
     Ok(term)
 }
 
