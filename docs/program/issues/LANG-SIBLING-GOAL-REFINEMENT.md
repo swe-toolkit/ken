@@ -107,6 +107,19 @@ goal, motive or IH while the context keeps its types, under independent
 producers, with no measured failure. Each needs a measured failure before
 it joins scope.
 
+- B residual: surface `Refl` vs an observationally reduced `Eq` goal (f5,
+  f6; Architect `evt_enxtkpcwcad3`). The next increment first measures
+  whether each goal is reflexive up to conversion, before anyone touches
+  the `Refl` sugar.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 1 (Architect `evt_enxtkpcwcad3`).
+
+1. Nested eliminator method binder mismatch under generalized goal (f4,
+   inner match `ys`), keyed on binder source across the generalization
+   boundary (to be measured).
+
 ## Stop conditions
 
 - Any kernel conversion change, trust change, or change to `zip_with`.
