@@ -106,3 +106,11 @@ Merged as `c91f42e7b` (PR #4404).
   - Removing the ownership conjunct re-admits the nested row.
   - The withdrawn completeness predicate removes both witness response rows.
   - The four named landed rows stay green and unedited.
+- **Carried, not funded.** Adversary M8 `evt_3v67bdxspxgh6`: ownership is
+  lexical, so in synthetic IR a leaf inside an inner `ComputationalMatch`
+  Vis case that dispatches the outer payload is owned by the inner Vis and
+  never counted (P1, P1b admitted; the top level refuses the same shape).
+  Source reachability is unshown: it needs a nested handler, inside a
+  handler's dispatch branch, that matches on the outer operation. Per the
+  operator's 2026-08-29 rule, fund only reachable shapes: a source witness
+  reopens it as its own node.
