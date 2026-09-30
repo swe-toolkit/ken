@@ -1281,6 +1281,29 @@ fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, 
     Ok(parents)
 }
 
+// A candidate belongs to the Vis whose CM case body encloses it most closely:
+// the same ownership relation the dispatch observer checks independently.
+fn response_leaf_owner(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    leaf: StaticOriginId,
+) -> Result<Option<(StaticOriginId, usize)>, CraneliftBackendError> {
+    let mut cursor = leaf;
+    while let Some((parent, position)) = parents.get(&cursor).copied() {
+        if let RuntimeExpr::ComputationalMatch { cases, .. } = plan.planned_occurrence_expr(parent)? {
+            if position
+                .checked_sub(1)
+                .and_then(|index| cases.get(index))
+                .is_some_and(|case| case.constructor.as_str().ends_with("::ITree::Vis"))
+            {
+                return Ok(Some((parent, position)));
+            }
+        }
+        cursor = parent;
+    }
+    Ok(None)
+}
+
 // A checked Let->Effect->Call case identifies its own leaf Match. Its
 // enclosing Match ancestors need not be generated operation dispatches:
 // ordinary source matches use the same runtime-IR constructor and binders.
@@ -1545,7 +1568,17 @@ fn response_vis_dispatch_leaf(
                         candidates,
                         &mut reached,
                     )?;
-                    return Ok((reached.len() == 1).then(|| *reached.first().unwrap()));
+                    let owner = Some((parent, case_index + 1));
+                    let mut owned = BTreeSet::new();
+                    for leaf in candidates.keys().copied() {
+                        if response_leaf_owner(plan, parents, leaf)? == owner {
+                            owned.insert(leaf);
+                        }
+                    }
+                    // An owned candidate the structural descent did not reach
+                    // is an unproven alternative for this response.
+                    return Ok((reached.len() == 1 && owned == reached)
+                        .then(|| *reached.first().unwrap()));
                 }
                 if !response_forwards_vis(plan, body, op_binder)? {
                     return Ok(None);
@@ -4637,6 +4670,88 @@ mod tests {
         let (&leaf, cases) = routes.iter().next().unwrap();
         assert_ne!(leaf, outer);
         assert!(cases.contains_key("ctor:fixture::FSOp::Allocate"));
+    }
+
+    fn two_leaf_response_fixture(nested: bool) -> RuntimeExpr {
+        let constructor = "ctor:fixture::FSOp::Allocate";
+        let response_match = |binder| RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Var(binder)),
+            cases: vec![host_response_case(constructor)],
+            default: trap(),
+        };
+        let dispatch = RuntimeExpr::If {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            then_expr: Box::new(response_match(if nested { 0 } else { 1 })),
+            else_expr: Box::new(response_match(if nested { 3 } else { 2 })),
+        };
+        let body = if nested {
+            RuntimeExpr::Match {
+                scrutinee: Box::new(RuntimeExpr::Var(1)),
+                cases: vec![RuntimeMatchCase {
+                    constructor: "ctor:fixture::Coproduct::InL".to_string(),
+                    binders: 1,
+                    body: dispatch,
+                }],
+                default: trap(),
+            }
+        } else {
+            dispatch
+        };
+        RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::ITree::Vis".to_string(),
+                args: vec![
+                    RuntimeExpr::Construct {
+                        constructor: constructor.to_string(),
+                        args: Vec::new(),
+                    },
+                    RuntimeExpr::Value(RuntimeValue::Unknown),
+                ],
+            }),
+            cases: vec![RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::ITree::Vis".to_string(),
+                argument_binders: 2,
+                recursive_positions: vec![1],
+                body,
+            }],
+            default: trap(),
+        }
+    }
+
+    // Promise class: durable invariant. MEASURED: two candidates owned by
+    // the same synthetic Vis include one reached and one unpaired in a nested
+    // dispatch; planning refuses at the multi-candidate structural path.
+    // CLAIMED: an owned but unreached candidate cannot be silently omitted.
+    // THE GAP: source reachability is established separately by the checked
+    // two-bracket witness, not by this hand-built runtime-IR fixture.
+    #[test]
+    fn nested_unpaired_response_candidate_owned_by_same_vis_refuses() {
+        let root = two_leaf_response_fixture(true);
+        let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
+            Err(error) => error,
+            Ok(_) => panic!("an unpaired owned response candidate must refuse"),
+        };
+        assert!(
+            format!("{error:?}").contains("one response Vis selects a constructor with more than one host response occurrence and no structural path to exactly one of them"),
+            "unexpected nested response-route refusal: {error:?}"
+        );
+    }
+
+    // Promise class: durable invariant. MEASURED: an unpaired top-level
+    // response exit refuses with the same multi-candidate path diagnostic.
+    // CLAIMED: the existing top-level completeness guard remains active.
+    // THE GAP: this is synthetic IR, not a checked Ken source observation.
+    #[test]
+    fn top_level_unpaired_response_candidate_still_refuses() {
+        let root = two_leaf_response_fixture(false);
+        let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
+            Err(error) => error,
+            Ok(_) => panic!("an unpaired top-level response candidate must refuse"),
+        };
+        assert!(
+            format!("{error:?}").contains("one response Vis selects a constructor with more than one host response occurrence and no structural path to exactly one of them"),
+            "unexpected top-level response-route refusal: {error:?}"
+        );
     }
 
     #[test]
