@@ -3795,8 +3795,14 @@ fn build_result_index_type_cong(
         &Term::Type(type_level),
         &source_type,
     )));
+    let proof_ty = Term::Eq(
+        Box::new(index_ty.clone()),
+        Box::new(old_index.clone()),
+        Box::new(new_index.clone()),
+    );
+    let proof = Term::Ascript(Box::new(equality), Box::new(proof_ty));
     (
-        Term::J(Box::new(motive), Box::new(base), Box::new(equality)),
+        Term::J(Box::new(motive), Box::new(base), Box::new(proof)),
         target_type,
     )
 }
