@@ -1999,7 +1999,9 @@ theorem slice_char_count
         (min (sub j i) (sub (length Char (string_to_list_char s)) i)) =
   let
     characters = string_to_list_char s;
-    selected_window = take Char (sub j i) (drop Char i characters);
+    suffix = drop Char i characters;
+    slice_width = sub j i;
+    selected_window = take Char slice_width suffix;
     window_view : Equal (List Char) (string_to_list_char (slice i j s)) selected_window =
       slice_view i j s h;
     view_count : Equal Nat
@@ -2014,31 +2016,29 @@ theorem slice_char_count
         window_view;
     selected_count : Equal Nat
       (length Char selected_window)
-      (min (sub j i) (length Char (drop Char i characters))) =
-      length_take_min Char (sub j i) (drop Char i characters);
-    suffix_count : Equal Nat
-      (length Char (drop Char i characters))
-      (sub (length Char characters) i) =
+      (min slice_width (length Char suffix)) =
+      length_take_min Char slice_width suffix;
+    suffix_count : Equal Nat (length Char suffix) (sub (length Char characters) i) =
       length_drop Char i characters
   in
     trans
       Nat
       (length Char (string_to_list_char (slice i j s)))
       (length Char selected_window)
-      (min (sub j i) (sub (length Char characters) i))
+      (min slice_width (sub (length Char characters) i))
       view_count
       (trans
         Nat
         (length Char selected_window)
-        (min (sub j i) (length Char (drop Char i characters)))
-        (min (sub j i) (sub (length Char characters) i))
+        (min slice_width (length Char suffix))
+        (min slice_width (sub (length Char characters) i))
         selected_count
         (cong
           Nat
           Nat
-          (length Char (drop Char i characters))
+          (length Char suffix)
           (sub (length Char characters) i)
-          (min (sub j i))
+          (min slice_width)
           suffix_count))
 
 theorem concat_view
