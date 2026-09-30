@@ -1,6 +1,6 @@
-//! Consumer-view controls for the private Derived filter-membership laws.
-//! The fixture roots-loads the real package, then exposes its private checked
-//! identities only inside the test environment; no catalog export is added.
+//! Owner-scope controls for the private Derived filter-membership laws.
+//! The real package is roots-loaded without flat aliases. Its checked example
+//! fences exercise private operations without adding catalog exports.
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
@@ -38,24 +38,6 @@ fn derived_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
         .unwrap_or_else(|error| panic!("Derived provider identity: {error}"))
 }
 
-fn load() -> (ElabEnv, GlobalId) {
-    let (mut env, owned) = load_derived_owned();
-    let derived_filter = derived_id(&env, &owned, "filter");
-    // The second, independent false-proof discriminator retains four aliases
-    // pending its separately ruled private-mem disposition.
-    for (module, names) in [
-        (DERIVED, &["filter", "mem"][..]),
-        ("Core.Classes.LawfulClasses", &["IsTrue", "bool_and"][..]),
-    ] {
-        for name in names {
-            let id = env.globals[&format!("{module}.{name}")];
-            env.globals.insert((*name).to_owned(), id);
-        }
-    }
-    assert_eq!(env.globals["filter"], derived_filter);
-    (env, derived_filter)
-}
-
 fn derived_qualified_bindings(env: &ElabEnv, owned: &[GlobalId]) -> BTreeMap<String, GlobalId> {
     let prefix = format!("{DERIVED}.");
     env.globals
@@ -78,8 +60,9 @@ fn derived_qualified_bindings(env: &ElabEnv, owned: &[GlobalId]) -> BTreeMap<Str
 /// examples citing the corresponding loader-owned law and filter identity.
 /// The complete Derived-qualified name/ID map and trust are unchanged by
 /// entry-fence execution. CLAIMED: the laws retain their original contracts
-/// without a public alias, export, or trust extension. THE GAP: the second
-/// false-proof discriminator still has four separately dispositioned aliases.
+/// without a public alias, export, or trust extension. THE GAP: example
+/// declarations are checked in the entry fence, not loader-owned; the
+/// absent-before, owned-ID, and trust checks defend that boundary.
 #[test]
 fn private_law_statements_resolve_the_derived_filter() {
     let (mut env, owned) = load_derived_owned();
@@ -154,60 +137,96 @@ fn private_law_statements_resolve_the_derived_filter() {
     }
 }
 
-/// Promise class: durable semantic discriminator. On the same x and xs, an
-/// arbitrary comparator that matches Zero while p disagrees with x gives
-/// unequal endpoints; Nat structural equality gives equal endpoints. Rejection
-/// must arise at the false proof, after every fixture declaration elaborates.
+/// Promise class: durable semantic discriminator. The same checked x and xs
+/// yield True/False without comparator compatibility and False/False with
+/// structural Nat equality; the attempted proof of the unequal endpoints
+/// must reach KernelRejected(TypeMismatch), not fail at source resolution.
 #[test]
 fn compatibility_premise_distinguishes_true_and_false_instances() {
-    let (mut env, _) = load();
-    env.elaborate_file(
-        "fn cat_eq_any (x : Nat) (y : Nat) : Bool = True\n\
-         fn cat_eq_nat (x : Nat) (y : Nat) : Bool = \
-           match x { Zero ↦ match y { Zero ↦ True; Suc k ↦ False }; \
-                     Suc k ↦ match y { Zero ↦ False; Suc j ↦ cat_eq_nat k j } }\n\
-         fn cat_is_zero (y : Nat) : Bool = \
-           match y { Zero ↦ True; Suc k ↦ False }\n\
-         const cat_x : Nat = Suc Zero\n\
-         const cat_xs : List Nat = Cons Nat Zero (Nil Nat)",
-    )
-    .expect("shared, nontrivial fixture must elaborate");
-
-    for (name, equation) in [
-        (
-            "unconstrained_left_true",
-            "Equal Bool (mem Nat cat_eq_any cat_x (filter Nat cat_is_zero cat_xs)) True",
-        ),
-        (
-            "unconstrained_right_false",
-            "Equal Bool (bool_and (mem Nat cat_eq_any cat_x cat_xs) (cat_is_zero cat_x)) False",
-        ),
-        (
-            "nat_equality_left_false",
-            "Equal Bool (mem Nat cat_eq_nat cat_x (filter Nat cat_is_zero cat_xs)) False",
-        ),
-        (
-            "nat_equality_right_false",
-            "Equal Bool (bool_and (mem Nat cat_eq_nat cat_x cat_xs) (cat_is_zero cat_x)) False",
-        ),
-    ] {
-        env.elaborate_decl(&format!("theorem {name} : {equation} = Proved"))
-            .unwrap_or_else(|error| panic!("{name} must reduce as stated: {error:?}"));
+    let (mut env, owned) = load_derived_owned();
+    let derived_filter = derived_id(&env, &owned, "filter");
+    let derived_mem = derived_id(&env, &owned, "mem");
+    let names = [
+        "derived_example_equal_any",
+        "derived_example_equal_nat",
+        "derived_example_is_zero",
+        "derived_example_x",
+        "derived_example_xs",
+        "derived_example_unconstrained_left",
+        "derived_example_unconstrained_right",
+        "derived_example_nat_equality_left",
+        "derived_example_nat_equality_right",
+        "derived_example_unconstrained_left_true",
+        "derived_example_unconstrained_right_false",
+        "derived_example_nat_equality_left_false",
+        "derived_example_nat_equality_right_false",
+        "derived_example_compatible_nat_equality",
+    ];
+    let qualified_before = derived_qualified_bindings(&env, &owned);
+    let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    for name in names {
+        assert!(
+            !env.globals.contains_key(name),
+            "{name} must come from the fence"
+        );
     }
-    env.elaborate_decl(
-        "theorem compatible_nat_equality_instance \
-         : Equal Bool (mem Nat cat_eq_nat cat_x (filter Nat cat_is_zero cat_xs)) \
-             (bool_and (mem Nat cat_eq_nat cat_x cat_xs) (cat_is_zero cat_x)) = Proved",
-    )
-    .expect("the compatible Nat equality instance must accept Proved");
+
+    env.execute_loaded_entry_checked_fences(DERIVED)
+        .expect("both endpoint pairs and the compatible equation check in owner scope");
+    assert_eq!(derived_qualified_bindings(&env, &owned), qualified_before);
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before
+    );
+    for name in names {
+        let id = *env
+            .globals
+            .get(name)
+            .unwrap_or_else(|| panic!("missing {name}"));
+        assert!(
+            !owned.contains(&id),
+            "{name} must remain an example, not a provider name"
+        );
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+    }
+    for name in [
+        "derived_example_unconstrained_left",
+        "derived_example_nat_equality_left",
+    ] {
+        let id = env.globals[name];
+        let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) else {
+            unreachable!()
+        };
+        assert!(
+            reference_count(body, derived_filter) > 0,
+            "{name} must apply checked filter"
+        );
+        assert!(
+            reference_count(body, derived_mem) > 0,
+            "{name} must apply private checked mem"
+        );
+    }
+    for name in [
+        "derived_example_unconstrained_right",
+        "derived_example_nat_equality_right",
+    ] {
+        let id = env.globals[name];
+        let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) else {
+            unreachable!()
+        };
+        assert!(
+            reference_count(body, derived_mem) > 0,
+            "{name} must apply private checked mem"
+        );
+    }
 
     let rejected = env
         .elaborate_decl(
             "theorem incompatible_unconstrained_instance \
-             : Equal Bool (mem Nat cat_eq_any cat_x (filter Nat cat_is_zero cat_xs)) \
-                 (bool_and (mem Nat cat_eq_any cat_x cat_xs) (cat_is_zero cat_x)) = Proved",
+             : Equal Bool derived_example_unconstrained_left \
+                 derived_example_unconstrained_right = Proved",
         )
-        .expect_err("the incompatible no-compat equation must be false");
+        .expect_err("the checked unequal endpoints must make the proof false");
     assert!(
         matches!(
             rejected,

@@ -727,6 +727,78 @@ theorem derived_example_filter_sound_generic_consumer
   mem_filter_sound a eqf p x xs membership
 ```
 
+```ken example
+fn derived_example_equal_any (x : Nat) (y : Nat) : Bool = True
+
+fn derived_example_equal_nat (x : Nat) (y : Nat) : Bool =
+  match x {
+    Zero ↦
+      match y {
+        Zero ↦ True;
+        Suc k ↦ False
+      };
+    Suc k ↦
+      match y {
+        Zero ↦ False;
+        Suc j ↦ derived_example_equal_nat k j
+      }
+  }
+
+fn derived_example_is_zero (y : Nat) : Bool =
+  match y {
+    Zero ↦ True;
+    Suc k ↦ False
+  }
+
+const derived_example_x : Nat = Suc Zero
+
+const derived_example_xs : List Nat = Cons Nat Zero (Nil Nat)
+
+const derived_example_unconstrained_left : Bool =
+  mem
+    Nat
+    derived_example_equal_any
+    derived_example_x
+    (filter Nat derived_example_is_zero derived_example_xs)
+
+const derived_example_unconstrained_right : Bool =
+  bool_and
+    (mem Nat derived_example_equal_any derived_example_x derived_example_xs)
+    (derived_example_is_zero derived_example_x)
+
+const derived_example_nat_equality_left : Bool =
+  mem
+    Nat
+    derived_example_equal_nat
+    derived_example_x
+    (filter Nat derived_example_is_zero derived_example_xs)
+
+const derived_example_nat_equality_right : Bool =
+  bool_and
+    (mem Nat derived_example_equal_nat derived_example_x derived_example_xs)
+    (derived_example_is_zero derived_example_x)
+
+theorem derived_example_unconstrained_left_true
+    : Equal Bool derived_example_unconstrained_left True =
+  Proved
+
+theorem derived_example_unconstrained_right_false
+    : Equal Bool derived_example_unconstrained_right False =
+  Proved
+
+theorem derived_example_nat_equality_left_false
+    : Equal Bool derived_example_nat_equality_left False =
+  Proved
+
+theorem derived_example_nat_equality_right_false
+    : Equal Bool derived_example_nat_equality_right False =
+  Proved
+
+theorem derived_example_compatible_nat_equality
+    : Equal Bool derived_example_nat_equality_left derived_example_nat_equality_right =
+  Proved
+```
+
 ### 4.2 DS-4 — five more `List` combinators completing the floor
 
 `reverse`/`zip`/`concat_map`/`range`/`foldl`, each an ordinary
