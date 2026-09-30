@@ -77,3 +77,11 @@ it matches the interpreter. The repair is ruled by the Architect.
   hypothesis is an Architect stop.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 1 (Architect `evt_2htrfrdpq3wy`).
+
+1. constructed context frame keyed on planner coordinates (continuation,
+   position, body) — keyed on static coordinates, but one function
+   constructs the same coordinates more than once with different operands.
