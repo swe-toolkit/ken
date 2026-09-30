@@ -186,12 +186,47 @@ fn eq_at_quot(r: &Term, a: &Term, b: &Term) -> Option<Term> {
     }
 }
 
-/// Structural type equality `Eq Type A B` (`16 §2.2`, §3). Same universe head
-/// with equal level ⇒ `Top`; different heads (Π/Σ/Ω/Type vs a different head) ⇒
-/// `Bottom`; compound heads (Π/Π, Σ/Σ, inductive, quotient) and neutral heads ⇒
-/// neutral — a full structural type-equality needs congruence over families,
-/// deferred (sound: a stuck `Eq Type` is fine; K2 conformance does not exercise
-/// it directly).
+/// Only a rigid type former can establish disjointness from another rigid
+/// former. Applications are rigid solely when headed by an inductive family;
+/// a neutral application could later instantiate to either side's head.
+#[derive(PartialEq, Eq)]
+enum RigidTypeFormer {
+    Pi,
+    Sigma,
+    Omega,
+    Type,
+    Inductive(crate::term::GlobalId),
+    Quot,
+    Trunc,
+}
+
+fn rigid_type_former(ty: &Term) -> Option<RigidTypeFormer> {
+    match ty {
+        Term::Pi(..) => Some(RigidTypeFormer::Pi),
+        Term::Sigma(..) => Some(RigidTypeFormer::Sigma),
+        Term::Omega(..) => Some(RigidTypeFormer::Omega),
+        Term::Type(..) => Some(RigidTypeFormer::Type),
+        Term::IndFormer { id, .. } => Some(RigidTypeFormer::Inductive(*id)),
+        Term::App(..) => {
+            let mut head = ty;
+            while let Term::App(f, _) = head {
+                head = f;
+            }
+            match head {
+                Term::IndFormer { id, .. } => Some(RigidTypeFormer::Inductive(*id)),
+                _ => None,
+            }
+        }
+        Term::Quot(..) => Some(RigidTypeFormer::Quot),
+        Term::Trunc(..) => Some(RigidTypeFormer::Trunc),
+        _ => None,
+    }
+}
+
+/// Structural type equality `Eq Type A B` (`16 §2.2`, §3). Equal universe
+/// instances reduce to `Top`, unequal levels to `Bottom`. Different rigid
+/// formers (or different inductive ids) reduce to `Bottom`; same-former and
+/// neutral pairs remain neutral until their equality can be decomposed.
 fn eq_at_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term> {
     let a_w = whnf(env, ctx, a);
     let b_w = whnf(env, ctx, b);
@@ -210,13 +245,12 @@ fn eq_at_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term
                 Some(bottom_term(env))
             }
         }
-        // Different universe/compound heads ⇒ the empty proposition.
-        (Term::Pi(_, _) | Term::Sigma(_, _) | Term::Omega(_) | Term::Type(_), _)
-        | (_, Term::Pi(_, _) | Term::Sigma(_, _) | Term::Omega(_) | Term::Type(_)) => {
-            Some(bottom_term(env))
-        }
-        // Π/Π, Σ/Σ, inductive, quotient, neutral: leave neutral for K2.
-        _ => None,
+        // A single known head does not decide inequality: the other side
+        // might be neutral and later instantiate to that very former.
+        _ => match (rigid_type_former(&a_w), rigid_type_former(&b_w)) {
+            (Some(left), Some(right)) if left != right => Some(bottom_term(env)),
+            _ => None,
+        },
     }
 }
 
