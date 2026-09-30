@@ -33,7 +33,7 @@ constructor of `Fin` targets `Fin Zero`. The identity law uses the checked
 `idf` function and `cong` equality congruence from their catalog providers.
 
 ```ken
-import Core.Function.Combinators (idf)
+import Core.Function.Combinators (idf, comp)
 
 import Core.Logic.Transport (cong)
 
@@ -138,6 +138,35 @@ theorem map_vcons
         (map a b (Suc n) f (VCons a n x xs))
         (VCons b n (f x) (map a b n f xs)) =
   Refl
+
+theorem vec_map_compose
+      (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b) (g : b → c) (xs : Vec a n)
+    : Equal (Vec c n) (map b c n g (map a b n f xs)) (map a c n (comp a b c g f) xs) =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      cong
+        (Vec c m)
+        (Vec c (Suc m))
+        (map b c m g (map a b m f tail_xs))
+        (map a c m (comp a b c g f) tail_xs)
+        (VCons c m (g (f x)))
+        (vec_map_compose a b c m f g tail_xs)
+  }
+
+theorem lookup_map
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) (i : Fin n)
+    : Equal b (lookup b n (map a b n f xs) i) (f (lookup a n xs i)) =
+  match i {
+    FZero m ↦
+      match xs {
+        VCons _ x tail_xs ↦ Refl
+      };
+    FSuc m rest ↦
+      match xs {
+        VCons _ x tail_xs ↦ lookup_map a b m f tail_xs rest
+      }
+  }
 ```
 
 ## Using it
