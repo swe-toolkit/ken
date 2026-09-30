@@ -1147,12 +1147,38 @@ pub struct PendingAdmission {
     ids: Vec<GlobalId>,
     mark_len: usize,
     mark_next_id: GlobalId,
+    env_instance: u64,
+    staged_types: Vec<Term>,
 }
 
 impl PendingAdmission {
     pub fn ids(&self) -> &[GlobalId] {
         &self.ids
     }
+}
+
+/// Verify the exact staged prefix before either installing bodies or removing
+/// declarations. Later literal postulates may follow this prefix; they are
+/// removed only by a valid rollback on the staging environment itself.
+fn pending_tail_intact(env: &GlobalEnv, pending: &PendingAdmission) -> bool {
+    if pending.ids.first().copied() != Some(pending.mark_next_id)
+        || pending.ids.len() != pending.staged_types.len()
+    {
+        return false;
+    }
+    let Some(end) = pending.mark_len.checked_add(pending.ids.len()) else {
+        return false;
+    };
+    env.declarations()
+        .get(pending.mark_len..end)
+        .is_some_and(|tail| {
+            tail.iter()
+                .zip(pending.ids.iter().zip(&pending.staged_types))
+                .all(|(decl, (id, ty))| {
+                    matches!(decl, Decl::Opaque { id: actual_id, ty: actual_ty, .. }
+                        if actual_id == id && actual_ty == ty)
+                })
+        })
 }
 
 /// Classify all signatures before staging any opaque declarations. Staged
@@ -1173,9 +1199,12 @@ pub fn stage_placeholders(
     }
     let mark_len = env.declarations().len();
     let mark_next_id = env.next_global_id();
+    let env_instance = env.instance_id();
     let mut ids = Vec::with_capacity(specs.len());
+    let mut staged_types = Vec::with_capacity(specs.len());
     for (name, level_params, ty) in specs {
         let id = env.fresh_id();
+        staged_types.push(ty.clone());
         env.add_decl(Decl::Opaque {
             id,
             name,
@@ -1188,17 +1217,22 @@ pub fn stage_placeholders(
         ids,
         mark_len,
         mark_next_id,
+        env_instance,
+        staged_types,
     })
 }
 
 /// Remove only this transaction's declarations, newest first, including
 /// literal postulates added after staging. Refuse a handle from another env.
 pub fn rollback_pending(env: &mut GlobalEnv, pending: PendingAdmission) -> KernelResult<Vec<Decl>> {
-    if env.declarations().get(pending.mark_len).map(Decl::id) != pending.ids.first().copied()
-        || pending.ids.first().copied() != Some(pending.mark_next_id)
-    {
+    if env.instance_id() != pending.env_instance {
+        return Err(KernelError::Msg(
+            "admission handle belongs to another environment".into(),
+        ));
+    }
+    if !pending_tail_intact(env, &pending) {
         return Err(KernelError::IllFormedDecl(
-            "pending admission does not own the environment mark".into(),
+            "pending admission staged tail is no longer intact".into(),
         ));
     }
     let mut removed = Vec::new();
@@ -1219,6 +1253,18 @@ pub fn admit_pending(
     pending: PendingAdmission,
     bodies: Vec<Term>,
 ) -> Result<Vec<GlobalId>, (KernelError, Vec<Decl>)> {
+    if env.instance_id() != pending.env_instance {
+        return Err((
+            KernelError::Msg("admission handle belongs to another environment".into()),
+            Vec::new(),
+        ));
+    }
+    if !pending_tail_intact(env, &pending) {
+        return Err((
+            KernelError::IllFormedDecl("pending admission staged tail is no longer intact".into()),
+            Vec::new(),
+        ));
+    }
     let result = if bodies.len() == pending.ids.len() {
         let group = pending.ids.iter().copied().zip(bodies).collect::<Vec<_>>();
         admit_bodies(env, &group)
@@ -1726,6 +1772,153 @@ mod tests {
         }
     }
 
+    fn assert_same_admission_state(env: &GlobalEnv, before: &GlobalEnv) {
+        assert!(
+            env.same_contents_for_test(before),
+            "declarations and all indices must be unchanged"
+        );
+        assert_eq!(env.declarations(), before.declarations());
+        assert_eq!(env.next_global_id(), before.next_global_id());
+        assert_eq!(env.trusted_base(), before.trusted_base());
+    }
+
+    fn assert_foreign_admission_error(error: &KernelError) {
+        assert!(
+            matches!(error, KernelError::Msg(message)
+                if message == "admission handle belongs to another environment"),
+            "foreign-handle refusal must be exact, got {error:?}"
+        );
+    }
+
+    /// Durable invariant (`11 §4`, `18 §4`): matching IDs do not establish
+    /// transaction ownership. MEASURED: two separately constructed envs have
+    /// the same g3 and staged type, but rollback/admit on the foreign env must
+    /// refuse without changing any declaration, index, allocator or trust.
+    /// CLAIMED: every `PendingAdmission` is bound to its staging env instance.
+    /// GAP: this fixture creates two real envs with coincident IDs; it does not
+    /// enumerate all possible environments. A no-instance-check mutation
+    /// removes B's postulate (rollback) or upgrades it (admit).
+    #[test]
+    fn foreign_pending_handle_refuses_matching_ids_without_mutation() {
+        let ty = Term::Type(Level::zero().suc());
+        let mut a = GlobalEnv::new();
+        let mut b = GlobalEnv::new();
+        let rollback_handle =
+            stage_placeholders(&mut a, vec![("staged A".into(), vec![], ty.clone())])
+                .expect("checked staged type");
+        let unrelated = declare_postulate(&mut b, "unrelated B".into(), vec![], ty.clone())
+            .expect("checked same-id postulate");
+        assert_eq!(rollback_handle.ids()[0], unrelated);
+        assert_ne!(a.instance_id(), b.instance_id());
+        let before_b = b.clone();
+        let error = rollback_pending(&mut b, rollback_handle)
+            .expect_err("A's handle cannot roll back B's unrelated postulate");
+        assert_foreign_admission_error(&error);
+        assert_same_admission_state(&b, &before_b);
+        assert!(b.trusted_base().contains(&unrelated));
+
+        let mut c = GlobalEnv::new();
+        let mut d = GlobalEnv::new();
+        let admit_handle =
+            stage_placeholders(&mut c, vec![("staged C".into(), vec![], ty.clone())])
+                .expect("checked staged type");
+        let unrelated_d = declare_postulate(&mut d, "unrelated D".into(), vec![], ty)
+            .expect("checked same-id postulate");
+        assert_eq!(admit_handle.ids()[0], unrelated_d);
+        let before_d = d.clone();
+        let (error, removed) = admit_pending(&mut d, admit_handle, vec![Term::Type(Level::zero())])
+            .expect_err("C's handle cannot upgrade D's unrelated postulate");
+        assert_foreign_admission_error(&error);
+        assert!(removed.is_empty());
+        assert_same_admission_state(&d, &before_d);
+        assert!(d.trusted_base().contains(&unrelated_d));
+    }
+
+    /// Durable invariant: cloning an env mints a new transaction identity,
+    /// while its declarations and allocator are preserved as ordinary data.
+    /// Test-only duplication of the opaque handle exercises both the refused
+    /// clone and legitimate owner; the public handle remains move-only.
+    #[test]
+    fn cloned_env_cannot_consume_source_pending_handle() {
+        let mut a = GlobalEnv::new();
+        let pending = stage_placeholders(
+            &mut a,
+            vec![("staged owner".into(), vec![], Term::Type(Level::zero()))],
+        )
+        .expect("checked staged type");
+        let staged_id = pending.ids()[0];
+        let test_handle_copy = PendingAdmission {
+            ids: pending.ids.clone(),
+            mark_len: pending.mark_len,
+            mark_next_id: pending.mark_next_id,
+            env_instance: pending.env_instance,
+            staged_types: pending.staged_types.clone(),
+        };
+        let mut clone = a.clone();
+        assert_ne!(a.instance_id(), clone.instance_id());
+        let before_clone = clone.clone();
+        let error = rollback_pending(&mut clone, test_handle_copy)
+            .expect_err("source handle cannot mutate a cloned env");
+        assert_foreign_admission_error(&error);
+        assert_same_admission_state(&clone, &before_clone);
+        let removed = rollback_pending(&mut a, pending).expect("owner rollback still succeeds");
+        assert_eq!(
+            removed.iter().map(Decl::id).collect::<Vec<_>>(),
+            vec![staged_id]
+        );
+        assert!(!a.declarations().iter().any(|decl| decl.id() == staged_id));
+    }
+
+    /// Durable invariant: an env move preserves its instance and ownership.
+    #[test]
+    fn moved_env_retains_pending_transaction_ownership() {
+        struct Owner {
+            env: GlobalEnv,
+            pending: PendingAdmission,
+        }
+        let mut env = GlobalEnv::new();
+        let pending = stage_placeholders(
+            &mut env,
+            vec![("moved owner".into(), vec![], Term::Type(Level::zero()))],
+        )
+        .expect("checked staged type");
+        let id = pending.ids()[0];
+        let owner_id = env.instance_id();
+        let mut owner = Owner { env, pending };
+        assert_eq!(owner.env.instance_id(), owner_id);
+        let removed = rollback_pending(&mut owner.env, owner.pending)
+            .expect("moving the env preserves ownership");
+        assert_eq!(removed.iter().map(Decl::id).collect::<Vec<_>>(), vec![id]);
+    }
+
+    /// Defense-in-depth: even the right instance cannot consume a handle if
+    /// another declaration has taken a staged slot with the same ID but a
+    /// different type. No such raw reinstall is exported from the kernel.
+    #[test]
+    fn pending_handle_refuses_changed_staged_tail_without_mutation() {
+        let mut env = GlobalEnv::new();
+        let pending = stage_placeholders(
+            &mut env,
+            vec![("original".into(), vec![], Term::Type(Level::zero()))],
+        )
+        .expect("checked staged type");
+        let original_id = pending.ids()[0];
+        assert_eq!(env.remove_last().map(|decl| decl.id()), Some(original_id));
+        let replacement_id = env.fresh_id();
+        assert_eq!(replacement_id, original_id);
+        env.add_decl(Decl::Opaque {
+            id: replacement_id,
+            name: "changed type".into(),
+            level_params: vec![],
+            ty: Term::Type(Level::zero().suc()),
+        });
+        let before = env.clone();
+        let error = rollback_pending(&mut env, pending)
+            .expect_err("staged type changed even though the id coincides");
+        assert!(matches!(error, KernelError::IllFormedDecl(_)));
+        assert_same_admission_state(&env, &before);
+    }
+
     #[test]
     fn failed_pending_recursive_admission_restores_entire_environment() {
         let (mut env, ids) = bool_nat_env();
@@ -1754,8 +1947,8 @@ mod tests {
             removed.iter().map(Decl::id).collect::<Vec<_>>(),
             vec![literal, recursive_id]
         );
-        assert_eq!(
-            env, before,
+        assert!(
+            env.same_contents_for_test(&before),
             "failed staging must restore all env indices and next_id"
         );
         assert_eq!(env.next_global_id(), before.next_global_id());
@@ -1770,7 +1963,10 @@ mod tests {
             declare_inductive_try(&mut env, |_| Err::<InductiveSpec, _>("builder rejected"))
                 .expect("a builder error is not a kernel error");
         assert_eq!(outcome, Err("builder rejected"));
-        assert_eq!(env, before, "builder error must leave no reservation");
+        assert!(
+            env.same_contents_for_test(&before),
+            "builder error must leave no reservation"
+        );
     }
 
     #[test]
@@ -1829,7 +2025,10 @@ mod tests {
         let barrier = env
             .with_recursion_barriers(&[rec])
             .expect("checked recursive id");
-        assert_eq!(env, before, "view must not mutate the checked environment");
+        assert!(
+            env.same_contents_for_test(&before),
+            "view must not mutate the checked environment"
+        );
         assert_eq!(barrier.declarations().len(), env.declarations().len());
         assert_eq!(barrier.next_global_id(), env.next_global_id());
         assert!(matches!(barrier.lookup(rec), Some(Decl::Opaque { .. })));

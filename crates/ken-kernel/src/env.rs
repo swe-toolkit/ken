@@ -13,6 +13,7 @@
 //! that makes `infer` O(1).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{KernelError, KernelResult};
 use crate::term::{GlobalId, Level, LevelVar, Term};
@@ -260,10 +261,36 @@ impl Decl {
     }
 }
 
+/// Identity of one environment instance, independent of its declaration IDs.
+/// Moves preserve it; cloning mints a distinct identity, even when the cloned
+/// declarations and allocator state are byte-identical to their source.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct EnvInstance(u64);
+
+impl EnvInstance {
+    fn fresh() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
+impl Default for EnvInstance {
+    fn default() -> Self {
+        Self::fresh()
+    }
+}
+
+impl Clone for EnvInstance {
+    fn clone(&self) -> Self {
+        Self::fresh()
+    }
+}
+
 /// The global environment `Σ` — checked declarations plus SCT-admitted
 /// recursive bodies (`11 §4`, `17 §4`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GlobalEnv {
+    instance: EnvInstance,
     decls: Vec<Decl>,
     by_id: HashMap<GlobalId, usize>,
     /// Transparent constants on cycles of the current transparent-body graph.
@@ -342,6 +369,21 @@ impl std::ops::Deref for BarrierEnv {
 }
 
 impl GlobalEnv {
+    /// Private transaction ownership identity, not a declaration ID.
+    pub(crate) fn instance_id(&self) -> u64 {
+        self.instance.0
+    }
+
+    /// Assert value-state equality without treating a snapshot clone as the
+    /// same transaction owner. Keep derived equality exhaustive over all
+    /// environment indices; only this test-only copy's identity is normalized.
+    #[cfg(test)]
+    pub(crate) fn same_contents_for_test(&self, other: &Self) -> bool {
+        let mut copy = self.clone();
+        copy.instance.0 = other.instance.0;
+        copy == *other
+    }
+
     /// Return a read-only normalization view, folding selected recursive
     /// transparent declarations at their existing indices. A clone of the
     /// view is an ordinary mutable environment: folded constants become
