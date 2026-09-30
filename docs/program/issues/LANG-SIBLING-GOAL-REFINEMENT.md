@@ -23,7 +23,8 @@ different scrutinee, is refined consistently. So f7, f4, f5 and f6 check.
 
 - **The witnesses.** f7 is the minimal `BadEliminator("refl a does not
   match Eq A x y")`. f4 and f5 raise `Internal("index refinement: could not
-  classify the branch goal")`. f6 is a `BadEliminator`. All are in
+  classify the branch goal")`. On `ba2cd314c`, f6 is the same `Internal`
+  classification error, not a `BadEliminator`. All are in
   `LANG-REFINED-SIBLING-MATCH-TAIL.md` and `evt_3tsanywqzghge`.
 - **The compared indices are distinct binders:** the inner VCons field
   index `_` and the outer Fin-branch `m`, related only by generated
@@ -34,7 +35,18 @@ different scrutinee, is refined consistently. So f7, f4, f5 and f6 check.
 
 ## Deliverable
 
-After an Architect-ruled AC-0, one repair to goal refinement.
+Two increments on this thread, each its own candidate (Architect AC-0b
+ruling `evt_bw82kr4k5pm5`; Steward resize):
+1. **Class B (SUBST, 10 rows): f5, f6 and f4's outer `xs`.**
+   - `refine_branch_goal` rewrites the goal from this match's leaves, but
+     the binders re-typed in the context come from separate scans.
+   - The repair establishes that, when a leaf rewrites the goal, every
+     reachable in-scope binder whose type mentions `leaf.scrutinee` is
+     re-typed by the same leaf in the same frame. Otherwise the goal is not
+     rewritten.
+2. **Class A (5 rows): the J-base `Refl` inside a `Cast`, f7 and f4's
+   inner `ys`.** Its scope waits for its classification. A row classified
+   ONE-SIDED joins increment 1.
 
 ## Acceptance
 
@@ -49,7 +61,18 @@ After an Architect-ruled AC-0, one repair to goal refinement.
   It is one mechanism if and only if every failure is a leaf whose proof's
   endpoints are not its recorded endpoints (a wrong region, orientation or
   slot). Stop to the Architect with the rows.
-- **AC-1.** f7, f4, f5 and f6 check. `lookup_zip_with` checks unchanged,
+- **AC-0b (done).** The measurements refute one mechanism: Class A is
+  OTHER and Class B is SUBST, and the kernel is correct on all 15 rows.
+- **B-AC0 and the A measurement (no fix, same base, one scratch session).**
+  - For each failing B `Var`, and for every binder in those frames whose
+    type mentions `leaf.scrutinee`, name which of the four exclusion paths
+    in `evt_bw82kr4k5pm5` kept it out of the re-typed context.
+  - For each A row, name the `Cast`'s builder and the binder map applied.
+    Classify each row ONE-SIDED, RELOCATED or OTHER.
+  - The Architect rules increment 1 from B-AC0: a single narrowed path, or
+    one leaf set driving both goal and context.
+- **AC-1.** f7, f4, f5 and f6 check. f5 and f6 check after increment 1;
+  f7 and f4 after both increments. `lookup_zip_with` checks unchanged,
   together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
 - **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged, plus a
   mutation named in the ruling.
