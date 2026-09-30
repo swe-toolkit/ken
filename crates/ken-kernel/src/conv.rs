@@ -1764,6 +1764,71 @@ mod tests {
         ));
     }
 
+    /// Durable memo lookup invariant (`17 §3.5`, §5): a failed checked pred
+    /// pair is reused on each side of deferred WHNF. MEASURED: the same
+    /// Ascript-wrapped input compares in constant structural work against a
+    /// supplied memo entry matching only before, or only after, deferred WHNF.
+    /// CLAIMED: neither lookup plane recomputes a known failed spine pair.
+    /// GAP: the memo is supplied privately here; the six-shape and checked
+    /// conversion rows establish automatic installation during a δ retry.
+    #[test]
+    fn failed_spine_memo_is_consulted_before_and_after_deferred_whnf() {
+        let mut env = GlobalEnv::new();
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
+        let mut ctx = Context::new();
+        ctx.push(nt.clone());
+        ctx.push(nt.clone());
+        let nested_pred =
+            |k, seed| (0..k).fold(seed, |arg, _| Term::app(Term::const_(pred, vec![]), arg));
+        let left = nested_pred(8, Term::var(1));
+        let right = nested_pred(8, Term::var(0));
+        let ascribed_left = Term::Ascript(Box::new(left.clone()), Box::new(nt.clone()));
+        for term in [&left, &right, &ascribed_left] {
+            assert_typed(&env, &ctx, term);
+        }
+        assert_ne!(ascribed_left, left);
+        assert_eq!(whnf_defer_head_delta(&env, &ctx, &ascribed_left).0, left);
+        let path = [];
+        assert!(!conv_struct_path(&env, &ctx, &left, &right, &path));
+        assert!(!conv_struct_path(&env, &ctx, &ascribed_left, &right, &path));
+
+        for (plane, remembered_left, matches_before) in [
+            ("before deferred WHNF", &ascribed_left, true),
+            ("after deferred WHNF", &left, false),
+        ] {
+            let failure = SpineFailure {
+                depth: ctx.len(),
+                left: remembered_left,
+                right: &right,
+                path: &path,
+                next: None,
+            };
+            let memo = Some(&failure);
+            assert_eq!(
+                seen_spine_failure(memo, &ctx, &path, &ascribed_left, &right),
+                matches_before,
+                "{plane}: fixture must select its intended lookup plane"
+            );
+            assert_eq!(
+                seen_spine_failure(memo, &ctx, &path, &left, &right),
+                !matches_before,
+                "{plane}: the other lookup must not mask a deleted guard"
+            );
+            delta_probe::reset();
+            assert!(
+                !conv_struct_path_memo(&env, &ctx, &ascribed_left, &right, &path, memo),
+                "{plane}: known failed pair stays unequal"
+            );
+            let entries = delta_probe::struct_entries();
+            assert!(
+                entries > 0 && entries <= 2,
+                "{plane}: known failure must avoid subtree recomparison ({entries} entries)"
+            );
+        }
+    }
+
     /// The recursive-head counterpart retains the existing δ-origin ledger
     /// verdict (`17 §3.5`, §5): unlike `pred`, `map` carries a certified
     /// recursive origin and must not acquire an equality from memoized fails.
