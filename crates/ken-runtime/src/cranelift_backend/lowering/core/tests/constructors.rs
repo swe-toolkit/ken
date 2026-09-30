@@ -701,20 +701,14 @@ fn assert_runtime_final_kind_discriminator_rejects_scalar(fixture: &RuntimeExpr,
     );
 }
 
-// Promise class: durable invariant (spec 45 §4). MEASURED: a synthetic
-// non-ExitCode constructor returned by a synthetic non-root callable yields
-// the existing root trap -1. CLAIMED: the tag-5 branch accepts only checked
-// ExitCode identities. THE GAP: this could trap before the root identity
-// check; the required identity-guard mutation has not yet been run.
-#[test]
-fn persistent_non_exit_constructor_at_process_root_traps() {
+fn persistent_non_exit_constructor_root_status(fields: Vec<RuntimeExpr>, shape: &str) -> i64 {
     let source = RuntimeExpr::Call {
         callee: Box::new(RuntimeExpr::LexicalClosure {
             captures: Vec::new(),
             params: Vec::new(),
             body: Box::new(RuntimeExpr::Construct {
                 constructor: "ctor:fixture::NotExitCode::Other".to_string(),
-                args: Vec::new(),
+                args: fields,
             }),
         }),
         args: Vec::new(),
@@ -728,7 +722,7 @@ fn persistent_non_exit_constructor_at_process_root_traps() {
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let compiled = compile_expr_into_module(
         cranelift_jit::JITModule::new(jit),
-        "ken_root_non_exit_persistent",
+        &format!("ken_root_non_exit_persistent_{shape}"),
         Linkage::Local,
         &source,
         &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
@@ -756,7 +750,28 @@ fn persistent_non_exit_constructor_at_process_root_traps() {
         .1
         .expect("root reports a terminal status");
     assert_eq!(host_observation, 0, "no unrelated host path executed");
-    assert_eq!(status, -1, "non-exit ground constructor must trap");
+    status
+}
+
+// Promise class: durable invariant (spec 45 §4). MEASURED: both nullary and
+// Failure-arity unary synthetic non-ExitCode constructors cross a non-root
+// callable and reach the persistent-root trap -1. CLAIMED: the tag-5 root
+// branch accepts only the planner-issued ExitCode identities, not an unrelated
+// constructor with the same arity and Int field as ExitFailure. THE GAP: these
+// are synthetic runtime-IR controls, not checked Ken source; the checked
+// Success/Failure parity witnesses separately establish lawful acceptance.
+#[test]
+fn persistent_non_exit_constructor_at_process_root_traps() {
+    for (shape, fields) in [
+        ("nullary", Vec::new()),
+        (
+            "failure_arity",
+            vec![RuntimeExpr::Value(RuntimeValue::Int(5.into()))],
+        ),
+    ] {
+        let status = persistent_non_exit_constructor_root_status(fields, shape);
+        assert_eq!(status, -1, "non-exit ground constructor must trap");
+    }
 }
 
 #[test]
@@ -1211,8 +1226,10 @@ fn constructor_field_missing_case_owns_default_before_fields() {
         RuntimeObservation::Trapped(default)
     );
 }
+// The former name claimed the Result sibling stayed ordinary. Under the B
+// projection guard, this synthetic non-exit answer must instead refuse.
 #[test]
-fn constructor_field_aggregate_unconsumed_sibling_stays_ordinary() {
+fn constructor_field_aggregate_unconsumed_sibling_refuses_nonexit_projection() {
     let prefix = RuntimeExpr::Construct {
         constructor: "ctor:fixture::Prefix::Keep".to_string(),
         args: vec![RuntimeExpr::Value(RuntimeValue::Int((41).into()))],
