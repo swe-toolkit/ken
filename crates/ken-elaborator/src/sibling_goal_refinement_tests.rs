@@ -234,6 +234,9 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
         &inside_ty,
     ));
     kernel_check_current(&cx, &inside, &inside_ty).expect("redirected proof is well-typed");
+    let checked = check_variable_with_index_views(&mut cx, 0, &inside_ty)
+        .expect("checking shares inference's binder identity");
+    assert_eq!(checked, inside);
     cx.scoped_premise_aliases.clear();
     cx.ctx.pop();
     cx.hidden_positions.pop();
@@ -243,12 +246,12 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
 
 #[test]
 fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
-    // Promise class: durable invariant. MEASURED: scrutinee identity skips
-    // itself, while an independent dependent sibling remains in the inner
-    // convoy and reaches the exact equation-convoy overlap refusal. CLAIMED:
-    // the self-skip does not suppress a real ambient binder. THE GAP: this
-    // constructed seam checks the guard; the f4 source supplies the exact
-    // redirected-scrutinee case and its empty convoy separately.
+    // Promise class: transition sentinel, retired when a sound composition
+    // of index-equation and ambient convoys admits genuine siblings. MEASURED:
+    // scrutinee identity skips itself, while an independent dependent sibling
+    // reaches the exact overlap refusal. CLAIMED: the self-skip does not
+    // suppress a real ambient binder. THE GAP: this constructed seam checks
+    // the guard; the f4 source separately reaches its redirected scrutinee.
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(
         "data ConvoyVec (a : Type) : Nat → Type where { \
@@ -273,6 +276,14 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
     );
     cx.ctx.push(nat_ty.clone()); // n
     cx.ctx.push(nat_ty.clone()); // m, inside an enclosing field region
+    let without_sibling = Context {
+        types: vec![nat_ty.clone(), nat_ty.clone(), vec_ty(Term::var(0))],
+    };
+    assert!(
+        compute_context_convoy(&without_sibling, &Term::var(0), &[Term::var(1)], &[1..2],)
+            .is_empty(),
+        "a dependent scrutinee is not its own ambient sibling"
+    );
     cx.ctx.push(vec_ty(Term::var(0))); // independent x : ConvoyVec Nat m
     cx.ctx.push(vec_ty(Term::var(1))); // scrutinee y : ConvoyVec Nat m
     cx.match_field_regions.push(1..2);
