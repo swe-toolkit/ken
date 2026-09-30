@@ -53,6 +53,7 @@ fn expected_owned_names() -> BTreeSet<String> {
         "vec_map_compose",
         "vec_map_identity",
         "zip_with",
+        "zip_with_vcons",
         "zip_with_vnil",
     ]
     .into_iter()
@@ -176,7 +177,7 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 /// Promise class: transition sentinel for the owned declarations in this
 /// proof-only increment. Retire or rebaseline at the next separately authorized
 /// Vector declaration extension; this inventory is not a permanent API promise.
-/// MEASURED: ordinary isolated roots loading installs these twenty-one checked
+/// MEASURED: ordinary isolated roots loading installs these twenty-two checked
 /// Vector identities, returns only identities from that population, and
 /// executes every checked fence, then retains the same qualified name and ID
 /// populations. Provider-closure trust is unchanged by Vector. CLAIMED: the
