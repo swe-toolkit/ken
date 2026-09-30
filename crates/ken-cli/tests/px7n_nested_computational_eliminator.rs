@@ -131,41 +131,22 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
     );
 }
 
-// Ignored pending RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
-//
-// Observed first refusal after RT-FRAME-MARKER-ONCE: native execution reaches
-// the root result guard at units.rs:9389, which expects ImmediateExitStatus
-// tag 2 but receives PersistentGround tag 5 (terminal status -1). The
-// ExitCode constructor reaches that boundary through a CarrierWord join;
-// it is not decoded there. The interpreter produces seed:ok-payload, exit 0,
-// two ConsoleWrites and one ConsoleFlush; native parity is NOT established.
-// Owner node: RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
-// The earlier frame-marker refusal blocked object emission and is cleared by
-// RT-FRAME-MARKER-ONCE, not by a bind-order change. This row and the Err twin
-// retain their source and expected parity observation unchanged.
+// Promise class: durable invariant, spec 42 §3.3 and 45 §4. MEASURED: the
+// checked Ok payload's full terminal and effect observation on both real
+// executors. CLAIMED: a PersistentGround ExitCode crossing a Ret result edge
+// is decoded at the root. THE GAP: this positive alone cannot exclude a wrong
+// constructor identity; the Err twin and non-exit-root negative distinguish it.
 #[test]
-#[ignore = "RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN: root result guard at units.rs:9389 expects ImmediateExitStatus tag 2, receives PersistentGround tag 5 (native terminal -1); no native/interpreter parity"]
 fn nested_ok_payload_reaches_both_real_executors() {
     assert_case(&[], b"seed:ok-payload", 0);
 }
 
-// Ignored pending RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
-//
-// Observed first refusal after RT-FRAME-MARKER-ONCE: native execution reaches
-// the root result guard at units.rs:9389, which expects ImmediateExitStatus
-// tag 2 but receives PersistentGround tag 5 (terminal status -1). The
-// ExitCode constructor reaches that boundary through a CarrierWord join;
-// it is not decoded there. The interpreter produces seed:err-payload, exit 7,
-// two ConsoleWrites and one ConsoleFlush; native parity is NOT established.
-// Owner node: RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN.
-// This refusal is downstream of the earlier frame-marker object-emission
-// refusal; neither observation is a bind-order regression.
-// px7o_heterogeneous_eliminator_frames.rs defines a test of the SAME NAME.
-// It is a different binary with a different cause and a different owner
-// (RT-ENTRY-TRAP-PX7O) -- do not read the two annotations as copies.
-// Source and expected parity observation are unchanged.
+// Promise class: durable invariant, spec 42 §3.3 and 45 §4. MEASURED: the
+// checked Err payload's full terminal and effect observation, including exit
+// 7. CLAIMED: the root projects a checked Failure rather than inferring success
+// from matched pre-guard effects. THE GAP: this does not assert native parity
+// for the px7o twin, which belongs to RT-ENTRY-TRAP-PX7O.
 #[test]
-#[ignore = "RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN: root result guard at units.rs:9389 expects ImmediateExitStatus tag 2, receives PersistentGround tag 5 (native terminal -1); no native/interpreter parity"]
 fn nested_err_payload_reaches_both_real_executors() {
     assert_case(&["err"], b"seed:err-payload", 7);
 }

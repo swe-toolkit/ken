@@ -85,7 +85,7 @@ impl BoolMatchCaseOrdinals {
     }
 }
 
-/// A fixed constructor role synthesized by effect lowering.
+/// A fixed constructor role for effect lowering or checked process-root decoding.
 ///
 /// This is a closed capability vocabulary, not a name lookup.  Lowering may
 /// ask for one of these roles, but it cannot submit a `RuntimeSymbol`, an
@@ -148,10 +148,13 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ResourceMappingLimit,
     /// ABI-S6 D5a appends the third resource-kind reification role.
     ResourceKindMapping,
+    /// Checked process-root ExitCode roles share the source constructor identity plane.
+    ExitSuccess,
+    ExitFailure,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 51] = [
+    pub(super) const ALL: [Self; 53] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -203,6 +206,8 @@ impl SynthesizedFixedConstructorRole {
         Self::FileOperationDuplicate,
         Self::ResourceMappingLimit,
         Self::ResourceKindMapping,
+        Self::ExitSuccess,
+        Self::ExitFailure,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -234,6 +239,8 @@ impl SynthesizedFixedConstructorRole {
             Self::MkInstant => &symbols.mk_instant,
             Self::ReadChunk => &symbols.read_chunk,
             Self::ReadResultEof => &symbols.read_result_eof,
+            Self::ExitSuccess => &symbols.exit_success,
+            Self::ExitFailure => &symbols.exit_failure,
             Self::Unit => &symbols.unit,
             Self::FileOperationAppend => &symbols.file_operation_append,
             Self::FileOperationMetadata => &symbols.file_operation_metadata,
@@ -825,6 +832,8 @@ pub(super) fn build_synthesized_constructor_inventory(
             SynthesizedFixedConstructorRole::MkInstant
                 | SynthesizedFixedConstructorRole::ReadChunk
                 | SynthesizedFixedConstructorRole::ReadResultEof
+                | SynthesizedFixedConstructorRole::ExitSuccess
+                | SynthesizedFixedConstructorRole::ExitFailure
         ) {
             continue;
         }
@@ -849,11 +858,13 @@ pub(super) fn build_synthesized_constructor_inventory(
         io_roles.push(role);
     }
     // Post-IOError roles append in promotion order so no established semantic
-    // identity moves when ConsoleRead adds its two constructors.
+    // identity moves when ConsoleRead or root ExitCode adds constructor roles.
     for role in [
         SynthesizedFixedConstructorRole::MkInstant,
         SynthesizedFixedConstructorRole::ReadChunk,
         SynthesizedFixedConstructorRole::ReadResultEof,
+        SynthesizedFixedConstructorRole::ExitSuccess,
+        SynthesizedFixedConstructorRole::ExitFailure,
     ] {
         let span = arena.intern(role.spelling(symbols).as_bytes())?;
         identities.insert(SynthesizedConstructorRole::Fixed(role), span);

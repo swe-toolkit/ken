@@ -701,6 +701,64 @@ fn assert_runtime_final_kind_discriminator_rejects_scalar(fixture: &RuntimeExpr,
     );
 }
 
+// Promise class: durable invariant (spec 45 §4). MEASURED: a synthetic
+// non-ExitCode constructor returned by a synthetic non-root callable yields
+// the existing root trap -1. CLAIMED: the tag-5 branch accepts only checked
+// ExitCode identities. THE GAP: this could trap before the root identity
+// check; the required identity-guard mutation has not yet been run.
+#[test]
+fn persistent_non_exit_constructor_at_process_root_traps() {
+    let source = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: Vec::new(),
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::NotExitCode::Other".to_string(),
+                args: Vec::new(),
+            }),
+        }),
+        args: Vec::new(),
+    };
+    let isa = native_isa().expect("native ISA");
+    let mut jit = cranelift_jit::JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+    jit.symbol(
+        "ken_host_dispatch_v1",
+        final_kind_discriminator_host_probe as *const u8,
+    );
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let compiled = compile_expr_into_module(
+        cranelift_jit::JITModule::new(jit),
+        "ken_root_non_exit_persistent",
+        Linkage::Local,
+        &source,
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
+        BTreeMap::new(),
+        None,
+        true,
+        Some(&symbols),
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    )
+    .expect("synthetic non-exit producer emits a process object");
+    let process_input = 0_u8;
+    let mut host_observation = 0_u64;
+    let ingress = crate::boundary_activation::GeneratedRootIngressV1 {
+        process_input: (&process_input as *const u8).cast(),
+        host_dispatch_context: (&mut host_observation as *mut u64).cast(),
+        capability: 1_u64 << 32,
+    };
+    let status = compiled
+        .run_with_profile(
+            Some((&ingress as *const crate::boundary_activation::GeneratedRootIngressV1).cast()),
+            crate::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .expect("synthetic process object runs")
+        .1
+        .expect("root reports a terminal status");
+    assert_eq!(host_observation, 0, "no unrelated host path executed");
+    assert_eq!(status, -1, "non-exit ground constructor must trap");
+}
+
 #[test]
 fn dynamic_host_result_producer_wrong_arity_rejects_specifically() {
     let err = emit_process_entrypoint_object_with_cranelift(
@@ -799,7 +857,7 @@ fn nested_computational_payload_kind_rejects_specifically() {
 }
 #[test]
 fn heterogeneous_eliminator_well_formed_control_emits() {
-    emit_process_entrypoint_object_with_cranelift(
+    let err = emit_process_entrypoint_object_with_cranelift(
         &heterogeneous_eliminator_fixture(
             "ctor:fixture::Inner::Hit",
             "ctor:fixture::Inner::Hit",
@@ -812,7 +870,14 @@ fn heterogeneous_eliminator_well_formed_control_emits() {
         ),
         "ken_px7o_well_formed",
     )
-    .expect("dynamic producer composes through both ordinary frames");
+    .expect_err("non-exit Inner/Outer constructors cannot be projected as root ExitCode");
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
 }
 #[test]
 fn constructor_field_selected_case_composes_before_field_lowering() {
@@ -999,17 +1064,36 @@ fn constructor_field_binder_shift_mutation_recovers_exact_refusal() {
         &constructor_field_selected_case_fixture(2, 0),
         "ken_px7p_constructor_field_wrong_binder",
     )
-    .expect_err("the aggregate-looking sibling is not the selected field consumer");
-    assert!(
-        matches!(
-            err,
-            CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct: "Match",
-                ref reason,
-            }) if reason == "scrutinee is not a constructor value"
-        ),
-        "{err:?}"
-    );
+    .expect_err("non-exit Result arms must refuse before the mutated binder");
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
+
+    // The earlier gate masks this independent mutation in the Result family.
+    // Keep the field graph, but use ExitCode for its dynamic producer: the
+    // correct binder emits, whereas selecting the sibling reaches the same
+    // exact generic-selector refusal as before narrowing the non-exit gate.
+    emit_process_entrypoint_object_with_cranelift(
+        &constructor_field_exit_family_fixture(2, 1),
+        "ken_px7p_exit_family_correct_binder",
+    )
+    .expect("the ExitCode-family control selects the carried field");
+    let mutated = emit_process_entrypoint_object_with_cranelift(
+        &constructor_field_exit_family_fixture(2, 0),
+        "ken_px7p_exit_family_wrong_binder",
+    )
+    .expect_err("the sibling is not a constructor in the selected frame");
+    assert!(matches!(
+        mutated,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "scrutinee is not a constructor value"
+    ), "{mutated:?}");
 }
 #[test]
 fn constructor_field_bridge_removal_recovers_exact_refusal() {
@@ -1035,26 +1119,62 @@ fn constructor_field_bridge_removal_recovers_exact_refusal() {
         &eagerly_materialized,
         "ken_px7p_constructor_field_bridge_removed",
     )
-    .expect_err("eager field lowering must recover the pre-PX7-P boundary");
+    .expect_err("non-exit Result arms refuse before the eager bridge removal");
     let refusal_observations = refusal_scope.finish();
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
     assert!(
-        matches!(
-            err,
-            CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct: "Match",
-                ref reason,
-            }) if reason == "scrutinee is not a constructor value"
-        ),
-        "{err:?}"
+        refusal_observations.is_empty(),
+        "the Result gate must precede the generic selector: {refusal_observations:#?}"
     );
+
+    emit_process_entrypoint_object_with_cranelift(
+        &constructor_field_exit_family_fixture(2, 1),
+        "ken_px7p_exit_family_bridge_control",
+    )
+    .expect("the ExitCode field composes through the intact bridge");
+    let RuntimeExpr::ComputationalMatch {
+        scrutinee,
+        cases,
+        default,
+    } = constructor_field_exit_family_fixture(2, 1)
+    else {
+        unreachable!()
+    };
+    let removed_bridge = RuntimeExpr::Let {
+        value: scrutinee,
+        body: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            cases,
+            default,
+        }),
+    };
+    let refusal_scope = checked_ih_realization_observation_scope();
+    let removed = emit_process_entrypoint_object_with_cranelift(
+        &removed_bridge,
+        "ken_px7p_exit_family_bridge_removed",
+    )
+    .expect_err("the missing bridge must recover the generic-selector refusal");
+    let observations = refusal_scope.finish();
+    assert!(matches!(
+        removed,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "scrutinee is not a constructor value"
+    ), "{removed:?}");
     assert_eq!(
-        refusal_observations,
+        observations,
         vec![CheckedIhRealizationObservation::MatchRefusal {
             site: CheckedIhMatchRefusalSite::GenericExpressionSelector,
             operand_kind: "ProcessExitStatus",
         }],
-        "D5: the byte-identical refusal must be attributed to the generic selector, \
-         independently of the source-machine control: {refusal_observations:#?}"
+        "bridge removal must reach the generic selector: {observations:#?}"
     );
 }
 #[test]
@@ -1131,8 +1251,18 @@ fn constructor_field_aggregate_unconsumed_sibling_stays_ordinary() {
             message: "px7p outer default".to_string(),
         },
     };
-    emit_process_entrypoint_object_with_cranelift(&expr, "ken_px7p_aggregate_unconsumed_sibling")
-        .expect("an unconsumed aggregate-looking field retains ordinary lowering");
+    let err = emit_process_entrypoint_object_with_cranelift(
+        &expr,
+        "ken_px7p_aggregate_unconsumed_sibling",
+    )
+    .expect_err("ordinary Result sibling cannot project as a root ExitCode");
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
 }
 #[test]
 fn constructor_field_host_result_stays_on_ordinary_dynamic_match() {
@@ -1230,8 +1360,11 @@ fn recursive_computational_aggregate_traverses_ordinary_frame() {
     )
     .expect("recursive aggregate traverses the active ordinary frame");
 }
+// Promise class: durable boundary invariant. The synthetic Inner/Outer pair
+// cannot certify a runtime constructor discriminator: it is not checked Ken
+// and its non-exit result now refuses before process-root status projection.
 #[test]
-fn heterogeneous_bridge_removal_uses_the_runtime_constructor_route() {
+fn heterogeneous_bridge_removal_refuses_nonexit_result_before_root() {
     let fixture = heterogeneous_eliminator_fixture(
         "ctor:fixture::Inner::Hit",
         "ctor:fixture::Inner::Hit",
@@ -1252,8 +1385,18 @@ fn heterogeneous_bridge_removal_uses_the_runtime_constructor_route() {
         value: Box::new(args.remove(0)),
         body,
     };
-    emit_process_entrypoint_object_with_cranelift(&bridge_removed, "ken_px7o_bridge_removed")
-        .expect("the functionized carrier retains the runtime constructor discriminator");
+    let err = emit_process_entrypoint_object_with_cranelift(
+        &bridge_removed,
+        "ken_px7o_bridge_removed",
+    )
+    .expect_err("a non-exit synthetic answer must not become a root ExitCode");
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
 }
 #[test]
 fn heterogeneous_frame_environment_and_binder_order_are_preserved() {
@@ -1398,12 +1541,21 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
         )),
         args: vec![inner_call],
     };
-    emit_process_entrypoint_object_with_cranelift(&expr, "ken_px7o_final_kind_mismatch")
-        .expect("the functionized route emits the dynamic final-kind discriminator");
+    let err = emit_process_entrypoint_object_with_cranelift(&expr, "ken_px7o_final_kind_mismatch")
+        .expect_err("non-exit Inner/Outer constructors cannot project as ExitCode");
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
 }
+// The non-exit producer refuses before any runtime arity guard would execute.
+// This emitter test promises refusal, not emission or native parity.
 #[test]
-fn heterogeneous_ordinary_arity_is_guarded_in_the_emitted_consumer() {
-    emit_process_entrypoint_object_with_cranelift(
+fn heterogeneous_wrong_arity_refuses_nonexit_result_before_root() {
+    let err = emit_process_entrypoint_object_with_cranelift(
         &heterogeneous_eliminator_fixture(
             "ctor:fixture::Inner::Hit",
             "ctor:fixture::Inner::Hit",
@@ -1416,11 +1568,20 @@ fn heterogeneous_ordinary_arity_is_guarded_in_the_emitted_consumer() {
         ),
         "ken_px7o_wrong_arity",
     )
-    .expect("the functionized consumer emits its runtime binder-arity guard");
+    .expect_err("synthetic Inner/Outer answers cannot be projected as ExitCode");
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
 }
+// Payload-kind diagnostics in this synthetic fixture are shadowed by the
+// narrow non-exit status gate; this checks only the earlier refusal.
 #[test]
-fn heterogeneous_nested_payload_kind_is_guarded_in_the_emitted_consumer() {
-    emit_process_entrypoint_object_with_cranelift(
+fn heterogeneous_wrong_payload_refuses_nonexit_result_before_root() {
+    let err = emit_process_entrypoint_object_with_cranelift(
         &heterogeneous_eliminator_fixture(
             "ctor:fixture::Inner::Hit",
             "ctor:fixture::Inner::Hit",
@@ -1433,7 +1594,14 @@ fn heterogeneous_nested_payload_kind_is_guarded_in_the_emitted_consumer() {
         ),
         "ken_px7o_payload_kind",
     )
-    .expect("the functionized consumer preserves the runtime payload-kind guard");
+    .expect_err("synthetic Inner/Outer answers cannot be projected as ExitCode");
+    assert!(matches!(
+        err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            ref reason,
+        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ), "{err:?}");
 }
 #[test]
 fn pattern_default_trap_is_observation_not_backend_error() {
@@ -1711,6 +1879,39 @@ fn constructor_field_selected_case_fixture(
         },
     }
 }
+
+// The same field-binder graph with a checked ExitCode constructor family.
+// Result::Err/Ok at the original producer now rightfully refuse at the
+// earlier non-exit scalar boundary, so they cannot witness the independent
+// binder-shift and bridge-removal refusal paths.
+fn constructor_field_exit_family_fixture(
+    selected_binders: usize,
+    selected_field_var: u32,
+) -> RuntimeExpr {
+    let mut fixture = constructor_field_selected_case_fixture(selected_binders, selected_field_var);
+    let RuntimeExpr::ComputationalMatch { scrutinee, cases, .. } = &mut fixture else {
+        unreachable!("field fixture must begin with its computational match")
+    };
+    let RuntimeExpr::Construct { args, .. } = &mut **scrutinee else {
+        unreachable!("field fixture must construct its envelope")
+    };
+    let RuntimeExpr::Match { cases: producer, .. } = &mut args[1] else {
+        unreachable!("field fixture must carry a dynamic producer")
+    };
+    for arm in producer {
+        let RuntimeExpr::Construct { constructor, .. } = &mut arm.body else {
+            unreachable!("dynamic producer must construct a result")
+        };
+        *constructor = crate::EXIT_FAILURE_CONSTRUCTOR.to_string();
+    }
+    let RuntimeExpr::Match { cases: consumer, .. } = &mut cases[0].body else {
+        unreachable!("field fixture must consume the selected field")
+    };
+    consumer.truncate(1);
+    consumer[0].constructor = crate::EXIT_FAILURE_CONSTRUCTOR.to_string();
+    fixture
+}
+
 fn dynamic_io_error_match(producer: bool, ordinary_bool: bool) -> RuntimeExpr {
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let tree = "ctor:fixture::DynamicConstructorTree::Code";

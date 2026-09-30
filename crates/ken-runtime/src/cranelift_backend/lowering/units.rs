@@ -9385,12 +9385,87 @@ fn define_unit_body<M: Module>(
                         word.word,
                         crate::boundary_value::BOUNDARY_TAG_MASK as i64,
                     );
-                    Lowering::require_i64(
-                        &mut builder,
+                    let immediate = builder.create_block();
+                    let persistent = builder.create_block();
+                    let decoded = builder.create_block();
+                    builder.append_block_param(decoded, types::I64);
+                    let is_immediate = builder.ins().icmp_imm(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal,
                         tag,
                         BoundaryTag::ImmediateExitStatus as i64,
                     );
+                    builder.ins().brif(is_immediate, immediate, &[], persistent, &[]);
+
+                    builder.switch_to_block(immediate);
                     let status = compiler.emit_carrier_scalar(&mut builder, word)?;
+                    builder.ins().jump(decoded, &[status.into()]);
+
+                    builder.switch_to_block(persistent);
+                    Lowering::require_i64(&mut builder, tag, BoundaryTag::PersistentGround as i64);
+                    // The non-root Ret result edge retains its constructor field.
+                    // Only the checked process root projects that carried ExitCode.
+                    let constructor = compiler.emit_carrier_tag(&mut builder, word)?;
+                    let fields = compiler.emit_carrier_field_count(&mut builder, word)?;
+                    let success_identity = compiler.static_transition_plan.synthesized_constructor_identity(
+                        SynthesizedConstructorRole::Fixed(SynthesizedFixedConstructorRole::ExitSuccess),
+                    )?;
+                    let failure_identity = compiler.static_transition_plan.synthesized_constructor_identity(
+                        SynthesizedConstructorRole::Fixed(SynthesizedFixedConstructorRole::ExitFailure),
+                    )?;
+                    let success_tag = Lowering::carrier_identity_immediate(
+                        &mut builder,
+                        success_identity.tag_abi_word()?,
+                    );
+                    let is_success = builder.ins().icmp(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal,
+                        constructor,
+                        success_tag,
+                    );
+                    let success = builder.create_block();
+                    let failure = builder.create_block();
+                    builder.ins().brif(is_success, success, &[], failure, &[]);
+
+                    builder.switch_to_block(success);
+                    Lowering::require_i64(&mut builder, fields, 0);
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    builder.ins().jump(decoded, &[zero.into()]);
+
+                    builder.switch_to_block(failure);
+                    let failure_tag = Lowering::carrier_identity_immediate(
+                        &mut builder,
+                        failure_identity.tag_abi_word()?,
+                    );
+                    let is_failure = builder.ins().icmp(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal,
+                        constructor,
+                        failure_tag,
+                    );
+                    Lowering::require_i64(&mut builder, is_failure, 1);
+                    Lowering::require_i64(&mut builder, fields, 1);
+                    let field = compiler.emit_carrier_field(&mut builder, word, 0)?;
+                    let field_tag = builder.ins().band_imm(
+                        field.word,
+                        crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                    );
+                    Lowering::require_i64(&mut builder, field_tag, BoundaryTag::ImmediateInt as i64);
+                    let code = compiler.emit_carrier_scalar(&mut builder, field)?;
+                    let small = Lowering::carrier_small_marker(&mut builder);
+                    compiler.function_local.native_int_tags.insert(code, small);
+                    let status = compiler.emit_process_exit_status(
+                        &mut builder,
+                        Lowered::Constructor {
+                            constructor: compiler.process_symbols.exit_failure.clone(),
+                            synthesized_identity: Some(failure_identity),
+                            occurrence: None,
+                            args: vec![ConstructorField::specialized(Lowered::Int {
+                                value: code,
+                                known: None,
+                            })],
+                        },
+                    );
+                    builder.ins().jump(decoded, &[status.into()]);
+                    builder.switch_to_block(decoded);
+                    let status = builder.block_params(decoded)[0];
                     (
                         Some(status),
                         Some(RootUnitResult {

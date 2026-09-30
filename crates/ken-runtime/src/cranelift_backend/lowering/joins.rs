@@ -2650,13 +2650,23 @@ impl<'a> Lowering<'a> {
                     },
                     ScalarMergeKind::ExitCode,
                 )),
-                lowered if checked_root_exit_representation => Ok((
-                    NativeScalarPairV1 {
-                        tag: zero_tag,
-                        payload: self.emit_process_exit_status(builder, lowered),
-                    },
-                    ScalarMergeKind::ExitCode,
-                )),
+                lowered
+                    if checked_root_exit_representation
+                        && matches!(
+                            &lowered,
+                            Lowered::Constructor { constructor, .. }
+                                if constructor == &self.process_symbols.exit_success
+                                    || constructor == &self.process_symbols.exit_failure
+                        ) =>
+                {
+                    Ok((
+                        NativeScalarPairV1 {
+                            tag: zero_tag,
+                            payload: self.emit_process_exit_status(builder, lowered),
+                        },
+                        ScalarMergeKind::ExitCode,
+                    ))
+                },
                 _ => Err(unsupported(
                     construct,
                     "dynamic arms must produce scalar Int or Bool values",
