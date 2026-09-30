@@ -195,10 +195,7 @@ fn type_eq_by_j(
         Box::new(source.clone()),
         Box::new(target.clone()),
     );
-    if let Err(err) = crate::check::check(env, ctx, &result, &expected) {
-        eprintln!("type_eq_by_j mismatch: {err:?}; domain={domain:?}; source={source:?}; target={target:?}");
-        return None;
-    }
+    crate::check::check(env, ctx, &result, &expected).ok()?;
     Some(result)
 }
 
