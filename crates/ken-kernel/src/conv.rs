@@ -78,18 +78,35 @@ fn whnf_progress_for_conversion(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Te
     whnf_progress_mode(env, ctx, t, false, true)
 }
 
-fn stuck_component(
+/// Only a transparent head needs a second pass: it may expose a constructor
+/// or a reducible observational type to the enclosing consumer. A neutral
+/// deferred head already makes that consumer stuck.
+fn deferred_head_is_transparent_const(env: &GlobalEnv, term: &Term) -> bool {
+    matches!(peel_app(term).0, Term::Const { id, .. } if env.transparent_body(id).is_some())
+}
+
+/// Reduce a nested component once in deferred mode. If its folded head can
+/// discharge the consumer, retry δ on that result rather than reducing the
+/// original component again. The caller commits both progress flags only when
+/// the consumer fires; otherwise it rebuilds from the deferred term/flag.
+/// Public `whnf` keeps its eager result and progress in the first pair.
+fn whnf_nested_component(
     env: &GlobalEnv,
     ctx: &Context,
-    original: &Term,
-    eager: Term,
-    progress: WhnfProgress,
+    component: &Term,
     defer_stuck_nested_delta: bool,
-) -> (Term, WhnfProgress) {
+) -> ((Term, WhnfProgress), (Term, WhnfProgress)) {
     if defer_stuck_nested_delta {
-        whnf_defer_head_delta(env, ctx, original)
+        let deferred = whnf_defer_head_delta(env, ctx, component);
+        let eager = if deferred_head_is_transparent_const(env, &deferred.0) {
+            whnf_progress_for_conversion(env, ctx, &deferred.0)
+        } else {
+            (deferred.0.clone(), WhnfProgress::default())
+        };
+        (deferred, eager)
     } else {
-        (eager, progress)
+        let eager = whnf_progress(env, ctx, component);
+        (eager.clone(), (eager.0, WhnfProgress::default()))
     }
 }
 
@@ -117,6 +134,7 @@ fn whnf_progress_mode(
     defer_head_delta: bool,
     defer_stuck_nested_delta: bool,
 ) -> (Term, WhnfProgress) {
+    probe_reducer_entry();
     let mut cur = t.clone();
     let mut iota = false;
     loop {
@@ -187,14 +205,11 @@ fn whnf_progress_mode(
                 }
             }
             Term::Proj1(p) => {
-                let (p_w, pp) = if defer_stuck_nested_delta {
-                    whnf_progress_for_conversion(env, ctx, p)
-                } else {
-                    whnf_progress(env, ctx, p)
-                };
+                let ((p_d, dp), (p_w, ep)) =
+                    whnf_nested_component(env, ctx, p, defer_stuck_nested_delta);
                 match &p_w {
                     Term::Pair(a, _) => {
-                        iota |= pp.iota;
+                        iota |= dp.iota || ep.iota;
                         cur = (**a).clone();
                         continue;
                     }
@@ -208,30 +223,21 @@ fn whnf_progress_mode(
                             cur = Term::proj1(body);
                             continue;
                         }
-                        return (
-                            Term::proj1(p_w),
-                            WhnfProgress {
-                                iota: iota | pp.iota,
-                            },
-                        );
+                        iota |= dp.iota;
+                        return (Term::proj1(p_d), WhnfProgress { iota });
                     }
                     _ => {
-                        let (p_w, pp) =
-                            stuck_component(env, ctx, p, p_w, pp, defer_stuck_nested_delta);
-                        iota |= pp.iota;
-                        return (Term::proj1(p_w), WhnfProgress { iota });
+                        iota |= dp.iota;
+                        return (Term::proj1(p_d), WhnfProgress { iota });
                     }
                 }
             }
             Term::Proj2(p) => {
-                let (p_w, pp) = if defer_stuck_nested_delta {
-                    whnf_progress_for_conversion(env, ctx, p)
-                } else {
-                    whnf_progress(env, ctx, p)
-                };
+                let ((p_d, dp), (p_w, ep)) =
+                    whnf_nested_component(env, ctx, p, defer_stuck_nested_delta);
                 match &p_w {
                     Term::Pair(_, b) => {
-                        iota |= pp.iota;
+                        iota |= dp.iota || ep.iota;
                         cur = (**b).clone();
                         continue;
                     }
@@ -242,18 +248,12 @@ fn whnf_progress_mode(
                             cur = Term::proj2(body);
                             continue;
                         }
-                        return (
-                            Term::proj2(p_w),
-                            WhnfProgress {
-                                iota: iota | pp.iota,
-                            },
-                        );
+                        iota |= dp.iota;
+                        return (Term::proj2(p_d), WhnfProgress { iota });
                     }
                     _ => {
-                        let (p_w, pp) =
-                            stuck_component(env, ctx, p, p_w, pp, defer_stuck_nested_delta);
-                        iota |= pp.iota;
-                        return (Term::proj2(p_w), WhnfProgress { iota });
+                        iota |= dp.iota;
+                        return (Term::proj2(p_d), WhnfProgress { iota });
                     }
                 }
             }
@@ -266,11 +266,8 @@ fn whnf_progress_mode(
                 indices,
                 scrut,
             } => {
-                let (s_w, sp) = if defer_stuck_nested_delta {
-                    whnf_progress_for_conversion(env, ctx, scrut)
-                } else {
-                    whnf_progress(env, ctx, scrut)
-                };
+                let ((s_d, dp), (s_w, _ep)) =
+                    whnf_nested_component(env, ctx, scrut, defer_stuck_nested_delta);
                 let (head, all_args) = peel_app(&s_w);
                 if let Term::Constructor { id, .. } = head {
                     if let Some((ind, k)) = env.constructor(id) {
@@ -278,7 +275,8 @@ fn whnf_progress_mode(
                             if let Ok(reduct) = iota_reduct(
                                 env, ind, k, level_args, params, motive, methods, &all_args,
                             ) {
-                                // The sole ι-progress site (`14 §7.2`).
+                                // This ι step subsumes both nested progress
+                                // flags (`14 §7.2`).
                                 iota = true;
                                 probe_iota();
                                 cur = reduct;
@@ -290,8 +288,7 @@ fn whnf_progress_mode(
                 // A stuck scrutinee cannot commit eager nested δ; keep its
                 // deferred head for the structural child comparison instead.
                 // Indices don't gate ι firing (`14 §7.2`).
-                let (s_w, sp) = stuck_component(env, ctx, scrut, s_w, sp, defer_stuck_nested_delta);
-                iota |= sp.iota;
+                iota |= dp.iota;
                 return (
                     Term::Elim {
                         fam: *fam,
@@ -300,7 +297,7 @@ fn whnf_progress_mode(
                         motive: motive.clone(),
                         methods: methods.clone(),
                         indices: indices.clone(),
-                        scrut: Box::new(s_w),
+                        scrut: Box::new(s_d),
                     },
                     WhnfProgress { iota },
                 );
@@ -326,20 +323,16 @@ fn whnf_progress_mode(
             Term::Eq(ty, x, y) => {
                 // `Eq A a b` reduces by recursion on `whnf(A)` (`15 §2`, `16
                 // §2.2`); a neutral `A` leaves it a neutral proposition.
-                let (ty_w, tp) = if defer_stuck_nested_delta {
-                    whnf_progress_for_conversion(env, ctx, ty)
-                } else {
-                    whnf_progress(env, ctx, ty)
-                };
+                let ((ty_d, dp), (ty_w, ep)) =
+                    whnf_nested_component(env, ctx, ty, defer_stuck_nested_delta);
                 if let Some(r) = crate::obs::eq_reduce(env, ctx, &ty_w, x, y) {
-                    iota |= tp.iota;
+                    iota |= dp.iota || ep.iota;
                     cur = r;
                     continue;
                 }
-                let (ty_w, tp) = stuck_component(env, ctx, ty, ty_w, tp, defer_stuck_nested_delta);
-                iota |= tp.iota;
+                iota |= dp.iota;
                 return (
-                    Term::Eq(Box::new(ty_w), (*x).clone(), (*y).clone()),
+                    Term::Eq(Box::new(ty_d), (*x).clone(), (*y).clone()),
                     WhnfProgress { iota },
                 );
             }
@@ -347,26 +340,18 @@ fn whnf_progress_mode(
                 // `cast A B e t` reduces by recursion on `whnf(A)`,`whnf(B)`
                 // (`16 §3.2`); mismatched/neutral heads or a neutral proof leave
                 // it a neutral cast.
-                let (a_w, ap) = if defer_stuck_nested_delta {
-                    whnf_progress_for_conversion(env, ctx, a)
-                } else {
-                    whnf_progress(env, ctx, a)
-                };
-                let (b_w, bp) = if defer_stuck_nested_delta {
-                    whnf_progress_for_conversion(env, ctx, b)
-                } else {
-                    whnf_progress(env, ctx, b)
-                };
+                let ((a_d, ad), (a_w, ae)) =
+                    whnf_nested_component(env, ctx, a, defer_stuck_nested_delta);
+                let ((b_d, bd), (b_w, be)) =
+                    whnf_nested_component(env, ctx, b, defer_stuck_nested_delta);
                 if let Some(r) = crate::obs::cast_reduce(env, ctx, &a_w, &b_w, e, t) {
-                    iota |= ap.iota || bp.iota;
+                    iota |= ad.iota || ae.iota || bd.iota || be.iota;
                     cur = r;
                     continue;
                 }
-                let (a_w, ap) = stuck_component(env, ctx, a, a_w, ap, defer_stuck_nested_delta);
-                let (b_w, bp) = stuck_component(env, ctx, b, b_w, bp, defer_stuck_nested_delta);
-                iota |= ap.iota || bp.iota;
+                iota |= ad.iota || bd.iota;
                 return (
-                    Term::Cast(Box::new(a_w), Box::new(b_w), (*e).clone(), (*t).clone()),
+                    Term::Cast(Box::new(a_d), Box::new(b_d), (*e).clone(), (*t).clone()),
                     WhnfProgress { iota },
                 );
             }
@@ -395,32 +380,28 @@ fn whnf_progress_mode(
                 // (`16 §5`); `elim_trunc P f |a| ⇝ f a` (truncation elim encoded
                 // as `QuotElim` on a `TruncProj` scrut, `16 §6`). A neutral
                 // scrutinee leaves the eliminator neutral.
-                let (s_w, sp) = if defer_stuck_nested_delta {
-                    whnf_progress_for_conversion(env, ctx, scrut)
-                } else {
-                    whnf_progress(env, ctx, scrut)
-                };
+                let ((s_d, dp), (s_w, ep)) =
+                    whnf_nested_component(env, ctx, scrut, defer_stuck_nested_delta);
                 match &s_w {
                     Term::QuotClass(a0) => {
-                        iota |= sp.iota;
+                        iota |= dp.iota || ep.iota;
                         cur = Term::app((**method).clone(), (**a0).clone());
                         continue;
                     }
                     Term::TruncProj(a0) => {
-                        iota |= sp.iota;
+                        iota |= dp.iota || ep.iota;
                         cur = Term::app((**method).clone(), (**a0).clone());
                         continue;
                     }
                     _ => {}
                 }
-                let (s_w, sp) = stuck_component(env, ctx, scrut, s_w, sp, defer_stuck_nested_delta);
-                iota |= sp.iota;
+                iota |= dp.iota;
                 return (
                     Term::QuotElim {
                         motive: (*motive).clone(),
                         method: (*method).clone(),
                         respect: (*respect).clone(),
-                        scrut: Box::new(s_w),
+                        scrut: Box::new(s_d),
                     },
                     WhnfProgress { iota },
                 );
@@ -704,6 +685,7 @@ mod delta_probe {
         static IOTAS: Cell<u64> = const { Cell::new(0) };
         static REFUSALS: Cell<u64> = const { Cell::new(0) };
         static HARD_CONTINUES: Cell<u64> = const { Cell::new(0) };
+        static REDUCER_ENTRIES: Cell<u64> = const { Cell::new(0) };
     }
     pub(super) fn reset() {
         UNFOLDS.with(|c| c.set(0));
@@ -711,6 +693,13 @@ mod delta_probe {
         IOTAS.with(|c| c.set(0));
         REFUSALS.with(|c| c.set(0));
         HARD_CONTINUES.with(|c| c.set(0));
+        REDUCER_ENTRIES.with(|c| c.set(0));
+    }
+    pub(super) fn bump_reducer_entry() {
+        REDUCER_ENTRIES.with(|c| c.set(c.get() + 1));
+    }
+    pub(super) fn reducer_entries() -> u64 {
+        REDUCER_ENTRIES.with(|c| c.get())
     }
     pub(super) fn bump_unfold() {
         UNFOLDS.with(|c| c.set(c.get() + 1));
@@ -743,6 +732,15 @@ mod delta_probe {
         HARD_CONTINUES.with(|c| c.get())
     }
 }
+
+#[cfg(test)]
+#[inline]
+fn probe_reducer_entry() {
+    delta_probe::bump_reducer_entry();
+}
+#[cfg(not(test))]
+#[inline(always)]
+fn probe_reducer_entry() {}
 
 #[cfg(test)]
 #[inline]
@@ -1248,6 +1246,102 @@ fn conv_struct_path(
 mod tests {
     use super::*;
     use crate::term::{Level, LevelVar};
+
+    /// Durable reducer-work invariant: a stuck component is reduced once,
+    /// even when conversion defers its head δ. MEASURED: reducer entries at
+    /// depths 16/32/64 across every nested-consumer arm, against public whnf
+    /// on the identical neutral term. CLAIMED: conversion's deferral adds no
+    /// exponential work on nested stuck components. GAP: entry counts do not
+    /// measure allocation, nor independent computation inside a consumer.
+    /// Cast tests *both type components* as deep neutral projection chains;
+    /// `Cast^k` itself already repeats conversion within public `whnf`.
+    #[test]
+    fn stuck_nested_components_take_linear_reducer_entries() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        ctx.push(Term::Type(Level::zero()));
+        for shape in ["proj1", "proj2", "elim", "quot", "eq", "cast"] {
+            for k in [16, 32, 64] {
+                let mut term = Term::var(0);
+                for _ in 0..k {
+                    term = match shape {
+                        "proj1" => Term::proj1(term),
+                        "proj2" => Term::proj2(term),
+                        "elim" => Term::Elim {
+                            fam: GlobalId(9000),
+                            level_args: vec![],
+                            params: vec![],
+                            motive: Box::new(Term::var(1)),
+                            methods: vec![],
+                            indices: vec![],
+                            scrut: Box::new(term),
+                        },
+                        "quot" => Term::QuotElim {
+                            motive: Box::new(Term::var(1)),
+                            method: Box::new(Term::var(1)),
+                            respect: Box::new(Term::var(1)),
+                            scrut: Box::new(term),
+                        },
+                        "eq" => Term::Eq(
+                            Box::new(term),
+                            Box::new(Term::var(1)),
+                            Box::new(Term::var(2)),
+                        ),
+                        // Both Cast types carry k nested stuck projectees.
+                        "cast" => Term::proj2(term),
+                        _ => unreachable!(),
+                    };
+                }
+                if shape == "proj2" {
+                    // This deep neutral projectee can arise from a checked
+                    // Σ-field chain, not only from a raw reducer probe.
+                    let mut field_type = Term::Type(Level::zero());
+                    for _ in 0..k {
+                        field_type = Term::sigma(Term::Type(Level::zero()), field_type);
+                    }
+                    let mut typed_ctx = Context::new();
+                    typed_ctx.push(field_type);
+                    assert_eq!(
+                        crate::check::infer(&env, &typed_ctx, &term).expect("nested Σ projection"),
+                        Term::Type(Level::zero())
+                    );
+                }
+                if shape == "cast" {
+                    let mut other = Term::var(0);
+                    for _ in 0..k {
+                        other = Term::proj1(other);
+                    }
+                    term = Term::Cast(
+                        Box::new(term),
+                        Box::new(other),
+                        Box::new(Term::var(1)),
+                        Box::new(Term::var(2)),
+                    );
+                }
+                delta_probe::reset();
+                let public = whnf(&env, &ctx, &term);
+                let public_count = delta_probe::reducer_entries();
+                delta_probe::reset();
+                let deferred = whnf_defer_head_delta(&env, &ctx, &term).0;
+                let deferred_count = delta_probe::reducer_entries();
+                delta_probe::reset();
+                let full = whnf_progress_for_conversion(&env, &ctx, &term).0;
+                let full_count = delta_probe::reducer_entries();
+                assert_eq!(public, deferred, "deferred {shape} depth {k}");
+                assert_eq!(public, full, "full {shape} depth {k}");
+                assert!(
+                    public_count > k,
+                    "public reducer must reach the nested site"
+                );
+                for (mode, entries) in [("deferred", deferred_count), ("full", full_count)] {
+                    assert!(
+                        entries <= public_count * 2 && entries <= k * 6 + 8,
+                        "{shape} depth {k}: {mode} {entries} vs public {public_count} entries"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn level_semilattice_eq() {
