@@ -142,10 +142,10 @@ before this file.
 
 Ordinary transparent recursive definitions over `List`/`Nat`; no primitive
 or postulated law is added. `take_drop_decomposition`, `map_length`, and
-`length_take_min` are the three original proof-returning laws. The private
-`length_append` and `length_drop` laws also hold for any element type and list;
-`length_append` uses the canonical addition laws because `add` recurses on
-its second argument. The private `mem_filter` theorem characterizes
+`length_take_min` are the three original proof-returning laws. The public
+`list_append::length` and private `length_drop` laws hold for any element type
+and list. The append law uses the canonical addition laws because `add`
+recurses on its second argument. The private `mem_filter` theorem characterizes
 membership through this module's `filter`:
 given `compat`, a matching head has the same predicate result as `x`.
 The private `mem_filter_sound` theorem needs no compatibility premise:
@@ -688,7 +688,7 @@ theorem mem_filter_sound
         (Refl)
   }
 
-theorem length_append
+pub proof length for list_append
       (a : Type) (xs : List a) (ys : List a)
     : Equal Nat (length a (list_append a xs ys)) (add (length a xs) (length a ys)) =
   match xs {
@@ -705,7 +705,7 @@ theorem length_append
           (length a (list_append a tail ys))
           (add (length a tail) (length a ys))
           Suc
-          (length_append a tail ys))
+          (list_append::length a tail ys))
         (sym
           Nat
           (add (Suc (length a tail)) (length a ys))
@@ -748,11 +748,6 @@ theorem length_take_min
 ```
 
 ```ken example
-theorem derived_example_length_append_generic
-      (a : Type) (xs : List a) (ys : List a)
-    : Equal Nat (length a (list_append a xs ys)) (add (length a xs) (length a ys)) =
-  length_append a xs ys
-
 theorem derived_example_length_drop_generic
       (a : Type) (n : Nat) (xs : List a)
     : Equal Nat (length a (drop a n xs)) (sub (length a xs) n) =
@@ -1983,7 +1978,7 @@ theorem concat_char_count
       (length Char joined_chars)
       (add (length Char (string_to_list_char a)) (length Char (string_to_list_char b)))
       view_count
-      (length_append Char (string_to_list_char a) (string_to_list_char b))
+      (list_append::length Char (string_to_list_char a) (string_to_list_char b))
 
 theorem slice_char_count
       (i : Nat)
@@ -2076,9 +2071,16 @@ The count laws apply to the specific assembled character list only when its
 encode-then-decode round trip preserves that list. Their proofs lift the
 corresponding view equality through `length` and use the generic append,
 take, and drop length laws. The view equalities themselves restate their
-explicit premises after unfolding the transparent string operations. An NFC
-boundary can change the character count, so neither count law claims an
-unconditional equation for arbitrary strings.
+explicit premises after unfolding the transparent string operations. NFC
+normalization happens when a literal is admitted: a decomposed list such as
+`['e', U+301]` is the view of no String literal. That is why the laws require
+the assembled list's round trip as a premise. No closed term currently
+discharges the round-trip premise; these laws apply to a consumer that obtains
+it (e.g., from a future conditional section certificate, an operator TCB
+decision). Neither count law claims an unconditional equation for arbitrary
+strings. `list_char_to_string` is conversion-opaque: even for ASCII or `Nil`,
+`string_to_list_char (list_char_to_string cs)` does not reduce definitionally
+to `cs`, and the count equations do not close by `Refl`.
 
 ```ken example
 theorem derived_example_concat_char_count_generic
@@ -2163,7 +2165,7 @@ const derived_nfc_base : String = "e"
 
 const derived_nfc_mark : String = "\u{301}"
 
-theorem derived_reject_concat_nfc_round_trip
+theorem derived_reject_round_trip_not_definitional
     : Equal
         (List Char)
         (string_to_list_char
@@ -2176,6 +2178,44 @@ theorem derived_reject_concat_nfc_round_trip
           Char
           (string_to_list_char derived_nfc_base)
           (string_to_list_char derived_nfc_mark)) =
+  Refl
+```
+
+The same round-trip obstruction occurs with ASCII, independently of NFC.
+At literal admission, however, decomposed and composed spellings have the
+same normalized character view.
+
+```ken reject
+const derived_ascii_left : String = "a"
+
+const derived_ascii_right : String = "b"
+
+theorem derived_reject_ascii_round_trip_not_definitional
+    : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string
+            (list_append
+              Char
+              (string_to_list_char derived_ascii_left)
+              (string_to_list_char derived_ascii_right))))
+        (list_append
+          Char
+          (string_to_list_char derived_ascii_left)
+          (string_to_list_char derived_ascii_right)) =
+  Refl
+```
+
+```ken example
+const derived_nfc_decomposed_literal : String = "e\u{301}"
+
+const derived_nfc_composed_literal : String = "\u{e9}"
+
+theorem derived_example_nfc_literal_admission
+    : Equal
+        (List Char)
+        (string_to_list_char derived_nfc_decomposed_literal)
+        (string_to_list_char derived_nfc_composed_literal) =
   Refl
 ```
 
@@ -2525,7 +2565,7 @@ reference implementation.
 2. **Public API.** Operations: `bytes_nat_length`, `concat_map`, `count`,
    `eq_from_ord`, `filter`, `length`, `list_append`, `map`, `nth`, `reverse`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
-   `list_append::right_unit`, `map::fusion`, `map::id`,
+   `list_append::right_unit`, `list_append::length`, `map::fusion`, `map::id`,
    `nth::at_or_beyond_is_none`, `nth::some_below_length`,
    `reverse::involutive`. All other definitions in this package are
    package-local; `cat_derived_pub_export.rs` is the authoritative inventory,
@@ -2562,8 +2602,8 @@ reference implementation.
    structural induction + `cong`/`trans` under the head constructor. Private
    `mem_filter` and `mem_filter_sound` split named predicate/comparator
    outcomes and use `cong` over this module's `filter` branch, with
-   compatibility needed only for the first law. `length_append` combines the
-   list induction with the canonical `add` successor law; `length_drop`
+   compatibility needed only for the first law. `list_append::length` combines
+   the list induction with the canonical `add` successor law; `length_drop`
    splits the bound and the list. The two conditional string count laws lift
    their view equalities with `cong` and compose the corresponding generic
    append/take/drop length laws; the view lemmas pass their explicit list
@@ -2599,10 +2639,12 @@ reference implementation.
    concatenates it (after `Transport.ken.md`'s tangled source) ahead of
    several rosetta examples that reuse it per the DRY rule.
 8. **Validation evidence.**
-   `crates/ken-elaborator/tests/cat_derived_string_view_laws.rs` checks six
-   owner-local generic consumers and exact before/after trust identities;
-   the paired reject fences refuse unconditional count equations and the
-   decomposed NFC pair's round-trip premise.
+   `crates/ken-elaborator/tests/cat_derived_string_view_laws.rs` checks five
+   private owner-local generic consumers and exact before/after trust
+   identities; `cat_derived_pub_export.rs` checks public attached-law use.
+   The paired reject fences refuse unconditional count equations and the
+   non-definitional round-trip premise for both ASCII and the decomposed NFC
+   pair, while the literal-admission example checks their canonical view.
    `crates/ken-elaborator/tests/cat_derived_filter_membership_law.rs` —
    pins both private checked contracts to this module's `filter`
    and distinguishes incompatible from compatible concrete equations.

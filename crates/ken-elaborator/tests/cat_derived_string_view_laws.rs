@@ -1,4 +1,4 @@
-//! Checked owner-local consumers for the six private Derived String and List laws.
+//! Checked owner-local consumers for the five private Derived String and List laws.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -48,14 +48,13 @@ fn owner_bindings(env: &ElabEnv) -> BTreeMap<String, GlobalId> {
 /// each private theorem is transparent and its generic owner example applies
 /// its loader-owned identity in a checked proof body. A fresh client refuses
 /// every private import. Checked example/reject fences preserve the owner's
-/// qualified binding map and trust. CLAIMED: six private laws admit generic
+/// qualified binding map and trust. CLAIMED: five private laws admit generic
 /// typed use without a new assumption or export. THE GAP: a reference can be
 /// present yet irrelevant to the stated equation; compile-preserving count-law
 /// filler mutations must fail the unchanged generic owner consumers.
 #[test]
 fn derived_private_view_laws_check_generic_owner_uses_without_trust() {
     let examples = [
-        ("derived_example_length_append_generic", "length_append"),
         ("derived_example_length_drop_generic", "length_drop"),
         (
             "derived_example_concat_char_count_generic",
@@ -104,7 +103,7 @@ fn derived_private_view_laws_check_generic_owner_uses_without_trust() {
         );
     }
     env.execute_loaded_entry_checked_fences(DERIVED)
-        .expect("six generic owner examples and the paired rejects must check");
+        .expect("five generic owner examples and the paired rejects must check");
     assert_eq!(owner_bindings(&env), bindings_before);
     assert_eq!(
         env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),

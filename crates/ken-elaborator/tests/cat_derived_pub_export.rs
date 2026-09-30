@@ -2,8 +2,8 @@
 //!
 //! Promise class: durable invariants. The ten public collection operations
 //! retain their `Data.Collections.Derived` identities. The two `nth` bound
-//! proofs, three `list_append` monoid-law attached proofs
-//! (`list_append::{left_unit, assoc, right_unit}`), the `map::{id, fusion}`
+//! proofs, four `list_append` attached proofs (the three monoid laws and
+//! `list_append::length`), the `map::{id, fusion}`
 //! proofs, and the checked `reverse::involutive` proof are published beside
 //! their subjects.
 //! The helper `reverse_snoc` and verified-sort carrier remain private.
@@ -205,11 +205,17 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
         let theorem = theorem_and_separator[..separator].trim_end();
         let probe = format!("cat_derived_export_probe_{}", queries.len());
         let attached = format!("{subject}::{proof_name}");
+        let signature_imports = if attached == "list_append::length" {
+            "import Data.Collections.Derived (length)\n\
+             import Data.Numeric.Nat.Arithmetic (add)\n"
+        } else {
+            ""
+        };
         queries.push(PublicationQuery {
             surface: attached.clone(),
             source: format!(
                 "import {DERIVED} ({subject})\n\
-                 theorem {probe} {binders} : {theorem} = {attached} {arguments}"
+                 {signature_imports}theorem {probe} {binders} : {theorem} = {attached} {arguments}"
             ),
             unpublished_names: BTreeSet::from([
                 format!("{DERIVED}.{subject}"),
@@ -227,8 +233,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// including attached proofs via their imported subjects; the successful set is
 /// compared with an independent literal contract set. CLAIMED: Derived's
 /// complete loader-visible export surface is exactly the ten authorized
-/// operations, two `nth` bound proofs, three `list_append` monoid-law
-/// attached proofs, and the one
+/// operations, two `nth` bound proofs, four `list_append` attached proofs
+/// (the three monoid laws and `length`), and the one
 /// `map::{id, fusion}` proofs and `reverse::involutive` attached proof.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
@@ -276,6 +282,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "list_append".to_owned(),
             "list_append::assoc".to_owned(),
             "list_append::left_unit".to_owned(),
+            "list_append::length".to_owned(),
             "list_append::right_unit".to_owned(),
             "map".to_owned(),
             "map::fusion".to_owned(),
@@ -287,6 +294,6 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "reverse::involutive".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         ten operations, two map proofs, two nth proofs, three list_append proofs and reverse::involutive"
+         ten operations, two map proofs, two nth proofs, four list_append proofs and reverse::involutive"
     );
 }
