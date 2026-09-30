@@ -205,11 +205,17 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
         let theorem = theorem_and_separator[..separator].trim_end();
         let probe = format!("cat_derived_export_probe_{}", queries.len());
         let attached = format!("{subject}::{proof_name}");
+        let signature_imports = if attached == "list_append::length" {
+            "import Data.Collections.Derived (length)\n\
+             import Data.Numeric.Nat.Arithmetic (add)\n"
+        } else {
+            ""
+        };
         queries.push(PublicationQuery {
             surface: attached.clone(),
             source: format!(
                 "import {DERIVED} ({subject})\n\
-                 theorem {probe} {binders} : {theorem} = {attached} {arguments}"
+                 {signature_imports}theorem {probe} {binders} : {theorem} = {attached} {arguments}"
             ),
             unpublished_names: BTreeSet::from([
                 format!("{DERIVED}.{subject}"),
@@ -276,6 +282,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "list_append".to_owned(),
             "list_append::assoc".to_owned(),
             "list_append::left_unit".to_owned(),
+            "list_append::length".to_owned(),
             "list_append::right_unit".to_owned(),
             "map".to_owned(),
             "map::fusion".to_owned(),

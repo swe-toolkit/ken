@@ -18467,21 +18467,6 @@ fn raw_outer_keys (k : Type) (tree : Tree k Unit) : List k =
       Cons k key (list_append k (raw_outer_keys k right) (raw_outer_keys k left))
   }
 
-theorem list_append_length_swapped
-      (k : Type) (left : List k) (right : List k)
-    : Equal Nat (length k (list_append k left right)) (add (length k right) (length k left)) =
-  match left {
-    Nil ↦ Refl;
-    Cons head tail ↦
-      cong
-        Nat
-        Nat
-        (length k (list_append k tail right))
-        (add (length k right) (length k tail))
-        Suc
-        (list_append_length_swapped k tail right)
-  }
-
 theorem raw_outer_keys_length
       (k : Type) (tree : Tree k Unit)
     : Equal Nat (length k (raw_outer_keys k tree)) (size k Unit tree) =
@@ -18499,7 +18484,15 @@ theorem raw_outer_keys_length
           (length k (list_append k (raw_outer_keys k right) (raw_outer_keys k left)))
           (add (length k (raw_outer_keys k left)) (length k (raw_outer_keys k right)))
           (add (size k Unit left) (size k Unit right))
-          (list_append_length_swapped k (raw_outer_keys k right) (raw_outer_keys k left))
+          (trans
+            Nat
+            (length k (list_append k (raw_outer_keys k right) (raw_outer_keys k left)))
+            (add (length k (raw_outer_keys k right)) (length k (raw_outer_keys k left)))
+            (add (length k (raw_outer_keys k left)) (length k (raw_outer_keys k right)))
+            (list_append::length k (raw_outer_keys k right) (raw_outer_keys k left))
+            ((proof comm for add)
+              (length k (raw_outer_keys k right))
+              (length k (raw_outer_keys k left))))
           (trans
             Nat
             (add (length k (raw_outer_keys k left)) (length k (raw_outer_keys k right)))
