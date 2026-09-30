@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMATTING-DOC-LAWS
 title: "Prove the Formatting Doc fitting and layout laws with no new trust: a document that fits renders flat in exactly its flat width, Group and Alt choose flat exactly when their layout fits, and render_string is coherent with render under an explicit round-trip premise"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -70,13 +70,26 @@ which AC-0 fixes, is:
     flat width of 2.
   - Replacing a law with a reflexive filler reddens its consumer.
 
-## Residual (carried, not in scope)
+## Closeout
 
-Nat order leq-add, leq-refl and leq-suc private duplicates in Map
-(`:17119`, `:17131`), Gcd (`:328`) and Parsing (`:3239`) should import from
-`Data.Numeric.Nat.Order` once this WP adds the shared bounds (Architect AC-0
-ruling `evt_2w0bcx37ysnen`, read at `510e25a8d`). A name collision with
-Map's private `leq_nat_add_right` brings Map's migration into this WP.
+Merged `bd783c79d` (PR #4411), exact `afb528e90`: Foundation QA
+`evt_5p6np7are5qav`, Architect `evt_7j70gsh9df7k7`, Decision
+`dec_v2b0anvqyhc`.
+
+- `render_flat_fits`, the four choice laws and `render_string_view` check,
+  each with a general-proposition consumer. `trusted_base()` is unchanged.
+- Order gains `leq_nat_add_left_bound` and `leq_nat_add_right_bound`
+  (public) and a private `leq_nat_successor_bound`.
+- The premise-deletion reject fence is closed by `Proved`. It rejects the
+  false `4 = 2` with a TypeMismatch and accepts the adjacent true `4 = 4`.
+
+Carried:
+- The Nat `leq` dedupe (Architect `evt_2w0bcx37ysnen`, `evt_bbf8w6ww9208`)
+  is framed as `CAT-NAT-LEQ-CANONICAL`.
+- Catalog `ken reject` fences closed by `Refl` on closed inductive-typed
+  equations do not discriminate. They reject a true statement too, because
+  such an equation reduces past the `Eq` shape (Architect
+  `evt_bbf8w6ww9208`). Unfunded; a sweep needs a consumer.
 
 ## Stop conditions
 
