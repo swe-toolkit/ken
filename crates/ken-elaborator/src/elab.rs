@@ -17574,7 +17574,17 @@ fn compile_match_leaf(
     }
     if ret_ty_slot.is_none() {
         let zonked = cx.metas.zonk_term(&body_ty_ctx);
-        let lowered = lower_by(&zonked, real_depth_so_far).unwrap_or(zonked);
+        let lowered = lower_by(&zonked, real_depth_so_far).map_err(|index| {
+            ElabError::InferredMatchResultEscapesPattern {
+                match_span: top_span.clone(),
+                arm_span: arms[first_row.arm_idx].span.clone(),
+                escaping_binder: recover_escaping_pattern_binder(
+                    &arms[first_row.arm_idx].pat,
+                    &first_occurrences,
+                    index,
+                ),
+            }
+        })?;
         *ret_ty_slot = Some(lowered);
     }
     Ok(body_core)
@@ -18028,19 +18038,25 @@ fn close_inferred_index_method(
         tail_ty = *codomain;
     }
     let method = if let Some(mut method) = method {
-        for _ in 0..domains.len() {
-            let Term::Lam(_, body) = method else {
-                return Err(ElabError::Internal(
-                    "matrix method lost a constructor field/IH binder".into(),
-                ));
-            };
+        let mut peeled = 0;
+        while peeled < domains.len() {
+            let Term::Lam(_, body) = method else { break };
             method = *body;
+            peeled += 1;
         }
+        // A nested split can leave an eliminator of the remaining Π type
+        // rather than a syntactic lambda. Apply it to the method telescope's
+        // remaining field/IH binders under those binders before closing the
+        // generated index premises and re-wrapping the full telescope.
+        let missing = domains.len() - peeled;
+        let body = (0..missing).rev().fold(weaken(&method, missing as i64), |f, i| {
+            Term::app(f, Term::var(i))
+        });
         let premises_under_ih: Vec<_> = premise_domains
             .iter()
             .map(|premise| weaken(premise, ih_count as i64))
             .collect();
-        let mut closed = wrap_premise_lams_finalized(method, &premises_under_ih, sentinel_region);
+        let mut closed = wrap_premise_lams_finalized(body, &premises_under_ih, sentinel_region);
         for domain in domains.iter().rev() {
             closed = Term::lam(domain.clone(), closed);
         }
@@ -18665,16 +18681,10 @@ fn infer_match(
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by: Vec<Vec<usize>> = vec![Vec::new(); arms.len()];
 
-    let index_coverage = !ind.indices.is_empty()
-        && ind.constructors.iter().any(|constructor| {
-            !rows.iter().any(|row| match &row.real_pats[0].kind {
-                RPatKind::Ctor(_, _) | RPatKind::CheckedCtor(_, _, _) => {
-                    pattern_ctor_id(cx, &row.real_pats[0].kind) == Some(constructor.id)
-                }
-                RPatKind::Wild | RPatKind::Var(_, _) => true,
-                _ => false,
-            })
-        });
+    // Indexed families need the dependent motive even when every root
+    // constructor is written. Only a missing root bucket uses the omission
+    // permission, with the existing absurd-method proof as its authority.
+    let indexed = !ind.indices.is_empty();
     let raw_methods_result = build_ctor_buckets(
         cx,
         arms,
@@ -18690,7 +18700,7 @@ fn infer_match(
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
-        index_coverage,
+        indexed,
     );
     let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result)?;
 
@@ -18713,7 +18723,7 @@ fn infer_match(
     }
 
     let ret_ty = ret_ty_slot.unwrap_or_else(|| Term::ty(Level::Zero));
-    if index_coverage {
+    if indexed {
         let Term::IndFormer { level_args, .. } = &head else {
             unreachable!("inductive scrutinee head checked above")
         };
@@ -18993,49 +19003,93 @@ fn lower_pattern_type_to_common(term: &Term, k: usize) -> Option<Term> {
     }
 }
 
-fn lower_by(term: &Term, k: usize) -> Option<Term> {
+/// Return the first escaping index when a leaf type cannot be projected to
+/// the match's outer scope. The index is relative to the matrix leaf; a local
+/// type binder is excluded from it by `cutoff`.
+fn lower_by(term: &Term, k: usize) -> Result<Term, usize> {
     if k == 0 {
-        return Some(term.clone());
+        return Ok(term.clone());
     }
     lower_by_inner(term, k, 0)
 }
 
-fn lower_by_inner(term: &Term, k: usize, cutoff: usize) -> Option<Term> {
+fn lower_by_inner(term: &Term, k: usize, cutoff: usize) -> Result<Term, usize> {
     match term {
         Term::Var(i) => {
             if *i < cutoff {
-                Some(Term::var(*i)) // bound under a local binder — keep as is
+                Ok(Term::var(*i))
             } else if *i < cutoff + k {
-                None // refers to a ctor-arg var — can't project to outer scope
+                Err(*i - cutoff)
             } else {
-                Some(Term::var(*i - k)) // outer context var — shift down
+                Ok(Term::var(*i - k))
             }
         }
-        Term::Type(l) => Some(Term::ty(l.clone())),
-        Term::Omega(l) => Some(Term::omega(l.clone())),
-        Term::Pi(a, b) => Some(Term::pi(
+        Term::Type(l) => Ok(Term::ty(l.clone())),
+        Term::Omega(l) => Ok(Term::omega(l.clone())),
+        Term::Pi(a, b) => Ok(Term::pi(
             lower_by_inner(a, k, cutoff)?,
             lower_by_inner(b, k, cutoff + 1)?,
         )),
-        Term::Lam(a, body) => Some(Term::lam(
+        Term::Lam(a, body) => Ok(Term::lam(
             lower_by_inner(a, k, cutoff)?,
             lower_by_inner(body, k, cutoff + 1)?,
         )),
-        Term::App(f, a) => Some(Term::app(
+        Term::App(f, a) => Ok(Term::app(
             lower_by_inner(f, k, cutoff)?,
             lower_by_inner(a, k, cutoff)?,
         )),
-        Term::Const { id, level_args } => Some(Term::const_(*id, level_args.clone())),
-        Term::IndFormer { id, level_args } => Some(Term::IndFormer {
+        Term::Const { id, level_args } => Ok(Term::const_(*id, level_args.clone())),
+        Term::IndFormer { id, level_args } => Ok(Term::IndFormer {
             id: *id,
             level_args: level_args.clone(),
         }),
-        Term::Constructor { id, level_args } => Some(Term::Constructor {
+        Term::Constructor { id, level_args } => Ok(Term::Constructor {
             id: *id,
             level_args: level_args.clone(),
         }),
-        other => Some(other.clone()),
+        other => Ok(other.clone()),
     }
+}
+
+/// Resolve a failing core variable to its original pattern name only where
+/// the matrix has an exact surviving occurrence; projection/alias paths may
+/// not have one, and the surface diagnostic still applies without a name.
+fn recover_escaping_pattern_binder(
+    pattern: &RPattern,
+    occurrences: &[Option<Term>],
+    escaping_index: usize,
+) -> Option<String> {
+    fn names<'a>(pattern: &'a RPattern, out: &mut Vec<Option<&'a str>>) {
+        match &pattern.kind {
+            RPatKind::Var(name, _) if name != "_" => out.push(Some(name)),
+            RPatKind::Var(_, _) | RPatKind::Wild | RPatKind::Literal(_, _) => out.push(None),
+            RPatKind::Ctor(_, fields) | RPatKind::CheckedCtor(_, _, fields)
+            | RPatKind::Tuple(fields) => {
+                for field in fields { names(field, out); }
+            }
+            RPatKind::Record(fields) => {
+                for field in fields { names(&field.pattern, out); }
+            }
+            RPatKind::As(inner, alias, _) => {
+                out.push(Some(alias));
+                names(inner, out);
+            }
+            // Or alternatives can reorder their canonical slots by name;
+            // never report a guessed binder from one alternative.
+            RPatKind::Or(_) => {}
+        }
+    }
+    let mut binding_names = Vec::new();
+    names(pattern, &mut binding_names);
+    if binding_names.len() != occurrences.len() {
+        return None;
+    }
+    binding_names.into_iter().zip(occurrences).find_map(|(name, occurrence)| {
+        matches!(occurrence, Some(Term::Var(index)) if *index == escaping_index)
+            .then_some(name)
+            .flatten()
+            .map(str::to_string)
+    })
 }
 
 // ----- standalone expression elaboration -----

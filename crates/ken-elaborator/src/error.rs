@@ -260,6 +260,13 @@ pub enum ElabError {
         missing: MissingPatternWitness,
         span: Span,
     },
+    /// An inferred result type still mentions a pattern-local binder after
+    /// leaving the arm; only an annotated, checked match can type that body.
+    InferredMatchResultEscapesPattern {
+        match_span: Span,
+        arm_span: Span,
+        escaping_binder: Option<String>,
+    },
     /// A dead match arm (`34 §4.2`): `cause` says why (`ArmDeadCause`).
     ReachabilityError { span: Span, cause: ArmDeadCause },
     /// An instance declared outside the module of its class AND its head-type
@@ -754,6 +761,21 @@ impl fmt::Display for ElabError {
                     "non-exhaustive match at {}-{}: unmatched pattern '{}'",
                     span.start, span.end, missing
                 )
+            }
+            ElabError::InferredMatchResultEscapesPattern {
+                match_span,
+                arm_span,
+                escaping_binder,
+            } => {
+                write!(
+                    f,
+                    "inferred match result type at {}-{} escapes pattern arm at {}-{}",
+                    match_span.start, match_span.end, arm_span.start, arm_span.end,
+                )?;
+                if let Some(name) = escaping_binder {
+                    write!(f, " through binder '{name}'")?;
+                }
+                write!(f, "; annotate the match's result type")
             }
             ElabError::ReachabilityError { span, cause } => match cause {
                 ArmDeadCause::Subsumed { first, rest } => {
