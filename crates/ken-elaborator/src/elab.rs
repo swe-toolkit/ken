@@ -3777,6 +3777,91 @@ fn apply_term_spine(head: Term, arguments: &[Term]) -> Term {
     arguments.iter().cloned().fold(head, Term::app)
 }
 
+/// J-congruence for the exact family supplied by the caller. `family_at_y`
+/// lives under both motive binders: `y = Var(1)` and its equality proof at
+/// `Var(0)`. The caller obtains its source and target from the same forward
+/// family; this constructor never inverts a substitution by value.
+#[allow(clippy::too_many_arguments)]
+fn build_family_type_cong(
+    env: &GlobalEnv,
+    ctx: &Context,
+    index_ty: &Term,
+    old_index: &Term,
+    new_index: &Term,
+    source_type: &Term,
+    family_at_y: &Term,
+    type_level: Level,
+    equality: Term,
+) -> Term {
+    let equality_domain = Term::Eq(
+        Box::new(weaken(index_ty, 1)),
+        Box::new(weaken(old_index, 1)),
+        Box::new(Term::var(0)),
+    );
+    let motive_body = Term::lam(
+        index_ty.clone(),
+        Term::lam(
+            equality_domain.clone(),
+            Term::Eq(
+                Box::new(Term::Type(type_level.clone())),
+                Box::new(weaken(source_type, 2)),
+                Box::new(family_at_y.clone()),
+            ),
+        ),
+    );
+    let motive_type = Term::pi(
+        index_ty.clone(),
+        Term::pi(equality_domain, Term::omega(type_level.clone().suc())),
+    );
+    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_type));
+    let base = Term::Refl(Box::new(refl_base_arg(
+        env, ctx, &Term::Type(type_level), source_type,
+    )));
+    let proof_ty = Term::Eq(
+        Box::new(index_ty.clone()),
+        Box::new(old_index.clone()),
+        Box::new(new_index.clone()),
+    );
+    let proof = Term::Ascript(Box::new(equality), Box::new(proof_ty));
+    Term::J(Box::new(motive), Box::new(base), Box::new(proof))
+}
+
+/// Direct Ω transport through the same caller-supplied family. The target is
+/// carried out unchanged, never recovered by reversing the old substitution.
+#[allow(clippy::too_many_arguments)]
+fn build_family_omega_transport(
+    idx_ty: &Term,
+    old_idx: &Term,
+    new_idx: &Term,
+    family_at_y: &Term,
+    target_type: &Term,
+    omega_level: Level,
+    value: Term,
+    h: Term,
+) -> (Term, Term) {
+    let dom2 = Term::Eq(
+        Box::new(weaken(idx_ty, 1)),
+        Box::new(weaken(old_idx, 1)),
+        Box::new(Term::var(0)),
+    );
+    let motive_body = Term::lam(
+        idx_ty.clone(),
+        Term::lam(dom2.clone(), family_at_y.clone()),
+    );
+    let motive_ty = Term::pi(idx_ty.clone(), Term::pi(dom2, Term::omega(omega_level)));
+    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_ty));
+    let proof_ty = Term::Eq(
+        Box::new(idx_ty.clone()),
+        Box::new(old_idx.clone()),
+        Box::new(new_idx.clone()),
+    );
+    let proof = Term::Ascript(Box::new(h), Box::new(proof_ty));
+    (
+        Term::J(Box::new(motive), Box::new(value), Box::new(proof)),
+        target_type.clone(),
+    )
+}
+
 /// Build equality between two applications of one result family while changing
 /// exactly one index argument. Unlike `build_index_type_cong`, this does not
 /// replace equal-looking occurrences in sibling indices: the J motive rebuilds
@@ -3810,43 +3895,11 @@ fn build_result_index_type_cong(
         &Term::var(1),
     );
     let type_at_y = apply_term_spine(weaken(result_head, 2), &arguments_at_y);
-    let equality_domain = Term::Eq(
-        Box::new(weaken(index_ty, 1)),
-        Box::new(weaken(old_index, 1)),
-        Box::new(Term::var(0)),
+    let proof = build_family_type_cong(
+        env, ctx, index_ty, old_index, new_index, &source_type, &type_at_y,
+        type_level, equality,
     );
-    let motive_body = Term::lam(
-        index_ty.clone(),
-        Term::lam(
-            equality_domain.clone(),
-            Term::Eq(
-                Box::new(Term::Type(type_level.clone())),
-                Box::new(weaken(&source_type, 2)),
-                Box::new(type_at_y),
-            ),
-        ),
-    );
-    let motive_type = Term::pi(
-        index_ty.clone(),
-        Term::pi(equality_domain, Term::omega(type_level.clone().suc())),
-    );
-    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_type));
-    let base = Term::Refl(Box::new(refl_base_arg(
-        env,
-        ctx,
-        &Term::Type(type_level),
-        &source_type,
-    )));
-    let proof_ty = Term::Eq(
-        Box::new(index_ty.clone()),
-        Box::new(old_index.clone()),
-        Box::new(new_index.clone()),
-    );
-    let proof = Term::Ascript(Box::new(equality), Box::new(proof_ty));
-    (
-        Term::J(Box::new(motive), Box::new(base), Box::new(proof)),
-        target_type,
-    )
+    (proof, target_type)
 }
 
 /// Transport a recursive-group sibling call from its concrete result-family
@@ -4904,7 +4957,8 @@ enum BranchGoalRestoration {
         index_type: Term,
         old_index: Term,
         new_index: Term,
-        source_type: Term,
+        target_type: Term,
+        family_at_y: Term,
         omega_level: Level,
         equality: Term,
     },
@@ -4932,18 +4986,14 @@ impl BranchGoalRestoration {
                 index_type,
                 old_index,
                 new_index,
-                source_type,
+                target_type,
+                family_at_y,
                 omega_level,
                 equality,
             } => {
-                let (transported, _) = build_index_omega_transport(
-                    &index_type,
-                    &old_index,
-                    &new_index,
-                    &source_type,
-                    omega_level,
-                    value,
-                    equality,
+                let (transported, _) = build_family_omega_transport(
+                    &index_type, &old_index, &new_index, &family_at_y,
+                    &target_type, omega_level, value, equality,
                 );
                 transported
             }
@@ -4969,14 +5019,36 @@ impl BranchGoalRestoration {
                 equality: translate(&equality)?,
             },
             Self::OmegaJ {
-                index_type, old_index, new_index, source_type, omega_level, equality,
-            } => Self::OmegaJ {
-                index_type: translate(&index_type)?,
-                old_index: translate(&old_index)?,
-                new_index: translate(&new_index)?,
-                source_type: translate(&source_type)?,
-                omega_level,
-                equality: translate(&equality)?,
+                index_type, old_index, new_index, target_type, family_at_y,
+                omega_level, equality,
+            } => {
+                // The stored family has two free *motive-local* variables.
+                // Embed it under its actual binders before translating the
+                // outer expanded context, then peel them back off. Translating
+                // the naked body would mistake Var(1) for a context binding.
+                let equality_domain = Term::Eq(
+                    Box::new(weaken(&index_type, 1)),
+                    Box::new(weaken(&old_index, 1)),
+                    Box::new(Term::var(0)),
+                );
+                let family_motive = Term::lam(
+                    index_type.clone(), Term::lam(equality_domain, family_at_y),
+                );
+                let Term::Lam(_, inner) = translate(&family_motive)? else {
+                    unreachable!("the family motive has two binders")
+                };
+                let Term::Lam(_, translated_family) = *inner else {
+                    unreachable!("the family motive has two binders")
+                };
+                Self::OmegaJ {
+                    index_type: translate(&index_type)?,
+                    old_index: translate(&old_index)?,
+                    new_index: translate(&new_index)?,
+                    target_type: translate(&target_type)?,
+                    family_at_y: *translated_family,
+                    omega_level,
+                    equality: translate(&equality)?,
+                }
             },
         })
     }
@@ -4990,24 +5062,24 @@ fn classify_branch_goal_restoration(
     old_index: &Term,
     new_index: &Term,
     source_type: &Term,
+    // The pre-image of the caller's forward substitution. Abstract precisely
+    // its scrutinee side; never invert `source_type` by replacing its image.
+    generalized: &Term,
     classifier: Term,
     equality: Term,
 ) -> Result<BranchGoalRestoration, ElabError> {
+    let family_at_y = subst_term_generalize(
+        &weaken(generalized, 2), &weaken(new_index, 2), &Term::var(1),
+    );
     match classifier {
         Term::Type(level) => {
-            let (type_equality, target_type) = build_index_type_cong(
-                env,
-                ctx,
-                index_type,
-                old_index,
-                new_index,
-                source_type,
-                level,
-                equality,
+            let type_equality = build_family_type_cong(
+                env, ctx, index_type, old_index, new_index, source_type,
+                &family_at_y, level, equality,
             );
             Ok(BranchGoalRestoration::TypeCast {
                 source_type: source_type.clone(),
-                target_type,
+                target_type: generalized.clone(),
                 equality: type_equality,
             })
         }
@@ -5015,7 +5087,8 @@ fn classify_branch_goal_restoration(
             index_type: index_type.clone(),
             old_index: old_index.clone(),
             new_index: new_index.clone(),
-            source_type: source_type.clone(),
+            target_type: generalized.clone(),
+            family_at_y,
             omega_level,
             equality,
         }),
@@ -7008,13 +7081,8 @@ fn build_sym(
     Term::J(Box::new(motive), Box::new(base), Box::new(proof))
 }
 
-/// Build `e : Eq Type cur_ty new_ty` where `new_ty = cur_ty[new_idx/old_idx]`,
-/// given `h : Eq idx_ty old_idx new_idx` — the type-level congruence a
-/// constructor-index equation licenses (index-refinement injectivity /
-/// convoy re-typing). Derived via `J`, never postulated: motive
-/// `λ(y:idx_ty)(_:Eq idx_ty old_idx y). Eq Type cur_ty cur_ty[y/old_idx]`,
-/// based at `old_idx` (`base = refl cur_ty`); `J` gives the result at
-/// `y = new_idx`. Returns `(e, new_ty)`.
+/// Forward type transport: both its target and its motive come from the
+/// caller's source, never by inverting a substituted image.
 fn build_index_type_cong(
     env: &GlobalEnv,
     ctx: &Context,
@@ -7026,42 +7094,13 @@ fn build_index_type_cong(
     h: Term,
 ) -> (Term, Term) {
     let new_ty = subst_term_generalize(cur_ty, old_idx, new_idx);
-    // Motive body, under the two new binders (`y`, `_ : Eq idx_ty old_idx y`):
-    // `cur_ty` with `old_idx` abstracted to `y` (= `Var(1)` at this depth).
-    let cur_ty_at_y = subst_term_generalize(&weaken(cur_ty, 2), &weaken(old_idx, 2), &Term::var(1));
-    let dom2 = Term::Eq(
-        Box::new(weaken(idx_ty, 1)),
-        Box::new(weaken(old_idx, 1)),
-        Box::new(Term::var(0)),
+    let family_at_y =
+        subst_term_generalize(&weaken(cur_ty, 2), &weaken(old_idx, 2), &Term::var(1));
+    let proof = build_family_type_cong(
+        env, ctx, idx_ty, old_idx, new_idx, cur_ty, &family_at_y,
+        type_level, h,
     );
-    let cod = Term::Eq(
-        Box::new(Term::Type(type_level.clone())),
-        Box::new(weaken(cur_ty, 2)),
-        Box::new(cur_ty_at_y),
-    );
-    let motive_body = Term::lam(idx_ty.clone(), Term::lam(dom2.clone(), cod));
-    // Ascribed for the same reason `build_sym` is — `J`'s motive is a bare
-    // `Lam`, never inferrable on its own. Its own classifier is one level
-    // up: `Eq (Type l) _ _ : Omega (suc l)`.
-    let motive_ty = Term::pi(
-        idx_ty.clone(),
-        Term::pi(dom2, Term::omega(type_level.clone().suc())),
-    );
-    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_ty));
-    let base = Term::Refl(Box::new(refl_base_arg(
-        env,
-        ctx,
-        &Term::Type(type_level),
-        cur_ty,
-    )));
-    let proof_ty = Term::Eq(
-        Box::new(idx_ty.clone()),
-        Box::new(old_idx.clone()),
-        Box::new(new_idx.clone()),
-    );
-    let proof = Term::Ascript(Box::new(h), Box::new(proof_ty));
-    let e = Term::J(Box::new(motive), Box::new(base), Box::new(proof));
-    (e, new_ty)
+    (proof, new_ty)
 }
 
 /// Transport `value : cur_ty` directly to `cur_ty[new_idx/old_idx]` when
@@ -7078,25 +7117,12 @@ fn build_index_omega_transport(
     h: Term,
 ) -> (Term, Term) {
     let new_ty = subst_term_generalize(cur_ty, old_idx, new_idx);
-    let cur_ty_at_y = subst_term_generalize(&weaken(cur_ty, 2), &weaken(old_idx, 2), &Term::var(1));
-    let dom2 = Term::Eq(
-        Box::new(weaken(idx_ty, 1)),
-        Box::new(weaken(old_idx, 1)),
-        Box::new(Term::var(0)),
-    );
-    let motive_body = Term::lam(idx_ty.clone(), Term::lam(dom2.clone(), cur_ty_at_y));
-    // `infer_j` infers its motive directly, so the bare lambda needs the
-    // ruled explicit sort ascription.
-    let motive_ty = Term::pi(idx_ty.clone(), Term::pi(dom2, Term::omega(omega_level)));
-    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_ty));
-    let proof_ty = Term::Eq(
-        Box::new(idx_ty.clone()),
-        Box::new(old_idx.clone()),
-        Box::new(new_idx.clone()),
-    );
-    let proof = Term::Ascript(Box::new(h), Box::new(proof_ty));
-    let transported = Term::J(Box::new(motive), Box::new(value), Box::new(proof));
-    (transported, new_ty)
+    let family_at_y =
+        subst_term_generalize(&weaken(cur_ty, 2), &weaken(old_idx, 2), &Term::var(1));
+    build_family_omega_transport(
+        idx_ty, old_idx, new_idx, &family_at_y, &new_ty,
+        omega_level, value, h,
+    )
 }
 
 /// If `cur_ty` (a type at the branch's current context depth) literally
@@ -7374,6 +7400,7 @@ fn refine_branch_goal(
             &target,
             &scrutinee,
             &candidate,
+            &generalized,
             classifier,
             proof,
         )?;
@@ -19164,6 +19191,7 @@ mod omega_index_refinement_tests {
         let value = Term::var(5);
         let equality = Term::var(6);
         let env = ElabEnv::new().expect("base environment");
+        let generalized = subst_term_generalize(&source_type, &old_index, &new_index);
         let plan = classify_branch_goal_restoration(
             &env.env,
             &Context::new(),
@@ -19171,6 +19199,7 @@ mod omega_index_refinement_tests {
             &old_index,
             &new_index,
             &source_type,
+            &generalized,
             Term::omega(Level::Zero),
             equality.clone(),
         )
@@ -19215,6 +19244,7 @@ mod omega_index_refinement_tests {
             &index_type,
             &old_index,
             &new_index,
+            &source_type,
             &source_type,
             nat.clone(),
             Term::var(3),
