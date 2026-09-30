@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-IOTA-DISCHARGE-DESCENT
 title: "Conversion never halts on two distinct recursive heads whose neutral elimination sits under a closed ι-redex: the no-progress ledger discharges the head pair on any ι-progress, so a closed `elim_Bool true` resets it every lap. Discharge only on ι-progress that witnesses descent toward the pair's recurrence"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -78,3 +78,18 @@ false at the default stack.
 - Any change to what the kernel accepts beyond halting at this boundary:
   stop to the Architect.
 - A `trusted_base()` change.
+
+## Closeout
+
+Merged as `9301e09e1` (PR #4398).
+- **AC-1.** Conversion returns false at the distinct recursive-identity
+  boundary beneath a stuck eliminator, as spec 17 §3.5 requires, with no
+  fuel or depth guard. Nested δ is deferred below eliminator descent
+  (`whnf_nested_component`), and the hard refusal keys on SCT diagonals.
+- **AC-2.** The 57-package census shows zero verdict changes. The pin
+  `stuck_nested_components_take_linear_reducer_entries` bounds all six
+  nested shapes at k = 16, 32 and 64, and QA's mutation turns it red.
+  Public `whnf` mode is unchanged. There is no `trusted_base()` change.
+- **Carried.** Nested `Cast` types stay exponential in public `whnf`
+  through `obs::cast_reduce` (Architect `evt_1fyxdasdg2g79`). It predates
+  this WP, and its placement is an operator question.
