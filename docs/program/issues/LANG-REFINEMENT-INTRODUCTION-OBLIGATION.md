@@ -73,6 +73,16 @@ base, stop and report the mismatch.
     discharges.
   - The seeds `seed-def-refinement`, `seed-data-match`, `seed-obligations`
     and `seed-spec-syntax` are swept.
+  - **Int terms introduced at Char elsewhere** (grep for `(N : Int)` at
+    `0699d6e90`; AC-0 extends the census by mechanism, not by spelling):
+    - Closed literals, each of which should discharge: `Console/Text.ken.md`
+      `:18` and `:28`; `Formatting/Doc.ken.md` `:106`-`:107`; the
+      `char_to_digit` arguments at `Parsing/Numeric.ken.md` `:626`-`:630`;
+      and `ds9_json_codec_acceptance.rs` `:458`, `:811` and `:831`.
+    - One open Int expression, `(48 : Int) + natToInt d`, at
+      `rtp1_elim_reduce_ih_perf_acceptance.rs:200`. AC-0 reports whether
+      its obligation discharges. If it does not, that is the third stop
+      condition, and it goes to the Architect with the site.
   - `char-expected-integer-literal-scalar-boundary`
     (`seed-numbers.md:286`) states its observable as the obligation:
     `55295` leaves no open refinement obligation, and `55296` elaborates
