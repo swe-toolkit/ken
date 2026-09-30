@@ -180,8 +180,14 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
 2. `cast_at_pi` projects `e.1` from a Π/Π type equality that has no Σ
    reduct (keyed on the absent structural decomposition of `Eq Type` at a
    same-former compound pair). Recut to `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
-3. J's reading of a proof's `Eq` changed for proofs whose `Eq` reduces to
-   another `Eq`, and 22 catalog packages rejected (keyed on which `Eq`
-   formation, written or reduct, the eliminator reads). Shared predicate
-   with entries 1 and 2: each `Eq` consumer re-derives the proof's `Eq`
-   from `whnf`. Ruled: endpoints recorded once, `evt_143zpap46cmfr`.
+3. Under the `eq_formation` WIP, 22 catalog packages rejected. The
+   Architect's reading was that J's reading of a proof's `Eq` changed for
+   proofs whose `Eq` reduces to another `Eq`. **Measured cause**
+   (`evt_1k071x8epb5t1`, `evt_6a3p14yjwh8fc`): the failing J at span 55965
+   has `eq = Refl(@0.1)`. Kernel-generated site-1 evidence lost its `Eq`
+   on substitution to a bare `Refl`, so `infer(eq)` fails before any `Eq`
+   is read. Dropping only site 1's recorded ascription restores that
+   rejection, and restoring it returns 57/57. Shared predicate with entries
+   1 and 2: each `Eq` consumer re-derives the proof's `Eq` from its type
+   instead of reading a recorded input. Ruled: endpoints recorded once,
+   `evt_143zpap46cmfr`.
