@@ -278,8 +278,10 @@ reflexivity and transitivity witnesses for the shared comparator, §4.7.12
 proves the successor-set union characterization of `compose` and its membership
 corollary. A checked `Nat` chain refutes transitivity until its missing `0→2`
 edge is added. Under the same lawful comparator and ordered-representation
-premises, the closure laws now prove positive-walk faithfulness and saturation.
-General converse membership remains a separate obligation.
+premises, the closure laws prove positive-walk faithfulness and saturation.
+The converse membership characterization uses outer `Ordered` and
+`Distinct` and ordered successor sets; the checked chain refutes the
+unreversed direction.
 
 ## 4. Laws & proofs
 
@@ -15013,6 +15015,14 @@ successors: `succ`/`rel_member`/`add_edge` for the raw relation,
 `is_reflexive`/`is_symmetric`/`is_transitive`/`is_equivalence` as the standard
 relation-property predicates stated directly against `rel_member`.
 
+The converse membership proof folds over stored targets with a parameterized
+step, using the open-tree unfold equations to connect those folds to `converse`
+and `converse_targets`. Outer `Ordered` and `Distinct` ensure each visited
+source's stored successor set is the one observed by `succ`; successor-set
+`Ordered` ensures each visited target is found by membership. No fold over a
+closed-step `Node` is reduced as part of these bridges. The finite chain
+exhibits an edge that is absent in the unreversed converse direction.
+
 The chain `0 → 1 → 2` refutes transitivity because it has no `0 → 2` edge.
 Adding that single missing edge completes this finite relation. Its transitivity
 proof covers every `Nat` endpoint, including sources beyond the two stored
@@ -20855,6 +20865,2586 @@ theorem compose_member_union
         (set_member k leq z)
         (compose_successors_union k leq reflLeq transLeq x r s ordered distinct)
 
+theorem relation_set_insert_member_hit
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (key : k)
+      (query : k)
+      (s : Tree k Unit)
+      (heq : order_equiv k leq query key)
+    : Equal Bool (set_member k leq query (set_insert k leq key s)) True =
+  cong
+    (Option Unit)
+    Bool
+    (lookup k Unit leq query (insert k Unit leq key MkUnit s))
+    (Some Unit MkUnit)
+    (is_some Unit)
+    (insert_lookup_hit k Unit leq reflLeq transLeq key query MkUnit s heq)
+
+theorem relation_set_insert_member_away
+      (k : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (key : k)
+      (query : k)
+      (s : Tree k Unit)
+      (hnot : not_order_equiv_to_key k leq key query)
+    : Equal Bool (set_member k leq query (set_insert k leq key s)) (set_member k leq query s) =
+  cong
+    (Option Unit)
+    Bool
+    (lookup k Unit leq query (insert k Unit leq key MkUnit s))
+    (lookup k Unit leq query s)
+    (is_some Unit)
+    (lookup_locality k Unit leq transLeq key query MkUnit s hnot)
+
+theorem relation_set_insert_preserves_member
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (key : k)
+      (query : k)
+      (s : Tree k Unit)
+    : Equal Bool (set_member k leq query s) True
+      → Equal Bool (set_member k leq query (set_insert k leq key s)) True =
+  match bool_dichotomy (leq query key) {
+    Inl q1 ↦
+      match bool_dichotomy (leq key query) {
+        Inl q2 ↦
+          λhold.
+            relation_set_insert_member_hit
+              k
+              leq
+              reflLeq
+              transLeq
+              key
+              query
+              s
+              (and_intro
+                (Equal Bool (leq query key) True)
+                (Equal Bool (leq key query) True)
+                q1
+                q2);
+        Inr q2 ↦
+          λhold.
+            trans
+              Bool
+              (set_member k leq query (set_insert k leq key s))
+              (set_member k leq query s)
+              True
+              (relation_set_insert_member_away
+                k
+                leq
+                transLeq
+                key
+                query
+                s
+                (not_order_equiv_from_left_false k leq key query q2))
+              hold
+      };
+    Inr q1 ↦
+      λhold.
+        trans
+          Bool
+          (set_member k leq query (set_insert k leq key s))
+          (set_member k leq query s)
+          True
+          (relation_set_insert_member_away
+            k
+            leq
+            transLeq
+            key
+            query
+            s
+            (not_order_equiv_from_right_false k leq key query q1))
+          hold
+  }
+
+fn relation_set_insert_member_cases
+      (k : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (key : k)
+      (query : k)
+      (s : Tree k Unit)
+    : Equal Bool (set_member k leq query (set_insert k leq key s)) True
+      → Or (Equal Bool (set_member k leq query s) True) (order_equiv k leq query key) =
+  match bool_dichotomy (leq query key) {
+    Inl below ↦
+      match bool_dichotomy (leq key query) {
+        Inl above ↦
+          λpresent.
+            Inr
+              (Equal Bool (set_member k leq query s) True)
+              (order_equiv k leq query key)
+              (and_intro
+                (Equal Bool (leq query key) True)
+                (Equal Bool (leq key query) True)
+                below
+                above);
+        Inr not_above ↦
+          λpresent.
+            Inl
+              (Equal Bool (set_member k leq query s) True)
+              (order_equiv k leq query key)
+              (trans
+                Bool
+                (set_member k leq query s)
+                (set_member k leq query (set_insert k leq key s))
+                True
+                (sym
+                  Bool
+                  (set_member k leq query (set_insert k leq key s))
+                  (set_member k leq query s)
+                  (relation_set_insert_member_away
+                    k
+                    leq
+                    transLeq
+                    key
+                    query
+                    s
+                    (not_order_equiv_from_left_false k leq key query not_above)))
+                present)
+      };
+    Inr not_below ↦
+      λpresent.
+        Inl
+          (Equal Bool (set_member k leq query s) True)
+          (order_equiv k leq query key)
+          (trans
+            Bool
+            (set_member k leq query s)
+            (set_member k leq query (set_insert k leq key s))
+            True
+            (sym
+              Bool
+              (set_member k leq query (set_insert k leq key s))
+              (set_member k leq query s)
+              (relation_set_insert_member_away
+                k
+                leq
+                transLeq
+                key
+                query
+                s
+                (not_order_equiv_from_right_false k leq key query not_below)))
+            present)
+  }
+
+theorem relation_add_edge_succ_hit
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (key : k)
+      (target : k)
+      (acc : Tree k (Tree k Unit))
+      (heq : order_equiv k leq query key)
+    : Equal
+        (Tree k Unit)
+        (succ k leq query (add_edge k leq key target acc))
+        (set_insert k leq target (succ k leq key acc)) =
+  cong
+    (Option (Tree k Unit))
+    (Tree k Unit)
+    (lookup
+      k
+      (Tree k Unit)
+      leq
+      query
+      (insert k (Tree k Unit) leq key (set_insert k leq target (succ k leq key acc)) acc))
+    (Some (Tree k Unit) (set_insert k leq target (succ k leq key acc)))
+    (relation_option_or_empty k)
+    (insert_lookup_hit
+      k
+      (Tree k Unit)
+      leq
+      reflLeq
+      transLeq
+      key
+      query
+      (set_insert k leq target (succ k leq key acc))
+      acc
+      heq)
+
+theorem relation_add_edge_succ_away
+      (k : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (key : k)
+      (target : k)
+      (acc : Tree k (Tree k Unit))
+      (hnot : not_order_equiv_to_key k leq key query)
+    : Equal
+        (Tree k Unit)
+        (succ k leq query (add_edge k leq key target acc))
+        (succ k leq query acc) =
+  cong
+    (Option (Tree k Unit))
+    (Tree k Unit)
+    (lookup
+      k
+      (Tree k Unit)
+      leq
+      query
+      (insert k (Tree k Unit) leq key (set_insert k leq target (succ k leq key acc)) acc))
+    (lookup k (Tree k Unit) leq query acc)
+    (relation_option_or_empty k)
+    (lookup_locality
+      k
+      (Tree k Unit)
+      leq
+      transLeq
+      key
+      query
+      (set_insert k leq target (succ k leq key acc))
+      acc
+      hnot)
+
+theorem relation_succ_order_equiv
+      (k : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (key : k)
+      (r : Tree k (Tree k Unit))
+      (heq : order_equiv k leq query key)
+    : Equal (Tree k Unit) (succ k leq query r) (succ k leq key r) =
+  cong
+    (Option (Tree k Unit))
+    (Tree k Unit)
+    (lookup k (Tree k Unit) leq query r)
+    (lookup k (Tree k Unit) leq key r)
+    (relation_option_or_empty k)
+    (lookup_order_equiv_agree k (Tree k Unit) leq transLeq query key r heq)
+
+theorem relation_add_edge_member_away
+      (k : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (target : k)
+      (key : k)
+      (inserted : k)
+      (r : Tree k (Tree k Unit))
+      (hnot : not_order_equiv_to_key k leq key query)
+    : Equal Bool
+        (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+        (set_member k leq target (succ k leq query r)) =
+  cong
+    (Tree k Unit)
+    Bool
+    (succ k leq query (add_edge k leq key inserted r))
+    (succ k leq query r)
+    (set_member k leq target)
+    (relation_add_edge_succ_away k leq transLeq query key inserted r hnot)
+
+theorem relation_add_edge_member_hit
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (target : k)
+      (key : k)
+      (inserted : k)
+      (r : Tree k (Tree k Unit))
+      (heq_query : order_equiv k leq query key)
+      (heq_target : order_equiv k leq target inserted)
+    : Equal Bool
+        (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+        True =
+  trans
+    Bool
+    (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+    (set_member k leq target (set_insert k leq inserted (succ k leq key r)))
+    True
+    (cong
+      (Tree k Unit)
+      Bool
+      (succ k leq query (add_edge k leq key inserted r))
+      (set_insert k leq inserted (succ k leq key r))
+      (set_member k leq target)
+      (relation_add_edge_succ_hit k leq reflLeq transLeq query key inserted r heq_query))
+    (relation_set_insert_member_hit
+      k
+      leq
+      reflLeq
+      transLeq
+      inserted
+      target
+      (succ k leq key r)
+      heq_target)
+
+fn relation_add_edge_member_cases_at_source
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (target : k)
+      (key : k)
+      (inserted : k)
+      (r : Tree k (Tree k Unit))
+      (heq : order_equiv k leq query key)
+    : rel_member k leq query target (add_edge k leq key inserted r)
+      → Or
+        (rel_member k leq query target r)
+        (And (order_equiv k leq query key) (order_equiv k leq target inserted)) =
+  λpresent.
+    let
+      original = set_member k leq target (succ k leq query r);
+      at_key = set_member k leq target (succ k leq key r);
+      inserted_member = set_member k leq target (set_insert k leq inserted (succ k leq key r));
+      new_member = set_member k leq target (succ k leq query (add_edge k leq key inserted r));
+      at_inserted =
+        trans
+          Bool
+          inserted_member
+          new_member
+          True
+          (sym
+            Bool
+            new_member
+            inserted_member
+            (cong
+              (Tree k Unit)
+              Bool
+              (succ k leq query (add_edge k leq key inserted r))
+              (set_insert k leq inserted (succ k leq key r))
+              (set_member k leq target)
+              (relation_add_edge_succ_hit k leq reflLeq transLeq query key inserted r heq)))
+          present
+    in
+      match relation_set_insert_member_cases k leq transLeq inserted target
+        (succ k leq key r)
+        at_inserted {
+        Inl older ↦
+          Inl
+            (rel_member k leq query target r)
+            (And (order_equiv k leq query key) (order_equiv k leq target inserted))
+            (trans
+              Bool
+              original
+              at_key
+              True
+              (cong
+                (Tree k Unit)
+                Bool
+                (succ k leq query r)
+                (succ k leq key r)
+                (set_member k leq target)
+                (relation_succ_order_equiv k leq transLeq query key r heq))
+              older);
+        Inr target_equiv ↦
+          Inr
+            (rel_member k leq query target r)
+            (And (order_equiv k leq query key) (order_equiv k leq target inserted))
+            (and_intro
+              (order_equiv k leq query key)
+              (order_equiv k leq target inserted)
+              heq
+              target_equiv)
+      }
+
+fn relation_add_edge_member_cases
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (target : k)
+      (key : k)
+      (inserted : k)
+      (r : Tree k (Tree k Unit))
+    : rel_member k leq query target (add_edge k leq key inserted r)
+      → Or
+        (rel_member k leq query target r)
+        (And (order_equiv k leq query key) (order_equiv k leq target inserted)) =
+  match bool_dichotomy (leq query key) {
+    Inl below ↦
+      match bool_dichotomy (leq key query) {
+        Inl above ↦
+          relation_add_edge_member_cases_at_source
+            k
+            leq
+            reflLeq
+            transLeq
+            query
+            target
+            key
+            inserted
+            r
+            (and_intro
+              (Equal Bool (leq query key) True)
+              (Equal Bool (leq key query) True)
+              below
+              above);
+        Inr not_above ↦
+          λpresent.
+            Inl
+              (rel_member k leq query target r)
+              (And (order_equiv k leq query key) (order_equiv k leq target inserted))
+              (trans
+                Bool
+                (set_member k leq target (succ k leq query r))
+                (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+                True
+                (sym
+                  Bool
+                  (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+                  (set_member k leq target (succ k leq query r))
+                  (relation_add_edge_member_away
+                    k
+                    leq
+                    transLeq
+                    query
+                    target
+                    key
+                    inserted
+                    r
+                    (not_order_equiv_from_left_false k leq key query not_above)))
+                present)
+      };
+    Inr not_below ↦
+      λpresent.
+        Inl
+          (rel_member k leq query target r)
+          (And (order_equiv k leq query key) (order_equiv k leq target inserted))
+          (trans
+            Bool
+            (set_member k leq target (succ k leq query r))
+            (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+            True
+            (sym
+              Bool
+              (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+              (set_member k leq target (succ k leq query r))
+              (relation_add_edge_member_away
+                k
+                leq
+                transLeq
+                query
+                target
+                key
+                inserted
+                r
+                (not_order_equiv_from_right_false k leq key query not_below)))
+            present)
+  }
+
+theorem relation_add_edge_preserves_member_at_source
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (target : k)
+      (key : k)
+      (inserted : k)
+      (r : Tree k (Tree k Unit))
+      (heq : order_equiv k leq query key)
+      (previous : rel_member k leq query target r)
+    : rel_member k leq query target (add_edge k leq key inserted r) =
+  let old_at_key =
+    trans
+      Bool
+      (set_member k leq target (succ k leq key r))
+      (set_member k leq target (succ k leq query r))
+      True
+      (sym
+        Bool
+        (set_member k leq target (succ k leq query r))
+        (set_member k leq target (succ k leq key r))
+        (cong
+          (Tree k Unit)
+          Bool
+          (succ k leq query r)
+          (succ k leq key r)
+          (set_member k leq target)
+          (relation_succ_order_equiv k leq transLeq query key r heq)))
+      previous
+  in
+    trans
+      Bool
+      (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+      (set_member k leq target (set_insert k leq inserted (succ k leq key r)))
+      True
+      (cong
+        (Tree k Unit)
+        Bool
+        (succ k leq query (add_edge k leq key inserted r))
+        (set_insert k leq inserted (succ k leq key r))
+        (set_member k leq target)
+        (relation_add_edge_succ_hit k leq reflLeq transLeq query key inserted r heq))
+      (relation_set_insert_preserves_member
+        k
+        leq
+        reflLeq
+        transLeq
+        inserted
+        target
+        (succ k leq key r)
+        old_at_key)
+
+theorem relation_add_edge_preserves_member
+      (k : Type)
+      (leq : k → k → Bool)
+      (reflLeq : (x : k) → Equal Bool (leq x x) True)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (target : k)
+      (key : k)
+      (inserted : k)
+      (r : Tree k (Tree k Unit))
+    : rel_member k leq query target r
+      → rel_member k leq query target (add_edge k leq key inserted r) =
+  match bool_dichotomy (leq query key) {
+    Inl q1 ↦
+      match bool_dichotomy (leq key query) {
+        Inl q2 ↦
+          λprevious.
+            relation_add_edge_preserves_member_at_source
+              k
+              leq
+              reflLeq
+              transLeq
+              query
+              target
+              key
+              inserted
+              r
+              (and_intro
+                (Equal Bool (leq query key) True)
+                (Equal Bool (leq key query) True)
+                q1
+                q2)
+              previous;
+        Inr q2 ↦
+          λprevious.
+            trans
+              Bool
+              (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+              (set_member k leq target (succ k leq query r))
+              True
+              (relation_add_edge_member_away
+                k
+                leq
+                transLeq
+                query
+                target
+                key
+                inserted
+                r
+                (not_order_equiv_from_left_false k leq key query q2))
+              previous
+      };
+    Inr q1 ↦
+      λprevious.
+        trans
+          Bool
+          (set_member k leq target (succ k leq query (add_edge k leq key inserted r)))
+          (set_member k leq target (succ k leq query r))
+          True
+          (relation_add_edge_member_away
+            k
+            leq
+            transLeq
+            query
+            target
+            key
+            inserted
+            r
+            (not_order_equiv_from_right_false k leq key query q1))
+          previous
+  }
+
+fn converse_targets_step
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (key : k)
+      (unit : Unit)
+      (before : Tree k (Tree k Unit))
+    : Tree k (Tree k Unit) =
+  add_edge k leq key source before
+
+fn converse_targets_rhs
+      (k : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+    : Tree k (Tree k Unit) =
+  fold k Unit (Tree k (Tree k Unit)) (λy. λu. λacc2. add_edge k leq y x acc2) acc targets
+
+fn converse_targets_param
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+    : Tree k (Tree k Unit) =
+  fold k Unit (Tree k (Tree k Unit)) (converse_targets_step k leq source) acc targets
+
+theorem converse_targets_step_equal
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (key : k)
+      (unit : Unit)
+      (before : Tree k (Tree k Unit))
+    : Equal
+        (Tree k (Tree k Unit))
+        (add_edge k leq key source before)
+        (converse_targets_step k leq source key unit before) =
+  Refl
+
+theorem converse_targets_rhs_param_bridge
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+    : Equal
+        (Tree k (Tree k Unit))
+        (converse_targets_rhs k leq source targets acc)
+        (converse_targets_param k leq source targets acc) =
+  fold_congruent
+    k
+    Unit
+    (Tree k (Tree k Unit))
+    (λkey. λunit. λbefore. add_edge k leq key source before)
+    (converse_targets_step k leq source)
+    acc
+    targets
+    (converse_targets_step_equal k leq source)
+
+theorem converse_targets_unfold
+      (k : Type)
+      (leq : k → k → Bool)
+      (x : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+    : Equal
+        (Tree k (Tree k Unit))
+        (converse_targets k leq x targets acc)
+        (converse_targets_rhs k leq x targets acc) =
+  Refl
+
+theorem fold_relation_member_preserves
+      (k : Type)
+      (leq : k → k → Bool)
+      (a : k)
+      (b : k)
+      (f : k → Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit))
+      (acc : Tree k (Tree k Unit))
+      (targets : Tree k Unit)
+      (step : (key : k)
+        → (unit : Unit)
+        → (before : Tree k (Tree k Unit))
+        → rel_member
+        k
+        leq
+        a
+        b
+        before
+        → rel_member
+        k
+        leq
+        a
+        b
+        (f key unit before))
+    : rel_member k leq a b acc
+      → rel_member k leq a b (fold k Unit (Tree k (Tree k Unit)) f acc targets) =
+  match targets {
+    Leaf ↦ λpresent. present;
+    Node left key unit right ↦
+      λpresent.
+        let
+          left_acc = fold k Unit (Tree k (Tree k Unit)) f acc left;
+          after_key = f key unit left_acc;
+          left_present = fold_relation_member_preserves k leq a b f acc left step present;
+          after_present = step key unit left_acc left_present
+        in
+          fold_relation_member_preserves k leq a b f after_key right step after_present
+  }
+
+theorem fold_relation_member_hit
+      (k : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (target : k)
+      (f : k → Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit))
+      (acc : Tree k (Tree k Unit))
+      (targets : Tree k Unit)
+      (preserve : (key : k)
+        → (unit : Unit)
+        → (before : Tree k (Tree k Unit))
+        → rel_member
+        k
+        leq
+        query
+        target
+        before
+        → rel_member
+        k
+        leq
+        query
+        target
+        (f key unit before))
+      (hit : (key : k)
+        → (unit : Unit)
+        → (before : Tree k (Tree k Unit))
+        → order_equiv
+        k
+        leq
+        query
+        key
+        → rel_member
+        k
+        leq
+        query
+        target
+        (f key unit before))
+    : Equal Bool (set_member k leq query targets) True
+      → rel_member k leq query target (fold k Unit (Tree k (Tree k Unit)) f acc targets) =
+  match targets {
+    Leaf ↦ λpresent. absurd present;
+    Node left key unit right ↦
+      λpresent.
+        let
+          left_acc = fold k Unit (Tree k (Tree k Unit)) f acc left;
+          after_key = f key unit left_acc
+        in
+          match bool_dichotomy (leq query key) {
+            Inl below ↦
+              match bool_dichotomy (leq key query) {
+                Inl above ↦
+                  fold_relation_member_preserves
+                    k
+                    leq
+                    query
+                    target
+                    f
+                    after_key
+                    right
+                    preserve
+                    (hit
+                      key
+                      unit
+                      left_acc
+                      (and_intro
+                        (Equal Bool (leq query key) True)
+                        (Equal Bool (leq key query) True)
+                        below
+                        above));
+                Inr not_above ↦
+                  let
+                    left_present =
+                      member_node_left_when_selected
+                        k
+                        Unit
+                        leq
+                        query
+                        left
+                        key
+                        unit
+                        right
+                        below
+                        not_above
+                        present;
+                    left_hit =
+                      fold_relation_member_hit
+                        k
+                        leq
+                        query
+                        target
+                        f
+                        acc
+                        left
+                        preserve
+                        hit
+                        left_present
+                  in
+                    fold_relation_member_preserves
+                      k
+                      leq
+                      query
+                      target
+                      f
+                      after_key
+                      right
+                      preserve
+                      (preserve key unit left_acc left_hit)
+              };
+            Inr not_below ↦
+              fold_relation_member_hit
+                k
+                leq
+                query
+                target
+                f
+                after_key
+                right
+                preserve
+                hit
+                (member_node_right_when_selected
+                  k
+                  Unit
+                  leq
+                  query
+                  left
+                  key
+                  unit
+                  right
+                  not_below
+                  present)
+          }
+  }
+
+theorem relation_tree_member_equiv
+      (k : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (key : k)
+      (tree : Tree k Unit)
+      (heq : order_equiv k leq query key)
+    : Equal Bool (set_member k leq key tree) True
+      → Equal Bool (set_member k leq query tree) True =
+  λstored.
+    trans
+      Bool
+      (set_member k leq query tree)
+      (set_member k leq key tree)
+      True
+      (set_member_order_equiv_agree k leq transLeq query key tree heq)
+      stored
+
+fn fold_relation_member_exact
+      (k : Type)
+      (leq : k → k → Bool)
+      (transLeq : (x : k)
+        → (y : k)
+        → (z : k)
+        → Equal
+        Bool
+        (leq x y)
+        True
+        → Equal
+        Bool
+        (leq y z)
+        True
+        → Equal
+        Bool
+        (leq x z)
+        True)
+      (query : k)
+      (target : k)
+      (source : k)
+      (f : k → Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit))
+      (whole : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+      (tree : Tree k Unit)
+      (step : (key : k)
+        → (unit : Unit)
+        → (before : Tree k (Tree k Unit))
+        → rel_member
+        k
+        leq
+        query
+        target
+        (f key unit before)
+        → Or
+        (rel_member k leq query target before)
+        (And (order_equiv k leq query key) (order_equiv k leq target source)))
+    : all_keys k Unit (tree_member_pred k leq whole) tree
+      → rel_member k leq query target (fold k Unit (Tree k (Tree k Unit)) f acc tree)
+      → Or
+        (rel_member k leq query target acc)
+        (And
+          (order_equiv k leq target source)
+          (Equal Bool (set_member k leq query whole) True)) =
+  match tree {
+    Leaf ↦
+      λstored.
+        λpresent.
+          Inl
+            (rel_member k leq query target acc)
+            (And
+              (order_equiv k leq target source)
+              (Equal Bool (set_member k leq query whole) True))
+            present;
+    Node left key unit right ↦
+      λstored.
+        λpresent.
+          let
+            predicate = tree_member_pred k leq whole;
+            left_acc = fold k Unit (Tree k (Tree k Unit)) f acc left;
+            after_key = f key unit left_acc;
+            siblings =
+              and_snd
+                (predicate key)
+                (And (all_keys k Unit predicate left) (all_keys k Unit predicate right))
+                stored;
+            left_stored =
+              and_fst
+                (all_keys k Unit predicate left)
+                (all_keys k Unit predicate right)
+                siblings;
+            right_stored =
+              and_snd
+                (all_keys k Unit predicate left)
+                (all_keys k Unit predicate right)
+                siblings;
+            key_stored =
+              and_fst
+                (predicate key)
+                (And (all_keys k Unit predicate left) (all_keys k Unit predicate right))
+                stored
+          in
+            match fold_relation_member_exact
+            k
+            leq
+            transLeq
+            query
+            target
+            source
+            f
+            whole
+            after_key
+            right
+            step
+            right_stored
+            present {
+              Inr discovered ↦
+                Inr
+                  (rel_member k leq query target acc)
+                  (And
+                    (order_equiv k leq target source)
+                    (Equal Bool (set_member k leq query whole) True))
+                  discovered;
+              Inl after_present ↦
+                match step key unit left_acc after_present {
+                  Inr added ↦
+                    let
+                      query_equiv =
+                        and_fst
+                          (order_equiv k leq query key)
+                          (order_equiv k leq target source)
+                          added;
+                      target_equiv =
+                        and_snd
+                          (order_equiv k leq query key)
+                          (order_equiv k leq target source)
+                          added;
+                      in_whole =
+                        relation_tree_member_equiv
+                          k
+                          leq
+                          transLeq
+                          query
+                          key
+                          whole
+                          query_equiv
+                          key_stored
+                    in
+                      Inr
+                        (rel_member k leq query target acc)
+                        (And
+                          (order_equiv k leq target source)
+                          (Equal Bool (set_member k leq query whole) True))
+                        (and_intro
+                          (order_equiv k leq target source)
+                          (Equal Bool (set_member k leq query whole) True)
+                          target_equiv
+                          in_whole);
+                  Inl left_present ↦
+                    fold_relation_member_exact
+                      k
+                      leq
+                      transLeq
+                      query
+                      target
+                      source
+                      f
+                      whole
+                      acc
+                      left
+                      step
+                      left_stored
+                      left_present
+                }
+            }
+  }
+
+theorem converse_targets_preserve_member
+      (k : Type)
+      (d : Ord k)
+      (source : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+      (query : k)
+      (target : k)
+    : rel_member k (relation_ord_leq k d) query target acc
+      → rel_member k
+        (relation_ord_leq k d)
+        query target
+        (converse_targets k (relation_ord_leq k d) source targets acc) =
+  λpresent.
+    let
+      leq = relation_ord_leq k d;
+      rhs = converse_targets_rhs k leq source targets acc;
+      body : k → Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit) =
+        λkey. λunit. λbefore. add_edge k leq key source before;
+      folded =
+        fold_relation_member_preserves
+          k
+          leq
+          query
+          target
+          body
+          acc
+          targets
+          (λkey.
+            λunit.
+              λbefore.
+                relation_add_edge_preserves_member
+                  k
+                  leq
+                  d.refl
+                  d.trans
+                  query
+                  target
+                  key
+                  source
+                  before)
+          present
+    in
+      trans
+        Bool
+        (set_member k leq target (succ k leq query (converse_targets k leq source targets acc)))
+        (set_member k leq target (succ k leq query rhs))
+        True
+        (cong
+          (Tree k (Tree k Unit))
+          Bool
+          (converse_targets k leq source targets acc)
+          rhs
+          (λupdated. set_member k leq target (succ k leq query updated))
+          (converse_targets_unfold k leq source targets acc))
+        folded
+
+theorem converse_targets_member_from_stored
+      (k : Type)
+      (d : Ord k)
+      (source : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+      (query : k)
+    : Equal Bool (set_member k (relation_ord_leq k d) query targets) True
+      → rel_member k
+        (relation_ord_leq k d)
+        query source
+        (converse_targets k (relation_ord_leq k d) source targets acc) =
+  λpresent.
+    let
+      leq = relation_ord_leq k d;
+      rhs = converse_targets_rhs k leq source targets acc;
+      body : k → Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit) =
+        λkey. λunit. λbefore. add_edge k leq key source before;
+      source_equiv =
+        and_intro
+          (Equal Bool (leq source source) True)
+          (Equal Bool (leq source source) True)
+          (d.refl source)
+          (d.refl source);
+      folded =
+        fold_relation_member_hit
+          k
+          leq
+          query
+          source
+          body
+          acc
+          targets
+          (λkey.
+            λunit.
+              λbefore.
+                relation_add_edge_preserves_member
+                  k
+                  leq
+                  d.refl
+                  d.trans
+                  query
+                  source
+                  key
+                  source
+                  before)
+          (λkey.
+            λunit.
+              λbefore.
+                λequiv.
+                  relation_add_edge_member_hit
+                    k
+                    leq
+                    d.refl
+                    d.trans
+                    query
+                    source
+                    key
+                    source
+                    before
+                    equiv
+                    source_equiv)
+          present
+    in
+      trans
+        Bool
+        (set_member k leq source (succ k leq query (converse_targets k leq source targets acc)))
+        (set_member k leq source (succ k leq query rhs))
+        True
+        (cong
+          (Tree k (Tree k Unit))
+          Bool
+          (converse_targets k leq source targets acc)
+          rhs
+          (λupdated. set_member k leq source (succ k leq query updated))
+          (converse_targets_unfold k leq source targets acc))
+        folded
+
+fn relation_add_edge_step_cases
+      (k : Type)
+      (d : Ord k)
+      (source : k)
+      (query : k)
+      (target : k)
+      (key : k)
+      (unit : Unit)
+      (before : Tree k (Tree k Unit))
+    : rel_member k
+        (relation_ord_leq k d)
+        query target
+        (add_edge k (relation_ord_leq k d) key source before)
+      → Or
+        (rel_member k (relation_ord_leq k d) query target before)
+        (And
+          (order_equiv k (relation_ord_leq k d) query key)
+          (order_equiv k (relation_ord_leq k d) target source)) =
+  relation_add_edge_member_cases
+    k
+    (relation_ord_leq k d)
+    d.refl
+    d.trans
+    query
+    target
+    key
+    source
+    before
+
+theorem converse_targets_param_transport
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+    : Equal
+        (Tree k (Tree k Unit))
+        (converse_targets k leq source targets acc)
+        (converse_targets_param k leq source targets acc) =
+  trans
+    (Tree k (Tree k Unit))
+    (converse_targets k leq source targets acc)
+    (converse_targets_rhs k leq source targets acc)
+    (converse_targets_param k leq source targets acc)
+    (converse_targets_unfold k leq source targets acc)
+    (converse_targets_rhs_param_bridge k leq source targets acc)
+
+theorem converse_targets_member_to_param
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+      (query : k)
+      (target : k)
+    : rel_member k leq query target (converse_targets k leq source targets acc)
+      → rel_member k leq query target (converse_targets_param k leq source targets acc) =
+  λpresent.
+    trans
+      Bool
+      (set_member
+        k
+        leq
+        target
+        (succ k leq query (converse_targets_param k leq source targets acc)))
+      (set_member k leq target (succ k leq query (converse_targets k leq source targets acc)))
+      True
+      (sym
+        Bool
+        (set_member k leq target (succ k leq query (converse_targets k leq source targets acc)))
+        (set_member
+          k
+          leq
+          target
+          (succ k leq query (converse_targets_param k leq source targets acc)))
+        (cong
+          (Tree k (Tree k Unit))
+          Bool
+          (converse_targets k leq source targets acc)
+          (converse_targets_param k leq source targets acc)
+          (λupdated. set_member k leq target (succ k leq query updated))
+          (converse_targets_param_transport k leq source targets acc)))
+      present
+
+fn converse_targets_member_cases
+      (k : Type)
+      (d : Ord k)
+      (source : k)
+      (targets : Tree k Unit)
+      (acc : Tree k (Tree k Unit))
+      (query : k)
+      (target : k)
+      (ordered : Ordered k Unit (relation_ord_leq k d) targets)
+      (present : rel_member
+        k
+        (relation_ord_leq k d)
+        query
+        target
+        (converse_targets k (relation_ord_leq k d) source targets acc))
+    : Or
+        (rel_member k (relation_ord_leq k d) query target acc)
+        (And
+          (order_equiv k (relation_ord_leq k d) target source)
+          (Equal Bool (set_member k (relation_ord_leq k d) query targets) True)) =
+  fold_relation_member_exact
+    k
+    (relation_ord_leq k d)
+    d.trans
+    query
+    target
+    source
+    (converse_targets_step k (relation_ord_leq k d) source)
+    targets
+    acc
+    targets
+    (relation_add_edge_step_cases k d source query target)
+    (ordered_self_members k (relation_ord_leq k d) d.refl targets ordered)
+    (converse_targets_member_to_param
+      k
+      (relation_ord_leq k d)
+      source
+      targets
+      acc
+      query
+      target
+      present)
+
+fn converse_rhs
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit))
+    : Tree k (Tree k Unit) =
+  fold
+    k
+    (Tree k Unit)
+    (Tree k (Tree k Unit))
+    (λkey. λtargets. λbefore. converse_targets k leq key targets before)
+    (empty k (Tree k Unit))
+    r
+
+fn converse_step
+      (k : Type)
+      (leq : k → k → Bool)
+      (key : k)
+      (targets : Tree k Unit)
+      (before : Tree k (Tree k Unit))
+    : Tree k (Tree k Unit) =
+  converse_targets k leq key targets before
+
+fn converse_param
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit))
+    : Tree k (Tree k Unit) =
+  fold k (Tree k Unit) (Tree k (Tree k Unit)) (converse_step k leq) (empty k (Tree k Unit)) r
+
+theorem converse_unfold
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit))
+    : Equal (Tree k (Tree k Unit)) (converse k leq r) (converse_rhs k leq r) =
+  Refl
+
+theorem converse_step_equal
+      (k : Type)
+      (leq : k → k → Bool)
+      (key : k)
+      (targets : Tree k Unit)
+      (before : Tree k (Tree k Unit))
+    : Equal
+        (Tree k (Tree k Unit))
+        (converse_targets k leq key targets before)
+        (converse_step k leq key targets before) =
+  Refl
+
+theorem converse_rhs_param_bridge
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit))
+    : Equal (Tree k (Tree k Unit)) (converse_rhs k leq r) (converse_param k leq r) =
+  fold_congruent
+    k
+    (Tree k Unit)
+    (Tree k (Tree k Unit))
+    (λkey. λtargets. λbefore. converse_targets k leq key targets before)
+    (converse_step k leq)
+    (empty k (Tree k Unit))
+    r
+    (converse_step_equal k leq)
+
+theorem converse_param_transport
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit))
+    : Equal (Tree k (Tree k Unit)) (converse k leq r) (converse_param k leq r) =
+  trans
+    (Tree k (Tree k Unit))
+    (converse k leq r)
+    (converse_rhs k leq r)
+    (converse_param k leq r)
+    (converse_unfold k leq r)
+    (converse_rhs_param_bridge k leq r)
+
+theorem fold_relation_outer_preserves
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (query : k)
+      (target : k)
+      (f : k → v → Tree k (Tree k Unit) → Tree k (Tree k Unit))
+      (acc : Tree k (Tree k Unit))
+      (tree : Tree k v)
+      (step : (key : k)
+        → (val : v)
+        → (before : Tree k (Tree k Unit))
+        → rel_member
+        k
+        leq
+        query
+        target
+        before
+        → rel_member
+        k
+        leq
+        query
+        target
+        (f key val before))
+    : rel_member k leq query target acc
+      → rel_member k leq query target (fold k v (Tree k (Tree k Unit)) f acc tree) =
+  match tree {
+    Leaf ↦ λpresent. present;
+    Node left key val right ↦
+      λpresent.
+        let
+          left_acc = fold k v (Tree k (Tree k Unit)) f acc left;
+          after_key = f key val left_acc;
+          left_present =
+            fold_relation_outer_preserves k v leq query target f acc left step present;
+          after_present = step key val left_acc left_present
+        in
+          fold_relation_outer_preserves
+            k
+            v
+            leq
+            query
+            target
+            f
+            after_key
+            right
+            step
+            after_present
+  }
+
+theorem converse_step_preserves_member
+      (k : Type)
+      (d : Ord k)
+      (query : k)
+      (target : k)
+      (key : k)
+      (targets : Tree k Unit)
+      (before : Tree k (Tree k Unit))
+    : rel_member k (relation_ord_leq k d) query target before
+      → rel_member k
+        (relation_ord_leq k d)
+        query target
+        (converse_step k (relation_ord_leq k d) key targets before) =
+  converse_targets_preserve_member k d key targets before query target
+
+theorem relation_member_via_successor_eq
+      (k : Type)
+      (leq : k → k → Bool)
+      (target : k)
+      (observed : Tree k Unit)
+      (selected : Tree k Unit)
+      (same : Equal (Tree k Unit) observed selected)
+    : Equal Bool (set_member k leq target observed) True
+      → Equal Bool (set_member k leq target selected) True =
+  λpresent.
+    trans
+      Bool
+      (set_member k leq target selected)
+      (set_member k leq target observed)
+      True
+      (sym
+        Bool
+        (set_member k leq target observed)
+        (set_member k leq target selected)
+        (cong (Tree k Unit) Bool observed selected (set_member k leq target) same))
+      present
+
+theorem fold_relation_outer_hit
+      (k : Type)
+      (leq : k → k → Bool)
+      (source : k)
+      (target : k)
+      (f : k → Tree k Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit))
+      (acc : Tree k (Tree k Unit))
+      (tree : Tree k (Tree k Unit))
+      (preserve : (key : k)
+        → (targets : Tree k Unit)
+        → (before : Tree k (Tree k Unit))
+        → rel_member
+        k
+        leq
+        target
+        source
+        before
+        → rel_member
+        k
+        leq
+        target
+        source
+        (f key targets before))
+      (hit : (key : k)
+        → (targets : Tree k Unit)
+        → (before : Tree k (Tree k Unit))
+        → order_equiv
+        k
+        leq
+        source
+        key
+        → Equal
+        Bool
+        (set_member k leq target targets)
+        True
+        → rel_member
+        k
+        leq
+        target
+        source
+        (f key targets before))
+    : rel_member k leq source target tree
+      → rel_member k leq target source
+        (fold k (Tree k Unit) (Tree k (Tree k Unit)) f acc tree) =
+  match tree {
+    Leaf ↦ λedge. absurd edge;
+    Node left key targets right ↦
+      λedge.
+        let
+          observed = succ k leq source (Node k (Tree k Unit) left key targets right);
+          left_acc = fold k (Tree k Unit) (Tree k (Tree k Unit)) f acc left;
+          after_key = f key targets left_acc
+        in
+          match bool_dichotomy (leq source key) {
+            Inl below ↦
+              match bool_dichotomy (leq key source) {
+                Inl above ↦
+                  let
+                    stored =
+                      relation_member_via_successor_eq
+                        k
+                        leq
+                        target
+                        observed
+                        targets
+                        (succ_node_hit k leq source left key targets right below above)
+                        edge;
+                    source_equiv =
+                      and_intro
+                        (Equal Bool (leq source key) True)
+                        (Equal Bool (leq key source) True)
+                        below
+                        above
+                  in
+                    fold_relation_outer_preserves
+                      k
+                      (Tree k Unit)
+                      leq
+                      target
+                      source
+                      f
+                      after_key
+                      right
+                      preserve
+                      (hit key targets left_acc source_equiv stored);
+                Inr not_above ↦
+                  let
+                    left_edge =
+                      relation_member_via_successor_eq
+                        k
+                        leq
+                        target
+                        observed
+                        (succ k leq source left)
+                        (succ_node_left k leq source left key targets right below not_above)
+                        edge;
+                    left_hit =
+                      fold_relation_outer_hit
+                        k
+                        leq
+                        source
+                        target
+                        f
+                        acc
+                        left
+                        preserve
+                        hit
+                        left_edge
+                  in
+                    fold_relation_outer_preserves
+                      k
+                      (Tree k Unit)
+                      leq
+                      target
+                      source
+                      f
+                      after_key
+                      right
+                      preserve
+                      (preserve key targets left_acc left_hit)
+              };
+            Inr not_below ↦
+              fold_relation_outer_hit
+                k
+                leq
+                source
+                target
+                f
+                after_key
+                right
+                preserve
+                hit
+                (relation_member_via_successor_eq
+                  k
+                  leq
+                  target
+                  observed
+                  (succ k leq source right)
+                  (succ_node_right k leq source left key targets right not_below)
+                  edge)
+          }
+  }
+
+theorem converse_step_hit
+      (k : Type)
+      (d : Ord k)
+      (source : k)
+      (target : k)
+      (key : k)
+      (targets : Tree k Unit)
+      (before : Tree k (Tree k Unit))
+      (heq : order_equiv k (relation_ord_leq k d) source key)
+    : Equal Bool (set_member k (relation_ord_leq k d) target targets) True
+      → rel_member k
+        (relation_ord_leq k d)
+        target source
+        (converse_step k (relation_ord_leq k d) key targets before) =
+  λstored.
+    relation_tree_member_equiv
+      k
+      (relation_ord_leq k d)
+      d.trans
+      source
+      key
+      (succ
+        k
+        (relation_ord_leq k d)
+        target
+        (converse_targets k (relation_ord_leq k d) key targets before))
+      heq
+      (converse_targets_member_from_stored k d key targets before target stored)
+
+theorem converse_param_member_from_edge
+      (k : Type)
+      (d : Ord k)
+      (source : k)
+      (target : k)
+      (acc : Tree k (Tree k Unit))
+      (tree : Tree k (Tree k Unit))
+    : rel_member k (relation_ord_leq k d) source target tree
+      → rel_member k
+        (relation_ord_leq k d)
+        target source
+        (fold
+          k
+          (Tree k Unit)
+          (Tree k (Tree k Unit))
+          (converse_step k (relation_ord_leq k d))
+          acc
+          tree) =
+  fold_relation_outer_hit
+    k
+    (relation_ord_leq k d)
+    source
+    target
+    (converse_step k (relation_ord_leq k d))
+    acc
+    tree
+    (converse_step_preserves_member k d target source)
+    (converse_step_hit k d source target)
+
+theorem converse_member_forward
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : rel_member k (relation_ord_leq k d) source target r
+      → rel_member k
+        (relation_ord_leq k d)
+        target source
+        (converse k (relation_ord_leq k d) r) =
+  λedge.
+    trans
+      Bool
+      (set_member
+        k
+        (relation_ord_leq k d)
+        source
+        (succ k (relation_ord_leq k d) target (converse k (relation_ord_leq k d) r)))
+      (set_member
+        k
+        (relation_ord_leq k d)
+        source
+        (succ k (relation_ord_leq k d) target (converse_param k (relation_ord_leq k d) r)))
+      True
+      (cong
+        (Tree k (Tree k Unit))
+        Bool
+        (converse k (relation_ord_leq k d) r)
+        (converse_param k (relation_ord_leq k d) r)
+        (λupdated.
+          set_member
+            k
+            (relation_ord_leq k d)
+            source
+            (succ k (relation_ord_leq k d) target updated))
+        (converse_param_transport k (relation_ord_leq k d) r))
+      (converse_param_member_from_edge k d source target (empty k (Tree k Unit)) r edge)
+
+fn all_relation_entries_visible
+      (k : Type)
+      (leq : k → k → Bool)
+      (whole : Tree k (Tree k Unit))
+      (tree : Tree k (Tree k Unit))
+    : Prop =
+  match tree {
+    Leaf ↦ Top;
+    Node left key targets right ↦
+      And
+        (Equal (Tree k Unit) (succ k leq key whole) targets)
+        (And
+          (all_relation_entries_visible k leq whole left)
+          (all_relation_entries_visible k leq whole right))
+  }
+
+theorem relation_stored_edge_observed
+      (k : Type)
+      (d : Ord k)
+      (whole : Tree k (Tree k Unit))
+      (query : k)
+      (target : k)
+      (key : k)
+      (targets : Tree k Unit)
+      (same : Equal (Tree k Unit) (succ k (relation_ord_leq k d) key whole) targets)
+      (heq : order_equiv k (relation_ord_leq k d) target key)
+    : Equal Bool (set_member k (relation_ord_leq k d) query targets) True
+      → rel_member k (relation_ord_leq k d) target query whole =
+  λstored.
+    let
+      leq = relation_ord_leq k d;
+      key_succ = succ k leq key whole;
+      target_succ = succ k leq target whole;
+      observed =
+        relation_member_via_successor_eq
+          k
+          leq
+          query
+          targets
+          key_succ
+          (sym (Tree k Unit) key_succ targets same)
+          stored
+    in
+      relation_member_via_successor_eq
+        k
+        leq
+        query
+        key_succ
+        target_succ
+        (sym
+          (Tree k Unit)
+          target_succ
+          key_succ
+          (relation_succ_order_equiv k leq d.trans target key whole heq))
+        observed
+
+fn fold_relation_outer_exact
+      (k : Type)
+      (d : Ord k)
+      (query : k)
+      (target : k)
+      (f : k → Tree k Unit → Tree k (Tree k Unit) → Tree k (Tree k Unit))
+      (whole : Tree k (Tree k Unit))
+      (acc : Tree k (Tree k Unit))
+      (tree : Tree k (Tree k Unit))
+      (step : (key : k)
+        → (targets : Tree k Unit)
+        → (before : Tree k (Tree k Unit))
+        → Ordered
+        k
+        Unit
+        (relation_ord_leq k d)
+        targets
+        → rel_member
+        k
+        (relation_ord_leq k d)
+        query
+        target
+        (f key targets before)
+        → Or
+        (rel_member k (relation_ord_leq k d) query target before)
+        (And
+          (order_equiv k (relation_ord_leq k d) target key)
+          (Equal Bool (set_member k (relation_ord_leq k d) query targets) True)))
+    : successors_ordered k d tree
+      → all_relation_entries_visible k (relation_ord_leq k d) whole tree
+      → rel_member k
+        (relation_ord_leq k d)
+        query target
+        (fold k (Tree k Unit) (Tree k (Tree k Unit)) f acc tree)
+      → Or
+        (rel_member k (relation_ord_leq k d) query target acc)
+        (rel_member k (relation_ord_leq k d) target query whole) =
+  match tree {
+    Leaf ↦
+      λordered.
+        λvisible.
+          λpresent.
+            Inl
+              (rel_member k (relation_ord_leq k d) query target acc)
+              (rel_member k (relation_ord_leq k d) target query whole)
+              present;
+    Node left key targets right ↦
+      λordered.
+        λvisible.
+          λpresent.
+            let
+              leq = relation_ord_leq k d;
+              node_acc = fold k (Tree k Unit) (Tree k (Tree k Unit)) f acc left;
+              after_key = f key targets node_acc;
+              children_ordered =
+                and_snd
+                  (Ordered k Unit leq targets)
+                  (And (successors_ordered k d left) (successors_ordered k d right))
+                  ordered;
+              left_ordered =
+                and_fst
+                  (successors_ordered k d left)
+                  (successors_ordered k d right)
+                  children_ordered;
+              right_ordered =
+                and_snd
+                  (successors_ordered k d left)
+                  (successors_ordered k d right)
+                  children_ordered;
+              key_ordered =
+                and_fst
+                  (Ordered k Unit leq targets)
+                  (And (successors_ordered k d left) (successors_ordered k d right))
+                  ordered;
+              children_visible =
+                and_snd
+                  (Equal (Tree k Unit) (succ k leq key whole) targets)
+                  (And
+                    (all_relation_entries_visible k leq whole left)
+                    (all_relation_entries_visible k leq whole right))
+                  visible;
+              left_visible =
+                and_fst
+                  (all_relation_entries_visible k leq whole left)
+                  (all_relation_entries_visible k leq whole right)
+                  children_visible;
+              right_visible =
+                and_snd
+                  (all_relation_entries_visible k leq whole left)
+                  (all_relation_entries_visible k leq whole right)
+                  children_visible;
+              key_visible =
+                and_fst
+                  (Equal (Tree k Unit) (succ k leq key whole) targets)
+                  (And
+                    (all_relation_entries_visible k leq whole left)
+                    (all_relation_entries_visible k leq whole right))
+                  visible
+            in
+              match fold_relation_outer_exact
+              k
+              d
+              query
+              target
+              f
+              whole
+              after_key
+              right
+              step
+              right_ordered
+              right_visible
+              present {
+                Inr found ↦
+                  Inr
+                    (rel_member k leq query target acc)
+                    (rel_member k leq target query whole)
+                    found;
+                Inl after_present ↦
+                  match step key targets node_acc key_ordered after_present {
+                    Inr added ↦
+                      let
+                        source_equiv =
+                          and_fst
+                            (order_equiv k leq target key)
+                            (Equal Bool (set_member k leq query targets) True)
+                            added;
+                        stored =
+                          and_snd
+                            (order_equiv k leq target key)
+                            (Equal Bool (set_member k leq query targets) True)
+                            added
+                      in
+                        Inr
+                          (rel_member k leq query target acc)
+                          (rel_member k leq target query whole)
+                          (relation_stored_edge_observed
+                            k
+                            d
+                            whole
+                            query
+                            target
+                            key
+                            targets
+                            key_visible
+                            source_equiv
+                            stored);
+                    Inl left_present ↦
+                      fold_relation_outer_exact
+                        k
+                        d
+                        query
+                        target
+                        f
+                        whole
+                        acc
+                        left
+                        step
+                        left_ordered
+                        left_visible
+                        left_present
+                  }
+              }
+  }
+
+fn converse_step_member_cases
+      (k : Type)
+      (d : Ord k)
+      (query : k)
+      (target : k)
+      (key : k)
+      (targets : Tree k Unit)
+      (before : Tree k (Tree k Unit))
+      (ordered : Ordered k Unit (relation_ord_leq k d) targets)
+      (present : rel_member
+        k
+        (relation_ord_leq k d)
+        query
+        target
+        (converse_step k (relation_ord_leq k d) key targets before))
+    : Or
+        (rel_member k (relation_ord_leq k d) query target before)
+        (And
+          (order_equiv k (relation_ord_leq k d) target key)
+          (Equal Bool (set_member k (relation_ord_leq k d) query targets) True)) =
+  converse_targets_member_cases k d key targets before query target ordered present
+
+fn converse_param_member_cases
+      (k : Type)
+      (d : Ord k)
+      (r : Tree k (Tree k Unit))
+      (query : k)
+      (target : k)
+      (ordered : successors_ordered k d r)
+      (visible : all_relation_entries_visible k (relation_ord_leq k d) r r)
+      (present : rel_member
+        k
+        (relation_ord_leq k d)
+        query
+        target
+        (converse_param k (relation_ord_leq k d) r))
+    : Or
+        (rel_member k (relation_ord_leq k d) query target (empty k (Tree k Unit)))
+        (rel_member k (relation_ord_leq k d) target query r) =
+  fold_relation_outer_exact
+    k
+    d
+    query
+    target
+    (converse_step k (relation_ord_leq k d))
+    r
+    (empty k (Tree k Unit))
+    r
+    (converse_step_member_cases k d query target)
+    ordered
+    visible
+    present
+
+theorem converse_member_to_param
+      (k : Type) (leq : k → k → Bool) (r : Tree k (Tree k Unit)) (query : k) (target : k)
+    : rel_member k leq query target (converse k leq r)
+      → rel_member k leq query target (converse_param k leq r) =
+  λpresent.
+    relation_member_via_successor_eq
+      k
+      leq
+      target
+      (succ k leq query (converse k leq r))
+      (succ k leq query (converse_param k leq r))
+      (cong
+        (Tree k (Tree k Unit))
+        (Tree k Unit)
+        (converse k leq r)
+        (converse_param k leq r)
+        (succ k leq query)
+        (converse_param_transport k leq r))
+      present
+
+theorem converse_member_backward_from_visible
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : successors_ordered k d r
+      → all_relation_entries_visible k (relation_ord_leq k d) r r
+      → rel_member k (relation_ord_leq k d) target source (converse k (relation_ord_leq k d) r)
+      → rel_member k (relation_ord_leq k d) source target r =
+  λinner.
+    λvisible.
+      λreversed.
+        match converse_param_member_cases k d r target source inner visible
+          (converse_member_to_param k (relation_ord_leq k d) r target source reversed) {
+          Inl impossible ↦ absurd impossible;
+          Inr present ↦ present
+        }
+
+theorem all_relation_entries_visible_transport
+      (k : Type)
+      (leq : k → k → Bool)
+      (from : Tree k (Tree k Unit))
+      (to : Tree k (Tree k Unit))
+      (tree : Tree k (Tree k Unit))
+      (p : k → Prop)
+      (step : (key : k) → p key → Equal (Tree k Unit) (succ k leq key from) (succ k leq key to))
+    : all_keys k (Tree k Unit) p tree
+      → all_relation_entries_visible k leq from tree
+      → all_relation_entries_visible k leq to tree =
+  match tree {
+    Leaf ↦ λcovered. λvisible. Proved;
+    Node left key targets right ↦
+      λcovered.
+        λvisible.
+          let
+            child_covered =
+              and_snd
+                (p key)
+                (And (all_keys k (Tree k Unit) p left) (all_keys k (Tree k Unit) p right))
+                covered;
+            left_covered =
+              and_fst
+                (all_keys k (Tree k Unit) p left)
+                (all_keys k (Tree k Unit) p right)
+                child_covered;
+            right_covered =
+              and_snd
+                (all_keys k (Tree k Unit) p left)
+                (all_keys k (Tree k Unit) p right)
+                child_covered;
+            key_covered =
+              and_fst
+                (p key)
+                (And (all_keys k (Tree k Unit) p left) (all_keys k (Tree k Unit) p right))
+                covered;
+            child_visible =
+              and_snd
+                (Equal (Tree k Unit) (succ k leq key from) targets)
+                (And
+                  (all_relation_entries_visible k leq from left)
+                  (all_relation_entries_visible k leq from right))
+                visible;
+            left_visible =
+              and_fst
+                (all_relation_entries_visible k leq from left)
+                (all_relation_entries_visible k leq from right)
+                child_visible;
+            right_visible =
+              and_snd
+                (all_relation_entries_visible k leq from left)
+                (all_relation_entries_visible k leq from right)
+                child_visible;
+            key_visible =
+              and_fst
+                (Equal (Tree k Unit) (succ k leq key from) targets)
+                (And
+                  (all_relation_entries_visible k leq from left)
+                  (all_relation_entries_visible k leq from right))
+                visible
+          in
+            and_intro
+              (Equal (Tree k Unit) (succ k leq key to) targets)
+              (And
+                (all_relation_entries_visible k leq to left)
+                (all_relation_entries_visible k leq to right))
+              (trans
+                (Tree k Unit)
+                (succ k leq key to)
+                (succ k leq key from)
+                targets
+                (sym
+                  (Tree k Unit)
+                  (succ k leq key from)
+                  (succ k leq key to)
+                  (step key key_covered))
+                key_visible)
+              (and_intro
+                (all_relation_entries_visible k leq to left)
+                (all_relation_entries_visible k leq to right)
+                (all_relation_entries_visible_transport
+                  k
+                  leq
+                  from
+                  to
+                  left
+                  p
+                  step
+                  left_covered
+                  left_visible)
+                (all_relation_entries_visible_transport
+                  k
+                  leq
+                  from
+                  to
+                  right
+                  p
+                  step
+                  right_covered
+                  right_visible))
+  }
+
+fn relation_left_visible_pred (k : Type) (leq : k → k → Bool) (pivot : k) (query : k) : Prop =
+  And (le_below k (Tree k Unit) leq pivot query) (not_order_equiv_to_key k leq pivot query)
+
+fn relation_right_visible_pred (k : Type) (leq : k → k → Bool) (pivot : k) (query : k) : Prop =
+  And (le_above k (Tree k Unit) leq pivot query) (not_order_equiv_to_key k leq pivot query)
+
+theorem relation_left_no_duplicate_root
+      (k : Type)
+      (leq : k → k → Bool)
+      (left : Tree k (Tree k Unit))
+      (pivot : k)
+      (targets : Tree k Unit)
+      (right : Tree k (Tree k Unit))
+    : Distinct k (Tree k Unit) leq (Node k (Tree k Unit) left pivot targets right)
+      → all_keys k (Tree k Unit) (not_order_equiv_to_key k leq pivot) left =
+  λdistinct.
+    all_in_list_to_all_keys
+      k
+      (Tree k Unit)
+      (not_order_equiv_to_key k leq pivot)
+      left
+      (no_dup_append_head_excl
+        k
+        (Tree k Unit)
+        leq
+        (to_list k (Tree k Unit) left)
+        (mk_pair k (Tree k Unit) pivot targets)
+        (to_list k (Tree k Unit) right)
+        distinct)
+
+theorem relation_right_no_duplicate_root
+      (k : Type)
+      (leq : k → k → Bool)
+      (left : Tree k (Tree k Unit))
+      (pivot : k)
+      (targets : Tree k Unit)
+      (right : Tree k (Tree k Unit))
+    : Distinct k (Tree k Unit) leq (Node k (Tree k Unit) left pivot targets right)
+      → all_keys k (Tree k Unit) (not_order_equiv_to_key k leq pivot) right =
+  λdistinct.
+    all_in_list_to_all_keys
+      k
+      (Tree k Unit)
+      (not_order_equiv_to_key k leq pivot)
+      right
+      (and_fst
+        (all_in_list
+          k
+          (Tree k Unit)
+          (not_order_equiv_to_key k leq pivot)
+          (to_list k (Tree k Unit) right))
+        (Distinct k (Tree k Unit) leq right)
+        (no_dup_append_right
+          k
+          (Tree k Unit)
+          leq
+          (to_list k (Tree k Unit) left)
+          (Cons
+            (Pair k (Tree k Unit))
+            (mk_pair k (Tree k Unit) pivot targets)
+            (to_list k (Tree k Unit) right))
+          distinct))
+
+theorem relation_left_succ_lift
+      (k : Type)
+      (leq : k → k → Bool)
+      (left : Tree k (Tree k Unit))
+      (pivot : k)
+      (targets : Tree k Unit)
+      (right : Tree k (Tree k Unit))
+      (query : k)
+    : relation_left_visible_pred k leq pivot query
+      → Equal
+        (Tree k Unit)
+        (succ k leq query left)
+        (succ k leq query (Node k (Tree k Unit) left pivot targets right)) =
+  λfacts.
+    let
+      below =
+        and_fst
+          (le_below k (Tree k Unit) leq pivot query)
+          (not_order_equiv_to_key k leq pivot query)
+          facts;
+      away =
+        and_snd
+          (le_below k (Tree k Unit) leq pivot query)
+          (not_order_equiv_to_key k leq pivot query)
+          facts
+    in
+      match bool_dichotomy (leq pivot query) {
+        Inl above ↦
+          absurd
+            (away
+              (and_intro
+                (Equal Bool (leq pivot query) True)
+                (Equal Bool (leq query pivot) True)
+                above
+                below));
+        Inr not_above ↦
+          sym
+            (Tree k Unit)
+            (succ k leq query (Node k (Tree k Unit) left pivot targets right))
+            (succ k leq query left)
+            (succ_node_left k leq query left pivot targets right below not_above)
+      }
+
+theorem relation_right_succ_lift
+      (k : Type)
+      (leq : k → k → Bool)
+      (left : Tree k (Tree k Unit))
+      (pivot : k)
+      (targets : Tree k Unit)
+      (right : Tree k (Tree k Unit))
+      (query : k)
+    : relation_right_visible_pred k leq pivot query
+      → Equal
+        (Tree k Unit)
+        (succ k leq query right)
+        (succ k leq query (Node k (Tree k Unit) left pivot targets right)) =
+  λfacts.
+    let
+      above =
+        and_fst
+          (le_above k (Tree k Unit) leq pivot query)
+          (not_order_equiv_to_key k leq pivot query)
+          facts;
+      away =
+        and_snd
+          (le_above k (Tree k Unit) leq pivot query)
+          (not_order_equiv_to_key k leq pivot query)
+          facts
+    in
+      match bool_dichotomy (leq query pivot) {
+        Inl below ↦
+          absurd
+            (away
+              (and_intro
+                (Equal Bool (leq pivot query) True)
+                (Equal Bool (leq query pivot) True)
+                above
+                below));
+        Inr not_below ↦
+          sym
+            (Tree k Unit)
+            (succ k leq query (Node k (Tree k Unit) left pivot targets right))
+            (succ k leq query right)
+            (succ_node_right k leq query left pivot targets right not_below)
+      }
+
+theorem relation_entries_visible
+      (k : Type) (d : Ord k) (tree : Tree k (Tree k Unit))
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) tree
+      → Distinct k (Tree k Unit) (relation_ord_leq k d) tree
+      → all_relation_entries_visible k (relation_ord_leq k d) tree tree =
+  match tree {
+    Leaf ↦ λordered. λdistinct. Proved;
+    Node left pivot targets right ↦
+      λordered.
+        λdistinct.
+          let
+            leq = relation_ord_leq k d;
+            node = Node k (Tree k Unit) left pivot targets right;
+            below = get_below_l k (Tree k Unit) leq left pivot targets right ordered;
+            above = get_above_r k (Tree k Unit) leq left pivot targets right ordered;
+            left_excludes_root =
+              relation_left_no_duplicate_root k leq left pivot targets right distinct;
+            right_excludes_root =
+              relation_right_no_duplicate_root k leq left pivot targets right distinct;
+            left_coverage =
+              all_keys_binary
+                k
+                (Tree k Unit)
+                (le_below k (Tree k Unit) leq pivot)
+                (not_order_equiv_to_key k leq pivot)
+                (relation_left_visible_pred k leq pivot)
+                left
+                (λentry.
+                  λbound.
+                    λaway.
+                      and_intro
+                        (le_below k (Tree k Unit) leq pivot entry)
+                        (not_order_equiv_to_key k leq pivot entry)
+                        bound
+                        away)
+                below
+                left_excludes_root;
+            right_coverage =
+              all_keys_binary
+                k
+                (Tree k Unit)
+                (le_above k (Tree k Unit) leq pivot)
+                (not_order_equiv_to_key k leq pivot)
+                (relation_right_visible_pred k leq pivot)
+                right
+                (λentry.
+                  λbound.
+                    λaway.
+                      and_intro
+                        (le_above k (Tree k Unit) leq pivot entry)
+                        (not_order_equiv_to_key k leq pivot entry)
+                        bound
+                        away)
+                above
+                right_excludes_root;
+            left_visible =
+              relation_entries_visible
+                k
+                d
+                left
+                (get_ordered_l k (Tree k Unit) leq left pivot targets right ordered)
+                (law5_distinct_l k (Tree k Unit) leq left pivot targets right distinct);
+            right_visible =
+              relation_entries_visible
+                k
+                d
+                right
+                (get_ordered_r k (Tree k Unit) leq left pivot targets right ordered)
+                (law5_distinct_r k (Tree k Unit) leq left pivot targets right distinct);
+            left_at_node =
+              all_relation_entries_visible_transport
+                k
+                leq
+                left
+                node
+                left
+                (relation_left_visible_pred k leq pivot)
+                (relation_left_succ_lift k leq left pivot targets right)
+                left_coverage
+                left_visible;
+            right_at_node =
+              all_relation_entries_visible_transport
+                k
+                leq
+                right
+                node
+                right
+                (relation_right_visible_pred k leq pivot)
+                (relation_right_succ_lift k leq left pivot targets right)
+                right_coverage
+                right_visible
+          in
+            and_intro
+              (Equal (Tree k Unit) (succ k leq pivot node) targets)
+              (And
+                (all_relation_entries_visible k leq node left)
+                (all_relation_entries_visible k leq node right))
+              (succ_node_hit k leq pivot left pivot targets right (d.refl pivot) (d.refl pivot))
+              (and_intro
+                (all_relation_entries_visible k leq node left)
+                (all_relation_entries_visible k leq node right)
+                left_at_node
+                right_at_node)
+  }
+
+theorem converse_member_backward
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → Distinct k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → rel_member k (relation_ord_leq k d) target source (converse k (relation_ord_leq k d) r)
+      → rel_member k (relation_ord_leq k d) source target r =
+  λordered.
+    λdistinct.
+      λinner.
+        λreversed.
+          converse_member_backward_from_visible
+            k
+            d
+            r
+            source
+            target
+            inner
+            (relation_entries_visible k d r ordered distinct)
+            reversed
+
+theorem converse_member_characterization
+      (k : Type) (d : Ord k) (r : Tree k (Tree k Unit)) (source : k) (target : k)
+    : Ordered k (Tree k Unit) (relation_ord_leq k d) r
+      → Distinct k (Tree k Unit) (relation_ord_leq k d) r
+      → successors_ordered k d r
+      → Equal Bool
+        (set_member k (relation_ord_leq k d) target (succ k (relation_ord_leq k d) source r))
+        (set_member
+          k
+          (relation_ord_leq k d)
+          source
+          (succ k (relation_ord_leq k d) target (converse k (relation_ord_leq k d) r))) =
+  λordered.
+    λdistinct.
+      λinner.
+        let
+          leq = relation_ord_leq k d;
+          direct = set_member k leq target (succ k leq source r);
+          reversed = set_member k leq source (succ k leq target (converse k leq r))
+        in
+          bool_value_eq_from_biimpl
+            direct
+            reversed
+            (converse_member_forward k d r source target)
+            (converse_member_backward k d r source target ordered distinct inner)
+            (bool_dichotomy direct)
+            (bool_dichotomy reversed)
+
 const relation_chain : Tree Nat (Tree Nat Unit) =
   add_edge
     Nat
@@ -20969,6 +23559,24 @@ theorem relation_converse_does_not_keep_direction
           (succ Nat leq_nat Zero (converse Nat leq_nat relation_chain)))
         False =
   Proved
+
+const relation_unreversed_control : Tree Nat (Tree Nat Unit) = relation_chain
+
+theorem relation_unreversed_converse_direction_refuted
+    : Not
+        (rel_member
+          Nat
+          leq_nat
+          Zero
+          (Suc Zero)
+          relation_unreversed_control
+          → rel_member
+          Nat
+          leq_nat
+          Zero
+          (Suc Zero)
+          (converse Nat leq_nat relation_unreversed_control)) =
+  λclaim. absurd (claim Proved)
 
 const relation_duplicate_right : Tree Nat (Tree Nat Unit) =
   Node
@@ -21689,7 +24297,10 @@ recursive assembly (every law's own top-level `fn`, §4.1–§4.6, §4.7.5–§4
 and successor-set equality for composition (`compose_successors_union` and
 `compose_member_union`, §4.7.12). The composition proof uses outer `Ordered`
 and `Distinct` plus reflexivity and transitivity witnesses for the shared
-comparator; it does not establish the general converse membership equivalence.
+comparator. The converse family proves that equivalence by generic fold-step
+preservation, hit, and exactness; an independent visibility induction uses
+outer `Ordered` and `Distinct` to identify stored successor sets, while
+ordered successor sets discharge target lookup.
 
 The bounded-reachability family (§4.7.12) independently checks a nonempty
 vertex list with `relation_walk_bool`, carrying its certificate in the private
@@ -21706,12 +24317,14 @@ repeated nonterminal source; list-length fuel yields a repeat-free witness.
 non-order-equivalent source keys into those raw nodes. This closes
 `reachable_plus_complete` at the public bound and the Boolean equality in
 `reachable_within_saturates` for any extra fuel, without outer `Distinct`.
-Only the general converse membership equivalence remains deferred.
+The general converse membership equivalence is proved separately under the
+stronger representation premises; the checked unreversed-direction refutation
+and duplicate-outer example show why its orientation and `Distinct` matter.
 
 **Consumers.** The selectively importable closure surface serves programs
 parameterized over abstract `Tree` values. The broader checked theory remains
 module-private; this surface neither constructs trees nor supplies the
-representation premises needed by the remaining converse proof.
+representation premises needed by the converse and composition laws.
 
 **Validation evidence.** `ken check` elaborates this entry's tangled source
 fences; the catalog checks its capstone laws and keyed operations.
