@@ -143,7 +143,10 @@ before this file.
 Ordinary transparent recursive definitions over `List`/`Nat`; no primitive
 or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `length_take_min` are the three original proof-returning laws. The private
-`mem_filter` theorem characterizes membership through this module's `filter`:
+`length_append` and `length_drop` laws also hold for any element type and list;
+`length_append` uses the canonical addition laws because `add` recurses on
+its second argument. The private `mem_filter` theorem characterizes
+membership through this module's `filter`:
 given `compat`, a matching head has the same predicate result as `x`.
 The private `mem_filter_sound` theorem needs no compatibility premise:
 membership after filtering implies membership before filtering. Both laws
@@ -2558,10 +2561,14 @@ reference implementation.
    lifting the tail proof under `Cons` with `cong`; `§4.1`/`§4.2` also use
    structural induction + `cong`/`trans` under the head constructor. Private
    `mem_filter` and `mem_filter_sound` split named predicate/comparator
-   outcomes and use
-   `cong` over this module's `filter` branch, with compatibility needed only
-   for the first law. Private `concat_map_append` lifts the IH under
-   `list_append` and uses
+   outcomes and use `cong` over this module's `filter` branch, with
+   compatibility needed only for the first law. `length_append` combines the
+   list induction with the canonical `add` successor law; `length_drop`
+   splits the bound and the list. The two conditional string count laws lift
+   their view equalities with `cong` and compose the corresponding generic
+   append/take/drop length laws; the view lemmas pass their explicit list
+   round-trip premises through the transparent string definitions. Private
+   `concat_map_append` lifts the IH under `list_append` and uses
    `list_append::assoc` in reverse. The `nth` bounds proofs split the list
    before the index so lookup, length, and order reduce together. `§4.3`:
    generic `insert::count` preserves every count with any comparator and
@@ -2592,6 +2599,10 @@ reference implementation.
    concatenates it (after `Transport.ken.md`'s tangled source) ahead of
    several rosetta examples that reuse it per the DRY rule.
 8. **Validation evidence.**
+   `crates/ken-elaborator/tests/cat_derived_string_view_laws.rs` checks six
+   owner-local generic consumers and exact before/after trust identities;
+   the paired reject fences refuse unconditional count equations and the
+   decomposed NFC pair's round-trip premise.
    `crates/ken-elaborator/tests/cat_derived_filter_membership_law.rs` —
    pins both private checked contracts to this module's `filter`
    and distinguishes incompatible from compatible concrete equations.
