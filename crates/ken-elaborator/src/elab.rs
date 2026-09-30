@@ -379,6 +379,10 @@ struct ElabCtx<'e> {
     /// body` later relocates to the convoy binder — so the resolved term is a
     /// bare `Var` in that case, not a `Cast`.
     var_refinements: HashMap<usize, (Term, Term, usize)>,
+    /// During a generalized branch-goal check, a premise sentinel resolves to
+    /// the temporary Pi binder rather than its original method premise. The
+    /// bottom-relative position is stable across deeper local binders.
+    scoped_premise_aliases: HashMap<(usize, usize), usize>,
     /// Generated equality leaves for each active indexed-match branch. The
     /// leaves are stored at `install_depth`; a fresh local binder rebases their
     /// endpoints by later context growth before refining its recorded type.
@@ -452,6 +456,7 @@ impl<'e> ElabCtx<'e> {
             provenance: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
+            scoped_premise_aliases: HashMap::new(),
             active_index_refinements: Vec::new(),
             match_field_regions: Vec::new(),
             hidden_positions: Vec::new(),
@@ -647,6 +652,7 @@ struct ActivePremiseEmbedding {
     expanded_sources: Vec<ExpandedBindingSource>,
     premise_to_expanded: HashMap<(usize, usize), usize>,
     premise_install_depth: HashMap<(usize, usize), usize>,
+    scoped_premise_aliases: HashMap<(usize, usize), usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -4712,22 +4718,147 @@ fn check_match_dependent_refined_fallback(
         n,
         expected_here,
     )?;
-    let expected_here_refined = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
-        goal_refined
-    } else {
+    check_generalized_branch_goal(
+        cx,
+        arm,
+        goal_refined,
+        goal_restorations,
+        expected_here,
+        preserve_goal,
+    )
+}
+
+#[inline(never)]
+fn check_generalized_branch_goal(
+    cx: &mut ElabCtx<'_>,
+    arm: &RMatchArm,
+    goal_refined: Term,
+    restorations: Vec<BranchGoalRestoration>,
+    expected_here: &Term,
+    preserve_goal: bool,
+) -> Result<Term, ElabError> {
+    // Do not introduce an additional early kernel admission for a branch
+    // whose goal needs no dependent binder. In particular, declaration
+    // universe metas may still be solved by the enclosing method checker.
+    if !restorations.iter().any(|restoration| {
+        matches!(restoration, BranchGoalRestoration::Generalized { binders, .. } if !binders.is_empty())
+    }) {
+        let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+            goal_refined
+        } else {
             simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
         };
-    let body_core_checked = check(cx, &arm.body, &expected_here_refined, &arm.span)?;
-    let mut body_core = body_core_checked;
-    for restoration in goal_restorations.into_iter().rev() {
-        body_core = restoration.apply(body_core);
+        let mut body = check(cx, &arm.body, &expected, &arm.span)?;
+        for restoration in restorations.into_iter().rev() {
+            body = restoration.apply(body);
+        }
+        return Ok(body);
     }
-    Ok(body_core)
+    let original_depth = cx.ctx.len();
+    let original_hidden = cx.hidden_positions.len();
+    let saved_refinements = cx.var_refinements.clone();
+    let saved_premises = cx.scoped_premise_aliases.clone();
+    let attempt = (|| {
+        let mut inner_goal = goal_refined;
+        let mut domains = Vec::new();
+        let mut premise_binders = Vec::new();
+        // The last leaf wrapped the outermost Pi. Peel in the same order
+        // that `check` enters its hidden, temporary binder telescope.
+        for restoration in restorations.iter().rev() {
+            let BranchGoalRestoration::Generalized { binders, .. } = restoration else {
+                continue;
+            };
+            for binder in binders {
+                let Term::Pi(domain, codomain) = inner_goal else {
+                    return Err(ElabError::Internal(
+                        "generalized branch goal lost its binder telescope".into(),
+                    ));
+                };
+                let domain = *domain;
+                cx.ctx.push(domain.clone());
+                let position = cx.ctx.len() - 1;
+                cx.hidden_positions.push(position);
+                match binder.source {
+                    GeneralizedGoalSource::Original(original_position) => {
+                        cx.var_refinements.insert(
+                            original_position,
+                            (Term::var(0), weaken(&domain, 1), cx.ctx.len()),
+                        );
+                    }
+                    GeneralizedGoalSource::Premise { region, slot } => {
+                        cx.scoped_premise_aliases.insert((region, slot), position);
+                        premise_binders.push((region, slot, position));
+                    }
+                }
+                domains.push(domain);
+                inner_goal = *codomain;
+            }
+        }
+        let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+            inner_goal
+        } else {
+            simplify_branch_goal(cx.env, &cx.ctx, &inner_goal)
+        };
+        let mut body = check(cx, &arm.body, &expected, &arm.span)?;
+        kernel_check_current(cx, &body, &expected).map_err(|error| match error {
+            CurrentKernelQueryError::View(error) => error,
+            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                error,
+                span: arm.span.clone(),
+            },
+        })?;
+        // A generated proof can still contain the owner-local sentinel even
+        // though immediate kernel queries saw its scoped alias. Redirect it
+        // before introducing the Lambda; finalization must not recover the
+        // unrefined method premise underneath the generalized binder.
+        for (region, slot, position) in premise_binders {
+            let frame = cx
+                .active_index_premise_frames
+                .iter()
+                .find(|frame| frame.sentinel_region == region && slot < frame.premise_domains.len())
+                .ok_or_else(|| {
+                    ElabError::Internal("generalized premise lost its installing frame".into())
+                })?;
+            let sentinel = checked_index_refinement_sentinel(
+                region,
+                slot + cx.ctx.len() - frame.install_depth,
+            )?;
+            body = subst_term_generalize(
+                &body,
+                &Term::var(sentinel),
+                &Term::var(cx.ctx.len() - 1 - position),
+            );
+        }
+        for domain in domains.into_iter().rev() {
+            body = Term::lam(domain, body);
+        }
+        Ok(body)
+    })();
+    cx.ctx.types.truncate(original_depth);
+    cx.hidden_positions.truncate(original_hidden);
+    cx.var_refinements = saved_refinements;
+    cx.scoped_premise_aliases = saved_premises;
+    let mut body = attempt?;
+    for restoration in restorations.into_iter().rev() {
+        body = restoration.apply(body);
+    }
+    kernel_check_current(cx, &body, expected_here).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error,
+            span: arm.span.clone(),
+        },
+    })?;
+    Ok(body)
 }
 
 /// A branch-goal restoration is classified once, where the refined goal is
 /// produced. Replay consumes this tag without re-classifying the goal.
 enum BranchGoalRestoration {
+    Generalized {
+        whole: Box<BranchGoalRestoration>,
+        binders: Vec<GeneralizedGoalBinder>,
+    },
     TypeCast {
         source_type: Term,
         target_type: Term,
@@ -4746,6 +4877,11 @@ enum BranchGoalRestoration {
 impl BranchGoalRestoration {
     fn apply(self, value: Term) -> Term {
         match self {
+            Self::Generalized { whole, binders } => binders
+                .into_iter()
+                .fold(whole.apply(value), |function, binder| {
+                    Term::app(function, binder.source_value)
+                }),
             Self::TypeCast {
                 source_type,
                 target_type,
@@ -4776,6 +4912,37 @@ impl BranchGoalRestoration {
                 transported
             }
         }
+    }
+
+    fn translate_to_original(self, embedding: &ActivePremiseEmbedding) -> Result<Self, ElabError> {
+        let translate = |term: &Term| {
+            embedding.translate_to_original(term, embedding.original_len, embedding.expanded_len)
+        };
+        Ok(match self {
+            Self::Generalized { whole, binders } => Self::Generalized {
+                whole: Box::new(whole.translate_to_original(embedding)?),
+                binders,
+            },
+            Self::TypeCast {
+                source_type,
+                target_type,
+                equality,
+            } => Self::TypeCast {
+                source_type: translate(&source_type)?,
+                target_type: translate(&target_type)?,
+                equality: translate(&equality)?,
+            },
+            Self::OmegaJ {
+                index_type, old_index, new_index, source_type, omega_level, equality,
+            } => Self::OmegaJ {
+                index_type: translate(&index_type)?,
+                old_index: translate(&old_index)?,
+                new_index: translate(&new_index)?,
+                source_type: translate(&source_type)?,
+                omega_level,
+                equality: translate(&equality)?,
+            },
+        })
     }
 }
 
@@ -6955,6 +7122,112 @@ fn try_reindex_cast(
     }
 }
 
+#[derive(Clone)]
+enum GeneralizedGoalSource {
+    Original(usize),
+    Premise { region: usize, slot: usize },
+}
+
+#[derive(Clone)]
+struct GeneralizedGoalBinder {
+    source: GeneralizedGoalSource,
+    /// A checked value at the original leaf endpoint. For an Original with
+    /// an installed refinement this is the effective alias, not its raw Var.
+    source_value: Term,
+}
+
+/// Free expanded-context positions, not surface indices. This also visits
+/// proof terms hidden inside casts and generated index equalities.
+fn expanded_goal_free_positions(
+    term: &Term,
+    context_len: usize,
+) -> Result<HashSet<usize>, ElabError> {
+    let mut positions = HashSet::new();
+    relocate_active_premise_term(term, 0, &mut |index, depth| {
+        let position = context_len.checked_sub(1 + index).ok_or_else(|| {
+            ElabError::Internal("branch goal has a free variable outside the expanded view".into())
+        })?;
+        positions.insert(position);
+        Ok(Term::var(depth + index))
+    })?;
+    Ok(positions)
+}
+
+fn generalized_goal_binders(
+    cx: &ElabCtx<'_>,
+    view: &ActivePremiseKernelView,
+    goal: &Term,
+    leaf_scrutinee: &Term,
+    leaf_target: &Term,
+) -> Result<Vec<(Term, Term, GeneralizedGoalBinder)>, ElabError> {
+    let len = view.context.len();
+    let original_len = view.embedding.original_len;
+    let mut needed = expanded_goal_free_positions(goal, len)?;
+    // A binder's domain may name another, outer binder. Follow these edges
+    // from inner to outer before deciding which goal-referenced types change.
+    let mut selected = Vec::new();
+    for position in (0..len).rev() {
+        let source = &view.embedding.expanded_sources[position];
+        let index = len - 1 - position;
+        let mut current_type = weaken(
+            view.context.lookup(index).expect("expanded position in range"),
+            (index + 1) as i64,
+        );
+        let mut value = Term::var(index);
+        if let ExpandedBindingSource::Original(original_position) = source {
+            if let Some((alias, ty, install_depth)) = cx.var_refinements.get(original_position) {
+                let growth = original_len.checked_sub(*install_depth).ok_or_else(|| {
+                    ElabError::Internal("branch goal alias escaped its installing context".into())
+                })?;
+                let alias = view.embedding.translate_from_original(
+                    &cx.metas.zonk_term(&weaken(alias, growth as i64)),
+                    original_len,
+                    len,
+                )?;
+                // Only an alias actually occurring in the goal is its
+                // abstraction source; a raw Var must keep its raw type.
+                if scrut_occurs(goal, &alias) {
+                    current_type = view.embedding.translate_from_original(
+                        &cx.metas.zonk_term(&weaken(ty, growth as i64)),
+                        original_len,
+                        len,
+                    )?;
+                    value = alias;
+                }
+            }
+        }
+        if !needed.contains(&position)
+            || subst_term_generalize(&current_type, leaf_scrutinee, leaf_target) == current_type
+        {
+            continue;
+        }
+        needed.extend(expanded_goal_free_positions(&current_type, len)?);
+        let source_original = view.embedding.translate_to_original(&value, original_len, len)?;
+        let binder_source = match source {
+            ExpandedBindingSource::Original(original_position) => {
+                GeneralizedGoalSource::Original(*original_position)
+            }
+            ExpandedBindingSource::Premise {
+                sentinel_region,
+                premise_slot,
+            } => GeneralizedGoalSource::Premise {
+                region: *sentinel_region,
+                slot: *premise_slot,
+            },
+        };
+        selected.push((
+            current_type,
+            value,
+            GeneralizedGoalBinder {
+                source: binder_source,
+                source_value: source_original,
+            },
+        ));
+    }
+    selected.reverse();
+    Ok(selected)
+}
+
 /// Capability 3: does the branch's own CHECKING GOAL (not a context
 /// variable) depend on the scrutinee's un-refined outer index? A branch
 /// that constructs a FRESH value (e.g. `VNil Nat` against goal `Vec Nat n`,
@@ -7000,34 +7273,73 @@ fn refine_branch_goal(
         )?);
     }
 
+    let view = active_premise_kernel_view_for_context(cx, &zonked_ctx)?;
     let mut goal = expected_here.clone();
     let mut restorations = Vec::new();
     for leaf in leaves {
-        let candidate = subst_term_generalize(&goal, &leaf.scrutinee, &leaf.target);
-        if candidate == goal {
+        let Some(view) = &view else {
+            // The leaf's generated proof is a premise sentinel; an absent
+            // expanded view cannot justify refining the branch goal.
+            return Err(ElabError::Internal(
+                "branch-goal refinement has no active premise view".into(),
+            ));
+        };
+        let embedding = &view.embedding;
+        let original_len = embedding.original_len;
+        let expanded_len = embedding.expanded_len;
+        let from_original = |term: &Term| {
+            embedding.translate_from_original(
+                &cx.metas.zonk_term(term),
+                original_len,
+                expanded_len,
+            )
+        };
+        let goal_expanded = from_original(&goal)?;
+        let index_ty = from_original(&leaf.index_ty)?;
+        let target = from_original(&leaf.target)?;
+        let scrutinee = from_original(&leaf.scrutinee)?;
+        let proof = from_original(&leaf.proof)?;
+        let binders = generalized_goal_binders(cx, view, &goal_expanded, &scrutinee, &target)?;
+        let mut generalized = goal_expanded.clone();
+        // Wrap inside-out to retain the outer-first telescope order; replace
+        // the actual binder value before rewriting the index leaf. This is
+        // what prevents an existing alias's earlier proof being rewritten.
+        for (domain, value, _) in binders.iter().rev() {
+            generalized = Term::pi(
+                domain.clone(),
+                subst_term_generalize(
+                    &weaken(&generalized, 1),
+                    &weaken(value, 1),
+                    &Term::var(0),
+                ),
+            );
+        }
+        let candidate = subst_term_generalize(&generalized, &scrutinee, &target);
+        if candidate == generalized {
             continue;
         }
-        let level_ty = kernel_infer_in_zonked_current(cx, &zonked_ctx, &candidate).map_err(
-            |error| match error {
-                CurrentKernelQueryError::View(error) => error,
-                CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
-                    "index refinement: could not classify the branch goal: {error:?}"
-                )),
-            },
-        )?;
-        let classifier = whnf(cx.env, &zonked_ctx, &level_ty);
+        let level_ty = kernel_infer_raw(cx.env, &view.context, &candidate).map_err(|error| {
+            ElabError::Internal(format!(
+                "index refinement: could not classify the branch goal: {error:?}"
+            ))
+        })?;
+        let classifier = whnf(cx.env, &view.context, &level_ty);
         let restoration = classify_branch_goal_restoration(
             cx.env,
-            &zonked_ctx,
-            &leaf.index_ty,
-            &leaf.target,
-            &leaf.scrutinee,
+            &view.context,
+            &index_ty,
+            &target,
+            &scrutinee,
             &candidate,
             classifier,
-            leaf.proof,
+            proof,
         )?;
-        restorations.push(restoration);
-        goal = candidate;
+        let restoration = restoration.translate_to_original(embedding)?;
+        restorations.push(BranchGoalRestoration::Generalized {
+            whole: Box::new(restoration),
+            binders: binders.into_iter().map(|(_, _, binder)| binder).collect(),
+        });
+        goal = embedding.translate_to_original(&candidate, original_len, expanded_len)?;
     }
     Ok((goal, restorations))
 }
@@ -7631,9 +7943,19 @@ impl ActivePremiseEmbedding {
                             "active premise region {sentinel_region} slot {premise_slot} is a forward dependency"
                         )));
                     }
-                    return Ok(Term::var(
-                        depth + expanded_prefix_len - 1 - expanded_position,
-                    ));
+                    let position = self
+                        .scoped_premise_aliases
+                        .get(&(sentinel_region, premise_slot))
+                        .copied()
+                        .filter(|position| *position < original_prefix_len)
+                        .map(|position| self.original_to_expanded[position])
+                        .unwrap_or(expanded_position);
+                    if position >= expanded_prefix_len {
+                        return Err(ElabError::Internal(
+                            "active premise alias is outside its expanded prefix".into(),
+                        ));
+                    }
+                    return Ok(Term::var(depth + expanded_prefix_len - 1 - position));
                 }
             }
             if free_index >= original_prefix_len {
@@ -7850,6 +8172,7 @@ fn active_premise_kernel_view_for_context(
         expanded_sources,
         premise_to_expanded,
         premise_install_depth,
+        scoped_premise_aliases: cx.scoped_premise_aliases.clone(),
     };
     let mut context = Context::new();
     for source in &embedding.expanded_sources {
@@ -19098,6 +19421,10 @@ mod omega_index_refinement_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "sibling_goal_refinement_tests.rs"]
+mod sibling_goal_refinement_tests;
 
 #[cfg(test)]
 mod result_transport_control_flow_tests {
