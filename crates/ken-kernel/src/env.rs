@@ -12,7 +12,7 @@
 //! pure data structure, lookup, and the type-former/constructor type generation
 //! that makes `infer` O(1).
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::term::{GlobalId, Level, LevelVar, Term};
 
@@ -268,6 +268,9 @@ pub struct GlobalEnv {
     /// Transparent constants on cycles of the current transparent-body graph.
     /// Derived from bodies, never from the admission route or declaration name.
     recursive_transparent: BTreeSet<GlobalId>,
+    /// SCT-certified strict diagonal positions, in the declared Π telescope.
+    /// Missing for raw unchecked transparent installs; conversion fails closed.
+    sct_decreasing: HashMap<GlobalId, BTreeSet<usize>>,
     /// Target id → transparent constants whose bodies mention `Const` of that
     /// id. Include opaque targets: a group placeholder may later be upgraded.
     referrers: HashMap<GlobalId, HashSet<GlobalId>>,
@@ -491,6 +494,7 @@ impl GlobalEnv {
         self.support_edges.remove(&decl.id());
         self.all_supports.retain(|_, family| *family != decl.id());
         self.checked_literals.remove(&decl.id());
+        self.sct_decreasing.remove(&decl.id());
         if let Decl::Transparent { id, .. } = &decl {
             let refs = self
                 .body_refs
@@ -537,6 +541,19 @@ impl GlobalEnv {
     /// This is not an SCT/admission-route flag: an acyclic group member is false.
     pub fn is_recursive_transparent(&self, id: GlobalId) -> bool {
         self.recursive_transparent.contains(&id)
+    }
+
+    /// Positions witnessed by the exact SCT closure during checked admission.
+    /// `None` is not an empty proof: the body was installed outside the gate.
+    pub(crate) fn sct_decreasing_positions(&self, id: GlobalId) -> Option<&BTreeSet<usize>> {
+        self.sct_decreasing.get(&id)
+    }
+
+    pub(crate) fn install_sct_decreasing(
+        &mut self,
+        positions: BTreeMap<GlobalId, BTreeSet<usize>>,
+    ) {
+        self.sct_decreasing.extend(positions);
     }
 
     /// An added transparent body introduces cycles only through its own id.
@@ -996,7 +1013,10 @@ mod literal_rollback_tests {
         assert_eq!(env.checked_literals.get(&id).unwrap().as_str(), "zz");
         let popped = env.remove_last().unwrap();
         assert_eq!(popped.id(), id);
-        assert!(env.checked_literals.get(&id).is_none(), "rollback must purge the raw entry, not merely hide it behind the accessor");
+        assert!(
+            env.checked_literals.get(&id).is_none(),
+            "rollback must purge the raw entry, not merely hide it behind the accessor"
+        );
         assert_eq!(env.next_global_id(), id);
         let fresh = declare_checked_string_literal(&mut env, "az").unwrap();
         assert_eq!(fresh, id);
@@ -1037,6 +1057,9 @@ mod literal_rollback_tests {
         .unwrap();
         env.checked_literals
             .insert(wrong_carrier, CheckedStringLiteral("stale".into()));
-        assert!(env.checked_literal(wrong_carrier).is_none(), "convertible is not the exact String carrier");
+        assert!(
+            env.checked_literal(wrong_carrier).is_none(),
+            "convertible is not the exact String carrier"
+        );
     }
 }

@@ -58,6 +58,8 @@
 //! guard was inlined as a direct `Cons`/`Nil` match at each call site) and
 //! `crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs`.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::conv::whnf;
 use crate::env::{Context, GlobalEnv};
 use crate::inductive::{peel_app, recursive_shapes};
@@ -622,7 +624,7 @@ fn collect_calls(
 /// This function keeps each distinct `(caller, callee, matrix)` triple
 /// separately; the closure is closed under composition until no new triple
 /// appears.  Idempotent self-loops are then collected without merging.
-fn composition_closure_self_loops(edges: &[CallEdge]) -> Vec<ScMatrix> {
+fn composition_closure_self_loops(edges: &[CallEdge]) -> Vec<(usize, ScMatrix)> {
     // G* = full reachable set of (caller, callee, matrix) triples.
     let mut closure: Vec<(usize, usize, ScMatrix)> = Vec::new();
 
@@ -662,7 +664,7 @@ fn composition_closure_self_loops(edges: &[CallEdge]) -> Vec<ScMatrix> {
         .into_iter()
         .filter_map(|(i, k, m)| {
             if i == k && m.is_idempotent() {
-                Some(m)
+                Some((i, m))
             } else {
                 None
             }
@@ -715,7 +717,7 @@ fn declared_telescope(
     }
 }
 
-fn declared_arity(env: &GlobalEnv, id: GlobalId) -> crate::error::KernelResult<usize> {
+pub(crate) fn declared_arity(env: &GlobalEnv, id: GlobalId) -> crate::error::KernelResult<usize> {
     Ok(declared_telescope(env, id)?.0.len())
 }
 
@@ -765,16 +767,18 @@ fn initial_recon(n: usize) -> Reconstructions {
 }
 
 /// SCT gate: accept iff every idempotent self-loop has ≥1 `↓` on the diagonal.
+/// Returns the union of strict diagonal positions of those loops, by member;
+/// conversion uses the very same closure and parameter coordinates as admission.
 ///
 /// `group_bodies` = `(id, body)` for each member of the mutually-recursive
-/// group. Bodies must include their leading parameter lambdas. `env` must have
-/// all group members pre-admitted (as opaque) so their IDs are visible.
+/// group. Bodies are eta-canonicalized at the declared Π arity; they may have
+/// fewer leading lambdas. All members must be pre-admitted as opaque.
 pub fn sct_check(
     env: &GlobalEnv,
     group_bodies: &[(GlobalId, Term)],
-) -> crate::error::KernelResult<()> {
+) -> crate::error::KernelResult<BTreeMap<GlobalId, BTreeSet<usize>>> {
     if group_bodies.is_empty() {
-        return Ok(());
+        return Ok(BTreeMap::new());
     }
 
     let group: Vec<(GlobalId, usize)> = group_bodies
@@ -793,20 +797,22 @@ pub fn sct_check(
         );
     }
 
-    if edges.is_empty() {
-        return Ok(());
-    } // non-recursive
-
-    let self_loops = composition_closure_self_loops(&edges);
-
-    for m in &self_loops {
-        if m.is_idempotent() && !m.has_strict_diagonal() {
+    let mut decreasing: BTreeMap<GlobalId, BTreeSet<usize>> =
+        group.iter().map(|(id, _)| (*id, BTreeSet::new())).collect();
+    // The closure preserves its caller identity; no second graph, parameter
+    // count, or matrix product can drift from the actual admission decision.
+    for (caller, m) in composition_closure_self_loops(&edges) {
+        if !m.has_strict_diagonal() {
             return Err(crate::error::KernelError::NotTerminating(
                 "SCT: idempotent self-loop has no strictly-decreasing parameter".into(),
             ));
         }
+        decreasing
+            .get_mut(&group[caller].0)
+            .expect("group member")
+            .extend((0..m.nrows).filter(|&i| m.entries[i][i] == SizeOrd::Down));
     }
-    Ok(())
+    Ok(decreasing)
 }
 
 #[cfg(test)]
@@ -1080,6 +1086,38 @@ mod tests {
         assert!(!composed.has_strict_diagonal());
     }
 
+    /// Promise class: durable invariant. Two owners with identical matrix
+    /// values remain distinct in the closure, so D(g) cannot be assigned to
+    /// the wrong recursive group member.
+    #[test]
+    fn idempotent_closure_preserves_the_loop_owner() {
+        let matrix = ScMatrix {
+            entries: vec![vec![SizeOrd::Down]],
+            nrows: 1,
+            ncols: 1,
+        };
+        let edges = vec![
+            CallEdge {
+                caller: 0,
+                callee: 0,
+                matrix: matrix.clone(),
+            },
+            CallEdge {
+                caller: 1,
+                callee: 1,
+                matrix,
+            },
+        ];
+        let loops = composition_closure_self_loops(&edges);
+        assert_eq!(loops.len(), 2);
+        assert!(loops
+            .iter()
+            .any(|(owner, m)| *owner == 0 && m.has_strict_diagonal()));
+        assert!(loops
+            .iter()
+            .any(|(owner, m)| *owner == 1 && m.has_strict_diagonal()));
+    }
+
     #[test]
     fn union_masking_correctly_rejected() {
         // Architect counterexample: f has two distinct self-loops.
@@ -1122,7 +1160,7 @@ mod tests {
         ];
         let loops = composition_closure_self_loops(&edges);
         assert!(
-            loops.iter().any(|m| !m.has_strict_diagonal()),
+            loops.iter().any(|(_, m)| !m.has_strict_diagonal()),
             "M_B = [[↓=]] must survive as a distinct idempotent loop"
         );
     }
