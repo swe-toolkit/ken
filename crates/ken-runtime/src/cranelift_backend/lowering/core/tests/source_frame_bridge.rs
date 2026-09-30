@@ -5251,7 +5251,10 @@ fn d6c_the_sealed_binder_run_refuses_a_miscounted_or_permuted_run_at_its_produce
         // ⚠ For the permutation this is the EQUAL-VALUE LIMIT: the refusal below
         // proves typed-ROLE order, never that the two members differ in value.
         reset_d8g_emissions();
-        let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket(3);
+        let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket_answering(
+            3,
+            crate::EXIT_SUCCESS_CONSTRUCTOR,
+        );
         let (governed, governed_applications) =
             with_d6c_selection_mutation(*mutation, || recursive_port_process_compiles(&expr));
         assert!(
@@ -5316,7 +5319,10 @@ fn d6c_the_sealed_binder_run_refuses_a_miscounted_or_permuted_run_at_its_produce
         !d8g_emissions().is_empty(),
         "and it still emits, so the zero-emission clauses above are facts about the refusals"
     );
-    let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket(3);
+    let expr = crate::cranelift_backend::planning::governed_nested_resource_bracket_answering(
+        3,
+        crate::EXIT_SUCCESS_CONSTRUCTOR,
+    );
     recursive_port_process_compiles(&expr)
         .expect("THE EXACT POSITIVE: the unperturbed governed witness still compiles");
 }

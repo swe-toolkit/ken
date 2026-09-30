@@ -112,7 +112,8 @@ pub(in crate::cranelift_backend) use static_transition::{
 pub(super) use static_transition::plan_static_transition_graph_with_symbols;
 #[cfg(test)]
 pub(super) use static_transition::{
-    contspec_nested_fixture, governed_nested_resource_bracket, plan_static_transition_graph,
+    contspec_nested_fixture, governed_nested_resource_bracket,
+    governed_nested_resource_bracket_answering, plan_static_transition_graph,
     take_continuation_required_consumer_observations, with_c4_disabled_for_independent_control,
     PlannedResultFieldKindForTest,
     RequiredConsumerProjectionDisposition, ScaleBPlanCensus,

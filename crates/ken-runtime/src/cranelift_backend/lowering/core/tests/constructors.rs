@@ -857,10 +857,10 @@ fn nested_computational_payload_kind_rejects_specifically() {
 }
 #[test]
 fn heterogeneous_eliminator_well_formed_control_emits() {
-    let err = emit_process_entrypoint_object_with_cranelift(
+    emit_process_entrypoint_object_with_cranelift(
         &heterogeneous_eliminator_fixture(
-            "ctor:fixture::Inner::Hit",
-            "ctor:fixture::Inner::Hit",
+            crate::EXIT_FAILURE_CONSTRUCTOR,
+            crate::EXIT_FAILURE_CONSTRUCTOR,
             "ctor:fixture::Outer::Hit",
             "ctor:fixture::Outer::Hit",
             1,
@@ -870,14 +870,7 @@ fn heterogeneous_eliminator_well_formed_control_emits() {
         ),
         "ken_px7o_well_formed",
     )
-    .expect_err("non-exit Inner/Outer constructors cannot be projected as root ExitCode");
-    assert!(matches!(
-        err,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
-    ), "{err:?}");
+    .expect("dynamic producer composes through both ordinary frames");
 }
 #[test]
 fn constructor_field_selected_case_composes_before_field_lowering() {
@@ -1360,14 +1353,11 @@ fn recursive_computational_aggregate_traverses_ordinary_frame() {
     )
     .expect("recursive aggregate traverses the active ordinary frame");
 }
-// Promise class: durable boundary invariant. The synthetic Inner/Outer pair
-// cannot certify a runtime constructor discriminator: it is not checked Ken
-// and its non-exit result now refuses before process-root status projection.
 #[test]
-fn heterogeneous_bridge_removal_refuses_nonexit_result_before_root() {
+fn heterogeneous_bridge_removal_uses_the_runtime_constructor_route() {
     let fixture = heterogeneous_eliminator_fixture(
-        "ctor:fixture::Inner::Hit",
-        "ctor:fixture::Inner::Hit",
+        crate::EXIT_FAILURE_CONSTRUCTOR,
+        crate::EXIT_FAILURE_CONSTRUCTOR,
         "ctor:fixture::Outer::Hit",
         "ctor:fixture::Outer::Hit",
         1,
@@ -1385,18 +1375,8 @@ fn heterogeneous_bridge_removal_refuses_nonexit_result_before_root() {
         value: Box::new(args.remove(0)),
         body,
     };
-    let err = emit_process_entrypoint_object_with_cranelift(
-        &bridge_removed,
-        "ken_px7o_bridge_removed",
-    )
-    .expect_err("a non-exit synthetic answer must not become a root ExitCode");
-    assert!(matches!(
-        err,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
-    ), "{err:?}");
+    emit_process_entrypoint_object_with_cranelift(&bridge_removed, "ken_px7o_bridge_removed")
+        .expect("the functionized carrier retains the runtime constructor discriminator");
 }
 #[test]
 fn heterogeneous_frame_environment_and_binder_order_are_preserved() {
@@ -1455,8 +1435,19 @@ fn heterogeneous_frame_environment_and_binder_order_are_preserved() {
         RuntimeObservation::Returned(RuntimeGroundValue::Int((34).into()))
     );
 }
-#[test]
-fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
+fn heterogeneous_final_kind_fixture(exit_code_filler: bool) -> RuntimeExpr {
+    // Preserve the original heterogeneous branch shape for the B refusal
+    // control, while changing only the two producer/selector identities.
+    let inner_unary = if exit_code_filler {
+        crate::EXIT_FAILURE_CONSTRUCTOR
+    } else {
+        "ctor:fixture::Inner::Scalar"
+    };
+    let inner_nullary = if exit_code_filler {
+        crate::EXIT_SUCCESS_CONSTRUCTOR
+    } else {
+        "ctor:fixture::Inner::Exit"
+    };
     let producer = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
             family: "Console".to_string(),
@@ -1472,7 +1463,7 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
                 constructor: "ctor:prelude::Bool::True".to_string(),
                 binders: 0,
                 body: RuntimeExpr::Construct {
-                    constructor: "ctor:fixture::Inner::Scalar".to_string(),
+                    constructor: inner_unary.to_string(),
                     args: vec![RuntimeExpr::Value(RuntimeValue::Int((7).into()))],
                 },
             },
@@ -1480,7 +1471,7 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
                 constructor: "ctor:prelude::Bool::False".to_string(),
                 binders: 0,
                 body: RuntimeExpr::Construct {
-                    constructor: "ctor:fixture::Inner::Exit".to_string(),
+                    constructor: inner_nullary.to_string(),
                     args: Vec::new(),
                 },
             },
@@ -1494,7 +1485,7 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
         callee: Box::new(ordinary_match_closure(
             vec![
                 RuntimeMatchCase {
-                    constructor: "ctor:fixture::Inner::Scalar".to_string(),
+                    constructor: inner_unary.to_string(),
                     binders: 1,
                     body: RuntimeExpr::Construct {
                         constructor: "ctor:fixture::Outer::Scalar".to_string(),
@@ -1502,7 +1493,7 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
                     },
                 },
                 RuntimeMatchCase {
-                    constructor: "ctor:fixture::Inner::Exit".to_string(),
+                    constructor: inner_nullary.to_string(),
                     binders: 0,
                     body: RuntimeExpr::Construct {
                         constructor: "ctor:fixture::Outer::Exit".to_string(),
@@ -1541,8 +1532,23 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
         )),
         args: vec![inner_call],
     };
-    let err = emit_process_entrypoint_object_with_cranelift(&expr, "ken_px7o_final_kind_mismatch")
-        .expect_err("non-exit Inner/Outer constructors cannot project as ExitCode");
+    expr
+}
+#[test]
+fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
+    emit_process_entrypoint_object_with_cranelift(
+        &heterogeneous_final_kind_fixture(true),
+        "ken_px7o_final_kind_mismatch",
+    )
+    .expect("the functionized route emits the dynamic final-kind discriminator");
+
+    // Population-side negative: restore the exact original non-exit Inner
+    // answers while leaving the runtime discriminator and consumer unchanged.
+    let err = emit_process_entrypoint_object_with_cranelift(
+        &heterogeneous_final_kind_fixture(false),
+        "ken_px7o_final_kind_nonexit_control",
+    )
+    .expect_err("the original non-exit Inner variants must reach the B refusal");
     assert!(matches!(
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
@@ -1551,14 +1557,12 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
         }) if reason == "dynamic arms must produce scalar Int or Bool values"
     ), "{err:?}");
 }
-// The non-exit producer refuses before any runtime arity guard would execute.
-// This emitter test promises refusal, not emission or native parity.
 #[test]
-fn heterogeneous_wrong_arity_refuses_nonexit_result_before_root() {
-    let err = emit_process_entrypoint_object_with_cranelift(
+fn heterogeneous_ordinary_arity_is_guarded_in_the_emitted_consumer() {
+    emit_process_entrypoint_object_with_cranelift(
         &heterogeneous_eliminator_fixture(
-            "ctor:fixture::Inner::Hit",
-            "ctor:fixture::Inner::Hit",
+            crate::EXIT_FAILURE_CONSTRUCTOR,
+            crate::EXIT_FAILURE_CONSTRUCTOR,
             "ctor:fixture::Outer::Hit",
             "ctor:fixture::Outer::Hit",
             0,
@@ -1568,23 +1572,14 @@ fn heterogeneous_wrong_arity_refuses_nonexit_result_before_root() {
         ),
         "ken_px7o_wrong_arity",
     )
-    .expect_err("synthetic Inner/Outer answers cannot be projected as ExitCode");
-    assert!(matches!(
-        err,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
-    ), "{err:?}");
+    .expect("the functionized consumer emits its runtime binder-arity guard");
 }
-// Payload-kind diagnostics in this synthetic fixture are shadowed by the
-// narrow non-exit status gate; this checks only the earlier refusal.
 #[test]
-fn heterogeneous_wrong_payload_refuses_nonexit_result_before_root() {
-    let err = emit_process_entrypoint_object_with_cranelift(
+fn heterogeneous_nested_payload_kind_is_guarded_in_the_emitted_consumer() {
+    emit_process_entrypoint_object_with_cranelift(
         &heterogeneous_eliminator_fixture(
-            "ctor:fixture::Inner::Hit",
-            "ctor:fixture::Inner::Hit",
+            crate::EXIT_FAILURE_CONSTRUCTOR,
+            crate::EXIT_FAILURE_CONSTRUCTOR,
             "ctor:fixture::Outer::Hit",
             "ctor:fixture::Outer::Hit",
             1,
@@ -1594,14 +1589,7 @@ fn heterogeneous_wrong_payload_refuses_nonexit_result_before_root() {
         ),
         "ken_px7o_payload_kind",
     )
-    .expect_err("synthetic Inner/Outer answers cannot be projected as ExitCode");
-    assert!(matches!(
-        err,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
-    ), "{err:?}");
+    .expect("the functionized consumer preserves the runtime payload-kind guard");
 }
 #[test]
 fn pattern_default_trap_is_observation_not_backend_error() {

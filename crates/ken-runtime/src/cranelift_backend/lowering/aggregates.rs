@@ -4734,8 +4734,8 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     fn d7_transfer_carried_constructor_operands() -> Result<(), CraneliftBackendError> {
         emit_process_entrypoint_object_with_cranelift(
             &heterogeneous_eliminator_fixture(
-                "ctor:fixture::Inner::Hit",
-                "ctor:fixture::Inner::Hit",
+                crate::EXIT_FAILURE_CONSTRUCTOR,
+                crate::EXIT_FAILURE_CONSTRUCTOR,
                 "ctor:fixture::Outer::Hit",
                 "ctor:fixture::Outer::Hit",
                 1,
@@ -4773,8 +4773,8 @@ pub(in crate::cranelift_backend::lowering) mod tests {
         };
 
         let outer = heterogeneous_eliminator_fixture(
-            "ctor:fixture::Inner::Hit",
-            "ctor:fixture::Inner::Hit",
+            crate::EXIT_FAILURE_CONSTRUCTOR,
+            crate::EXIT_FAILURE_CONSTRUCTOR,
             "ctor:fixture::Outer::Hit",
             "ctor:fixture::Outer::Hit",
             1,
