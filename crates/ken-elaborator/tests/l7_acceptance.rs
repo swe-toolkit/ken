@@ -117,8 +117,13 @@ fn not_relied_on_foreign_absent_from_trusted_base_delta() {
 
     // A checked transparent definition whose body does NOT reference os_write.
     let os_write_ty = env.env.const_type(os_write_id).expect("typed foreign").1;
-    let unrelated = declare_postulate(&mut env.env, "unrelated".into(), vec![], os_write_ty.clone())
-        .expect("typed independent postulate");
+    let unrelated = declare_postulate(
+        &mut env.env,
+        "unrelated".into(),
+        vec![],
+        os_write_ty.clone(),
+    )
+    .expect("typed independent postulate");
     let no_def_id = declare_def(
         &mut env.env,
         vec![],
@@ -152,8 +157,13 @@ fn trusted_base_delta_flips_on_dependency_not_scope() {
         Term::const_(os_write_id, vec![]),
     )
     .expect("checked caller");
-    let unrelated = declare_postulate(&mut env.env, "unrelated".into(), vec![], os_write_ty.clone())
-        .expect("typed independent postulate");
+    let unrelated = declare_postulate(
+        &mut env.env,
+        "unrelated".into(),
+        vec![],
+        os_write_ty.clone(),
+    )
+    .expect("typed independent postulate");
     let no_id = declare_def(
         &mut env.env,
         vec![],

@@ -1773,8 +1773,8 @@ mod tests {
     }
 
     fn assert_same_admission_state(env: &GlobalEnv, before: &GlobalEnv) {
-        assert!(
-            env.same_contents_for_test(before),
+        assert_eq!(
+            env, before,
             "declarations and all indices must be unchanged"
         );
         assert_eq!(env.declarations(), before.declarations());
@@ -1856,6 +1856,11 @@ mod tests {
         };
         let mut clone = a.clone();
         assert_ne!(a.instance_id(), clone.instance_id());
+        assert_eq!(
+            a, clone,
+            "structural equality excludes transaction identity"
+        );
+        assert_ne!(a.instance_id(), GlobalEnv::default().instance_id());
         let before_clone = clone.clone();
         let error = rollback_pending(&mut clone, test_handle_copy)
             .expect_err("source handle cannot mutate a cloned env");
@@ -1947,8 +1952,8 @@ mod tests {
             removed.iter().map(Decl::id).collect::<Vec<_>>(),
             vec![literal, recursive_id]
         );
-        assert!(
-            env.same_contents_for_test(&before),
+        assert_eq!(
+            env, before,
             "failed staging must restore all env indices and next_id"
         );
         assert_eq!(env.next_global_id(), before.next_global_id());
@@ -1963,10 +1968,7 @@ mod tests {
             declare_inductive_try(&mut env, |_| Err::<InductiveSpec, _>("builder rejected"))
                 .expect("a builder error is not a kernel error");
         assert_eq!(outcome, Err("builder rejected"));
-        assert!(
-            env.same_contents_for_test(&before),
-            "builder error must leave no reservation"
-        );
+        assert_eq!(env, before, "builder error must leave no reservation");
     }
 
     #[test]
@@ -2025,10 +2027,7 @@ mod tests {
         let barrier = env
             .with_recursion_barriers(&[rec])
             .expect("checked recursive id");
-        assert!(
-            env.same_contents_for_test(&before),
-            "view must not mutate the checked environment"
-        );
+        assert_eq!(env, before, "view must not mutate the checked environment");
         assert_eq!(barrier.declarations().len(), env.declarations().len());
         assert_eq!(barrier.next_global_id(), env.next_global_id());
         assert!(matches!(barrier.lookup(rec), Some(Decl::Opaque { .. })));

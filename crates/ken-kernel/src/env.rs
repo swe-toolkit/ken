@@ -288,7 +288,7 @@ impl Clone for EnvInstance {
 
 /// The global environment `Σ` — checked declarations plus SCT-admitted
 /// recursive bodies (`11 §4`, `17 §4`).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default)]
 pub struct GlobalEnv {
     instance: EnvInstance,
     decls: Vec<Decl>,
@@ -353,6 +353,60 @@ pub struct GlobalEnv {
     checked_literals: HashMap<GlobalId, CheckedStringLiteral>,
 }
 
+// Value equality is the pre-existing structural environment comparison. The
+// ownership token is deliberately excluded: cloning preserves every checked
+// declaration/index while minting a different transaction owner. Destructuring
+// every field makes a newly added state field a compile-time review point.
+impl PartialEq for GlobalEnv {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            instance: _,
+            decls,
+            by_id,
+            recursive_transparent,
+            sct_decreasing,
+            referrers,
+            body_refs,
+            ctor_index,
+            next_id,
+            all_supports,
+            terminal_supports,
+            support_edges,
+            top_id,
+            bottom_id,
+            tt_id,
+            deceq_certs,
+            int_lit_ty,
+            literal_char_view,
+            checked_string_carrier,
+            checked_char_carrier,
+            checked_literals,
+        } = self;
+        decls == &other.decls
+            && by_id == &other.by_id
+            && recursive_transparent == &other.recursive_transparent
+            && sct_decreasing == &other.sct_decreasing
+            && referrers == &other.referrers
+            && body_refs == &other.body_refs
+            && ctor_index == &other.ctor_index
+            && next_id == &other.next_id
+            && all_supports == &other.all_supports
+            && terminal_supports == &other.terminal_supports
+            && support_edges == &other.support_edges
+            && top_id == &other.top_id
+            && bottom_id == &other.bottom_id
+            && tt_id == &other.tt_id
+            && deceq_certs == &other.deceq_certs
+            && int_lit_ty == &other.int_lit_ty
+            && literal_char_view == &other.literal_char_view
+            && checked_string_carrier == &other.checked_string_carrier
+            && checked_char_carrier == &other.checked_char_carrier
+            && checked_literals == &other.checked_literals
+    }
+}
+
+impl Eq for GlobalEnv {}
+
 /// A read-only view for normalization. It cannot be mutated in place. A clone
 /// of it is an ordinary environment in which the listed constants are opaque:
 /// admission into such a clone is sound (a checked body exists in the source
@@ -372,16 +426,6 @@ impl GlobalEnv {
     /// Private transaction ownership identity, not a declaration ID.
     pub(crate) fn instance_id(&self) -> u64 {
         self.instance.0
-    }
-
-    /// Assert value-state equality without treating a snapshot clone as the
-    /// same transaction owner. Keep derived equality exhaustive over all
-    /// environment indices; only this test-only copy's identity is normalized.
-    #[cfg(test)]
-    pub(crate) fn same_contents_for_test(&self, other: &Self) -> bool {
-        let mut copy = self.clone();
-        copy.instance.0 = other.instance.0;
-        copy == *other
     }
 
     /// Return a read-only normalization view, folding selected recursive
