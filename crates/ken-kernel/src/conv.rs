@@ -1670,7 +1670,8 @@ mod tests {
     // authored traceability, not an executable scan of repository text.
 
     use crate::check::{
-        declare_def, declare_inductive, declare_recursive_group, CtorSpec, InductiveSpec,
+        declare_def, declare_inductive, declare_postulate, declare_recursive_group, CtorSpec,
+        InductiveSpec,
     };
 
     const LU: LevelVar = LevelVar(0);
@@ -2801,6 +2802,143 @@ mod tests {
         assert!(convert_type(&env, &ctx, &source, &expected));
         assert!(delta_probe::iotas() >= 1, "real constructor selection must run");
         assert_eq!(normalize(&env, &ctx, &source), expected);
+    }
+
+    /// Durable invariant: when projection-β cannot fire, conversion retains
+    /// a checked transparent alias as a deferred projectee, while public whnf
+    /// still exposes its opaque target. Both projection arms are exercised.
+    #[test]
+    fn stuck_projections_defer_nested_delta_but_public_whnf_does_not() {
+        let mut env = GlobalEnv::new();
+        let (nat, _, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pair_ty = Term::sigma(nt.clone(), nt);
+        let opaque = declare_postulate(&mut env, "opaque_pair".into(), vec![], pair_ty.clone())
+            .expect("opaque pair declaration");
+        let alias = declare_def(&mut env, vec![], pair_ty, cref0(opaque))
+            .expect("checked pair alias");
+        let ctx = Context::new();
+        for projection in [Term::proj1 as fn(Term) -> Term, Term::proj2] {
+            let source = projection(cref0(alias));
+            let unfolded = projection(cref0(opaque));
+            assert_typed(&env, &ctx, &source);
+            assert_typed(&env, &ctx, &unfolded);
+            assert_ne!(source, unfolded);
+            assert_eq!(whnf_progress_for_conversion(&env, &ctx, &source).0, source);
+            assert_eq!(whnf(&env, &ctx, &source), unfolded);
+            assert!(convert_type(&env, &ctx, &source, &unfolded));
+        }
+    }
+
+    /// Durable invariant: Eq at an opaque type and Cast between opaque types
+    /// cannot commit nested δ unless their observational reduction fires.
+    /// This compares the conversion-only stuck rebuild to the eager public one
+    /// for both type-observation arms independently.
+    #[test]
+    fn stuck_eq_and_cast_types_defer_nested_delta() {
+        let mut env = GlobalEnv::new();
+        let ty = Term::Type(Level::zero());
+        let opaque_a = declare_postulate(&mut env, "opaque_a".into(), vec![], ty.clone())
+            .expect("opaque A");
+        let opaque_b = declare_postulate(&mut env, "opaque_b".into(), vec![], ty.clone())
+            .expect("opaque B");
+        let alias_a = declare_def(&mut env, vec![], ty.clone(), cref0(opaque_a))
+            .expect("checked A alias");
+        let alias_b = declare_def(&mut env, vec![], ty.clone(), cref0(opaque_b))
+            .expect("checked B alias");
+        let x = declare_postulate(&mut env, "x".into(), vec![], cref0(opaque_a))
+            .expect("opaque A value");
+        let proof_ty = Term::Eq(
+            Box::new(ty),
+            Box::new(cref0(opaque_a)),
+            Box::new(cref0(opaque_b)),
+        );
+        let proof = declare_postulate(&mut env, "cast_proof".into(), vec![], proof_ty)
+            .expect("opaque cast certificate");
+        let ctx = Context::new();
+        let eq_alias = Term::Eq(
+            Box::new(cref0(alias_a)),
+            Box::new(cref0(x)),
+            Box::new(cref0(x)),
+        );
+        let eq_opaque = Term::Eq(
+            Box::new(cref0(opaque_a)),
+            Box::new(cref0(x)),
+            Box::new(cref0(x)),
+        );
+        assert_typed(&env, &ctx, &eq_alias);
+        assert_eq!(whnf_progress_for_conversion(&env, &ctx, &eq_alias).0, eq_alias);
+        assert_eq!(whnf(&env, &ctx, &eq_alias), eq_opaque);
+        assert!(convert_type(&env, &ctx, &eq_alias, &eq_opaque));
+
+        let cast_alias = Term::Cast(
+            Box::new(cref0(alias_a)),
+            Box::new(cref0(alias_b)),
+            Box::new(cref0(proof)),
+            Box::new(cref0(x)),
+        );
+        let cast_opaque = Term::Cast(
+            Box::new(cref0(opaque_a)),
+            Box::new(cref0(opaque_b)),
+            Box::new(cref0(proof)),
+            Box::new(cref0(x)),
+        );
+        assert_typed(&env, &ctx, &cast_alias);
+        assert_eq!(whnf_progress_for_conversion(&env, &ctx, &cast_alias).0, cast_alias);
+        assert_eq!(whnf(&env, &ctx, &cast_alias), cast_opaque);
+        assert!(convert_type(&env, &ctx, &cast_alias, &cast_opaque));
+    }
+
+    /// Durable invariant: a checked quotient eliminator with an opaque
+    /// scrutinee does not consume its checked alias's δ-unfolding merely by
+    /// staying stuck. Public whnf remains eager on that same scrutinee.
+    #[test]
+    fn stuck_quot_elim_preserves_deferred_alias_and_eager_public_whnf() {
+        let mut env = GlobalEnv::new();
+        let (nat, zero_id, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let rel_ty = Term::pi(nt.clone(), Term::pi(nt.clone(), Term::Omega(Level::zero())));
+        let rel = declare_postulate(&mut env, "quot_relation".into(), vec![], rel_ty)
+            .expect("opaque quotient relation");
+        let quot_ty = Term::Quot(Box::new(nt.clone()), Box::new(cref0(rel)));
+        let q = declare_postulate(&mut env, "opaque_quot".into(), vec![], quot_ty.clone())
+            .expect("opaque quotient value");
+        let alias = declare_def(&mut env, vec![], quot_ty.clone(), cref0(q))
+            .expect("checked quotient alias");
+        let motive = declare_def(
+            &mut env,
+            vec![],
+            Term::pi(quot_ty.clone(), Term::Type(Level::zero())),
+            Term::lam(quot_ty, nt.clone()),
+        )
+        .expect("checked constant quotient motive");
+        let zero = Term::constructor(zero_id, vec![]);
+        let method = declare_def(
+            &mut env,
+            vec![],
+            Term::pi(nt.clone(), nt.clone()),
+            Term::lam(nt.clone(), zero),
+        )
+        .expect("checked constant quotient method");
+        let h_ty = Term::app(Term::app(cref0(rel), Term::var(1)), Term::var(0));
+        let respect = Term::lam(
+            nt.clone(),
+            Term::lam(nt.clone(), Term::lam(h_ty, cref0(env.tt_id()))),
+        );
+        let elim = |scrut| Term::QuotElim {
+            motive: Box::new(cref0(motive)),
+            method: Box::new(cref0(method)),
+            respect: Box::new(respect.clone()),
+            scrut: Box::new(scrut),
+        };
+        let source = elim(cref0(alias));
+        let unfolded = elim(cref0(q));
+        let ctx = Context::new();
+        assert_typed(&env, &ctx, &source);
+        assert_typed(&env, &ctx, &unfolded);
+        assert_eq!(whnf_progress_for_conversion(&env, &ctx, &source).0, source);
+        assert_eq!(whnf(&env, &ctx, &source), unfolded);
+        assert!(convert_type(&env, &ctx, &source, &unfolded));
     }
 
     /// Open-recursive case (recurring pair, no ι, one refusal, false): two
