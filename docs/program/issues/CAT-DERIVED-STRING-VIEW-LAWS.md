@@ -68,8 +68,10 @@ Merged as `111442ba8` (PR #4394).
 - **AC-1.** Each law checks and has an owner-local generic consumer.
   `trusted_base()` is unchanged when Derived loads over its providers.
   `cat_derived_string_view_laws.rs` pins both.
-- **AC-2.** Paired reject fences pin the unconditional form as false
-  under NFC absorption.
+- **AC-2.** Paired reject fences refuse the unconditional forms. Because
+  `list_char_to_string` is conversion-opaque, they show the equations are
+  not definitional; they do not observe NFC absorption (Adversary M8
+  `evt_qg7bq28ghbzc`, with an ASCII control that refuses identically).
 - **Harness edge.** The first candidate `ba4f1b5a8` went red on four
   Rosetta examples: `rosetta.rs` `collections_prelude` lacked Derived's new
   `Data.Numeric.Nat.Arithmetic (add)` provider. The repair carries it.

@@ -9,7 +9,7 @@ gate: architect
 depends_on: [CAT-DERIVED-STRING-VIEW-LAWS]
 blocks: []
 github: null
-origin: "Architect ruling evt_7gvrbta87rt6z on the CAT-DERIVED-STRING-VIEW-LAWS semantic-duplicate finding (Foundation QA evt_5eapcc68m6cac): ba4f1b5a8 stands, Derived owns the law, and Map's private copy is retired in a follow-up. Steward-filed per COORDINATION section 2."
+origin: "Architect rulings evt_7gvrbta87rt6z and evt_xqx26mskfhjv (the fence fold) on the CAT-DERIVED-STRING-VIEW-LAWS semantic-duplicate finding (Foundation QA evt_5eapcc68m6cac): ba4f1b5a8 stands, Derived owns the law, and Map's private copy is retired in a follow-up. Steward-filed per COORDINATION section 2."
 ---
 
 # One length-of-append law, owned by Derived
@@ -46,6 +46,27 @@ base, stop and report the mismatch.
   `list_append::assoc` and `list_append::left_unit`.
 - Map's `list_append_length_swapped` is deleted. `raw_outer_keys_length`
   uses the Derived law composed with `add::comm`.
+- **Folded: the String-law fences say what they measure** (Architect
+  `evt_xqx26mskfhjv` on Adversary M8 `evt_qg7bq28ghbzc`, at `111442ba8`).
+  `list_char_to_string` is conversion-opaque, so the §4.6 reject fences
+  measure "not definitional", not NFC. In `Derived.ken.md`:
+  - rename `derived_reject_concat_nfc_round_trip` to
+    `derived_reject_round_trip_not_definitional`, and reword its prose to
+    the opacity reason: `s2l (l2s cs) = cs` holds by `Refl` for no `cs`,
+    ASCII and `Nil` included, and the count equations do not hold by
+    `Refl`. Drop "an NFC boundary can change the character count" as the
+    refusal's stated reason;
+  - keep one reject fence beside it on the ASCII `"a"`/`"b"` control;
+  - add an accepting fence where NFC is observable, at literal admission:
+    `Equal (List Char) (string_to_list_char "e\u{301}")
+    (string_to_list_char "\u{e9}")` by `Refl`;
+  - keep the NFC motivation, attributed to literal admission: a decomposed
+    list such as `['e', U+301]` is the view of no String literal, which is
+    why the laws take the round trip as a premise;
+  - add one §4.6 sentence: "No closed term currently discharges the
+    round-trip premise; these laws apply to a consumer that obtains it
+    (e.g., from a future conditional section certificate, an operator TCB
+    decision)."
 
 ## Acceptance
 
@@ -59,9 +80,14 @@ base, stop and report the mismatch.
   - The statement grep above finds exactly one length-of-append law, plus
     `append_length_snoc`.
   - Replacing the public law with a reflexive filler reddens its consumer.
+  - The ASCII control refuses with the same error as the renamed fence,
+    and the literal-admission fence is accepted.
 
 ## Stop conditions
 
 - The public name collides with a prelude or built-in name: stop to the
   Architect (operator 2026-09-25, built-ins are fixed).
 - Any change to `list_append`, `length` or `add`.
+- Any discharge route for the round-trip premise. It needs a new
+  `trusted_base()` entry, which is an operator question, and only after
+  `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` lands.
