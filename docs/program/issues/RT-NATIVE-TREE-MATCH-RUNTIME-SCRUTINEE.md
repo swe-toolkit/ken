@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE
 title: "Clear the two rt_escape rows' next native refusal: lower a tree-producing ComputationalMatch whose scrutinee is not a specialized Bool, Nat or constructor, so the escaped-resource and nat-fanout programs build and run natively and agree with the interpreter"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -93,3 +93,29 @@ cover still refuses.
   one repair clears, relabel the rest, and report.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Merged in two units: the boundary increment `12ff7ad6d` and the D1 gate
+narrowing `c70971aa5`.
+- **AC-0.** The refusal's outer is Option, not ExitCode (inventory 1). The
+  Architect ruled a case-of-case composition route (D1) for a tree-producing
+  match whose outer arms are ExitCode constructors.
+- **Delivered.** D1 lowers the shared-bind ExitCode shape natively. In
+  `rt_native_tree_match_case_of_case.rs`, the Failure arm matches the
+  interpreter with D1 hits above 0.
+- **Narrowing (Adversary `evt_5a1w4dyw7t93`, Architect
+  `evt_6ma0t6rfwg29s`).** The first gate composed every outer family except
+  Bool and Nat, so Option-outer shapes emitted trapping artifacts. D1 now
+  requires the outer cases to be exactly `exit_success`/`exit_failure`.
+  `option_outer_family_refuses_before_artifact_while_exit_code_uses_d1`
+  pins the refusal. Restoring the old gate turns it into artifact plus trap.
+- **Not cleared here (stop 2: a second, independent repair).**
+  - `:654` relabelled to `RT-NATIVE-SEQUENTIAL-BRACKETS`.
+  - `:714` relabelled to `RT-JOIN-PHASE-CASE-BINDER-CARRIED`.
+  - The byte-1 Success arm and the closed-ExitCode witnesses (Adversary
+    (b) byte 1, `Failure 5`, and the runtime `Failure c` discriminator) go
+    to `RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN`.
+- **Carry.** Widening D1 to another family needs per-family native and
+  interpreter parity on every arm, including closed-constant returns, under
+  its own WP.
