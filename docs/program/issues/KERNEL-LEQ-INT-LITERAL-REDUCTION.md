@@ -49,6 +49,10 @@ stop and report the mismatch.
 - One kernel reduction arm for `leq_int` on two literals, using the same
   `BigInt` `<=` as the interpreter.
 - An ADR 0013 amendment recording Layer 2's extension to `leq_int`.
+- A spec 16 §2.2 amendment. Its "Primitive type" paragraph says an `Op`
+  application on literals stays neutral under conversion (K3-deferred), so
+  this is a spec change and needs the Spec vote (Architect
+  `evt_4r2mqaavb9gbh`).
 
 ## Acceptance
 

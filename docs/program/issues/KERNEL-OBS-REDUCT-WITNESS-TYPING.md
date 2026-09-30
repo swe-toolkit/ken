@@ -6,7 +6,7 @@ owner: kernel
 size: M
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [KERNEL-OBS-EQ-AT-TYPE-RIGID-BOTTOM]
 blocks: [KERNEL-OBS-NESTED-CAST-LINEAR]
 github: null
 origin: "Architect stop ruling evt_449gyxrrejte1 on LANG-SIBLING-GOAL-REFINEMENT Class A: a kernel reducer defect, not an elaborator one. Trust-root work. Steward-filed per COORDINATION section 2."
@@ -53,28 +53,45 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-All four sites build their witness from the reduction's own `e`: the
-decomposition projections, then `cong` via `J` along `eq'`, accumulated
-along the telescope per §3.2, or §4.1's singleton schema for `pair-eq`.
+Recut by the Architect in `evt_229qe9tgfetw1`, after AC-0 landed at
+`aa51bf9d7`. **Sites 1, 2 and 4 only.** Production edits wait until
+`KERNEL-OBS-EQ-AT-TYPE-RIGID-BOTTOM` merges. Until then, a witness at a Π
+or Σ type is still ill-typed, because its base type is `Bottom`.
+
+Each witness is a `J` along evidence the reduction already has, with an
+ascribed motive, as in the elaborator's `build_index_type_cong`:
+
+- **Site 1.** Built inside the Σ codomain along `Var(0) : Eq A1 p.1 q.1`.
+- **Site 2.** Built along the Σ-telescope pair `E_j = (h_1, (h_2, …))` of
+  the earlier conjunct proofs.
+- **Site 4.** Built directly along `e`.
+
+The base is the canonical proof of `Eq Type X X`. It is `Refl x'` if whnf
+gives `Eq _ x' _`, and `tt` if it gives `Top`. Otherwise the reducer
+returns `None` and fabricates no witness.
+
+**Site 3 (`cast_at_inductive` Phase 3) moves to
+`KERNEL-OBS-INDUCTIVE-TYPE-EQ`.** Its `e` has no projections, because
+`eq_at_type` leaves `(App, App)` neutral. The five Class A fixtures move
+with it.
 
 ## Acceptance
 
-- **AC-0 (no fix).**
-  - For each site, a subject-reduction row: a well-typed redex whose
-    reduct fails `infer` today.
-  - Name the consumer that re-types the reduct on the five Class A rows.
-  - Measure the witness-construction cost on the nested-`Cast` shape,
-    because the reducer is hot.
-  - The Kernel leader asks the Spec leader to confirm that the four witness
-    schemas are the normative ones. The Architect then rules the repair.
+- **AC-0: done** (`evt_1r571tvqwhywe`, `evt_1xa46f5v6661`).
+  - Four subject-reduction rows reach the `Refl` guard at `aa51bf9d7`.
+  - The Class A consumer is `check_dependent_branch_body`'s
+    `kernel_check_current`.
+  - The nested-Cast baseline cost is measured.
 - **AC-1.**
-  - `infer(reduct)` is convertible to `infer(redex)` at each site.
-  - The five Class A kernel pairs are committed as fixtures.
-  - A `j_reduce` row whose proof carries a Phase 3 reduct now computes.
+  - At sites 1, 2 and 4, `infer(reduct)` is convertible to
+    `infer(redex)`, on the AC-0 rows.
+  - Each of those sites also has a row where X is a Π or Σ type.
 - **AC-2 (controls).**
-  - Reverting any one site reddens its subject-reduction row.
+  - Reverting any one site reddens its row.
+  - A base that does not whnf to `Eq` or `Top` leaves the reduct neutral.
   - The 57-package census shows no conversion verdict change.
   - `trusted_base()` is unchanged.
+  - The nested-Cast cost is re-measured against the AC-0 baseline.
 
 ## Stop conditions
 
