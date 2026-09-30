@@ -202,7 +202,14 @@ fn type_eq_by_j(
 /// `Eq ((x:A1)×B1) p q ⇝ Eq A1 p.1 q.1 and Eq (B1 q.1)
 /// (cast (B1 p.1) (B1 q.1) (cong (x.B1 x) eq-fst) p.2) q.2` (`16 §2.2`).
 /// The equality proof is available only inside the Σ codomain.
-fn eq_at_sigma(env: &GlobalEnv, ctx: &Context, a1: &Term, b1: &Term, p: &Term, q: &Term) -> Option<Term> {
+fn eq_at_sigma(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a1: &Term,
+    b1: &Term,
+    p: &Term,
+    q: &Term,
+) -> Option<Term> {
     let p1 = whnf(env, ctx, &Term::proj1(p.clone()));
     let q1 = whnf(env, ctx, &Term::proj1(q.clone()));
     let eq_fst = Term::Eq(
@@ -226,10 +233,7 @@ fn eq_at_sigma(env: &GlobalEnv, ctx: &Context, a1: &Term, b1: &Term, p: &Term, q
         &weaken(&b1_p1, 1),
         &weaken(&b1_q1, 1),
         b1_at_y,
-        Term::Ascript(
-            Box::new(Term::var(0)),
-            Box::new(weaken(&eq_fst, 1)),
-        ),
+        Term::Ascript(Box::new(Term::var(0)), Box::new(weaken(&eq_fst, 1))),
     )?;
     let p2_cast = Term::Cast(
         Box::new(weaken(&b1_p1, 1)),
@@ -380,22 +384,40 @@ fn inductive_conjuncts(
             })
         })?;
         let prefix = weaken(&prefix, j as i64);
-        let a_values = a_bar[..j].iter().map(|x| weaken(x, j as i64)).collect::<Vec<_>>();
-        let b_values = b_bar[..j].iter().map(|x| weaken(x, j as i64)).collect::<Vec<_>>();
+        let a_values = a_bar[..j]
+            .iter()
+            .map(|x| weaken(x, j as i64))
+            .collect::<Vec<_>>();
+        let b_values = b_bar[..j]
+            .iter()
+            .map(|x| weaken(x, j as i64))
+            .collect::<Vec<_>>();
         let (left, right) = if j == 1 {
             (telescope_tuple(&a_values), telescope_tuple(&b_values))
         } else {
             (
-                Term::Ascript(Box::new(telescope_tuple(&a_values)), Box::new(prefix.clone())),
-                Term::Ascript(Box::new(telescope_tuple(&b_values)), Box::new(prefix.clone())),
+                Term::Ascript(
+                    Box::new(telescope_tuple(&a_values)),
+                    Box::new(prefix.clone()),
+                ),
+                Term::Ascript(
+                    Box::new(telescope_tuple(&b_values)),
+                    Box::new(prefix.clone()),
+                ),
             )
         };
-        let prefix_eq = Term::Eq(Box::new(prefix.clone()), Box::new(left.clone()), Box::new(right));
-        let earlier = (0..j)
-            .map(|k| Term::var(j - 1 - k))
-            .collect::<Vec<_>>();
+        let prefix_eq = Term::Eq(
+            Box::new(prefix.clone()),
+            Box::new(left.clone()),
+            Box::new(right),
+        );
+        let earlier = (0..j).map(|k| Term::var(j - 1 - k)).collect::<Vec<_>>();
         let evidence = Term::Ascript(
-            Box::new(if j == 1 { earlier[0].clone() } else { telescope_tuple(&earlier) }),
+            Box::new(if j == 1 {
+                earlier[0].clone()
+            } else {
+                telescope_tuple(&earlier)
+            }),
             Box::new(prefix_eq),
         );
         // Shift the outer context past the j constructor positions and the
@@ -872,10 +894,7 @@ fn j_nonrefl(
     let p_b_e = apply_args(motive.clone(), &[b_idx.clone(), eq.clone()]);
     // The singleton's equality e transports the motive's output type from
     // (a, refl a) to (b, e); the cast ignores the proof after typing it.
-    let motive_at_y = apply_args(
-        weaken(motive, 2),
-        &[Term::var(1), Term::var(0)],
-    );
+    let motive_at_y = apply_args(weaken(motive, 2), &[Term::var(1), Term::var(0)]);
     let pair_eq = type_eq_by_j(
         env,
         ctx,
@@ -925,6 +944,9 @@ mod witness_base_tests {
             Box::new(ty.clone()),
             Box::new(ty.clone()),
         );
-        assert_eq!(canonical_type_eq_base(&env, &ctx, &base), Some(Term::Refl(Box::new(ty))));
+        assert_eq!(
+            canonical_type_eq_base(&env, &ctx, &base),
+            Some(Term::Refl(Box::new(ty)))
+        );
     }
 }

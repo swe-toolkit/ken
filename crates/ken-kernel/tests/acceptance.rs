@@ -11,7 +11,8 @@ use ken_kernel::inductive::peel_app;
 use ken_kernel::subst::weaken;
 use ken_kernel::term::{Level, LevelVar, Term};
 use ken_kernel::{
-    convert, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, GlobalId, InductiveSpec,
+    convert, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, GlobalId,
+    InductiveSpec,
 };
 
 /// Identifiers for the standard prelude of inductive families.
@@ -1717,7 +1718,11 @@ fn k2_j_nonrefl_reduces_not_stuck() {
     );
     let base = ctor(s.zero);
     let e = Term::var(0); // checked, non-Refl variable
-    let j = Term::J(Box::new(motive.clone()), Box::new(base.clone()), Box::new(e.clone()));
+    let j = Term::J(
+        Box::new(motive.clone()),
+        Box::new(base.clone()),
+        Box::new(e.clone()),
+    );
     assert!(ken_kernel::convert_type(
         &env,
         &ctx,
@@ -2089,7 +2094,10 @@ fn k2_seam1b_eq_inductive_dependent_stuck() {
     .expect("unindexed family with a dependent Vec field");
     let mk = env.inductive(family).unwrap().constructors[0].id;
     let mut assumption = |label: &str, ty: Term| {
-        Term::const_(declare_postulate(&mut env, label.into(), vec![], ty).unwrap(), vec![])
+        Term::const_(
+            declare_postulate(&mut env, label.into(), vec![], ty).unwrap(),
+            vec![],
+        )
     };
     let n = assumption("n", nat.clone());
     let m = assumption("m", nat.clone());
@@ -2105,12 +2113,22 @@ fn k2_seam1b_eq_inductive_dependent_stuck() {
     );
     let original_type = infer(&env, &ctx, &redex).expect("fully instantiated Vec redex");
     let reduct = whnf(&env, &ctx, &redex);
-    assert!(matches!(&reduct, Term::Sigma(..)), "dependent conjunction computes");
+    assert!(
+        matches!(&reduct, Term::Sigma(..)),
+        "dependent conjunction computes"
+    );
     if let Term::Sigma(_, second) = &reduct {
-        assert!(matches!(&**second, Term::Eq(_, lhs, _) if matches!(&**lhs,
+        assert!(
+            matches!(&**second, Term::Eq(_, lhs, _) if matches!(&**lhs,
             Term::Cast(_, _, witness, _) if matches!(&**witness, Term::J(..)))),
-            "dependent conjunct transports using a derived J witness");
+            "dependent conjunct transports using a derived J witness"
+        );
     }
     let reduct_type = infer(&env, &ctx, &reduct).expect("reduct checks at original type");
-    assert!(ken_kernel::convert_type(&env, &ctx, &original_type, &reduct_type));
+    assert!(ken_kernel::convert_type(
+        &env,
+        &ctx,
+        &original_type,
+        &reduct_type
+    ));
 }
