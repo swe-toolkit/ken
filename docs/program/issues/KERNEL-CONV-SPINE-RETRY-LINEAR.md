@@ -57,8 +57,8 @@ base, stop and report the mismatch.
 ## Deliverable
 
 Conversion over the six nested shapes is linear in k on empty and hard
-paths, with the repair ruled by the Architect. The `9301e09e1` halting fixture and its converging
-counterexamples keep their verdicts.
+paths, with the repair ruled by the Architect. The `9301e09e1` halting
+fixture and its converging counterexamples keep their verdicts.
 
 ## Acceptance
 
