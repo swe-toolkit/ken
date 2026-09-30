@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DERIVED: &str = "Data.Collections.Derived";
@@ -46,12 +46,12 @@ fn owner_bindings(env: &ElabEnv) -> BTreeMap<String, GlobalId> {
 ///
 /// MEASURED: real roots loading adds no trust beyond the direct providers;
 /// each private theorem is transparent and its generic owner example applies
-/// its loader-owned identity in a checked proof body. Executing all checked
-/// example/reject fences preserves the Derived-qualified binding map and trust.
-/// CLAIMED: six private laws admit generic typed use without a new assumption
-/// or export. THE GAP: a reference can be present yet irrelevant to the
-/// stated equation; compile-preserving count-law filler mutations must fail
-/// the unchanged generic owner consumers to establish that implication.
+/// its loader-owned identity in a checked proof body. A fresh client refuses
+/// every private import. Checked example/reject fences preserve the owner's
+/// qualified binding map and trust. CLAIMED: six private laws admit generic
+/// typed use without a new assumption or export. THE GAP: a reference can be
+/// present yet irrelevant to the stated equation; compile-preserving count-law
+/// filler mutations must fail the unchanged generic owner consumers.
 #[test]
 fn derived_private_view_laws_check_generic_owner_uses_without_trust() {
     let examples = [
@@ -111,6 +111,20 @@ fn derived_private_view_laws_check_generic_owner_uses_without_trust() {
         loaded_trust,
         "checked examples must not add trust"
     );
+    let mut outside = ElabEnv::new().expect("fresh client elaborator");
+    outside
+        .elaborate_module_from_roots(roots, DERIVED)
+        .expect("Derived provider must load for an unrelated client");
+    for (_, law) in examples {
+        match outside.elaborate_file(&format!("import {DERIVED} ({law})")) {
+            Err(ElabError::UnboundName { name, .. }) => {
+                assert_eq!(name, format!("{DERIVED}.{law}"));
+            }
+            Err(other) => panic!("private {law} must refuse as UnboundName: {other:?}"),
+            Ok(_) => panic!("private {law} must not be importable"),
+        }
+    }
+
     for (example, law) in examples {
         let law_id = owned_id(&env, &owned, law);
         let example_id = *env
