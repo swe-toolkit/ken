@@ -1970,6 +1970,60 @@ mod tests {
         ));
     }
 
+    /// Durable invariant (`11 §4`, `18 §4`): checked group admission requires
+    /// exactly one body per staged ID. MEASURED: empty, short and excess body
+    /// vectors each refuse with the body-count error, remove both placeholders
+    /// in reverse order and restore declarations, indices, allocator and trust;
+    /// exactly two checked bodies install both. CLAIMED: a group cannot partly
+    /// upgrade or silently ignore any bodies. GAP: this is one two-ID group,
+    /// not an enumeration of every possible arity or body type.
+    #[test]
+    fn pending_admission_body_count_mismatch_rolls_back_entire_group() {
+        let body = Term::Type(Level::zero());
+        let staged_type = Term::Type(Level::zero().suc());
+        let specs = || {
+            vec![
+                ("first".into(), vec![], staged_type.clone()),
+                ("second".into(), vec![], staged_type.clone()),
+            ]
+        };
+        for body_count in [1, 3, 0] {
+            let mut env = GlobalEnv::new();
+            let before = env.clone();
+            let pending = stage_placeholders(&mut env, specs()).expect("checked group staging");
+            let ids = pending.ids().to_vec();
+            assert_eq!(ids.len(), 2);
+            let (error, removed) = admit_pending(&mut env, pending, vec![body.clone(); body_count])
+                .expect_err(&format!(
+                    "body count {body_count} must reject the entire group"
+                ));
+            assert!(
+                matches!(&error, KernelError::IllFormedDecl(message)
+                    if message == "pending admission body count does not match placeholder count"),
+                "body count {body_count}: wrong refusal {error:?}"
+            );
+            assert_eq!(
+                removed.iter().map(Decl::id).collect::<Vec<_>>(),
+                vec![ids[1], ids[0]],
+                "body count {body_count}: rollback must remove both staged IDs newest first"
+            );
+            assert_same_admission_state(&env, &before);
+        }
+
+        let mut valid = GlobalEnv::new();
+        let pending = stage_placeholders(&mut valid, specs()).expect("checked group staging");
+        let ids = pending.ids().to_vec();
+        assert_eq!(
+            admit_pending(&mut valid, pending, vec![body.clone(), body])
+                .expect("matching bodies admit the entire group"),
+            ids
+        );
+        for id in ids {
+            assert!(matches!(valid.lookup(id), Some(Decl::Transparent { .. })));
+            assert!(!valid.trusted_base().contains(&id));
+        }
+    }
+
     #[test]
     fn failed_pending_recursive_admission_restores_entire_environment() {
         let (mut env, ids) = bool_nat_env();
