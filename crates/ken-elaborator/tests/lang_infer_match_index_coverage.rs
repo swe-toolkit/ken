@@ -44,9 +44,10 @@ fn inferred_index_impossible_bucket_checks_without_new_trust() {
     // Promise class: durable invariant. MEASURED: a missing VNil method for
     // Vec a (Suc n) checks under an inferred match (not a checked RHS match).
     // CLAIMED: the VCons method returns its index field m and the complete
-    // elim computes it. THE GAP: a mere transparent declaration also admits
-    // a wrong, well-typed branch; evaluate a closed input with index m = 1
-    // and element x = 0. Its result is 2, unlike either wrong Zero or x (1).
+    // elim computes it. THE GAP: one value could conceal a constant wrong
+    // method. At n=0 the index m=0 and element x=1, yielding 1; at n=1 the
+    // index m=1 and element x=0, yielding 2. Either a constant-one method or
+    // an element-returning method disagrees at one of these two checked inputs.
     let mut env = ElabEnv::new().expect("base environment");
     let trusted_before = env.env.trusted_base();
     env.elaborate_file(&format!(
@@ -56,12 +57,18 @@ fn inferred_index_impossible_bucket_checks_without_new_trust() {
     .expect("impossible VNil bucket must be synthesized");
     let id = env.globals["direct"];
     assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
-    let observed = observed_closed_nat(
+    let observed_zero = observed_closed_nat(
         &mut env,
-        "const direct_observed : Nat = direct Nat (Suc Zero) \
+        "const direct_at_zero : Nat = direct Nat Zero \
+         (VCons Nat Zero (Suc Zero) (VNil Nat))",
+    );
+    assert_eq!(observed_zero, nat(&env, 1));
+    let observed_one = observed_closed_nat(
+        &mut env,
+        "const direct_at_one : Nat = direct Nat (Suc Zero) \
          (VCons Nat (Suc Zero) Zero (VCons Nat Zero Zero (VNil Nat)))",
     );
-    assert_eq!(observed, nat(&env, 2));
+    assert_eq!(observed_one, nat(&env, 2));
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
@@ -91,8 +98,9 @@ fn inferred_nonnullary_impossible_bucket_checks_without_new_trust() {
 
 #[test]
 fn reachable_omitted_constructor_keeps_its_exact_witness() {
-    // Promise class: negative boundary. MEASURED: VNil remains reachable
-    // for Vec a n, and the missing method reports its own constructor and
+    // Promise class: durable invariant (negative boundary).
+    // MEASURED: VNil remains reachable for Vec a n, and the missing method
+    // reports its own constructor and
     // arity, rather than being filled by a new coverage rule. CLAIMED: §4.3's
     // type-possible constructor is required. THE GAP: the positive controls
     // above establish an actual omitted-impossible method at a fixed index.
