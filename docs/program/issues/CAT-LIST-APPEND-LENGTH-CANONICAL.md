@@ -31,10 +31,14 @@ attached to Derived's operations.
   `add::comm` (`Nat/Arithmetic.ken.md:55`).
 - **Map's uses.** `:18482`, the recursive call inside itself, and `:18502`
   in `raw_outer_keys_length`.
-- **Statement sweep, done.** Searching for `Equal Nat (length _ (list_append`
-  over `catalog/` and `library/` finds only these two laws and Derived's
-  `append_length_snoc` (`:882`). The last is the single-element special
-  case, not a duplicate.
+- **Statement sweep.** Searching for `Equal Nat (length _ (list_append`
+  over `catalog/` and `library/` finds these two laws and two
+  specializations, which are not duplicates (Foundation QA
+  `evt_5kdh5tsn759k0`, Steward ruling `evt_2n49gqc2vmzm4`):
+  - Derived's `append_length_snoc` (`:882`), the single-element case;
+  - Map's private `list_append_remove_length` (`Map.ken.md:19191`),
+    `length (prefix ++ (stored :: suffix)) = Suc (length (prefix ++
+    suffix))`.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
@@ -77,8 +81,9 @@ base, stop and report the mismatch.
     general proposition.
 - **AC-2 (controls).**
   - The catalog census shows no verdict change.
-  - The statement grep above finds exactly one length-of-append law, plus
-    `append_length_snoc`.
+  - The statement grep above finds exactly one general additive
+    length-of-append law, plus the two specializations
+    `append_length_snoc` and `list_append_remove_length`.
   - Replacing the public law with a reflexive filler reddens its consumer.
   - The ASCII control refuses with the same error as the renamed fence,
     and the literal-admission fence is accepted.

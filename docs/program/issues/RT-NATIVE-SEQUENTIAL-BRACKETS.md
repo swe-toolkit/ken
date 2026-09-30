@@ -80,8 +80,11 @@ it matches the interpreter. The repair is ruled by the Architect.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 1 (Architect `evt_2htrfrdpq3wy`).
+§1a count: 2 (Architect `evt_2htrfrdpq3wy`, `evt_6r92kzemmaxps`).
 
 1. constructed context frame keyed on planner coordinates (continuation,
    position, body) — keyed on static coordinates, but one function
    constructs the same coordinates more than once with different operands.
+2. constructed context frame scoped to the writer's lowering call extent —
+   keyed on static lowering call nesting, but the consumer runs after that
+   call returns.
