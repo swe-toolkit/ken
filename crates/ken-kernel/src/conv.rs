@@ -463,17 +463,19 @@ fn is_omega_type(env: &GlobalEnv, ctx: &Context, ty: &Term) -> bool {
 // is retried. An origin is recorded only if BOTH deferred heads are
 // transparent and at least one belongs to a cycle in the transparent-body
 // graph, including (c, c) for recursive c. One no-progress lap is allowed.
-// On a recurring origin with no head ι-progress, return false before
-// comparing another copy. A real ι-step discharges the pair for descendants.
-// This never concludes equality from a cyclic hypothesis. Each edge either
-// descends on a proper subterm of its deferred-whnf inputs or retries δ.
-// Pure non-recursive δ terminates down the condensation DAG: if a
-// non-recursive g recurred indefinitely by regeneration from recursive f,
-// then g reaches f and f reaches g, contradicting g's non-recursiveness.
-// Thus infinitely many retries contain a recursive head; finite constant
-// pairs force a repeated recorded origin without ι, which is refused. SCT
-// bounds ι-progress on admitted recursion. A closed-scrutinee ι loop remains
-// a known residual.
+// A recurring hard origin refuses even if some ι occurred; a recurring soft
+// origin may be discharged only by ι. This never concludes equality from a
+// cyclic hypothesis. Each edge either descends on a proper subterm of its
+// deferred-whnf inputs or retries δ. Pure non-recursive δ terminates down
+// the condensation DAG: if a non-recursive g recurred indefinitely by
+// regeneration from recursive f, then g reaches f and f reaches g,
+// contradicting g's non-recursiveness. Finite constant pairs force an
+// infinitely recurring origin to discharge softly on every lap. Without an
+// intervening structural descent into a stuck eliminator, a recursive call
+// can then be reached only at the whnf head or in an executed ι method on a
+// real constructor. Infinitely many such soft discharges form an infinite
+// executed call trace of an SCT-admitted recursive group; SCT rules that out.
+// A symbolic call beneath a stuck eliminator hardens the path instead.
 //
 // Governing spec: `17 §3.3` step (5) and `17 §3.5` require head-δ deferral
 // before congruence; the distinct-identity boundary also forbids unbounded
@@ -485,6 +487,14 @@ fn is_omega_type(env: &GlobalEnv, ctx: &Context, ty: &Term) -> bool {
 /// A canonical unordered pair of transparent-`Const` GlobalIds (possibly
 /// equal) at a δ retry; the origin of a structural conversion edge.
 type ConstPair = (GlobalId, GlobalId);
+
+/// A recorded δ-origin. Hard entries have passed into a stuck eliminator's
+/// components; a later ι cannot witness descent for such a symbolic call.
+#[derive(Clone, Copy)]
+struct DeltaPathEntry {
+    pair: ConstPair,
+    hard: bool,
+}
 
 /// Canonicalise so `(x, y)` and `(y, x)` denote the same δ-origin.
 fn canonical_pair(x: GlobalId, y: GlobalId) -> ConstPair {
@@ -621,7 +631,7 @@ fn convert_path(
     ty: &Term,
     a: &Term,
     b: &Term,
-    path: &[ConstPair],
+    path: &[DeltaPathEntry],
 ) -> bool {
     if a == b {
         return true; // α: syntactic identity under de Bruijn (`13 §6.2` step 1)
@@ -695,14 +705,14 @@ pub fn convert_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> bool 
 /// with head δ deferred first. Compare same transparent heads by congruence;
 /// otherwise retry full δ if a head is transparent, and record the pair of
 /// deferred transparent heads only if at least one is recursive. Head
-/// ι-progress discharges the pair; recurring no-progress retries refuse
-/// before another structural copy is compared.
+/// ι-progress discharges a recurring soft pair, while a recurring hard pair
+/// refuses even with ι; fresh origins are recorded soft.
 fn conv_struct_path(
     env: &GlobalEnv,
     ctx: &Context,
     a: &Term,
     b: &Term,
-    path: &[ConstPair],
+    path: &[DeltaPathEntry],
 ) -> bool {
     // Syntactic-identity fast path (pre-δ, `13 §6.2` step 1): identical
     // de Bruijn terms are convertible with no reduction and no ledger touch.
@@ -778,33 +788,64 @@ fn conv_struct_path(
         return true;
     }
 
-    // The ledger the structural descendants inherit:
-    //   - real ι-progress on either side DISCHARGES this pair (genuine
-    //     reduction, whose depth SCT already bounds);
-    //   - otherwise a FIRST no-progress sighting is recorded and one structural
-    //     lap is allowed;
-    //   - a RECURRING no-progress sighting REFUSES before another structural
-    //     copy — the heads loop without converging, so they are not
-    //     definitionally equal (fail-closed: sound, at worst under-accepting).
-    let child_storage: Vec<ConstPair>;
-    let child_path: &[ConstPair] = match origin {
-        Some(p) if iota_progress => {
-            child_storage = path.iter().copied().filter(|q| *q != p).collect();
-            &child_storage
-        }
-        Some(p) if path.contains(&p) => {
+    // The ledger the structural descendants inherit. A first sighting is
+    // recorded even if the current whnf happened to do ι: only a later ι may
+    // discharge a *previously recorded* soft entry. A hard entry is never
+    // discharged, and both α checks above precede every refusal.
+    let child_storage: Vec<DeltaPathEntry>;
+    let child_path: &[DeltaPathEntry] = match origin {
+        Some(p) if path.iter().any(|entry| entry.pair == p && entry.hard) => {
             probe_refusal();
             return false;
         }
-        Some(p) => {
+        Some(p) if !path.iter().any(|entry| entry.pair == p) => {
             child_storage = {
                 let mut v = path.to_vec();
-                v.push(p);
+                v.push(DeltaPathEntry {
+                    pair: p,
+                    hard: false,
+                });
                 v
             };
             &child_storage
         }
+        Some(p) if iota_progress => {
+            child_storage = path.iter().copied().filter(|entry| entry.pair != p).collect();
+            &child_storage
+        }
+        Some(_) => {
+            probe_refusal();
+            return false;
+        }
         None => path,
+    };
+
+    // Only a structural match on a whnf-stuck eliminator descends into its
+    // components. Canonical forms, binders, neutral App spines and Ascript do
+    // not harden. J has no structural congruence arm: stuck J already refuses.
+    let hard_storage: Vec<DeltaPathEntry>;
+    let child_path: &[DeltaPathEntry] = if !child_path.is_empty()
+        && matches!(
+            (&a, &b),
+            (Term::Elim { .. }, Term::Elim { .. })
+                | (Term::QuotElim { .. }, Term::QuotElim { .. })
+                | (Term::Proj1(_), Term::Proj1(_))
+                | (Term::Proj2(_), Term::Proj2(_))
+                | (Term::TruncProj(_), Term::TruncProj(_))
+                | (Term::Cast(_, _, _, _), Term::Cast(_, _, _, _))
+                | (Term::Absurd(_, _), Term::Absurd(_, _))
+        )
+    {
+        hard_storage = child_path
+            .iter()
+            .map(|entry| DeltaPathEntry {
+                pair: entry.pair,
+                hard: true,
+            })
+            .collect();
+        &hard_storage
+    } else {
+        child_path
     };
 
     match (&a, &b) {
