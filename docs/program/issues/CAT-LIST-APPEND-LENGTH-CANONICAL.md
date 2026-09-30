@@ -1,7 +1,7 @@
 ---
 id: CAT-LIST-APPEND-LENGTH-CANONICAL
 title: "The length-of-append law is proved twice in the catalog, once in Derived and once privately in Map. Publish Derived's as the canonical attached law and retire Map's private copy, deriving its one external use through add commutativity"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T1
