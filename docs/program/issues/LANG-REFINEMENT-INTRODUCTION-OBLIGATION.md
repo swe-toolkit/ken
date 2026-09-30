@@ -6,7 +6,7 @@ owner: language
 size: M
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [KERNEL-LEQ-INT-LITERAL-REDUCTION]
 blocks: [TEST-CHAR-CONSTRUCTION-ROUTES-SCALAR]
 github: null
 origin: "Architect ruling evt_1a3kmh4jf12ga on the TEST-CHAR-CONSTRUCTION-ROUTES-SCALAR (b)/(c) stop: routes (b) and (c) are accepted at 944ff08ca because a named refinement emits no introduction obligation; an elaborator defect against spec 34 section 5, not a design fork. Steward-filed per COORDINATION section 2."
@@ -115,3 +115,15 @@ base, stop and report the mismatch.
 - A new `trusted_base()` entry in the prelude or catalog.
 - Any kernel change.
 - A checked program gains an obligation it cannot discharge.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 1 (Architect `evt_5qg2098zmhd20` on stop `evt_4g6d57z5x6wqz`).
+
+1. A closed Int refinement obligation stays open. The kernel has no
+   reduction for primitive `leq_int` on `IntLit` (keyed on primitive-Op
+   computation), so `isScalar 55295` and PosInt `5` have no proof term. The
+   route through `checked_char_literal` is refused: it misses PosInt and is
+   a second scalar derivation. Recut: prerequisite
+   `KERNEL-LEQ-INT-LITERAL-REDUCTION`. This WP holds its WIP until that
+   merges, then resumes with AC-1 and AC-2 unchanged.
