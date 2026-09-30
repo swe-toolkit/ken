@@ -1,7 +1,7 @@
 ---
 id: RT-RESPONSE-DESCENT-NESTED-COMPLETENESS
 title: "Host-response descent applies its completeness rule at every dispatch level: a nested dispatch case whose branch has an unrelated exit refuses, as the top level already does, instead of selecting the one leaf it reached"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: architect
@@ -49,9 +49,15 @@ level is incomplete.
 
 ## Acceptance
 
-- **AC-0 (ruling).** The Architect rules the repair shape before any edit.
-  The census of every caller of `response_dispatch_entries` and
-  `response_dispatch_leaves` goes into the ruling request (Check 7).
+- **AC-0 (reachability, then ruling).**
+  - First measure whether a well-formed Ken source program reaches the
+    nested shape. If only planner fixtures or hand-built IR reach it, stop:
+    the Steward closes the node (operator 2026-08-29, fund only reachable
+    shapes).
+  - If a source program reaches it, the Architect rules the repair shape
+    before any edit. The census of every caller of
+    `response_dispatch_entries` and `response_dispatch_leaves` goes into the
+    ruling request (Check 7).
 - **AC-1.** The Adversary's nested row refuses with the top-level message,
   and its top-level row still refuses. Both are committed as planner unit
   rows.
