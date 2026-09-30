@@ -114,11 +114,18 @@ it joins scope.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 1 (Architect `evt_enxtkpcwcad3`).
+§1a count: 2 (Architect `evt_34d247xhy4t9f`).
 
 1. Nested eliminator method binder mismatch under generalized goal (f4,
    inner match `ys`), keyed on binder source across the generalization
    boundary (to be measured).
+2. Nested equation-convoy match sees the generalized binder as an ambient
+   convoy sibling of its own redirected scrutinee — keyed on scrutinee
+   identity across the redirect (sentinel spelling vs pushed Var).
+
+Candidate shared predicate: the generalized binder has two spellings across
+the generalization boundary, and each consumer that compares by spelling
+breaks.
 
 ## Stop conditions
 
