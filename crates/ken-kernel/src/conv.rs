@@ -1582,13 +1582,12 @@ mod tests {
     /// Non-empty-path pin (`17 §3.5`, §5): a recursive `map` head exposes the
     /// checked `pred^k x`/`pred^k y` pair beneath its δ-origin ledger.
     /// MEASURED: `convert`'s structural entries at k=8/16/20 after a real
-    /// recursive head captured an origin; the same linear bound as the six
-    /// shape rows applies. CLAIMED: this checked recursive-head descendant
-    /// does not restart exponential work under its nonempty ledger path.
-    /// GAP: the entry counter excludes whnf/allocations, and this fixture
-    /// does not establish a linear bound for *soft*-to-hard path transitions.
-    /// `captures()>0` and a tracked pred-head comparison on a nonempty path
-    /// establish the reaching case. The empty-path pair is pinned above.
+    /// recursive head captures an origin; every nonempty pred-head comparison
+    /// sees a wholly hard ledger. CLAIMED: this checked recursive-head
+    /// descendant does not restart exponential work under its hard path.
+    /// GAP: the entry counter excludes whnf/allocations; this fixture does
+    /// not establish linearity for soft-to-hard transitions (pinned below).
+    /// The empty-path pair is independently pinned above.
     #[test]
     fn checked_pred_under_recursive_delta_origin_has_linear_structural_entries() {
         let mut env = GlobalEnv::new();
@@ -1625,9 +1624,11 @@ mod tests {
                 delta_probe::captures() > 0,
                 "map/pred k={k}: origin captured"
             );
+            let nonempty = delta_probe::tracked_head_nonempty();
+            let hard = delta_probe::tracked_head_hard();
             assert!(
-                delta_probe::tracked_head_nonempty() > 0,
-                "map/pred k={k}: pred pair compared beneath a ledger path"
+                nonempty > 0 && hard == nonempty,
+                "map/pred k={k}: expected only hard ledger comparisons ({nonempty}, {hard})"
             );
             let entries = delta_probe::struct_entries();
             assert!(
