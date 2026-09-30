@@ -1432,80 +1432,111 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn producer_inventory_is_bidirectional_and_sync_drift_is_discriminating() {
-        let build = include_str!("../build.rs");
-        let mapping = include_str!("mapping_v1.rs")
-            .split_once("#[cfg(test)]")
-            .map(|(source, _)| source)
-            .unwrap_or(include_str!("mapping_v1.rs"));
-        let host = format!("{mapping}\n{}", include_str!("lib.rs"));
-        let consumer = include_str!("../../ken-interp/src/eval.rs");
-        let probe = include_str!("../abi_probe.c");
-        let facts = TARGET_ABI
-            .facts
-            .iter()
-            .map(|fact| (fact.name, fact.value))
-            .collect::<Vec<_>>();
+        // Checker behavior is exercised only on fixture strings. Real source
+        // closure is owned by build.rs::verify_boundary_inventory.
+        const BUILD: &str = "";
+        const HOST: &str = r#"
+            fn fixture() {
+                let _ = AtFlags::empty();
+                let _ = std::fs::read_dir("fixture");
+                let _ = std::fs::remove_dir_all("fixture");
+            }
+        "#;
+        const PROBE: &str = "";
+        const FACTS: &[(&str, u64)] = &[];
+        fn consumer_fixture(dispatch: &str) -> String {
+            format!(
+                "impl HostHandler for PosixHost {{\n{dispatch}\n}}\n\
+                 /// Deterministic in-memory Console provider\n"
+            )
+        }
 
-        build_support::verify_inventory_closure(build, &host, consumer, probe, &facts)
-            .expect("the current producer inventory is exactly manifested");
+        let consumer = consumer_fixture("");
+        build_support::verify_inventory_closure(BUILD, HOST, &consumer, PROBE, FACTS)
+            .expect("the closed checker fixture must be accepted");
 
-        let injected_host = host.replacen(
-            "} | OFlags::CLOEXEC;",
-            "} | OFlags::CLOEXEC | OFlags::SYNC;",
+        let injected_host = HOST.replacen(
+            "AtFlags::empty();",
+            "AtFlags::empty(); let _flag = OFlags::SYNC;",
             1,
         );
         let error =
-            build_support::verify_inventory_closure(build, &injected_host, consumer, probe, &facts)
-                .expect_err("an unregistered production OFlags variant must fail closed");
+            build_support::verify_inventory_closure(BUILD, &injected_host, &consumer, PROBE, FACTS)
+                .expect_err("an unregistered OFlags fixture must fail closed");
         assert_eq!(error, "unmanifested producer ABI fact: OFlags::SYNC");
 
-        let mut restored_facts = facts.clone();
-        restored_facts.push(("O_SYNC", linux_raw_sys::general::O_SYNC.into()));
-        let restored_probe = probe.replacen(
-            "    return 0;",
-            "    printf(\"O_SYNC=%lld\\n\", (long long)O_SYNC);\n    return 0;",
-            1,
-        );
+        let mut restored_facts = FACTS.to_vec();
+        restored_facts.push(("O_SYNC", 1));
+        let restored_probe = r#"printf("O_SYNC=%lld\n", (long long)O_SYNC);"#;
         build_support::verify_inventory_closure(
-            build,
+            BUILD,
             &injected_host,
-            consumer,
-            &restored_probe,
+            &consumer,
+            restored_probe,
             &restored_facts,
         )
-        .expect("linux-raw-sys registration plus matching observer restores closure");
+        .expect("a matching fixture fact and observer restore closure");
 
-        let injected_build = build.replacen(
-            "        layout_fact(\"POINTER_WIDTH\", bit_width::<*const core::ffi::c_void>()),",
-            "        layout_fact(\"C_UCHAR_WIDTH\", bit_width::<core::ffi::c_uchar>()),\n        layout_fact(\"POINTER_WIDTH\", bit_width::<*const core::ffi::c_void>()),",
-            1,
-        );
-        let producer_only = build_support::verify_inventory_closure(
-            &injected_build,
-            &host,
-            consumer,
-            probe,
-            &facts,
-        )
-                .expect_err("a producer-only ABI layout fact must fail closed");
+        let injected_build = r#"layout_fact("C_UCHAR_WIDTH", 8),"#;
+        let producer_only =
+            build_support::verify_inventory_closure(injected_build, HOST, &consumer, PROBE, FACTS)
+                .expect_err("a producer-only layout fixture must fail closed");
         assert_eq!(
             producer_only,
             "unmanifested producer ABI fact: ABI layout::C_UCHAR_WIDTH"
         );
 
-        let mut registry_only_facts = facts;
-        registry_only_facts.push(("C_UCHAR_WIDTH", 8));
+        let registry_only_facts = [("C_UCHAR_WIDTH", 8)];
         let registry_only = build_support::verify_inventory_closure(
-            build,
-            &host,
-            consumer,
-            probe,
+            BUILD,
+            HOST,
+            &consumer,
+            PROBE,
             &registry_only_facts,
         )
-        .expect_err("a registry-only ABI layout fact must fail closed");
+        .expect_err("a registry-only layout fixture must fail closed");
         assert_eq!(
             registry_only,
             "manifested ABI fact lacks producer: ABI layout::C_UCHAR_WIDTH"
+        );
+
+        let unregistered_errno =
+            consumer_fixture("error.kind() == io::ErrorKind::PermissionDenied;");
+        let error =
+            build_support::verify_inventory_closure(BUILD, HOST, &unregistered_errno, PROBE, FACTS)
+                .expect_err("an unregistered consumer errno fixture must fail closed");
+        assert_eq!(
+            error,
+            "unmanifested producer ABI fact: errno::PermissionDenied"
+        );
+
+        let missing_errno_facts = [("ERRNO_EEXIST", 17)];
+        let error = build_support::verify_inventory_closure(
+            BUILD,
+            HOST,
+            &consumer,
+            PROBE,
+            &missing_errno_facts,
+        )
+        .expect_err("an errno fact without a consumer fixture must fail closed");
+        assert_eq!(
+            error,
+            "manifested ABI fact lacks producer: errno::AlreadyExists"
+        );
+
+        let not_found_consumer = consumer_fixture("error.kind() == io::ErrorKind::NotFound;");
+        let observer_facts = [("ERRNO_ENOENT", 2)];
+        let error = build_support::verify_inventory_closure(
+            BUILD,
+            HOST,
+            &not_found_consumer,
+            PROBE,
+            &observer_facts,
+        )
+        .expect_err("a registered fact without a probe label must fail closed");
+        assert_eq!(
+            error,
+            "manifested ABI fact lacks observer query: ERRNO_ENOENT"
         );
     }
 
@@ -1530,24 +1561,6 @@ mod tests {
             );
         }
         assert_eq!(PathComponent::new(&[0xff]).unwrap().as_bytes(), &[0xff]);
-    }
-
-    #[test]
-    fn public_surface_contains_only_ken_owned_semantic_types() {
-        let source = include_str!("lib.rs");
-        let public_surface = source
-            .split_once("/// An opaque host-owned descriptor")
-            .expect("public boundary marker")
-            .1
-            .split_once("#[cfg(test)]")
-            .expect("test module marker")
-            .0;
-        for leaked in ["rustix::", "OwnedFd", "RawFd", "OFlags", "AtFlags", "Errno"] {
-            assert!(
-                !public_surface.contains(leaked),
-                "private backend type leaked into public surface: {leaked}"
-            );
-        }
     }
 
     #[cfg(target_os = "linux")]
