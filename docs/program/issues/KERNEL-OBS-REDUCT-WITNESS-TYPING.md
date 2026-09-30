@@ -135,7 +135,11 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
   - The nested-Cast series at depths 8/16/32/64 is reported beside the AC-0
     baseline. A super-linear jump is a stop to the Architect.
 - **AC-2c (recorded endpoints, `evt_143zpap46cmfr`).** Scope adds
-  `crates/ken-elaborator/src/elab.rs` (surface `infer_j` only).
+  `crates/ken-elaborator/src/elab.rs` (surface `infer_j` only) and
+  `crates/ken-elaborator/tests/surface_transport_acceptance.rs`.
+  - `j_elaborates_to_a_real_term_j_node` also asserts that the `Term::J`
+    equality argument is `Ascript(_, Eq A a b)`. Removing the recording
+    reddens it.
   - The 57-package census returns to 57/57 accept, with no verdict change
     against `65af5c7cd`.
   - A J recorded at `Eq Nat (suc a) (suc b)` and a J recorded at
