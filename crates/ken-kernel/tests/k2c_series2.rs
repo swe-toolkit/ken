@@ -422,9 +422,9 @@ fn j_dependent_motive_raw_input_stays_neutral() {
     assert_eq!(result, j_term, "no fabricated witness for a raw J input");
 }
 
-/// Typed seam-2: a dependent Π-valued motive transports along a neutral
-/// Nat equality and J-cast computes a lambda. Its inner Vec index cast may
-/// remain neutral; the out-of-scope site-3 constructor rewrite is not needed.
+/// Typed seam-2: a dependent Vec-valued motive transports along a neutral
+/// Nat equality. An opaque base leaves the full WHNF at a checked, neutral
+/// Cast; structural equality at a compound former belongs to the follow-on.
 #[test]
 fn j_dependent_motive_fires() {
     let (mut env, s) = std_env();
@@ -437,11 +437,11 @@ fn j_dependent_motive_fires() {
     let proof_b = Term::Eq(Box::new(nat.clone()), Box::new(n.clone()), Box::new(Term::var(0)));
     let motive = Term::Ascript(
         Box::new(Term::lam(nat.clone(), Term::lam(
-            proof_b.clone(), Term::pi(nat.clone(), vec_t(&s, nat.clone(), Term::var(2))),
+            proof_b.clone(), vec_t(&s, nat.clone(), Term::var(1)),
         ))),
         Box::new(Term::pi(nat.clone(), Term::pi(proof_b, Term::Type(Level::zero())))),
     );
-    let base_ty = Term::pi(nat.clone(), vec_t(&s, nat.clone(), n));
+    let base_ty = vec_t(&s, nat.clone(), n);
     let base = Term::const_(declare_postulate(&mut env, "base".into(), vec![], base_ty).unwrap(), vec![]);
     let j = Term::J(Box::new(motive.clone()), Box::new(base.clone()), Box::new(e.clone()));
     let expected = infer(&env, &ctx, &j).expect("dependent J must be typed");
@@ -451,8 +451,8 @@ fn j_dependent_motive_fires() {
     let inferred = infer(&env, &ctx, &reduct).expect("J-cast reduct must remain typed");
     assert!(convert_type(&env, &ctx, &expected, &inferred));
     let computed = whnf(&env, &ctx, &j);
-    assert!(matches!(&computed, Term::Lam(..)), "Pi cast computes without site 3");
-    ken_kernel::check(&env, &ctx, &computed, &expected).expect("lambda checks at J's inferred type");
+    assert!(matches!(&computed, Term::Cast(..)), "opaque base keeps the full WHNF neutral");
+    ken_kernel::check(&env, &ctx, &computed, &expected).expect("full WHNF checks at J's inferred type");
 }
 
 // =============================================================================
