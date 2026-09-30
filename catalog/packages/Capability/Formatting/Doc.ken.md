@@ -699,7 +699,7 @@ theorem doc_reject_flat_without_fit
     : Equal Nat
         (length Char (render_mode True Zero (Suc (Suc Zero)) doc_reject_fitting_counterexample))
         (doc_flat_width doc_reject_fitting_counterexample) =
-  Refl
+  Proved
 ```
 
 ## 4. String boundary
