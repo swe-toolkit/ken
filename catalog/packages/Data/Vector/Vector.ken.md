@@ -29,11 +29,11 @@ vectors with the same length.
 
 `Vec` and `Fin` are ordinary indexed inductive families. `VNil` targets length
 `Zero`; `VCons` extends a vector at length `n` to length `Suc n`. Neither
-constructor of `Fin` targets `Fin Zero`. The identity law uses the checked
-`idf` function and `cong` equality congruence from their catalog providers.
+constructor of `Fin` targets `Fin Zero`. The map laws use checked `idf` and
+`comp` from the combinator package and `cong` from the transport package.
 
 ```ken
-import Core.Function.Combinators (idf)
+import Core.Function.Combinators (comp, idf)
 
 import Core.Logic.Transport (cong)
 
@@ -125,6 +125,48 @@ theorem lookup_fzero
       (a : Type) (n : Nat) (x : a) (xs : Vec a n)
     : Equal a (lookup a (Suc n) (VCons a n x xs) (FZero n)) x =
   Refl
+
+theorem lookup_fsuc
+      (a : Type) (n : Nat) (x : a) (xs : Vec a n) (i : Fin n)
+    : Equal a (lookup a (Suc n) (VCons a n x xs) (FSuc n i)) (lookup a n xs i) =
+  Refl
+
+theorem map_vcons
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (x : a) (xs : Vec a n)
+    : Equal
+        (Vec b (Suc n))
+        (map a b (Suc n) f (VCons a n x xs))
+        (VCons b n (f x) (map a b n f xs)) =
+  Refl
+
+theorem vec_map_compose
+      (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b) (g : b → c) (xs : Vec a n)
+    : Equal (Vec c n) (map b c n g (map a b n f xs)) (map a c n (comp a b c g f) xs) =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      cong
+        (Vec c m)
+        (Vec c (Suc m))
+        (map b c m g (map a b m f tail_xs))
+        (map a c m (comp a b c g f) tail_xs)
+        (VCons c m (g (f x)))
+        (vec_map_compose a b c m f g tail_xs)
+  }
+
+theorem lookup_map
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) (i : Fin n)
+    : Equal b (lookup b n (map a b n f xs) i) (f (lookup a n xs i)) =
+  match i {
+    FZero m ↦
+      match xs {
+        VCons _ x tail_xs ↦ Refl
+      };
+    FSuc m rest ↦
+      match xs {
+        VCons _ x tail_xs ↦ lookup_map a b m f tail_xs rest
+      }
+  }
 ```
 
 ## Using it
@@ -157,18 +199,21 @@ Totality is likewise carried by the domain types. `head` and `tail` accept only
 Impossible empty branches are omitted only where the index refutes them; the
 elaborator still supplies a total dependent eliminator to the kernel.
 
-The five computation theorems are checked proof terms. The successor-vector
-and first-index cases reduce to reflexive equalities and close with `Refl`.
-The empty `map` and `zip_with` results reduce to the same nullary constructor,
-so their equalities collapse and close with `Proved`.
+Seven computation theorems are checked proof terms. The cons and bounded-index
+cases reduce to reflexive equalities and close with `Refl`. The empty `map`
+and `zip_with` results reduce to the same nullary constructor, so their
+equalities collapse and close with `Proved`.
 
-Mapping `idf a` over any vector returns the same vector. The empty case reduces
-to the same nullary constructor; in the successor case, `cong` lifts the
-recursive proof under `VCons a m x`. The theorem is private: it checks the
-operation without adding a public name.
+Mapping `idf a` over any vector returns the same vector. Composition of two
+maps equals mapping their composite `comp a b c g f`. The two empty cases
+collapse; in each successor case, `cong` lifts the recursive equality under
+`VCons`. Looking up an element after mapping is the same as mapping the
+original lookup result: matching `Fin n`, then its vector, follows the index
+into the successor tail. These laws are private checked proofs, not exports.
 
-These checked examples exercise the private operations at concrete indices.
-The Boolean helpers exist only for these examples and are not package laws.
+The checked examples first use all four private laws at their generic
+propositions, then illustrate the operations at concrete indices. The Boolean
+helpers exist only for those illustrations and are not package laws.
 
 ```ken example
 fn vec_example_not (x : Bool) : Bool =
@@ -182,6 +227,29 @@ fn vec_example_and (x : Bool) (y : Bool) : Bool =
     True ↦ y;
     False ↦ False
   }
+
+theorem use_lookup_fsuc
+      (a : Type) (n : Nat) (x : a) (xs : Vec a n) (i : Fin n)
+    : Equal a (lookup a (Suc n) (VCons a n x xs) (FSuc n i)) (lookup a n xs i) =
+  lookup_fsuc a n x xs i
+
+theorem use_map_vcons
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (x : a) (xs : Vec a n)
+    : Equal
+        (Vec b (Suc n))
+        (map a b (Suc n) f (VCons a n x xs))
+        (VCons b n (f x) (map a b n f xs)) =
+  map_vcons a b n f x xs
+
+theorem use_vec_map_compose
+      (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b) (g : b → c) (xs : Vec a n)
+    : Equal (Vec c n) (map b c n g (map a b n f xs)) (map a c n (comp a b c g f) xs) =
+  vec_map_compose a b c n f g xs
+
+theorem use_lookup_map
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) (i : Fin n)
+    : Equal b (lookup b n (map a b n f xs) i) (f (lookup a n xs i)) =
+  lookup_map a b n f xs i
 
 theorem vec_example_lookup_second
     : Equal Bool
@@ -238,8 +306,13 @@ names on the current surface. Function names are snake_case; in particular,
 zip-with operation.
 
 The implementation recurses structurally. `zip_with` and `lookup` refine a
-sibling indexed value through a nested match, so their recursive steps consume
-only tails whose indices have been refined to the same predecessor.
+sibling indexed value through a nested match. Generic cons computation for
+`zip_with`, lookup after `zip_with`, and `zip_with`/map naturality remain outside
+the proved laws: at an open index, a nested match on an index-refined sibling
+does not expose its tail to a generic proof. Writing the naturality equation
+with an inline lambda inside its proposition type is also not supported by
+the current type grammar. Concrete checked examples illustrate the operations
+but do not stand in for those general laws.
 
 ## References
 
@@ -257,19 +330,19 @@ only tails whose indices have been refined to the same predecessor.
 This entry realizes the length-indexed vector contract in
 `spec/50-stdlib/60-length-indexed-vectors.md` using the ordinary `Nat`, indexed
 `data`, structural recursion, dependent `match`, `Equal`, `Refl`, and `Proved`
-surfaces. The private identity law reuses the checked catalog definitions
-`Core.Function.Combinators.idf` and `Core.Logic.Transport.cong`.
+surfaces. The private map laws reuse `Core.Function.Combinators.comp`/`idf`
+and `Core.Logic.Transport.cong`.
 
 The public API is `Vec`, `VNil`, `VCons`, `Fin`, `FZero`, `FSuc`, `head`,
-`tail`, `map`, `zip_with`, and `lookup`, together with the five computation
-theorems above.
+`tail`, `map`, `zip_with`, and `lookup`. Seven computation theorems, map
+composition, and lookup after map are private checked laws.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
 adds no axiom, postulate, primitive, foreign declaration, or unresolved hole.
 Its cold roots-loaded `trusted_base()` set equals a separately fresh compiler
-base set. The imported identity and congruence providers contribute no trusted
-items, and Vector adds none.
+base set. The imported combinator and congruence providers contribute no
+trusted items, and Vector adds none.
 
 Targeted validation checks the package through the roots-based module loader,
 the exact family indices and constructor targets, generic operation types,

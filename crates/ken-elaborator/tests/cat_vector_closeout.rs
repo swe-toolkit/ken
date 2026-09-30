@@ -1,8 +1,9 @@
 //! CAT-MIGRATE-TIER-C-DATA-VALUE Vector closeout controls.
 //!
 //! Vector owns checked indexed families, operations, computation theorems,
-//! and one private map identity law. It consumes only Combinators/Transport,
-//! publishes no catalog surface, and adds no trust beyond those providers.
+//! and private map identity, fusion, and lookup-after-map laws. Its only
+//! catalog dependencies are Combinators and Transport. It publishes no
+//! catalog surface and adds no trust beyond those providers.
 //! `cat_vec_acceptance` retains the family-index, computation, and
 //! impossible-call behavior obligations.
 
@@ -42,10 +43,14 @@ fn expected_owned_names() -> BTreeSet<String> {
         "head_vcons",
         "lookup",
         "lookup_fzero",
+        "lookup_fsuc",
+        "lookup_map",
         "map",
+        "map_vcons",
         "map_vnil",
         "tail",
         "tail_vcons",
+        "vec_map_compose",
         "vec_map_identity",
         "zip_with",
         "zip_with_vnil",
@@ -169,9 +174,9 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 }
 
 /// Promise class: transition sentinel for the owned declarations in this
-/// proof-only increment. Retire or rebaseline at the first separately authorized
+/// proof-only increment. Retire or rebaseline at the next separately authorized
 /// Vector declaration extension; this inventory is not a permanent API promise.
-/// MEASURED: ordinary isolated roots loading installs these seventeen checked
+/// MEASURED: ordinary isolated roots loading installs these twenty-one checked
 /// Vector identities, returns only identities from that population, and
 /// executes every checked fence, then retains the same qualified name and ID
 /// populations. Provider-closure trust is unchanged by Vector. CLAIMED: the
@@ -216,7 +221,11 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
         .execute_loaded_entry_checked_fences(VECTOR)
         .expect("Vector Definition and every checked fence must elaborate");
     assert_eq!(
-        via_vector.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        via_vector
+            .env
+            .trusted_base()
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
         pre_fence_trust,
         "Vector checked fences must not add trust"
     );
@@ -233,11 +242,12 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
 }
 
 /// Promise class: transition sentinel for this proof-only dependency edge;
-/// retire at the first separately authorized Vector provider change.
-/// MEASURED: checked Vector references exactly the compiler floor plus the
-/// canonical imported `idf`/`cong` identities; parsed imports list exactly
-/// those two providers, with no public declaration or re-export. CLAIMED:
-/// the private law uses the two authorized providers and Vector publishes no
+/// retire or rebaseline at the next separately authorized Vector import change.
+/// MEASURED: checked Vector references exactly the compiler floor, including
+/// `Top` in the new inductive proof goals, plus the canonical imported
+/// `comp`/`idf`/`cong` identities; parsed imports list exactly those two
+/// providers, with no public declaration or re-export. CLAIMED:
+/// the private laws use the two authorized providers and Vector publishes no
 /// catalog surface. THE GAP: `Type` and `Refl` elaborate without separate
 /// provider globals; checked GlobalId comparisons close the provider edge.
 #[test]
@@ -254,18 +264,22 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
     for id in &owned_ids {
         external.remove(id);
     }
-    let mut expected_external = ["Proved", "Nat", "Zero", "Suc", "Equal"]
+    let mut expected_external = ["Top", "Proved", "Nat", "Zero", "Suc", "Equal"]
         .into_iter()
         .map(|name| base.globals[name])
         .collect::<BTreeSet<_>>();
-    for name in ["Core.Function.Combinators.idf", "Core.Logic.Transport.cong"] {
+    for name in [
+        "Core.Function.Combinators.comp",
+        "Core.Function.Combinators.idf",
+        "Core.Logic.Transport.cong",
+    ] {
         expected_external.insert(via_vector.globals[name]);
     }
     assert_eq!(
         external, expected_external,
         "Vector's checked external identity inventory changed"
     );
-    for name in ["Proved", "Nat", "Zero", "Suc", "Equal"] {
+    for name in ["Top", "Proved", "Nat", "Zero", "Suc", "Equal"] {
         assert_eq!(
             via_vector.globals[name], base.globals[name],
             "Vector must retain the compiler's canonical `{name}` identity"
@@ -297,6 +311,7 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
     assert_eq!(
         shape.providers,
         [
+            ("Core.Function.Combinators".to_owned(), "comp".to_owned()),
             ("Core.Function.Combinators".to_owned(), "idf".to_owned()),
             ("Core.Logic.Transport".to_owned(), "cong".to_owned()),
         ]
