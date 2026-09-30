@@ -35,6 +35,8 @@ pub enum ProvKind {
     /// Open proof obligation generated for an unsatisfied call-site premise
     /// (`22 §2.3`). An undischarged hole exports as `unknown`.
     CallRequires,
+    /// Value introduced at a refinement (`22 §2.1`).
+    RefinementIntroduction,
     /// Runtime-tested contract at a foreign boundary (`21 §5.2`, `38 §3.3`).
     FfiRuntimeCheck,
     /// Partial-primitive side condition (`22 §2.4`, `35 §3`).
@@ -139,6 +141,10 @@ fn lift_obligation(def_name: &str, obl: &Obligation) -> ObligationTriple {
         ObligationKind::Requires => (
             format!("{}.requires.{}", def_name, obl.id),
             ProvKind::CallRequires,
+        ),
+        ObligationKind::RefinementIntroduction => (
+            format!("{}.refinement.{}", def_name, obl.id),
+            ProvKind::RefinementIntroduction,
         ),
         // A `foreign` runtime-check slot: tested status (`21 §5.2`, `38 §3.3`).
         ObligationKind::FfiRuntimeCheck => (

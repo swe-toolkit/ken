@@ -420,7 +420,9 @@ fn assemble_checked_export(
                 //   Ensures / call-site requires → open proof hole → Unknown.
                 //   FFI runtime checks → tested boundary assertion → Tested.
                 let status = match &triple.provenance.kind {
-                    ProvKind::Ensures { .. } | ProvKind::CallRequires => PStatus::Unknown,
+                    ProvKind::Ensures { .. }
+                    | ProvKind::CallRequires
+                    | ProvKind::RefinementIntroduction => PStatus::Unknown,
                     ProvKind::Prove
                     | ProvKind::LawField { .. }
                     | ProvKind::FfiRuntimeCheck

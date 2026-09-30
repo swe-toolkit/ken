@@ -39,6 +39,14 @@ use crate::resolve::{
 
 // ----- obligation model -----
 
+/// Surface refinement facts never enter the kernel's carrier type. An alias
+/// identity, not its spelling or its carrier, selects an introduction site.
+#[derive(Default)]
+pub(crate) struct RefinementFacts {
+    pub refinement_predicates: HashMap<GlobalId, Term>,
+    pub refined_params: HashMap<GlobalId, Vec<Option<Term>>>,
+}
+
 /// Source clause kind for a V1 obligation hole (`22 §1`, §2).
 #[derive(Debug, Clone)]
 pub enum ObligationKind {
@@ -52,6 +60,8 @@ pub enum ObligationKind {
     PartialPrim,
     /// A callee's `requires` premise that is absent in the caller (`22 §2.3`).
     Requires,
+    /// From an introduction at a named or site-local refinement (`22 §2.1`).
+    RefinementIntroduction,
     /// A `foreign` boundary contract that is statically unprovable → lowered
     /// to a runtime-checked assertion (`21 §5.2`, `38 §3.3`).
     FfiRuntimeCheck,
@@ -413,6 +423,12 @@ struct ElabCtx<'e> {
     numeric_env: &'e NumericEnv,
     obligations: Vec<Obligation>,
     obl_counter: u32,
+    refinement_facts: Option<&'e RefinementFacts>,
+    /// Logical assumptions for obligations in a callee; these do not change
+    /// the kernel context or the checked core term.
+    callee_refined_params: Vec<Option<Term>>,
+    callee_param_depth: usize,
+    path_conditions: Vec<(Term, usize)>,
     /// The typeclass registry, when available — needed only for `.field`
     /// Σ-record projection (`RExpr::RProj`, `33 §5.2` η). `None` in every
     /// elaboration path that predates class support and never projects
@@ -645,6 +661,10 @@ impl<'e> ElabCtx<'e> {
             numeric_env,
             obligations: Vec::new(),
             obl_counter: 0,
+            refinement_facts: None,
+            callee_refined_params: Vec::new(),
+            callee_param_depth: 0,
+            path_conditions: Vec::new(),
             class_env: None,
             standard_operators: None,
             provenance: None,
@@ -756,6 +776,11 @@ impl<'e> ElabCtx<'e> {
         self.class_env = Some(class_env);
         self.provenance = Some(provenance);
         self.standard_operators = Some(standard_operators);
+        self
+    }
+
+    fn with_refinements(mut self, facts: &'e RefinementFacts) -> Self {
+        self.refinement_facts = Some(facts);
         self
     }
 
@@ -1209,6 +1234,15 @@ fn prepare_let_rhs(
         Some(ty) => {
             let ty_core = elab_type(cx, ty)?;
             let rhs_core = check(cx, rhs, &ty_core, span)?;
+            let rhs_core = if matches!(ty, RType::RRefine(..)) {
+                let inferred = kernel_infer_current(cx, &rhs_core).map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                        error, span: span.clone(),
+                    },
+                })?;
+                emit_refinement_introduction(cx, &ty_core, &inferred, rhs_core, span, Some(ty))?
+            } else { rhs_core };
             Ok((rhs_core, ty_core))
         }
         None => infer(cx, rhs),
@@ -1362,8 +1396,22 @@ fn check_if(
     span: &Span,
 ) -> Result<Term, ElabError> {
     let condition_core = elaborate_if_condition(cx, condition)?;
-    let then_core = check(cx, then_branch, expected, then_branch.span())?;
-    let else_core = check(cx, else_branch, expected, else_branch.span())?;
+    let base = cx.path_conditions.len();
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
+    ), cx.ctx.len()));
+    let then_result = check(cx, then_branch, expected, then_branch.span());
+    cx.path_conditions.truncate(base);
+    let then_core = then_result?;
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
+    ), cx.ctx.len()));
+    let else_result = check(cx, else_branch, expected, else_branch.span());
+    cx.path_conditions.truncate(base);
+    let else_core = else_result?;
     make_if_elim(cx, condition_core, then_core, else_core, expected, span)
 }
 
@@ -1375,8 +1423,22 @@ fn infer_if(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let condition_core = elaborate_if_condition(cx, condition)?;
-    let (then_core, result_ty) = infer(cx, then_branch)?;
-    let else_core = check(cx, else_branch, &result_ty, else_branch.span())?;
+    let base = cx.path_conditions.len();
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
+    ), cx.ctx.len()));
+    let then_result = infer(cx, then_branch);
+    cx.path_conditions.truncate(base);
+    let (then_core, result_ty) = then_result?;
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
+    ), cx.ctx.len()));
+    let else_result = check(cx, else_branch, &result_ty, else_branch.span());
+    cx.path_conditions.truncate(base);
+    let else_core = else_result?;
     let core = make_if_elim(cx, condition_core, then_core, else_core, &result_ty, span)?;
     Ok((core, result_ty))
 }
@@ -1691,7 +1753,7 @@ fn check_inferred_without_group_transport(
 ) -> Result<Term, ElabError> {
     let (core, inferred_ty) = infer(cx, expr)?;
     unify_types(&mut cx.metas, expected, &inferred_ty);
-    Ok(core)
+    emit_refinement_introduction(cx, expected, &inferred_ty, core, expr.span(), None)
 }
 
 #[inline(never)]
@@ -1708,10 +1770,12 @@ fn check_inferred_with_group_transport(
         inferred_ty.clone(),
         expected,
     )? {
-        return Ok(transported);
+        return emit_refinement_introduction(
+            cx, expected, &inferred_ty, transported, expr.span(), None,
+        );
     }
     unify_types(&mut cx.metas, expected, &inferred_ty);
-    Ok(core)
+    emit_refinement_introduction(cx, expected, &inferred_ty, core, expr.span(), None)
 }
 
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
@@ -1764,7 +1828,15 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         // expected type selects the view at checking boundaries (notably local
         // helper arguments); inference remains outer-refined by default.
         RExpr::RVar(index, name, span) if !cx.var_refinements.is_empty() => {
-            check_variable_with_index_views_named(cx, *index, name, span, expected)
+            let core = check_variable_with_index_views_named(cx, *index, name, span, expected)?;
+            let inferred = kernel_infer_current(cx, &core).map_err(|error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                },
+            })?;
+            emit_refinement_introduction(cx, expected, &inferred, core, span, None)
         }
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
@@ -1776,8 +1848,15 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             else_branch,
             span,
         } => check_if(cx, condition, then_branch, else_branch, expected, span),
-        RExpr::RNumLit(lit, num_span) => elab_num_lit_checked(cx, lit, expected, num_span),
-        RExpr::RStr(s, span) => elab_str_lit(cx, s, Some(expected), span).map(|(t, _)| t),
+        RExpr::RNumLit(lit, num_span) => {
+            let core = elab_num_lit_checked(cx, lit, expected, num_span)?;
+            let inferred = Term::const_(cx.numeric_env.int_id, vec![]);
+            emit_refinement_introduction(cx, expected, &inferred, core, num_span, None)
+        }
+        RExpr::RStr(s, span) => {
+            let (core, inferred) = elab_str_lit(cx, s, Some(expected), span)?;
+            emit_refinement_introduction(cx, expected, &inferred, core, span, None)
+        }
         // `Refl` — reflexivity, checked (never inferred): the expected goal
         // must originate as a kernel `Eq A t u` / prelude `Equal A t u` with
         // `t`/`u` CONVERTIBLE. If observational equality reduces that equality
@@ -1973,7 +2052,9 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             } else {
                 let (core, inferred_ty) = infer_match(cx, scrut, arms, span, Some(expected))?;
                 unify_types(&mut cx.metas, expected, &inferred_ty);
-                Ok(core)
+                // This is an inferred match, not the checked structural path;
+                // each branch has already been checked against its result.
+                emit_refinement_introduction(cx, expected, &inferred_ty, core, span, None)
             }
         }
         _ if cx.recursive_group.is_empty() => {
@@ -6641,6 +6722,13 @@ fn check_dependent_branch_body(
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
+    let path_base = cx.path_conditions.len();
+    let path_eq = Term::Eq(
+        Box::new(weaken(scrut_ty, n as i64)),
+        Box::new(weaken(scrut_core, n as i64)),
+        Box::new(concrete.clone()),
+    );
+    cx.path_conditions.push((path_eq, cx.ctx.len()));
 
     let outcome = (|| {
         if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
@@ -6766,6 +6854,7 @@ fn check_dependent_branch_body(
 
     cx.active_index_premise_frames
         .truncate(active_index_premise_frame_base);
+    cx.path_conditions.truncate(path_base);
     cx.result_refinements.truncate(result_refinement_base);
     cx.active_index_refinements
         .truncate(active_index_refinement_base);
@@ -9823,6 +9912,17 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             match f_ty_wh {
                 Term::Pi(dom, cod) => {
                     let a_core = check(cx, a, &dom, span)?;
+                    let (head, previous_args) = peel_app(&f_core);
+                    if let Term::Const { id, .. } = head {
+                        if let Some(template) = cx.refinement_facts
+                            .and_then(|facts| facts.refined_params.get(&id))
+                            .and_then(|params| params.get(previous_args.len()))
+                            .and_then(Option::as_ref).cloned()
+                        {
+                            let instantiated = subst_outer(&template, previous_args.len(), &previous_args, 0);
+                            emit_refinement_predicate(cx, instantiated, a_core.clone(), span)?;
+                        }
+                    }
                     let result_ty = subst0(&cod, &a_core);
                     Ok((Term::app(f_core, a_core), result_ty))
                 }
@@ -9830,9 +9930,18 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             }
         }
 
-        RExpr::RAsc(e, ty, _) => {
+        RExpr::RAsc(e, ty, span) => {
             let ty_core = elab_type(cx, ty)?;
             let e_core = check(cx, e, &ty_core, e.span())?;
+            let e_core = if matches!(ty.as_ref(), RType::RRefine(..)) {
+                let inferred = kernel_infer_current(cx, &e_core).map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                        error, span: span.clone(),
+                    },
+                })?;
+                emit_refinement_introduction(cx, &ty_core, &inferred, e_core, span, Some(ty.as_ref()))?
+            } else { e_core };
             Ok((e_core, ty_core))
         }
 
@@ -11050,6 +11159,97 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
         obligation.id = dst.len() as u32;
         dst.push(obligation);
     }
+}
+
+/// Close a logical refinement goal over ordinary binders followed by branch
+/// equations and refined-parameter assumptions. The latter are assumptions
+/// only in the obligation, never unchecked evidence in an emitted program.
+#[inline(never)]
+fn close_refinement_goal(cx: &ElabCtx<'_>, goal: Term, proof: Option<Term>) -> (Term, Option<Term>) {
+    let count = cx.path_conditions.len();
+    let mut closed = weaken(&goal, count as i64);
+    let mut certificate = proof;
+    for (index, (condition, install_depth)) in cx.path_conditions.iter().enumerate().rev() {
+        let growth = cx.ctx.len() - install_depth;
+        let domain = weaken(condition, (growth + index) as i64);
+        closed = Term::pi(domain.clone(), closed);
+        certificate = certificate.map(|term| Term::lam(domain, term));
+    }
+    let mut result = closed;
+    for stored in cx.ctx.types.iter().rev() {
+        result = Term::pi(stored.clone(), result);
+        certificate = certificate.map(|term| Term::lam(stored.clone(), term));
+    }
+    (result, certificate)
+}
+
+#[inline(never)]
+fn emit_refinement_introduction(
+    cx: &mut ElabCtx<'_>,
+    expected: &Term,
+    inferred_ty: &Term,
+    core: Term,
+    span: &Span,
+    literal: Option<&RType>,
+) -> Result<Term, ElabError> {
+    let named = match cx.metas.zonk_term(expected) {
+        Term::Const { id, .. } => cx.refinement_facts
+            .and_then(|facts| facts.refinement_predicates.get(&id))
+            .filter(|_| !matches!(cx.metas.zonk_term(inferred_ty), Term::Const { id: source, .. } if source == id))
+            .cloned(),
+        _ => None,
+    };
+    let predicate = if let Some(RType::RRefine(_, _, phi, _)) = literal {
+        let carrier = cx.metas.zonk_term(expected);
+        cx.ctx.push(carrier.clone());
+        let checked = check(cx, phi, &Term::omega(Level::Zero), phi.span());
+        cx.ctx.pop();
+        Some(Term::lam(carrier, checked?))
+    } else {
+        named
+    };
+    let Some(predicate) = predicate else { return Ok(core) };
+    emit_refinement_predicate(cx, predicate, core.clone(), span)?;
+    Ok(core)
+}
+
+fn apply_refinement_predicate(predicate: Term, value: Term) -> Term {
+    match predicate {
+        Term::Lam(_, body) => subst0(&body, &value),
+        other => Term::app(other, value),
+    }
+}
+
+#[inline(never)]
+fn emit_refinement_predicate(
+    cx: &mut ElabCtx<'_>, predicate: Term, core: Term, span: &Span,
+) -> Result<(), ElabError> {
+    let goal = apply_refinement_predicate(predicate, core);
+    let (closed, _) = close_refinement_goal(cx, goal.clone(), None);
+    let proof = (0..cx.path_conditions.len())
+        .map(Term::var)
+        .chain(std::iter::once(Term::const_(cx.env.tt_id(), vec![])))
+        .find_map(|candidate| {
+            let (_, certificate) = close_refinement_goal(cx, goal.clone(), Some(candidate));
+            let certificate = certificate?;
+            kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
+                .ok().map(|_| certificate)
+        });
+    let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
+        .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
+    if let Some(proof) = proof {
+        ken_kernel::check::admit_bodies(cx.env, &[(hole_id, proof)])
+            .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
+    }
+    cx.obligations.push(Obligation {
+        id: cx.obl_counter,
+        hole_id,
+        goal_closed: closed,
+        span: span.clone(),
+        kind: ObligationKind::RefinementIntroduction,
+    });
+    cx.obl_counter += 1;
+    Ok(())
 }
 
 // ----- declaration elaboration -----
@@ -13421,6 +13621,7 @@ pub(crate) fn elaborate_rdecl_v1(
     // only within this single declaration. The persistent cross-declaration
     // registry travels through the module path via `ElabEnv::ctor_decl_spans`.
     let mut ctor_decl_spans = HashMap::new();
+    let mut refinement_facts = RefinementFacts::default();
     let no_names = HashMap::new();
     let no_checked_ids = HashMap::new();
     let mut preconditions = HashMap::new();
@@ -13437,6 +13638,7 @@ pub(crate) fn elaborate_rdecl_v1(
         &mut fixities,
         &mut fixity_spans,
         &mut ctor_decl_spans,
+        &mut refinement_facts,
         None,
         rdecl,
     )
@@ -13486,6 +13688,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
+    refinement_facts: &mut RefinementFacts,
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
@@ -13506,6 +13709,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
             fixities,
             fixity_spans,
             ctor_decl_spans,
+            refinement_facts,
             declared_fixity,
             rdecl,
         );
@@ -13525,6 +13729,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
         fixities,
         fixity_spans,
         ctor_decl_spans,
+        refinement_facts,
         declared_fixity,
         &associated,
     )
@@ -13544,6 +13749,7 @@ fn elaborate_associated_rdecl(
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
+    refinement_facts: &mut RefinementFacts,
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
@@ -13630,6 +13836,7 @@ fn elaborate_associated_rdecl(
                 standard_operators,
                 rdecl,
                 &local_dicts,
+                refinement_facts,
                 fixities,
                 fixity_spans,
                 declared_fixity.clone(),
@@ -13650,6 +13857,7 @@ fn elaborate_associated_rdecl(
             standard_operators,
             rdecl,
             &HashMap::new(),
+            refinement_facts,
             fixities,
             fixity_spans,
             declared_fixity.clone(),
@@ -13749,16 +13957,22 @@ fn elaborate_associated_rdecl(
             })
         }
         RDeclKind::TypeAlias { ty } => {
-            // A definition `def T = A` declares T as a transparent definition
-            // of type `Type 0` whose body is A (`34 §2`).
-            let (alias_body, alias_id) = {
+            // A named refinement keeps its transparent carrier body; only its
+            // GlobalId records the predicate. A literal never mints an alias.
+            let (alias_body, predicate) = {
                 let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                     .with_preconditions(preconditions, PremiseHoles::Refused);
                 let body = elab_type(&mut cx, ty)?;
-                let body_z = cx.metas.zonk_term(&body);
-                (body_z, ())
+                let predicate = if let RType::RRefine(_, _, phi, _) = ty {
+                    cx.ctx.push(body.clone());
+                    let checked = check(&mut cx, phi, &Term::omega(Level::Zero), phi.span())?;
+                    cx.ctx.pop();
+                    Some(Term::lam(body.clone(), cx.metas.zonk_term(&checked)))
+                } else {
+                    None
+                };
+                (cx.metas.zonk_term(&body), predicate)
             };
-            let _ = alias_id;
             let alias_ty = Term::ty(Level::Zero);
             let id = declare_def(env, vec![], alias_ty, alias_body).map_err(|e| {
                 ElabError::KernelRejected {
@@ -13767,6 +13981,9 @@ fn elaborate_associated_rdecl(
                 }
             })?;
             globals.insert(rdecl.name.clone(), id);
+            if let Some(predicate) = predicate {
+                refinement_facts.refinement_predicates.insert(id, predicate);
+            }
             Ok(ElabResult {
                 name: rdecl.name.clone(),
                 def_id: id,
@@ -14820,6 +15037,7 @@ fn elaborate_view_or_let(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    refinement_facts: &mut RefinementFacts,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -14843,6 +15061,7 @@ fn elaborate_view_or_let(
             standard_operators,
             rdecl,
             local_dicts,
+            refinement_facts,
             fixities,
             fixity_spans,
             declared_fixity,
@@ -14860,6 +15079,7 @@ fn elaborate_view_or_let(
         standard_operators,
         rdecl,
         local_dicts,
+        refinement_facts,
     )
 }
 
@@ -15317,6 +15537,38 @@ pub(crate) fn innermost_refine_pred(ty: &RType) -> Option<&RExpr> {
     }
 }
 
+/// Compile each declared parameter predicate once in its telescope context.
+/// The same lambda template feeds the callee's assumption and the caller's
+/// argument obligation; the carrier remains the only kernel parameter type.
+#[inline(never)]
+fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<Option<Term>>, ElabError> {
+    let base = cx.ctx.len();
+    let result = (|| {
+        let mut params = Vec::new();
+        let mut current = declared;
+        loop {
+            let (domain, codomain) = match current {
+                RType::RPi(_, domain, codomain, _) | RType::RArr(domain, codomain, _)
+                | RType::REffectArr(domain, _, codomain, _) => (domain.as_ref(), codomain.as_ref()),
+                _ => break,
+            };
+            let carrier = elab_type(cx, domain)?;
+            let predicate = if let RType::RRefine(_, _, phi, _) = domain {
+                cx.ctx.push(carrier.clone());
+                let checked = check(cx, phi, &Term::omega(Level::Zero), phi.span());
+                cx.ctx.pop();
+                Some(Term::lam(carrier.clone(), checked?))
+            } else { None };
+            params.push(predicate);
+            cx.ctx.push(carrier);
+            current = codomain;
+        }
+        Ok(params)
+    })();
+    cx.ctx.types.truncate(base);
+    result
+}
+
 fn elaborate_v0(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
@@ -15328,6 +15580,7 @@ fn elaborate_v0(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    refinement_facts: &mut RefinementFacts,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -15346,30 +15599,35 @@ fn elaborate_v0(
             class_env,
             provenance,
             standard_operators,
+            refinement_facts,
             fixities,
             fixity_spans,
             declared_fixity,
             rdecl,
         );
     }
-    let (ty_core, body_core, body_obligations) = {
+    let (ty_core, body_core, body_obligations, params) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
+            .with_refinements(refinement_facts)
             .with_local_dicts(local_dicts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
-        let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
+        let (body_raw, ty_raw, params) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
+            let params = collect_refined_params(&mut cx, ty)?;
+            cx.callee_refined_params = params.clone();
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
-            (body_c, ty_c)
+            (body_c, ty_c, params)
         } else {
             let (body_c, ty_c) = infer(&mut cx, &rdecl.body)?;
-            (body_c, ty_c)
+            (body_c, ty_c, Vec::new())
         };
         let obligations = std::mem::take(&mut cx.obligations);
         (
             cx.metas.zonk_term(&ty_raw),
             cx.metas.zonk_term(&body_raw),
             obligations,
+            params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect::<Vec<_>>(),
         )
     };
     if rdecl.ty.is_none()
@@ -15389,6 +15647,9 @@ fn elaborate_v0(
             span: rdecl.span.clone(),
         })?;
     globals.insert(rdecl.name.clone(), id);
+    if params.iter().any(Option::is_some) {
+        refinement_facts.refined_params.insert(id, params);
+    }
     Ok(ElabResult {
         name: rdecl.name.clone(),
         def_id: id,
@@ -15466,6 +15727,7 @@ fn elaborate_recursive_view(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    refinement_facts: &mut RefinementFacts,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -15475,6 +15737,7 @@ fn elaborate_recursive_view(
     let (ty_core, type_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
+            .with_refinements(refinement_facts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("recursive declaration requires a type annotation".into())
@@ -15897,6 +16160,7 @@ fn elaborate_view_with_spec(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    refinement_facts: &mut RefinementFacts,
 ) -> Result<ElabResult, ElabError> {
     let mut pending: Option<ken_kernel::PendingAdmission> = None;
     let mut precondition_entry = None;
