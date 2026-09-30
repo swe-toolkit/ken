@@ -1,7 +1,7 @@
 ---
 id: RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN
 title: "Decode the root exit status once, at the root result boundary, from the checked answer type (ExitCode), whatever join representation delivers it; joins stop projecting, so an Option arm no longer collapses to -2 and an ExitCode constructor carried through a CarrierWord merge no longer fails the root guard"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -98,3 +98,26 @@ arms must produce scalar Int or Bool values" refusal.
   the Architect with the test and its trace.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Merged as `0c0ce413a` (PR #4396), from exact candidate `92da4a5b8`.
+- **AC-0.** The census and the Architect's placement (`evt_615jk3tv28rz5`)
+  and shared-builder ruling (`evt_6628bxtfkbyz5`) preceded the build.
+- **AC-1.** The root decodes a persistent `ExitCode` only for the
+  planner-issued `ExitSuccess` identity with no fields, or `ExitFailure`
+  with one immediate Int. Every other persistent root still traps. The
+  join projection fires only for those two constructors, and an
+  Option-armed join still refuses. Un-ignored with native/interpreter
+  parity: the px7n rows `nested_ok_payload_reaches_both_real_executors`
+  (exit 0) and `nested_err_payload_reaches_both_real_executors` (exit 7),
+  and the TREE-MATCH `shared_bind_success_arm_matches_interpreter_after_root_exit_projection`.
+  Closed and runtime `Failure` agree on both bytes.
+- **AC-2.** The Failure-identity mutation reddens (5 against -1), and so
+  does the Success control. The original-Inner pin reaches the join
+  refusal. The 10 F bracket callers use the answering builder variant, and
+  every planner caller keeps the Unit wrapper, byte-identical at depths
+  0-7.
+- **Carried.** An `ExitFailure` whose code is a boxed Int traps at the root
+  rather than exiting. It fails closed, and it is noted for a later
+  ExitCode-width item.

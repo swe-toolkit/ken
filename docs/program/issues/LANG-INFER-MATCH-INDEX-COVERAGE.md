@@ -1,7 +1,7 @@
 ---
 id: LANG-INFER-MATCH-INDEX-COVERAGE
 title: "An unannotated match on an indexed family never discharges an index-impossible constructor, so an empty VNil bucket fails coverage; the matrix path must use the dependent path's one authority for index impossibility"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
