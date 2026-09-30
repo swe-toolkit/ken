@@ -45,8 +45,11 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
      re-typed by the same leaf in the same frame. Otherwise the goal is not
      rewritten.
 2. **Class A (5 rows): the J-base `Refl` inside a `Cast`, f7 and f4's
-   inner `ys`.** Its scope waits for its classification. A row classified
-   ONE-SIDED joins increment 1.
+   inner `ys`.** This is a kernel reducer defect (Architect
+   `evt_449gyxrrejte1`): the reducer emits ill-typed `Cast` reducts.
+   Increment 2 waits for `KERNEL-OBS-REDUCT-WITNESS-TYPING`, and the five
+   rows may then go green. A B row that involves a reducer-synthesized
+   reduct moves here too.
 
 ## Acceptance
 
@@ -68,7 +71,8 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
     type mentions `leaf.scrutinee`, name which of the four exclusion paths
     in `evt_bw82kr4k5pm5` kept it out of the re-typed context.
   - For each A row, name the `Cast`'s builder and the binder map applied.
-    Classify each row ONE-SIDED, RELOCATED or OTHER.
+    Classify each row ONE-SIDED, RELOCATED or OTHER. This is paused until
+    the kernel WP lands.
   - The Architect rules increment 1 from B-AC0: a single narrowed path, or
     one leaf set driving both goal and context.
 - **AC-1.** f7, f4, f5 and f6 check. f5 and f6 check after increment 1;
