@@ -66,10 +66,31 @@ pub fn whnf(env: &GlobalEnv, ctx: &Context, t: &Term) -> Term {
 
 /// Conversion's first pass: reduce β/ι/etc. but leave a transparent global
 /// application folded at the head, so congruence can inspect its spine first.
-/// Nested reductions (scrutinees, projections, observation types) still use
-/// the ordinary, eager-δ [`whnf_progress`].
+/// A nested reduction may commit δ only if its consumer fires; otherwise the
+/// stuck component is rebuilt in this same deferred-head mode.
 fn whnf_defer_head_delta(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgress) {
-    whnf_progress_mode(env, ctx, t, true)
+    whnf_progress_mode(env, ctx, t, true, true)
+}
+
+/// Retry full head δ in conversion, retaining deferred heads inside stuck
+/// eliminators so a symbolic recursive call reaches its own δ-origin ledger.
+fn whnf_progress_for_conversion(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgress) {
+    whnf_progress_mode(env, ctx, t, false, true)
+}
+
+fn stuck_component(
+    env: &GlobalEnv,
+    ctx: &Context,
+    original: &Term,
+    eager: Term,
+    progress: WhnfProgress,
+    defer_stuck_nested_delta: bool,
+) -> (Term, WhnfProgress) {
+    if defer_stuck_nested_delta {
+        whnf_defer_head_delta(env, ctx, original)
+    } else {
+        (eager, progress)
+    }
 }
 
 /// The sole weak-head reducer, additionally reporting [`WhnfProgress`]. The
@@ -82,24 +103,27 @@ fn whnf_defer_head_delta(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, Whn
 /// context); K1's head reduction does not consult it, hence the allow.
 #[allow(clippy::only_used_in_recursion)]
 fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgress) {
-    whnf_progress_mode(env, ctx, t, false)
+    whnf_progress_mode(env, ctx, t, false, false)
 }
 
-/// `defer_head_delta` applies along the function spine only. All non-head
-/// reductions call [`whnf_progress`] and retain ordinary eager δ.
+/// `defer_head_delta` applies along the function spine. In conversion-only
+/// mode a nested component is rolled back to deferred-head form if its
+/// consumer stays stuck; the public reducer still commits eager δ.
 #[allow(clippy::only_used_in_recursion)]
 fn whnf_progress_mode(
     env: &GlobalEnv,
     ctx: &Context,
     t: &Term,
     defer_head_delta: bool,
+    defer_stuck_nested_delta: bool,
 ) -> (Term, WhnfProgress) {
     let mut cur = t.clone();
     let mut iota = false;
     loop {
         match &cur {
             Term::App(f, a) => {
-                let (f_w, fp) = whnf_progress_mode(env, ctx, f, defer_head_delta);
+                let (f_w, fp) =
+                    whnf_progress_mode(env, ctx, f, defer_head_delta, defer_stuck_nested_delta);
                 iota |= fp.iota;
                 // K3: only the registered String -> List Char operation on
                 // an immutable checked String literal. No other primitive
@@ -164,39 +188,75 @@ fn whnf_progress_mode(
                 }
             }
             Term::Proj1(p) => {
-                let (p_w, pp) = whnf_progress(env, ctx, p);
-                iota |= pp.iota;
+                let (p_w, pp) = if defer_stuck_nested_delta {
+                    whnf_progress_for_conversion(env, ctx, p)
+                } else {
+                    whnf_progress(env, ctx, p)
+                };
                 match &p_w {
                     Term::Pair(a, _) => {
+                        iota |= pp.iota;
                         cur = (**a).clone();
                         continue;
+                    }
+                    // Even this explicit δ retry cannot commit a projectee
+                    // unless projection-β subsequently fires.
+                    Term::Const { .. } if defer_stuck_nested_delta => {
+                        let (p_w, pp) = stuck_component(
+                            env, ctx, p, p_w, pp, defer_stuck_nested_delta,
+                        );
+                        iota |= pp.iota;
+                        return (Term::proj1(p_w), WhnfProgress { iota });
                     }
                     Term::Const { id, level_args } if env.transparent_body(*id).is_some() => {
                         if let Some(body) = unfold_const(env, *id, level_args) {
                             cur = Term::proj1(body);
                             continue;
                         }
+                        return (Term::proj1(p_w), WhnfProgress { iota: iota | pp.iota });
+                    }
+                    _ => {
+                        let (p_w, pp) = stuck_component(
+                            env, ctx, p, p_w, pp, defer_stuck_nested_delta,
+                        );
+                        iota |= pp.iota;
                         return (Term::proj1(p_w), WhnfProgress { iota });
                     }
-                    _ => return (Term::proj1(p_w), WhnfProgress { iota }),
                 }
             }
             Term::Proj2(p) => {
-                let (p_w, pp) = whnf_progress(env, ctx, p);
-                iota |= pp.iota;
+                let (p_w, pp) = if defer_stuck_nested_delta {
+                    whnf_progress_for_conversion(env, ctx, p)
+                } else {
+                    whnf_progress(env, ctx, p)
+                };
                 match &p_w {
                     Term::Pair(_, b) => {
+                        iota |= pp.iota;
                         cur = (**b).clone();
                         continue;
+                    }
+                    Term::Const { .. } if defer_stuck_nested_delta => {
+                        let (p_w, pp) = stuck_component(
+                            env, ctx, p, p_w, pp, defer_stuck_nested_delta,
+                        );
+                        iota |= pp.iota;
+                        return (Term::proj2(p_w), WhnfProgress { iota });
                     }
                     Term::Const { id, level_args } if env.transparent_body(*id).is_some() => {
                         if let Some(body) = unfold_const(env, *id, level_args) {
                             cur = Term::proj2(body);
                             continue;
                         }
+                        return (Term::proj2(p_w), WhnfProgress { iota: iota | pp.iota });
+                    }
+                    _ => {
+                        let (p_w, pp) = stuck_component(
+                            env, ctx, p, p_w, pp, defer_stuck_nested_delta,
+                        );
+                        iota |= pp.iota;
                         return (Term::proj2(p_w), WhnfProgress { iota });
                     }
-                    _ => return (Term::proj2(p_w), WhnfProgress { iota }),
                 }
             }
             Term::Elim {
@@ -208,8 +268,11 @@ fn whnf_progress_mode(
                 indices,
                 scrut,
             } => {
-                let (s_w, sp) = whnf_progress(env, ctx, scrut);
-                iota |= sp.iota;
+                let (s_w, sp) = if defer_stuck_nested_delta {
+                    whnf_progress_for_conversion(env, ctx, scrut)
+                } else {
+                    whnf_progress(env, ctx, scrut)
+                };
                 let (head, all_args) = peel_app(&s_w);
                 if let Term::Constructor { id, .. } = head {
                     if let Some((ind, k)) = env.constructor(id) {
@@ -226,8 +289,13 @@ fn whnf_progress_mode(
                         }
                     }
                 }
-                // Stuck eliminator (neutral): rebuild with the whnf'd scrutinee
-                // (`14 §7.6`). Indices don't gate ι firing (`14 §7.2`).
+                // A stuck scrutinee cannot commit eager nested δ; keep its
+                // deferred head for the structural child comparison instead.
+                // Indices don't gate ι firing (`14 §7.2`).
+                let (s_w, sp) = stuck_component(
+                    env, ctx, scrut, s_w, sp, defer_stuck_nested_delta,
+                );
+                iota |= sp.iota;
                 return (
                     Term::Elim {
                         fam: *fam,
@@ -262,12 +330,20 @@ fn whnf_progress_mode(
             Term::Eq(ty, x, y) => {
                 // `Eq A a b` reduces by recursion on `whnf(A)` (`15 §2`, `16
                 // §2.2`); a neutral `A` leaves it a neutral proposition.
-                let (ty_w, tp) = whnf_progress(env, ctx, ty);
-                iota |= tp.iota;
+                let (ty_w, tp) = if defer_stuck_nested_delta {
+                    whnf_progress_for_conversion(env, ctx, ty)
+                } else {
+                    whnf_progress(env, ctx, ty)
+                };
                 if let Some(r) = crate::obs::eq_reduce(env, ctx, &ty_w, x, y) {
+                    iota |= tp.iota;
                     cur = r;
                     continue;
                 }
+                let (ty_w, tp) = stuck_component(
+                    env, ctx, ty, ty_w, tp, defer_stuck_nested_delta,
+                );
+                iota |= tp.iota;
                 return (
                     Term::Eq(Box::new(ty_w), (*x).clone(), (*y).clone()),
                     WhnfProgress { iota },
@@ -277,14 +353,24 @@ fn whnf_progress_mode(
                 // `cast A B e t` reduces by recursion on `whnf(A)`,`whnf(B)`
                 // (`16 §3.2`); mismatched/neutral heads or a neutral proof leave
                 // it a neutral cast.
-                let (a_w, ap) = whnf_progress(env, ctx, a);
-                iota |= ap.iota;
-                let (b_w, bp) = whnf_progress(env, ctx, b);
-                iota |= bp.iota;
+                let (a_w, ap) = if defer_stuck_nested_delta {
+                    whnf_progress_for_conversion(env, ctx, a)
+                } else {
+                    whnf_progress(env, ctx, a)
+                };
+                let (b_w, bp) = if defer_stuck_nested_delta {
+                    whnf_progress_for_conversion(env, ctx, b)
+                } else {
+                    whnf_progress(env, ctx, b)
+                };
                 if let Some(r) = crate::obs::cast_reduce(env, ctx, &a_w, &b_w, e, t) {
+                    iota |= ap.iota || bp.iota;
                     cur = r;
                     continue;
                 }
+                let (a_w, ap) = stuck_component(env, ctx, a, a_w, ap, defer_stuck_nested_delta);
+                let (b_w, bp) = stuck_component(env, ctx, b, b_w, bp, defer_stuck_nested_delta);
+                iota |= ap.iota || bp.iota;
                 return (
                     Term::Cast(Box::new(a_w), Box::new(b_w), (*e).clone(), (*t).clone()),
                     WhnfProgress { iota },
@@ -315,19 +401,28 @@ fn whnf_progress_mode(
                 // (`16 §5`); `elim_trunc P f |a| ⇝ f a` (truncation elim encoded
                 // as `QuotElim` on a `TruncProj` scrut, `16 §6`). A neutral
                 // scrutinee leaves the eliminator neutral.
-                let (s_w, sp) = whnf_progress(env, ctx, scrut);
-                iota |= sp.iota;
+                let (s_w, sp) = if defer_stuck_nested_delta {
+                    whnf_progress_for_conversion(env, ctx, scrut)
+                } else {
+                    whnf_progress(env, ctx, scrut)
+                };
                 match &s_w {
                     Term::QuotClass(a0) => {
+                        iota |= sp.iota;
                         cur = Term::app((**method).clone(), (**a0).clone());
                         continue;
                     }
                     Term::TruncProj(a0) => {
+                        iota |= sp.iota;
                         cur = Term::app((**method).clone(), (**a0).clone());
                         continue;
                     }
                     _ => {}
                 }
+                let (s_w, sp) = stuck_component(
+                    env, ctx, scrut, s_w, sp, defer_stuck_nested_delta,
+                );
+                iota |= sp.iota;
                 return (
                     Term::QuotElim {
                         motive: (*motive).clone(),
@@ -773,12 +868,12 @@ fn conv_struct_path(
         probe_capture();
     }
     let (a, ap) = if retry {
-        whnf_progress(env, ctx, &a_deferred)
+        whnf_progress_for_conversion(env, ctx, &a_deferred)
     } else {
         (a_deferred, WhnfProgress::default())
     };
     let (b, bp) = if retry {
-        whnf_progress(env, ctx, &b_deferred)
+        whnf_progress_for_conversion(env, ctx, &b_deferred)
     } else {
         (b_deferred, WhnfProgress::default())
     };
@@ -2305,6 +2400,76 @@ mod tests {
         .expect("closed-Nat wrapper remains SCT-admitted")[0]
     }
 
+    /// The recursive call occurs as a Nat-eliminator scrutinee inside the
+    /// predecessor method of another Nat elimination. Both groups must pass
+    /// SCT; the closed Bool only selects this neutral computation.
+    fn closed_iota_recursive_scrutinee_pair(
+        env: &mut GlobalEnv,
+        nat: GlobalId,
+        zero_id: GlobalId,
+        suc_id: GlobalId,
+        bool_id: GlobalId,
+        true_id: GlobalId,
+    ) -> GlobalId {
+        let nt = Term::indformer(nat, vec![]);
+        let bt = bool_ty(bool_id);
+        let motive = || {
+            Term::Ascript(
+                Box::new(Term::lam(nt.clone(), nt.clone())),
+                Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+            )
+        };
+        let zero = Term::constructor(zero_id, vec![]);
+        declare_recursive_group(
+            env,
+            vec![(vec![], Term::pi(nt.clone(), nt.clone()))],
+            |ids| {
+                let inner_step = Term::lam(
+                    nt.clone(),
+                    Term::lam(
+                        nt.clone(),
+                        Term::app(Term::constructor(suc_id, vec![]), Term::var(0)),
+                    ),
+                );
+                let inner = Term::Elim {
+                    fam: nat,
+                    level_args: vec![],
+                    params: vec![],
+                    motive: Box::new(motive()),
+                    methods: vec![zero.clone(), inner_step],
+                    indices: vec![],
+                    scrut: Box::new(Term::app(cref0(ids[0]), Term::var(1))),
+                };
+                let outer_nat = Term::Elim {
+                    fam: nat,
+                    level_args: vec![],
+                    params: vec![],
+                    motive: Box::new(motive()),
+                    methods: vec![
+                        zero.clone(),
+                        Term::lam(nt.clone(), Term::lam(nt.clone(), inner)),
+                    ],
+                    indices: vec![],
+                    scrut: Box::new(Term::var(0)),
+                };
+                let closed_bool = Term::Elim {
+                    fam: bool_id,
+                    level_args: vec![],
+                    params: vec![],
+                    motive: Box::new(Term::Ascript(
+                        Box::new(Term::lam(bt.clone(), nt.clone())),
+                        Box::new(Term::pi(bt.clone(), Term::Type(Level::zero()))),
+                    )),
+                    methods: vec![outer_nat.clone(), outer_nat],
+                    indices: vec![],
+                    scrut: Box::new(bool_ctor(true_id)),
+                };
+                vec![Term::lam(nt.clone(), closed_bool)]
+            },
+        )
+        .expect("recursive-call-in-scrutinee must be SCT-admitted")[0]
+    }
+
     /// Durable invariant, `17 §3.5`: unrelated closed ι cannot erase the
     /// identity boundary of two recursive heads beneath a stuck eliminator.
     #[test]
@@ -2355,6 +2520,33 @@ mod tests {
         assert!(delta_probe::captures() >= 1, "the pair must reach the δ-ledger");
         assert!(delta_probe::iotas() >= 1, "the closed Nat scrutinee must ι-reduce");
         assert_eq!(delta_probe::refusals(), 1, "the recurrent hard pair must refuse");
+    }
+
+    /// Durable invariant, `17 §3.5`: an unexecuted recursive call in an
+    /// eliminator's scrutinee remains a symbolic cross-identity boundary.
+    #[test]
+    fn recursive_call_in_scrutinee_under_closed_iota_refuses() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, _, true_id) = declare_bool(&mut env);
+        let (nat, zero_id, suc_id) = declare_nat_for_iota(&mut env);
+        let c = closed_iota_recursive_scrutinee_pair(
+            &mut env, nat, zero_id, suc_id, bool_id, true_id,
+        );
+        let d = closed_iota_recursive_scrutinee_pair(
+            &mut env, nat, zero_id, suc_id, bool_id, true_id,
+        );
+        assert_ne!(c, d);
+        let mut ctx = Context::new();
+        ctx.push(Term::indformer(nat, vec![]));
+        let lhs = Term::app(cref0(c), Term::var(0));
+        let rhs = Term::app(cref0(d), Term::var(0));
+        assert_typed(&env, &ctx, &lhs);
+        assert_typed(&env, &ctx, &rhs);
+        delta_probe::reset();
+        assert!(!convert_type(&env, &ctx, &lhs, &rhs));
+        assert!(delta_probe::captures() >= 1, "scrutinee calls must enter the ledger");
+        assert!(delta_probe::iotas() >= 1, "closed Bool selector must execute");
+        assert!(delta_probe::refusals() >= 1, "symbolic recursive calls must refuse");
     }
 
     fn declare_is_even(
@@ -2439,7 +2631,176 @@ mod tests {
             "neutral twin recursion cannot use ι as an equality hypothesis"
         );
         assert!(delta_probe::captures() >= 1, "neutral twins must reach the ledger");
-        assert_eq!(delta_probe::refusals(), 1, "neutral recurrence must refuse");
+        assert!(delta_probe::refusals() >= 1, "neutral recurrence must refuse");
+    }
+
+    fn declare_mutual_even_odd(
+        env: &mut GlobalEnv,
+        nat: GlobalId,
+        bool_id: GlobalId,
+        false_id: GlobalId,
+        true_id: GlobalId,
+    ) -> (GlobalId, GlobalId) {
+        let nt = Term::indformer(nat, vec![]);
+        let bt = bool_ty(bool_id);
+        let ty = Term::pi(nt.clone(), bt.clone());
+        let ids = declare_recursive_group(
+            env,
+            vec![(vec![], ty.clone()), (vec![], ty)],
+            |ids| {
+                let body = |callee: GlobalId, base: GlobalId| {
+                    let method = Term::lam(
+                        nt.clone(),
+                        Term::lam(bt.clone(), Term::app(cref0(callee), Term::var(1))),
+                    );
+                    Term::lam(
+                        nt.clone(),
+                        Term::Elim {
+                            fam: nat,
+                            level_args: vec![],
+                            params: vec![],
+                            motive: Box::new(Term::Ascript(
+                                Box::new(Term::lam(nt.clone(), bt.clone())),
+                                Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+                            )),
+                            methods: vec![bool_ctor(base), method],
+                            indices: vec![],
+                            scrut: Box::new(Term::var(0)),
+                        },
+                    )
+                };
+                vec![body(ids[1], true_id), body(ids[0], false_id)]
+            },
+        )
+        .expect("mutual even/odd must be admitted as one SCT group");
+        (ids[0], ids[1])
+    }
+
+    /// Durable invariant, `17 §3.5`: distinct mutual SCCs must not acquire a
+    /// cyclic cross-group equality through their unexecuted step methods.
+    #[test]
+    fn mutual_even_odd_neutral_twins_refuse_without_affecting_closed_three() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let (nat, zero_id, suc_id) = declare_nat_for_iota(&mut env);
+        let (even_a, odd_a) =
+            declare_mutual_even_odd(&mut env, nat, bool_id, false_id, true_id);
+        let (even_b, odd_b) =
+            declare_mutual_even_odd(&mut env, nat, bool_id, false_id, true_id);
+        assert_ne!(even_a, even_b);
+        assert_ne!(odd_a, odd_b);
+        for id in [even_a, odd_a, even_b, odd_b] {
+            assert!(env.is_recursive_transparent(id), "every mutual member is recursive");
+        }
+        let empty = Context::new();
+        let three = nat_value(zero_id, suc_id, 3);
+        let closed_a = Term::app(cref0(even_a), three.clone());
+        let closed_b = Term::app(cref0(even_b), three);
+        assert_typed(&env, &empty, &closed_a);
+        assert_typed(&env, &empty, &closed_b);
+        assert_eq!(whnf(&env, &empty, &closed_a), bool_ctor(false_id));
+        assert_eq!(whnf(&env, &empty, &closed_b), bool_ctor(false_id));
+        assert!(convert_type(&env, &empty, &closed_a, &closed_b));
+
+        let mut open = Context::new();
+        open.push(Term::indformer(nat, vec![]));
+        let open_a = Term::app(cref0(even_a), Term::var(0));
+        let open_b = Term::app(cref0(even_b), Term::var(0));
+        assert_typed(&env, &open, &open_a);
+        assert_typed(&env, &open, &open_b);
+        delta_probe::reset();
+        assert!(!convert_type(&env, &open, &open_a, &open_b));
+        assert!(delta_probe::captures() >= 1, "mutual comparison must reach the ledger");
+        assert!(delta_probe::refusals() >= 1, "neutral mutual recurrence must refuse");
+    }
+
+    fn literal_is_even_body(env: &GlobalEnv, id: GlobalId, input: &Term) -> Term {
+        let (_, body) = env.transparent_body(id).expect("checked isEven body");
+        let Term::Lam(_, body) = body else {
+            panic!("isEven definition must be a lambda");
+        };
+        subst0(&body, input)
+    }
+
+    fn bool_elim_on_scrut(
+        bool_id: GlobalId,
+        false_id: GlobalId,
+        true_id: GlobalId,
+        scrut: Term,
+    ) -> Term {
+        let bt = bool_ty(bool_id);
+        Term::Elim {
+            fam: bool_id,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(Term::Ascript(
+                Box::new(Term::lam(bt.clone(), bt.clone())),
+                Box::new(Term::pi(bt, Term::Type(Level::zero()))),
+            )),
+            methods: vec![bool_ctor(false_id), bool_ctor(true_id)],
+            indices: vec![],
+            scrut: Box::new(scrut),
+        }
+    }
+
+    /// Durable invariant, `17 §3.3`/§3.5: a deferred scrutinee must still
+    /// compare equal to its literal δ-unfolding, not become syntactically rigid.
+    /// This pin uses the checked declaration's stored body as the independent
+    /// expected constructor, not the conversion reducer's output.
+    #[test]
+    fn stuck_bool_elim_compares_with_literal_is_even_delta_unfolding() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let (nat, _, _) = declare_nat_for_iota(&mut env);
+        let not_id = declare_not(&mut env, bool_id, false_id, true_id);
+        let a = declare_is_even(&mut env, nat, bool_id, true_id, not_id);
+        let mut ctx = Context::new();
+        ctx.push(Term::indformer(nat, vec![]));
+        let folded = Term::app(cref0(a), Term::var(0));
+        let literal = literal_is_even_body(&env, a, &Term::var(0));
+        assert_ne!(folded, literal, "δ must visibly change this scrutinee");
+        assert_typed(&env, &ctx, &folded);
+        assert_typed(&env, &ctx, &literal);
+        let lhs = bool_elim_on_scrut(bool_id, false_id, true_id, folded.clone());
+        let rhs = bool_elim_on_scrut(bool_id, false_id, true_id, literal.clone());
+        assert_typed(&env, &ctx, &lhs);
+        assert_typed(&env, &ctx, &rhs);
+        delta_probe::reset();
+        assert!(
+            convert_type(&env, &ctx, &lhs, &rhs),
+            "a stuck folded recursive scrutinee converts to its literal δ body"
+        );
+        assert!(delta_probe::unfolds() >= 1, "comparison must retry δ on demand");
+
+        // Public whnf retains the historical eager stuck-eliminator rebuild;
+        // only the private conversion reducer may leave `folded` in place.
+        let eager = whnf(&env, &ctx, &lhs);
+        let Term::Elim { fam, scrut, .. } = eager else {
+            panic!("open Bool elimination must remain stuck");
+        };
+        assert_eq!(fam, bool_id);
+        assert_eq!(scrut.as_ref(), &literal);
+        assert_ne!(scrut.as_ref(), &folded);
+    }
+
+    /// Durable invariant: an acyclic transparent scrutinee still computes to
+    /// a constructor and its elimination performs ι, including in conversion.
+    #[test]
+    fn nonrecursive_transparent_bool_scrutinee_still_iota_reduces() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let bt = bool_ty(bool_id);
+        let constant = declare_def(&mut env, vec![], bt, bool_ctor(true_id))
+            .expect("checked nonrecursive Bool constant");
+        let source = bool_elim_on_scrut(bool_id, false_id, true_id, cref0(constant));
+        let expected = bool_ctor(true_id);
+        let ctx = Context::new();
+        assert_typed(&env, &ctx, &source);
+        assert_eq!(whnf(&env, &ctx, &source), expected);
+        delta_probe::reset();
+        assert!(convert_type(&env, &ctx, &source, &expected));
+        assert!(delta_probe::iotas() >= 1, "real constructor selection must run");
+        assert_eq!(normalize(&env, &ctx, &source), expected);
     }
 
     /// Open-recursive case (recurring pair, no ι, one refusal, false): two
