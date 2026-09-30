@@ -16,7 +16,7 @@
 //! never a hand-fed expected value
 //! ([[conformance-hand-feeds-the-deliverable]]).
 
-use ken_elaborator::{ElabEnv, NumericLitVal};
+use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{convert, convert_type, infer, whnf, Context, Decl, Term};
 
@@ -150,6 +150,37 @@ fn decimal_add_same_exponent() {
 }
 
 // ── AC-C1 — Char refinement (soundness) ─────────────────────────────────────
+
+/// surface/numbers/char-excludes-surrogates (soundness)
+///
+/// Promise class: durable invariant.
+/// MEASURED: a valid character literal elaborates, while the surrogate escape
+/// is an `InvalidEscape` with the exact scalar-specific diagnostic.
+/// CLAIMED: the character-literal route excludes surrogate code points.
+/// THE GAP: this pins only the literal route; it does not establish named
+/// refinement introductions.
+#[test]
+fn char_literal_rejects_surrogate_escape() {
+    let mut env = ElabEnv::new().expect("prelude init");
+    env.elaborate_decl_v1("const a : Char = 'a'")
+        .expect("a valid scalar character literal elaborates as Char");
+
+    let error = env
+        .elaborate_decl_v1(r"const b : Char = '\u{D800}'")
+        .expect_err("a surrogate character escape must be rejected");
+    assert!(
+        matches!(
+            &error,
+            ElabError::InvalidEscape { reason, .. }
+                if reason == "unicode escape is not a valid scalar value"
+        ),
+        "surrogate rejection must identify the invalid scalar: {error:?}"
+    );
+    assert_eq!(
+        error.to_string(),
+        "invalid escape at 18-26: unicode escape is not a valid scalar value"
+    );
+}
 
 /// surface/numbers/char-is-isscalar-refinement (soundness)
 #[test]
