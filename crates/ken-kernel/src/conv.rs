@@ -730,6 +730,8 @@ mod delta_probe {
         static HARD_CONTINUES: Cell<u64> = const { Cell::new(0) };
         static REDUCER_ENTRIES: Cell<u64> = const { Cell::new(0) };
         static STRUCT_ENTRIES: Cell<u64> = const { Cell::new(0) };
+        static TRACKED_HEAD: Cell<Option<super::GlobalId>> = const { Cell::new(None) };
+        static TRACKED_HEAD_NONEMPTY: Cell<u64> = const { Cell::new(0) };
     }
     pub(super) fn reset() {
         UNFOLDS.with(|c| c.set(0));
@@ -739,6 +741,8 @@ mod delta_probe {
         HARD_CONTINUES.with(|c| c.set(0));
         REDUCER_ENTRIES.with(|c| c.set(0));
         STRUCT_ENTRIES.with(|c| c.set(0));
+        TRACKED_HEAD.with(|c| c.set(None));
+        TRACKED_HEAD_NONEMPTY.with(|c| c.set(0));
     }
     pub(super) fn bump_reducer_entry() {
         REDUCER_ENTRIES.with(|c| c.set(c.get() + 1));
@@ -751,6 +755,18 @@ mod delta_probe {
     }
     pub(super) fn struct_entries() -> u64 {
         STRUCT_ENTRIES.with(|c| c.get())
+    }
+    pub(super) fn track_head(id: super::GlobalId) {
+        TRACKED_HEAD.with(|c| c.set(Some(id)));
+    }
+    pub(super) fn tracked_head() -> Option<super::GlobalId> {
+        TRACKED_HEAD.with(|c| c.get())
+    }
+    pub(super) fn bump_tracked_head_nonempty() {
+        TRACKED_HEAD_NONEMPTY.with(|c| c.set(c.get() + 1));
+    }
+    pub(super) fn tracked_head_nonempty() -> u64 {
+        TRACKED_HEAD_NONEMPTY.with(|c| c.get())
     }
     pub(super) fn bump_unfold() {
         UNFOLDS.with(|c| c.set(c.get() + 1));
@@ -795,12 +811,24 @@ fn probe_reducer_entry() {}
 
 #[cfg(test)]
 #[inline]
-fn probe_struct_entry() {
+fn probe_struct_entry(path: &[DeltaPathEntry], a: &Term, b: &Term) {
     delta_probe::bump_struct_entry();
+    if !path.is_empty() {
+        if let Some(tracked) = delta_probe::tracked_head() {
+            let (ha, _) = peel_app(a);
+            let (hb, _) = peel_app(b);
+            if matches!((&ha, &hb),
+                (Term::Const { id: ia, .. }, Term::Const { id: ib, .. })
+                if *ia == tracked && *ib == tracked)
+            {
+                delta_probe::bump_tracked_head_nonempty();
+            }
+        }
+    }
 }
 #[cfg(not(test))]
 #[inline(always)]
-fn probe_struct_entry() {}
+fn probe_struct_entry(_path: &[DeltaPathEntry], _a: &Term, _b: &Term) {}
 
 #[cfg(test)]
 #[inline]
@@ -964,7 +992,7 @@ fn conv_struct_path_memo(
     path: &[DeltaPathEntry],
     memo: Option<&SpineFailure<'_>>,
 ) -> bool {
-    probe_struct_entry();
+    probe_struct_entry(path, a, b);
     // Syntactic-identity fast path (pre-δ, `13 §6.2` step 1): identical
     // de Bruijn terms are convertible with no reduction and no ledger touch.
     if a == b {
@@ -1353,6 +1381,37 @@ mod tests {
     use super::*;
     use crate::term::{Level, LevelVar};
 
+    // Stable bound for the checked and six synthetic no-soft-transition rows.
+    const SPINE_LINEAR_ENTRY_FACTOR: u64 = 16;
+
+    fn declare_checked_nat_pred(env: &mut GlobalEnv, nat: GlobalId, zero: GlobalId) -> GlobalId {
+        let nt = Term::indformer(nat, vec![]);
+        declare_def(
+            env,
+            vec![],
+            Term::pi(nt.clone(), nt.clone()),
+            Term::lam(
+                nt.clone(),
+                Term::Elim {
+                    fam: nat,
+                    level_args: vec![],
+                    params: vec![],
+                    motive: Box::new(Term::Ascript(
+                        Box::new(Term::lam(nt.clone(), nt.clone())),
+                        Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+                    )),
+                    methods: vec![
+                        Term::constructor(zero, vec![]),
+                        Term::lam(nt.clone(), Term::lam(nt.clone(), Term::var(1))),
+                    ],
+                    indices: vec![],
+                    scrut: Box::new(Term::var(0)),
+                },
+            ),
+        )
+        .expect("checked non-recursive pred")
+    }
+
     /// Durable invariant (`17 §3.5`, §5): a negative same-head spine comparison
     /// is not recomputed at every level of its own non-recursive δ retry.
     /// MEASURED: `conv_struct_path` entries, including failed comparisons, for
@@ -1436,9 +1495,9 @@ mod tests {
                 assert!(!convert(&env, &ctx, &ty, &left, &right), "{shape} k={k}");
                 let entries = delta_probe::struct_entries();
                 assert!(
-                    entries > 0 && entries <= 16 * k,
+                    entries > 0 && entries <= SPINE_LINEAR_ENTRY_FACTOR * k,
                     "{shape} k={k}: {entries} structural entries, limit {}",
-                    16 * k
+                    SPINE_LINEAR_ENTRY_FACTOR * k
                 );
 
                 let same_rebuilt = nested(
@@ -1462,30 +1521,7 @@ mod tests {
         // Real checked admission: the original non-recursive `pred` witness.
         let (nat, zero, _) = declare_nat_for_iota(&mut env);
         let nt = Term::indformer(nat, vec![]);
-        let pred = declare_def(
-            &mut env,
-            vec![],
-            Term::pi(nt.clone(), nt.clone()),
-            Term::lam(
-                nt.clone(),
-                Term::Elim {
-                    fam: nat,
-                    level_args: vec![],
-                    params: vec![],
-                    motive: Box::new(Term::Ascript(
-                        Box::new(Term::lam(nt.clone(), nt.clone())),
-                        Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
-                    )),
-                    methods: vec![
-                        Term::constructor(zero, vec![]),
-                        Term::lam(nt.clone(), Term::lam(nt.clone(), Term::var(1))),
-                    ],
-                    indices: vec![],
-                    scrut: Box::new(Term::var(0)),
-                },
-            ),
-        )
-        .expect("checked non-recursive pred");
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
         assert!(!env.is_recursive_transparent(pred));
         let mut nat_ctx = Context::new();
         nat_ctx.push(nt.clone());
@@ -1499,7 +1535,7 @@ mod tests {
             assert!(!convert(&env, &nat_ctx, &nt, &left, &right));
             let entries = delta_probe::struct_entries();
             assert!(
-                entries > 0 && entries <= 16 * k,
+                entries > 0 && entries <= SPINE_LINEAR_ENTRY_FACTOR * k,
                 "checked pred k={k}: {entries} structural entries"
             );
             let same_rebuilt = nested(
@@ -1528,6 +1564,65 @@ mod tests {
             assert_typed(&env, &nat_ctx, &left);
             assert_typed(&env, &nat_ctx, &right);
             assert!(convert(&env, &nat_ctx, &nt, &left, &right), "k0 k={k}");
+        }
+    }
+
+    /// Non-empty-path pin (`17 §3.5`, §5): a recursive `map` head exposes the
+    /// checked `pred^k x`/`pred^k y` pair beneath its δ-origin ledger.
+    /// MEASURED: `convert`'s structural entries at k=8/16/20 after a real
+    /// recursive head captured an origin; the same linear bound as the six
+    /// shape rows applies. CLAIMED: this checked recursive-head descendant
+    /// does not restart exponential work under its nonempty ledger path.
+    /// GAP: the entry counter excludes whnf/allocations, and this fixture
+    /// does not establish a linear bound for *soft*-to-hard path transitions.
+    /// `captures()>0` and a tracked pred-head comparison on a nonempty path
+    /// establish the reaching case. The empty-path pair is pinned above.
+    #[test]
+    fn checked_pred_under_recursive_delta_origin_has_linear_structural_entries() {
+        let mut env = GlobalEnv::new();
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
+        let (list, nil, cons) = declare_list(&mut env);
+        let map = declare_map(&mut env, list, nil, cons);
+        let list_nt = list_at(list, Level::zero(), nt.clone());
+        assert!(!env.is_recursive_transparent(pred));
+        assert!(env.is_recursive_transparent(map));
+        let mut ctx = Context::new();
+        ctx.push(nt.clone()); // x, de Bruijn 2
+        ctx.push(nt.clone()); // y, de Bruijn 1
+        ctx.push(list_nt.clone()); // shared list, de Bruijn 0
+        let nested_pred =
+            |k, seed| (0..k).fold(seed, |arg, _| Term::app(Term::const_(pred, vec![]), arg));
+        for k in [8, 16, 20] {
+            let left_pred = nested_pred(k, Term::var(2));
+            let right_pred = nested_pred(k, Term::var(1));
+            let left_f = Term::lam(nt.clone(), weaken(&left_pred, 1));
+            let right_f = Term::lam(nt.clone(), weaken(&right_pred, 1));
+            let left = map_apply(map, nt.clone(), nt.clone(), left_f, Term::var(0));
+            let right = map_apply(map, nt.clone(), nt.clone(), right_f, Term::var(0));
+            assert_typed(&env, &ctx, &left);
+            assert_typed(&env, &ctx, &right);
+            delta_probe::reset();
+            delta_probe::track_head(pred);
+            assert!(
+                !convert(&env, &ctx, &list_nt, &left, &right),
+                "map/pred k={k}"
+            );
+            assert!(
+                delta_probe::captures() > 0,
+                "map/pred k={k}: origin captured"
+            );
+            assert!(
+                delta_probe::tracked_head_nonempty() > 0,
+                "map/pred k={k}: pred pair compared beneath a ledger path"
+            );
+            let entries = delta_probe::struct_entries();
+            assert!(
+                entries > 0 && entries <= SPINE_LINEAR_ENTRY_FACTOR * k,
+                "map/pred k={k}: {entries} structural entries, limit {}",
+                SPINE_LINEAR_ENTRY_FACTOR * k
+            );
         }
     }
 
