@@ -97,6 +97,34 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   }
 "#;
 
+// AC-1: a closed Failure 5 through a composed Ret and the nearest runtime
+// Failure byte must agree with the interpreter on both selected bytes.
+#[cfg(target_os = "linux")]
+fn root_exit_discriminator_source(runtime_failure: bool) -> String {
+    let source = SHARED_BIND_SOURCE
+        .replace(
+            "proc decide (byte : UInt8)",
+            "proc decide (byte : UInt8) (fallback : ExitCode) (runtime_code : UInt8)",
+        )
+        .replace("False |-> Failure 7", "False |-> fallback")
+        .replace("(print_line \"accepted\")", "(print_line \"ok\")")
+        .replace("ExitCode Success);", "ExitCode (Failure 5));")
+        .replace("(print_line \"rejected\")", "(print_line \"bad\")")
+        .replace(
+            "Some byte |-> decide byte",
+            "Some byte |-> decide byte (Failure 9) byte",
+        );
+    assert_eq!(source.matches("ExitCode (Failure 5));").count(), 1);
+    if runtime_failure {
+        source.replace(
+            "ExitCode (Failure 5));",
+            "ExitCode (Failure runtime_code));",
+        )
+    } else {
+        source
+    }
+}
+
 // The same shared-bind and ProcessInput harness as SHARED_BIND_SOURCE, but the
 // inner result and outer case family are Option. Neither arm has native parity
 // authorization: both remain on the pre-D1 fail-closed build path.
@@ -382,6 +410,64 @@ fn option_outer_family_refuses_before_artifact_while_exit_code_uses_d1() {
     eprintln!("RT_TREE_OPTION_REFUSAL {message}");
 
     shared_bind_exit_code_arm_matches_interpreter(2, b"rejected\n", 7);
+}
+
+// Promise class: durable invariant. MEASURED: both selected bytes in each
+// shared-bind variant, with full native/interpreter observation parity and
+// distinct terminal codes. CLAIMED: a closed ExitCode and a runtime ExitCode
+// reach the same checked root boundary. THE GAP: the two fixtures alone do not
+// cover other producer families; the Option refusal is a separate pin.
+#[cfg(target_os = "linux")]
+#[test]
+fn root_exit_closed_and_runtime_failure_agree_on_both_bytes() {
+    for (runtime_failure, label) in [(false, "closed"), (true, "runtime")] {
+        let source = root_exit_discriminator_source(runtime_failure);
+        let dir = tempfile::tempdir().unwrap();
+        let (artifact, hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                "rt-root-exit-closed-and-runtime",
+                dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        });
+        assert!(hits > 0, "both ExitCode producers must use D1");
+        let artifact = artifact.expect("both checked variants emit an artifact");
+        for (byte, exit, stdout) in [
+            (
+                1_u8,
+                if runtime_failure { 1 } else { 5 },
+                b"ok\n".as_slice(),
+            ),
+            (2_u8, 9, b"bad\n".as_slice()),
+        ] {
+            let mut host = ken_interp::PosixHost::new_at(dir.path());
+            let interpreted = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &[b"ken".to_vec(), vec![byte]],
+                &[],
+                dir.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .expect("same checked source executes in interpreter");
+            assert_eq!(interpreted.exit_status, exit);
+            assert_eq!(interpreted.stdout, stdout);
+            assert_eq!(interpreted.effect_trace.len(), 1);
+            let native = ken_runtime::run_bound_process_effect_observation(
+                &artifact.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: vec![std::ffi::OsString::from_vec(vec![byte])],
+                    environment: Vec::new(),
+                    cwd: dir.path().to_owned(),
+                    plan_hash: artifact.plan_transport_hash,
+                },
+            );
+            eprintln!("RT_ROOT_EXIT_DISCRIMINATOR {label} byte={byte} native={native:?}");
+            assert_eq!(native.expect("native exit must not trap"), interpreted);
+        }
+    }
 }
 
 // ROOT-EXIT AC-1 witness, deliberately ignored until its root-boundary decode
