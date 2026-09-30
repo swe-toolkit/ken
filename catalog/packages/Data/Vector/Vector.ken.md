@@ -125,6 +125,19 @@ theorem lookup_fzero
       (a : Type) (n : Nat) (x : a) (xs : Vec a n)
     : Equal a (lookup a (Suc n) (VCons a n x xs) (FZero n)) x =
   Refl
+
+theorem lookup_fsuc
+      (a : Type) (n : Nat) (x : a) (xs : Vec a n) (i : Fin n)
+    : Equal a (lookup a (Suc n) (VCons a n x xs) (FSuc n i)) (lookup a n xs i) =
+  Refl
+
+theorem map_vcons
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (x : a) (xs : Vec a n)
+    : Equal
+        (Vec b (Suc n))
+        (map a b (Suc n) f (VCons a n x xs))
+        (VCons b n (f x) (map a b n f xs)) =
+  Refl
 ```
 
 ## Using it
