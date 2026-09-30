@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-SIBLING-MATCH-TAIL
 title: "An indexed sibling binder whose index was fixed by matching a different scrutinee is not refined consistently: its tail does not reduce at an open index, a goal mentioning it cannot be classified, and its own match fails coverage. Name the mechanism, then repair match compilation"
-status: draft
+status: ready
 owner: language
 size: M
 tier: T1
@@ -9,7 +9,7 @@ gate: architect
 depends_on: []
 blocks: []
 github: null
-origin: "Architect rulings evt_5p7xx5e6tmegw and evt_31z4jzrt6v8wf (scope widened) on the CAT-VECTOR-DEFERRED-LAWS zip_with_vcons and lookup_zip_with stops: a capability gap in elaborator match compilation, not a proof-shape problem. Steward-filed per COORDINATION section 2. Scheduling it on the Language ring is an operator lane question."
+origin: "Architect rulings evt_5p7xx5e6tmegw and evt_31z4jzrt6v8wf (scope widened) on the CAT-VECTOR-DEFERRED-LAWS zip_with_vcons and lookup_zip_with stops: a capability gap in elaborator match compilation, not a proof-shape problem. Steward-filed per COORDINATION section 2. Operator 2026-09-30 ('concur with recs'): next on the Language ring, ahead of the rest of LANG-SESSION-SCOPE."
 ---
 
 # Refinement of an indexed sibling binder
