@@ -105,7 +105,9 @@ with it.
   - `trusted_base()` is unchanged.
   - The nested-Cast cost is re-measured against the AC-0 baseline.
 - **AC-2b (legacy raw fixtures, Architect `evt_7k85x8en4fekz`).** Scope adds
-  `crates/ken-kernel/tests/acceptance.rs`.
+  `crates/ken-kernel/tests/acceptance.rs` and
+  `crates/ken-kernel/tests/k2c_series2.rs` (`j_dependent_motive_fires` and
+  `j_constant_motive_still_reduces`, found by the every-target sweep).
   - `k2_j_nonrefl_reduces_not_stuck` moves to a typed redex with an
     ascribed motive, and J-cast still fires.
   - `k2_seam1b_eq_inductive_dependent_stuck` instantiates the `Vec` level
