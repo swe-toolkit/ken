@@ -15269,8 +15269,8 @@ fn infer_active_pattern_alias(
 #[inline(never)]
 fn finish_pattern_alias_frame(
     cx: &mut ElabCtx,
-    raw_methods_result: Result<Vec<Term>, ElabError>,
-) -> Result<Vec<Term>, ElabError> {
+    raw_methods_result: Result<Vec<Option<Term>>, ElabError>,
+) -> Result<Vec<Option<Term>>, ElabError> {
     let replacements = cx
         .pattern_alias_replacement_frames
         .pop()
@@ -15288,7 +15288,7 @@ fn finish_pattern_alias_frame(
     }
     Ok(raw_methods
         .into_iter()
-        .map(|method| finalize_pattern_aliases(&method, 0, &replacements))
+        .map(|method| method.map(|term| finalize_pattern_aliases(&term, 0, &replacements)))
         .collect())
 }
 
@@ -17284,16 +17284,6 @@ fn compile_match_matrix(
             // one recursive field deep), the enclosing split's own pending
             // continuation (its constant motive's codomain) is genuinely
             // owed and must be folded in.
-            let ret_ty = ret_ty_slot
-                .as_ref()
-                .expect("IH column reached before return type known")
-                .clone();
-            let ih_ty = tail_codomain(
-                &col_types[remaining + 1..],
-                &col_kinds[remaining + 1..],
-                &ret_ty,
-                real_depth_so_far,
-            );
             let rows = rows.into_iter().map(RowState::under_core_binder).collect();
             let inner = compile_match_matrix(
                 cx,
@@ -17307,6 +17297,19 @@ fn compile_match_matrix(
                 arm_used,
                 subsumed_by,
             )?;
+            // The first reachable bucket may be preceded by an omitted
+            // indexed constructor. Its first leaf is then inside this IH
+            // column, so defer the IH domain until that leaf infers R.
+            let ret_ty = ret_ty_slot
+                .as_ref()
+                .expect("IH column reached before return type known")
+                .clone();
+            let ih_ty = tail_codomain(
+                &col_types[remaining + 1..],
+                &col_kinds[remaining + 1..],
+                &ret_ty,
+                real_depth_so_far,
+            );
             Ok(Term::lam(ih_ty, weaken(&inner, 1)))
         }
         ColKind::Real => {
@@ -17447,7 +17450,7 @@ fn compile_match_matrix(
                 .map(RowState::enter_current_real_binder)
                 .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
                 .collect();
-            let raw_methods = build_ctor_buckets(
+            let raw_methods: Vec<Term> = build_ctor_buckets(
                 cx,
                 arms,
                 &ind0,
@@ -17462,7 +17465,11 @@ fn compile_match_matrix(
                 ret_ty_slot,
                 arm_used,
                 subsumed_by,
-            )?;
+                false,
+            )?
+            .into_iter()
+            .map(|method| method.expect("nested constructor coverage checked in bucket builder"))
+            .collect();
 
             // The split column itself is a fresh binder no surface pattern
             // named — resolver never counted it, so (like the IH slots
@@ -17544,7 +17551,8 @@ fn build_ctor_buckets(
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
-) -> Result<Vec<Term>, ElabError> {
+    allow_index_omission: bool,
+) -> Result<Vec<Option<Term>>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
 
     for (k0, c0) in ind0.constructors.iter().enumerate() {
@@ -17594,6 +17602,9 @@ fn build_ctor_buckets(
 
         let n_args0 = c0.args.len();
         if bucket.is_empty() {
+            if allow_index_omission {
+                continue;
+            }
             return Err(ElabError::ExhaustivenessError {
                 missing: missing_pattern_witness(cx, c0.id),
                 span: top_span.clone(),
@@ -17635,7 +17646,160 @@ fn build_ctor_buckets(
         methods[k0] = Some(inner);
     }
 
-    Ok(methods.into_iter().map(|m| m.unwrap()).collect())
+    Ok(methods)
+}
+
+/// Close one root matrix method against the kernel's constructor method type.
+/// Matrix leaves do not use the generated index evidence: only the outer
+/// constructor method gains the premise lambdas. Reuse the kernel's own IH
+/// domains, since the premise-carrying motive changes their result type too.
+fn close_inferred_index_method(
+    method: Option<Term>,
+    method_ty: Term,
+    premise_domains: &[Term],
+    field_count: usize,
+    ih_count: usize,
+    sentinel_region: usize,
+) -> Result<(Option<Term>, Vec<Term>), ElabError> {
+    let mut domains = Vec::with_capacity(field_count + ih_count);
+    let mut tail_ty = method_ty;
+    for _ in 0..field_count + ih_count {
+        let Term::Pi(domain, codomain) = tail_ty else {
+            return Err(ElabError::Internal(
+                "inferred indexed constructor method lost a field/IH domain".into(),
+            ));
+        };
+        domains.push(*domain);
+        tail_ty = *codomain;
+    }
+    let method = if let Some(mut method) = method {
+        for _ in 0..domains.len() {
+            let Term::Lam(_, body) = method else {
+                return Err(ElabError::Internal(
+                    "matrix method lost a constructor field/IH binder".into(),
+                ));
+            };
+            method = *body;
+        }
+        let premises_under_ih: Vec<_> = premise_domains
+            .iter()
+            .map(|premise| weaken(premise, ih_count as i64))
+            .collect();
+        let mut closed = wrap_premise_lams_finalized(method, &premises_under_ih, sentinel_region);
+        for domain in domains.iter().rev() {
+            closed = Term::lam(domain.clone(), closed);
+        }
+        Some(closed)
+    } else {
+        // The caller supplies the omitted constructor's Absurd method after
+        // checking whether one of these very premises proves Bottom.
+        None
+    };
+    Ok((method, domains))
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn finish_inferred_indexed_match(
+    cx: &mut ElabCtx,
+    ind: &InductiveDecl,
+    family: GlobalId,
+    level_args: &[Level],
+    params: &[Term],
+    scrut_indices: &[Term],
+    raw_methods: Vec<Option<Term>>,
+    result_ty: &Term,
+    scrut_core: Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let sentinel_region = cx.match_field_regions.len();
+    let zonked_ctx = Context {
+        types: cx
+            .ctx
+            .types
+            .iter()
+            .map(|ty| cx.metas.zonk_term(ty))
+            .collect(),
+    };
+    let motive_ctx = motive_context_at(&zonked_ctx, ind, params, level_args);
+    let motive = build_checked_dependent_motive(
+        cx,
+        &motive_ctx,
+        ind,
+        family,
+        params,
+        scrut_indices,
+        weaken(result_ty, (ind.indices.len() + 1) as i64),
+        false,
+        RecursiveFieldIndexPath::CoupledRefinement,
+        span,
+    )?;
+    let mut methods = Vec::with_capacity(ind.constructors.len());
+    for (ordinal, (ctor, raw)) in ind.constructors.iter().zip(raw_methods).enumerate() {
+        let field_count = ctor.args.len();
+        let ih_count = recursive_shapes(cx.env, ctor, family, ind.params.len())
+            .map_err(|error| ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            })?
+            .len();
+        let targets = ctor_target_indices(ctor, ind, params, level_args, field_count);
+        let premises = method_index_premises(ind, params, &targets, scrut_indices, field_count);
+        let expected_method = method_type(cx.env, ind, ordinal, &motive, params, level_args)
+            .map_err(|error| ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            })?;
+        let (method, domains) = close_inferred_index_method(
+            raw,
+            expected_method,
+            &premises,
+            field_count,
+            ih_count,
+            sentinel_region,
+        )?;
+        if let Some(method) = method {
+            methods.push(method);
+            continue;
+        }
+        let old_depth = cx.ctx.len();
+        for domain in &domains {
+            cx.ctx.push(domain.clone());
+        }
+        let premises_under_ih: Vec<_> = premises
+            .iter()
+            .map(|premise| weaken(premise, ih_count as i64))
+            .collect();
+        let omitted = synthesize_omitted_index_method(
+            cx,
+            &premises_under_ih,
+            &weaken(result_ty, (field_count + ih_count) as i64),
+            sentinel_region,
+            missing_pattern_witness(cx, ctor.id),
+            span,
+        );
+        cx.ctx.types.truncate(old_depth);
+        let mut omitted = omitted?;
+        for domain in domains.iter().rev() {
+            omitted = Term::lam(domain.clone(), omitted);
+        }
+        methods.push(omitted);
+    }
+    let mut elim = Term::Elim {
+        fam: family,
+        level_args: level_args.to_vec(),
+        params: params.to_vec(),
+        motive,
+        methods,
+        indices: scrut_indices.to_vec(),
+        scrut: Box::new(scrut_core),
+    };
+    let top_premises = method_index_premises(ind, params, scrut_indices, scrut_indices, 0);
+    for premise in &top_premises {
+        let proof = synth_generated_index_evidence(cx.env, &cx.ctx, premise, span)?;
+        elim = Term::app(elim, proof);
+    }
+    Ok(elim)
 }
 
 #[inline(never)]
@@ -18146,6 +18310,16 @@ fn infer_match(
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by: Vec<Vec<usize>> = vec![Vec::new(); arms.len()];
 
+    let index_coverage = !ind.indices.is_empty()
+        && ind.constructors.iter().any(|constructor| {
+            !rows.iter().any(|row| match &row.real_pats[0].kind {
+                RPatKind::Ctor(_, _) | RPatKind::CheckedCtor(_, _, _) => {
+                    pattern_ctor_id(cx, &row.real_pats[0].kind) == Some(constructor.id)
+                }
+                RPatKind::Wild | RPatKind::Var(_, _) => true,
+                _ => false,
+            })
+        });
     let raw_methods_result = build_ctor_buckets(
         cx,
         arms,
@@ -18161,6 +18335,7 @@ fn infer_match(
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
+        index_coverage,
     );
     let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result)?;
 
@@ -18183,6 +18358,29 @@ fn infer_match(
     }
 
     let ret_ty = ret_ty_slot.unwrap_or_else(|| Term::ty(Level::Zero));
+    if index_coverage {
+        let Term::IndFormer { level_args, .. } = &head else {
+            unreachable!("inductive scrutinee head checked above")
+        };
+        let (params, scrut_indices) = params_terms.split_at(m);
+        let elim = finish_inferred_indexed_match(
+            cx,
+            &ind,
+            d_id,
+            level_args,
+            params,
+            scrut_indices,
+            raw_methods,
+            &ret_ty,
+            scrut_core,
+            span,
+        )?;
+        return Ok((elim, ret_ty));
+    }
+    let raw_methods: Vec<_> = raw_methods
+        .into_iter()
+        .map(|method| method.expect("complete inferred match has all constructor methods"))
+        .collect();
 
     // 7. Build the constant motive: Ascript(λ(x: D). R, D → Type ℓ)
     //    The kernel can't infer the type of a bare lambda, so we annotate.
