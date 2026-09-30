@@ -104,6 +104,20 @@ with it.
   - The 57-package census shows no conversion verdict change.
   - `trusted_base()` is unchanged.
   - The nested-Cast cost is re-measured against the AC-0 baseline.
+- **AC-2b (legacy raw fixtures, Architect `evt_7k85x8en4fekz`).** Scope adds
+  `crates/ken-kernel/tests/acceptance.rs`.
+  - `k2_j_nonrefl_reduces_not_stuck` moves to a typed redex with an
+    ascribed motive, and J-cast still fires.
+  - `k2_seam1b_eq_inductive_dependent_stuck` instantiates the `Vec` level
+    and asserts the §2.2 reduct with a typed witness. If the spec makes it
+    neutral, it asserts neutral and is renamed to match.
+  - Each legacy ill-typed redex gets a control that asserts it stays
+    neutral, with no fabricated witness and no panic.
+  - Every `ken-kernel` test target and the kernel conformance suites are
+    run scoped before QA, and every changed raw-fixture observation is
+    listed. A change on a typed input is a stop to the Architect.
+  - The nested-Cast series at depths 8/16/32/64 is reported beside the AC-0
+    baseline. A super-linear jump is a stop to the Architect.
 - **AC-3 (J admission fences).**
   - The committed third-field row (`Nat; Vec Nat x1; Vec Nat x1`) computes,
     and `infer(reduct) ≡ infer(redex)`.
