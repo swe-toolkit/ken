@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ENV-RAW-INSTALL-CRATE-PRIVATE
 title: "Code outside the kernel can still install a Decl::Transparent body or pop a declaration with no check, because GlobalEnv::add_decl and remove_last are pub. Route every external use through a checked kernel entry point and make both raw primitives crate-private"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1

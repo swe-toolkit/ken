@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-SEQUENTIAL-BRACKETS
 title: "Native execution of two sequential resource brackets: a program that uses two withBuffer brackets in sequence builds and runs natively with the observation the interpreter gives, instead of refusing in object emission at the BoundaryCarrier carried-recursive-hypothesis arity check"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect

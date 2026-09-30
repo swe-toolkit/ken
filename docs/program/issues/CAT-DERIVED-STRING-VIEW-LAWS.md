@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-STRING-VIEW-LAWS
 title: "Prove the Derived String concat and slice laws with no new trust: each law either is stated on the List Char side or carries the round trip for its specific list as an explicit premise, because the unconditional String-level equations are false under NFC"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -57,3 +57,23 @@ honest routes:
 - Any law that needs a new postulate, axiom or `trusted_base()` entry: an
   operator question. The NFC-absorption postulate is not authorized.
 - Any change to `concat`, `slice` or the conversion primitives.
+
+## Closeout
+
+Merged as `111442ba8` (PR #4394).
+- **AC-0.** The Architect ruled six private laws (`evt_27cp20nn1twrx`):
+  `length_append`, `length_drop`, `concat_char_count`,
+  `slice_char_count`, `concat_view` and `slice_view`. The four String
+  laws take route (b), each with the round-trip premise for its list.
+- **AC-1.** Each law checks and has an owner-local generic consumer.
+  `trusted_base()` is unchanged when Derived loads over its providers.
+  `cat_derived_string_view_laws.rs` pins both.
+- **AC-2.** Paired reject fences refuse the unconditional forms. Because
+  `list_char_to_string` is conversion-opaque, they show the equations are
+  not definitional; they do not observe NFC absorption (Adversary M8
+  `evt_qg7bq28ghbzc`, with an ASCII control that refuses identically).
+- **Harness edge.** The first candidate `ba4f1b5a8` went red on four
+  Rosetta examples: `rosetta.rs` `collections_prelude` lacked Derived's new
+  `Data.Numeric.Nat.Arithmetic (add)` provider. The repair carries it.
+- **Carried.** `length_append` becomes the public `list_append::length`
+  in `CAT-LIST-APPEND-LENGTH-CANONICAL`.

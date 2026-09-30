@@ -1,6 +1,6 @@
 ---
 id: RT-RESPONSE-DESCENT-NESTED-COMPLETENESS
-title: "Host-response descent applies its completeness rule at every dispatch level: a nested dispatch case whose branch has an unrelated exit refuses, as the top level already does, instead of selecting the one leaf it reached"
+title: "Host-response descent admits a multi-candidate route only when it reaches exactly one leaf and that leaf is the only candidate its Vis case owns, so a nested dispatch whose sibling branch leaves an owned candidate unpaired refuses, as the top level already does"
 status: active
 owner: runtime
 size: S
@@ -12,12 +12,14 @@ github: null
 origin: "Adversary finding 2026-09-28 on M8 68be6686d (evt_5xwyfjkdxzf7s): a latent over-admission in RT-IGNORED-ROWS-NEXT-GROUP's ruled descent (Architect evt_1y9rpazn2sj6j). Steward-filed per COORDINATION section 2."
 ---
 
-# Nested completeness in the response descent
+# Candidate ownership in the response descent
 
 ## Objective
 
-The multi-candidate host-response descent admits a route only when every
-reached tail exit, at every dispatch level, finds a dispatch entry.
+The multi-candidate host-response descent admits a route only when it
+reaches exactly one leaf, and that leaf is the only candidate owned by this
+Vis's case. A candidate is owned by the nearest enclosing
+`ComputationalMatch` whose case at its position is `ITree::Vis`.
 
 ## Settled inputs (Adversary `evt_5xwyfjkdxzf7s`, at `68be6686d`)
 
@@ -37,15 +39,25 @@ reached tail exit, at every dispatch level, finds a dispatch entry.
   - The same `If` one level down, under `Match Var(1) { InL p => .. }`, is
     admitted. It selects the leaf at call origin 11, while the else leaf, at
     origin 22 with scrutinee `Var(3)`, is never paired.
-- **Unmeasured:** whether any source or generated program reaches the nested
-  shape. No native divergence is claimed.
+- **Source-reachable** (runtime leader `evt_2fqx849dqy550`): the checked
+  two-bracket `withBuffer` witness reaches nested descent. No native
+  divergence is claimed.
 
 ## Deliverable
 
-The nested level refuses whenever the top level would, on the same shape.
-The Adversary's proposed shape, for the Architect to rule: propagate
-`complete` out of `response_dispatch_leaves`, and return `None` when any
-level is incomplete.
+The ownership rule above, ruled by the Architect (`evt_g30yv6w4a4zf`). A
+new `response_leaf_owner` walks `response_parents`; the `:1541` return
+requires `reached.len() == 1 && owned == reached`. The descent functions and
+the top-level `:1533` gate are unchanged.
+
+- **Withdrawn shapes.** The Adversary's "propagate `complete` from every
+  level" and the Architect's leaf-boundary completeness
+  (`evt_5d8ea6zyw9dve`). AC-0b falsified the latter: the two-bracket source
+  witness has incomplete cases at non-leaf levels, with `Let` dead ends, so
+  tail completeness is the wrong predicate.
+- **AC-0c** measured ownership before the edit: each witness Vis has
+  owned == reached of size 1, and the nested row owns {18, 29} but reaches
+  {18}.
 
 ## Acceptance
 
