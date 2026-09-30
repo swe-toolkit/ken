@@ -7,7 +7,7 @@ size: M
 tier: T1
 gate: architect
 depends_on: [KERNEL-OBS-EQ-AT-TYPE-RIGID-BOTTOM]
-blocks: [KERNEL-OBS-NESTED-CAST-LINEAR]
+blocks: [KERNEL-OBS-NESTED-CAST-LINEAR, KERNEL-OBS-TYPE-EQ-STRUCTURAL]
 github: null
 origin: "Architect stop ruling evt_449gyxrrejte1 on LANG-SIBLING-GOAL-REFINEMENT Class A: a kernel reducer defect, not an elaborator one. Trust-root work. Steward-filed per COORDINATION section 2."
 ---
@@ -83,9 +83,10 @@ spec 15 §4.
   widening explicitly.
 
 **Site 3 (`cast_at_inductive` Phase 3) moves to
-`KERNEL-OBS-INDUCTIVE-TYPE-EQ`.** Its `e` has no projections, because
-`eq_at_type` leaves `(App, App)` neutral. The five Class A fixtures move
-with it.
+`KERNEL-OBS-TYPE-EQ-STRUCTURAL`.** Its `e` has no projections, because
+`eq_at_type` leaves same-former compound pairs neutral. The five Class A
+fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
+`cast_at_sigma` and `cast_at_quot` (Architect `evt_4sj0kg0kd2qbz`).
 
 ## Acceptance
 
@@ -115,6 +116,11 @@ with it.
     neutral, it asserts neutral and is renamed to match.
   - Each legacy ill-typed redex gets a control that asserts it stays
     neutral, with no fabricated witness and no panic.
+  - `j_dependent_motive_fires` moves to `P(y,h) = Vec Nat y` over an opaque
+    `base` (Architect `evt_4sj0kg0kd2qbz`). J-cast fires,
+    `infer(reduct) ≡ infer(redex)`, and the full whnf ends at a neutral,
+    typed `Cast` that checks against `infer(J)`. The Π-motive row moves to
+    `KERNEL-OBS-TYPE-EQ-STRUCTURAL` as its motivating red.
   - Every `ken-kernel` test target and the kernel conformance suites are
     run scoped before QA, and every changed raw-fixture observation is
     listed. A change on a typed input is a stop to the Architect.
@@ -143,10 +149,13 @@ with it.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 1 (Architect `evt_3qfzytddvnjkn`).
+§1a count: 2 (Architect `evt_4sj0kg0kd2qbz`).
 
 1. J cannot eliminate a proof whose Eq formation reduces. `infer_j` reads
    `whnf(e_ty)` and demands the `Eq` shape, but `Eq` at Σ reduces to a Σ
    (keyed on reading an Eq formation after its own reduction). The same
    shape sits in `check`'s `Refl` rule (`check.rs:483`), which is left to
-   `KERNEL-OBS-INDUCTIVE-TYPE-EQ`.
+   `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
+2. `cast_at_pi` projects `e.1` from a Π/Π type equality that has no Σ
+   reduct (keyed on the absent structural decomposition of `Eq Type` at a
+   same-former compound pair). Recut to `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
