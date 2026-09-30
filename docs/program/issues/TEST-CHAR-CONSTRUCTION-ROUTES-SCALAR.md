@@ -6,7 +6,7 @@ owner: verify
 size: S
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [LANG-REFINEMENT-INTRODUCTION-OBLIGATION]
 blocks: []
 github: null
 origin: "Operator 2026-09-30 ('concur with recs'), on the Architect's Char-refinement ruling evt_h489cs74b8j (question 2), which found the Char scalar refinement unpinned on two surface routes while ruling the String section postulate. Steward-filed per COORDINATION section 2."
@@ -66,3 +66,19 @@ One committed refuse/accept pair per route (a), (b) and (c), claiming rows
   a test change.
 - Any elaborator, kernel, runtime or spec change.
 - A new `trusted_base()` entry.
+
+## Stop ruling (Architect `evt_1a3kmh4jf12ga`)
+
+Routes (b) and (c) are accepted at `944ff08ca`. That is an elaborator
+defect, not a design fork: spec 34 §5 requires every introduction at a
+refinement to emit `φ a`, and a `def`-named refinement emits nothing.
+Accepted or refused is not the observable, because a correct elaborator
+accepts both members of each pair. The emitted goal is the observable.
+- **Route (a) proceeds now.** It claims `char-excludes-surrogates` on the
+  literal route only.
+- **(b) and (c) are held** on `LANG-REFINEMENT-INTRODUCTION-OBLIGATION`.
+  When they resume, their AC-1 is refit:
+  - (b) `55296` at Char emits `isScalar 55296`, undischarged, and `55295`
+    leaves no open obligation;
+  - (c) the obligation fires in `toC`'s body, with `n` free. The control is
+    a `toC` that discharges it, for example through `intToChar`.
