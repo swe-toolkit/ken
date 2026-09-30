@@ -1,8 +1,13 @@
 //! An inferred indexed match uses the dependent path's index premise to
 //! discharge an omitted constructor, without admitting a reachable omission.
+//!
+//! Spec: `spec/30-surface/34-data-match.md §4.1–4.3`.
+//! Conformance: `surface/data-match/indexed-impossible-pair` (TR5b omission)
+//! in `conformance/surface/data-match/seed-data-match.md`. Its separate TR5a
+//! impossible-application case is not claimed by these tests.
 use ken_elaborator::error::ElabError;
 use ken_elaborator::ElabEnv;
-use ken_kernel::Decl;
+use ken_kernel::{normalize, Context, Decl, Term};
 
 const VEC: &str = r#"
 data Vec (a : Type) : Nat → Type where {
@@ -11,11 +16,37 @@ data Vec (a : Type) : Nat → Type where {
 }
 "#;
 
+fn nat(env: &ElabEnv, successors: usize) -> Term {
+    let zero = Term::Constructor {
+        id: env.globals["Zero"],
+        level_args: vec![],
+    };
+    let suc = Term::Constructor {
+        id: env.globals["Suc"],
+        level_args: vec![],
+    };
+    (0..successors).fold(zero, |value, _| Term::app(suc.clone(), value))
+}
+
+fn observed_closed_nat(env: &mut ElabEnv, source: &str) -> Term {
+    let id = env
+        .elaborate_decl(source)
+        .expect("closed observation checks");
+    let (_, body) = env
+        .env
+        .transparent_body(id)
+        .expect("checked observation body");
+    normalize(&env.env, &Context::new(), &body)
+}
+
 #[test]
 fn inferred_index_impossible_bucket_checks_without_new_trust() {
     // Promise class: durable invariant. MEASURED: a missing VNil method for
-    // Vec a (Suc n) checks under an inferred match (not a checked RHS match),
-    // and the admitted function is transparent with no extra trusted base.
+    // Vec a (Suc n) checks under an inferred match (not a checked RHS match).
+    // CLAIMED: the VCons method returns its index field m and the complete
+    // elim computes it. THE GAP: a mere transparent declaration also admits
+    // a wrong, well-typed branch; evaluate a closed input with index m = 1
+    // and element x = 0. Its result is 2, unlike either wrong Zero or x (1).
     let mut env = ElabEnv::new().expect("base environment");
     let trusted_before = env.env.trusted_base();
     env.elaborate_file(&format!(
@@ -25,6 +56,12 @@ fn inferred_index_impossible_bucket_checks_without_new_trust() {
     .expect("impossible VNil bucket must be synthesized");
     let id = env.globals["direct"];
     assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+    let observed = observed_closed_nat(
+        &mut env,
+        "const direct_observed : Nat = direct Nat (Suc Zero) \
+         (VCons Nat (Suc Zero) Zero (VCons Nat Zero Zero (VNil Nat)))",
+    );
+    assert_eq!(observed, nat(&env, 2));
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
@@ -32,7 +69,9 @@ fn inferred_index_impossible_bucket_checks_without_new_trust() {
 fn inferred_nonnullary_impossible_bucket_checks_without_new_trust() {
     // Promise class: durable invariant. MEASURED: a missing VCons method,
     // with three fields and a recursive IH, is discharged for Vec a Zero.
-    // The other constructor remains a checked transparent method.
+    // CLAIMED: the present VNil method returns Zero and computes to Suc Zero
+    // through the wrapper. THE GAP: admission alone cannot tell Zero from a
+    // different well-typed result; the closed VNil observation does.
     let mut env = ElabEnv::new().expect("base environment");
     let trusted_before = env.env.trusted_base();
     env.elaborate_file(&format!(
@@ -42,6 +81,11 @@ fn inferred_nonnullary_impossible_bucket_checks_without_new_trust() {
     .expect("impossible nonnullary VCons bucket must be synthesized");
     let id = env.globals["only_nil"];
     assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+    let observed = observed_closed_nat(
+        &mut env,
+        "const nil_observed : Nat = only_nil Nat (VNil Nat)",
+    );
+    assert_eq!(observed, nat(&env, 1));
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
@@ -49,7 +93,9 @@ fn inferred_nonnullary_impossible_bucket_checks_without_new_trust() {
 fn reachable_omitted_constructor_keeps_its_exact_witness() {
     // Promise class: negative boundary. MEASURED: VNil remains reachable
     // for Vec a n, and the missing method reports its own constructor and
-    // arity, rather than being filled by a new coverage rule.
+    // arity, rather than being filled by a new coverage rule. CLAIMED: §4.3's
+    // type-possible constructor is required. THE GAP: the positive controls
+    // above establish an actual omitted-impossible method at a fixed index.
     let mut env = ElabEnv::new().expect("base environment");
     let trusted_before = env.env.trusted_base();
     let error = env
