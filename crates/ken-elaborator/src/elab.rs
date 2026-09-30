@@ -7309,6 +7309,13 @@ fn refine_branch_goal(
         )?);
     }
 
+    // No equality leaf can refine this goal. Preserve the old no-op path:
+    // constructing an expanded kernel view here would prematurely classify
+    // unrelated context domains (including a malformed expression Pi still
+    // awaiting its final kernel admission).
+    if leaves.is_empty() {
+        return Ok((expected_here.clone(), Vec::new()));
+    }
     let view = active_premise_kernel_view_for_context(cx, &zonked_ctx)?;
     let mut goal = expected_here.clone();
     let mut restorations = Vec::new();
