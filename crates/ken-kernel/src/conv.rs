@@ -1814,6 +1814,28 @@ mod tests {
         let ctors = &env.inductive(b).expect("Bool lookup").constructors;
         (b, ctors[0].id, ctors[1].id)
     }
+    fn declare_nat_for_iota(env: &mut GlobalEnv) -> (GlobalId, GlobalId, GlobalId) {
+        let nat = declare_inductive(env, |nat| InductiveSpec {
+            level_params: vec![],
+            params: vec![],
+            indices: vec![],
+            level: Level::zero(),
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![Term::indformer(nat, vec![])],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .expect("Nat admission");
+        let ctors = &env.inductive(nat).expect("Nat lookup").constructors;
+        (nat, ctors[0].id, ctors[1].id)
+    }
+
     /// `Bool` as a type term (`Type 0` inhabitant).
     fn bool_ty(bool_id: GlobalId) -> Term {
         Term::indformer(bool_id, vec![])
@@ -2194,6 +2216,32 @@ mod tests {
         );
     }
 
+    fn neutral_nat_recursive_elim(
+        nat: GlobalId,
+        bool_id: GlobalId,
+        true_id: GlobalId,
+        self_id: GlobalId,
+    ) -> Term {
+        let bt = bool_ty(bool_id);
+        let nt = Term::indformer(nat, vec![]);
+        let recursive_call = Term::app(cref0(self_id), Term::var(1));
+        Term::Elim {
+            fam: nat,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(Term::Ascript(
+                Box::new(Term::lam(nt.clone(), bt.clone())),
+                Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+            )),
+            methods: vec![
+                bool_ctor(true_id),
+                Term::lam(nt.clone(), Term::lam(bt, recursive_call)),
+            ],
+            indices: vec![],
+            scrut: Box::new(Term::var(0)),
+        }
+    }
+
     /// Both declarations are SCT-admitted independently. A closed Bool ι-step
     /// selects a neutral Nat eliminator whose step method calls its own head on
     /// the predecessor; the two heads have distinct identities.
@@ -2207,22 +2255,7 @@ mod tests {
         let nt = Term::indformer(nat, vec![]);
         let ty = Term::pi(nt.clone(), bt.clone());
         declare_recursive_group(env, vec![(vec![], ty)], |ids| {
-            let recursive_call = Term::app(cref0(ids[0]), Term::var(1));
-            let nat_elim = Term::Elim {
-                fam: nat,
-                level_args: vec![],
-                params: vec![],
-                motive: Box::new(Term::Ascript(
-                    Box::new(Term::lam(nt.clone(), bt.clone())),
-                    Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
-                )),
-                methods: vec![
-                    bool_ctor(true_id),
-                    Term::lam(nt.clone(), Term::lam(bt.clone(), recursive_call)),
-                ],
-                indices: vec![],
-                scrut: Box::new(Term::var(0)),
-            };
+            let nat_elim = neutral_nat_recursive_elim(nat, bool_id, true_id, ids[0]);
             let closed_bool_elim = Term::Elim {
                 fam: bool_id,
                 level_args: vec![],
@@ -2240,29 +2273,45 @@ mod tests {
         .expect("closed-Bool wrapper remains SCT-admitted")[0]
     }
 
+    fn closed_nat_recursive_pair(
+        env: &mut GlobalEnv,
+        nat: GlobalId,
+        zero_id: GlobalId,
+        bool_id: GlobalId,
+        true_id: GlobalId,
+    ) -> GlobalId {
+        let bt = bool_ty(bool_id);
+        let nt = Term::indformer(nat, vec![]);
+        let ty = Term::pi(nt.clone(), bt.clone());
+        declare_recursive_group(env, vec![(vec![], ty)], |ids| {
+            let nat_elim = neutral_nat_recursive_elim(nat, bool_id, true_id, ids[0]);
+            let closed_nat_elim = Term::Elim {
+                fam: nat,
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(Term::Ascript(
+                    Box::new(Term::lam(nt.clone(), bt.clone())),
+                    Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+                )),
+                methods: vec![
+                    nat_elim,
+                    Term::lam(nt.clone(), Term::lam(bt.clone(), bool_ctor(true_id))),
+                ],
+                indices: vec![],
+                scrut: Box::new(Term::constructor(zero_id, vec![])),
+            };
+            vec![Term::lam(nt.clone(), closed_nat_elim)]
+        })
+        .expect("closed-Nat wrapper remains SCT-admitted")[0]
+    }
+
     /// Durable invariant, `17 §3.5`: unrelated closed ι cannot erase the
     /// identity boundary of two recursive heads beneath a stuck eliminator.
     #[test]
     fn closed_bool_iota_cannot_erase_distinct_recursive_heads() {
         let mut env = GlobalEnv::new();
         let (bool_id, _, true_id) = declare_bool(&mut env);
-        let nat = declare_inductive(&mut env, |nat| InductiveSpec {
-            level_params: vec![],
-            params: vec![],
-            indices: vec![],
-            level: Level::zero(),
-            constructors: vec![
-                CtorSpec {
-                    args: vec![],
-                    target_indices: vec![],
-                },
-                CtorSpec {
-                    args: vec![Term::indformer(nat, vec![])],
-                    target_indices: vec![],
-                },
-            ],
-        })
-        .expect("Nat admission");
+        let (nat, _, _) = declare_nat_for_iota(&mut env);
         let c = closed_iota_recursive_pair(&mut env, nat, bool_id, true_id);
         let d = closed_iota_recursive_pair(&mut env, nat, bool_id, true_id);
         assert_ne!(c, d, "separately admitted heads must remain distinct");
@@ -2280,6 +2329,117 @@ mod tests {
         assert!(delta_probe::captures() >= 1, "the pair must reach the δ-ledger");
         assert!(delta_probe::iotas() >= 1, "the closed Bool scrutinee must ι-reduce");
         assert_eq!(delta_probe::refusals(), 1, "the recurrent hard pair must refuse");
+    }
+
+    /// Durable invariant, `17 §3.5`: changing the unrelated closed ι from
+    /// Bool to Nat cannot erase a distinct recursive-identity boundary.
+    #[test]
+    fn closed_nat_iota_cannot_erase_distinct_recursive_heads() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, _, true_id) = declare_bool(&mut env);
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let c = closed_nat_recursive_pair(&mut env, nat, zero, bool_id, true_id);
+        let d = closed_nat_recursive_pair(&mut env, nat, zero, bool_id, true_id);
+        assert_ne!(c, d);
+        let mut ctx = Context::new();
+        ctx.push(Term::indformer(nat, vec![]));
+        let lhs = Term::app(cref0(c), Term::var(0));
+        let rhs = Term::app(cref0(d), Term::var(0));
+        assert_typed(&env, &ctx, &lhs);
+        assert_typed(&env, &ctx, &rhs);
+        delta_probe::reset();
+        assert!(
+            !convert_type(&env, &ctx, &lhs, &rhs),
+            "a closed Nat ι must not make distinct neutral recursion equal"
+        );
+        assert!(delta_probe::captures() >= 1, "the pair must reach the δ-ledger");
+        assert!(delta_probe::iotas() >= 1, "the closed Nat scrutinee must ι-reduce");
+        assert_eq!(delta_probe::refusals(), 1, "the recurrent hard pair must refuse");
+    }
+
+    fn declare_is_even(
+        env: &mut GlobalEnv,
+        nat: GlobalId,
+        bool_id: GlobalId,
+        true_id: GlobalId,
+        not_id: GlobalId,
+    ) -> GlobalId {
+        let nt = Term::indformer(nat, vec![]);
+        let bt = bool_ty(bool_id);
+        declare_recursive_group(
+            env,
+            vec![(vec![], Term::pi(nt.clone(), bt.clone()))],
+            |ids| {
+                let recursive_call = Term::app(cref0(ids[0]), Term::var(1));
+                let step = Term::lam(
+                    nt.clone(),
+                    Term::lam(bt.clone(), Term::app(cref0(not_id), recursive_call)),
+                );
+                vec![Term::lam(
+                    nt.clone(),
+                    Term::Elim {
+                        fam: nat,
+                        level_args: vec![],
+                        params: vec![],
+                        motive: Box::new(Term::Ascript(
+                            Box::new(Term::lam(nt.clone(), bt.clone())),
+                            Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+                        )),
+                        methods: vec![bool_ctor(true_id), step],
+                        indices: vec![],
+                        scrut: Box::new(Term::var(0)),
+                    },
+                )]
+            },
+        )
+        .expect("each isEven twin must be SCT-admitted")[0]
+    }
+
+    fn nat_value(zero_id: GlobalId, suc_id: GlobalId, n: usize) -> Term {
+        (0..n).fold(Term::constructor(zero_id, vec![]), |prev, _| {
+            Term::app(Term::constructor(suc_id, vec![]), prev)
+        })
+    }
+
+    /// Durable invariant, `17 §3.5`: canonical recursive inputs compute to a
+    /// shared Bool, but a neutral input never identifies distinct recursive
+    /// GlobalIds through an unexecuted method.
+    #[test]
+    fn is_even_closed_three_converges_but_neutral_twin_refuses() {
+        let mut env = GlobalEnv::new();
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let (nat, zero_id, suc_id) = declare_nat_for_iota(&mut env);
+        let not_id = declare_not(&mut env, bool_id, false_id, true_id);
+        let c = declare_is_even(&mut env, nat, bool_id, true_id, not_id);
+        let d = declare_is_even(&mut env, nat, bool_id, true_id, not_id);
+        assert_ne!(c, d);
+
+        let three = nat_value(zero_id, suc_id, 3);
+        let closed_lhs = Term::app(cref0(c), three.clone());
+        let closed_rhs = Term::app(cref0(d), three);
+        let empty = Context::new();
+        assert_typed(&env, &empty, &closed_lhs);
+        assert_typed(&env, &empty, &closed_rhs);
+        assert_eq!(whnf(&env, &empty, &closed_lhs), bool_ctor(false_id));
+        assert_eq!(whnf(&env, &empty, &closed_rhs), bool_ctor(false_id));
+        assert!(
+            convert_type(&env, &empty, &closed_lhs, &closed_rhs),
+            "honest canonical descent to equal Bool constructors must convert"
+        );
+
+        let mut open = Context::new();
+        open.push(Term::indformer(nat, vec![]));
+        let open_lhs = Term::app(cref0(c), Term::var(0));
+        let open_rhs = Term::app(cref0(d), Term::var(0));
+        assert_typed(&env, &open, &open_lhs);
+        assert_typed(&env, &open, &open_rhs);
+        delta_probe::reset();
+        assert!(
+            !convert_type(&env, &open, &open_lhs, &open_rhs),
+            "neutral twin recursion cannot use ι as an equality hypothesis"
+        );
+        assert!(delta_probe::captures() >= 1, "neutral twins must reach the ledger");
+        assert_eq!(delta_probe::refusals(), 1, "neutral recurrence must refuse");
     }
 
     /// Open-recursive case (recurring pair, no ι, one refusal, false): two
