@@ -50,6 +50,10 @@ base, stop and report the mismatch.
   expected type whose head, after alias resolution, is a refinement. Syntax
   sites are not enumerated.
 - No kernel change.
+- The design is ruled at AC-0 (Architect `evt_y1v2wbnhx9ej`, R3 and R4):
+  - a predicate table keyed on GlobalId;
+  - a literal refinement becomes an anonymous named one;
+  - one emission helper, with arm path conditions.
 
 ## Acceptance
 
@@ -79,10 +83,16 @@ base, stop and report the mismatch.
       `:18` and `:28`; `Formatting/Doc.ken.md` `:106`-`:107`; the
       `char_to_digit` arguments at `Parsing/Numeric.ken.md` `:626`-`:630`;
       and `ds9_json_codec_acceptance.rs` `:458`, `:811` and `:831`.
-    - One open Int expression, `(48 : Int) + natToInt d`, at
-      `rtp1_elim_reduce_ih_perf_acceptance.rs:200`. AC-0 reports whether
-      its obligation discharges. If it does not, that is the third stop
-      condition, and it goes to the Architect with the site.
+    - One open Int expression, `(48 : Int) + natToInt d`, in `digitChar`.
+      Its obligation `isScalar (48 + natToInt d)` over `d : Nat` is false
+      at `d = 55248`, so the consumer over-promises (Architect AC-0 ruling
+      `evt_y1v2wbnhx9ej`, R2). **In scope:** rewrite each `digitChar`
+      through the prelude's checked `intToChar`, with outputs unchanged for
+      `d < 10`. There are six sites:
+      - `crates/ken-interp/tests/rtp1_elim_reduce_ih_perf_acceptance.rs`
+        (`:199`); QA reruns its perf thresholds;
+      - `examples/rosetta/{ackermann,factorial,fibonacci,fizzbuzz,gcd}/`
+        `*.ken`.
   - `char-expected-integer-literal-scalar-boundary`
     (`seed-numbers.md:286`) states its observable as the obligation:
     `55295` leaves no open refinement obligation, and `55296` elaborates

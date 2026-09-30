@@ -98,6 +98,23 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
   on the emitted term, and a duplicate-restoration mutation reddens it. A's
   five rows keep their verdicts under increment 1.
 
+## Increments landed
+
+- Increment 1 (Class B): merged `0ae184458` (PR #4410), exact
+  `aa0c46bc1`. Language QA `evt_ca83804wqt64`, Architect
+  `evt_24a17cz9c2zya`, Decision `dec_33yge2tyn50s9`.
+  - The 10 rows classify, the 38 untouched dependents stay untouched, and
+    one binder identity crosses the generalization boundary.
+  - f4 now fails at the `obs.rs` Phase 3 kernel dependency, and f5 and f6
+    at the `Refl` residual below.
+  - The CI-red respin (`f0aaa79e1` to `aa0c46bc1`) returns early with zero
+    equality leaves, so a malformed non-sort Pi still fails at final kernel
+    admission (`ds5b` row).
+  - Architect residual, diagnostic only: a no-op with nonempty leaves still
+    builds the expanded view.
+- Open: increment 2 (Class A) waits on `KERNEL-OBS-REDUCT-WITNESS-TYPING`.
+  The WP stays open.
+
 ## Residual (carried, not closed)
 
 Potential one-sided rewrite surfaces, unmeasured (`evt_1fbdcqg5127qa`):
