@@ -1,97 +1,105 @@
-//! K5 follow-on — `Term::Absurd` in `trusted_base_delta`'s dependency walk.
-//!
-//! `foreign::collect_consts_in_tb` (`38 §3.1`'s dependency-cone walker) is a
-//! purely structural traversal with one arm per `Term` variant, same shape as
-//! `ken-kernel`'s `sct.rs::collect_calls`/`term.rs::children()`. K5 added
-//! `Term::Absurd(motive, proof)` to the kernel's `Term` enum but this
-//! downstream crate's own exhaustive match over `Term` wasn't in K5's own
-//! (kernel-only) review scope — CI caught it as a build break, and Architect
-//! separately named it the same class of hole as K5's own SCT-launder issue:
-//! a definition whose only reference to a `trusted_base()` postulate sits
-//! inside an `Absurd` subterm would be silently excluded from its
-//! `trusted_base_delta`, undercounting the TCB dependency cone.
-//!
-//! Mirrors `l7_acceptance.rs`'s B1/B2 dependency-pair pattern, using the
-//! kernel API directly (structural test — `trusted_base_delta` doesn't
-//! type-check the body, so the injected `Absurd` terms need not themselves
-//! be well-typed, same license L7 takes with its `Decl::Transparent` bodies).
+//! `Absurd` contributes both its proof and motive to the trusted-base walk.
+//! All dependency witnesses are admitted by the checked kernel API; no test
+//! needs to install an unchecked transparent declaration.
 
 use ken_elaborator::trusted_base_delta;
-use ken_kernel::{declare_postulate, Decl, GlobalEnv, Level, Term};
+use ken_kernel::{
+    declare_def, declare_inductive, declare_postulate, CtorSpec, GlobalEnv, InductiveSpec, Level,
+    Term,
+};
 
-/// A definition whose only reference to a trusted-base postulate sits in
-/// `Absurd`'s **proof** position (the shape from K5's own SCT-launder test,
-/// `loop : Bottom := absurd(Bottom, loop)`) must still count it.
+fn bottom(env: &GlobalEnv) -> Term {
+    Term::const_(env.bottom_id(), vec![])
+}
+
+/// The only reference to the postulate sits in `Absurd`'s proof position.
 #[test]
 fn absurd_proof_position_counted_in_trusted_base_delta() {
     let mut env = GlobalEnv::new();
-    let p = declare_postulate(&mut env, "test postulate".to_string(), vec![], Term::Omega(Level::zero())).expect("postulate p");
-
-    let def_id = env.fresh_id();
-    env.add_decl(Decl::Transparent {
-        id: def_id,
-        level_params: vec![],
-        ty: Term::Omega(Level::zero()),
-        body: Term::Absurd(
-            Box::new(Term::Omega(Level::zero())), // motive — no reference to p
-            Box::new(Term::const_(p, vec![])),    // proof — the only reference to p
-        ),
-    });
-
-    let delta = trusted_base_delta(&env, def_id);
+    let bottom_ty = bottom(&env);
+    let p = declare_postulate(&mut env, "proof of Bottom".into(), vec![], bottom_ty)
+        .expect("checked Bottom postulate");
+    let ty = Term::Type(Level::zero());
+    let trusted_before = env.trusted_base();
+    let def_id = declare_def(
+        &mut env,
+        vec![],
+        ty.clone(),
+        Term::Absurd(Box::new(ty), Box::new(Term::const_(p, vec![]))),
+    )
+    .expect("checked absurd elimination");
+    assert_eq!(env.trusted_base(), trusted_before);
     assert!(
-        delta.contains(&p),
-        "a postulate referenced only in Absurd's proof position must appear in trusted_base_delta"
+        trusted_base_delta(&env, def_id).contains(&p),
+        "a postulate referenced only in the proof must be counted"
     );
 }
 
-/// Same, but the reference sits in the **motive** position instead — both
-/// subterms must be walked, not just one.
+/// The only reference to the opaque type `c` sits in `Absurd`'s motive.
 #[test]
 fn absurd_motive_position_counted_in_trusted_base_delta() {
     let mut env = GlobalEnv::new();
-    let p = declare_postulate(&mut env, "test postulate".to_string(), vec![], Term::Omega(Level::zero())).expect("postulate p");
-
-    let def_id = env.fresh_id();
-    env.add_decl(Decl::Transparent {
-        id: def_id,
-        level_params: vec![],
-        ty: Term::Omega(Level::zero()),
-        body: Term::Absurd(
-            Box::new(Term::const_(p, vec![])), // motive — the only reference to p
-            Box::new(Term::Omega(Level::zero())), // proof — no reference to p
+    let c = declare_postulate(
+        &mut env,
+        "opaque type".into(),
+        vec![],
+        Term::Type(Level::zero()),
+    )
+    .expect("checked type postulate");
+    let bottom_ty = bottom(&env);
+    let c_ty = Term::const_(c, vec![]);
+    let trusted_before = env.trusted_base();
+    let def_id = declare_def(
+        &mut env,
+        vec![],
+        Term::pi(bottom_ty.clone(), c_ty.clone()),
+        Term::lam(
+            bottom_ty,
+            Term::Absurd(Box::new(c_ty), Box::new(Term::var(0))),
         ),
-    });
-
-    let delta = trusted_base_delta(&env, def_id);
+    )
+    .expect("checked motive-only absurd elimination");
+    assert_eq!(env.trusted_base(), trusted_before);
     assert!(
-        delta.contains(&p),
-        "a postulate referenced only in Absurd's motive position must appear in trusted_base_delta"
+        trusted_base_delta(&env, def_id).contains(&c),
+        "a postulate referenced only in the motive must be counted"
     );
 }
 
-/// Discriminant: a definition whose `Absurd` subterms reference NO postulate
-/// has an empty delta — the positive tests above aren't vacuously true
-/// (`trusted_base_delta` isn't just returning every postulate in scope).
+/// The closed Nat motive does not mention an unrelated postulate in scope.
 #[test]
 fn absurd_with_no_postulate_reference_has_empty_delta() {
     let mut env = GlobalEnv::new();
-    let p = declare_postulate(&mut env, "test postulate".to_string(), vec![], Term::Omega(Level::zero())).expect("postulate p");
-
-    let def_id = env.fresh_id();
-    env.add_decl(Decl::Transparent {
-        id: def_id,
+    let bottom_ty = bottom(&env);
+    let p = declare_postulate(&mut env, "unrelated".into(), vec![], bottom_ty)
+        .expect("checked unrelated postulate");
+    let nat = declare_inductive(&mut env, |_| InductiveSpec {
         level_params: vec![],
-        ty: Term::Omega(Level::zero()),
-        body: Term::Absurd(
-            Box::new(Term::Omega(Level::zero())),
-            Box::new(Term::Omega(Level::zero())),
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![],
+            target_indices: vec![],
+        }],
+    })
+    .expect("checked Nat family");
+    let bottom_ty = bottom(&env);
+    let nat_ty = Term::indformer(nat, vec![]);
+    let trusted_before = env.trusted_base();
+    let def_id = declare_def(
+        &mut env,
+        vec![],
+        Term::pi(bottom_ty.clone(), nat_ty.clone()),
+        Term::lam(
+            bottom_ty,
+            Term::Absurd(Box::new(nat_ty), Box::new(Term::var(0))),
         ),
-    });
-
-    let delta = trusted_base_delta(&env, def_id);
+    )
+    .expect("checked no-reference absurd elimination");
+    assert_eq!(env.trusted_base(), trusted_before);
     assert!(
-        !delta.contains(&p),
-        "an Absurd term with no reference to p must not count it — being declared ≠ being reached"
+        !trusted_base_delta(&env, def_id).contains(&p),
+        "an unrelated postulate in scope must not appear in the delta"
     );
 }

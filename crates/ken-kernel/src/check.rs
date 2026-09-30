@@ -969,8 +969,27 @@ pub fn declare_inductive<F>(env: &mut GlobalEnv, build: F) -> KernelResult<Globa
 where
     F: FnOnce(GlobalId) -> InductiveSpec,
 {
+    declare_inductive_try(env, |id| Ok::<_, std::convert::Infallible>(build(id)))?
+        .map_err(|never| match never {})
+}
+
+/// Fallible inductive specification builder. If `build` fails, release the
+/// reserved family id without installing an unchecked placeholder declaration.
+pub fn declare_inductive_try<F, E>(
+    env: &mut GlobalEnv,
+    build: F,
+) -> KernelResult<Result<GlobalId, E>>
+where
+    F: FnOnce(GlobalId) -> Result<InductiveSpec, E>,
+{
     let d_id = env.fresh_id();
-    let spec = build(d_id);
+    let spec = match build(d_id) {
+        Ok(spec) => spec,
+        Err(error) => {
+            env.release_unused_id(d_id);
+            return Ok(Err(error));
+        }
+    };
     let constructors: Vec<_> = spec
         .constructors
         .into_iter()
@@ -1059,7 +1078,7 @@ where
         }
     }
     env.register_all_supports(ind.id, supports);
-    Ok(d_id)
+    Ok(Ok(d_id))
 }
 
 fn validate_inductive_decl(env: &GlobalEnv, ind: &InductiveDecl) -> KernelResult<()> {
@@ -1118,6 +1137,103 @@ fn validate_inductive_decl_inner(
         ));
     }
     Ok(())
+}
+
+/// Kernel-owned opaque placeholders awaiting one checked group admission.
+/// The stored mark bounds rollback to this transaction and its subsequent
+/// literal postulates; external callers cannot construct or alter it.
+#[must_use]
+pub struct PendingAdmission {
+    ids: Vec<GlobalId>,
+    mark_len: usize,
+    mark_next_id: GlobalId,
+}
+
+impl PendingAdmission {
+    pub fn ids(&self) -> &[GlobalId] {
+        &self.ids
+    }
+}
+
+/// Classify all signatures before staging any opaque declarations. Staged
+/// placeholders can be referenced while the elaborator checks recursive
+/// bodies; only [`admit_pending`] can make them transparent.
+pub fn stage_placeholders(
+    env: &mut GlobalEnv,
+    specs: Vec<(String, Vec<LevelVar>, Term)>,
+) -> KernelResult<PendingAdmission> {
+    if specs.is_empty() {
+        return Err(KernelError::IllFormedDecl(
+            "checked staging needs at least one placeholder".into(),
+        ));
+    }
+    let empty = Context::new();
+    for (_, _, ty) in &specs {
+        classify(env, &empty, ty)?;
+    }
+    let mark_len = env.declarations().len();
+    let mark_next_id = env.next_global_id();
+    let mut ids = Vec::with_capacity(specs.len());
+    for (name, level_params, ty) in specs {
+        let id = env.fresh_id();
+        env.add_decl(Decl::Opaque {
+            id,
+            name,
+            level_params,
+            ty,
+        });
+        ids.push(id);
+    }
+    Ok(PendingAdmission {
+        ids,
+        mark_len,
+        mark_next_id,
+    })
+}
+
+/// Remove only this transaction's declarations, newest first, including
+/// literal postulates added after staging. Refuse a handle from another env.
+pub fn rollback_pending(env: &mut GlobalEnv, pending: PendingAdmission) -> KernelResult<Vec<Decl>> {
+    if env.declarations().get(pending.mark_len).map(Decl::id) != pending.ids.first().copied()
+        || pending.ids.first().copied() != Some(pending.mark_next_id)
+    {
+        return Err(KernelError::IllFormedDecl(
+            "pending admission does not own the environment mark".into(),
+        ));
+    }
+    let mut removed = Vec::new();
+    while env.declarations().len() > pending.mark_len {
+        removed.push(
+            env.remove_last()
+                .expect("declarations exceed admission mark"),
+        );
+    }
+    debug_assert_eq!(env.next_global_id(), pending.mark_next_id);
+    Ok(removed)
+}
+
+/// Check all pending bodies as one SCT group. Failure consumes and rolls back
+/// the transaction and returns the declarations for elaborator-side cleanup.
+pub fn admit_pending(
+    env: &mut GlobalEnv,
+    pending: PendingAdmission,
+    bodies: Vec<Term>,
+) -> Result<Vec<GlobalId>, (KernelError, Vec<Decl>)> {
+    let result = if bodies.len() == pending.ids.len() {
+        let group = pending.ids.iter().copied().zip(bodies).collect::<Vec<_>>();
+        admit_bodies(env, &group)
+    } else {
+        Err(KernelError::IllFormedDecl(
+            "pending admission body count does not match placeholder count".into(),
+        ))
+    };
+    match result {
+        Ok(()) => Ok(pending.ids),
+        Err(error) => match rollback_pending(env, pending) {
+            Ok(removed) => Err((error, removed)),
+            Err(rollback_error) => Err((rollback_error, Vec::new())),
+        },
+    }
 }
 
 /// Check and install a complete group of pre-admitted opaque bodies.
@@ -1196,24 +1312,13 @@ pub fn declare_def(
     ty: Term,
     body: Term,
 ) -> KernelResult<GlobalId> {
-    let empty = Context::new();
-    classify(env, &empty, &ty)?;
-    // Pre-admit as opaque so the body can self-reference.
-    let id = env.fresh_id();
-    env.add_decl(Decl::Opaque {
-        id,
-        name: "provisional definition".to_string(),
-        level_params: level_params.clone(),
-        ty: ty.clone(),
-    });
-    // All checks run while the provisional declaration is still opaque.
-    match admit_bodies(env, &[(id, body)]) {
-        Ok(()) => Ok(id),
-        Err(e) => {
-            env.remove_last();
-            Err(e)
-        }
-    }
+    let pending = stage_placeholders(
+        env,
+        vec![("provisional definition".into(), level_params, ty)],
+    )?;
+    admit_pending(env, pending, vec![body])
+        .map(|mut ids| ids.remove(0))
+        .map_err(|(error, _removed)| error)
 }
 
 /// Declare a group of mutually-recursive transparent definitions.
@@ -1235,47 +1340,22 @@ where
     if specs.is_empty() {
         return Ok(Vec::new());
     }
-    let empty = Context::new();
-
-    // Check all types.
-    for (lp, ty) in &specs {
-        let _ = lp; // level params checked via classify
-        classify(env, &empty, ty)?;
-    }
-
-    // Pre-admit all members as opaque.
-    let mut ids: Vec<GlobalId> = Vec::new();
-    for (level_params, ty) in &specs {
-        let id = env.fresh_id();
-        env.add_decl(Decl::Opaque {
-            id,
-            name: "provisional recursive definition".to_string(),
-            level_params: level_params.clone(),
-            ty: ty.clone(),
-        });
-        ids.push(id);
-    }
-
-    let bodies = bodies_fn(&ids);
+    let pending = stage_placeholders(
+        env,
+        specs
+            .into_iter()
+            .map(|(level_params, ty)| ("provisional recursive definition".into(), level_params, ty))
+            .collect(),
+    )?;
+    let bodies = bodies_fn(pending.ids());
     assert_eq!(
         bodies.len(),
-        ids.len(),
+        pending.ids().len(),
         "bodies_fn must return one body per member"
     );
 
-    // Admission checks SCT once on the entire mutual group and installs it
-    // only after every body and every path outside the group passes its gate.
-    let group_bodies: Vec<(GlobalId, Term)> = ids.iter().copied().zip(bodies).collect();
-    match admit_bodies(env, &group_bodies) {
-        Ok(()) => Ok(ids),
-        Err(e) => {
-            // Rollback all pre-admitted members (remove in reverse order).
-            for _ in 0..ids.len() {
-                env.remove_last();
-            }
-            Err(e)
-        }
-    }
+    // Admission checks SCT once on the entire mutual group.
+    admit_pending(env, pending, bodies).map_err(|(error, _removed)| error)
 }
 
 /// `declare_postulate` — admit an opaque constant `c : A` after checking
@@ -1644,6 +1724,160 @@ mod tests {
             val: Box::new(val),
             body: Box::new(body),
         }
+    }
+
+    #[test]
+    fn failed_pending_recursive_admission_restores_entire_environment() {
+        let (mut env, ids) = bool_nat_env();
+        let before = env.clone();
+        let nat = nat_ty(&ids);
+        let pending = stage_placeholders(
+            &mut env,
+            vec![(
+                "recursive".into(),
+                vec![],
+                Term::pi(nat.clone(), nat.clone()),
+            )],
+        )
+        .expect("checked recursive signature");
+        let recursive_id = pending.ids()[0];
+        let literal = declare_postulate(&mut env, "intervening".into(), vec![], nat.clone())
+            .expect("typed intervening postulate");
+        let looping_body = Term::lam(
+            nat,
+            Term::app(Term::const_(recursive_id, vec![]), Term::var(0)),
+        );
+        let (error, removed) = admit_pending(&mut env, pending, vec![looping_body])
+            .expect_err("nondecreasing self recursion must fail SCT");
+        assert!(matches!(error, KernelError::NotTerminating(_)));
+        assert_eq!(
+            removed.iter().map(Decl::id).collect::<Vec<_>>(),
+            vec![literal, recursive_id]
+        );
+        assert_eq!(
+            env, before,
+            "failed staging must restore all env indices and next_id"
+        );
+        assert_eq!(env.next_global_id(), before.next_global_id());
+        assert_eq!(env.trusted_base(), before.trusted_base());
+    }
+
+    #[test]
+    fn failed_inductive_builder_releases_uninstalled_family_id() {
+        let mut env = GlobalEnv::new();
+        let before = env.clone();
+        let outcome =
+            declare_inductive_try(&mut env, |_| Err::<InductiveSpec, _>("builder rejected"))
+                .expect("a builder error is not a kernel error");
+        assert_eq!(outcome, Err("builder rejected"));
+        assert_eq!(env, before, "builder error must leave no reservation");
+    }
+
+    #[test]
+    fn checked_recursive_barrier_matches_prior_normalization_without_shadowing() {
+        let mut env = GlobalEnv::new();
+        let ids_nat = declare_inductive(&mut env, |id| InductiveSpec {
+            level_params: vec![],
+            params: vec![],
+            indices: vec![],
+            level: Level::zero(),
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![Term::indformer(id, vec![])],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .expect("checked Nat with successor");
+        let nat = Term::indformer(ids_nat, vec![]);
+        let zero = Term::constructor(env.inductive(ids_nat).unwrap().constructors[0].id, vec![]);
+        let rec = declare_recursive_group(
+            &mut env,
+            vec![(vec![], Term::pi(nat.clone(), nat.clone()))],
+            |ids| {
+                let step = Term::lam(
+                    nat.clone(),
+                    Term::lam(
+                        nat.clone(),
+                        Term::app(Term::const_(ids[0], vec![]), Term::var(1)),
+                    ),
+                );
+                vec![Term::lam(
+                    nat.clone(),
+                    Term::Elim {
+                        fam: ids_nat,
+                        level_args: vec![],
+                        params: vec![],
+                        motive: Box::new(Term::Ascript(
+                            Box::new(Term::lam(nat.clone(), nat.clone())),
+                            Box::new(Term::pi(nat.clone(), Term::Type(Level::zero()))),
+                        )),
+                        methods: vec![zero.clone(), step],
+                        indices: vec![],
+                        scrut: Box::new(Term::var(0)),
+                    },
+                )]
+            },
+        )
+        .expect("SCT-admitted structural recursion")[0];
+        assert!(env.is_recursive_transparent(rec));
+        let before = env.clone();
+        let barrier = env
+            .with_recursion_barriers(&[rec])
+            .expect("checked recursive id");
+        assert_eq!(env, before, "view must not mutate the checked environment");
+        assert_eq!(barrier.declarations().len(), env.declarations().len());
+        assert_eq!(barrier.next_global_id(), env.next_global_id());
+        assert!(matches!(barrier.lookup(rec), Some(Decl::Opaque { .. })));
+        assert!(!barrier.is_recursive_transparent(rec));
+        assert!(barrier.transparent_body_refs(rec).is_none());
+        assert!(barrier.sct_decreasing_positions(rec).is_none());
+        let mut cloned: GlobalEnv = (*barrier).clone();
+        let admitted_in_clone = declare_postulate(
+            &mut cloned,
+            "checked clone-only postulate".into(),
+            vec![],
+            nat.clone(),
+        )
+        .expect("a mutable clone admits only through a checked entry point");
+        assert!(cloned.trusted_base().contains(&rec));
+        assert!(cloned.trusted_base().contains(&admitted_in_clone));
+        assert!(!env.trusted_base().contains(&rec));
+        assert!(!env.trusted_base().contains(&admitted_in_clone));
+
+        // The prior driver appended a same-id opaque shadow to a private env.
+        // Its stale indexes did not alter normalization's lookup result.
+        let mut prior_shadow = env.clone();
+        prior_shadow.add_decl(Decl::Opaque {
+            id: rec,
+            name: "prior px8l barrier".into(),
+            level_params: vec![],
+            ty: Term::pi(nat.clone(), nat.clone()),
+        });
+        let source = Term::app(Term::const_(rec, vec![]), zero);
+        let ctx = Context::new();
+        let (_, admitted_body) = env.transparent_body(rec).expect("checked body");
+        assert_eq!(
+            crate::conv::normalize(&barrier, &ctx, &admitted_body),
+            crate::conv::normalize(&prior_shadow, &ctx, &admitted_body),
+            "the actual recursive body must normalize as under the prior driver"
+        );
+        assert_eq!(
+            crate::conv::normalize(&barrier, &ctx, &source),
+            crate::conv::normalize(&prior_shadow, &ctx, &source),
+            "barrier view must reproduce the prior driver's normalized body"
+        );
+        assert!(env.with_recursion_barriers(&[ids_nat]).is_err());
+        let zero_again =
+            Term::constructor(env.inductive(ids_nat).unwrap().constructors[0].id, vec![]);
+        let acyclic =
+            declare_def(&mut env, vec![], nat, zero_again).expect("checked nonrecursive constant");
+        assert!(!env.is_recursive_transparent(acyclic));
+        assert!(env.with_recursion_barriers(&[acyclic]).is_err());
     }
 
     #[test]

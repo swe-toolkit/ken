@@ -51,15 +51,32 @@ pub mod sct;
 pub mod subst;
 pub mod term;
 
+#[cfg(test)]
+extern crate self as ken_kernel;
+
+// Deliberately internal raw fixtures: these exercise pre-admission shapes
+// that are not themselves admitted declarations, without exporting `add_decl`.
+#[cfg(test)]
+#[path = "tests/eliminator_shape_demand_driven.rs"]
+mod eliminator_shape_demand_driven;
+#[cfg(test)]
+#[path = "tests/nested_inductives_d3b_d4.rs"]
+mod nested_inductives_d3b_d4;
+#[cfg(test)]
+#[path = "tests/obs_eq_termination_congruence.rs"]
+mod obs_eq_termination_congruence;
+
 // --- re-exports (the provisional internal entry points; stable API is K-api) ---
 pub use check::{
-    check, declare_deceq_certificate, declare_def, declare_inductive, declare_postulate,
-    declare_primitive, declare_recursive_group, infer, raw_well_formed, CtorSpec, InductiveSpec,
+    admit_pending, check, declare_deceq_certificate, declare_def, declare_inductive,
+    declare_inductive_try, declare_postulate, declare_primitive, declare_recursive_group, infer,
+    raw_well_formed, rollback_pending, stage_placeholders, CtorSpec, InductiveSpec,
+    PendingAdmission,
 };
 pub use conv::{convert, convert_type, level_eq, normalize, whnf};
 pub use env::{
-    AllSupportSort, ConstructorDecl, Context, DecEqCert, Decl, GlobalEnv, InductiveDecl,
-    ParameterPolarity, PrimReduction,
+    AllSupportSort, BarrierEnv, ConstructorDecl, Context, DecEqCert, Decl, GlobalEnv,
+    InductiveDecl, ParameterPolarity, PrimReduction,
 };
 pub use error::{KernelError, KernelResult};
 pub use term::{GlobalId, Level, LevelVar, Term};
