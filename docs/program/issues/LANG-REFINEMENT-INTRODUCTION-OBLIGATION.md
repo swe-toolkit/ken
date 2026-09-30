@@ -74,6 +74,15 @@ base, stop and report the mismatch.
   - The seeds `seed-def-refinement`, `seed-data-match`, `seed-obligations`
     and `seed-spec-syntax` are swept.
   - `ac7_plain_carrier_no_obligation` stays at zero.
+  - **The forgetful direction emits nothing** (`{x:A|φ} ≤ A` is free, 34
+    §5). The prelude's `charToInt`, `eqChar` and `leqChar`, and
+    `add_int n p` with `p : PosInt` in the guide's `add_to_pos_int`, add
+    zero obligations.
+  - **Re-use at the same refinement emits nothing new.** In the guide's
+    `const ten : Int = add_to_pos_int five five`, passing `five : PosInt` at
+    a `PosInt` parameter adds none; only `const five : PosInt = 5` carries
+    one (Architect `evt_3svpdbv1cjmwx`). These zeros are what separate
+    emitting at introduction from emitting on the type's name.
 
 ## Stop conditions
 
