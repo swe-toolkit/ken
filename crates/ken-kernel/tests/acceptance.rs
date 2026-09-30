@@ -11,7 +11,7 @@ use ken_kernel::inductive::peel_app;
 use ken_kernel::subst::weaken;
 use ken_kernel::term::{Level, LevelVar, Term};
 use ken_kernel::{
-    convert, declare_inductive, infer, whnf, CtorSpec, GlobalEnv, GlobalId, InductiveSpec,
+    convert, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, GlobalId, InductiveSpec,
 };
 
 /// Identifiers for the standard prelude of inductive families.
@@ -1643,13 +1643,10 @@ fn k2_funext_with_levels() {
     assert_eq!(whnf(&env, &ctx, &eq), expected);
 }
 
-// --- C7 (non-refl): J reduces on a non-refl equality (`15 §4.3`) -----------
-// The headline. `J` on a canonical non-`refl` proof (here a *variable*
-// `e : Eq A a b`, neutral — not `refl`) must reduce, not get stuck. With a
-// constant motive `P = λb.λe. Type 0`, `P a (refl a) ≡ P b e ≡ Type 0`, so
-// `J ≡ cast Type 0 Type 0 (refl ...) base → base` by regularity.
+// An un-ascribed lambda motive is a raw, uninferrable J input. It once
+// reduced by synthesizing an unchecked Refl; neutral is the safe fallback.
 #[test]
-fn k2_j_nonrefl_reduces_not_stuck() {
+fn k2_j_nonrefl_raw_lambda_motive_stays_neutral() {
     let (env, _s) = std_env();
     let mut ctx = Context::new();
     ctx.push(Term::Type(Level::zero())); // A : Type 0  (A=0)
@@ -1680,8 +1677,62 @@ fn k2_j_nonrefl_reduces_not_stuck() {
         Box::new(base.clone()),
         Box::new(Term::var(0)), // e : Eq A a b  (non-refl: a variable)
     );
-    // J on the non-refl `e` reduces (to `base`), it does NOT stay stuck at a
-    // neutral `J` node.
+    assert_eq!(
+        infer(&env, &ctx, &j),
+        Err(ken_kernel::KernelError::Msg(
+            "cannot infer an introduction form (λ/pair/refl/quotient class/truncation) without an expected type (use ascription)".into()
+        )),
+    );
+    assert_eq!(whnf(&env, &ctx, &j), j, "no unchecked raw witness");
+}
+
+// --- C7 (non-refl): J-cast reduces on a checked non-refl Eq (`15 §4.3`) ---
+#[test]
+fn k2_j_nonrefl_reduces_not_stuck() {
+    let (env, s) = std_env();
+    let mut ctx = Context::new();
+    ctx.push(Term::Type(Level::zero())); // A : Type0
+    ctx.push(Term::var(0)); // a : A
+    ctx.push(Term::var(1)); // b : A
+    ctx.push(Term::Eq(
+        Box::new(Term::var(2)),
+        Box::new(Term::var(1)),
+        Box::new(Term::var(0)),
+    )); // e : Eq A a b
+    let eq_b = Term::Eq(
+        Box::new(Term::var(4)),
+        Box::new(Term::var(3)),
+        Box::new(Term::var(0)),
+    );
+    let nat = Term::indformer(s.nat, vec![]);
+    let motive = Term::Ascript(
+        Box::new(Term::lam(
+            Term::var(3),
+            Term::lam(eq_b.clone(), nat.clone()),
+        )),
+        Box::new(Term::pi(
+            Term::var(3),
+            Term::pi(eq_b, Term::Type(Level::zero())),
+        )),
+    );
+    let base = ctor(s.zero);
+    let e = Term::var(0); // checked, non-Refl variable
+    let j = Term::J(Box::new(motive.clone()), Box::new(base.clone()), Box::new(e.clone()));
+    assert!(ken_kernel::convert_type(
+        &env,
+        &ctx,
+        &infer(&env, &ctx, &j).expect("checked J"),
+        &nat,
+    ));
+    let reduct = ken_kernel::obs::j_reduce(&env, &ctx, &motive, &base, &e)
+        .expect("checked non-Refl J reduces by cast");
+    assert!(matches!(reduct, Term::Cast(..)), "J-cast is reached");
+    assert!(ken_kernel::convert_type(
+        &env,
+        &ctx,
+        &infer(&env, &ctx, &reduct).expect("J-cast reduct remains typed"),
+        &nat,
+    ));
     assert_eq!(whnf(&env, &ctx, &j), base);
 }
 
@@ -1972,12 +2023,11 @@ fn k2_seam1_cast_inductive_index_change_stuck() {
     );
 }
 
-// --- Seam 1b: Eq at an inductive with a dependent telescope REDUCES (K2c) ---
-// `Eq (Vec A (suc n)) (vcons A n a xs) (vcons A m a' xs')`: the `xs` arg's type
-// depends on the earlier (forced) arg, so K2c emits a transported conjunct via
-// Cast. Result is a Σ, not a stuck neutral Eq.
+// The old raw Vec equality had an uninstantiated universe variable and
+// mismatched forced indices. It must remain neutral, not fabricate a cast
+// witness merely because its constructor spines are visible.
 #[test]
-fn k2_seam1b_eq_inductive_dependent_stuck() {
+fn k2_seam1b_ill_typed_raw_vec_equality_stays_neutral() {
     let (env, s) = std_env();
     let mut ctx = Context::new();
     ctx.push(Term::Type(Level::zero())); // A  (A=0)
@@ -2006,18 +2056,61 @@ fn k2_seam1b_eq_inductive_dependent_stuck() {
             Term::var(0),
         )), // vcons A m a' xs'
     );
-    let result = whnf(&env, &ctx, &eq);
-    // K2c: dependent telescope now reduces to a Σ conjunction with Cast in the
-    // xs position (seam 1b). Must NOT stay stuck as a neutral Eq.
-    assert!(
-        !matches!(result, Term::Eq(..)),
-        "K2c seam 1b: Eq at a dependent telescope must REDUCE (not stay stuck); \
-         got {:?}",
-        result
+    assert!(matches!(
+        infer(&env, &ctx, &eq),
+        Err(ken_kernel::KernelError::TypeMismatch { expected, found })
+            if *expected == Term::Type(lvar()) && *found == Term::Type(Level::zero())
+    ));
+    assert_eq!(whnf(&env, &ctx, &eq), eq, "no unchecked raw cast witness");
+}
+
+// --- Seam 1b: a typed dependent constructor telescope REDUCES (16 §2.2) ---
+#[test]
+fn k2_seam1b_eq_inductive_dependent_stuck() {
+    let (mut env, s) = std_env();
+    let ctx = Context::new();
+    let nat = Term::indformer(s.nat, vec![]);
+    let vec_nat = |index: Term| {
+        Term::app(
+            Term::app(Term::indformer(s.vec_, vec![Level::zero()]), nat.clone()),
+            index,
+        )
+    };
+    let family = declare_inductive(&mut env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![nat.clone(), vec_nat(Term::var(0))],
+            target_indices: vec![],
+        }],
+    })
+    .expect("unindexed family with a dependent Vec field");
+    let mk = env.inductive(family).unwrap().constructors[0].id;
+    let mut assumption = |label: &str, ty: Term| {
+        Term::const_(declare_postulate(&mut env, label.into(), vec![], ty).unwrap(), vec![])
+    };
+    let n = assumption("n", nat.clone());
+    let m = assumption("m", nat.clone());
+    let xs = assumption("xs", vec_nat(n.clone()));
+    let ys = assumption("ys", vec_nat(m.clone()));
+    let mk_value = |index: Term, vector: Term| {
+        Term::app(Term::app(Term::constructor(mk, vec![]), index), vector)
+    };
+    let redex = Term::Eq(
+        Box::new(Term::indformer(family, vec![])),
+        Box::new(mk_value(n, xs)),
+        Box::new(mk_value(m, ys)),
     );
-    assert!(
-        matches!(result, Term::Sigma(..)),
-        "K2c seam 1b: result must be a Σ conjunction; got {:?}",
-        result
-    );
+    let original_type = infer(&env, &ctx, &redex).expect("fully instantiated Vec redex");
+    let reduct = whnf(&env, &ctx, &redex);
+    assert!(matches!(&reduct, Term::Sigma(..)), "dependent conjunction computes");
+    if let Term::Sigma(_, second) = &reduct {
+        assert!(matches!(&**second, Term::Eq(_, lhs, _) if matches!(&**lhs,
+            Term::Cast(_, _, witness, _) if matches!(&**witness, Term::J(..)))),
+            "dependent conjunct transports using a derived J witness");
+    }
+    let reduct_type = infer(&env, &ctx, &reduct).expect("reduct checks at original type");
+    assert!(ken_kernel::convert_type(&env, &ctx, &original_type, &reduct_type));
 }
