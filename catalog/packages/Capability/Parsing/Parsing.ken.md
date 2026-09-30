@@ -1289,12 +1289,6 @@ pub theorem parse_bool_expr_total : ParserTotal (Syntax BoolExpr) parse_bool_exp
           Failed err ↦ Proved
         }
 
-theorem nat_leq_suc (n : Nat) : LessEqNat n (Suc n) =
-  match n {
-    Zero ↦ Proved;
-    Suc previous ↦ nat_leq_suc previous
-  }
-
 theorem bytes_refl (b : Bytes) : Equal Bytes b b = Refl
 
 theorem source_length_from_bytes
@@ -1374,7 +1368,7 @@ theorem byte_cursor_advance_bounded
       position
       (Suc position)
       start_bounded
-      (nat_leq_suc position))
+      (leq_nat_successor_bound position))
     (byte_cursor_peek_in_bounds s position value peeked)
 
 fn DecoderOutcomeBounded
