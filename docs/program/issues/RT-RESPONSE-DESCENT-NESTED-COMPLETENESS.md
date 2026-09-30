@@ -1,7 +1,7 @@
 ---
 id: RT-RESPONSE-DESCENT-NESTED-COMPLETENESS
 title: "Host-response descent admits a multi-candidate route only when it reaches exactly one leaf and that leaf is the only candidate its Vis case owns, so a nested dispatch whose sibling branch leaves an owned candidate unpaired refuses, as the top level already does"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: architect
@@ -86,3 +86,23 @@ the top-level `:1533` gate are unchanged.
   Architect with the row and its verbatim refusal.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Merged as `c91f42e7b` (PR #4404).
+- **AC-0.** The shape is reachable from source: the checked two-bracket
+  `withBuffer` witness reaches nested descent.
+  - The first leaf-boundary ruling (`evt_5d8ea6zyw9dve`) was falsified by
+    AC-0b and withdrawn.
+  - The ownership re-ruling (`evt_g30yv6w4a4zf`) was measured by AC-0c
+    before the edit. Both witness Vises have owned == reached, size 1. The
+    nested row owns {18, 29} but reaches {18}.
+- **AC-1.** `response_leaf_owner` walks the existing `ResponseParents`
+  ancestry and reuses the landed `::ITree::Vis` key.
+  `response_dispatch_entries` and `response_dispatch_leaves` are unchanged.
+  The nested planner row refuses, and the top-level row still refuses, both
+  with the existing multi-candidate message.
+- **AC-2.**
+  - Removing the ownership conjunct re-admits the nested row.
+  - The withdrawn completeness predicate removes both witness response rows.
+  - The four named landed rows stay green and unedited.
