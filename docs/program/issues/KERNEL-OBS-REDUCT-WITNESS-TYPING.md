@@ -70,6 +70,18 @@ The base is the canonical proof of `Eq Type X X`. It is `Refl x'` if whnf
 gives `Eq _ x' _`, and `tt` if it gives `Top`. Otherwise the reducer
 returns `None` and fabricates no witness.
 
+**J admission reads the Eq formation** (Architect `evt_3qfzytddvnjkn`
+ruling on stop `evt_6kbr8qe24a6sw`). This restores the declarative J rule of
+spec 15 §4.
+- One helper, `check.rs::eq_formation`, head-reduces by β, δ, let and
+  ascription only. It stops at the first `Term::Eq` and never applies
+  `eq_reduce` at the head.
+- If no `Eq` head appears, it falls back to today's whnf-and-shape demand.
+- `infer_j` (`check.rs:742-750`) and `obs.rs::j_nonrefl` both use it, so
+  typing and reduction read the same formation.
+- This widens J admission in the kernel. The merge Decision reviews that
+  widening explicitly.
+
 **Site 3 (`cast_at_inductive` Phase 3) moves to
 `KERNEL-OBS-INDUCTIVE-TYPE-EQ`.** Its `e` has no projections, because
 `eq_at_type` leaves `(App, App)` neutral. The five Class A fixtures move
@@ -92,6 +104,17 @@ with it.
   - The 57-package census shows no conversion verdict change.
   - `trusted_base()` is unchanged.
   - The nested-Cast cost is re-measured against the AC-0 baseline.
+- **AC-3 (J admission fences).**
+  - The committed third-field row (`Nat; Vec Nat x1; Vec Nat x1`) computes,
+    and `infer(reduct) ≡ infer(redex)`.
+  - `J` over a variable `h : Eq (Σ x:Nat. Vec Nat x) p q` with a dependent
+    motive typechecks.
+  - `J` over `h : Top`, or over any proof whose type has no `Eq` head, is
+    still rejected with `BadEliminator`.
+  - `J` over an `Eq` reached only by δ-unfolding a def keeps today's
+    verdict.
+  - The 57-package census shows no accept→reject flip. New accepts appear
+    only where the old verdict was this exact `BadEliminator`.
 
 ## Stop conditions
 
@@ -101,3 +124,13 @@ with it.
 - Any change to what the kernel accepts, beyond reducts that now compute:
   stop to the Architect.
 - A spec change: an operator question.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 1 (Architect `evt_3qfzytddvnjkn`).
+
+1. J cannot eliminate a proof whose Eq formation reduces. `infer_j` reads
+   `whnf(e_ty)` and demands the `Eq` shape, but `Eq` at Σ reduces to a Σ
+   (keyed on reading an Eq formation after its own reduction). The same
+   shape sits in `check`'s `Refl` rule (`check.rs:483`), which is left to
+   `KERNEL-OBS-INDUCTIVE-TYPE-EQ`.
