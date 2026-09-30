@@ -37,13 +37,19 @@ different scrutinee, is refined consistently. So f7, f4, f5 and f6 check.
 
 Two increments on this thread, each its own candidate (Architect AC-0b
 ruling `evt_bw82kr4k5pm5`; Steward resize):
-1. **Class B (SUBST, 10 rows): f5, f6 and f4's outer `xs`.**
-   - `refine_branch_goal` rewrites the goal from this match's leaves, but
-     the binders re-typed in the context come from separate scans.
-   - The repair establishes that, when a leaf rewrites the goal, every
-     reachable in-scope binder whose type mentions `leaf.scrutinee` is
-     re-typed by the same leaf in the same frame. Otherwise the goal is not
-     rewritten.
+1. **Class B (SUBST, 10 rows): f5, f6 and f4's outer `xs`** (M, T1;
+   Architect B ruling `evt_71bay9b5yf04r`).
+   - The defect: the re-typed context set is computed on the ambient
+     `cx.ctx`, but the candidate goal is classified on the expanded kernel
+     view (`active_premise_kernel_view_for_context`). The binders it
+     references live only on the second plane.
+   - The repair, in `refine_branch_goal`: take the binders free in the
+     candidate goal, on the expanded view, whose types mention
+     `leaf.scrutinee`, closed outer-first. Abstract the goal over them,
+     rewrite with `subst_term_generalize`, and restore through the existing
+     `try_reindex_cast` or Ω transport on the same leaf proof.
+   - Invariant: no goal rewrite without a rewrite of every goal-referenced
+     dependent, in the same step and on the same plane.
 2. **Class A (5 rows): the J-base `Refl` inside a `Cast`, f7 and f4's
    inner `ys`.** This is a kernel reducer defect (Architect
    `evt_449gyxrrejte1`): the reducer emits ill-typed `Cast` reducts.
@@ -66,18 +72,21 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
   slot). Stop to the Architect with the rows.
 - **AC-0b (done).** The measurements refute one mechanism: Class A is
   OTHER and Class B is SUBST, and the kernel is correct on all 15 rows.
-- **B-AC0 and the A measurement (no fix, same base, one scratch session).**
-  - For each failing B `Var`, and for every binder in those frames whose
-    type mentions `leaf.scrutinee`, name which of the four exclusion paths
-    in `evt_bw82kr4k5pm5` kept it out of the re-typed context.
-  - For each A row, name the `Cast`'s builder and the binder map applied.
-    Classify each row ONE-SIDED, RELOCATED or OTHER. This is paused until
-    the kernel WP lands.
-  - The Architect rules increment 1 from B-AC0: a single narrowed path, or
-    one leaf set driving both goal and context.
-- **AC-1.** f7, f4, f5 and f6 check. f5 and f6 check after increment 1;
-  f7 and f4 after both increments. `lookup_zip_with` checks unchanged,
-  together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
+- **B-AC0 (done).** 10 attempts and 48 dependent binders measured: two
+  exclusion mechanisms, so a structural closure. No B row fires one of the
+  four kernel witness sites, so all 10 stay in B.
+- **B-D0 (design only, Architect gate).** The representation of a
+  generalized premise binder and the step that resolves it; the sweep of
+  goal-rewriting `subst_term_generalize` callers, each in or out with a
+  reason; the double-refinement control.
+- **A measurement.** Paused until the kernel WP lands.
+- **AC-1.** Increment 1: all 10 B rows classify. Each of f4, f5 and f6
+  checks or fails at a named later site. The 38 unreferenced dependents
+  stay untouched. Increment 2: f7 and f4 check. `lookup_zip_with` checks
+  unchanged, together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
+- **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A binder
+  already refined by its own enclosing match is transported once, not
+  twice. A's five rows are unchanged by increment 1.
 - **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged, plus a
   mutation named in the ruling.
 
