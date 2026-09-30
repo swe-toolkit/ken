@@ -582,11 +582,43 @@ type ConstPair = (GlobalId, GlobalId);
 /// A recorded δ-origin. Hard entries have passed into a stuck eliminator's
 /// components; a later ι cannot witness descent for a symbolic call.
 /// The entry depth identifies binders introduced since this particular retry.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct DeltaPathEntry {
     pair: ConstPair,
     hard: bool,
     depth: usize,
+}
+
+/// A failed spine argument visible only to the δ retry of its owner and that
+/// retry's descendants. Borrow the compared pair and exact ledger snapshot;
+/// sibling comparisons and later public conversions have no access to it.
+struct SpineFailure<'a> {
+    depth: usize,
+    left: &'a Term,
+    right: &'a Term,
+    path: &'a [DeltaPathEntry],
+    next: Option<&'a SpineFailure<'a>>,
+}
+
+fn seen_spine_failure(
+    memo: Option<&SpineFailure<'_>>,
+    ctx: &Context,
+    path: &[DeltaPathEntry],
+    a: &Term,
+    b: &Term,
+) -> bool {
+    let mut current = memo;
+    while let Some(failure) = current {
+        if failure.depth == ctx.len()
+            && failure.path == path
+            && ((failure.left == a && failure.right == b)
+                || (failure.left == b && failure.right == a))
+        {
+            return true;
+        }
+        current = failure.next;
+    }
+    false
 }
 
 /// Whether an argument mentions one of the `fresh` innermost context binders.
@@ -697,6 +729,10 @@ mod delta_probe {
         static REFUSALS: Cell<u64> = const { Cell::new(0) };
         static HARD_CONTINUES: Cell<u64> = const { Cell::new(0) };
         static REDUCER_ENTRIES: Cell<u64> = const { Cell::new(0) };
+        static STRUCT_ENTRIES: Cell<u64> = const { Cell::new(0) };
+        static TRACKED_HEAD: Cell<Option<super::GlobalId>> = const { Cell::new(None) };
+        static TRACKED_HEAD_NONEMPTY: Cell<u64> = const { Cell::new(0) };
+        static TRACKED_HEAD_HARD: Cell<u64> = const { Cell::new(0) };
     }
     pub(super) fn reset() {
         UNFOLDS.with(|c| c.set(0));
@@ -705,12 +741,40 @@ mod delta_probe {
         REFUSALS.with(|c| c.set(0));
         HARD_CONTINUES.with(|c| c.set(0));
         REDUCER_ENTRIES.with(|c| c.set(0));
+        STRUCT_ENTRIES.with(|c| c.set(0));
+        TRACKED_HEAD.with(|c| c.set(None));
+        TRACKED_HEAD_NONEMPTY.with(|c| c.set(0));
+        TRACKED_HEAD_HARD.with(|c| c.set(0));
     }
     pub(super) fn bump_reducer_entry() {
         REDUCER_ENTRIES.with(|c| c.set(c.get() + 1));
     }
     pub(super) fn reducer_entries() -> u64 {
         REDUCER_ENTRIES.with(|c| c.get())
+    }
+    pub(super) fn bump_struct_entry() {
+        STRUCT_ENTRIES.with(|c| c.set(c.get() + 1));
+    }
+    pub(super) fn struct_entries() -> u64 {
+        STRUCT_ENTRIES.with(|c| c.get())
+    }
+    pub(super) fn track_head(id: super::GlobalId) {
+        TRACKED_HEAD.with(|c| c.set(Some(id)));
+    }
+    pub(super) fn tracked_head() -> Option<super::GlobalId> {
+        TRACKED_HEAD.with(|c| c.get())
+    }
+    pub(super) fn bump_tracked_head_nonempty() {
+        TRACKED_HEAD_NONEMPTY.with(|c| c.set(c.get() + 1));
+    }
+    pub(super) fn tracked_head_nonempty() -> u64 {
+        TRACKED_HEAD_NONEMPTY.with(|c| c.get())
+    }
+    pub(super) fn bump_tracked_head_hard() {
+        TRACKED_HEAD_HARD.with(|c| c.set(c.get() + 1));
+    }
+    pub(super) fn tracked_head_hard() -> u64 {
+        TRACKED_HEAD_HARD.with(|c| c.get())
     }
     pub(super) fn bump_unfold() {
         UNFOLDS.with(|c| c.set(c.get() + 1));
@@ -752,6 +816,30 @@ fn probe_reducer_entry() {
 #[cfg(not(test))]
 #[inline(always)]
 fn probe_reducer_entry() {}
+
+#[cfg(test)]
+#[inline]
+fn probe_struct_entry(path: &[DeltaPathEntry], a: &Term, b: &Term) {
+    delta_probe::bump_struct_entry();
+    if !path.is_empty() {
+        if let Some(tracked) = delta_probe::tracked_head() {
+            let (ha, _) = peel_app(a);
+            let (hb, _) = peel_app(b);
+            if matches!((&ha, &hb),
+                (Term::Const { id: ia, .. }, Term::Const { id: ib, .. })
+                if *ia == tracked && *ib == tracked)
+            {
+                delta_probe::bump_tracked_head_nonempty();
+                if path.iter().all(|entry| entry.hard) {
+                    delta_probe::bump_tracked_head_hard();
+                }
+            }
+        }
+    }
+}
+#[cfg(not(test))]
+#[inline(always)]
+fn probe_struct_entry(_path: &[DeltaPathEntry], _a: &Term, _b: &Term) {}
 
 #[cfg(test)]
 #[inline]
@@ -808,7 +896,7 @@ fn probe_hard_continue() {}
 /// is threaded through the private recursion to bound no-progress δ retries;
 /// see [`conv_struct_path`].
 pub fn convert(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term) -> bool {
-    convert_path(env, ctx, ty, a, b, &[])
+    convert_path(env, ctx, ty, a, b, &[], None)
 }
 
 /// [`convert`] with the δ-origin ledger threaded in. Only the private recursion
@@ -820,6 +908,7 @@ fn convert_path(
     a: &Term,
     b: &Term,
     path: &[DeltaPathEntry],
+    memo: Option<&SpineFailure<'_>>,
 ) -> bool {
     if a == b {
         return true; // α: syntactic identity under de Bruijn (`13 §6.2` step 1)
@@ -845,7 +934,7 @@ fn convert_path(
             let rhs = Term::app(b_ext, Term::var(0));
             let mut ctx2 = ctx.clone();
             ctx2.push((**dom).clone());
-            convert_path(env, &ctx2, cod, &lhs, &rhs, path)
+            convert_path(env, &ctx2, cod, &lhs, &rhs, path, memo)
         }
         Term::Sigma(dom, cod) => {
             // Σ-η (`13 §6.2` step 3): compare both projections.
@@ -853,13 +942,13 @@ fn convert_path(
             let b_w = whnf(env, ctx, b);
             let a1 = whnf(env, ctx, &Term::proj1(a_w.clone()));
             let b1 = whnf(env, ctx, &Term::proj1(b_w.clone()));
-            if !convert_path(env, ctx, dom, &a1, &b1, path) {
+            if !convert_path(env, ctx, dom, &a1, &b1, path, memo) {
                 return false;
             }
             let cod_a1 = subst0(cod, &a1); // B[a1/x]
             let a2 = whnf(env, ctx, &Term::proj2(a_w.clone()));
             let b2 = whnf(env, ctx, &Term::proj2(b_w.clone()));
-            convert_path(env, ctx, &cod_a1, &a2, &b2, path)
+            convert_path(env, ctx, &cod_a1, &a2, &b2, path, memo)
         }
         _ => {
             // (4) Unit-η / single-constructor-no-field inductive (`17 §2`):
@@ -872,7 +961,7 @@ fn convert_path(
                     }
                 }
             }
-            conv_struct_path(env, ctx, a, b, path)
+            conv_struct_path_memo(env, ctx, a, b, path, memo)
         }
     }
 }
@@ -903,16 +992,34 @@ fn conv_struct_path(
     b: &Term,
     path: &[DeltaPathEntry],
 ) -> bool {
+    conv_struct_path_memo(env, ctx, a, b, path, None)
+}
+
+fn conv_struct_path_memo(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a: &Term,
+    b: &Term,
+    path: &[DeltaPathEntry],
+    memo: Option<&SpineFailure<'_>>,
+) -> bool {
+    probe_struct_entry(path, a, b);
     // Syntactic-identity fast path (pre-δ, `13 §6.2` step 1): identical
     // de Bruijn terms are convertible with no reduction and no ledger touch.
     if a == b {
         return true;
+    }
+    if seen_spine_failure(memo, ctx, path, a, b) {
+        return false;
     }
 
     let (a_deferred, ad) = whnf_defer_head_delta(env, ctx, a);
     let (b_deferred, bd) = whnf_defer_head_delta(env, ctx, b);
     if a_deferred == b_deferred {
         return true;
+    }
+    if seen_spine_failure(memo, ctx, path, &a_deferred, &b_deferred) {
+        return false;
     }
 
     // Head identity is observed AFTER β/let/ascription reduction. A head
@@ -921,6 +1028,7 @@ fn conv_struct_path(
     // falls through to δ retry (e.g. a constant ignoring that argument).
     let (ha, args_a) = peel_app(&a_deferred);
     let (hb, args_b) = peel_app(&b_deferred);
+    let mut failed_spine = None;
     if let (
         Term::Const {
             id: ia,
@@ -936,12 +1044,18 @@ fn conv_struct_path(
             && is_transparent(env, *ia)
             && level_args_eq(la, lb)
             && args_a.len() == args_b.len()
-            && args_a
-                .iter()
-                .zip(&args_b)
-                .all(|(x, y)| conv_struct_path(env, ctx, x, y, path))
         {
-            return true;
+            let mut mismatch = None;
+            for (x, y) in args_a.iter().zip(&args_b) {
+                if !conv_struct_path_memo(env, ctx, x, y, path, memo) {
+                    mismatch = Some((x, y));
+                    break;
+                }
+            }
+            if mismatch.is_none() {
+                return true;
+            }
+            failed_spine = mismatch;
         }
     }
 
@@ -953,6 +1067,20 @@ fn conv_struct_path(
         _ => false,
     };
     let retry = transparent_head(&ha) || transparent_head(&hb);
+    // The failed pair belongs only to this node's δ retry. No memo is
+    // visible to the original spine's other arguments or sibling callers.
+    let retry_failure = if retry {
+        failed_spine.map(|(left, right)| SpineFailure {
+            depth: ctx.len(),
+            left,
+            right,
+            path,
+            next: memo,
+        })
+    } else {
+        None
+    };
+    let retry_memo = retry_failure.as_ref().or(memo);
     let origin = if retry {
         delta_origin_pair(env, &a_deferred, &b_deferred)
     } else {
@@ -1091,32 +1219,32 @@ fn conv_struct_path(
             },
         ) => id1 == id2 && level_args_eq(la1, la2),
         (Term::Pi(a1, b1), Term::Pi(a2, b2)) => {
-            conv_struct_path(env, ctx, a1, a2, child_path) && {
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo) && {
                 let mut c = ctx.clone();
                 c.push((**a1).clone());
-                conv_struct_path(env, &c, b1, b2, child_path)
+                conv_struct_path_memo(env, &c, b1, b2, child_path, retry_memo)
             }
         }
         (Term::Lam(a1, t1), Term::Lam(a2, t2)) => {
-            conv_struct_path(env, ctx, a1, a2, child_path) && {
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo) && {
                 let mut c = ctx.clone();
                 c.push((**a1).clone());
-                conv_struct_path(env, &c, t1, t2, child_path)
+                conv_struct_path_memo(env, &c, t1, t2, child_path, retry_memo)
             }
         }
         (Term::Sigma(a1, b1), Term::Sigma(a2, b2)) => {
-            conv_struct_path(env, ctx, a1, a2, child_path) && {
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo) && {
                 let mut c = ctx.clone();
                 c.push((**a1).clone());
-                conv_struct_path(env, &c, b1, b2, child_path)
+                conv_struct_path_memo(env, &c, b1, b2, child_path, retry_memo)
             }
         }
         (Term::Pair(a1, b1), Term::Pair(a2, b2)) => {
-            conv_struct_path(env, ctx, a1, a2, child_path)
-                && conv_struct_path(env, ctx, b1, b2, child_path)
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, b1, b2, child_path, retry_memo)
         }
         (Term::App(f1, a1), Term::App(f2, a2)) => {
-            if !conv_struct_path(env, ctx, f1, f2, child_path) {
+            if !conv_struct_path_memo(env, ctx, f1, f2, child_path, retry_memo) {
                 return false;
             }
             // Propositional-argument skip (`16 §8.2`): compare the argument at
@@ -1127,32 +1255,36 @@ fn conv_struct_path(
             if let Ok(tf) = crate::check::infer(env, ctx, f1) {
                 let tf_w = whnf(env, ctx, &tf);
                 if let Term::Pi(dom, _cod) = &tf_w {
-                    return convert_path(env, ctx, dom, a1, a2, child_path);
+                    return convert_path(env, ctx, dom, a1, a2, child_path, retry_memo);
                 }
             }
-            conv_struct_path(env, ctx, a1, a2, child_path)
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
         }
-        (Term::Proj1(p1), Term::Proj1(p2)) => conv_struct_path(env, ctx, p1, p2, child_path),
-        (Term::Proj2(p1), Term::Proj2(p2)) => conv_struct_path(env, ctx, p1, p2, child_path),
+        (Term::Proj1(p1), Term::Proj1(p2)) => {
+            conv_struct_path_memo(env, ctx, p1, p2, child_path, retry_memo)
+        }
+        (Term::Proj2(p1), Term::Proj2(p2)) => {
+            conv_struct_path_memo(env, ctx, p1, p2, child_path, retry_memo)
+        }
         // Neutral Cast congruence (`16 §3.2`, `17 §3.3`): all four fields are
         // structural. In particular `e` is deliberately not skipped by proof
         // irrelevance because this type-agnostic path has no trusted field type.
         (Term::Cast(a1, b1, e1, t1), Term::Cast(a2, b2, e2, t2)) => {
-            conv_struct_path(env, ctx, a1, a2, child_path)
-                && conv_struct_path(env, ctx, b1, b2, child_path)
-                && conv_struct_path(env, ctx, e1, e2, child_path)
-                && conv_struct_path(env, ctx, t1, t2, child_path)
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, b1, b2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, e1, e2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, t1, t2, child_path, retry_memo)
         }
         // Quotient congruence (`16 §5`, `17 §3.3`): quotient types compare
         // their carriers and relations structurally. Class introductions
         // compare only their representatives; relation-respect is an
         // elimination-time obligation, never an extra equality premise here.
         (Term::Quot(a1, r1), Term::Quot(a2, r2)) => {
-            conv_struct_path(env, ctx, a1, a2, child_path)
-                && conv_struct_path(env, ctx, r1, r2, child_path)
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, r1, r2, child_path, retry_memo)
         }
         (Term::QuotClass(t1), Term::QuotClass(t2)) => {
-            conv_struct_path(env, ctx, t1, t2, child_path)
+            conv_struct_path_memo(env, ctx, t1, t2, child_path, retry_memo)
         }
         // A neutral quotient eliminator is congruent exactly when its four
         // fields are (`16 §5`, `17 §3.3`). `respect` remains structural rather
@@ -1171,16 +1303,18 @@ fn conv_struct_path(
                 scrut: s2,
             },
         ) => {
-            conv_struct_path(env, ctx, m1, m2, child_path)
-                && conv_struct_path(env, ctx, f1, f2, child_path)
-                && conv_struct_path(env, ctx, r1, r2, child_path)
-                && conv_struct_path(env, ctx, s1, s2, child_path)
+            conv_struct_path_memo(env, ctx, m1, m2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, f1, f2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, r1, r2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, s1, s2, child_path, retry_memo)
         }
         // Truncation congruence (`16 §6`): the former compares its underlying
         // type, and `|a|` compares its sole introduction operand.
-        (Term::Trunc(a1), Term::Trunc(a2)) => conv_struct_path(env, ctx, a1, a2, child_path),
+        (Term::Trunc(a1), Term::Trunc(a2)) => {
+            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
+        }
         (Term::TruncProj(t1), Term::TruncProj(t2)) => {
-            conv_struct_path(env, ctx, t1, t2, child_path)
+            conv_struct_path_memo(env, ctx, t1, t2, child_path, retry_memo)
         }
         (
             Term::Elim {
@@ -1208,28 +1342,28 @@ fn conv_struct_path(
                 && p1
                     .iter()
                     .zip(p2)
-                    .all(|(x, y)| conv_struct_path(env, ctx, x, y, child_path))
-                && conv_struct_path(env, ctx, m1, m2, child_path)
+                    .all(|(x, y)| conv_struct_path_memo(env, ctx, x, y, child_path, retry_memo))
+                && conv_struct_path_memo(env, ctx, m1, m2, child_path, retry_memo)
                 && ms1.len() == ms2.len()
                 && ms1
                     .iter()
                     .zip(ms2)
-                    .all(|(x, y)| conv_struct_path(env, ctx, x, y, child_path))
+                    .all(|(x, y)| conv_struct_path_memo(env, ctx, x, y, child_path, retry_memo))
                 && ix1.len() == ix2.len()
                 && ix1
                     .iter()
                     .zip(ix2)
-                    .all(|(x, y)| conv_struct_path(env, ctx, x, y, child_path))
-                && conv_struct_path(env, ctx, s1, s2, child_path)
+                    .all(|(x, y)| conv_struct_path_memo(env, ctx, x, y, child_path, retry_memo))
+                && conv_struct_path_memo(env, ctx, s1, s2, child_path, retry_memo)
         }
-        (Term::Ascript(t1, _), x) => conv_struct_path(env, ctx, t1, x, child_path),
-        (x, Term::Ascript(t2, _)) => conv_struct_path(env, ctx, x, t2, child_path),
+        (Term::Ascript(t1, _), x) => conv_struct_path_memo(env, ctx, t1, x, child_path, retry_memo),
+        (x, Term::Ascript(t2, _)) => conv_struct_path_memo(env, ctx, x, t2, child_path, retry_memo),
         // `absurd` congruence. For Ω motives this is usually bypassed by the
         // proof-irrelevance shortcut; for Type motives it keeps `Absurd`
         // structurally comparable without adding any reduction rule.
         (Term::Absurd(m1, p1), Term::Absurd(m2, p2)) => {
-            conv_struct_path(env, ctx, m1, m2, child_path)
-                && conv_struct_path(env, ctx, p1, p2, child_path)
+            conv_struct_path_memo(env, ctx, m1, m2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, p1, p2, child_path, retry_memo)
         }
         // `Eq` congruence (Gap-conv, `conv-eq-congruence`, re-landing here per
         // `obs-eq-termination`) — the missing congruence closure for the `Eq`
@@ -1238,9 +1372,9 @@ fn conv_struct_path(
         // already carries; not a loosening (fail-closed direction only —
         // recognises strictly more true equalities, never a false one).
         (Term::Eq(ty1, a1, b1), Term::Eq(ty2, a2, b2)) => {
-            conv_struct_path(env, ctx, ty1, ty2, child_path)
-                && conv_struct_path(env, ctx, a1, a2, child_path)
-                && conv_struct_path(env, ctx, b1, b2, child_path)
+            conv_struct_path_memo(env, ctx, ty1, ty2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
+                && conv_struct_path_memo(env, ctx, b1, b2, child_path, retry_memo)
         }
         // `IntLit` definitional equality: by `BigInt` value, matching the
         // observational `Eq`-at-registered-literal reduction (`obs.rs`).
@@ -1257,6 +1391,476 @@ fn conv_struct_path(
 mod tests {
     use super::*;
     use crate::term::{Level, LevelVar};
+
+    // Stable bound for the checked and six synthetic no-soft-transition rows.
+    const SPINE_LINEAR_ENTRY_FACTOR: u64 = 16;
+    const SPINE_SOFT_ENTRY_FACTOR: u64 = 3;
+
+    fn declare_checked_nat_pred(env: &mut GlobalEnv, nat: GlobalId, zero: GlobalId) -> GlobalId {
+        let nt = Term::indformer(nat, vec![]);
+        declare_def(
+            env,
+            vec![],
+            Term::pi(nt.clone(), nt.clone()),
+            Term::lam(
+                nt.clone(),
+                Term::Elim {
+                    fam: nat,
+                    level_args: vec![],
+                    params: vec![],
+                    motive: Box::new(Term::Ascript(
+                        Box::new(Term::lam(nt.clone(), nt.clone())),
+                        Box::new(Term::pi(nt.clone(), Term::Type(Level::zero()))),
+                    )),
+                    methods: vec![
+                        Term::constructor(zero, vec![]),
+                        Term::lam(nt.clone(), Term::lam(nt.clone(), Term::var(1))),
+                    ],
+                    indices: vec![],
+                    scrut: Box::new(Term::var(0)),
+                },
+            ),
+        )
+        .expect("checked non-recursive pred")
+    }
+
+    /// Durable invariant (`17 §3.5`, §5): a negative same-head spine comparison
+    /// is not recomputed at every level of its own non-recursive δ retry.
+    /// MEASURED: `conv_struct_path` entries, including failed comparisons, for
+    /// six deferred consumer shapes at depths 8/16/20; both false and true
+    /// verdicts are checked through `convert`. CLAIMED: conversion-local
+    /// retry descent takes linear structural-comparison work in that depth.
+    /// GAP: this counter excludes work inside `whnf` and allocation. The five
+    /// non-Elim consumer declarations below are synthetic raw-shape probes;
+    /// the separate checked Nat/`pred` fixture proves real admission reach.
+    /// Public nested Cast `whnf` work is outside this pin (WP stop condition).
+    #[test]
+    fn nonrecursive_delta_retry_failed_spines_have_linear_structural_entries() {
+        use crate::env::Decl;
+
+        // The named neutral is closed and opaque, so Eq/Cast stay stuck without
+        // accidentally measuring their independent observational reductions.
+        let mut env = GlobalEnv::new();
+        let neutral = declare_postulate(
+            &mut env,
+            "retry-shape-neutral".into(),
+            vec![],
+            Term::Type(Level::zero()),
+        )
+        .expect("closed neutral type");
+        let static_neutral = Term::const_(neutral, vec![]);
+        let ty = Term::Type(Level::zero());
+        let mut ctx = Context::new();
+        ctx.push(ty.clone());
+        ctx.push(ty.clone());
+        let nested =
+            |head, k, seed| (0..k).fold(seed, |arg, _| Term::app(Term::const_(head, vec![]), arg));
+
+        // An intentionally synthetic constant, not checked admission: a term
+        // can't inhabit all six consumer result types at every nesting depth.
+        // The checked Nat/Elim witness below independently reaches `convert`.
+        for shape in ["proj1", "proj2", "elim", "quot", "eq", "cast"] {
+            let deep = Term::var(0);
+            let body = match shape {
+                "proj1" => Term::proj1(deep),
+                "proj2" => Term::proj2(deep),
+                "elim" => Term::Elim {
+                    fam: GlobalId(9000),
+                    level_args: vec![],
+                    params: vec![],
+                    motive: Box::new(static_neutral.clone()),
+                    methods: vec![],
+                    indices: vec![],
+                    scrut: Box::new(deep),
+                },
+                "quot" => Term::QuotElim {
+                    motive: Box::new(static_neutral.clone()),
+                    method: Box::new(static_neutral.clone()),
+                    respect: Box::new(static_neutral.clone()),
+                    scrut: Box::new(deep),
+                },
+                "eq" => Term::Eq(
+                    Box::new(static_neutral.clone()),
+                    Box::new(deep),
+                    Box::new(static_neutral.clone()),
+                ),
+                "cast" => Term::Cast(
+                    Box::new(static_neutral.clone()),
+                    Box::new(ty.clone()),
+                    Box::new(deep),
+                    Box::new(static_neutral.clone()),
+                ),
+                _ => unreachable!(),
+            };
+            let head = env.fresh_id();
+            env.add_decl(Decl::Transparent {
+                id: head,
+                level_params: vec![],
+                ty: Term::pi(ty.clone(), ty.clone()),
+                body: Term::lam(ty.clone(), body),
+            });
+            assert!(!env.is_recursive_transparent(head), "{shape} head");
+            for k in [8, 16, 20] {
+                let left = nested(head, k, Term::var(1));
+                let right = nested(head, k, Term::var(0));
+                delta_probe::reset();
+                assert!(!convert(&env, &ctx, &ty, &left, &right), "{shape} k={k}");
+                let entries = delta_probe::struct_entries();
+                assert!(
+                    entries > 0 && entries <= SPINE_LINEAR_ENTRY_FACTOR * k,
+                    "{shape} k={k}: {entries} structural entries, limit {}",
+                    SPINE_LINEAR_ENTRY_FACTOR * k
+                );
+
+                let same_rebuilt = nested(
+                    head,
+                    k,
+                    Term::Ascript(Box::new(Term::var(1)), Box::new(ty.clone())),
+                );
+                assert_ne!(left, same_rebuilt, "{shape} positive is not α");
+                delta_probe::reset();
+                assert!(
+                    convert(&env, &ctx, &ty, &left, &same_rebuilt),
+                    "{shape} k={k}: same variable rebuilt through ascription"
+                );
+                assert!(
+                    delta_probe::struct_entries() > 0,
+                    "{shape} reached conversion"
+                );
+            }
+        }
+
+        // Real checked admission: the original non-recursive `pred` witness.
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
+        assert!(!env.is_recursive_transparent(pred));
+        let mut nat_ctx = Context::new();
+        nat_ctx.push(nt.clone());
+        nat_ctx.push(nt.clone());
+        for k in [8, 16, 20] {
+            let left = nested(pred, k, Term::var(1));
+            let right = nested(pred, k, Term::var(0));
+            assert_typed(&env, &nat_ctx, &left);
+            assert_typed(&env, &nat_ctx, &right);
+            delta_probe::reset();
+            assert!(!convert(&env, &nat_ctx, &nt, &left, &right));
+            let entries = delta_probe::struct_entries();
+            assert!(
+                entries > 0 && entries <= SPINE_LINEAR_ENTRY_FACTOR * k,
+                "checked pred k={k}: {entries} structural entries"
+            );
+            let same_rebuilt = nested(
+                pred,
+                k,
+                Term::Ascript(Box::new(Term::var(1)), Box::new(nt.clone())),
+            );
+            assert_ne!(left, same_rebuilt);
+            assert_typed(&env, &nat_ctx, &same_rebuilt);
+            assert!(convert(&env, &nat_ctx, &nt, &left, &same_rebuilt));
+        }
+
+        // Completeness control: keep the eager δ retry, since its body can
+        // erase a failed spine argument and converge to a single constructor.
+        let k0 = declare_def(
+            &mut env,
+            vec![],
+            Term::pi(nt.clone(), nt.clone()),
+            Term::lam(nt.clone(), Term::constructor(zero, vec![])),
+        )
+        .expect("checked argument-ignoring wrapper");
+        assert!(!env.is_recursive_transparent(k0));
+        for k in [8, 16, 20] {
+            let left = nested(k0, k, Term::var(1));
+            let right = nested(k0, k, Term::var(0));
+            assert_typed(&env, &nat_ctx, &left);
+            assert_typed(&env, &nat_ctx, &right);
+            assert!(convert(&env, &nat_ctx, &nt, &left, &right), "k0 k={k}");
+        }
+    }
+
+    /// Non-empty-path pin (`17 §3.5`, §5): a recursive `map` head exposes the
+    /// checked `pred^k x`/`pred^k y` pair beneath its δ-origin ledger.
+    /// MEASURED: `convert`'s structural entries at k=8/16/20 after a real
+    /// recursive head captures an origin; every nonempty pred-head comparison
+    /// sees a wholly hard ledger. CLAIMED: this checked recursive-head
+    /// descendant does not restart exponential work under its hard path.
+    /// GAP: the entry counter excludes whnf/allocations; this fixture does
+    /// not establish linearity for soft-to-hard transitions (pinned below).
+    /// The empty-path pair is independently pinned above.
+    #[test]
+    fn checked_pred_under_recursive_delta_origin_has_linear_structural_entries() {
+        let mut env = GlobalEnv::new();
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
+        let (list, nil, cons) = declare_list(&mut env);
+        let map = declare_map(&mut env, list, nil, cons);
+        let list_nt = list_at(list, Level::zero(), nt.clone());
+        assert!(!env.is_recursive_transparent(pred));
+        assert!(env.is_recursive_transparent(map));
+        let mut ctx = Context::new();
+        ctx.push(nt.clone()); // x, de Bruijn 2
+        ctx.push(nt.clone()); // y, de Bruijn 1
+        ctx.push(list_nt.clone()); // shared list, de Bruijn 0
+        let nested_pred =
+            |k, seed| (0..k).fold(seed, |arg, _| Term::app(Term::const_(pred, vec![]), arg));
+        for k in [8, 16, 20] {
+            let left_pred = nested_pred(k, Term::var(2));
+            let right_pred = nested_pred(k, Term::var(1));
+            let left_f = Term::lam(nt.clone(), weaken(&left_pred, 1));
+            let right_f = Term::lam(nt.clone(), weaken(&right_pred, 1));
+            let left = map_apply(map, nt.clone(), nt.clone(), left_f, Term::var(0));
+            let right = map_apply(map, nt.clone(), nt.clone(), right_f, Term::var(0));
+            assert_typed(&env, &ctx, &left);
+            assert_typed(&env, &ctx, &right);
+            delta_probe::reset();
+            delta_probe::track_head(pred);
+            assert!(
+                !convert(&env, &ctx, &list_nt, &left, &right),
+                "map/pred k={k}"
+            );
+            assert!(
+                delta_probe::captures() > 0,
+                "map/pred k={k}: origin captured"
+            );
+            let nonempty = delta_probe::tracked_head_nonempty();
+            let hard = delta_probe::tracked_head_hard();
+            assert!(
+                nonempty > 0 && hard == nonempty,
+                "map/pred k={k}: expected only hard ledger comparisons ({nonempty}, {hard})"
+            );
+            let entries = delta_probe::struct_entries();
+            assert!(
+                entries > 0 && entries <= SPINE_LINEAR_ENTRY_FACTOR * k,
+                "map/pred k={k}: {entries} structural entries, limit {}",
+                SPINE_LINEAR_ENTRY_FACTOR * k
+            );
+        }
+    }
+
+    /// Durable polynomial residual (`17 §3.5`, §5; Architect ruling
+    /// `evt_37g2qxwesq2zz`): soft→hard transition at each soft level;
+    /// accepted polynomial residual. MEASURED: `conv_struct_path` entries for
+    /// the checked Nat `pred^k x`/`pred^k y` pair at k=8/16/20 under a
+    /// seeded nonempty soft ledger, plus witnesses of both soft and hardened
+    /// pred comparisons. CLAIMED: this transition costs at most quadratic
+    /// structural work in k, never the original exponential retry.
+    /// GAP: the ledger is seeded privately; no checked caller has been shown
+    /// to deliver a soft entry to pred, and this counter excludes whnf and
+    /// allocation. The checked reachable *hard* path stays pinned above.
+    #[test]
+    fn seeded_soft_delta_path_pred_retry_has_quadratic_structural_bound() {
+        let mut env = GlobalEnv::new();
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
+        let (list, nil, cons) = declare_list(&mut env);
+        let map = declare_map(&mut env, list, nil, cons);
+        assert!(!env.is_recursive_transparent(pred));
+        assert!(env.is_recursive_transparent(map));
+        let mut ctx = Context::new();
+        ctx.push(nt.clone());
+        ctx.push(nt.clone());
+        let soft_path = [DeltaPathEntry {
+            pair: (map, map),
+            hard: false,
+            depth: ctx.len(),
+        }];
+        let nested_pred =
+            |k, seed| (0..k).fold(seed, |arg, _| Term::app(Term::const_(pred, vec![]), arg));
+        for k in [8, 16, 20] {
+            let left = nested_pred(k, Term::var(1));
+            let right = nested_pred(k, Term::var(0));
+            assert_typed(&env, &ctx, &left);
+            assert_typed(&env, &ctx, &right);
+            delta_probe::reset();
+            delta_probe::track_head(pred);
+            assert!(!conv_struct_path(&env, &ctx, &left, &right, &soft_path));
+            let nonempty = delta_probe::tracked_head_nonempty();
+            let hard = delta_probe::tracked_head_hard();
+            assert!(
+                hard > 0 && nonempty > hard,
+                "pred k={k}: both soft and hard ledger comparisons must run ({nonempty}, {hard})"
+            );
+            let entries = delta_probe::struct_entries();
+            assert!(
+                entries > 0 && entries <= SPINE_SOFT_ENTRY_FACTOR * k * k,
+                "soft-to-hard pred k={k}: {entries} structural entries, limit {}",
+                SPINE_SOFT_ENTRY_FACTOR * k * k
+            );
+        }
+    }
+
+    /// Memo-key control (durable invariant): a failed pair is reusable only
+    /// with the identical depth and full δ ledger. This directly exercises
+    /// the key; the six-shape pin above establishes real conversion reach.
+    #[test]
+    fn failed_spine_memo_requires_identical_context_depth_and_delta_path() {
+        let env = GlobalEnv::new();
+        let ty = Term::Type(Level::zero());
+        let mut ctx = Context::new();
+        ctx.push(ty.clone());
+        ctx.push(ty.clone());
+        let left = Term::var(1);
+        let right = Term::var(0);
+        let path = [DeltaPathEntry {
+            pair: (GlobalId(11), GlobalId(12)),
+            hard: false,
+            depth: ctx.len(),
+        }];
+        let failure = SpineFailure {
+            depth: ctx.len(),
+            left: &left,
+            right: &right,
+            path: &path,
+            next: None,
+        };
+        let memo = Some(&failure);
+        assert!(seen_spine_failure(memo, &ctx, &path, &left, &right));
+        assert!(seen_spine_failure(memo, &ctx, &path, &right, &left));
+        assert!(!seen_spine_failure(memo, &ctx, &[], &left, &right));
+        let hard_path = [DeltaPathEntry {
+            hard: true,
+            ..path[0]
+        }];
+        assert!(!seen_spine_failure(memo, &ctx, &hard_path, &left, &right));
+        let changed_origin = [DeltaPathEntry {
+            pair: (GlobalId(11), GlobalId(13)),
+            ..path[0]
+        }];
+        assert!(!seen_spine_failure(
+            memo,
+            &ctx,
+            &changed_origin,
+            &left,
+            &right
+        ));
+        let mut deeper = ctx.clone();
+        deeper.push(ty.clone());
+        assert!(!seen_spine_failure(memo, &deeper, &path, &left, &right));
+        assert!(!seen_spine_failure(memo, &ctx, &path, &left, &left));
+
+        // The α path wins even over an artificial equal-pair memo node.
+        let artificial = SpineFailure {
+            depth: ctx.len(),
+            left: &left,
+            right: &left,
+            path: &path,
+            next: None,
+        };
+        assert!(conv_struct_path_memo(
+            &env,
+            &ctx,
+            &left,
+            &left,
+            &path,
+            Some(&artificial)
+        ));
+        let rebuilt = Term::Ascript(Box::new(left.clone()), Box::new(ty));
+        assert!(!seen_spine_failure(memo, &ctx, &path, &rebuilt, &right));
+        assert!(!conv_struct_path_memo(
+            &env, &ctx, &rebuilt, &right, &path, memo
+        ));
+    }
+
+    /// Durable memo lookup invariant (`17 §3.5`, §5): a failed checked pred
+    /// pair is reused on each side of deferred WHNF. MEASURED: the same
+    /// Ascript-wrapped input compares in constant structural work against a
+    /// supplied memo entry matching only before, or only after, deferred WHNF.
+    /// CLAIMED: neither lookup plane recomputes a known failed spine pair.
+    /// GAP: the memo is supplied privately here; the six-shape and checked
+    /// conversion rows establish automatic installation during a δ retry.
+    #[test]
+    fn failed_spine_memo_is_consulted_before_and_after_deferred_whnf() {
+        let mut env = GlobalEnv::new();
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
+        let mut ctx = Context::new();
+        ctx.push(nt.clone());
+        ctx.push(nt.clone());
+        let nested_pred =
+            |k, seed| (0..k).fold(seed, |arg, _| Term::app(Term::const_(pred, vec![]), arg));
+        let left = nested_pred(8, Term::var(1));
+        let right = nested_pred(8, Term::var(0));
+        let ascribed_left = Term::Ascript(Box::new(left.clone()), Box::new(nt.clone()));
+        for term in [&left, &right, &ascribed_left] {
+            assert_typed(&env, &ctx, term);
+        }
+        assert_ne!(ascribed_left, left);
+        assert_eq!(whnf_defer_head_delta(&env, &ctx, &ascribed_left).0, left);
+        let path = [];
+        assert!(!conv_struct_path(&env, &ctx, &left, &right, &path));
+        assert!(!conv_struct_path(&env, &ctx, &ascribed_left, &right, &path));
+
+        for (plane, remembered_left, matches_before) in [
+            ("before deferred WHNF", &ascribed_left, true),
+            ("after deferred WHNF", &left, false),
+        ] {
+            let failure = SpineFailure {
+                depth: ctx.len(),
+                left: remembered_left,
+                right: &right,
+                path: &path,
+                next: None,
+            };
+            let memo = Some(&failure);
+            assert_eq!(
+                seen_spine_failure(memo, &ctx, &path, &ascribed_left, &right),
+                matches_before,
+                "{plane}: fixture must select its intended lookup plane"
+            );
+            assert_eq!(
+                seen_spine_failure(memo, &ctx, &path, &left, &right),
+                !matches_before,
+                "{plane}: the other lookup must not mask a deleted guard"
+            );
+            delta_probe::reset();
+            assert!(
+                !conv_struct_path_memo(&env, &ctx, &ascribed_left, &right, &path, memo),
+                "{plane}: known failed pair stays unequal"
+            );
+            let entries = delta_probe::struct_entries();
+            assert!(
+                entries > 0 && entries <= 2,
+                "{plane}: known failure must avoid subtree recomparison ({entries} entries)"
+            );
+        }
+    }
+
+    /// The recursive-head counterpart retains the existing δ-origin ledger
+    /// verdict (`17 §3.5`, §5): unlike `pred`, `map` carries a certified
+    /// recursive origin and must not acquire an equality from memoized fails.
+    /// This is a durable invariant over checked List/Bool/`map` terms.
+    #[test]
+    fn nested_recursive_map_head_still_refuses_distinct_neutrals() {
+        let mut env = GlobalEnv::new();
+        let (list, nil, cons) = declare_list(&mut env);
+        let map = declare_map(&mut env, list, nil, cons);
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let not = declare_not(&mut env, bool_id, false_id, true_id);
+        let bt = bool_ty(bool_id);
+        let list_bt = list_at(list, Level::zero(), bt.clone());
+        let mut ctx = Context::new();
+        ctx.push(list_bt.clone());
+        ctx.push(list_bt.clone());
+        let nest = |k, seed| {
+            (0..k).fold(seed, |xs, _| {
+                map_apply(map, bt.clone(), bt.clone(), cref0(not), xs)
+            })
+        };
+        assert!(env.is_recursive_transparent(map));
+        for k in [2, 4, 8] {
+            let left = nest(k, Term::var(1));
+            let right = nest(k, Term::var(0));
+            assert_typed(&env, &ctx, &left);
+            assert_typed(&env, &ctx, &right);
+            delta_probe::reset();
+            assert!(!convert(&env, &ctx, &list_bt, &left, &right), "map k={k}");
+            assert!(delta_probe::captures() > 0, "map k={k}: ledger reached");
+        }
+    }
 
     /// Durable reducer-work invariant: a stuck component is reduced once,
     /// even when conversion defers its head δ. MEASURED: reducer entries at
