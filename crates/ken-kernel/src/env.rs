@@ -13,7 +13,9 @@
 //! that makes `infer` O(1).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::error::{KernelError, KernelResult};
 use crate::term::{GlobalId, Level, LevelVar, Term};
 
 /// The local context Γ — a telescope of term-variable types (`11 §3`).
@@ -259,10 +261,36 @@ impl Decl {
     }
 }
 
+/// Identity of one environment instance, independent of its declaration IDs.
+/// Moves preserve it; cloning mints a distinct identity, even when the cloned
+/// declarations and allocator state are byte-identical to their source.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct EnvInstance(u64);
+
+impl EnvInstance {
+    fn fresh() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
+impl Default for EnvInstance {
+    fn default() -> Self {
+        Self::fresh()
+    }
+}
+
+impl Clone for EnvInstance {
+    fn clone(&self) -> Self {
+        Self::fresh()
+    }
+}
+
 /// The global environment `Σ` — checked declarations plus SCT-admitted
 /// recursive bodies (`11 §4`, `17 §4`).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default)]
 pub struct GlobalEnv {
+    instance: EnvInstance,
     decls: Vec<Decl>,
     by_id: HashMap<GlobalId, usize>,
     /// Transparent constants on cycles of the current transparent-body graph.
@@ -325,7 +353,129 @@ pub struct GlobalEnv {
     checked_literals: HashMap<GlobalId, CheckedStringLiteral>,
 }
 
+// Value equality is the pre-existing structural environment comparison. The
+// ownership token is deliberately excluded: cloning preserves every checked
+// declaration/index while minting a different transaction owner. Destructuring
+// every field makes a newly added state field a compile-time review point.
+impl PartialEq for GlobalEnv {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            instance: _,
+            decls,
+            by_id,
+            recursive_transparent,
+            sct_decreasing,
+            referrers,
+            body_refs,
+            ctor_index,
+            next_id,
+            all_supports,
+            terminal_supports,
+            support_edges,
+            top_id,
+            bottom_id,
+            tt_id,
+            deceq_certs,
+            int_lit_ty,
+            literal_char_view,
+            checked_string_carrier,
+            checked_char_carrier,
+            checked_literals,
+        } = self;
+        decls == &other.decls
+            && by_id == &other.by_id
+            && recursive_transparent == &other.recursive_transparent
+            && sct_decreasing == &other.sct_decreasing
+            && referrers == &other.referrers
+            && body_refs == &other.body_refs
+            && ctor_index == &other.ctor_index
+            && next_id == &other.next_id
+            && all_supports == &other.all_supports
+            && terminal_supports == &other.terminal_supports
+            && support_edges == &other.support_edges
+            && top_id == &other.top_id
+            && bottom_id == &other.bottom_id
+            && tt_id == &other.tt_id
+            && deceq_certs == &other.deceq_certs
+            && int_lit_ty == &other.int_lit_ty
+            && literal_char_view == &other.literal_char_view
+            && checked_string_carrier == &other.checked_string_carrier
+            && checked_char_carrier == &other.checked_char_carrier
+            && checked_literals == &other.checked_literals
+    }
+}
+
+impl Eq for GlobalEnv {}
+
+/// A read-only view for normalization. It cannot be mutated in place. A clone
+/// of it is an ordinary environment in which the listed constants are opaque:
+/// admission into such a clone is sound (a checked body exists in the source
+/// environment), and `trusted_base()` there reports each folded constant as
+/// opaque.
+pub struct BarrierEnv(GlobalEnv);
+
+impl std::ops::Deref for BarrierEnv {
+    type Target = GlobalEnv;
+
+    fn deref(&self) -> &GlobalEnv {
+        &self.0
+    }
+}
+
 impl GlobalEnv {
+    /// Private transaction ownership identity, not a declaration ID.
+    pub(crate) fn instance_id(&self) -> u64 {
+        self.instance.0
+    }
+
+    /// Return a read-only normalization view, folding selected recursive
+    /// transparent declarations at their existing indices. A clone of the
+    /// view is an ordinary mutable environment: folded constants become
+    /// reported opaque assumptions, not unchecked transparent bodies.
+    pub fn with_recursion_barriers(&self, ids: &[GlobalId]) -> KernelResult<BarrierEnv> {
+        for &id in ids {
+            if !matches!(self.lookup(id), Some(Decl::Transparent { .. }))
+                || !self.is_recursive_transparent(id)
+            {
+                return Err(KernelError::IllFormedDecl(
+                    "normalization barrier requires a recursive transparent declaration".into(),
+                ));
+            }
+        }
+        let mut view = self.clone();
+        let mut seen = HashSet::new();
+        for &id in ids {
+            if !seen.insert(id) {
+                continue;
+            }
+            let idx = view.by_id[&id];
+            let Decl::Transparent {
+                level_params, ty, ..
+            } = &view.decls[idx]
+            else {
+                unreachable!("prevalidated barrier is transparent")
+            };
+            let folded = Decl::Opaque {
+                id,
+                name: "normalization recursion barrier".into(),
+                level_params: level_params.clone(),
+                ty: ty.clone(),
+            };
+            view.decls[idx] = folded;
+            for target in view.body_refs.remove(&id).expect("transparent body index") {
+                if let Some(sources) = view.referrers.get_mut(&target) {
+                    sources.remove(&id);
+                    if sources.is_empty() {
+                        view.referrers.remove(&target);
+                    }
+                }
+            }
+            view.sct_decreasing.remove(&id);
+        }
+        view.recompute_transparent_cycles();
+        Ok(BarrierEnv(view))
+    }
+
     pub fn new() -> Self {
         let mut env = Self::default();
         // K2 prelude — the truth/falsity propositions as direct `Ω_0`
@@ -396,8 +546,19 @@ impl GlobalEnv {
     }
 
     /// Commit an already-checked declaration. The caller is responsible for
-    /// having run the admission checks (`crate::check`).
-    pub fn add_decl(&mut self, decl: Decl) -> GlobalId {
+    /// having run the admission checks (`crate::check`). External callers
+    /// cannot bypass checked admission by installing a transparent body:
+    ///
+    /// ```compile_fail
+    /// use ken_kernel::{Decl, GlobalEnv, Level, Term};
+    /// let mut env = GlobalEnv::new();
+    /// let id = env.fresh_id();
+    /// env.add_decl(Decl::Transparent {
+    ///     id, level_params: vec![], ty: Term::Type(Level::zero()),
+    ///     body: Term::Type(Level::zero()),
+    /// });
+    /// ```
+    pub(crate) fn add_decl(&mut self, decl: Decl) -> GlobalId {
         let id = decl.id();
         let idx = self.decls.len();
         self.decls.push(decl);
@@ -477,7 +638,13 @@ impl GlobalEnv {
     /// rollback: an inductive whose signature fails checking is withdrawn so
     /// its not-yet-finalized id is not left dangling). Reindexes the lookup
     /// maps; the popped [`GlobalId`]s become free for re-use.
-    pub fn remove_last(&mut self) -> Option<Decl> {
+    ///
+    /// ```compile_fail
+    /// use ken_kernel::GlobalEnv;
+    /// let mut env = GlobalEnv::new();
+    /// let _ = env.remove_last();
+    /// ```
+    pub(crate) fn remove_last(&mut self) -> Option<Decl> {
         let decl = self.decls.pop()?;
         self.by_id.remove(&decl.id());
         if let Decl::Inductive(ind) = &decl {
@@ -516,6 +683,13 @@ impl GlobalEnv {
             self.recompute_transparent_cycles();
         }
         Some(decl)
+    }
+
+    /// Release a fresh family id whose fallible specification builder returned
+    /// before a declaration was installed. Only kernel admission may rewind.
+    pub(crate) fn release_unused_id(&mut self, mark: GlobalId) {
+        debug_assert!(self.by_id.keys().all(|id| id.0 < mark.0));
+        self.next_id = mark.0;
     }
 
     /// The (level_params, type) of a const/former/primitive use, for `infer`.

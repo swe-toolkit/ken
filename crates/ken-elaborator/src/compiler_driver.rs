@@ -2347,7 +2347,7 @@ pub fn prepare_native_program_sources(
     // member with an opaque barrier in a private compiler environment. The
     // acyclic helper graph still deforests, while recursive edges remain exact
     // declaration references and therefore cannot unfold without bound.
-    let mut normalization_env = env.env.clone();
+    let mut barrier_ids = Vec::with_capacity(reachable_recursive.len());
     for symbol in &reachable_recursive {
         let id = symbols
             .iter()
@@ -2357,30 +2357,28 @@ pub fn prepare_native_program_sources(
                     id: checked.main,
                 })
             })?;
-        let declaration = env.env.lookup(id).ok_or_else(|| {
-            NativeProgramBuildError::Driver(CompilerDriverError::MissingStableSymbol { id })
-        })?;
-        let Decl::Transparent {
-            id,
-            level_params,
-            ty,
-            ..
-        } = declaration
-        else {
+        if !matches!(env.env.lookup(id), Some(Decl::Transparent { .. }))
+            || !env.env.is_recursive_transparent(id)
+        {
             return Err(NativeProgramBuildError::Driver(
                 CompilerDriverError::MissingClosureMetadata {
                     section: "transparent recursive declaration",
                     symbol: symbol.clone(),
                 },
             ));
-        };
-        normalization_env.add_decl(Decl::Opaque {
-            id: *id,
-            name: format!("px8l-recursion-barrier:{symbol}"),
-            level_params: level_params.clone(),
-            ty: ty.clone(),
-        });
+        }
+        barrier_ids.push(id);
     }
+    let normalization_env = env.env.with_recursion_barriers(&barrier_ids).map_err(|_| {
+        NativeProgramBuildError::Driver(CompilerDriverError::MissingClosureMetadata {
+            section: "transparent recursive declaration",
+            symbol: reachable_recursive
+                .iter()
+                .next()
+                .cloned()
+                .unwrap_or_else(|| plan.main.clone()),
+        })
+    })?;
     let mut normalized = package.clone();
     let mut normalized_bodies = BTreeMap::new();
     for symbol in &executable_declarations {

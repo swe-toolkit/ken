@@ -16,8 +16,8 @@ use std::collections::{HashMap, HashSet};
 
 use ken_kernel::subst::weaken;
 use ken_kernel::{
-    declare_inductive, infer, level_eq, whnf, Context, CtorSpec, GlobalEnv, GlobalId,
-    InductiveSpec, KernelError, Level, Term,
+    declare_inductive, declare_inductive_try, infer, level_eq, whnf, Context, CtorSpec, GlobalEnv,
+    GlobalId, InductiveSpec, KernelError, Level, Term,
 };
 
 use crate::error::{ElabError, Span};
@@ -57,10 +57,8 @@ pub(crate) fn elab_data_decl(
     // Clone ctors so the closure can take ownership.
     let ctors_owned = ctors.to_vec();
     let d_name_owned = d_name.to_string();
-    let mut build_error: Option<ElabError> = None;
-
-    let d_id = declare_inductive(env, |d_id| {
-        match build_legacy_inductive_spec(
+    let d_id = declare_inductive_try(env, |d_id| {
+        build_legacy_inductive_spec(
             d_id,
             &d_name_owned,
             &params,
@@ -68,13 +66,7 @@ pub(crate) fn elab_data_decl(
             &global_info,
             &ind_id_set,
             &ctor_id_set,
-        ) {
-            Ok(spec) => spec,
-            Err(err) => {
-                build_error = Some(err);
-                empty_inductive_spec()
-            }
-        }
+        )
     })
     .map_err(|error| {
         translate_legacy_kernel_error(
@@ -88,12 +80,7 @@ pub(crate) fn elab_data_decl(
             &ctor_id_set,
             span,
         )
-    })?;
-
-    if let Some(err) = build_error {
-        env.remove_last();
-        return Err(err);
-    }
+    })??;
 
     // Register the type former.
     globals.insert(d_name.to_string(), d_id);
@@ -184,16 +171,6 @@ fn build_legacy_inductive_spec(
     })
 }
 
-fn empty_inductive_spec() -> InductiveSpec {
-    InductiveSpec {
-        level_params: vec![],
-        params: vec![],
-        indices: vec![],
-        level: Level::Zero,
-        constructors: vec![],
-    }
-}
-
 /// Elaborate `data D (Δp) : (Δi) -> Type where { C : (Δk) -> D Δp t̄ }`
 /// (`34 §2`, `39 §2.2`) through the same kernel inductive-family admission path
 /// used by legacy simple data.
@@ -251,10 +228,8 @@ pub(crate) fn elab_explicit_data_decl(
     let level = level.map(level_from_nat).unwrap_or(Level::Zero);
     let ctors_owned = ctors.to_vec();
     let d_name_owned = d_name.to_string();
-    let mut build_error: Option<ElabError> = None;
-
-    let d_id = declare_inductive(env, |d_id| {
-        match build_explicit_inductive_spec(
+    let d_id = declare_inductive_try(env, |d_id| {
+        build_explicit_inductive_spec(
             d_id,
             &d_name_owned,
             m,
@@ -266,13 +241,7 @@ pub(crate) fn elab_explicit_data_decl(
             &global_info,
             &ind_id_set,
             &ctor_id_set,
-        ) {
-            Ok(spec) => spec,
-            Err(err) => {
-                build_error = Some(err);
-                empty_inductive_spec()
-            }
-        }
+        )
     })
     .map_err(|error| {
         translate_explicit_kernel_error(
@@ -288,12 +257,7 @@ pub(crate) fn elab_explicit_data_decl(
             &ctor_id_set,
             span,
         )
-    })?;
-
-    if let Some(err) = build_error {
-        env.remove_last();
-        return Err(err);
-    }
+    })??;
 
     globals.insert(d_name.to_string(), d_id);
 

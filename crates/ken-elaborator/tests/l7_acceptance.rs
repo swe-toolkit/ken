@@ -24,7 +24,7 @@ use ken_elaborator::{
     foreign::elaborate_foreign,
     trusted_base_delta, ElabEnv, MarshalKind, Span,
 };
-use ken_kernel::{Decl, Term};
+use ken_kernel::{declare_def, declare_postulate, Term};
 
 // ─── A1: AC1 — `foreign` declaration binds + marshals ────────────────────────
 
@@ -88,16 +88,16 @@ fn relied_on_foreign_listed_in_trusted_base_delta() {
     env.elaborate_decl_v1(r#"foreign os_write : Int -> Bytes -> Int = "write" "libc" [FS]"#)
         .expect("os_write must elaborate");
     let os_write_id = *env.globals.get("os_write").expect("os_write registered");
-    let int_id = *env.globals.get("Int").expect("Int");
 
-    // Register a transparent definition whose body IS `os_write` (direct use).
-    let use_def_id = env.env.fresh_id();
-    env.env.add_decl(Decl::Transparent {
-        id: use_def_id,
-        level_params: vec![],
-        ty: Term::const_(int_id, vec![]),
-        body: Term::const_(os_write_id, vec![]),
-    });
+    // Check a transparent definition whose body IS `os_write` (direct use).
+    let os_write_ty = env.env.const_type(os_write_id).expect("typed foreign").1;
+    let use_def_id = declare_def(
+        &mut env.env,
+        vec![],
+        os_write_ty,
+        Term::const_(os_write_id, vec![]),
+    )
+    .expect("checked foreign caller");
 
     let delta = trusted_base_delta(&env.env, use_def_id);
     assert!(
@@ -114,16 +114,23 @@ fn not_relied_on_foreign_absent_from_trusted_base_delta() {
     env.elaborate_decl_v1(r#"foreign os_write : Int -> Bytes -> Int = "write" "libc" [FS]"#)
         .expect("os_write must elaborate");
     let os_write_id = *env.globals.get("os_write").expect("os_write registered");
-    let int_id = *env.globals.get("Int").expect("Int");
 
-    // A transparent definition whose body does NOT reference os_write.
-    let no_def_id = env.env.fresh_id();
-    env.env.add_decl(Decl::Transparent {
-        id: no_def_id,
-        level_params: vec![],
-        ty: Term::const_(int_id, vec![]),
-        body: Term::const_(int_id, vec![]),
-    });
+    // A checked transparent definition whose body does NOT reference os_write.
+    let os_write_ty = env.env.const_type(os_write_id).expect("typed foreign").1;
+    let unrelated = declare_postulate(
+        &mut env.env,
+        "unrelated".into(),
+        vec![],
+        os_write_ty.clone(),
+    )
+    .expect("typed independent postulate");
+    let no_def_id = declare_def(
+        &mut env.env,
+        vec![],
+        os_write_ty,
+        Term::const_(unrelated, vec![]),
+    )
+    .expect("checked non-caller");
 
     let delta = trusted_base_delta(&env.env, no_def_id);
     assert!(
@@ -140,25 +147,30 @@ fn trusted_base_delta_flips_on_dependency_not_scope() {
     env.elaborate_decl_v1(r#"foreign os_write : Int -> Bytes -> Int = "write" "libc" [FS]"#)
         .expect("os_write");
     let os_write_id = *env.globals.get("os_write").expect("os_write");
-    let int_id = *env.globals.get("Int").expect("Int");
 
-    // caller: body IS os_write.
-    let use_id = env.env.fresh_id();
-    env.env.add_decl(Decl::Transparent {
-        id: use_id,
-        level_params: vec![],
-        ty: Term::const_(int_id, vec![]),
-        body: Term::const_(os_write_id, vec![]),
-    });
-
-    // non_caller: body does not mention os_write.
-    let no_id = env.env.fresh_id();
-    env.env.add_decl(Decl::Transparent {
-        id: no_id,
-        level_params: vec![],
-        ty: Term::const_(int_id, vec![]),
-        body: Term::const_(int_id, vec![]),
-    });
+    let os_write_ty = env.env.const_type(os_write_id).expect("typed foreign").1;
+    // Caller: body IS os_write; non-caller references an independent typed postulate.
+    let use_id = declare_def(
+        &mut env.env,
+        vec![],
+        os_write_ty.clone(),
+        Term::const_(os_write_id, vec![]),
+    )
+    .expect("checked caller");
+    let unrelated = declare_postulate(
+        &mut env.env,
+        "unrelated".into(),
+        vec![],
+        os_write_ty.clone(),
+    )
+    .expect("typed independent postulate");
+    let no_id = declare_def(
+        &mut env.env,
+        vec![],
+        os_write_ty,
+        Term::const_(unrelated, vec![]),
+    )
+    .expect("checked non-caller");
 
     let delta_use = trusted_base_delta(&env.env, use_id);
     let delta_no = trusted_base_delta(&env.env, no_id);
@@ -468,16 +480,16 @@ fn verified_component_foreign_call_and_roundtrip_proof() {
     env.elaborate_decl_v1(r#"foreign io_read : Int -> Bytes = "read_bytes" "libc" [FS]"#)
         .expect("io_read must elaborate");
     let io_read_id = *env.globals.get("io_read").expect("io_read");
-    let bytes_id = *env.globals.get("Bytes").expect("Bytes");
 
-    // Register a transparent component whose body references io_read.
-    let comp_id = env.env.fresh_id();
-    env.env.add_decl(Decl::Transparent {
-        id: comp_id,
-        level_params: vec![],
-        ty: Term::const_(bytes_id, vec![]),
-        body: Term::const_(io_read_id, vec![]),
-    });
+    // Check a transparent component whose body references io_read.
+    let io_read_ty = env.env.const_type(io_read_id).expect("typed foreign").1;
+    let comp_id = declare_def(
+        &mut env.env,
+        vec![],
+        io_read_ty,
+        Term::const_(io_read_id, vec![]),
+    )
+    .expect("checked foreign component");
 
     // G6 condition 1: foreign in trusted_base_delta (→ P).
     let delta = trusted_base_delta(&env.env, comp_id);

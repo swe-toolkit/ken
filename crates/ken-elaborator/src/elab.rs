@@ -14251,15 +14251,30 @@ fn elaborate_v0(
 /// `requires` clauses (so the full type ≠ the carrier Pi-chain) is a tracked
 /// follow-on; L3a's recursive views (`map`/`filter`/`fold`/`zip`/`unfoldUpTo`/
 /// `sort`/`insert`) carry none.
-// A rolled-back declaration releases its id in the kernel and in the
-// elaborator's literal side table as one lifetime transition.
-fn rollback_literal_decl(
-    env: &mut GlobalEnv,
+// Kernel transaction rollback releases ids and the corresponding elaborator
+// bindings together, including literals introduced after staging.
+fn forget_rolled_back_decls(
+    removed: Vec<Decl>,
+    globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
-) -> Option<Decl> {
-    let decl = env.remove_last()?;
-    num_values.remove(&decl.id());
-    Some(decl)
+) {
+    let ids = removed.iter().map(Decl::id).collect::<HashSet<_>>();
+    for id in &ids {
+        num_values.remove(id);
+    }
+    globals.retain(|_, id| !ids.contains(id));
+}
+
+fn rollback_elab_admission(
+    env: &mut GlobalEnv,
+    pending: ken_kernel::PendingAdmission,
+    globals: &mut HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+) -> Result<(), ElabError> {
+    let removed = ken_kernel::rollback_pending(env, pending)
+        .map_err(|error| ElabError::Internal(format!("pending admission rollback: {error}")))?;
+    forget_rolled_back_decls(removed, globals, num_values);
+    Ok(())
 }
 
 fn elaborate_recursive_view(
@@ -14285,21 +14300,20 @@ fn elaborate_recursive_view(
         cx.metas.zonk_term(&ty_c)
     };
 
-    // 2. Pre-admit as Opaque so the body can self-reference.
-    let id = env.fresh_id();
-    env.add_decl(Decl::Opaque {
-        id,
-        name: rdecl.name.clone(),
-        level_params: vec![],
-        ty: ty_core.clone(),
-    });
+    // 2. Stage a checked opaque placeholder so the body can self-reference.
+    let pending =
+        ken_kernel::stage_placeholders(env, vec![(rdecl.name.clone(), vec![], ty_core.clone())])
+            .map_err(|error| ElabError::KernelRejected {
+                error,
+                span: rdecl.span.clone(),
+            })?;
+    let id = pending.ids()[0];
     globals.insert(rdecl.name.clone(), id);
     let fixity_inserted =
         match install_fixity_binding(fixities, fixity_spans, id, &rdecl.name, declared_fixity) {
             Ok(inserted) => inserted,
             Err(error) => {
-                rollback_literal_decl(env, num_values);
-                globals.remove(&rdecl.name);
+                rollback_elab_admission(env, pending, globals, num_values)?;
                 return Err(error);
             }
         };
@@ -14309,8 +14323,7 @@ fn elaborate_recursive_view(
     let associated = match reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators)) {
         Ok(associated) => associated,
         Err(error) => {
-            rollback_literal_decl(env, num_values);
-            globals.remove(&rdecl.name);
+            rollback_elab_admission(env, pending, globals, num_values)?;
             if fixity_inserted {
                 fixities.remove(&id);
                 fixity_spans.remove(&id);
@@ -14329,12 +14342,7 @@ fn elaborate_recursive_view(
     let (body_core, body_obligations) = match body_result {
         Ok(body) => body,
         Err(error) => {
-            while let Some(d) = rollback_literal_decl(env, num_values) {
-                if d.id() == id {
-                    break;
-                }
-            }
-            globals.remove(&rdecl.name);
+            rollback_elab_admission(env, pending, globals, num_values)?;
             if fixity_inserted {
                 fixities.remove(&id);
                 fixity_spans.remove(&id);
@@ -14344,35 +14352,25 @@ fn elaborate_recursive_view(
     };
 
     // 4. Check and install the entire singleton group in the kernel.
-    let admit_result = ken_kernel::check::admit_bodies(env, &[(id, body_core)]);
+    let admit_result = ken_kernel::admit_pending(env, pending, vec![body_core]);
 
     match admit_result {
-        Ok(()) => {
-            Ok(ElabResult {
-                name: rdecl.name.clone(),
-                def_id: id,
-                obligations: body_obligations,
-                foreign_binding: None,
-                temporal_obligations: vec![],
-                effect_row_type: None,
-            })
-        }
-        Err(e) => {
-            // Roll back: remove the pre-admitted opaque and any literal
-            // postulates body elaboration added after it (remove_last until we
-            // hit our opaque), then unbind the name.
-            while let Some(d) = rollback_literal_decl(env, num_values) {
-                if d.id() == id {
-                    break;
-                }
-            }
-            globals.remove(&rdecl.name);
+        Ok(_) => Ok(ElabResult {
+            name: rdecl.name.clone(),
+            def_id: id,
+            obligations: body_obligations,
+            foreign_binding: None,
+            temporal_obligations: vec![],
+            effect_row_type: None,
+        }),
+        Err((error, removed)) => {
+            forget_rolled_back_decls(removed, globals, num_values);
             if fixity_inserted {
                 fixities.remove(&id);
                 fixity_spans.remove(&id);
             }
             Err(ElabError::KernelRejected {
-                error: e,
+                error,
                 span: rdecl.span.clone(),
             })
         }
@@ -14423,27 +14421,25 @@ pub(crate) fn elaborate_mutual_group(
     // BEFORE any body is elaborated — this is what lets a forward/mutual
     // reference to any sibling resolve, exactly as the singleton case
     // pre-admits its own single name.
-    let mut ids: Vec<GlobalId> = Vec::with_capacity(members.len());
-    for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
-        let id = env.fresh_id();
-        env.add_decl(Decl::Opaque {
-            id,
-            name: rdecl.name.clone(),
-            level_params: vec![],
-            ty: ty_core.clone(),
-        });
-        globals.insert(rdecl.name.clone(), id);
-        ids.push(id);
+    let pending = ken_kernel::stage_placeholders(
+        env,
+        members
+            .iter()
+            .zip(&ty_cores)
+            .map(|(rdecl, ty)| (rdecl.name.clone(), vec![], ty.clone()))
+            .collect(),
+    )
+    .map_err(|error| ElabError::KernelRejected {
+        error,
+        span: members[0].span.clone(),
+    })?;
+    let ids = pending.ids().to_vec();
+    for (rdecl, id) in members.iter().zip(&ids) {
+        globals.insert(rdecl.name.clone(), *id);
     }
 
     if declared_fixities.len() != members.len() {
-        for id in ids.iter().rev() {
-            rollback_literal_decl(env, num_values);
-            let _ = id;
-        }
-        for rdecl in members {
-            globals.remove(&rdecl.name);
-        }
+        rollback_elab_admission(env, pending, globals, num_values)?;
         return Err(ElabError::Internal(
             "mutual-group fixity metadata length does not match members".into(),
         ));
@@ -14458,16 +14454,7 @@ pub(crate) fn elaborate_mutual_group(
                     fixities.remove(inserted);
                     fixity_spans.remove(inserted);
                 }
-                for id in ids.iter().rev() {
-                    while let Some(decl) = rollback_literal_decl(env, num_values) {
-                        if decl.id() == *id {
-                            break;
-                        }
-                    }
-                }
-                for member in members {
-                    globals.remove(&member.name);
-                }
+                rollback_elab_admission(env, pending, globals, num_values)?;
                 return Err(error);
             }
         }
@@ -14483,16 +14470,7 @@ pub(crate) fn elaborate_mutual_group(
                 fixities.remove(inserted);
                 fixity_spans.remove(inserted);
             }
-            for id in ids.iter().rev() {
-                while let Some(decl) = rollback_literal_decl(env, num_values) {
-                    if decl.id() == *id {
-                        break;
-                    }
-                }
-            }
-            for member in members {
-                globals.remove(&member.name);
-            }
+            rollback_elab_admission(env, pending, globals, num_values)?;
             return Err(error);
         }
     };
@@ -14532,16 +14510,7 @@ pub(crate) fn elaborate_mutual_group(
         Ok(())
     })();
     if let Err(e) = proof_validation {
-        for id in ids.iter().rev() {
-            while let Some(decl) = rollback_literal_decl(env, num_values) {
-                if decl.id() == *id {
-                    break;
-                }
-            }
-        }
-        for rdecl in &members {
-            globals.remove(&rdecl.name);
-        }
+        rollback_elab_admission(env, pending, globals, num_values)?;
         for inserted in &inserted_fixity_ids {
             fixities.remove(inserted);
             fixity_spans.remove(inserted);
@@ -14571,16 +14540,7 @@ pub(crate) fn elaborate_mutual_group(
     // just the SCT gate below) — a partially-elaborated group must leave no
     // trace, same discipline as the singleton path's rollback.
     if let Err(e) = elab_err {
-        for id in ids.iter().rev() {
-            while let Some(d) = rollback_literal_decl(env, num_values) {
-                if d.id() == *id {
-                    break;
-                }
-            }
-        }
-        for rdecl in &members {
-            globals.remove(&rdecl.name);
-        }
+        rollback_elab_admission(env, pending, globals, num_values)?;
         for inserted in &inserted_fixity_ids {
             fixities.remove(inserted);
             fixity_spans.remove(inserted);
@@ -14592,45 +14552,30 @@ pub(crate) fn elaborate_mutual_group(
     // opaque during checking and SCT, and escape paths are checked before
     // any member is upgraded. A per-member call would wrongly reject an
     // honest mutual cycle through already-transparent siblings.
-    let group_bodies: Vec<(GlobalId, Term)> = ids.iter().copied().zip(bodies).collect();
-    let admit_result = ken_kernel::check::admit_bodies(env, &group_bodies);
+    let admit_result = ken_kernel::admit_pending(env, pending, bodies);
 
     match admit_result {
-        Ok(()) => {
-            Ok(members
-                .iter()
-                .zip(ids)
-                .zip(all_obligations)
-                .map(|((rdecl, id), obligations)| ElabResult {
-                    name: rdecl.name.clone(),
-                    def_id: id,
-                    obligations,
-                    foreign_binding: None,
-                    temporal_obligations: vec![],
-                    effect_row_type: None,
-                })
-                .collect())
-        }
-        Err(e) => {
-            // Roll back every pre-admitted member (reverse order) — a
-            // rejected group leaves zero trace, exactly like the singleton
-            // rollback, just for every member instead of one.
-            for id in ids.iter().rev() {
-                while let Some(d) = rollback_literal_decl(env, num_values) {
-                    if d.id() == *id {
-                        break;
-                    }
-                }
-            }
-            for rdecl in &members {
-                globals.remove(&rdecl.name);
-            }
+        Ok(_) => Ok(members
+            .iter()
+            .zip(ids)
+            .zip(all_obligations)
+            .map(|((rdecl, id), obligations)| ElabResult {
+                name: rdecl.name.clone(),
+                def_id: id,
+                obligations,
+                foreign_binding: None,
+                temporal_obligations: vec![],
+                effect_row_type: None,
+            })
+            .collect()),
+        Err((error, removed)) => {
+            forget_rolled_back_decls(removed, globals, num_values);
             for inserted in &inserted_fixity_ids {
                 fixities.remove(inserted);
                 fixity_spans.remove(inserted);
             }
             Err(ElabError::KernelRejected {
-                error: e,
+                error,
                 span: members[0].span.clone(),
             })
         }
@@ -14761,208 +14706,217 @@ fn elaborate_view_with_spec(
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
 ) -> Result<ElabResult, ElabError> {
-    let omega = Term::omega(Level::Zero);
+    let mut pending: Option<ken_kernel::PendingAdmission> = None;
+    let result = (|| -> Result<ElabResult, ElabError> {
+        let omega = Term::omega(Level::Zero);
 
-    // Phase 1: elaborate the declared type (carrier) and body.
-    //
-    // A self-recursive spec'd view (e.g. `sort`) must have its name pre-admitted
-    // as Opaque before the body is elaborated, so the body's self-call resolves
-    // (Approach A; see `elaborate_recursive_view`). The non-recursive path keeps
-    // type+body in one context so their level metas unify.
-    let is_recursive = rexpr_mentions_name(&rdecl.body, &rdecl.name);
+        // Phase 1: elaborate the declared type (carrier) and body.
+        //
+        // A self-recursive spec'd view (e.g. `sort`) must have its name pre-admitted
+        // as Opaque before the body is elaborated, so the body's self-call resolves
+        // (Approach A; see `elaborate_recursive_view`). The non-recursive path keeps
+        // type+body in one context so their level metas unify.
+        let is_recursive = rexpr_mentions_name(&rdecl.body, &rdecl.name);
 
-    let (body_raw, carrier_ty_raw, pre_admit_id): (Term, Term, Option<GlobalId>) = if is_recursive {
-        // Recursive: elab the carrier type, pre-admit, then elab the body.
-        let carrier_ty = {
-            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env, provenance, standard_operators)
-                .with_local_dicts(local_dicts);
-            let ty = rdecl.ty.as_ref().ok_or_else(|| {
-                ElabError::Internal(
-                    "recursive const with spec clauses requires a type annotation".into(),
+        let (body_raw, carrier_ty_raw, pre_admit_id): (Term, Term, Option<GlobalId>) =
+            if is_recursive {
+                // Recursive: elab the carrier type, pre-admit, then elab the body.
+                let carrier_ty = {
+                    let mut cx =
+                        ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                            .with_classes(class_env, provenance, standard_operators)
+                            .with_local_dicts(local_dicts);
+                    let ty = rdecl.ty.as_ref().ok_or_else(|| {
+                        ElabError::Internal(
+                            "recursive const with spec clauses requires a type annotation".into(),
+                        )
+                    })?;
+                    let ty_c = elab_type(&mut cx, ty)?;
+                    cx.metas.zonk_term(&ty_c)
+                };
+                let staged = ken_kernel::stage_placeholders(
+                    env,
+                    vec![(rdecl.name.clone(), vec![], carrier_ty.clone())],
                 )
-            })?;
-            let ty_c = elab_type(&mut cx, ty)?;
-            cx.metas.zonk_term(&ty_c)
-        };
-        let id = env.fresh_id();
-        env.add_decl(Decl::Opaque {
-            id,
-            name: rdecl.name.clone(),
-            level_params: vec![],
-            ty: carrier_ty.clone(),
-        });
-        globals.insert(rdecl.name.clone(), id);
-        let body = {
-            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env, provenance, standard_operators)
-                .with_local_dicts(local_dicts);
-            let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
-            cx.metas.zonk_term(&body_c)
-        };
-        (body, carrier_ty, Some(id))
-    } else {
-        // Non-recursive: original one-context flow.
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators)
-            .with_local_dicts(local_dicts);
-        if let Some(ty) = &rdecl.ty {
-            let ty_c = elab_type(&mut cx, ty)?;
-            let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
-            (cx.metas.zonk_term(&body_c), cx.metas.zonk_term(&ty_c), None)
-        } else {
-            let (body_c, ty_c) = infer(&mut cx, &rdecl.body)?;
-            (cx.metas.zonk_term(&body_c), cx.metas.zonk_term(&ty_c), None)
+                .map_err(|error| ElabError::KernelRejected {
+                    error,
+                    span: rdecl.span.clone(),
+                })?;
+                let id = staged.ids()[0];
+                pending = Some(staged);
+                globals.insert(rdecl.name.clone(), id);
+                let body = {
+                    let mut cx =
+                        ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                            .with_classes(class_env, provenance, standard_operators)
+                            .with_local_dicts(local_dicts);
+                    let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
+                    cx.metas.zonk_term(&body_c)
+                };
+                (body, carrier_ty, Some(id))
+            } else {
+                // Non-recursive: original one-context flow.
+                let mut cx =
+                    ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                        .with_classes(class_env, provenance, standard_operators)
+                        .with_local_dicts(local_dicts);
+                if let Some(ty) = &rdecl.ty {
+                    let ty_c = elab_type(&mut cx, ty)?;
+                    let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
+                    (cx.metas.zonk_term(&body_c), cx.metas.zonk_term(&ty_c), None)
+                } else {
+                    let (body_c, ty_c) = infer(&mut cx, &rdecl.body)?;
+                    (cx.metas.zonk_term(&body_c), cx.metas.zonk_term(&ty_c), None)
+                }
+            };
+
+        // Build the param context from the Pi-chain of the carrier type.
+        let param_types = unwrap_pi_chain(&carrier_ty_raw);
+        let carrier_b = innermost_codomain(&carrier_ty_raw);
+        let mut param_ctx = Context::new();
+        for pt in &param_types {
+            param_ctx.push(pt.clone());
         }
-    };
 
-    // Build the param context from the Pi-chain of the carrier type.
-    let param_types = unwrap_pi_chain(&carrier_ty_raw);
-    let carrier_b = innermost_codomain(&carrier_ty_raw);
-    let mut param_ctx = Context::new();
-    for pt in &param_types {
-        param_ctx.push(pt.clone());
-    }
+        // Phase 2: process `requires` clauses.
+        let mut req_cores: Vec<Term> = Vec::new();
+        for req in &rdecl.requires {
+            let phi_core = elab_in_ctx_at_omega(
+                env,
+                globals,
+                num_values,
+                numeric_env,
+                class_env,
+                provenance,
+                standard_operators,
+                local_dicts,
+                &param_ctx,
+                req,
+                &omega,
+                &rdecl.span,
+                &rdecl.name,
+            )?;
+            req_cores.push(phi_core);
+        }
 
-    // Phase 2: process `requires` clauses.
-    let mut req_cores: Vec<Term> = Vec::new();
-    for req in &rdecl.requires {
-        let phi_core = elab_in_ctx_at_omega(
-            env,
-            globals,
-            num_values,
-            numeric_env,
-            class_env,
-            provenance,
-            standard_operators,
-            local_dicts,
-            &param_ctx,
-            req,
-            &omega,
-            &rdecl.span,
-            &rdecl.name,
-        )?;
-        req_cores.push(phi_core);
-    }
+        // Phase 3: process `ensures` clauses.
+        // ensures context = param_ctx + [result : carrier_b]
+        let mut ens_ctx = param_ctx.clone();
+        ens_ctx.push(carrier_b.clone());
 
-    // Phase 3: process `ensures` clauses.
-    // ensures context = param_ctx + [result : carrier_b]
-    let mut ens_ctx = param_ctx.clone();
-    ens_ctx.push(carrier_b.clone());
+        // body_inner = the inner body term (past all param lambdas)
+        let body_inner = unwrap_lam(&body_raw, param_types.len());
 
-    // body_inner = the inner body term (past all param lambdas)
-    let body_inner = unwrap_lam(&body_raw, param_types.len());
+        // Collect ensures: explicit clauses + implicit from return-type refinement (`22 §2.1`).
+        // A `{ x : A | φ }` return type is a refinement introduction at the body site;
+        // its predicate φ is an implicit ensures with the same ψ[body/result] structure.
+        let mut all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
+        if let Some(phi) = rdecl.ty.as_ref().and_then(|ty| innermost_refine_pred(ty)) {
+            all_ensures.push(phi);
+        }
 
-    // Collect ensures: explicit clauses + implicit from return-type refinement (`22 §2.1`).
-    // A `{ x : A | φ }` return type is a refinement introduction at the body site;
-    // its predicate φ is an implicit ensures with the same ψ[body/result] structure.
-    let mut all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
-    if let Some(phi) = rdecl.ty.as_ref().and_then(|ty| innermost_refine_pred(ty)) {
-        all_ensures.push(phi);
-    }
+        let mut ens_obligations: Vec<Obligation> = Vec::new();
+        let mut obl_counter = 0u32;
+        for ens in &all_ensures {
+            let psi_core = elab_in_ctx_at_omega(
+                env,
+                globals,
+                num_values,
+                numeric_env,
+                class_env,
+                provenance,
+                standard_operators,
+                local_dicts,
+                &ens_ctx,
+                ens,
+                &omega,
+                &rdecl.span,
+                &rdecl.name,
+            )?;
+            // goal = ψ[body_inner/result]: result = Var(0) in ens_ctx, substitute body
+            let goal_open = subst0(&psi_core, &body_inner);
+            let closed = close_goal(&param_ctx, goal_open);
+            let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
+                .map_err(|e| ElabError::KernelRejected {
+                    error: e,
+                    span: rdecl.span.clone(),
+                })?;
+            ens_obligations.push(Obligation {
+                id: obl_counter,
+                hole_id,
+                goal_closed: closed,
+                span: rdecl.span.clone(),
+                kind: ObligationKind::Ensures,
+            });
+            obl_counter += 1;
+        }
 
-    let mut ens_obligations: Vec<Obligation> = Vec::new();
-    let mut obl_counter = 0u32;
-    for ens in &all_ensures {
-        let psi_core = elab_in_ctx_at_omega(
-            env,
-            globals,
-            num_values,
-            numeric_env,
-            class_env,
-            provenance,
-            standard_operators,
-            local_dicts,
-            &ens_ctx,
-            ens,
-            &omega,
-            &rdecl.span,
-            &rdecl.name,
-        )?;
-        // goal = ψ[body_inner/result]: result = Var(0) in ens_ctx, substitute body
-        let goal_open = subst0(&psi_core, &body_inner);
-        let closed = close_goal(&param_ctx, goal_open);
-        let hole_id =
-            declare_postulate(env, rdecl.name.clone(), vec![], closed.clone()).map_err(|e| {
+        // Phase 4: build the full type and body.
+        // full_ty = Pi(params..., Pi(req..., carrier_b))
+        let mut full_ty = carrier_b.clone();
+        for req in req_cores.iter().rev() {
+            full_ty = Term::pi(req.clone(), weaken(&full_ty, 1));
+        }
+        for pt in param_types.iter().rev() {
+            full_ty = Term::pi(pt.clone(), full_ty);
+        }
+        // full_body = Lam(params..., Lam(req..., body_inner))
+        // body_inner has free variables indexed relative to param_ctx (depth n_params).
+        // The req lambdas are inserted BETWEEN the param lambdas and the body, so each
+        // param variable in body_inner shifts up by req_cores.len() to skip the req binders.
+        let mut full_body = weaken(&body_inner, req_cores.len() as i64);
+        for req in req_cores.iter().rev() {
+            full_body = Term::lam(req.clone(), full_body);
+        }
+        for pt in param_types.iter().rev() {
+            full_body = Term::lam(pt.clone(), full_body);
+        }
+
+        let id = if let Some(pre_id) = pre_admit_id {
+            // Recursive: the opaque was pre-admitted with the carrier Pi-chain. For
+            // L3a's recursive views (no `requires`), `full_ty` == the carrier
+            // Pi-chain, so the opaque's type is already `full_ty`. The kernel
+            // checks and upgrades the singleton group. (A recursive fn WITH
+            // `requires` — `full_ty` ≠ carrier — is a tracked follow-on; see
+            // `elaborate_recursive_view`'s K2c note.)
+            let staged = pending
+                .take()
+                .expect("recursive view staged its placeholder");
+            match ken_kernel::admit_pending(env, staged, vec![full_body]) {
+                Ok(_) => pre_id,
+                Err((error, removed)) => {
+                    forget_rolled_back_decls(removed, globals, num_values);
+                    return Err(ElabError::KernelRejected {
+                        error,
+                        span: rdecl.span.clone(),
+                    });
+                }
+            }
+        } else {
+            let id = declare_def(env, vec![], full_ty, full_body).map_err(|e| {
                 ElabError::KernelRejected {
                     error: e,
                     span: rdecl.span.clone(),
                 }
             })?;
-        ens_obligations.push(Obligation {
-            id: obl_counter,
-            hole_id,
-            goal_closed: closed,
-            span: rdecl.span.clone(),
-            kind: ObligationKind::Ensures,
-        });
-        obl_counter += 1;
-    }
-
-    // Phase 4: build the full type and body.
-    // full_ty = Pi(params..., Pi(req..., carrier_b))
-    let mut full_ty = carrier_b.clone();
-    for req in req_cores.iter().rev() {
-        full_ty = Term::pi(req.clone(), weaken(&full_ty, 1));
-    }
-    for pt in param_types.iter().rev() {
-        full_ty = Term::pi(pt.clone(), full_ty);
-    }
-    // full_body = Lam(params..., Lam(req..., body_inner))
-    // body_inner has free variables indexed relative to param_ctx (depth n_params).
-    // The req lambdas are inserted BETWEEN the param lambdas and the body, so each
-    // param variable in body_inner shifts up by req_cores.len() to skip the req binders.
-    let mut full_body = weaken(&body_inner, req_cores.len() as i64);
-    for req in req_cores.iter().rev() {
-        full_body = Term::lam(req.clone(), full_body);
-    }
-    for pt in param_types.iter().rev() {
-        full_body = Term::lam(pt.clone(), full_body);
-    }
-
-    let id = if let Some(pre_id) = pre_admit_id {
-        // Recursive: the opaque was pre-admitted with the carrier Pi-chain. For
-        // L3a's recursive views (no `requires`), `full_ty` == the carrier
-        // Pi-chain, so the opaque's type is already `full_ty`. The kernel
-        // checks and upgrades the singleton group. (A recursive fn WITH
-        // `requires` — `full_ty` ≠ carrier — is a tracked follow-on; see
-        // `elaborate_recursive_view`'s K2c note.)
-        let result = ken_kernel::check::admit_bodies(env, &[(pre_id, full_body)]);
-        match result {
-            Ok(()) => pre_id,
-            Err(e) => {
-                // Roll back the pre-admission + any obligation holes / literal
-                // postulates added after it (ensures holes from Phase 3, etc.).
-                while let Some(d) = rollback_literal_decl(env, num_values) {
-                    if d.id() == pre_id {
-                        break;
-                    }
-                }
-                globals.remove(&rdecl.name);
-                return Err(ElabError::KernelRejected {
-                    error: e,
-                    span: rdecl.span.clone(),
-                });
-            }
+            globals.insert(rdecl.name.clone(), id);
+            id
+        };
+        Ok(ElabResult {
+            name: rdecl.name.clone(),
+            def_id: id,
+            obligations: ens_obligations,
+            foreign_binding: None,
+            temporal_obligations: vec![],
+            effect_row_type: None,
+        })
+    })();
+    if result.is_err() {
+        if let Some(staged) = pending {
+            rollback_elab_admission(env, staged, globals, num_values)?;
         }
-    } else {
-        let id = declare_def(env, vec![], full_ty, full_body).map_err(|e| {
-            ElabError::KernelRejected {
-                error: e,
-                span: rdecl.span.clone(),
-            }
-        })?;
-        globals.insert(rdecl.name.clone(), id);
-        id
-    };
-    Ok(ElabResult {
-        name: rdecl.name.clone(),
-        def_id: id,
-        obligations: ens_obligations,
-        foreign_binding: None,
-        temporal_obligations: vec![],
-        effect_row_type: None,
-    })
+    }
+    result
 }
 
 /// Elaborate `prove name : φ` (`21 §6.3`, §3).
