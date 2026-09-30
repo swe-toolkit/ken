@@ -1896,32 +1896,78 @@ mod tests {
         assert_eq!(removed.iter().map(Decl::id).collect::<Vec<_>>(), vec![id]);
     }
 
-    /// Defense-in-depth: even the right instance cannot consume a handle if
-    /// another declaration has taken a staged slot with the same ID but a
-    /// different type. No such raw reinstall is exported from the kernel.
+    /// Durable defense-in-depth (`11 §4`, `18 §4`): both transaction consumers
+    /// reject a changed staged type even when the env instance and ID match.
+    /// MEASURED: rollback and admission each refuse an in-kernel raw reinstall
+    /// with the same ID but another Opaque type, without mutating env state.
+    /// CLAIMED: neither consumer may consume a changed staged tail. GAP: the
+    /// raw reinstall is crate-private; external clients cannot construct it.
     #[test]
     fn pending_handle_refuses_changed_staged_tail_without_mutation() {
-        let mut env = GlobalEnv::new();
-        let pending = stage_placeholders(
-            &mut env,
-            vec![("original".into(), vec![], Term::Type(Level::zero()))],
-        )
-        .expect("checked staged type");
-        let original_id = pending.ids()[0];
-        assert_eq!(env.remove_last().map(|decl| decl.id()), Some(original_id));
-        let replacement_id = env.fresh_id();
-        assert_eq!(replacement_id, original_id);
-        env.add_decl(Decl::Opaque {
-            id: replacement_id,
-            name: "changed type".into(),
-            level_params: vec![],
-            ty: Term::Type(Level::zero().suc()),
-        });
+        let changed_tail = || {
+            let mut env = GlobalEnv::new();
+            let pending = stage_placeholders(
+                &mut env,
+                vec![("original".into(), vec![], Term::Type(Level::zero()))],
+            )
+            .expect("checked staged type");
+            let original_id = pending.ids()[0];
+            assert_eq!(env.remove_last().map(|decl| decl.id()), Some(original_id));
+            let replacement_id = env.fresh_id();
+            assert_eq!(replacement_id, original_id);
+            env.add_decl(Decl::Opaque {
+                id: replacement_id,
+                name: "changed type".into(),
+                level_params: vec![],
+                ty: Term::Type(Level::zero().suc()),
+            });
+            (env, pending)
+        };
+
+        let (mut env, pending) = changed_tail();
         let before = env.clone();
         let error = rollback_pending(&mut env, pending)
-            .expect_err("staged type changed even though the id coincides");
-        assert!(matches!(error, KernelError::IllFormedDecl(_)));
+            .expect_err("rollback must refuse a changed staged type");
+        assert!(
+            matches!(&error, KernelError::IllFormedDecl(message)
+            if message == "pending admission staged tail is no longer intact"),
+            "rollback tail refusal: {error:?}"
+        );
         assert_same_admission_state(&env, &before);
+
+        let (mut env, pending) = changed_tail();
+        let before = env.clone();
+        // Type 0 inhabits Type 1, the replacement's type, not the staged Type 0.
+        // Without the admission tail guard, this body upgrades the wrong slot.
+        let (error, removed) = admit_pending(&mut env, pending, vec![Term::Type(Level::zero())])
+            .expect_err("admission must refuse a changed staged type");
+        assert!(
+            matches!(&error, KernelError::IllFormedDecl(message)
+            if message == "pending admission staged tail is no longer intact"),
+            "admission tail refusal: {error:?}"
+        );
+        assert!(
+            removed.is_empty(),
+            "refusal must not roll back the replacement"
+        );
+        assert_same_admission_state(&env, &before);
+
+        let mut valid = GlobalEnv::new();
+        let valid_handle = stage_placeholders(
+            &mut valid,
+            vec![("untouched".into(), vec![], Term::Type(Level::zero().suc()))],
+        )
+        .expect("checked matching staged type");
+        let valid_id = valid_handle.ids()[0];
+        assert_eq!(
+            admit_pending(&mut valid, valid_handle, vec![Term::Type(Level::zero())])
+                .expect("untouched staged tail accepts the same body"),
+            vec![valid_id]
+        );
+        assert!(matches!(
+            valid.lookup(valid_id),
+            Some(Decl::Transparent { .. })
+        ));
     }
 
     #[test]
