@@ -285,9 +285,26 @@ jobs:
           CI_TIMING_SHARD: ${{ matrix.shard }}
         run: |
           python3 scripts/ci-rustc-timing.py report "$CI_RUSTC_TIMING_LOG" "$CI_TIMING_SHARD"
-          cp "$CI_RUSTC_TIMING_LOG" "realized-shard-${CI_TIMING_SHARD}/rustc-timings.jsonl"
+      # Retain the JSONL in the realized selection when planning reached staging.
+      - name: Copy Rustc timing log into realized shard when staged
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        env:
+          CI_TIMING_SHARD: ${{ matrix.shard }}
+        run: |
+          realized="realized-shard-${CI_TIMING_SHARD}"
+          if [ -d "$realized" ]; then
+            cp "$CI_RUSTC_TIMING_LOG" "$realized/rustc-timings.jsonl"
+          fi
+      # Keep a raw copy independent of report success and shard staging.
+      - name: Upload shard Rustc timing log
+        if: always() && steps.resource_monitor_start.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-rustc-timings-${{ matrix.shard }}
+          path: ${{ runner.temp }}/ci-rustc-timings-${{ github.run_id }}-${{ matrix.shard }}.jsonl
+          if-no-files-found: error
       - name: Upload workspace test-build timing reports
-        if: always()
+        if: always() && steps.resource_monitor_start.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: workspace-test-build-timings-${{ matrix.shard }}
