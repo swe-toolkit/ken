@@ -1,7 +1,7 @@
 ---
 id: LANG-GENERATED-J-PROOF-ASCRIPTION
 title: "An elaborator-built J carries its equality proof bare, so once the index premise is substituted by refl the kernel must infer a bare Refl and cannot; ascribe every generated J proof argument in the three index builders so generated terms stay inferable under substitution"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -56,3 +56,19 @@ Every generated `J` proof argument in the three builders is
 - Any kernel change. The kernel `infer_j` stability question is a separate
   carry.
 - Any trust change, or any change to the landed `zip_with`.
+
+## Closeout
+
+Merged as `b40f28977` (PR #4395).
+- **AC-1.** All four generated-J builders ascribe their equality argument
+  as `Eq index_ty old_index new_index`: `build_index_type_cong`,
+  `build_sym`, `build_index_omega_transport` and
+  `build_result_index_type_cong`. The fourth came from the Architect's
+  review of `e2755b545`. Fixtures `e5`, `e1` (`zip_with_vcons`, generic)
+  and `e4` check in `lang_generated_j_proof_ascription.rs`.
+- **AC-2.** Removing the `build_index_type_cong` ascription alone makes
+  `e5` fail again. The 61-file catalog census is byte-identical, and the
+  targeted tests pass 51/51.
+- **Carried.** `f6` belongs to `LANG-SIBLING-GOAL-REFINEMENT`. The
+  fourth site shows use, not necessity. The rustfmt drift in `elab.rs` is
+  inherited from main (141 hunks both before and after).
