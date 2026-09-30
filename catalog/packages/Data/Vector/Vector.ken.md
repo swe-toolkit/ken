@@ -121,6 +121,22 @@ theorem zip_with_vnil
     : Equal (Vec c Zero) (zip_with a b c Zero f (VNil a) (VNil b)) (VNil c) =
   Proved
 
+theorem zip_with_vcons
+      (a : Type)
+      (b : Type)
+      (c : Type)
+      (n : Nat)
+      (f : a → b → c)
+      (x : a)
+      (xs : Vec a n)
+      (y : b)
+      (ys : Vec b n)
+    : Equal
+        (Vec c (Suc n))
+        (zip_with a b c (Suc n) f (VCons a n x xs) (VCons b n y ys))
+        (VCons c n (f x y) (zip_with a b c n f xs ys)) =
+  Refl
+
 theorem lookup_fzero
       (a : Type) (n : Nat) (x : a) (xs : Vec a n)
     : Equal a (lookup a (Suc n) (VCons a n x xs) (FZero n)) x =
@@ -199,10 +215,11 @@ Totality is likewise carried by the domain types. `head` and `tail` accept only
 Impossible empty branches are omitted only where the index refutes them; the
 elaborator still supplies a total dependent eliminator to the kernel.
 
-Seven computation theorems are checked proof terms. The cons and bounded-index
-cases reduce to reflexive equalities and close with `Refl`. The empty `map`
-and `zip_with` results reduce to the same nullary constructor, so their
-equalities collapse and close with `Proved`.
+Eight computation theorems are checked proof terms. The cons and bounded-index
+cases reduce to reflexive equalities and close with `Refl`, including the
+generic cons case of `zip_with` over both vector tails. The empty `map` and
+`zip_with` results reduce to the same nullary constructor, so their equalities
+collapse and close with `Proved`.
 
 Mapping `idf a` over any vector returns the same vector. Composition of two
 maps equals mapping their composite `comp a b c g f`. The two empty cases
@@ -211,9 +228,9 @@ collapse; in each successor case, `cong` lifts the recursive equality under
 original lookup result: matching `Fin n`, then its vector, follows the index
 into the successor tail. These laws are private checked proofs, not exports.
 
-The checked examples first use all four private laws at their generic
-propositions, then illustrate the operations at concrete indices. The Boolean
-helpers exist only for those illustrations and are not package laws.
+The checked examples first use all five backfilled private laws at their
+generic propositions, then illustrate the operations at concrete indices.
+The Boolean helpers exist only for those illustrations and are not package laws.
 
 ```ken example
 fn vec_example_not (x : Bool) : Bool =
@@ -240,6 +257,22 @@ theorem use_map_vcons
         (map a b (Suc n) f (VCons a n x xs))
         (VCons b n (f x) (map a b n f xs)) =
   map_vcons a b n f x xs
+
+theorem use_zip_with_vcons
+      (a : Type)
+      (b : Type)
+      (c : Type)
+      (n : Nat)
+      (f : a → b → c)
+      (x : a)
+      (xs : Vec a n)
+      (y : b)
+      (ys : Vec b n)
+    : Equal
+        (Vec c (Suc n))
+        (zip_with a b c (Suc n) f (VCons a n x xs) (VCons b n y ys))
+        (VCons c n (f x y) (zip_with a b c n f xs ys)) =
+  zip_with_vcons a b c n f x xs y ys
 
 theorem use_vec_map_compose
       (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b) (g : b → c) (xs : Vec a n)
@@ -306,10 +339,10 @@ names on the current surface. Function names are snake_case; in particular,
 zip-with operation.
 
 The implementation recurses structurally. `zip_with` and `lookup` refine a
-sibling indexed value through a nested match. Generic cons computation for
-`zip_with`, lookup after `zip_with`, and `zip_with`/map naturality remain outside
-the proved laws: at an open index, a nested match on an index-refined sibling
-does not expose its tail to a generic proof. Writing the naturality equation
+sibling indexed value through nested matches. Generic cons computation for
+`zip_with` checks by `Refl`; lookup after `zip_with` and `zip_with`/map
+naturality remain outside the proved laws because their indexed sibling tails
+do not refine in the required generic goals. Writing the naturality equation
 with an inline lambda inside its proposition type is also not supported by
 the current type grammar. Concrete checked examples illustrate the operations
 but do not stand in for those general laws.
@@ -334,7 +367,7 @@ surfaces. The private map laws reuse `Core.Function.Combinators.comp`/`idf`
 and `Core.Logic.Transport.cong`.
 
 The public API is `Vec`, `VNil`, `VCons`, `Fin`, `FZero`, `FSuc`, `head`,
-`tail`, `map`, `zip_with`, and `lookup`. Seven computation theorems, map
+`tail`, `map`, `zip_with`, and `lookup`. Eight computation theorems, map
 composition, and lookup after map are private checked laws.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
