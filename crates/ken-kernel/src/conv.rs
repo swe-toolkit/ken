@@ -732,6 +732,7 @@ mod delta_probe {
         static STRUCT_ENTRIES: Cell<u64> = const { Cell::new(0) };
         static TRACKED_HEAD: Cell<Option<super::GlobalId>> = const { Cell::new(None) };
         static TRACKED_HEAD_NONEMPTY: Cell<u64> = const { Cell::new(0) };
+        static TRACKED_HEAD_HARD: Cell<u64> = const { Cell::new(0) };
     }
     pub(super) fn reset() {
         UNFOLDS.with(|c| c.set(0));
@@ -743,6 +744,7 @@ mod delta_probe {
         STRUCT_ENTRIES.with(|c| c.set(0));
         TRACKED_HEAD.with(|c| c.set(None));
         TRACKED_HEAD_NONEMPTY.with(|c| c.set(0));
+        TRACKED_HEAD_HARD.with(|c| c.set(0));
     }
     pub(super) fn bump_reducer_entry() {
         REDUCER_ENTRIES.with(|c| c.set(c.get() + 1));
@@ -767,6 +769,12 @@ mod delta_probe {
     }
     pub(super) fn tracked_head_nonempty() -> u64 {
         TRACKED_HEAD_NONEMPTY.with(|c| c.get())
+    }
+    pub(super) fn bump_tracked_head_hard() {
+        TRACKED_HEAD_HARD.with(|c| c.set(c.get() + 1));
+    }
+    pub(super) fn tracked_head_hard() -> u64 {
+        TRACKED_HEAD_HARD.with(|c| c.get())
     }
     pub(super) fn bump_unfold() {
         UNFOLDS.with(|c| c.set(c.get() + 1));
@@ -822,6 +830,9 @@ fn probe_struct_entry(path: &[DeltaPathEntry], a: &Term, b: &Term) {
                 if *ia == tracked && *ib == tracked)
             {
                 delta_probe::bump_tracked_head_nonempty();
+                if path.iter().all(|entry| entry.hard) {
+                    delta_probe::bump_tracked_head_hard();
+                }
             }
         }
     }
@@ -1383,6 +1394,7 @@ mod tests {
 
     // Stable bound for the checked and six synthetic no-soft-transition rows.
     const SPINE_LINEAR_ENTRY_FACTOR: u64 = 16;
+    const SPINE_SOFT_ENTRY_FACTOR: u64 = 3;
 
     fn declare_checked_nat_pred(env: &mut GlobalEnv, nat: GlobalId, zero: GlobalId) -> GlobalId {
         let nt = Term::indformer(nat, vec![]);
@@ -1622,6 +1634,59 @@ mod tests {
                 entries > 0 && entries <= SPINE_LINEAR_ENTRY_FACTOR * k,
                 "map/pred k={k}: {entries} structural entries, limit {}",
                 SPINE_LINEAR_ENTRY_FACTOR * k
+            );
+        }
+    }
+
+    /// Durable polynomial residual (`17 §3.5`, §5; Architect ruling
+    /// `evt_37g2qxwesq2zz`): soft→hard transition at each soft level;
+    /// accepted polynomial residual. MEASURED: `conv_struct_path` entries for
+    /// the checked Nat `pred^k x`/`pred^k y` pair at k=8/16/20 under a
+    /// seeded nonempty soft ledger, plus witnesses of both soft and hardened
+    /// pred comparisons. CLAIMED: this transition costs at most quadratic
+    /// structural work in k, never the original exponential retry.
+    /// GAP: the ledger is seeded privately; no checked caller has been shown
+    /// to deliver a soft entry to pred, and this counter excludes whnf and
+    /// allocation. The checked reachable *hard* path stays pinned above.
+    #[test]
+    fn seeded_soft_delta_path_pred_retry_has_quadratic_structural_bound() {
+        let mut env = GlobalEnv::new();
+        let (nat, zero, _) = declare_nat_for_iota(&mut env);
+        let nt = Term::indformer(nat, vec![]);
+        let pred = declare_checked_nat_pred(&mut env, nat, zero);
+        let (list, nil, cons) = declare_list(&mut env);
+        let map = declare_map(&mut env, list, nil, cons);
+        assert!(!env.is_recursive_transparent(pred));
+        assert!(env.is_recursive_transparent(map));
+        let mut ctx = Context::new();
+        ctx.push(nt.clone());
+        ctx.push(nt.clone());
+        let soft_path = [DeltaPathEntry {
+            pair: (map, map),
+            hard: false,
+            depth: ctx.len(),
+        }];
+        let nested_pred =
+            |k, seed| (0..k).fold(seed, |arg, _| Term::app(Term::const_(pred, vec![]), arg));
+        for k in [8, 16, 20] {
+            let left = nested_pred(k, Term::var(1));
+            let right = nested_pred(k, Term::var(0));
+            assert_typed(&env, &ctx, &left);
+            assert_typed(&env, &ctx, &right);
+            delta_probe::reset();
+            delta_probe::track_head(pred);
+            assert!(!conv_struct_path(&env, &ctx, &left, &right, &soft_path));
+            let nonempty = delta_probe::tracked_head_nonempty();
+            let hard = delta_probe::tracked_head_hard();
+            assert!(
+                hard > 0 && nonempty > hard,
+                "pred k={k}: both soft and hard ledger comparisons must run ({nonempty}, {hard})"
+            );
+            let entries = delta_probe::struct_entries();
+            assert!(
+                entries > 0 && entries <= SPINE_SOFT_ENTRY_FACTOR * k * k,
+                "soft-to-hard pred k={k}: {entries} structural entries, limit {}",
+                SPINE_SOFT_ENTRY_FACTOR * k * k
             );
         }
     }
