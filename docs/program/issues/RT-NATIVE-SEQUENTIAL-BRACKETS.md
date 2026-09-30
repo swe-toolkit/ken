@@ -1,18 +1,26 @@
 ---
 id: RT-NATIVE-SEQUENTIAL-BRACKETS
 title: "Native execution of two sequential resource brackets: a program that uses two withBuffer brackets in sequence builds and runs natively with the observation the interpreter gives, instead of refusing in object emission at the BoundaryCarrier carried-recursive-hypothesis arity check"
-status: active
+status: ready
 owner: runtime
 size: M
 gate: architect
 tier: T1
-depends_on: [RT-IGNORED-ROWS-NEXT-GROUP]
+depends_on: [RT-IGNORED-ROWS-NEXT-GROUP, RT-NATIVE-CONTINUATION-ENV-CARRIAGE]
 blocks: []
 github: null
 origin: "Architect ruling 2026-09-28 (evt_1ys064x0c11be) on RT-IGNORED-ROWS-NEXT-GROUP's A1 blocker (runtime-implementer evt_5nmkjfcnemamh): native execution of two sequential brackets is the successor, framed from the verbatim refusal and the one-bracket control. Steward-filed per COORDINATION section 2."
 ---
 
 # Native sequential resource brackets
+
+## Recut (Architect `evt_4x84ykwjtmbsh`)
+
+The side-slot repair is superseded. The continuation's environment travels
+in the value, and `RT-NATIVE-CONTINUATION-ENV-CARRIAGE` builds that. This
+WP is that node's first consumer: the two-bracket witness is its AC-1. The
+retained evidence is D0b, D0c, D1b, T2, the scoped-stack unit rows and the
+research advisory `evt_7rqnbfnw80fe`. WIP `a6a07bfd2` is not a candidate.
 
 ## Objective
 
@@ -80,8 +88,15 @@ it matches the interpreter. The repair is ruled by the Architect.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 1 (Architect `evt_2htrfrdpq3wy`).
+§1a count: 2 (Architect `evt_2htrfrdpq3wy`, `evt_6r92kzemmaxps`).
 
 1. constructed context frame keyed on planner coordinates (continuation,
    position, body) — keyed on static coordinates, but one function
    constructs the same coordinates more than once with different operands.
+2. constructed context frame scoped to the writer's lowering call extent —
+   keyed on static lowering call nesting, but the consumer runs after that
+   call returns.
+
+Both entries are one predicate: a first-class, escaping continuation's
+environment was associated with its consumer at compile time instead of
+being carried by the value (`evt_4x84ykwjtmbsh`).

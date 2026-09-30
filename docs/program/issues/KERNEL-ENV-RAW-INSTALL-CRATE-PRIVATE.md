@@ -66,3 +66,12 @@ that cannot reach production.
 - Any spec change: an operator question.
 - A production use that has no checked equivalent: stop to the Architect
   with the site.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 2 (Architect `evt_2pv8v6zsr41ng`).
+
+1. BarrierEnv read-only claim — keyed on the wrapper's Deref surface, but
+   GlobalEnv: Clone yields a mutable copy.
+2. PendingAdmission ownership — keyed on declaration-id coincidence, but
+   fresh environments share prelude ids.

@@ -17,8 +17,10 @@ origin: "Adversary M8 finding evt_2gmkfy1cdfe9y on 9301e09e1 (KERNEL-CONV-IOTA-D
 ## Objective
 
 A conversion between nested transparent eliminator wrappers costs time
-linear in the nesting depth, as it did before `9301e09e1`, and keeps the
-halting that change delivered.
+linear in the nesting depth on empty and hard δ-ledger paths, as it did
+before `9301e09e1`, and at worst quadratic across soft→hard transitions
+(Architect `evt_37g2qxwesq2zz`). It keeps the halting that change
+delivered.
 
 ## Settled inputs (Adversary `evt_2gmkfy1cdfe9y`, read at `9301e09e1`)
 
@@ -54,9 +56,9 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-Conversion over the six nested shapes is linear in k, with the repair ruled
-by the Architect. The `9301e09e1` halting fixture and its converging
-counterexamples keep their verdicts.
+Conversion over the six nested shapes is linear in k on empty and hard
+paths, with the repair ruled by the Architect. The `9301e09e1` halting
+fixture and its converging counterexamples keep their verdicts.
 
 ## Acceptance
 
@@ -66,6 +68,11 @@ counterexamples keep their verdicts.
 - **AC-1.** A committed `convert` pin over all six nested shapes, at three
   depths including k = 20, bounds a measure that is linear in k. It
   returns the expected verdict for each shape.
+  - A linear row on a hard, non-empty ledger path.
+  - A seeded soft-path row bounded by `c·k²` at k = 8, 16 and 20, with
+    the constant stated and the expected `false` verdict. It is the
+    accepted polynomial residual, and its promise comment cites
+    `evt_37g2qxwesq2zz`.
 - **AC-2 (controls).**
   - Reverting the repair reddens the new pin.
   - The `9301e09e1` halting fixture still returns false promptly, and its
@@ -79,3 +86,9 @@ counterexamples keep their verdicts.
 - A `trusted_base()` or spec change: an operator question.
 - The pre-existing nested `Cast` cost in public `whnf` (`obs::cast_reduce`)
   is not this WP. It is a separate operator question.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 1 (Architect `evt_37g2qxwesq2zz`). The audit row falsified
+linearity on a soft incoming path. The residual is accepted and pinned, and
+the memo is not redesigned.
