@@ -199,16 +199,12 @@ fn whnf_progress_mode(
                         cur = (**a).clone();
                         continue;
                     }
-                    // Even this explicit δ retry cannot commit a projectee
-                    // unless projection-β subsequently fires.
-                    Term::Const { .. } if defer_stuck_nested_delta => {
-                        let (p_w, pp) = stuck_component(
-                            env, ctx, p, p_w, pp, defer_stuck_nested_delta,
-                        );
-                        iota |= pp.iota;
-                        return (Term::proj1(p_w), WhnfProgress { iota });
-                    }
-                    Term::Const { id, level_args } if env.transparent_body(*id).is_some() => {
+                    // The legacy explicit δ retry is public-whnf only. In
+                    // conversion, a stuck projectee must take the folded
+                    // catch-all below, even when it is a transparent Const.
+                    Term::Const { id, level_args }
+                        if !defer_stuck_nested_delta && env.transparent_body(*id).is_some() =>
+                    {
                         if let Some(body) = unfold_const(env, *id, level_args) {
                             cur = Term::proj1(body);
                             continue;
@@ -236,14 +232,9 @@ fn whnf_progress_mode(
                         cur = (**b).clone();
                         continue;
                     }
-                    Term::Const { .. } if defer_stuck_nested_delta => {
-                        let (p_w, pp) = stuck_component(
-                            env, ctx, p, p_w, pp, defer_stuck_nested_delta,
-                        );
-                        iota |= pp.iota;
-                        return (Term::proj2(p_w), WhnfProgress { iota });
-                    }
-                    Term::Const { id, level_args } if env.transparent_body(*id).is_some() => {
+                    Term::Const { id, level_args }
+                        if !defer_stuck_nested_delta && env.transparent_body(*id).is_some() =>
+                    {
                         if let Some(body) = unfold_const(env, *id, level_args) {
                             cur = Term::proj2(body);
                             continue;
