@@ -177,6 +177,19 @@ fn collections_prelude() -> String {
         })
         .collect::<Vec<_>>()
         .join("\n");
+    let arithmetic_source = catalog_source("catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md");
+    let nat_arithmetic = [
+        "pub fn add",
+        "pub proof zero_l for add",
+        "pub proof suc_l for add",
+    ]
+    .into_iter()
+    .map(|start| {
+        let declaration = flattened_braced_declaration(&arithmetic_source, "Nat.Arithmetic", start);
+        &arithmetic_source[declaration]
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
     let combinators = catalog_source("catalog/packages/Core/Function/Combinators.ken.md");
     let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
 
@@ -198,12 +211,13 @@ fn collections_prelude() -> String {
         "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
         "import Core.Logic.Transport (cong, sym, trans)",
         "import Data.Numeric.Nat.Order (min, sub)",
+        "import Data.Numeric.Nat.Arithmetic (add)",
     ] {
         remove_flattened_import(&mut collections, "Derived", import);
     }
 
     format!(
-        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{combinators}\n{collections}"
+        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{nat_arithmetic}\n{combinators}\n{collections}"
     )
 }
 

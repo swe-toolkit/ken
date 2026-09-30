@@ -61,6 +61,8 @@ order provider and described in `§4.5`, next to the string ops that need it.
 ```ken
 import Core.Function.Combinators (comp, idf)
 
+import Data.Numeric.Nat.Arithmetic (add)
+
 import Data.Numeric.Nat.Order (min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
@@ -141,7 +143,10 @@ before this file.
 Ordinary transparent recursive definitions over `List`/`Nat`; no primitive
 or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `length_take_min` are the three original proof-returning laws. The private
-`mem_filter` theorem characterizes membership through this module's `filter`:
+`length_append` and `length_drop` laws also hold for any element type and list;
+`length_append` uses the canonical addition laws because `add` recurses on
+its second argument. The private `mem_filter` theorem characterizes
+membership through this module's `filter`:
 given `compat`, a matching head has the same predicate result as `x`.
 The private `mem_filter_sound` theorem needs no compatibility premise:
 membership after filtering implies membership before filtering. Both laws
@@ -683,6 +688,43 @@ theorem mem_filter_sound
         (Refl)
   }
 
+theorem length_append
+      (a : Type) (xs : List a) (ys : List a)
+    : Equal Nat (length a (list_append a xs ys)) (add (length a xs) (length a ys)) =
+  match xs {
+    Nil ↦ sym Nat (add Zero (length a ys)) (length a ys) ((proof zero_l for add) (length a ys));
+    Cons head tail ↦
+      trans
+        Nat
+        (length a (list_append a (Cons a head tail) ys))
+        (Suc (add (length a tail) (length a ys)))
+        (add (length a (Cons a head tail)) (length a ys))
+        (cong
+          Nat
+          Nat
+          (length a (list_append a tail ys))
+          (add (length a tail) (length a ys))
+          Suc
+          (length_append a tail ys))
+        (sym
+          Nat
+          (add (Suc (length a tail)) (length a ys))
+          (Suc (add (length a tail) (length a ys)))
+          ((proof suc_l for add) (length a tail) (length a ys)))
+  }
+
+theorem length_drop
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal Nat (length a (drop a n xs)) (sub (length a xs) n) =
+  match n {
+    Zero ↦ Refl;
+    Suc m ↦
+      match xs {
+        Nil ↦ Proved;
+        Cons head tail ↦ length_drop a m tail
+      }
+  }
+
 theorem map_length
       (a : Type) (b : Type) (f : a → b) (xs : List a)
     : Equal Nat (length b (map a b f xs)) (length a xs) =
@@ -703,6 +745,18 @@ theorem length_take_min
           cong Nat Nat (length a (take a m t)) (min m (length a t)) Suc (length_take_min a m t)
       }
   }
+```
+
+```ken example
+theorem derived_example_length_append_generic
+      (a : Type) (xs : List a) (ys : List a)
+    : Equal Nat (length a (list_append a xs ys)) (add (length a xs) (length a ys)) =
+  length_append a xs ys
+
+theorem derived_example_length_drop_generic
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal Nat (length a (drop a n xs)) (sub (length a xs) n) =
+  length_drop a n xs
 ```
 
 ```ken example
@@ -1895,6 +1949,234 @@ fn eq (a : String) (b : String) : Bool =
 
 fn compare (a : String) (b : String) : OrdResult =
   list_compare Char compare_char (string_to_list_char a) (string_to_list_char b)
+
+theorem concat_char_count
+      (a : String)
+      (b : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string
+            (list_append Char (string_to_list_char a) (string_to_list_char b))))
+        (list_append Char (string_to_list_char a) (string_to_list_char b)))
+    : Equal Nat
+        (length Char (string_to_list_char (concat a b)))
+        (add (length Char (string_to_list_char a)) (length Char (string_to_list_char b))) =
+  let
+    joined_chars = list_append Char (string_to_list_char a) (string_to_list_char b);
+    joined_view : Equal (List Char) (string_to_list_char (concat a b)) joined_chars =
+      concat_view a b h;
+    view_count : Equal Nat
+      (length Char (string_to_list_char (concat a b)))
+      (length Char joined_chars) =
+      cong
+        (List Char)
+        Nat
+        (string_to_list_char (concat a b))
+        joined_chars
+        (length Char)
+        joined_view
+  in
+    trans
+      Nat
+      (length Char (string_to_list_char (concat a b)))
+      (length Char joined_chars)
+      (add (length Char (string_to_list_char a)) (length Char (string_to_list_char b)))
+      view_count
+      (length_append Char (string_to_list_char a) (string_to_list_char b))
+
+theorem slice_char_count
+      (i : Nat)
+      (j : Nat)
+      (s : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string (take Char (sub j i) (drop Char i (string_to_list_char s)))))
+        (take Char (sub j i) (drop Char i (string_to_list_char s))))
+    : Equal Nat
+        (length Char (string_to_list_char (slice i j s)))
+        (min (sub j i) (sub (length Char (string_to_list_char s)) i)) =
+  let
+    characters = string_to_list_char s;
+    suffix = drop Char i characters;
+    slice_width = sub j i;
+    selected_window = take Char slice_width suffix;
+    window_view : Equal (List Char) (string_to_list_char (slice i j s)) selected_window =
+      slice_view i j s h;
+    view_count : Equal Nat
+      (length Char (string_to_list_char (slice i j s)))
+      (length Char selected_window) =
+      cong
+        (List Char)
+        Nat
+        (string_to_list_char (slice i j s))
+        selected_window
+        (length Char)
+        window_view;
+    selected_count : Equal Nat
+      (length Char selected_window)
+      (min slice_width (length Char suffix)) =
+      length_take_min Char slice_width suffix;
+    suffix_count : Equal Nat (length Char suffix) (sub (length Char characters) i) =
+      length_drop Char i characters
+  in
+    trans
+      Nat
+      (length Char (string_to_list_char (slice i j s)))
+      (length Char selected_window)
+      (min slice_width (sub (length Char characters) i))
+      view_count
+      (trans
+        Nat
+        (length Char selected_window)
+        (min slice_width (length Char suffix))
+        (min slice_width (sub (length Char characters) i))
+        selected_count
+        (cong
+          Nat
+          Nat
+          (length Char suffix)
+          (sub (length Char characters) i)
+          (min slice_width)
+          suffix_count))
+
+theorem concat_view
+      (a : String)
+      (b : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string
+            (list_append Char (string_to_list_char a) (string_to_list_char b))))
+        (list_append Char (string_to_list_char a) (string_to_list_char b)))
+    : Equal
+        (List Char)
+        (string_to_list_char (concat a b))
+        (list_append Char (string_to_list_char a) (string_to_list_char b)) =
+  h
+
+theorem slice_view
+      (i : Nat)
+      (j : Nat)
+      (s : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string (take Char (sub j i) (drop Char i (string_to_list_char s)))))
+        (take Char (sub j i) (drop Char i (string_to_list_char s))))
+    : Equal
+        (List Char)
+        (string_to_list_char (slice i j s))
+        (take Char (sub j i) (drop Char i (string_to_list_char s))) =
+  h
+```
+
+The count laws apply to the specific assembled character list only when its
+encode-then-decode round trip preserves that list. Their proofs lift the
+corresponding view equality through `length` and use the generic append,
+take, and drop length laws. The view equalities themselves restate their
+explicit premises after unfolding the transparent string operations. An NFC
+boundary can change the character count, so neither count law claims an
+unconditional equation for arbitrary strings.
+
+```ken example
+theorem derived_example_concat_char_count_generic
+      (a : String)
+      (b : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string
+            (list_append Char (string_to_list_char a) (string_to_list_char b))))
+        (list_append Char (string_to_list_char a) (string_to_list_char b)))
+    : Equal Nat
+        (length Char (string_to_list_char (concat a b)))
+        (add (length Char (string_to_list_char a)) (length Char (string_to_list_char b))) =
+  concat_char_count a b h
+
+theorem derived_example_slice_char_count_generic
+      (i : Nat)
+      (j : Nat)
+      (s : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string (take Char (sub j i) (drop Char i (string_to_list_char s)))))
+        (take Char (sub j i) (drop Char i (string_to_list_char s))))
+    : Equal Nat
+        (length Char (string_to_list_char (slice i j s)))
+        (min (sub j i) (sub (length Char (string_to_list_char s)) i)) =
+  slice_char_count i j s h
+
+theorem derived_example_concat_view_generic
+      (a : String)
+      (b : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string
+            (list_append Char (string_to_list_char a) (string_to_list_char b))))
+        (list_append Char (string_to_list_char a) (string_to_list_char b)))
+    : Equal
+        (List Char)
+        (string_to_list_char (concat a b))
+        (list_append Char (string_to_list_char a) (string_to_list_char b)) =
+  concat_view a b h
+
+theorem derived_example_slice_view_generic
+      (i : Nat)
+      (j : Nat)
+      (s : String)
+      (h : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string (take Char (sub j i) (drop Char i (string_to_list_char s)))))
+        (take Char (sub j i) (drop Char i (string_to_list_char s))))
+    : Equal
+        (List Char)
+        (string_to_list_char (slice i j s))
+        (take Char (sub j i) (drop Char i (string_to_list_char s))) =
+  slice_view i j s h
+```
+
+```ken reject
+theorem derived_reject_unconditional_concat_char_count
+      (a : String) (b : String)
+    : Equal Nat
+        (length Char (string_to_list_char (concat a b)))
+        (add (length Char (string_to_list_char a)) (length Char (string_to_list_char b))) =
+  Refl
+```
+
+```ken reject
+theorem derived_reject_unconditional_slice_char_count
+      (i : Nat) (j : Nat) (s : String)
+    : Equal Nat
+        (length Char (string_to_list_char (slice i j s)))
+        (min (sub j i) (sub (length Char (string_to_list_char s)) i)) =
+  Refl
+```
+
+```ken reject
+const derived_nfc_base : String = "e"
+
+const derived_nfc_mark : String = "\u{301}"
+
+theorem derived_reject_concat_nfc_round_trip
+    : Equal
+        (List Char)
+        (string_to_list_char
+          (list_char_to_string
+            (list_append
+              Char
+              (string_to_list_char derived_nfc_base)
+              (string_to_list_char derived_nfc_mark))))
+        (list_append
+          Char
+          (string_to_list_char derived_nfc_base)
+          (string_to_list_char derived_nfc_mark)) =
+  Refl
 ```
 
 ### 4.7 The derived `Bytes` structural fold
@@ -2279,10 +2561,14 @@ reference implementation.
    lifting the tail proof under `Cons` with `cong`; `§4.1`/`§4.2` also use
    structural induction + `cong`/`trans` under the head constructor. Private
    `mem_filter` and `mem_filter_sound` split named predicate/comparator
-   outcomes and use
-   `cong` over this module's `filter` branch, with compatibility needed only
-   for the first law. Private `concat_map_append` lifts the IH under
-   `list_append` and uses
+   outcomes and use `cong` over this module's `filter` branch, with
+   compatibility needed only for the first law. `length_append` combines the
+   list induction with the canonical `add` successor law; `length_drop`
+   splits the bound and the list. The two conditional string count laws lift
+   their view equalities with `cong` and compose the corresponding generic
+   append/take/drop length laws; the view lemmas pass their explicit list
+   round-trip premises through the transparent string definitions. Private
+   `concat_map_append` lifts the IH under `list_append` and uses
    `list_append::assoc` in reverse. The `nth` bounds proofs split the list
    before the index so lookup, length, and order reduce together. `§4.3`:
    generic `insert::count` preserves every count with any comparator and
@@ -2313,6 +2599,10 @@ reference implementation.
    concatenates it (after `Transport.ken.md`'s tangled source) ahead of
    several rosetta examples that reuse it per the DRY rule.
 8. **Validation evidence.**
+   `crates/ken-elaborator/tests/cat_derived_string_view_laws.rs` checks six
+   owner-local generic consumers and exact before/after trust identities;
+   the paired reject fences refuse unconditional count equations and the
+   decomposed NFC pair's round-trip premise.
    `crates/ken-elaborator/tests/cat_derived_filter_membership_law.rs` —
    pins both private checked contracts to this module's `filter`
    and distinguishes incompatible from compatible concrete equations.
