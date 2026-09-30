@@ -2161,7 +2161,8 @@ const derived_nfc_base : String = "e"
 const derived_nfc_mark : String = "\u{301}"
 
 theorem derived_reject_concat_nfc_round_trip
-    : Equal (List Char)
+    : Equal
+        (List Char)
         (string_to_list_char
           (list_char_to_string
             (list_append
