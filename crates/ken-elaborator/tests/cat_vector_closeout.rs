@@ -174,7 +174,7 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 }
 
 /// Promise class: transition sentinel for the owned declarations in this
-/// proof-only increment. Retire or rebaseline at the first separately authorized
+/// proof-only increment. Retire or rebaseline at the next separately authorized
 /// Vector declaration extension; this inventory is not a permanent API promise.
 /// MEASURED: ordinary isolated roots loading installs these twenty-one checked
 /// Vector identities, returns only identities from that population, and
@@ -306,7 +306,7 @@ fn vector_backfilled_laws_inhabit_the_generic_equations() {
 }
 
 /// Promise class: transition sentinel for this proof-only dependency edge;
-/// retire at the first separately authorized Vector provider change.
+/// retire or rebaseline at the next separately authorized Vector import change.
 /// MEASURED: checked Vector references exactly the compiler floor, including
 /// `Top` in the new inductive proof goals, plus the canonical imported
 /// `comp`/`idf`/`cong` identities; parsed imports list exactly those two
