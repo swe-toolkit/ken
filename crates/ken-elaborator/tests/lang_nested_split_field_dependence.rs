@@ -76,6 +76,30 @@ fn diagnostic_m_align_two_recursive_field_method_telescope() {
 }
 
 #[test]
+fn second_nested_split_inside_zero_bucket_keeps_root_ih_tail() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file(&format!(
+        "{VEC}\ndata PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
+         fn deeper (n : Nat) (xs : Vec Nat (Suc n)) : PairOut = \
+         match xs {{ \
+           VCons m Zero VNil ↦ Out Zero Zero; \
+           VCons m Zero (VCons k _ _) ↦ Out (Suc Zero) Zero; \
+           VCons m (Suc a) _ ↦ Out (Suc (Suc Zero)) Zero \
+         }}\n\
+         const nil : PairOut = deeper Zero (VCons Nat Zero Zero (VNil Nat))\n\
+         const cons : PairOut = deeper (Suc Zero) \
+           (VCons Nat (Suc Zero) Zero (VCons Nat Zero Zero (VNil Nat)))\n\
+         const expected_nil : PairOut = Out Zero Zero\n\
+         const expected_cons : PairOut = Out (Suc Zero) Zero"
+    ))
+    .expect("second nested split in Zero bucket checks with root IH still owed");
+    assert_normalized_equal(&env, "nil", "expected_nil");
+    assert_normalized_equal(&env, "cons", "expected_cons");
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+#[test]
 fn indexed_exact_adversary_repro_checks() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(&format!(

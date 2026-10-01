@@ -15981,29 +15981,39 @@ fn first_alias_sentinel(term: &Term) -> Option<usize> {
     }
 }
 
-/// Resolve every active alias frame before handing an in-matrix method to
-/// the kernel. Enclosing frames may own sentinels that the inner frame leaves
-/// untouched; only a sentinel in no active frame is an internal error.
+enum InMatrixCheck {
+    Ready(Term),
+    Deferred(Term),
+}
+
+/// Finalize only this match's aliases before a method query. An enclosing
+/// frame's binders have not all been woven into its result yet, so its alias
+/// sentinel must survive until that frame finishes and the final definition
+/// is kernel-checked.
 fn finalize_alias_sentinels_for_check(
     cx: &ElabCtx<'_>,
     term: &Term,
     check_ctx_len: usize,
-) -> Result<Term, ElabError> {
+) -> Result<InMatrixCheck, ElabError> {
     debug_assert_eq!(cx.pattern_alias_replacement_frames.len(), cx.pattern_alias_frame_roots.len());
-    let mut term = term.clone();
-    for (frame, &root_len) in cx.pattern_alias_replacement_frames.iter()
-        .zip(cx.pattern_alias_frame_roots.iter()).rev() {
-        let depth = check_ctx_len.checked_sub(root_len).ok_or_else(|| {
-            ElabError::Internal("in-matrix check context is above its match root".into())
-        })?;
-        term = finalize_pattern_aliases(&term, depth, frame)?;
-    }
-    if let Some(id) = first_alias_sentinel(&term) {
-        return Err(ElabError::Internal(format!(
+    let (Some(frame), Some(&root_len)) = (
+        cx.pattern_alias_replacement_frames.last(),
+        cx.pattern_alias_frame_roots.last(),
+    ) else {
+        return Ok(InMatrixCheck::Ready(term.clone()));
+    };
+    let depth = check_ctx_len.checked_sub(root_len).ok_or_else(|| {
+        ElabError::Internal("in-matrix check context is above its match root".into())
+    })?;
+    let term = finalize_pattern_aliases(term, depth, frame)?;
+    match first_alias_sentinel(&term) {
+        None => Ok(InMatrixCheck::Ready(term)),
+        Some(id) if cx.pattern_alias_replacement_frames.iter().rev().skip(1)
+            .any(|enclosing| enclosing.contains_key(&id)) => Ok(InMatrixCheck::Deferred(term)),
+        Some(id) => Err(ElabError::Internal(format!(
             "alias sentinel {id} reached a kernel query but is registered in no active frame"
-        )));
+        ))),
     }
-    Ok(term)
 }
 
 /// Elaborate `match scrut { C₁ x₁… => body₁ ; … }` (`34 §3`).
@@ -18546,7 +18556,12 @@ fn compile_match_matrix(
                         col_types.len() - 1,
                         binder_count,
                     )?;
-                    let finalized = finalize_alias_sentinels_for_check(cx, method, nested_ctx.len())?;
+                    let (finalized, check) = match finalize_alias_sentinels_for_check(
+                        cx, method, nested_ctx.len(),
+                    )? {
+                        InMatrixCheck::Ready(term) => (term, true),
+                        InMatrixCheck::Deferred(term) => (term, false),
+                    };
                     debug_assert_eq!(
                         nested_ctx.len() - *cx.pattern_alias_frame_roots.last()
                             .expect("nested matrix has an active match frame"),
@@ -18559,16 +18574,18 @@ fn compile_match_matrix(
                         expected.clone(),
                         binder_count,
                     )?;
-                    let checked = cx.metas.zonk_term(&closed);
-                    let expected_checked = cx.metas.zonk_term(&expected);
-                    kernel_check_in_context_current(cx, &nested_ctx, &checked, &expected_checked)
-                        .map_err(|error| match error {
-                            CurrentKernelQueryError::View(error) => error,
-                            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                                error,
-                                span: split_span.clone(),
-                            },
-                        })?;
+                    if check {
+                        let checked = cx.metas.zonk_term(&closed);
+                        let expected_checked = cx.metas.zonk_term(&expected);
+                        kernel_check_in_context_current(cx, &nested_ctx, &checked, &expected_checked)
+                            .map_err(|error| match error {
+                                CurrentKernelQueryError::View(error) => error,
+                                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                                    error,
+                                    span: split_span.clone(),
+                                },
+                            })?;
+                    }
                     *method = closed;
                 }
             }
