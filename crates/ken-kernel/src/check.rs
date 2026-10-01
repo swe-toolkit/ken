@@ -481,9 +481,9 @@ pub fn check(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResul
         }
         // --- K2 introduction forms (`15`, `16`) ---
         Term::Refl(a) => {
-            // `refl a : Eq A a a` checks against `Eq A x y` iff `a ≡ x ≡ y`
-            // (`15 §2`). (`Eq : Ω` makes proofs irrelevant, but `refl a` is the
-            // canonical proof, so its index must match.)
+            // `refl a` checks at any type convertible to `Eq (infer a) a a`
+            // (`15 §2`); do not whnf the expected proposition first, since
+            // a compound Eq Type may decompose into a Σ/Π proposition.
             let a_infer = infer(env, ctx, a)?;
             let inferred = Term::Eq(
                 Box::new(a_infer),
