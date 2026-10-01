@@ -86,6 +86,19 @@ The ruling decides three things:
   names;
 - how the host response premise is spelled.
 
+## AC-0 ruling (Architect `evt_22nte6kpr12t9`, probed at `3150e9331`)
+
+- **A named step function**, not a trace reading. `private_write_all_fuel`
+  is reshaped into `private_write_all_after_wrote`,
+  `private_write_all_step` and the loop, plus `private_write_all_next`
+  after `writeAll`. The four declarations are as given in the ruling.
+- **The laws live prelude-side**, after `writeAll` and before
+  `hide_prelude_names`. The new helpers and `write_all_refl` join
+  `private_names`, and the theorem names stay public. The step must stay
+  private: it would otherwise produce a public `BufferSpan`.
+- **The premise.** `write_all_count_fits span count` in `System.IO`, on
+  each `Wrote` response. `Err` responses carry no premise.
+
 ## Deliverable
 
 `System.IO` publishes kernel-checked theorems over `writeAll`, or over the
@@ -102,23 +115,38 @@ There is no `Axiom`, no `trusted_base()` change and no kernel change.
 
 ## Acceptance
 
-- **AC-1.**
-  - Each clause is a theorem whose statement names `writeAll` or the loop
-    AC-0 names.
-  - Each is checked in the `System.IO` load.
+- **AC-1 (amended to the AC-0 ruling, Architect `evt_22nte6kpr12t9`).**
+  - Each clause is a pairing. The loop half is a prelude law whose
+    statement names `writeAll` or the loop: `write_all_entry`, `_stop`,
+    `_request`, `_first_error_step`, `_done`, `_continue` and
+    `_advance_start`. The arithmetic half is a `System.IO` theorem (S1-S4)
+    under `write_all_count_fits`. No single catalog theorem can name the
+    loop (G1, G2, visibility).
+  - Both halves are checked in the `System.IO` load. The `System.IO` card
+    maps each §1.7.3 clause to its laws.
+  - A bridge lemma relates `buffer_nat_add` to `Arithmetic.add`. Their
+    agreement is proved, not assumed.
 - **AC-2 (controls).**
   - Success completeness without the response premise is rejected, and the
     failure is the fuel-`Zero` case.
-  - First error with a different error on the right is rejected.
+  - First error with a different error on the right is rejected. It names
+    private constants, so it is a Rust-side test: it elaborates before
+    `hide_prelude_names`, or it kernel-checks the false `write_all_refl`
+    instance. If neither route exists without a production change, stop to
+    the Architect.
+  - The premise-free S2 is a `System.IO` `ken reject` fence.
   - Each `ken reject` fence rejects a false claim and accepts its adjacent
     true twin. A fence closed by `Refl` on a closed inductive equation
     rejects true twins too, and does not count (Architect
     `evt_bbf8w6ww9208`).
 - **AC-3.** These suites stay green:
-  - `px8f_buffer_io_surface`;
+  - `px8f_buffer_io_surface`, with the new private names in its sealed
+    list;
   - `cat_capability_laws_prelude_move`;
   - the `System.IO` catalog load;
-  - `writeAll` execution behavior is unchanged.
+  - `writeAll` execution behavior is unchanged: the `writeAll` rows of
+    `crates/ken-cli/tests/rt_parity_native.rs` and the buffer-io conformance
+    seed, since the step closure changes the lowered shape.
 
 ## Stop conditions
 
