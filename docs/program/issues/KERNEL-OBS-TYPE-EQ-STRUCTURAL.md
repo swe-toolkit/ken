@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-TYPE-EQ-STRUCTURAL
 title: "Since the P0 fix, Eq Type between two same-former compound types (Π/Π, Σ/Σ, D/D, Quot/Quot) stays neutral, so every cast at a compound former projects witnesses (e.1, e.2, index equalities) that have no type, and the reducer's Phase 3 sub-cast synthesizes an ill-typed Refl. Add spec 16 §2.2's structural Eq Type arms, with Refl checked by conversion, behind one TCB Decision"
-status: draft
+status: ready
 owner: kernel
 size: M
 tier: T1
@@ -9,7 +9,7 @@ gate: architect
 depends_on: [KERNEL-OBS-EQ-AT-TYPE-RIGID-BOTTOM, KERNEL-OBS-REDUCT-WITNESS-TYPING]
 blocks: [LANG-SIBLING-GOAL-REFINEMENT]
 github: null
-origin: "Architect recuts evt_229qe9tgfetw1 (site 3 and the Class A fixtures) and evt_4sj0kg0kd2qbz (§1b entry 2 of KERNEL-OBS-REDUCT-WITNESS-TYPING: one defect across every compound-former cast). Kernel TCB change: held at draft for the operator. Steward-filed per COORDINATION section 2."
+origin: "Architect recuts evt_229qe9tgfetw1 (site 3 and the Class A fixtures) and evt_4sj0kg0kd2qbz (§1b entry 2 of KERNEL-OBS-REDUCT-WITNESS-TYPING: one defect across every compound-former cast). Kernel TCB change, approved by the operator 2026-10-01. Steward-filed per COORDINATION section 2."
 ---
 
 # Eq Type decomposes structurally
@@ -65,10 +65,11 @@ Under one TCB Decision:
 
 ## Acceptance
 
-AC-0 is set by the Architect when the operator authorizes the TCB change.
-It includes the Π-motive row and one typed-whnf subject-reduction row per
+The operator authorized the TCB change (2026-10-01). The Architect sets AC-0
+at kickoff, before any edit. It includes the Π-motive row and one typed-whnf subject-reduction row per
 former.
 
 ## Stop conditions
 
-- The operator does not authorize the TCB change: the node stays draft.
+- Any trusted-base change beyond the four deliverables: stop to the
+  Architect.

@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LEQ-INT-LITERAL-REDUCTION
 title: "The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as isScalar 55295 or PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs"
-status: draft
+status: ready
 owner: kernel
 size: S
 tier: T1
@@ -9,7 +9,7 @@ gate: architect
 depends_on: []
 blocks: [LANG-REFINEMENT-INTRODUCTION-OBLIGATION]
 github: null
-origin: "Architect recut evt_5qg2098zmhd20 on hard stop evt_4g6d57z5x6wqz (LANG-REFINEMENT-INTRODUCTION-OBLIGATION, §1b entry 1). A kernel TCB extension: held at draft for the operator. Steward-filed per COORDINATION section 2."
+origin: "Architect recut evt_5qg2098zmhd20 on hard stop evt_4g6d57z5x6wqz (LANG-REFINEMENT-INTRODUCTION-OBLIGATION, §1b entry 1). A kernel TCB extension, approved by the operator 2026-10-01. Steward-filed per COORDINATION section 2."
 ---
 
 # Kernel decides leq_int on literals

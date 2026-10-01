@@ -91,9 +91,13 @@ synchronization.
 
 Forward only real forks: priority between ready authorized WPs, scope not
 settled by a current ruling, any TCB growth, or a lane/objective change. Decide
-ordinary sequencing, WP size, and the appropriate existing gate without asking.
-Give the operator the smallest decision that separates the alternatives; do not
-attach a workflow retrospective.
+ordinary sequencing and the appropriate existing gate without asking. Give the
+operator the smallest decision that separates the alternatives; do not attach a
+workflow retrospective.
+
+**Size and tier are never an operator question**, including an L, a split
+call, or a tier mismatch. Decide, record it in the frame, and kick. You will be
+tempted to ask when a WP is large or a ring holds for confirmation.
 
 ## §4. Work packages
 
@@ -141,8 +145,8 @@ objective.
 Estimate T1 versus T2 from the reasoning required, using `MODELS.md`. Record the
 tier in the frame. Where the seated tier does not match, observe the current
 seat and correct it through `steward/add-agent.md` — the seat change is yours,
-not a question for the operator. Route only a genuine unresolved capability or
-soundness fork. Do not turn tier checking into a separate investigation.
+not a question for the operator (§3). Do not turn tier checking into a separate
+investigation.
 
 ## §5. Procedures are point-of-use
 
