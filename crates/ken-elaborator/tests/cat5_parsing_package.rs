@@ -9,7 +9,7 @@ mod catalog_or;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_kernel::{Decl, GlobalId, KernelError, Term};
 use std::collections::{BTreeSet, HashSet};
 
 const PARSING_KEN_MD: &str =
@@ -99,7 +99,10 @@ impl Cat5ClientElaboration for ElabEnv {
               ParseError, MkParseError, Syntax, MkSyntax, parse_bool_expr, format_bool_expr, print_bool_expr, \
               print_bool_expr_utf8, source_length, source_bytes, erase_spans, ValidSpan, \
               ValidLocated, ValidSyntax, valid_zero_width_span, ParserLaws, ParserValid, \
-              ParserTotal, ParserSourceLocal, parser_pure, parser_fail, \
+              ParserTotal, ParserSourceLocal, parser_pure, parser_fail, parser_from_decoder, \
+              ByteCursor, ByteCursorBounded, DecoderPreservesBounded, byte_cursor_ops, \
+              byte_cursor_bounded_locate, byte_cursor_bounded_after_peek, \
+              byte_satisfy_parser_laws, byte_many_parser_laws, \
               parser_from_decoder_laws, parser_pure_laws, parser_fail_laws, source_id, \
               span_start, span_end, located_source, located_span, error_source, error_span)\n\
              {source}"
@@ -375,6 +378,12 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "byte_cursor_advance",
         "byte_cursor_locate",
         "byte_cursor_ops",
+        "ByteCursorBounded",
+        "DecoderPreservesBounded",
+        "byte_cursor_bounded_locate",
+        "byte_cursor_bounded_after_peek",
+        "byte_satisfy_parser_laws",
+        "byte_many_parser_laws",
         "LessEqNat",
         "LessEqNat::refl",
         "LessEqNat::zero_left",
@@ -1335,19 +1344,58 @@ fn cat5_d1_reflexive_utf8_proof_rejected() {
 #[test]
 fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
     // Promise class: durable invariant (CAT-5 §4, ParserLaws). This fixture
-    // imports all three public laws through the real roots-loaded package;
-    // the pure and fail instances inhabit the unchanged ParserLaws predicate.
-    // A new parser may use the generic theorem only with a checked decoder
-    // bound; the package's paired literate fences exercise that distinction.
+    // imports the generic, pure, fail, satisfy and many laws through the
+    // real roots-loaded package. The many instance needs a checked decoder
+    // preservation premise; the package's paired fences exercise its bound.
     let mut env = mk_env();
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     env.elaborate_cat5_client(
         r#"
+        import Capability.Parsing.Decoder
+          (decoder_pure, decoder_pure_preserves, decoder_satisfy, decoder_many)
+        import Capability.Parsing.Cursor (cursor_locate, cursor_peek, cursor_advance)
+
         theorem client_pure_parser_laws : ParserLaws Bool (parser_pure Bool True) =
           parser_pure_laws Bool True
 
         theorem client_fail_parser_laws : ParserLaws Bool (parser_fail Bool) =
           parser_fail_laws Bool
+
+        theorem client_locate_sound (s : Source) (start : Nat) (cur : ByteCursor)
+            : ByteCursorBounded s start cur
+              → ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur) =
+          byte_cursor_bounded_locate s start cur
+
+        theorem client_advance_sound (s : Source) (start : Nat) (cur : ByteCursor)
+            : (v : UInt8)
+              → Equal (Option UInt8)
+                (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                (Some UInt8 v)
+              → ByteCursorBounded s start cur
+              → ByteCursorBounded s start
+                (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur) =
+          byte_cursor_bounded_after_peek s start cur
+
+        fn client_accept_every_byte (byte : UInt8) : Bool = True
+
+        theorem client_satisfy_parser_laws
+            : ParserLaws UInt8
+                (parser_from_decoder UInt8
+                  (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops
+                    client_accept_every_byte)) =
+          byte_satisfy_parser_laws client_accept_every_byte
+
+        theorem client_many_parser_laws
+            : ParserLaws (List Bool)
+                (parser_from_decoder (List Bool)
+                  (decoder_many ByteCursor UInt8 Span Bool byte_cursor_ops
+                    (decoder_pure ByteCursor Span Bool True))) =
+          byte_many_parser_laws
+            Bool
+            (decoder_pure ByteCursor Span Bool True)
+            (λs. λstart.
+              decoder_pure_preserves
+                ByteCursor Span Bool (ByteCursorBounded s start) (ValidSpan s) True)
         "#,
     )
     .expect("public parser_pure and parser_fail laws must instantiate for a client");
@@ -1355,6 +1403,76 @@ fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
         env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
         before,
         "importing and applying ParserLaws proofs must not extend trust"
+    );
+}
+
+/// Promise class: durable invariant (CAT-5 bounded ParserLaws, AC-2b).
+///
+/// MEASURED: the real Parsing package's rejected checked fences are elaborated
+/// as ordinary source; at least one reaches the kernel's exact over-end
+/// LessEqNat obligation. CLAIMED: the false bounded-parser twin cannot pass
+/// its fence merely by failing to parse or resolve a name. THE GAP: the
+/// literate `ken reject` role itself only observes any error, so this client
+/// checks the error's typed payload independently, while the accepted twin
+/// remains checked by `ken check` on the same package.
+#[test]
+fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
+    let extracted = ken_elaborator::literate::extract_ken_md(PARSING_KEN_MD)
+        .expect("Parsing checked fences must extract");
+    let mut env = mk_env();
+    catalog_or::expose_module(&mut env, "Data.Numeric.Nat.Order");
+    let leq = env.globals["LessEqNat"];
+    let source_length = env.globals["source_length"];
+    let suc = env.prelude_env.suc_id;
+    let over_end = extracted.reject_ranges.iter().any(|range| {
+        let err = env
+            .elaborate_file(&PARSING_KEN_MD[range.clone()])
+            .expect_err("a reject fence must not elaborate");
+        let ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { expected, found },
+            ..
+        } = err
+        else {
+            return false;
+        };
+        // Derive n from the found goal rather than freezing a de Bruijn
+        // index: every binder renaming still observes the same bound.
+        let Term::App(found_leq, found_right) = found.as_ref() else {
+            return false;
+        };
+        let Term::App(found_head, found_left) = found_leq.as_ref() else {
+            return false;
+        };
+        let Term::App(length_head, source) = found_left.as_ref() else {
+            return false;
+        };
+        if !matches!(source.as_ref(), Term::Var(_))
+            || found_head.as_ref() != &Term::const_(leq, vec![])
+            || length_head.as_ref() != &Term::const_(source_length, vec![])
+        {
+            return false;
+        }
+        let length = Term::app(Term::const_(source_length, vec![]), *source.clone());
+        let true_endpoint = Term::app(
+            Term::app(Term::const_(leq, vec![]), length.clone()),
+            length.clone(),
+        );
+        let false_endpoint = Term::app(
+            Term::app(
+                Term::const_(leq, vec![]),
+                Term::app(Term::constructor(suc, vec![]), length.clone()),
+            ),
+            length,
+        );
+        *found_right.as_ref() == *found_left.as_ref()
+            && *found == true_endpoint
+            && *expected == false_endpoint
+    });
+    assert!(
+        over_end,
+        "a rejected Parsing fence must reach TypeMismatch with expected \
+         LessEqNat (Suc (source_length s)) (source_length s) and found \
+         LessEqNat (source_length s) (source_length s), not an unrelated error"
     );
 }
 
