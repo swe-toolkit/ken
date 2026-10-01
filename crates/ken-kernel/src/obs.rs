@@ -52,17 +52,64 @@ fn is_refl(t: &Term) -> bool {
     matches!(t, Term::Refl(_))
 }
 
-/// `sym` of a type-equality proof (`16 §4`): `p : Eq Type A B ⇒ sym p : Eq Type
-/// B A`. Since `Eq Type _ _ : Ω` (proof-irrelevant) and `cast` never inspects the
-/// proof, this only needs to be well-typed; `sym (refl X) = refl X`, and a
-/// pair-structured proof is reversed componentwise. Anything else is returned
-/// unchanged (the dependent `cast` is then stuck — sound).
-fn mk_sym(proof: &Term) -> Term {
-    match proof {
-        Term::Refl(x) => Term::Refl(x.clone()),
-        Term::Pair(p, q) => Term::Pair(Box::new(mk_sym(p)), Box::new(mk_sym(q))),
-        other => other.clone(),
+/// Typed symmetry of `h : Eq (Type l) A B`, including neutral evidence.
+/// Both the Π type-equality arm and Π cast use this identical J construction.
+fn type_eq_sym(level: &crate::term::Level, a: &Term, b: &Term, h: Term) -> Term {
+    let type_l = Term::Type(level.clone());
+    let proof_domain = Term::Eq(
+        Box::new(type_l.clone()),
+        Box::new(weaken(a, 1)),
+        Box::new(Term::var(0)),
+    );
+    let motive = Term::Ascript(
+        Box::new(Term::lam(
+            type_l.clone(),
+            Term::lam(
+                proof_domain.clone(),
+                Term::Eq(
+                    Box::new(type_l.clone()),
+                    Box::new(Term::var(1)),
+                    Box::new(weaken(a, 2)),
+                ),
+            ),
+        )),
+        Box::new(Term::pi(
+            type_l.clone(),
+            Term::pi(proof_domain, Term::Omega(level.clone().suc())),
+        )),
+    );
+    Term::J(
+        Box::new(motive),
+        Box::new(Term::Refl(Box::new(a.clone()))),
+        Box::new(Term::Ascript(
+            Box::new(h),
+            Box::new(Term::Eq(
+                Box::new(type_l),
+                Box::new(a.clone()),
+                Box::new(b.clone()),
+            )),
+        )),
+    )
+}
+
+/// Universe level of a type, only when the kernel can infer it.
+fn type_level(env: &GlobalEnv, ctx: &Context, ty: &Term) -> Option<crate::term::Level> {
+    match crate::check::infer(env, ctx, ty).ok()? {
+        Term::Type(level) => Some(level),
+        _ => None,
     }
+}
+
+fn type_eq(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term> {
+    let level = type_level(env, ctx, a)?;
+    if !level.equiv(&type_level(env, ctx, b)?) {
+        return None;
+    }
+    Some(Term::Eq(
+        Box::new(Term::Type(level)),
+        Box::new(a.clone()),
+        Box::new(b.clone()),
+    ))
 }
 
 // ===========================================================================
@@ -111,9 +158,11 @@ fn eq_at_registered_literal(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) 
     let a_w = whnf(env, ctx, a);
     let b_w = whnf(env, ctx, b);
     match (&a_w, &b_w) {
-        (Term::IntLit(m), Term::IntLit(n)) => {
-            Some(if m == n { top_term(env) } else { bottom_term(env) })
-        }
+        (Term::IntLit(m), Term::IntLit(n)) => Some(if m == n {
+            top_term(env)
+        } else {
+            bottom_term(env)
+        }),
         _ => None,
     }
 }
@@ -133,9 +182,17 @@ fn eq_at_pi(a1: &Term, b1: &Term, f: &Term, g: &Term) -> Term {
     )
 }
 
-/// Introduce only a canonical, checked-by-shape base; a neutral proposition
-/// has no fabricated witness. The caller constructs `Eq Type X X` itself.
+/// Introduce a checked reflexive base even when `Eq Type X X` decomposes to
+/// a compound proposition. A generic neutral proposition still has no
+/// fabricated witness. The caller constructs `Eq Type X X` itself.
 fn canonical_type_eq_base(env: &GlobalEnv, ctx: &Context, base_ty: &Term) -> Option<Term> {
+    if let Term::Eq(_, x, y) = base_ty {
+        if convert_type(env, ctx, x, y) {
+            let base = Term::Refl(x.clone());
+            crate::check::check(env, ctx, &base, base_ty).ok()?;
+            return Some(base);
+        }
+    }
     match whnf(env, ctx, base_ty) {
         Term::Eq(_, x, _) => Some(Term::Refl(x)),
         head if head == top_term(env) => Some(tt_term(env)),
@@ -167,6 +224,37 @@ fn type_eq_by_j(
         Box::new(source.clone()),
     );
     let base = canonical_type_eq_base(env, ctx, &base_ty)?;
+    type_eq_by_j_with_base(
+        env,
+        ctx,
+        domain,
+        start,
+        source,
+        target,
+        family_at_y,
+        evidence,
+        base,
+    )
+}
+
+/// Chain a J transport onto a previously checked Eq Type witness. The left
+/// endpoint remains the original source, while the right endpoint advances
+/// through the forced constructor arguments one index at a time.
+fn type_eq_by_j_with_base(
+    env: &GlobalEnv,
+    ctx: &Context,
+    domain: &Term,
+    start: &Term,
+    source: &Term,
+    target: &Term,
+    family_at_y: Term,
+    evidence: Term,
+    base: Term,
+) -> Option<Term> {
+    let level = match crate::check::infer(env, ctx, source).ok()? {
+        Term::Type(level) => level,
+        _ => return None,
+    };
     let proof_domain = Term::Eq(
         Box::new(weaken(domain, 1)),
         Box::new(weaken(start, 1)),
@@ -305,27 +393,110 @@ fn rigid_type_former(ty: &Term) -> Option<RigidTypeFormer> {
     }
 }
 
-/// Structural type equality `Eq Type A B` (`16 §2.2`, §3). Equal universe
-/// instances reduce to `Top`, unequal levels to `Bottom`. Different rigid
-/// formers (or different inductive ids) reduce to `Bottom`; same-former and
-/// neutral pairs remain neutral until their equality can be decomposed.
+/// Structural type equality `Eq Type A B` (`16 §2.2`, §3). Unknown heads
+/// and unsupported same-former pairs remain neutral; distinct rigid heads
+/// reduce to `Bottom`, not an unproved equality.
 fn eq_at_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term> {
     let a_w = whnf(env, ctx, a);
     let b_w = whnf(env, ctx, b);
     match (&a_w, &b_w) {
-        (Term::Type(l1), Term::Type(l2)) => {
-            if l1.equiv(l2) {
-                Some(top_term(env))
+        (Term::Type(l1), Term::Type(l2)) | (Term::Omega(l1), Term::Omega(l2)) => {
+            Some(if l1.equiv(l2) {
+                top_term(env)
             } else {
-                Some(bottom_term(env))
-            }
+                bottom_term(env)
+            })
         }
-        (Term::Omega(l1), Term::Omega(l2)) => {
-            if l1.equiv(l2) {
-                Some(top_term(env))
-            } else {
-                Some(bottom_term(env))
+        (Term::Pi(a1, b1), Term::Pi(a2, b2)) => {
+            let level = type_level(env, ctx, a1)?;
+            if !level.equiv(&type_level(env, ctx, a2)?) {
+                return None;
             }
+            let dom_eq = type_eq(env, ctx, a1, a2)?;
+            let mut cod_ctx = ctx.clone();
+            cod_ctx.push(dom_eq.clone());
+            cod_ctx.push(weaken(a2, 1));
+            let back = Term::Cast(
+                Box::new(weaken(a2, 2)),
+                Box::new(weaken(a1, 2)),
+                Box::new(type_eq_sym(
+                    &level,
+                    &weaken(a1, 2),
+                    &weaken(a2, 2),
+                    Term::var(1),
+                )),
+                Box::new(Term::var(0)),
+            );
+            // `subst0` removes B1's original binder. Shift its free Γ
+            // references past d and x *plus* that removal first.
+            let left = subst0(&shift(b1, 2, 1), &back);
+            let right = shift(b2, 1, 1);
+            let cod_eq = type_eq(env, &cod_ctx, &left, &right)?;
+            Some(Term::sigma(dom_eq, Term::pi(weaken(a2, 1), cod_eq)))
+        }
+        (Term::Sigma(a1, b1), Term::Sigma(a2, b2)) => {
+            let dom_eq = type_eq(env, ctx, a1, a2)?;
+            let mut cod_ctx = ctx.clone();
+            cod_ctx.push(dom_eq.clone());
+            cod_ctx.push(weaken(a1, 1));
+            let forward = Term::Cast(
+                Box::new(weaken(a1, 2)),
+                Box::new(weaken(a2, 2)),
+                Box::new(Term::var(1)),
+                Box::new(Term::var(0)),
+            );
+            let cod_eq = type_eq(
+                env,
+                &cod_ctx,
+                &shift(b1, 1, 1),
+                &subst0(&shift(b2, 2, 1), &forward),
+            )?;
+            Some(Term::sigma(dom_eq, Term::pi(weaken(a1, 1), cod_eq)))
+        }
+        (Term::Quot(a1, r), Term::Quot(a2, s)) => {
+            let dom_eq = type_eq(env, ctx, a1, a2)?;
+            let mut rel_ctx = ctx.clone();
+            rel_ctx.push(dom_eq.clone());
+            rel_ctx.push(weaken(a1, 1));
+            rel_ctx.push(weaken(a1, 2));
+            let x = Term::var(1);
+            let y = Term::var(0);
+            let r_xy = apply_args(weaken(r, 3), &[x.clone(), y.clone()]);
+            let d = Term::var(2);
+            let forward = |v: Term| {
+                Term::Cast(
+                    Box::new(weaken(a1, 3)),
+                    Box::new(weaken(a2, 3)),
+                    Box::new(d.clone()),
+                    Box::new(v),
+                )
+            };
+            let s_xy = apply_args(weaken(s, 3), &[forward(x), forward(y)]);
+            let r_level = match crate::check::infer(env, &rel_ctx, &r_xy).ok()? {
+                Term::Omega(level) => level,
+                _ => return None,
+            };
+            let s_level = match crate::check::infer(env, &rel_ctx, &s_xy).ok()? {
+                Term::Omega(level) => level,
+                _ => return None,
+            };
+            if !r_level.equiv(&s_level) {
+                return None;
+            }
+            let rel_eq = Term::Eq(
+                Box::new(Term::Omega(r_level)),
+                Box::new(r_xy),
+                Box::new(s_xy),
+            );
+            Some(Term::sigma(
+                dom_eq,
+                Term::pi(weaken(a1, 1), Term::pi(weaken(a1, 2), rel_eq)),
+            ))
+        }
+        (Term::App(..) | Term::IndFormer { .. }, Term::App(..) | Term::IndFormer { .. })
+            if rigid_type_former(&a_w) == rigid_type_former(&b_w) =>
+        {
+            eq_type_at_inductive(env, ctx, &a_w, &b_w)
         }
         // A single known head does not decide inequality: the other side
         // might be neutral and later instantiate to that very former.
@@ -334,6 +505,52 @@ fn eq_at_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term
             _ => None,
         },
     }
+}
+
+/// Structural equality of fully applied instances of the same inductive
+/// family, using precisely the telescope conjunction used for constructor
+/// equality. A partial family or mismatched level application remains neutral.
+fn eq_type_at_inductive(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term> {
+    let (a_head, a_args) = peel_app(a);
+    let (b_head, b_args) = peel_app(b);
+    let (
+        Term::IndFormer {
+            id: a_id,
+            level_args: a_levels,
+        },
+        Term::IndFormer {
+            id: b_id,
+            level_args: b_levels,
+        },
+    ) = (a_head, b_head)
+    else {
+        return None;
+    };
+    if a_id != b_id
+        || a_levels.len() != b_levels.len()
+        || !a_levels.iter().zip(&b_levels).all(|(x, y)| x.equiv(y))
+    {
+        return None;
+    }
+    let ind = env.inductive(a_id)?;
+    let n = ind.params.len() + ind.indices.len();
+    if a_args.len() != n || b_args.len() != n {
+        return None;
+    }
+    if n == 0 {
+        return Some(top_term(env));
+    }
+    let (mut a_tpl, mut b_tpl) = (Vec::with_capacity(n), Vec::with_capacity(n));
+    for j in 0..n {
+        let binder = if j < ind.params.len() {
+            &ind.params[j]
+        } else {
+            &ind.indices[j - ind.params.len()]
+        };
+        a_tpl.push(subst_levels(binder, &ind.level_params, &a_levels));
+        b_tpl.push(subst_levels(binder, &ind.level_params, &b_levels));
+    }
+    inductive_conjuncts(env, ctx, &a_tpl, &b_tpl, &a_args, &b_args, 0)
 }
 
 /// A right-nested constructor prefix `(x1, (x2, ...))`, with the final
@@ -557,7 +774,7 @@ pub fn cast_reduce(
         return Some(t.clone());
     }
     match (a, b) {
-        (Term::Pi(a1, b1), Term::Pi(a2, b2)) => Some(cast_at_pi(a1, b1, a2, b2, e, t)),
+        (Term::Pi(a1, b1), Term::Pi(a2, b2)) => cast_at_pi(env, ctx, a1, b1, a2, b2, e, t),
         (Term::Sigma(a1, b1), Term::Sigma(a2, b2)) => {
             Some(cast_at_sigma(env, ctx, a1, b1, a2, b2, e, t))
         }
@@ -576,11 +793,25 @@ pub fn cast_reduce(
 
 /// `cast ((x:A1)→B1) ((x:A2)→B2) e f ⇝ λ(x:A2). cast (B1 (back x)) (B2 x)
 /// (cod-eq x) (f (back x))` where `back x = cast A2 A1 (sym dom-eq) x`,
-/// `dom-eq = e.1`, `cod-eq x = (e.2)(back x)` (`16 §3.2`). Sub-equality proofs
+/// `dom-eq = e.1`, `cod-eq x = (e.2)x` (`16 §3.2`). Sub-equality proofs
 /// are projected from `e`.
-fn cast_at_pi(a1: &Term, b1: &Term, a2: &Term, b2: &Term, e: &Term, f: &Term) -> Term {
+#[allow(clippy::too_many_arguments)]
+fn cast_at_pi(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a1: &Term,
+    b1: &Term,
+    a2: &Term,
+    b2: &Term,
+    e: &Term,
+    f: &Term,
+) -> Option<Term> {
+    let level = type_level(env, ctx, a1)?;
+    if !level.equiv(&type_level(env, ctx, a2)?) {
+        return None;
+    }
     let dom_eq = Term::proj1(e.clone()); // e.1 : Eq Type A1 A2
-    let sym_dom = mk_sym(&dom_eq);
+    let sym_dom = type_eq_sym(&level, a1, a2, dom_eq);
     // back x = cast A2 A1 (sym dom-eq) x,  x:A2 at index 0 under the λ.
     let back_x = Term::Cast(
         Box::new(weaken(a2, 1)),
@@ -588,11 +819,13 @@ fn cast_at_pi(a1: &Term, b1: &Term, a2: &Term, b2: &Term, e: &Term, f: &Term) ->
         Box::new(weaken(&sym_dom, 1)),
         Box::new(Term::var(0)),
     );
-    let b1_back = subst0(b1, &back_x); // B1[back x / x]  (B1's var 0 is the Π's x)
+    // Keep the output λ binder: `subst0` removes B1's original x, so
+    // compensate its free Γ references before replacing x by back x.
+    let b1_back = subst0(&shift(b1, 1, 1), &back_x);
     let b2_x = b2.clone(); // B2[x / x] = B2  (B2's var 0 is already the λ's x)
-    let cod_eq_x = Term::app(weaken(&Term::proj2(e.clone()), 1), back_x.clone()); // (e.2)(back x)
+    let cod_eq_x = Term::app(weaken(&Term::proj2(e.clone()), 1), Term::var(0)); // (e.2)x
     let f_back = Term::app(weaken(f, 1), back_x); // f (back x)
-    Term::lam(
+    Some(Term::lam(
         a2.clone(),
         Term::Cast(
             Box::new(b1_back),
@@ -600,7 +833,7 @@ fn cast_at_pi(a1: &Term, b1: &Term, a2: &Term, b2: &Term, e: &Term, f: &Term) ->
             Box::new(cod_eq_x),
             Box::new(f_back),
         ),
-    )
+    ))
 }
 
 /// `cast ((x:A1)×B1) ((x:A2)×B2) e p ⇝ (cast A1 A2 dom-eq p.1, cast (B1 p.1)
@@ -650,7 +883,6 @@ fn cast_at_inductive(
     e: &Term,
     t: &Term,
 ) -> Option<Term> {
-    let _ = e;
     let (a_head, a_args) = peel_app(a);
     let (b_head, b_args) = peel_app(b);
     let d_id = match a_head {
@@ -721,7 +953,13 @@ fn cast_at_inductive(
             }
             new_args.push(val.clone());
         }
-        return Some(apply_args(Term::Constructor { id: ctor, level_args }, &new_args));
+        return Some(apply_args(
+            Term::Constructor {
+                id: ctor,
+                level_args,
+            },
+            &new_args,
+        ));
     }
 
     // Index change present. Require params to agree; a mixed param+index
@@ -742,6 +980,7 @@ fn cast_at_inductive(
     // (n_ctor - 1) - k. The target inner value at that position gives the
     // forced value.
     let mut forced_values: Vec<Option<Term>> = vec![None; n_ctor];
+    let mut forced_indices: Vec<Option<usize>> = vec![None; n_ctor];
     for p in 0..i_bar.len() {
         if convert_type(env, ctx, &i_bar[p], &j_bar[p]) {
             continue; // this index slot agrees — skip
@@ -776,7 +1015,15 @@ fn cast_at_inductive(
             if let Term::Var(vi) = ti_arg {
                 let vi = *vi as usize;
                 if vi < n_ctor {
-                    forced_values[(n_ctor - 1) - vi] = Some(j_val.clone());
+                    let pos = (n_ctor - 1) - vi;
+                    if forced_values[pos]
+                        .as_ref()
+                        .is_some_and(|old| !convert_type(env, ctx, old, j_val))
+                    {
+                        return None;
+                    }
+                    forced_values[pos] = Some(j_val.clone());
+                    forced_indices[pos] = Some(m + p);
                 }
             }
         }
@@ -790,7 +1037,8 @@ fn cast_at_inductive(
     // `target_earlier` tracks target-side earlier arg values so that
     // `subst_tel(&b_ty_tpl, &target_earlier)` gives the correct b_ty_j for
     // dependent arg types (those whose type mentions an earlier forced arg).
-    // cast ignores its proof (§3.4), so refl(a_ty_j) is a valid Ω witness.
+    // Each dependent sub-cast obtains a typed witness from the projected
+    // family-index equality, never from reflexivity at a changed type.
     let mut new_args: Vec<Term> = b_param_args.to_vec();
     let mut target_earlier: Vec<Term> = vec![];
     for j in 0..n_ctor {
@@ -811,10 +1059,81 @@ fn cast_at_inductive(
         } else if convert_type(env, ctx, &a_ty_j, &b_ty_j) {
             (ctor_arg_vals[j].clone(), ctor_arg_vals[j].clone())
         } else {
+            // Each changed forced argument corresponds to an index equality
+            // projected from e. Change one earlier value at a time and chain
+            // J transports over its projected equality. If a dependency
+            // cannot be expressed by those checked projections, stay stuck.
+            let changed = (0..j)
+                .filter(|&k| {
+                    forced_values[k]
+                        .as_ref()
+                        .is_some_and(|fv| !convert_type(env, ctx, &ctor_arg_vals[k], fv))
+                })
+                .collect::<Vec<_>>();
+            if changed.is_empty() {
+                return None;
+            }
+            let level = type_level(env, ctx, &a_ty_j)?;
+            let base_ty = Term::Eq(
+                Box::new(Term::Type(level.clone())),
+                Box::new(a_ty_j.clone()),
+                Box::new(a_ty_j.clone()),
+            );
+            let mut witness = canonical_type_eq_base(env, ctx, &base_ty)?;
+            let mut mixed = ctor_arg_vals[..j].to_vec();
+            let mut current_ty = a_ty_j.clone();
+            for k in changed {
+                let index = forced_indices[k]?;
+                let target = forced_values[k].as_ref()?;
+                mixed[k] = target.clone();
+                let next_ty = subst_tel(&a_ty_tpl, &mixed);
+                if convert_type(env, ctx, &current_ty, &next_ty) {
+                    current_ty = next_ty;
+                    continue;
+                }
+                let domain = crate::check::infer(env, ctx, &ctor_arg_vals[k]).ok()?;
+                let index_evidence = telescope_projection(e, index, a_args.len());
+                let indexed_eq = Term::Eq(
+                    Box::new(domain.clone()),
+                    Box::new(ctor_arg_vals[k].clone()),
+                    Box::new(target.clone()),
+                );
+                let family_args = (0..j)
+                    .map(|i| {
+                        if i == k {
+                            Term::var(1)
+                        } else {
+                            weaken(&mixed[i], 2)
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                // Γ gains only the J motive's y and proof binders. The j
+                // constructor binders are removed by subst_tel below; unlike
+                // inductive_conjuncts, no j equality binders remain in Γ.
+                let family_at_y = subst_tel(&shift(&a_ty_tpl, 2, j), &family_args);
+                witness = type_eq_by_j_with_base(
+                    env,
+                    ctx,
+                    &domain,
+                    &ctor_arg_vals[k],
+                    &a_ty_j,
+                    &next_ty,
+                    family_at_y,
+                    Term::Ascript(Box::new(index_evidence), Box::new(indexed_eq)),
+                    witness,
+                )?;
+                current_ty = next_ty;
+            }
+            let expected = Term::Eq(
+                Box::new(Term::Type(level)),
+                Box::new(a_ty_j.clone()),
+                Box::new(b_ty_j.clone()),
+            );
+            crate::check::check(env, ctx, &witness, &expected).ok()?;
             let cast_val = Term::Cast(
                 Box::new(a_ty_j.clone()),
                 Box::new(b_ty_j),
-                Box::new(Term::Refl(Box::new(a_ty_j))),
+                Box::new(witness),
                 Box::new(ctor_arg_vals[j].clone()),
             );
             (cast_val.clone(), cast_val)
@@ -822,7 +1141,13 @@ fn cast_at_inductive(
         new_args.push(new_val);
         target_earlier.push(target_val);
     }
-    Some(apply_args(Term::Constructor { id: ctor, level_args }, &new_args))
+    Some(apply_args(
+        Term::Constructor {
+            id: ctor,
+            level_args,
+        },
+        &new_args,
+    ))
 }
 
 /// `cast (A1/R) (A2/S) e [a] ⇝ [cast A1 A2 e0 a]` where `e0 = e.1` is the

@@ -240,9 +240,11 @@ API (§C-C3), so it cannot bypass the check.
 - spec: `64 §2.1` (Contract AI-Indep), `23 §1` (never a false `proved`), `18 §5`
 - given: in a context with distinct abstract binders `x y : Int`, the
   certificate `Refl x` is offered at `Equal Int x y` to the kernel `check`
-  (`check.rs:386`), regardless of any "trusted-author" framing
-- expect: `check` **rejects** with `BadEliminator`; the abstract goal remains
-  `Eq`-shaped and conversion cannot establish `x ≡ y`
+  (`check.rs:483`, `Refl` arm), regardless of any "trusted-author" framing
+- expect: `check` **rejects** with
+  `TypeMismatch { expected: Equal Int x y, found: Equal Int x x }`;
+  the abstract goal remains `Eq`-shaped and conversion cannot establish
+  `x ≡ y`
 - why: (soundness ★) AC3. The distinct-binder goal is **unprovable, not
   false**. A generator's bug or malice yields a rejected certificate, never a
   false `proved` (`23 §1`). **Flip:** case C2 offers the same certificate shape

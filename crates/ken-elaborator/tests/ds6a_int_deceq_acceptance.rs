@@ -165,8 +165,10 @@ fn unregistered_primitive_equality_stays_neutral() {
 // never fires on literals in K1 either way) — so the discriminating,
 // DS-6a-scoped regression pin is: the certificate opens no new path to
 // equating two genuinely DISTINCT `Int`s at all, concrete or abstract.
-// Exercised at the most basic level `Refl` already covers, confirming
-// DS-6a's registration didn't loosen `check`'s `Refl` rule or `conv`.
+// Exercised at the most basic level `Refl` already covers: rejection at
+// conversion is `TypeMismatch` with the two Eq endpoints identified, while
+// the same certificate at the self-equality goal is accepted. DS-6a's
+// registration must not loosen `check`'s `Refl` rule or `conv`.
 // ─────────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -177,16 +179,39 @@ fn distinct_int_variables_refl_still_rejected() {
     ctx.push(int_const.clone());
     ctx.push(int_const.clone());
     let eq_ty = Term::Eq(
-        Box::new(int_const),
+        Box::new(int_const.clone()),
         Box::new(Term::var(1)),
         Box::new(Term::var(0)),
     );
     // `Refl (Var(1))` witnesses `x = x`, not the goal `x = y`.
     let err = check(&env.env, &ctx, &Term::Refl(Box::new(Term::var(1))), &eq_ty)
         .expect_err("Refl must not prove two distinct Int variables equal");
-    assert!(
-        matches!(err, KernelError::BadEliminator(_)),
-        "expected BadEliminator, got {:?}",
-        err
+    match err {
+        KernelError::TypeMismatch { expected, found } => {
+            assert_eq!(*expected, eq_ty, "the rejected goal is x = y as offered");
+            assert_eq!(
+                *found,
+                Term::Eq(
+                    Box::new(int_const.clone()),
+                    Box::new(Term::var(1)),
+                    Box::new(Term::var(1)),
+                ),
+                "Refl x has type Eq Int x x; only the right index cannot convert",
+            );
+        }
+        other => panic!("expected TypeMismatch at Refl conversion, got {other:?}"),
+    }
+
+    let self_eq = Term::Eq(
+        Box::new(int_const),
+        Box::new(Term::var(1)),
+        Box::new(Term::var(1)),
     );
+    check(
+        &env.env,
+        &ctx,
+        &Term::Refl(Box::new(Term::var(1))),
+        &self_eq,
+    )
+    .expect("Refl x proves x = x under the DS-6a package");
 }

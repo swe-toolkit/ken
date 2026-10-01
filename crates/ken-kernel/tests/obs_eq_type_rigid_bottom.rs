@@ -54,10 +54,9 @@ fn assert_closed_proof_does_not_check_as_bottom(compound: Term) {
         }),
         "a closed, well-typed proof cannot be checked against Bottom"
     );
-    assert_eq!(
-        whnf(&env, &ctx, &proposition),
-        proposition,
-        "equal compound type heads must remain neutral, not Bottom"
+    assert!(
+        matches!(whnf(&env, &ctx, &proposition), Term::Sigma(_, _)),
+        "equal compound heads decompose to a Σ, never Bottom"
     );
 }
 
@@ -165,7 +164,7 @@ fn distinct_rigid_formers_and_universe_levels_preserve_verdicts() {
     assert_eq!(whnf(&env, &ctx, &different_ids), bottom_term(&env));
     let same_id = eq(type0.clone(), d1.clone(), d1.clone());
     assert!(infer(&env, &ctx, &same_id).is_ok());
-    assert_eq!(whnf(&env, &ctx, &same_id), same_id);
+    assert_eq!(whnf(&env, &ctx, &same_id), top_term(&env));
     let same_former_different_parts = [
         eq(
             type0.clone(),
@@ -180,7 +179,7 @@ fn distinct_rigid_formers_and_universe_levels_preserve_verdicts() {
     ];
     for proposition in same_former_different_parts {
         assert!(infer(&env, &ctx, &proposition).is_ok());
-        assert_eq!(whnf(&env, &ctx, &proposition), proposition);
+        assert!(matches!(whnf(&env, &ctx, &proposition), Term::Sigma(_, _)));
     }
 }
 
@@ -224,7 +223,7 @@ fn inductive_headed_application_is_rigid_but_variable_headed_is_neutral() {
     assert!(infer(&env, &ctx, &rigid_pair).is_ok());
     assert_eq!(whnf(&env, &ctx, &rigid_pair), bottom_term(&env));
     let identical = eq(type0.clone(), left.clone(), left);
-    assert_eq!(whnf(&env, &ctx, &identical), identical);
+    assert_eq!(whnf(&env, &ctx, &identical), top_term(&env));
 
     // F : Type1 → Type0; F Type0 is an open type, not an inductive head.
     ctx.push(Term::pi(type1.clone(), type0.clone()));
