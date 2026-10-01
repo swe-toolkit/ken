@@ -17,6 +17,46 @@ exposing a `BufferSpan` producer to source code.
 
 ```ken
 import Core.Logic.Transport (cong)
+import Data.Numeric.Nat.Arithmetic (add)
+import Data.Numeric.Nat.Order (IsTrue, leq_nat)
+
+fn transfer_count_request_budget (count : TransferCount) : Nat =
+  add (transfer_count_nat count) (transfer_count_remaining count)
+
+fn write_all_count_fits (span : BufferSpan) (count : TransferCount) : Prop =
+  Equal Nat (transfer_count_request_budget count) (buffer_span_budget span)
+
+theorem write_all_suc_add_bound (predecessor : Nat) (remaining : Nat)
+    : IsTrue (leq_nat (Suc remaining) (add (Suc predecessor) remaining)) =
+  match remaining {
+    Zero ↦ Proved;
+    Suc more ↦ write_all_suc_add_bound predecessor more
+  }
+
+theorem write_all_positive_add_bound (budget : Nat)
+    : (remaining : Nat) →
+      (Equal Nat budget Zero → Bottom) →
+      IsTrue (leq_nat (Suc remaining) (add budget remaining)) =
+  match budget {
+    Zero ↦ λremaining. λnonzero. absurd (nonzero Proved);
+    Suc predecessor ↦
+      λremaining. λnonzero. write_all_suc_add_bound predecessor remaining
+  }
+
+theorem write_all_strict_decrease
+    (span : BufferSpan) (count : TransferCount)
+    (fits : write_all_count_fits span count)
+    : IsTrue
+        (leq_nat
+          (Suc (transfer_count_remaining count))
+          (buffer_span_budget span)) =
+  J
+    (λbudget _. IsTrue (leq_nat (Suc (transfer_count_remaining count)) budget))
+    (write_all_positive_add_bound
+      (transfer_count_nat count)
+      (transfer_count_remaining count)
+      (transfer_count_nat_nonzero count))
+    fits
 
 theorem write_all_terminates (fuel : Nat) : Equal Nat (write_all_call_bound fuel) fuel =
   proof termination for write_all_call_bound fuel

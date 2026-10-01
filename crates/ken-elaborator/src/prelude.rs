@@ -1818,6 +1818,14 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "theorem transfer_count_positive (count : TransferCount) : transfer_count_positive_prop count = match count { PrivateTransferCount predecessor remaining |-> Refl }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude transfer_count_nat::positive failed: {e}")))?;
+    // Constructor privacy leaves the count opaque to catalog clients; expose
+    // only this checked positivity elimination, not its predecessor witness.
+    elab.elaborate_decl(
+        "theorem transfer_count_nat_nonzero (count : TransferCount) \
+           : Equal Nat (transfer_count_nat count) Zero -> Bottom = \
+         match count { PrivateTransferCount predecessor remaining |-> \\h. absurd h }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude transfer_count_nat_nonzero failed: {e}")))?;
     elab.elaborate_decl(
         "proof bounded for transfer_count_request_budget (count : TransferCount) : Equal Nat (transfer_count_request_budget count) (buffer_nat_add (transfer_count_nat count) (transfer_count_remaining count)) = Refl",
     )
@@ -2590,6 +2598,34 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude write_all_advance_span failed: {e}")))?;
     elab.elaborate_decl(
+        "fn private_write_all_after_wrote (a : Auth) (file_offset : Int) (span : BufferSpan) \
+           (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit)) \
+           (count : TransferCount) (remaining : Nat) : HostIO a (Result ResourceError Unit) = \
+         match remaining { \
+           Zero |-> Ret (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result ResourceError Unit) (Ok ResourceError Unit MkUnit); \
+           Suc more |-> next (add_int file_offset (transfer_count_int count)) \
+             (write_all_advance_span span count) \
+         }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude private_write_all_after_wrote failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn private_write_all_step (a : Auth) (file_offset : Int) (span : BufferSpan) \
+           (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit)) \
+           (outcome : Result ResourceError WriteProgress) : HostIO a (Result ResourceError Unit) = \
+         match outcome { \
+           Err error |-> Ret (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result ResourceError Unit) (Err ResourceError Unit error); \
+           Ok progress |-> match progress { \
+             Wrote count |-> private_write_all_after_wrote a file_offset span next \
+               count (transfer_count_remaining count) \
+           } \
+         }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude private_write_all_step failed: {e}")))?;
+    elab.elaborate_decl(
         "proc private_write_all_fuel (a : Auth) (file : Resource ResourceKind.FsHandle) \
            (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) \
            (fuel : Nat) : HostIO a (Result ResourceError Unit) visits [FS] = \
@@ -2601,21 +2637,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
              (Result ResourceError WriteProgress) (Result ResourceError Unit) \
              (writeAt a file file_offset buffer span) \
-             (\\outcome. match outcome { \
-               Err error |-> Ret (Coproduct (FSOp a) AmbientOp) \
-                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-                 (Result ResourceError Unit) (Err ResourceError Unit error); \
-               Ok progress |-> match progress { \
-                 Wrote count |-> match transfer_count_remaining count { \
-                   Zero |-> Ret (Coproduct (FSOp a) AmbientOp) \
-                     (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-                     (Result ResourceError Unit) (Ok ResourceError Unit MkUnit); \
-                   Suc remaining |-> private_write_all_fuel a file \
-                     (add_int file_offset (transfer_count_int count)) buffer \
-                     (write_all_advance_span span count) rest \
-                 } \
-               } \
-             }) \
+             (private_write_all_step a file_offset span \
+               (\\next_offset next_span. private_write_all_fuel a file next_offset buffer next_span rest)) \
          }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude private_write_all_fuel failed: {e}")))?;
@@ -2627,8 +2650,128 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude writeAll failed: {e}")))?;
 
-    // Five separately checkable laws for the transparent loop's structural
-    // bookkeeping. These are ordinary proof bodies, not trusted declarations.
+    // The named step is the actual loop continuation, not a second response
+    // interpreter. Each law below is checked before its private terms are hidden.
+    elab.elaborate_decl(
+        "proc private_write_all_next (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           (buffer : BufferHandle) (rest : Nat) (file_offset : Int) (span : BufferSpan) \
+           : HostIO a (Result ResourceError Unit) visits [FS] = \
+         private_write_all_fuel a file file_offset buffer span rest",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude private_write_all_next failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_refl (t : Type) (x : t) : Equal t x x = Refl",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_refl failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_entry (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) \
+           : Equal (HostIO a (Result ResourceError Unit)) \
+             (writeAll a file file_offset buffer span) \
+             (private_write_all_fuel a file file_offset buffer span (buffer_span_budget span)) = Refl",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_entry failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_stop (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) \
+           : Equal (HostIO a (Result ResourceError Unit)) \
+             (private_write_all_fuel a file file_offset buffer span Zero) \
+             (Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result ResourceError Unit) (Ok ResourceError Unit MkUnit)) = \
+         write_all_refl (HostIO a (Result ResourceError Unit)) \
+           (private_write_all_fuel a file file_offset buffer span Zero)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_stop failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_request (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) (rest : Nat) \
+           : Equal (HostIO a (Result ResourceError Unit)) \
+             (private_write_all_fuel a file file_offset buffer span (Suc rest)) \
+             (bind (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result ResourceError WriteProgress) (Result ResourceError Unit) \
+               (writeAt a file file_offset buffer span) \
+               (private_write_all_step a file_offset span \
+                 (private_write_all_next a file buffer rest))) = \
+         write_all_refl (HostIO a (Result ResourceError Unit)) \
+           (private_write_all_fuel a file file_offset buffer span (Suc rest))",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_request failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_first_error_step (a : Auth) \
+           (file : Resource ResourceKind.FsHandle) (file_offset : Int) \
+           (buffer : BufferHandle) (span : BufferSpan) \
+           (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit)) \
+           (error : ResourceError) : Equal (HostIO a (Result ResourceError Unit)) \
+             (private_write_all_step a file_offset span next \
+               (Err ResourceError WriteProgress error)) \
+             (Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result ResourceError Unit) (Err ResourceError Unit error)) = \
+         write_all_refl (HostIO a (Result ResourceError Unit)) \
+           (private_write_all_step a file_offset span next \
+             (Err ResourceError WriteProgress error))",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_first_error_step failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_done (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) \
+           (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit)) \
+           (count : TransferCount) (h : Equal Nat (transfer_count_remaining count) Zero) \
+           : Equal (HostIO a (Result ResourceError Unit)) \
+             (private_write_all_step a file_offset span next \
+               (Ok ResourceError WriteProgress (Wrote count))) \
+             (Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result ResourceError Unit) (Ok ResourceError Unit MkUnit)) = \
+         J (\\n _. Equal (HostIO a (Result ResourceError Unit)) \
+             (private_write_all_after_wrote a file_offset span next count n) \
+             (Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result ResourceError Unit) (Ok ResourceError Unit MkUnit))) \
+           (write_all_refl (HostIO a (Result ResourceError Unit)) \
+             (Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result ResourceError Unit) (Ok ResourceError Unit MkUnit))) \
+           (J (\\z _. Equal Nat z (transfer_count_remaining count)) Refl h)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_done failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_continue (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) \
+           (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit)) \
+           (count : TransferCount) (more : Nat) \
+           (h : Equal Nat (transfer_count_remaining count) (Suc more)) \
+           : Equal (HostIO a (Result ResourceError Unit)) \
+             (private_write_all_step a file_offset span next \
+               (Ok ResourceError WriteProgress (Wrote count))) \
+             (next (add_int file_offset (transfer_count_int count)) \
+               (write_all_advance_span span count)) = \
+         J (\\n _. Equal (HostIO a (Result ResourceError Unit)) \
+             (private_write_all_after_wrote a file_offset span next count n) \
+             (next (add_int file_offset (transfer_count_int count)) \
+               (write_all_advance_span span count))) \
+           (write_all_refl (HostIO a (Result ResourceError Unit)) \
+             (next (add_int file_offset (transfer_count_int count)) \
+               (write_all_advance_span span count))) \
+           (J (\\z _. Equal Nat z (transfer_count_remaining count)) Refl h)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_continue failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn write_all_advance_start_prop (span : BufferSpan) (count : TransferCount) \
+           : Prop = Equal Int (buffer_span_start (write_all_advance_span span count)) \
+             (add_int (buffer_span_start span) (transfer_count_int count))",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_advance_start_prop failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem write_all_advance_start (span : BufferSpan) (count : TransferCount) \
+           : write_all_advance_start_prop span count = Refl",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude write_all_advance_start failed: {e}")))?;
+
+    // The older observer-only bookkeeping laws remain public for existing
+    // clients. The loop laws above are ordinary checked proof bodies too.
     elab.elaborate_decl(
         "fn write_all_call_bound (fuel : Nat) : Nat = match fuel { Zero |-> Zero; Suc rest |-> Suc (write_all_call_bound rest) }",
     )
@@ -2711,6 +2854,10 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "private_read_at_positive",
         "buffer_min_int",
         "private_write_all_fuel",
+        "private_write_all_after_wrote",
+        "private_write_all_step",
+        "private_write_all_next",
+        "write_all_refl",
         "resource_settle_ok_error_for",
         "resource_settle_body_error_for",
         "resource_settle_ok_for",
