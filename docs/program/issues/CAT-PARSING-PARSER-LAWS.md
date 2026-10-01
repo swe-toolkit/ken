@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-PARSER-LAWS
 title: "Parsing proves ParserLaws only for the one Boolean parser, so the card's stated behaviour of parser_pure and parser_fail and of every parser_from_decoder parser is unproved prose. Prove a generic ParserLaws for parser_from_decoder under DecoderPreservesBounded, with parser_pure and parser_fail as instances, at zero TCB"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -84,3 +84,24 @@ only the three new names in the expected public inventory (Steward
 - Any new import, primitive, postulate or axiom.
 - A `Decoder.ken.md` change, or a needed bound for `decoder_alt`,
   `decoder_bind` or `decoder_many` (a follow-on; only `decoder_seq` exists).
+
+## Closeout
+
+Merged `5e0a97be5` (PR #4428), exact `a9ef373d7`: Foundation QA
+`evt_7fdrmm9v9nh8`, Architect `evt_6am04tvz26vhx`, Decision
+`dec_1469akzkrpamj`.
+
+- `parser_from_decoder_laws` proves `ParserLaws` for every bounded decoder
+  parser. `parser_pure_laws` and `parser_fail_laws` are instances, and
+  `parse_bool_expr_laws` is re-derived from the generic law.
+- The public laws lead §4.3, followed by an 8-helper closure, in the same
+  definition run (`evt_4js9vdbbcgmb2`).
+- The public parsing inventory pin lists the three new names
+  (`evt_2mjp2qrv96thc`).
+- `trusted_base()` is unchanged.
+- Follow-on: `LANG-FORWARD-REFERENCE-ACROSS-DATA-EXPORT`. Spec 33 §8.4
+  forward references are cut off by an intervening `export` or `data`.
+
+§1a count: 1 (arrangement). The placement assumed module-wide forward
+references, which the loader does not deliver (`evt_4js9vdbbcgmb2`).
+
