@@ -62,6 +62,39 @@ Every inferred match on an indexed family takes the indexed path landed in
 impossibility authority. A nested split under the root and a result type
 that cannot be lowered each either check or give a surface diagnostic.
 
+**Construction (Architect rulings `evt_2yrn09v8znqx2`, `evt_734gcwk4m9f46`,
+`evt_1wqksbwbp0q2z`, `evt_q0h185p9bckb`).**
+- **Root dispatch.** `infer_match` dispatches on `!ind.indices.is_empty()`.
+  Methods close by applying the unpeeled suffix. A failed `lower_by` gives
+  `InferredMatchResultEscapesPattern`, naming the leaf-local binder (`m`).
+- **One Elim builder.** `matrix_family_elim` splits the family's arguments
+  at `ind.params.len()`. The nested split and the root constant-motive
+  branch both use it, and the fixed Bool and List sites
+  `debug_assert!(ind.indices.is_empty())`.
+- **One motive authority.** The indexed root motive is built once, when
+  `ret_ty_slot` is set, and it also feeds `finish_inferred_indexed_match`.
+- **Nested splits revert dependent hypotheses** (McBride's construction).
+  At a split on `x : D params is`:
+  - Δ is the in-scope binders the nested methods consume whose type
+    mentions `x` or its index variables, closed transitively and kept in
+    context order. Membership is computed by free-variable occurrence in
+    the current telescope.
+  - The nested motive is `λ is. λ x'. Π Δ[x := x']. R`, built with
+    `matrix_family_elim`.
+  - Each method's expected type is
+    `ken_kernel::inductive::method_type` over the nested Elim's own
+    inputs. Its leaf compiles under fields, IHs and the specialized Δ', and
+    it closes in check mode. No nested method or IH domain is built by
+    hand.
+  - The nested Elim is applied at the split site to the original Δ.
+  - The motive is constant iff Δ = ∅ and `R` does not mention `x`. Then the
+    term is byte-identical to today's constant-motive path.
+  - **Index clause.** The nested target's indices must be distinct
+    variables, occurring elsewhere only through Δ. Otherwise refuse with an
+    existing non-`Internal`, non-`KernelRejected` `ElabError` that names the
+    split. If no existing variant fits, stop to the Architect. This WP does
+    no equational generalization.
+
 ## Acceptance
 
 - **AC-0 (check 4; no build).** Write the obligation for a complete match
@@ -69,12 +102,28 @@ that cannot be lowered each either check or give a surface diagnostic.
   whether a nested-split method can be closed over the kernel's
   `method_type` domains. Say whether an unlowerable result is a surface
   error or a motive over the fields. The Architect rules before any edit.
-- **AC-1.** Each of the five repros above checks, or gives a named
-  surface `ElabError` that the Architect ruled for it. The landed
-  `lang_infer_match_index_coverage.rs` rows keep their results.
+- **AC-0: ruled** (`evt_2yrn09v8znqx2`).
+- **AC-1.**
+  - The three complete-match repros and the nested root split check, and
+    the nested one passes the kernel recheck.
+  - The field-dependent repro gives `InferredMatchResultEscapesPattern`
+    naming `m`, and its annotated twin checks.
+  - A Δ ≠ ∅ row with VNil/VCons specialization (the stop-3 shape) checks.
+  - A Δ = ∅ control is byte-identical to the constant-motive path.
+  - An index-clause refusal row is included if the clause is reachable on
+    these fixtures. Measure which branch the nested repro takes.
+  - The landed `lang_infer_match_index_coverage.rs` rows keep their
+    results.
+  - Each mutation reddens only its own row:
+    - reverting the dispatch reddens the complete-match rows;
+    - reverting the suffix application brings back `Internal`;
+    - reverting the nested Elim builder brings back `BadEliminator`;
+    - hand-carried IH domains in place of `method_type` bring back the
+      stop-3 `TypeMismatch`;
+    - a lowerable control stays accepted.
 - **AC-2 (controls).**
   - A genuinely reachable missing constructor still raises
-    `ExhaustivenessError`.
+    `ExhaustivenessError`, and so does a nested-column omission.
   - The 61-file catalog census is byte-identical.
 
 ## Stop conditions
@@ -83,3 +132,20 @@ that cannot be lowered each either check or give a surface diagnostic.
 - A second index-impossibility rule beside the dependent path's.
 - Accepting nested-column omission. That stays a residual of
   `LANG-INFER-MATCH-INDEX-COVERAGE`.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 3 (Architect `evt_2t2kabhh5rhgn`; research `evt_4m927ydg0rd7z`).
+
+1. The nested matrix split builds `Elim` with the indices inside `params`
+   and `indices: []` (keyed on the construction site instead of the
+   family's index arity).
+2. The matrix compiler types an IH column by the inferred result `R`, while
+   `method_type` types it as `motive(field indices, field)` (keyed on who
+   types the IH column).
+3. Nested method domains carry `root_motive m tl` built under the nested
+   motive's binder and reuse it under the constructor-field telescope.
+
+Shared predicate: the nested split hand-assembles a piece of an eliminator
+that the kernel re-derives from that eliminator's own inputs. Closed by
+reverting dependent hypotheses (`evt_q0h185p9bckb`).
