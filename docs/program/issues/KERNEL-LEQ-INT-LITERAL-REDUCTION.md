@@ -59,18 +59,22 @@ stop and report the mismatch.
   `String` literal (`conv.rs:216`, bfdbb9789). Every other registered `Op`
   stays K3-deferred. Wording only; no code, test or other rule change (CV
   `evt_7sa4v62w5xqkj`, `evt_44a12zma9rzdn`; Architect `evt_4j4109frj9gq6`).
-  - `spec/10-kernel/17-conversion.md` §1 (a **prim** row, the `Op` bullet,
-    the neutral list) and the `whnf` pseudocode, per the Architect's text.
+  - `spec/10-kernel/17-conversion.md` §1 (a **prim** row, a **ζ** row for
+    non-recursive `let` per `evt_70g6a5hps6x08`, the `Op` bullet, the
+    neutral list) and the `whnf` pseudocode, per the Architect's text.
     Also the termination rationale: the §3.2 Termination bullet, §5
     obligation 1, the first sentence of §5 obligation 2, and the opening
     sentence of §3.5 ("δ is the only reduction that can *grow* a term"). These take the
-    Architect's replacement text verbatim: `evt_24p37f1kftvnf`, which
-    replaces `evt_5qck78fhxb98c` after the CV's β-duplication counterexample
-    (`evt_2cdtpavqept4t`), so no
+    Architect's replacement text verbatim: `evt_24p37f1kftvnf` for §3.5
+    and obligation 2, and `evt_70g6a5hps6x08` for the §3.2 bullet and
+    obligation 1, which classify `let` substitution in the core (QA
+    `evt_2dea4ky2dnxkv`), so no
     rule is claimed to contract term size. Any other wording, or any other
     §17 sentence, needs the Architect's re-read. The
     termination claim itself is unchanged (CV `evt_4j6eg9eeh1pvt`).
-  - `spec/10-kernel/18-judgments.md` §4.2 and §5, and
+  - `spec/10-kernel/18-judgments.md` §4.2, §5, and the §6 "Strong
+    normalization of the core" row, which names `let` and the prim rules per
+    the Architect's text, and
     `spec/10-kernel/18a-primitive-registry.md` introduction, §5 and
     §5.2.2(3): name the pair, never "sole", and keep the interpreter's
     tested-not-trusted arm separate from the kernel arm. Also §5.9.1(1)'s
