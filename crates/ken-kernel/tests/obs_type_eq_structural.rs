@@ -279,9 +279,7 @@ fn pi_type_one_structural_equality_and_typed_symmetry() {
         panic!("Type-1 codomain equality must be a family")
     };
     assert!(matches!(&**cod_eq, Term::Eq(sort, ..) if **sort == Term::Type(high)));
-    infer(&f.env, &ctx, &structure).expect("decomposed Type-1 equality is typed");
-
-    let mut proof_ctx = ctx;
+    let mut proof_ctx = ctx.clone();
     proof_ctx.push(equality);
     let redex = cast(
         source,
@@ -299,6 +297,7 @@ fn pi_type_one_structural_equality_and_typed_symmetry() {
         Ok(()),
         "Type-1 back-cast must use symmetry at the inferred level"
     );
+    infer(&f.env, &ctx, &structure).expect("decomposed Type-1 equality is typed");
     assert_eq!(f.env.trusted_base(), trusted);
 }
 
