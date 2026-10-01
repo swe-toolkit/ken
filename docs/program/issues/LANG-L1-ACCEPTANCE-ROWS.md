@@ -60,7 +60,11 @@ is expected; both behaviours are delivered at zero TCB.
   exactly the `ac5_explicit_conversion_is_partial_option` and
   `sec24_char_excludes_surrogates` `placeholder-no-assertions` blocks, which
   the CI ignored-test sweep rejects once those rows run (PR #4433). The
-  `sec31_int_div_zero_emits_obligation` block stays.
+  `sec31_int_div_zero_emits_obligation` block stays. In `scripts/test-ci-ignored-sweep.py`, only
+  the assertion that hardcodes the live registry count ("plus 6 registry
+  exemptions is 52") moves to the reduced count. The pre-existing
+  `policy-cost: expected 1, actual 3` failure, which reproduces on the base,
+  is out of scope and is disclosed in the handoff.
 
 ## Acceptance
 
