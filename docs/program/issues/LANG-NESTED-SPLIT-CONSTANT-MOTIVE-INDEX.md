@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-SPLIT-CONSTANT-MOTIVE-INDEX
 title: "A nested indexed split whose motive is constant is refused when its index is concrete or repeated, although a constant motive does not depend on the index. Run the distinct-variable-index check only when the split needs reverting"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -69,3 +69,17 @@ omission check before it is unchanged, so an omitted constructor stays an
 - Lowering or the kernel rejects the accepted program: the constant path
   assumes variable indices somewhere else. Stop to the Architect.
 - Any kernel or spec change.
+
+## Closeout
+
+Merged `5d5e7bf02` (PR #4436), exact `58fb37c26`: Language QA
+`evt_4cc5wqsde428a`, Architect `evt_3s4r31fa66k1p`, Decision
+`dec_6taphqt67vkn5`.
+
+- `check_nested_index_variables` runs only when `needs_reverting`. A
+  constant-motive nested split at a concrete or repeated index is accepted
+  and evaluates.
+- The dependent-tail fence pairs stay refused, with the exact clause text
+  asserted.
+- A nested omission at a concrete index is still an `ExhaustivenessError`.
+- `elab.rs` and one test file changed. No kernel or spec change; zero TCB.

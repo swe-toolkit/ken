@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-SPLIT-FIELD-DEPENDENCE
 title: "A nested split whose constructor's other fields depend on the split column or the constructor's index fails in the kernel: a sibling field typed by the index gives TypeMismatch on the constant-motive path, and a variable row binding a split column a later field depends on leaks a pattern-alias sentinel as VarOutOfScope. Both checks or gives a surface diagnostic"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
