@@ -70,6 +70,16 @@ at kickoff, before any edit. It includes the Π-motive row and one typed-whnf
 subject-reduction row per former.
 
 - **AC-0: ruled** (`evt_71pe5ka6mwg8r`, base `a02cecfed`). §1a count 0.
+- **Re-pin after CI red on `16ecf06b2`** (Architect `evt_39snx0g9hygtg`).
+  Refl now fails at conversion as `TypeMismatch` (spec 18), which is lawful.
+  The scope adds exactly three paths:
+  - `crates/ken-elaborator/tests/ds6a_int_deceq_acceptance.rs`: pin the
+    payload, and add the accepting `Refl x : x = x` twin.
+  - `crates/ken-elaborator/tests/sec4_acceptance.rs`: pin the payload and
+    update the doc comments.
+  - The `abstract-distinct-index-certificate-rejected` row of
+    `conformance/security/trust-model/seed-trust-model.md`. This takes the
+    Spec vote (conformance-validator) on the exact SHA.
 
 ## Stop conditions
 
