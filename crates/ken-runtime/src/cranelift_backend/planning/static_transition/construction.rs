@@ -25,6 +25,7 @@
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::per_emitter_availability;
 use super::abi::{
     build_abi_plane, install_continuation_context_abi, install_continuation_specialization_abi,
     AbiPlane, AbiRootIngress,
@@ -291,6 +292,8 @@ impl<'src> Planner<'src> {
                 case_emissions: Vec::new(),
                 aggregate_ownership: Vec::new(),
                 checked_ih_environment_transports: Vec::new(),
+                per_emitter_materializations: Vec::new(),
+                unclassified_materializations: Vec::new(),
                 checked_ih_continuation_inheritances: Vec::new(),
                 checked_ih_generated_entry_confluences: BTreeMap::new(),
                 checked_ih_generated_entry_accesses: BTreeMap::new(),
@@ -1488,6 +1491,13 @@ impl<'src> Planner<'src> {
                 "execute-then-resume response-owner assignment changed the checked-IH transport source population",
             ));
         }
+        // After response-owner phase B the actual transport destinations are
+        // final. The census only records unavailable captures; unlike the
+        // interned specialization's own availability, it refuses no program.
+        let (materializations, unclassified) =
+            per_emitter_availability::build_per_emitter_availability(&self.plan)?;
+        self.plan.per_emitter_materializations = materializations;
+        self.plan.unclassified_materializations = unclassified;
         self.plan.checked_ih_continuation_inheritances =
             build_checked_ih_continuation_inheritances(&self.plan)?;
         #[cfg(feature = "px8-ds-test-support")]

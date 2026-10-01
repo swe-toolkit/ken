@@ -43,6 +43,8 @@ pub use static_transition::{
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
+    with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,
+    PerEmitterCaptureDiagnostic, PerEmitterMaterializationDiagnostic, PerEmitterOwnerDiagnostic,
     with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,

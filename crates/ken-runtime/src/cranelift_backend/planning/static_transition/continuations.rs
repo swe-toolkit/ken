@@ -597,6 +597,34 @@ pub(super) enum ContinuationEmitterFrame<'plan> {
     },
 }
 
+/// Construct the emitting frame from that owner's own interned key. The
+/// producer specialization whose captures we are projecting is independent
+/// of this owner; only the destination's key describes its context slots.
+pub(super) fn emitter_frame_for_owner(
+    units: &[PlannedContinuationSpecialization],
+    owner: ContinuationEmissionOwner,
+) -> Result<ContinuationEmitterFrame<'_>, CraneliftBackendError> {
+    match owner {
+        ContinuationEmissionOwner::Predeclared(owner) => {
+            Ok(ContinuationEmitterFrame::Predeclared(owner))
+        }
+        ContinuationEmissionOwner::Specialization(enclosing) => {
+            let unit = units.get(enclosing.0 as usize).ok_or_else(|| {
+                planner_error("an emitter names a specialization that was never interned")
+            })?;
+            Ok(ContinuationEmitterFrame::GeneratedContext {
+                enclosing,
+                worker_body_origin: unit.key.worker.body_origin,
+                context_parameters: generated_context_parameters(&unit.key.worker)?,
+                enclosing_inputs: &unit.key.continuation_inputs,
+            })
+        }
+        ContinuationEmissionOwner::Fusion(_) => Err(planner_error(
+            "an installed fusion has no ordinary continuation emitter frame",
+        )),
+    }
+}
+
 /// **`RT-CONTSRC-PRODUCER-LOCAL` `D3b` (re-cut)** — WHERE ONE NAMED CONSUMER
 /// holds this value, as a closed sum over **environments**.
 ///
@@ -4475,14 +4503,24 @@ pub(super) fn predeclared_entry_frame_slot(
 /// ⛔ Eligibility is the **complete** record — coordinate, carrier, ownership,
 /// storage owner and referent affinity. A position carrying the same coordinate
 /// under a different contract is a different value and does not qualify.
-pub(super) fn nearest_exact_alias(
+/// An exact alias probe retains the distinctions that interning refuses, so
+/// the per-emitter census can record a missing value without swallowing a
+/// capacity or structural planner error. An eligible singleton outranks an
+/// unrelated ambiguous path, as in the original nearest-exact-alias rule.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ExactAliasProbe {
+    Found(u32),
+    Missing,
+    Ambiguous(usize),
+    ContractMismatch,
+}
+
+pub(super) fn probe_nearest_exact_alias(
     requested: &ContinuationSourceSlotAuthority,
     seat_environment: &[ContinuationValueSourceAuthority],
-) -> Result<u32, CraneliftBackendError> {
+) -> Result<ExactAliasProbe, CraneliftBackendError> {
     let mut eligible: Vec<u32> = Vec::new();
-    // Two witnesses kept apart on purpose: they make the three refusals below
-    // distinguishable, so a control naming one cannot pass by tripping another.
-    let mut ambiguous = false;
+    let mut ambiguous = 0;
     let mut contract_mismatch = false;
     for (index, value) in seat_environment.iter().enumerate() {
         let ContinuationValueSourceAuthority::Closed(sources) = value else {
@@ -4492,45 +4530,53 @@ pub(super) fn nearest_exact_alias(
             planner_capacity_error("continuation lexical environment index exhausted")
         })?;
         match sources.as_slice() {
-            // ⭐ Exactly `Closed([S])`, compared as the WHOLE record.
             [only] if only == requested => eligible.push(index),
             [only] if only.coordinate == requested.coordinate => contract_mismatch = true,
             many if many.iter().any(|source| source.coordinate == requested.coordinate) => {
-                ambiguous = true;
+                ambiguous = ambiguous.max(many.len());
             }
             _ => {}
         }
     }
-    // ⛔ `min`, written as a fold over the whole eligible set rather than as an
-    // early exit from the loop above. The two agree today because the scan is
-    // ascending -- and that is exactly why the total rule is spelled out here:
-    // an early `break` would read as "take the first", and a later reordering of
-    // the scan would silently change the answer.
+    // All eligible sources are identical complete records. Min canonicalizes
+    // aliases; no first-match search picks among distinct source values.
     if let Some(selected) = eligible.iter().copied().min() {
-        return Ok(selected);
+        return Ok(ExactAliasProbe::Found(selected));
     }
-    if ambiguous {
-        return Err(planner_error(
+    if ambiguous > 0 {
+        return Ok(ExactAliasProbe::Ambiguous(ambiguous));
+    }
+    if contract_mismatch {
+        return Ok(ExactAliasProbe::ContractMismatch);
+    }
+    Ok(ExactAliasProbe::Missing)
+}
+
+pub(super) fn nearest_exact_alias(
+    requested: &ContinuationSourceSlotAuthority,
+    seat_environment: &[ContinuationValueSourceAuthority],
+) -> Result<u32, CraneliftBackendError> {
+    match probe_nearest_exact_alias(requested, seat_environment)? {
+        ExactAliasProbe::Found(index) => Ok(index),
+        ExactAliasProbe::Ambiguous(_) => Err(planner_error(
             "the emission seat holds this continuation coordinate only inside an ambiguous \
              source set (a Closed([S, T]) join), which does not prove any position certainly \
              yields the requested value; RT-CONTSRC-PRODUCER-LOCAL D3b requires an exact \
              singleton and refuses rather than selecting a position that may yield another \
              source",
-        ));
-    }
-    if contract_mismatch {
-        return Err(planner_error(
+        )),
+        ExactAliasProbe::ContractMismatch => Err(planner_error(
             "the emission seat holds this continuation coordinate under a different carrier, \
              ownership, storage owner or referent affinity, so it is a different value with the \
              same root identity; RT-CONTSRC-PRODUCER-LOCAL D3b matches the complete source-slot \
              authority and refuses rather than indexing on the coordinate alone",
-        ));
+        )),
+        ExactAliasProbe::Missing => Err(planner_error(
+            "a continuation coordinate is not present in the lexical environment in force at the \
+             emission seat, so the value is not immediately available there; this fails closed \
+             rather than reverse-searching for a position that happens to hold a similar value",
+        )),
     }
-    Err(planner_error(
-        "a continuation coordinate is not present in the lexical environment in force at the \
-         emission seat, so the value is not immediately available there; this fails closed \
-         rather than reverse-searching for a position that happens to hold a similar value",
-    ))
 }
 
 /// **`D3b` re-cut, the `CurrentLexical` arm** — select the nearest exact alias of
@@ -6559,50 +6605,10 @@ pub(super) fn build_continuation_specialization_plan(
                             producer_environment.producer_owner,
                         ),
                     };
-                    // The immediate-availability resolution, taken from the
-                    // SAME enclosing specialization that settled the emission
-                    // owner above. ⛔ Owned before the key is built: the
-                    // enclosing unit is read out of `units` here so the
-                    // immutable borrow ends before `intern_specialization`
-                    // takes it mutably.
-                    let enclosing_context = match discovery.enclosing_specialization {
-                        None => None,
-                        Some(enclosing) => {
-                            let enclosing_unit =
-                                units.get(enclosing.0 as usize).ok_or_else(|| {
-                                    planner_error(
-                                        "a descent names an enclosing specialization that was \
-                                         never interned",
-                                    )
-                                })?;
-                            Some((
-                                enclosing,
-                                // ⭐ The body origin half of the pair contexts
-                                // are interned on, taken from the enclosing
-                                // unit's own key so the frame identity is the
-                                // interning key rather than a restatement of it.
-                                enclosing_unit.key.worker.body_origin,
-                                generated_context_parameters(&enclosing_unit.key.worker)?,
-                                enclosing_unit.key.continuation_inputs.clone(),
-                            ))
-                        }
-                    };
-                    let emitter = match &enclosing_context {
-                        None => ContinuationEmitterFrame::Predeclared(
-                            producer_environment.producer_owner,
-                        ),
-                        Some((
-                            enclosing,
-                            worker_body_origin,
-                            context_parameters,
-                            enclosing_inputs,
-                        )) => ContinuationEmitterFrame::GeneratedContext {
-                            enclosing: *enclosing,
-                            worker_body_origin: *worker_body_origin,
-                            context_parameters: *context_parameters,
-                            enclosing_inputs,
-                        },
-                    };
+                    // Interning and later per-emitter projection use the same
+                    // owner-to-frame derivation. Its borrow ends after the key
+                    // is built, before intern_specialization mutates units.
+                    let emitter = emitter_frame_for_owner(&units, emission_owner)?;
                     let required_consuming_occurrence =
                         required_consuming_occurrence_for_alternative(
                             plan,

@@ -10,6 +10,12 @@ mod aggregates;
 mod closure;
 mod construction;
 mod continuations;
+mod per_emitter_availability;
+#[cfg(feature = "px8-ds-test-support")]
+pub use per_emitter_availability::{
+    with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,
+    PerEmitterCaptureDiagnostic, PerEmitterMaterializationDiagnostic, PerEmitterOwnerDiagnostic,
+};
 /// Fixture re-export for the lowering-side reconcile controls; see
 /// `planning.rs`. Test-only, and deliberately re-exporting the one fixture
 /// rather than opening the module.
@@ -688,6 +694,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// checked-IH environment to an escaping closure crossing. These reference
     /// `aggregate_ownership`; they never issue a second record.
     checked_ih_environment_transports: Vec<CheckedIhEnvironmentTransport>,
+    /// Planner-only capture availability under each materialization emitter.
+    per_emitter_materializations: Vec<per_emitter_availability::PerEmitterMaterialization>,
+    /// Other fields at enumerated construct emission sites are not residuals.
+    unclassified_materializations: Vec<per_emitter_availability::UnclassifiedMaterialization>,
     /// Planner-only successor projections proving, separately, that an
     /// existing captured continuation capability remains in scope at a
     /// descendant checked invocation and that its conditional fresh result has
@@ -983,6 +993,8 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
     let plan = planner.finish(symbols, root_ingress, functionized_units)?;
     #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    per_emitter_availability::record_per_emitter_availability_diagnostic(&plan);
     Ok(plan)
 }
 

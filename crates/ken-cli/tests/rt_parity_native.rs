@@ -2681,25 +2681,93 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
         let compile = |label: &str, entry: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
             let root = output_dir(&format!("direct-application-pairing-{label}"));
-            let (result, observations, applications) =
-                ken_runtime::with_checked_ih_direct_application_mutation(
-                    ken_runtime::CheckedIhDirectApplicationMutation::Exact,
-                    || {
-                        ken_cli::build_native_program(
-                            &source,
-                            ken_cli::SourceFormat::Ken,
-                            &format!("rt_parity_direct_application_pairing_{label}"),
-                            root.path(),
-                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                        )
-                    },
-                );
+            let ((result, observations, applications), availability) =
+                ken_runtime::with_per_emitter_availability_diagnostics(|| {
+                    ken_runtime::with_checked_ih_direct_application_mutation(
+                        ken_runtime::CheckedIhDirectApplicationMutation::Exact,
+                        || {
+                            ken_cli::build_native_program(
+                                &source,
+                                ken_cli::SourceFormat::Ken,
+                                &format!("rt_parity_direct_application_pairing_{label}"),
+                                root.path(),
+                                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                            )
+                        },
+                    )
+                });
             result.expect("the exact Direct application fixture must compile");
-            (observations, applications)
+            (observations, applications, availability)
         };
 
-        let (read, read_applications) = compile("read", "rt_read_offset_stage");
-        let (write, write_applications) = compile("write", "rt_write_writable_stage");
+        let (read, read_applications, read_availability) = compile("read", "rt_read_offset_stage");
+        let (write, write_applications, write_availability) = compile("write", "rt_write_writable_stage");
+        assert_eq!(read_availability.len(), 1);
+        let census = &read_availability[0];
+        // Promise class: transition sentinel. The checked read fixture's
+        // complete keys were recorded on 5d139f4 with the original interning
+        // frame construction; the factored construction produced byte-identical
+        // keys, including all input availability drafts. Re-record this vector
+        // only when specialization identity intentionally changes.
+        assert_eq!(census.interned_keys.join("\n"),
+            include_str!("rt_per_emitter_read_keys.5d139f4.txt"));
+        assert_eq!(census.materializations.len(), 7);
+        assert_eq!(census.unclassified.len(), 6);
+        let points_by_specialization = census.materializations.iter()
+            .fold(std::collections::BTreeMap::new(), |mut counts, point| {
+                *counts.entry(point.specialization).or_insert(0usize) += 1;
+                counts
+            });
+        assert_eq!(points_by_specialization,
+            [(0, 2usize), (1, 2), (2, 1), (3, 2)].into());
+        let counts_by_owner = census.materializations.iter()
+            .fold(std::collections::BTreeMap::new(), |mut counts, point| {
+                let entry = counts.entry(point.owner.as_str()).or_insert((0usize, 0usize));
+                for capture in &point.captures {
+                    if capture.result.starts_with("Finalized(") {
+                        assert_eq!(capture.unfinalizable_owner, None,
+                            "finalized captures cannot carry an unfinalizable owner");
+                        entry.0 += 1;
+                    } else {
+                        assert!(capture.result.starts_with("Unfinalizable {"),
+                            "the census must classify every ordinal: {capture:?}");
+                        assert_eq!(capture.unfinalizable_owner, Some(point.owner_id),
+                            "each unfinalizable result must name its own emitting point's owner");
+                        entry.1 += 1;
+                    }
+                }
+                counts
+            });
+        assert_eq!(counts_by_owner,
+            [
+                ("Predeclared(PredeclaredFunctionId(4))", (30usize, 0usize)),
+                ("Predeclared(PredeclaredFunctionId(5))", (9, 0)),
+                ("Specialization(ContinuationSpecializationId(2))", (4, 44)),
+            ].into());
+        let destination = census.materializations.iter().find(|point| {
+            point.specialization == 1
+                && point.emission_origin == 735
+                && point.kind == "CheckedIhTransportDestination"
+                && point.owner == "Specialization(ContinuationSpecializationId(2))"
+        }).expect("Vis735 has one checked-IH transport destination for spec 1");
+        assert_eq!(destination.owner_id,
+            ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2));
+        assert_eq!(destination.captures.len(), 14);
+        assert_eq!(destination.captures.iter().filter(|capture| capture.run == "Worker").count(), 8);
+        assert_eq!(destination.captures.iter().filter(|capture| capture.run == "Context").count(), 6);
+        for (index, capture) in destination.captures.iter().enumerate() {
+            assert_eq!(capture.run, if index < 8 { "Worker" } else { "Context" });
+            assert_eq!(capture.ordinal, if index < 8 { index as u32 } else { (index - 8) as u32 });
+            assert!(capture.result.contains("reason: NoClaim"),
+                "Spec2 lacks the source specialization's exact capture coordinate: {capture:?}");
+            // The result's typed owner is independent of the enclosing point.
+            // On Vis735 the producer's interning owner is P4, not emitter S2.
+            assert_eq!(capture.unfinalizable_owner,
+                Some(ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2)),
+                "every unfinalizable capture must name the actual emitting owner");
+        }
+        assert_eq!(write_availability.len(), 1);
+        assert_eq!(write_availability[0].materializations.len(), 13);
         assert!(
             read.is_empty() && read_applications == 0,
             "the Tail-only read fixture must not enter the Direct application lookup: {read:#?}"
