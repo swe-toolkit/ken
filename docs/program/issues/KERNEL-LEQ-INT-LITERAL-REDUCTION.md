@@ -63,8 +63,10 @@ stop and report the mismatch.
     the neutral list) and the `whnf` pseudocode, per the Architect's text.
     Also the termination rationale: the §3.2 Termination bullet, §5
     obligation 1, and the first sentence of §5 obligation 2. These take the
-    Architect's replacement text verbatim (`evt_5qck78fhxb98c`); any other
-    wording, or any other §17 sentence, needs the Architect's re-read. The
+    Architect's replacement text verbatim: `evt_5qck78fhxb98c`, as corrected
+    for the CV's β-duplication counterexample (`evt_2cdtpavqept4t`), so no
+    rule is claimed to contract term size. Any other wording, or any other
+    §17 sentence, needs the Architect's re-read. The
     termination claim itself is unchanged (CV `evt_4j6eg9eeh1pvt`).
   - `spec/10-kernel/18-judgments.md` §4.2 and §5, and
     `spec/10-kernel/18a-primitive-registry.md` introduction, §5 and
