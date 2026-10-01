@@ -361,9 +361,9 @@ class IgnoredSweepTests(unittest.TestCase):
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
         classes = [row["class"] for row in rows]
         self.assertEqual(classes.count("policy-cost"), 1)
-        self.assertEqual(classes.count("placeholder-no-assertions"), 3)
-        self.assertEqual(classes.count("blocked-upstream-relation"), 2)
-        self.assertEqual(len({row["test_path"] for row in rows}), 6)
+        self.assertEqual(classes.count("placeholder-no-assertions"), 1)
+        self.assertEqual(classes.count("blocked-upstream-relation"), 0)
+        self.assertEqual(len({row["test_path"] for row in rows}), 4)
         for row in rows:
             if row["class"] == "placeholder-no-assertions":
                 self.assertIn("assert", row["readmission"])
@@ -504,7 +504,7 @@ class IgnoredSweepTests(unittest.TestCase):
                 diagnostic,
             )
             self.assertIn("of 2646 discovered", diagnostic)
-            self.assertIn("53 rows", diagnostic)
+            self.assertIn("51 rows", diagnostic)
             self.assertIn("ken-runtime::ken-runtime::base_debt_0", diagnostic)
 
             selected_document = json.loads(selected_listing.read_text())
