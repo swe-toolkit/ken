@@ -210,11 +210,10 @@ pub fn type_of_global(env: &GlobalEnv, name: &str, id: GlobalId) -> Term {
 /// Does `carrier` occur anywhere in the result type of `ty`, modulo defeq?
 ///
 /// Two phases:
-///  1. **Π-telescope strip** — keeps SPAN-SEAL's WHNF discipline verbatim
-///     (reduce before the Pi decision and after every codomain step, carrying a
-///     `Context`), so a result type that is itself a transparent alias for a
-///     function type is unfolded before the Pi decision. This is exactly the
-///     landed `result_head` walk and, like it, only ever WHNFs the head.
+///  1. **Π-telescope strip** — checks the sort of each unreduced current type
+///     before WHNF. An Ω-sorted result yields only a proof. On an unknown sort
+///     it fails closed and continues through WHNF, carrying a `Context` across
+///     each Π, so transparent function aliases still unfold before descent.
 ///  2. **nested descent** — [`occurs`] walks *every* sub-position of the result
 ///     type (the AC-3 extension), detecting the carrier former modulo defeq by
 ///     delta-unfolding transparent aliases. It does **not** re-run full WHNF
@@ -227,11 +226,24 @@ pub fn type_of_global(env: &GlobalEnv, name: &str, id: GlobalId) -> Term {
 ///     leaves open.
 pub fn result_type_produces(env: &GlobalEnv, ty: &Term, carrier: GlobalId) -> bool {
     let mut ctx = Context::new();
-    let mut result = whnf(env, &ctx, ty);
-    while let Term::Pi(domain, codomain) = result {
-        ctx.push(*domain);
-        result = whnf(env, &ctx, &codomain);
-    }
+    let mut current = ty.clone();
+    let result = loop {
+        // An observational Eq's WHNF can be a Sigma of proofs whose sort is
+        // not inferable there. The source-checked Eq is Omega-sorted: classify
+        // each type before reducing it, including each Pi codomain.
+        if let Ok(sort) = infer(env, &ctx, &current) {
+            if matches!(whnf(env, &ctx, &sort), Term::Omega(_)) {
+                return false;
+            }
+        }
+        match whnf(env, &ctx, &current) {
+            Term::Pi(domain, codomain) => {
+                ctx.push(*domain);
+                current = *codomain;
+            }
+            other => break other,
+        }
+    };
     // A producer yields a carrier *value* only when its result type is a data
     // type (`Type ℓ`-sorted). A proposition (`Ω`-sorted result — a law or proof
     // obligation) yields a PROOF: an occurrence of the carrier former inside a
