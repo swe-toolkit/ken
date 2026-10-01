@@ -500,7 +500,7 @@ class IgnoredSweepTests(unittest.TestCase):
                 SWEEP.verify_lists(all_listing, selected_listing, 46, rows)
             diagnostic = str(mismatch.exception)
             self.assertIn(
-                "the passed expected count plus 6 registry exemptions is 52",
+                "the passed expected count plus 4 registry exemptions is 50",
                 diagnostic,
             )
             self.assertIn("of 2646 discovered", diagnostic)
