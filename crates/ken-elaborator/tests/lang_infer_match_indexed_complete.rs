@@ -69,6 +69,81 @@ fn nested_root_split_closes_the_remaining_method_telescope() {
 }
 
 #[test]
+fn nested_vnil_and_vcons_specialize_the_carried_root_ih() {
+    // Both nested constructor methods carry the outer VCons IH. Its type
+    // specializes to the nested constructor through the nested motive.
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(&format!(
+        "{VEC}\nfn nested_both (a : Type) (n : Nat) (xs : Vec a (Suc n)) : Nat = \
+         let r = match xs {{ \
+           VCons m _ VNil ↦ Zero; \
+           VCons m _ (VCons k _ _) ↦ Suc k \
+         }} in r"
+    ))
+    .expect("both specialized nested methods kernel-check");
+}
+
+#[test]
+fn nested_split_threads_two_root_ih_columns() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(
+        "data PairIx : Nat → Type where { \
+           PZero : PairIx Zero; \
+           PStep : (m : Nat) → PairIx m → PairIx m → PairIx (Suc m) \
+         }\nfn nested_pair (n : Nat) (xs : PairIx (Suc n)) : Nat = \
+         let r = match xs { \
+           PStep m PZero _ ↦ Zero; PStep m _ _ ↦ m \
+         } in r",
+    )
+    .expect("both dependent root IHs survive the nested split");
+}
+
+#[test]
+fn constant_nested_motive_keeps_the_nonindexed_control() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(
+        "data NatBox : Type where { BoxNat : Nat → NatBox }\n\
+         fn boxed (b : NatBox) : Nat = let r = match b { \
+           BoxNat Zero ↦ Zero; BoxNat (Suc n) ↦ n \
+         } in r",
+    )
+    .expect("independent nested motive remains the constant method path");
+}
+
+#[test]
+fn nested_variable_index_without_a_dependent_tail_checks() {
+    // The near-neighbour of a concrete index: a constructor-bound variable
+    // is eligible even when this nested motive has no dependent convoy.
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(&format!(
+        "{VEC}\ndata HolderVar (a : Type) : Type where {{ \
+           HoldVar : (n : Nat) → Vec a n → HolderVar a \
+         }}\nfn variable_nested (a : Type) (h : HolderVar a) : Nat = \
+         let r = match h {{ \
+           HoldVar n VNil ↦ Zero; HoldVar n (VCons m _ _) ↦ m \
+         }} in r"
+    ))
+    .expect("distinct variable index without a dependent tail checks");
+}
+
+#[test]
+fn nested_concrete_index_advises_an_annotation() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let error = env
+        .elaborate_file(&format!(
+            "{VEC}\ndata Holder (a : Type) : Type where {{ Hold : Vec a Zero → Holder a }}\n\
+         fn no_equational_generalization (a : Type) (h : Holder a) : Nat = \
+         let r = match h {{ Hold VNil ↦ Zero; Hold (VCons m _ _) ↦ m }} in r"
+        ))
+        .expect_err("concrete nested index needs an explicit separate match");
+    assert!(
+        matches!(&error, ElabError::TypeMismatch { reason, .. }
+        if reason.contains("nested indexed split") && reason.contains("annotate")),
+        "{error:?}"
+    );
+}
+
+#[test]
 fn unlowerable_pattern_field_result_has_surface_diagnostic() {
     // MEASURED: an inferred result type `Vec a m` uses the VCons-local `m`.
     // CLAIMED: a leaf-local type cannot escape into the indexed motive.
@@ -87,7 +162,10 @@ fn unlowerable_pattern_field_result_has_surface_diagnostic() {
         "{error:?}"
     );
     let rendered = error.to_string();
-    assert!(rendered.contains("m") && rendered.contains("annotate"), "{rendered}");
+    assert!(
+        rendered.contains("m") && rendered.contains("annotate"),
+        "{rendered}"
+    );
 }
 
 #[test]

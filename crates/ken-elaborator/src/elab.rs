@@ -403,6 +403,9 @@ struct ElabCtx<'e> {
     /// de Bruijn indices. Positions are stable bottom-relative context slots;
     /// `surface_var` skips them when translating an `RVar`.
     hidden_positions: Vec<usize>,
+    /// Split pattern columns emit method binders without a `ctx` push. Keep
+    /// their source positions so later names still resolve past the split.
+    matrix_virtual_surface_positions: Vec<usize>,
     /// Source values paired with kernel-generated lifted evidence. A support
     /// id marks residual `All`; `None` marks a directly consumable motive leaf.
     lift_bindings: HashMap<usize, LiftBinding>,
@@ -463,6 +466,7 @@ impl<'e> ElabCtx<'e> {
             active_index_refinements: Vec::new(),
             match_field_regions: Vec::new(),
             hidden_positions: Vec::new(),
+            matrix_virtual_surface_positions: Vec::new(),
             lift_bindings: HashMap::new(),
             result_refinements: Vec::new(),
             active_index_premise_frames: Vec::new(),
@@ -476,18 +480,33 @@ impl<'e> ElabCtx<'e> {
         }
     }
 
-    fn surface_var(&self, index: usize) -> Option<(usize, usize)> {
+    fn surface_binding_position(&self, index: usize) -> Option<usize> {
         let mut remaining = index;
         for position in (0..self.ctx.len()).rev() {
+            // A split lives after `position`, before later real fields. It
+            // consumes a source slot although it has no `ctx` position.
+            for _ in self.matrix_virtual_surface_positions.iter()
+                .filter(|&&split| split == position + 1)
+            {
+                if remaining == 0 {
+                    return None;
+                }
+                remaining -= 1;
+            }
             if self.hidden_positions.contains(&position) {
                 continue;
             }
             if remaining == 0 {
-                return Some((position, self.ctx.len() - 1 - position));
+                return Some(position);
             }
             remaining -= 1;
         }
         None
+    }
+
+    fn surface_var(&self, index: usize) -> Option<(usize, usize)> {
+        let position = self.surface_binding_position(index)?;
+        Some((position, self.ctx.len() - 1 - position))
     }
 
     fn binding_term(&self, position: usize) -> Option<(Term, Term)> {
@@ -500,21 +519,9 @@ impl<'e> ElabCtx<'e> {
     /// association gate. Unlike `surface_var`, this cannot return an ordinary
     /// source term or expose an arbitrary hidden method binder.
     fn selected_recursive_result(&self, index: usize) -> Option<(Term, Term)> {
-        let mut remaining = index;
-        for position in (0..self.ctx.len()).rev() {
-            if self.hidden_positions.contains(&position) {
-                continue;
-            }
-            if remaining == 0 {
-                let result_position = self
-                    .lift_bindings
-                    .get(&position)?
-                    .recursive_result_position?;
-                return self.binding_term(result_position);
-            }
-            remaining -= 1;
-        }
-        None
+        let position = self.surface_binding_position(index)?;
+        let result_position = self.lift_bindings.get(&position)?.recursive_result_position?;
+        self.binding_term(result_position)
     }
 
     /// Wire the class registry AND the certified standard-operator identities
@@ -15896,6 +15903,9 @@ struct RowState {
     real_pats: Vec<RPattern>,
     real_occurrences: Vec<MatrixOccurrence>,
     binding_occurrences: Vec<Option<Term>>,
+    /// Source slots for split columns missing from `cx.ctx`, per arm. A
+    /// constructor pattern does not create one; a wildcard/variable does.
+    virtual_surface_positions: Vec<usize>,
     arm_idx: usize,
 }
 
@@ -15974,7 +15984,8 @@ impl RowState {
         replacement_pats: Vec<RPattern>,
         replacement_source_bindings: bool,
     ) -> Self {
-        let surface_binder = self.real_occurrences[0].surface_binder;
+        let surface_binder =
+            self.real_occurrences[0].surface_binder && replacement_source_bindings;
         let source_bindings = vec![replacement_source_bindings; replacement_pats.len()];
         self.specialize_current_columns(replacement_pats, source_bindings, surface_binder)
     }
@@ -16219,6 +16230,7 @@ fn build_alias_rows(
             real_pats: vec![arm.pat.clone()],
             real_occurrences: vec![MatrixOccurrence::live(scrut_core.clone())],
             binding_occurrences: Vec::new(),
+            virtual_surface_positions: Vec::new(),
             arm_idx: i,
         };
         rows.push(expose_current_pattern_aliases(cx, row, scrut_ty));
@@ -16228,6 +16240,7 @@ fn build_alias_rows(
 
 struct PatternAliasLeafScope {
     hidden_base: usize,
+    virtual_base: usize,
 }
 
 #[inline(never)]
@@ -16236,6 +16249,7 @@ fn enter_pattern_alias_leaf(
     arm_idx: usize,
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
+    virtual_surface_positions: &[usize],
 ) -> PatternAliasLeafScope {
     let frame = cx
         .pattern_alias_type_frames
@@ -16295,13 +16309,17 @@ fn enter_pattern_alias_leaf(
             }
         }
     }
+    let virtual_base = cx.matrix_virtual_surface_positions.len();
+    cx.matrix_virtual_surface_positions
+        .extend_from_slice(virtual_surface_positions);
     cx.active_pattern_aliases.push(active_aliases);
-    PatternAliasLeafScope { hidden_base }
+    PatternAliasLeafScope { hidden_base, virtual_base }
 }
 
 fn leave_pattern_alias_leaf(cx: &mut ElabCtx, scope: PatternAliasLeafScope) {
     cx.active_pattern_aliases.pop();
     cx.hidden_positions.truncate(scope.hidden_base);
+    cx.matrix_virtual_surface_positions.truncate(scope.virtual_base);
 }
 
 fn use_direct_pattern_alias_occurrences(cx: &mut ElabCtx, direct: bool) {
@@ -16321,8 +16339,11 @@ fn infer_arm_at_matrix_leaf(
     arm_idx: usize,
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
+    virtual_surface_positions: &[usize],
 ) -> Result<(Option<Term>, Term, Term), ElabError> {
-    let scope = enter_pattern_alias_leaf(cx, arm_idx, binding_occurrences, real_depth);
+    let scope = enter_pattern_alias_leaf(
+        cx, arm_idx, binding_occurrences, real_depth, virtual_surface_positions,
+    );
     let result = (|| {
         use_direct_pattern_alias_occurrences(cx, true);
         let guard_result = arm
@@ -16346,9 +16367,12 @@ fn check_arm_at_matrix_leaf(
     arm_idx: usize,
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
+    virtual_surface_positions: &[usize],
     expected: &Term,
 ) -> Result<(Option<Term>, Term), ElabError> {
-    let scope = enter_pattern_alias_leaf(cx, arm_idx, binding_occurrences, real_depth);
+    let scope = enter_pattern_alias_leaf(
+        cx, arm_idx, binding_occurrences, real_depth, virtual_surface_positions,
+    );
     let result = (|| {
         use_direct_pattern_alias_occurrences(cx, true);
         let guard_result = arm
@@ -16482,9 +16506,91 @@ fn indexed_root_ih_domain(
         .ok_or_else(|| ElabError::Internal(
             "indexed root IH needs an inferred result before its nested motive".into(),
         ))?;
-    // The kernel domain is under all root constructor fields and earlier
-    // IHs. Real nested columns may insert further binders inside that prefix.
-    Ok(weaken(domain, depth.saturating_sub(column.field_count) as i64))
+    // The kernel domain is under every root field and earlier IH. Matrix
+    // recursion wraps earlier IHs *after* it constructs this domain, so drop
+    // that not-yet-emitted prefix now; each outer wrapper restores it once.
+    // Kernel method_type's IH domains depend on fields, never earlier IHs.
+    if (0..column.ordinal).any(|var| scrut_occurs(domain, &Term::var(var))) {
+        return Err(ElabError::Internal(
+            "root IH type unexpectedly depends on an earlier IH".into(),
+        ));
+    }
+    let domain = shift(domain, -(column.ordinal as i64), 0);
+    Ok(weaken(&domain, depth.saturating_sub(column.field_count) as i64))
+}
+
+/// Partition the pending telescope by free occurrences in its domains, not
+/// by whether a column originated as a constructor field or an IH. A member
+/// depending on the split variable, an index variable, or an earlier member
+/// joins the reverted convoy. The result type is tested at the full depth.
+fn nested_split_dependencies(
+    codomain: &Term,
+    tail_count: usize,
+    indices_under_split: &[Term],
+) -> Result<(Vec<usize>, bool), ElabError> {
+    let mut cursor = codomain;
+    let mut dependent = Vec::new();
+    for position in 0..tail_count {
+        let Term::Pi(domain, rest) = cursor else {
+            return Err(ElabError::Internal(
+                "nested continuation lost its pending telescope".into(),
+            ));
+        };
+        let mentions_split = scrut_occurs(domain, &Term::var(position));
+        let mentions_index = indices_under_split.iter().any(|index| {
+            scrut_occurs(domain, &weaken(index, position as i64))
+        });
+        let mentions_prior = dependent.iter().any(|prior| {
+            scrut_occurs(domain, &Term::var(position - prior - 1))
+        });
+        if mentions_split || mentions_index || mentions_prior {
+            dependent.push(position);
+        }
+        cursor = rest;
+    }
+    let result_mentions_split = scrut_occurs(cursor, &Term::var(tail_count));
+    Ok((dependent, result_mentions_split))
+}
+
+/// Nested indexed splits must not infer an equality convoy for a concrete
+/// or repeated index. The caller has already checked constructor coverage;
+/// this diagnostic cannot replace a nested omission's ExhaustivenessError.
+fn check_nested_index_variables(
+    cx: &ElabCtx<'_>,
+    indices: &[Term],
+    split_span: &Span,
+) -> Result<(), ElabError> {
+    let mut seen = HashSet::new();
+    for index in indices {
+        let Term::Var(index_var) = index else {
+            return Err(ElabError::TypeMismatch {
+                span: split_span.clone(),
+                reason: "nested indexed split needs distinct variable indices; annotate the match result or use a separate match".into(),
+            });
+        };
+        if !seen.insert(*index_var) {
+            return Err(ElabError::TypeMismatch {
+                span: split_span.clone(),
+                reason: "nested indexed split repeats an index; annotate the match result or use a separate match".into(),
+            });
+        }
+        // A captured ambient binder referring to this index cannot be
+        // generalized here unless it travels in the pending convoy below.
+        for binder in 0..cx.ctx.len() {
+            if binder == *index_var {
+                continue;
+            }
+            let Some(domain) = cx.ctx.lookup(binder) else { continue };
+            let ambient = weaken(domain, (binder + 1) as i64);
+            if scrut_occurs(&ambient, &Term::var(*index_var)) {
+                return Err(ElabError::TypeMismatch {
+                    span: split_span.clone(),
+                    reason: "nested indexed split shares an index with an ambient binder; annotate the match result or use a separate match".into(),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// A split's motive must compute the Pi-chain owed by its pending columns.
@@ -17668,6 +17774,7 @@ fn compile_match_leaf(
         first_row.arm_idx,
         &first_occurrences,
         real_depth_so_far,
+        &first_row.virtual_surface_positions,
     )?;
     let mut branches = vec![(first_row.arm_idx, first_guard, first_body)];
     for row in &candidates[1..=fallback] {
@@ -17678,6 +17785,7 @@ fn compile_match_leaf(
             row.arm_idx,
             &occurrences,
             real_depth_so_far,
+            &row.virtual_surface_positions,
             &body_ty_ctx,
         )?;
         branches.push((row.arm_idx, guard, body));
@@ -17706,6 +17814,7 @@ fn compile_match_leaf(
                     &arms[first_row.arm_idx].pat,
                     &first_occurrences,
                     index,
+                    real_depth_so_far,
                 ),
             }
         })?;
@@ -17940,12 +18049,25 @@ fn compile_match_matrix(
                 .clone();
             let m0 = ind0.params.len();
 
-            let rows = rows
+            let split_span = rows
+                .first()
+                .map(|row| row.real_pats[0].span.clone())
+                .unwrap_or_else(|| top_span.clone());
+            let split_depth = cx.ctx.len();
+            let rows: Vec<RowState> = rows
                 .into_iter()
-                .map(RowState::enter_current_real_binder)
+                .map(|mut row| {
+                    if row.real_occurrences[0].surface_binder && matches!(
+                        pattern_without_aliases(&row.real_pats[0]).kind,
+                        RPatKind::Wild | RPatKind::Var(_, _)
+                    ) {
+                        row.virtual_surface_positions.push(split_depth);
+                    }
+                    row.enter_current_real_binder()
+                })
                 .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
                 .collect();
-            let raw_methods: Vec<Term> = build_ctor_buckets(
+            let raw_methods_result = build_ctor_buckets(
                 cx,
                 arms,
                 &ind0,
@@ -17962,10 +18084,11 @@ fn compile_match_matrix(
                 subsumed_by,
                 false,
                 false,
-            )?
-            .into_iter()
-            .map(|method| method.expect("nested constructor coverage checked in bucket builder"))
-            .collect();
+            );
+            let raw_methods: Vec<Term> = raw_methods_result?
+                .into_iter()
+                .map(|method| method.expect("nested constructor coverage checked in bucket builder"))
+                .collect();
 
             // The split column itself is a fresh binder no surface pattern
             // named — resolver never counted it, so (like the IH slots
@@ -17987,12 +18110,43 @@ fn compile_match_matrix(
                 &ret_ty_base,
                 real_depth_so_far + 1,
             )?;
-            let ret_level = match kernel_infer_current(cx, &codomain) {
+            let indices_under_split: Vec<Term> = params0[m0..]
+                .iter()
+                .map(|index| weaken(index, 1))
+                .collect();
+            let (dependent_tail, result_mentions_split) = nested_split_dependencies(
+                &codomain,
+                col_types.len() - 1,
+                &indices_under_split,
+            )?;
+            let needs_reverting = !dependent_tail.is_empty() || result_mentions_split;
+            if !needs_reverting {
+                debug_assert!(
+                    !scrut_occurs(&codomain, &Term::var(0)),
+                    "a constant nested motive must not mention its split value",
+                );
+            }
+            // A nested omission is checked above, before the index clause:
+            // even at a concrete index it remains an exhaustiveness error.
+            check_nested_index_variables(cx, &params0[m0..], &split_span)?;
+            let ret_sort = if needs_reverting {
+                // Here the codomain mentions the abstract split value x'.
+                // Classify it in that context, with universe metas zonked;
+                // the old constant path remains byte-identical below.
+                let mut motive_ctx = Context {
+                    types: cx.ctx.types.iter().map(|ty| cx.metas.zonk_term(ty)).collect(),
+                };
+                motive_ctx.push(cx.metas.zonk_term(&col_types[0]));
+                kernel_infer_in_context_current(cx, &motive_ctx, &cx.metas.zonk_term(&codomain))
+            } else {
+                kernel_infer_current(cx, &codomain)
+            };
+            let ret_level = match ret_sort {
                 Ok(Term::Type(level)) => level,
                 Ok(_) => Level::Zero,
                 Err(CurrentKernelQueryError::View(error)) => return Err(error),
                 Err(CurrentKernelQueryError::Kernel(_))
-                    if cx.active_index_premise_frames.is_empty() =>
+                    if !needs_reverting && cx.active_index_premise_frames.is_empty() =>
                 {
                     Level::Zero
                 }
@@ -18008,17 +18162,70 @@ fn compile_match_matrix(
             let Term::IndFormer { level_args, .. } = head else {
                 unreachable!("nested split has an inductive scrutinee")
             };
-            let elim = matrix_family_elim(
+            // The dependent motive is built inside the enclosing split
+            // lambda. The codomain was formed under x' alone; move its
+            // outer variables past that lambda, leaving x' at Var(0).
+            let motive_body = if needs_reverting {
+                shift(&codomain, 1, 1)
+            } else {
+                codomain
+            };
+            let mut elim = matrix_family_elim(
                 &ind0,
                 d_id0,
                 &level_args,
                 &args,
                 &col_types[0],
-                codomain,
+                motive_body,
                 ret_level,
                 methods,
                 Term::var(0),
+                needs_reverting,
             );
+            if needs_reverting {
+                let Term::Elim { motive, methods, .. } = &mut elim else {
+                    unreachable!("shared matrix constructor returns an eliminator")
+                };
+                let params = &args[..m0];
+                let mut nested_ctx = Context {
+                    types: cx.ctx.types.iter().map(|ty| cx.metas.zonk_term(ty)).collect(),
+                };
+                nested_ctx.push(cx.metas.zonk_term(&col_types[0]));
+                for (ordinal, (ctor, method)) in ind0.constructors.iter()
+                    .zip(methods.iter_mut()).enumerate()
+                {
+                    let expected = method_type(
+                        cx.env, &ind0, ordinal, motive, params, &level_args,
+                    ).map_err(|error| ElabError::KernelRejected {
+                        error,
+                        span: split_span.clone(),
+                    })?;
+                    let ih_count = recursive_shapes(cx.env, ctor, d_id0, m0)
+                        .map_err(|error| ElabError::KernelRejected {
+                            error,
+                            span: split_span.clone(),
+                        })?
+                        .len();
+                    let closed = close_nested_matrix_method(
+                        cx,
+                        &nested_ctx,
+                        method.clone(),
+                        expected.clone(),
+                        ctor.args.len() + ih_count + col_types.len() - 1,
+                    )?;
+                    let checked = cx.metas.zonk_term(&closed);
+                    let expected_checked = cx.metas.zonk_term(&expected);
+                    kernel_check_in_context_current(cx, &nested_ctx, &checked, &expected_checked)
+                        .map_err(|error| match error {
+                            CurrentKernelQueryError::View(error) => error,
+                            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                                error,
+                                span: split_span.clone(),
+                            },
+                        })?;
+                    *method = closed;
+                }
+            }
             Ok(Term::lam(col_types[0].clone(), elim))
         }
     }
@@ -18170,6 +18377,7 @@ fn matrix_family_elim(
     level: Level,
     methods: Vec<Term>,
     scrut: Term,
+    abstract_indices: bool,
 ) -> Term {
     let (params, indices) = args.split_at(ind.params.len());
     debug_assert_eq!(indices.len(), ind.indices.len());
@@ -18181,7 +18389,20 @@ fn matrix_family_elim(
             Box::new(Term::pi(scrut_ty.clone(), sort)),
         )
     } else {
-        let body = shift(&motive_body, indices.len() as i64, 1);
+        let mut body = shift(&motive_body, indices.len() as i64, 1);
+        if abstract_indices {
+            let substitutions: Vec<(Term, Term)> = indices
+                .iter()
+                .enumerate()
+                .map(|(j, actual)| {
+                    (
+                        weaken(actual, (indices.len() + 1) as i64),
+                        Term::var(indices.len() - j),
+                    )
+                })
+                .collect();
+            body = subst_term_generalize_many(&body, &substitutions);
+        }
         Term::Ascript(
             Box::new(wrap_motive_lambdas_at(ind, family, params, body, level_args)),
             Box::new(motive_type_at(ind, family, params, &sort, level_args)),
@@ -18196,6 +18417,45 @@ fn matrix_family_elim(
         indices: indices.to_vec(),
         scrut: Box::new(scrut),
     }
+}
+
+/// A nested method's complete telescope is supplied by the very Elim it
+/// feeds. Its raw matrix body may end in another eliminator instead of an
+/// explicit lambda; η-apply the remaining expected binders before wrapping
+/// the kernel-derived domains. No raw domain becomes a checked method domain.
+fn close_nested_matrix_method(
+    cx: &ElabCtx<'_>,
+    context: &Context,
+    mut raw: Term,
+    mut expected: Term,
+    binder_count: usize,
+) -> Result<Term, ElabError> {
+    let mut domains = Vec::with_capacity(binder_count);
+    let mut telescope_ctx = context.clone();
+    for _ in 0..binder_count {
+        let Term::Pi(domain, rest) = whnf(cx.env, &telescope_ctx, &expected) else {
+            return Err(ElabError::Internal(
+                "nested method type lost a constructor or reverted binder".into(),
+            ));
+        };
+        telescope_ctx.push((*domain).clone());
+        domains.push(*domain);
+        expected = *rest;
+    }
+    let mut peeled = 0;
+    while peeled < binder_count {
+        let Term::Lam(_, body) = raw else { break };
+        raw = *body;
+        peeled += 1;
+    }
+    let missing = binder_count - peeled;
+    let mut body = (0..missing).rev().fold(weaken(&raw, missing as i64), |f, i| {
+        Term::app(f, Term::var(i))
+    });
+    for domain in domains.into_iter().rev() {
+        body = Term::lam(domain, body);
+    }
+    Ok(body)
 }
 
 /// Close one root matrix method against the kernel's constructor method type.
@@ -18968,6 +19228,7 @@ fn infer_match(
         ret_level,
         raw_methods,
         scrut_core,
+        false,
     );
 
     Ok((elim, ret_ty))
@@ -19248,6 +19509,7 @@ fn recover_escaping_pattern_binder(
     pattern: &RPattern,
     occurrences: &[Option<Term>],
     escaping_index: usize,
+    real_depth_so_far: usize,
 ) -> Option<String> {
     fn names<'a>(pattern: &'a RPattern, out: &mut Vec<Option<&'a str>>) {
         match &pattern.kind {
@@ -19274,12 +19536,29 @@ fn recover_escaping_pattern_binder(
     if binding_names.len() != occurrences.len() {
         return None;
     }
-    binding_names.into_iter().zip(occurrences).find_map(|(name, occurrence)| {
-        matches!(occurrence, Some(Term::Var(index)) if *index == escaping_index)
-            .then_some(name)
-            .flatten()
-            .map(str::to_string)
-    })
+    // `occurrences` live in the emitted method telescope (including IHs
+    // and split binders). The escaping index instead lives in `cx.ctx`,
+    // which has only real field pushes. Compare their binder *order*, not
+    // their raw de Bruijn indices: a synthetic IH below `m` changes its
+    // emitted index without changing the context position of `m`.
+    let mut binders = binding_names
+        .into_iter()
+        .zip(occurrences)
+        .map(|(name, occurrence)| match occurrence {
+            Some(Term::Var(index)) => Some((*index, name)),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()?;
+    if binders.len() != real_depth_so_far || escaping_index >= real_depth_so_far {
+        return None;
+    }
+    binders.sort_by(|a, b| b.0.cmp(&a.0));
+    if binders.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        return None;
+    }
+    binders[real_depth_so_far - 1 - escaping_index]
+        .1
+        .map(str::to_string)
 }
 
 // ----- standalone expression elaboration -----
