@@ -808,12 +808,18 @@ fn catalog_ambient_passthrough_migration_census() {
             // The standalone theorem no longer shadows its native-prelude
             // subject, so the ordinary package boundary loads. The remaining
             // vector is the exact compiler-native proof vocabulary it uses.
+            // prelude-intrinsic: projections/witness over constructor-private TransferCount/BufferSpan; no catalog provider is possible without exposing the constructor (Architect, CAT-SYSTEM-IO-LAWS)
             "Capability.System.IO".to_string(),
             [
                 "BufferSpan",
                 "ResourceError",
                 "TransferCount",
                 "Unit",
+                "buffer_span_budget",
+                "transfer_count_nat",
+                "transfer_count_nat_succ",
+                "transfer_count_predecessor",
+                "transfer_count_remaining",
                 "write_all_exact_prefix_prop",
                 "write_all_exact_prefix_prop::exact_prefix",
             ]
