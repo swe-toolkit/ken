@@ -844,6 +844,30 @@ fn lift_association_error(
 
 // ----- type elaboration -----
 
+/// `RVarTy` arm of `elab_type`, split out per `check`'s FRAME BUDGET note:
+/// `elab_type` recurses on every nested type, so the alias temporary must
+/// not sit in its frame.
+#[inline(never)]
+fn elab_type_named_variable(
+    cx: &mut ElabCtx,
+    index: usize,
+    name: &str,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    if let Some((term, _)) = infer_virtual_pattern_alias(cx, index, name, span)? {
+        Ok(term)
+    } else {
+        cx.surface_var(index)
+            .map(|(_, actual_index)| Term::var(actual_index))
+            .ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "type variable '{}' at {}-{} is out of range",
+                    name, span.start, span.end
+                ))
+            })
+    }
+}
+
 fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
     match ty {
         RType::RUniv(None, _) => {
@@ -928,20 +952,7 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             Ok(Term::app(f_k, a_k))
         }
 
-        RType::RVarTy(index, name, span) => {
-            if let Some((term, _)) = infer_virtual_pattern_alias(cx, *index, name, span)? {
-                Ok(term)
-            } else {
-                cx.surface_var(*index)
-                    .map(|(_, actual_index)| Term::var(actual_index))
-                    .ok_or_else(|| {
-                        ElabError::Internal(format!(
-                            "type variable '{}' at {}-{} is out of range",
-                            name, span.start, span.end
-                        ))
-                    })
-            }
-        },
+        RType::RVarTy(index, name, span) => elab_type_named_variable(cx, *index, name, span),
         RType::RPatternAliasTy(slot, name, _) => {
             infer_active_pattern_alias(cx, *slot, name).map(|(term, _)| term)
         }
@@ -8875,6 +8886,40 @@ fn infer_spelling_global(
     Ok((Term::const_(id, vec![]), decl_ty.clone()))
 }
 
+/// `RVar` arm of `infer`, split out per `check`'s FRAME BUDGET note:
+/// `infer` recurses on every expression, so the alias temporary must not
+/// sit in its frame.
+#[inline(never)]
+fn infer_named_local_variable(
+    cx: &mut ElabCtx,
+    i: &usize,
+    name: &str,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if let Some(alias) = infer_virtual_pattern_alias(cx, *i, name, span)? {
+        return Ok(alias);
+    }
+    // An installed index refinement (constructor injectivity
+    // / sibling convoy) replaces the bare `Var` with its `Cast`-
+    // wrapped alias for the duration of one branch's body — see
+    // `ElabCtx::var_refinements`.
+    let (pos, actual_index) = cx
+        .surface_var(*i)
+        .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
+    if let Some((raw_term, raw_ty, install_depth)) = cx.var_refinements.get(&pos) {
+        let growth = (cx.ctx.len() - install_depth) as i64;
+        let core = weaken(raw_term, growth);
+        return Ok(scoped_premise_binding(cx, &core)?
+            .unwrap_or_else(|| (core, weaken(raw_ty, growth))));
+    }
+    let ty_stored = cx
+        .ctx
+        .lookup(actual_index)
+        .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
+    let ty = weaken(ty_stored, (actual_index as i64) + 1);
+    Ok((Term::var(actual_index), ty))
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -8931,30 +8976,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             Ok((result, result_type))
         }
         RExpr::RPatternAlias(slot, name, _span) => infer_active_pattern_alias(cx, *slot, name),
-        RExpr::RVar(i, name, span) => {
-            if let Some(alias) = infer_virtual_pattern_alias(cx, *i, name, span)? {
-                return Ok(alias);
-            }
-            // An installed index refinement (constructor injectivity
-            // / sibling convoy) replaces the bare `Var` with its `Cast`-
-            // wrapped alias for the duration of one branch's body — see
-            // `ElabCtx::var_refinements`.
-            let (pos, actual_index) = cx
-                .surface_var(*i)
-                .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
-            if let Some((raw_term, raw_ty, install_depth)) = cx.var_refinements.get(&pos) {
-                let growth = (cx.ctx.len() - install_depth) as i64;
-                let core = weaken(raw_term, growth);
-                return Ok(scoped_premise_binding(cx, &core)?
-                    .unwrap_or_else(|| (core, weaken(raw_ty, growth))));
-            }
-            let ty_stored = cx
-                .ctx
-                .lookup(actual_index)
-                .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
-            let ty = weaken(ty_stored, (actual_index as i64) + 1);
-            Ok((Term::var(actual_index), ty))
-        }
+        RExpr::RVar(i, name, span) => infer_named_local_variable(cx, i, name, span),
 
         RExpr::RCell(index, _, span) => {
             let Some((state_position, cell_types)) = &cx.space_state else {
