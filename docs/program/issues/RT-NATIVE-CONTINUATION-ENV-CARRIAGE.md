@@ -151,8 +151,58 @@ reconstructed from term geometry.
   continuation specializations, which are creation sites recorded at
   interning.
 
+## Carrier-schema closure (recut, Architect `evt_v9p2kbzdccb0`)
+
+This governs the build; the deliverable bullets above are retained where they
+do not conflict. On Research `evt_9cn9mr73248`, the five §1b entries share one
+predicate: a recursive child's carrier slot has no planner-owned schema, so
+each consumer infers what a slot holds from local geometry. A slot's
+representation must be a static function of the set of values that can flow
+into it.
+
+- **I1. A planner record per slot.** Keyed `(eliminator, constructor
+  identity, recursive position)`, as `recursive_residual_candidates` keys it.
+  It holds the slot's flow set (the closed set of specializations or
+  producers that reach it) and its schema as a function of that set. A
+  singleton may elide the label, as a recorded choice; a larger set is the
+  labelled sum, the label being the interned candidate index.
+- **I2. One schema per slot.** Every producer writes the recorded schema. A
+  producer whose natural form differs is converted by an injection emitted
+  only on a planner-recorded coercion edge.
+- **I3. Consumers read the schema from the record, never from the word.**
+  Class, tag and arity checks stay only as fail-closed assertions that the
+  word matches. This covers Direct's `Constructor`/`declared_children` check,
+  the residual decoder, and the pass-through
+  `checked_ih_captured_environment_from_case_environment`.
+- **I4. Field reads are by role.** `Child`, `WorkerCapture{seat, ordinal}`
+  and `ContinuationInput{ordinal}`, never a raw offset in a consumer. The
+  transport W and C authorities are the role definitions.
+- **Retained.** Owner-independent labels keyed `(construct, pos, spec id)`
+  and the d099 interning-key pin; the `TransportCarriedClaim` census; the
+  three transport emission sites; the label-switch reuse with per-arm
+  `Some(body)` and the `source.rs:4515` guard; the gate refusals.
+- **Replaced.** Every consumer-side classification in I3, and any producer
+  writing a form other than its slot's schema.
+- **Sequence.** D0 below, then the Architect rules each slot's schema and
+  coercion edges, then the build: the planner schema record, conforming
+  writers, consumers that read the record and assert, and role-addressed
+  reads.
+
 ## Acceptance
 
+- **D0 (recut; measure only, on WIP `62060eea6`, read and write
+  fixtures).** A table of every carrier slot `(eliminator, constructor,
+  position)`: its flow set; each writer and the schema it writes today
+  (capture record, labelled residual or static worker); each reader (Direct
+  W read, Tail, the non-governed pass-through, the label switch, the gate
+  decode). Flag every slot whose writers disagree; S5 `(533, pos 1)` is
+  expected to be one. Count the population; do not infer it from shape.
+- **AC-S (carrier schema).**
+  - A writer emitting the other schema into a slot reddens at the
+    assertion, not at a later field read.
+  - Dropping a recorded coercion edge reddens.
+  - The interning-key pin stays byte-identical.
+  - The write fixture compiles and runs.
 - **AC-0 (measure; no build).** Done so far: the suffix census, record
   coverage, the seat relation (a checked parent→child edge, not equality),
   and the disposable trace. Remaining (`evt_2wywq8pmjerv8`): a compile-time
@@ -211,8 +261,12 @@ reconstructed from term geometry.
 5. Transport target at a force site whose arriving population is a labelled
    {S3, S4} set: there is no static body to key the planner lookup on, and
    the WIP refuses rather than reconstructing it (`evt_550cpvt3p4qw5`, §1a
-   5). The formal §1b predicate question falls due at entry 6, where the
-   Architect holds and calls Research.
+   5).
+
+Predicate (Architect `evt_v9p2kbzdccb0`, on Research `evt_9cn9mr73248`): the
+carrier slot has no planner-owned schema. This chain closes at §1a 5; the
+carrier-schema recut's own count starts at 0, and its 3rd advancing stop
+triggers hold-and-research.
 
 ## Stop conditions
 
