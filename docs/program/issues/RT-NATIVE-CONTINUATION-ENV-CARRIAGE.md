@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [RT-PLANNER-PER-EMITTER-AVAILABILITY]
 blocks: [RT-NATIVE-SEQUENTIAL-BRACKETS]
 github: null
 origin: "Architect recut ruling evt_4x84ykwjtmbsh on RT-NATIVE-SEQUENTIAL-BRACKETS (§1a 2), on the research advisory evt_7rqnbfnw80fe: an escaping continuation's environment must travel in the value (closure conversion). Size is provisional and is re-set at AC-0. Steward-filed per COORDINATION section 2."
@@ -77,11 +77,19 @@ decode them from the word they hold, and the side slot is retired.
 which is recorded at interning (`ContinuationSpecializationKey`). Nothing is
 reconstructed from term geometry.
 
-- **Issuer.** Each context C issues one disposition at its enclosing
-  specialization S's recorded creation site. That site gives the parent
-  (`producer_construct_origin`), the position, the owner (`emission_owner`)
-  and the label (`S.id`). The source-occurrence scan and its
+- **Issuer** (owner-independent, Architect `evt_5jqsyq6xfkfrn`). Each
+  context C issues one disposition keyed `(S.key.producer_construct_origin,
+  S.key.recursive_position, S.id)` for its enclosing specialization S. It
+  applies at every emission of that field, under whatever owner lowers it;
+  `S.key.emission_owner` is not a filter. The source-occurrence scan and its
   constructor-identity key are deleted.
+- **Closed records.** A wrapped residual carries all C context captures, not
+  only the missing ones: layout `[child, W, C]`, with the label after the
+  child for a size>1 gate. The gate and retarget read every capture from the
+  record, never from a frame. Each capture comes from the claims
+  `RT-PLANNER-PER-EMITTER-AVAILABILITY` finalizes under the emitting owner
+  (`evt_3yp3tea99hfta`). A checked-IH transport is not a creation site and
+  forwards its value unchanged.
 - **Gate.** The candidate set is the specializations whose key names this
   eliminator, constructor and position, sorted by
   `ContinuationSpecializationId`. A set of size 1 behaves as today. A larger
@@ -139,11 +147,16 @@ reconstructed from term geometry.
     - Each gate's candidate-set size is recorded, with a count of the gates
       whose set is larger than 1.
     - There are no mixed-disposition refusals.
+    - Gate and retarget capture reads from any frame: 0.
+  - **Mutation.** Dropping the last C capture from the record refuses at the
+    creator or goes red.
+  - **Census.** Per creation construct, its emitting owners; per label, the
+    gate owners it is dispatched under.
 
 ## Stop conditions
 
-- A W or M capture that does not resolve at the creation site (AC-3 D0):
-  stop with that capture named, for the Architect to rule.
+- A W or C capture with no finalized claim under its emitting owner: stop
+  with that capture and owner named, for the Architect to rule.
 - A suffix operand not in hand where the residual is materialized: the
   def-use rows name the carriage path, and the Architect sizes it. Do not
   add a second carriage mechanism.
