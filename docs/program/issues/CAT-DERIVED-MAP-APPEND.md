@@ -68,6 +68,15 @@ Scope:
   only the `map::append` entry in the exact expected Derived provider set of
   `parsing_module_provider_closure_is_exact_and_sibling_disjoint` (~`:660`),
   since Parsing now reuses the Derived law (implementer `evt_1ap6mqgabpdhs`).
+- `crates/ken-elaborator/tests/cat_derived_pub_export.rs`: only adding
+  `map::append` to the exact export surface (`:288`) and, if the test pairs
+  each public name with a client (`:71`), one client row for it (foundation
+  `evt_4a4k7a1z9s8jk`).
+- Any other exact name inventory under `crates/*/tests` or `r_layer_tests`
+  that reddens only because it gains `map::append`, or loses
+  `map_appends`/`list_map_append_distrib`. Change only that entry, and list
+  each such file and its measured diff in the handoff. Any other kind of
+  failure is a stop.
 
 ## Acceptance
 
