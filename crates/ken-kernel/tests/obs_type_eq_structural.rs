@@ -493,6 +493,7 @@ fn two_index_changes_transport_each_dependent_field() {
     let mut f = Fixture::new();
     let nat = f.nat.clone();
     let vec_id = f.vec;
+    let suc = f.suc;
     let item = nat.clone();
     let vec = move |i: Term| {
         Term::app(
@@ -513,7 +514,10 @@ fn two_index_changes_transport_each_dependent_field() {
                 vec(Term::var(1)),
                 Term::sigma(vec(Term::var(3)), vec(Term::var(3))),
             ],
-            target_indices: vec![Term::var(4), Term::var(3)],
+            target_indices: vec![
+                Term::app(Term::constructor(suc, vec![]), Term::var(4)),
+                Term::app(Term::constructor(suc, vec![]), Term::var(3)),
+            ],
         }],
     })
     .expect("two-index family");
@@ -526,8 +530,8 @@ fn two_index_changes_transport_each_dependent_field() {
     let ys = f.opaque("ys", vec(m.clone()));
     let z = f.opaque("z", Term::sigma(vec(n.clone()), vec(m.clone())));
     let family = |i: Term, j: Term| Term::app(Term::app(Term::indformer(twin, vec![]), i), j);
-    let source = family(n.clone(), m.clone());
-    let target = family(n2.clone(), m2.clone());
+    let source = family(f.suc(n.clone()), f.suc(m.clone()));
+    let target = family(f.suc(n2.clone()), f.suc(m2.clone()));
     let value = [n, m, xs, ys, z]
         .into_iter()
         .fold(Term::constructor(ctor, vec![]), Term::app);
