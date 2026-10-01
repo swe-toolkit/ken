@@ -2754,6 +2754,11 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             assert_eq!(capture.ordinal, if index < 8 { index as u32 } else { (index - 8) as u32 });
             assert!(capture.result.contains("reason: NoClaim"),
                 "Spec2 lacks the source specialization's exact capture coordinate: {capture:?}");
+            // The result's typed owner is independent of the enclosing point.
+            // On Vis735 the producer's interning owner is P4, not emitter S2.
+            assert_eq!(capture.unfinalizable_owner,
+                Some(ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2)),
+                "every unfinalizable capture must name the actual emitting owner");
         }
         assert_eq!(write_availability.len(), 1);
         assert_eq!(write_availability[0].materializations.len(), 13);

@@ -392,12 +392,33 @@ pub(super) fn build_per_emitter_availability(
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PerEmitterOwnerDiagnostic {
+    Predeclared(u32),
+    Specialization(u32),
+    Fusion(u32),
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn diagnostic_owner(owner: ContinuationEmissionOwner) -> PerEmitterOwnerDiagnostic {
+    match owner {
+        ContinuationEmissionOwner::Predeclared(id) => PerEmitterOwnerDiagnostic::Predeclared(id.0),
+        ContinuationEmissionOwner::Specialization(id) => {
+            PerEmitterOwnerDiagnostic::Specialization(id.0)
+        }
+        ContinuationEmissionOwner::Fusion(id) => PerEmitterOwnerDiagnostic::Fusion(id.0),
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PerEmitterCaptureDiagnostic {
     pub run: String,
     pub ordinal: u32,
     pub source: Option<String>,
     pub result: String,
+    /// Obtained from the capture's typed result, not from its enclosing point.
+    pub unfinalizable_owner: Option<PerEmitterOwnerDiagnostic>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -469,6 +490,12 @@ pub(super) fn record_per_emitter_availability_diagnostic(plan: &StaticTransition
                             ordinal: capture.ordinal,
                             source: capture.source.map(|source| format!("{source:?}")),
                             result: format!("{:?}", capture.claim),
+                            unfinalizable_owner: match capture.claim {
+                                PerEmitterCaptureClaim::Finalized(_) => None,
+                                PerEmitterCaptureClaim::Unfinalizable { owner, .. } => {
+                                    Some(diagnostic_owner(owner))
+                                }
+                            },
                         })
                         .collect(),
                 })

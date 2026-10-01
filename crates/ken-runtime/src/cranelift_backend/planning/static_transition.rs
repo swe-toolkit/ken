@@ -14,7 +14,7 @@ mod per_emitter_availability;
 #[cfg(feature = "px8-ds-test-support")]
 pub use per_emitter_availability::{
     with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,
-    PerEmitterCaptureDiagnostic, PerEmitterMaterializationDiagnostic,
+    PerEmitterCaptureDiagnostic, PerEmitterMaterializationDiagnostic, PerEmitterOwnerDiagnostic,
 };
 /// Fixture re-export for the lowering-side reconcile controls; see
 /// `planning.rs`. Test-only, and deliberately re-exporting the one fixture
