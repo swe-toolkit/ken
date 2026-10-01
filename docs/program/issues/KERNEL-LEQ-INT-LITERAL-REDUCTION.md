@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LEQ-INT-LITERAL-REDUCTION
 title: "The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -163,3 +163,27 @@ stop and report the mismatch.
   to the Architect.
 - A comparison that is not the interpreter's operator: stop to the
   Architect.
+
+## Closeout
+
+Merged `2df33a695` (PR #4435), exact `e697809a4`: Kernel QA
+`evt_2e0xcfwh3hmew`, Architect `evt_4kq827gbrv50e`, CV Spec/conformance
+`evt_3jb6z15rak6ay`, Decision `dec_2ewtf3e00eeve`.
+
+- Kernel whnf reduces `leq_int` on two `IntLit` values to `True` or `False`
+  by the interpreter's `BigInt <=`. A non-literal operand stays neutral, and
+  every other `Op` stays K3-deferred.
+- ADR 0013 Layer 2 and spec 16, 17, 18 and 18a name the two kernel-WHNF `Op`
+  rules. Spec 17's termination rationale classifies β, ζ and the String view
+  in the typed core. The general opacity sentences are qualified.
+- One conformance case per rule. A cross-layer test pins kernel and
+  interpreter agreement on negatives, equality and values beyond `i64`.
+- The runtime pins moved with the arm: the read-key sentinel is re-recorded,
+  and the owner is selected by shape.
+- Carried:
+  - the `:817` ignored reason's stale "owner 1298" goes to
+    `RT-SOURCE-IH-RELAY-K-VALUE`;
+  - the ζ-row conformance case goes to
+    `KERNEL-REFL-ENDPOINT-TYPED-CONVERSION`.
+- `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` is unblocked. It resumes on L2
+  after `LANG-NESTED-SPLIT-FIELD-DEPENDENCE`.

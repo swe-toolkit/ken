@@ -47,6 +47,11 @@ typed conversion at the carried type, so the Ω-PI shortcut applies. The
 Architect rules at AC-0 whether the fix belongs in the `Refl` arm or in the
 `Eq` congruence itself (check 7: every other caller of that congruence).
 
+Also owed, carried from `KERNEL-LEQ-INT-LITERAL-REDUCTION` (CV
+`evt_3jb6z15rak6ay`, Steward `evt_4f1evy7egy04z`): one discriminating
+kernel-conversion case for spec 17 §1's ζ row (non-recursive `let`) in
+`conformance/kernel/conversion/seed-conversion.md`.
+
 ## Acceptance
 
 - **AC-1.** The surface repro and both kernel repros are accepted.

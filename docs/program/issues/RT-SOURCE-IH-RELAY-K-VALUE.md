@@ -30,6 +30,10 @@ by giving its relay K a value the owner return protocol can carry.
   (`source.rs:1643-1655`) propagates a backedge past the constructor. No K
   value exists to put in a pending-Vis record.
 - **Three IH marker arms:** `core.rs:3574`, `core.rs:15382`, `source.rs:829`.
+- **Owner numbering moved** with `KERNEL-LEQ-INT-LITERAL-REDUCTION`
+  (`2df33a695`): planner origins renumbered monotonically, so the r2 owner is
+  no longer 1298. `:783-802` now selects it by shape. The `:817` ignored
+  reason still says "owner 1298"; correct it when this row flips.
 - **The protocol excludes 1298 today.** An owner whose fixpoint contains a
   relay member fails closed to the Ret-tag trap (the owner protocol's AC-3
   pin), so this node starts from that exact failure.

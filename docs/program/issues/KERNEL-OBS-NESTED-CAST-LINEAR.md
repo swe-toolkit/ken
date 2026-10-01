@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-NESTED-CAST-LINEAR
 title: "Reducing a nested Cast in public whnf repeats conversion work at each level, because cast_reduce's regularity test converts the two type endpoints before any structural step. Make public whnf of a Cast nested k deep cost work linear in k"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
