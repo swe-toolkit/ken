@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-PARSER-LAWS
 title: "Parsing proves ParserLaws only for the one Boolean parser, so the card's stated behaviour of parser_pure and parser_fail and of every parser_from_decoder parser is unproved prose. Prove a generic ParserLaws for parser_from_decoder under DecoderPreservesBounded, with parser_pure and parser_fail as instances, at zero TCB"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T1
