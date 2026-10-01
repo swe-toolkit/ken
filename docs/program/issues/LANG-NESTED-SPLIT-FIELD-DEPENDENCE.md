@@ -94,6 +94,10 @@ alias used across a nested-splitting inner match, reporting any runtime
    (`build_ctor_buckets`), so method domains are off by `n_args0 - 1`
    (`evt_24geh629pgfz1`, §1a 1). Repair: rebase the tail per constructor at
    the nested split; a two-field constructor pins the +1 direction.
+2. The IH tail entry of a reverted convoy was copied into a nested bucket
+   unrebased (the `ColKind::Ih` skip in the rebase). It was written under x',
+   in a bucket where x' is replaced by `n_args0` fields. Keyed on tail-entry
+   kind (`evt_378pchbn859mr`, §1a 2).
 
 ## Stop conditions
 
