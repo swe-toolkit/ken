@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-01 15:57:39Z — from 818 issue file(s) in `docs/program/issues/`.
+2026-10-01 16:25:20Z — from 818 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -313,7 +313,7 @@ the committed file matches the generator's output.
 | `LANG-INTERVENING-LET-FRAME-WEAKENING` | An intervening let between an outer match's premise and a nested match reaches install_index_refinements and dies in refine_branch_goal with 'could not classify the branch goal: TypeMismatch' -- and the Architect refused 'orthogonal', because the reported found term carries LANG-CONVOY's own D1 signature and there is an influence path through RVar resolution | merged | language | S | none | — |
 | `LANG-KENFMT-AXIOM-CLOSING-PAREN` | Formatter repair: ken fmt must print a valid axiom declaration whose type ends in a parenthesized application without dropping the final closing parenthesis, so formatting is parse-preserving and idempotent on every axiom shape | merged | foundation | S | architect | — |
 | `LANG-KENFMT-SELECTIVE-IMPORT-WRAP` | kenfmt: breakable selective-import item lists — teach the layout engine to wrap a selective-import item list at CANONICAL_WIDTH so a wide import renders width-conformant, with byte-idempotence and exact parse/token-shape preservation. Pure layout; zero parser/import-relation/kernel change. The reusable predecessor the Tier-C/D/E import migration needs (every multi-item dictionary import hits the 96-col wall). | merged | language | S | none | — |
-| `LANG-L1-ACCEPTANCE-ROWS` | Un-ignore the three l1_acceptance rows (explicit Int.toInt64 conversion, the Int division-by-zero obligation, and Char literals excluding surrogates) as real assertions of the behaviour /spec already settles | active | language | M | architect | — |
+| `LANG-L1-ACCEPTANCE-ROWS` | Un-ignore two l1_acceptance rows as real assertions of settled behaviour: the explicit Int to Int64 conversion (delivered as intToInt64) and Char literals excluding surrogates. The Int division row stays ignored until the operator rules on registering div_int and mod_int | active | language | S | architect | — |
 | `LANG-LEX-HEX-FLOAT` | Both spec literal tables give `0x1p-3` as a `Float` form, but the lexer has no hex-float path at all -- and unlike every other numeric form in this arc it cannot be reached by handing a string to `parse::<f64>()`, because Rust's float parser rejects hex-float syntax, so the value must be assembled and correctly rounded by hand | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1885 |
 | `LANG-LEX-NUMERIC-FORMS` | The lexer implements none of the numeric literal forms 31-lexical and 35-numbers list besides bare decimal -- no `1_000` separators, no `0xFF`/`0b1010`/`0o17` radix integers, no `0x1p-3` hex float -- and `1e-9`, which both spec tables give as the canonical Float example, does not lex as a float at all because the exponent branch is gated on having seen a dot | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1881 |
 | `LANG-LEX-PROJECTION-ADJACENCY` | The positional-projection lexer guard tests raw character adjacency, so exactly one of four spacing variants fails -- `p.1.2`, `p.1 .2` and `p. 1 .2` all lex as two projections while `p. 1.2` lexes as `Dot, FloatLit(1.2)` -- and the refusal comes from the number scanner rather than from any grammar rule | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/1864 |
