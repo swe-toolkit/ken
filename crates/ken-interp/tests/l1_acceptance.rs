@@ -8,7 +8,7 @@
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal, ObligationKind};
 use ken_elaborator::extract::{v2_extract, ProvKind};
-use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_interp::eval::{eval, eval_vals_eq, EvalStore, EvalVal};
 use ken_kernel::env::Context;
 use ken_kernel::{convert, Decl, GlobalId, KernelError, Term};
 
@@ -283,15 +283,60 @@ fn ac5_no_implicit_cross_type_coercion() {
     assert_eq!(*found, Term::const_(env.numeric_env.int64_id, vec![]));
 }
 
-/// Not conformance cover; waits on L-classes to expose `Int.toInt64`.
+/// surface/numbers/explicit-conversion-is-partial-option (soundness)
+/// Promise class: durable invariant (35 §5, seed-numbers AC5).
+/// The spec/conformance spelling `Int.toInt64` is not yet a surface name;
+/// `intToInt64` is the delivered, derived conversion with the same behavior.
+/// MEASURED: checked calls at both signed bounds return Some with their exact
+/// payloads; the next integers return None. CLAIMED: explicit narrowing is
+/// partial and never silently wraps. THE GAP: this pins only Int→Int64, not
+/// other conversion widths or implicit-coercion refusal (the preceding test).
 #[test]
-#[ignore = "explicit conversions require L-classes or a separate conversion WP"]
 fn ac5_explicit_conversion_is_partial_option() {
     let mut env = ElabEnv::new().unwrap();
-    // Int.toInt64 : Int → Option Int64  (total, may fail if out of range)
-    let _result = env.elaborate_decl_v1(
-        "fn f (x : Int) = Int.toInt64 x"
-    ).unwrap();
+    env.elaborate_decl_v1("fn f (x : Int) : Option Int64 = intToInt64 x")
+        .expect("the named conversion checks with an explicit result type");
+    let some_id = env.prelude_env.some_id;
+    let none_id = env.prelude_env.none_id;
+
+    for (source, expected, boundary) in [
+        (
+            "const max_i64 : Option Int64 = f 9223372036854775807",
+            Some(9223372036854775807_i128),
+            "Int64 maximum",
+        ),
+        (
+            "const above_max_i64 : Option Int64 = f 9223372036854775808",
+            None,
+            "one above Int64 maximum",
+        ),
+        (
+            "const min_i64 : Option Int64 = f (sub_int 0 9223372036854775808)",
+            Some(-9223372036854775808_i128),
+            "Int64 minimum",
+        ),
+        (
+            "const below_min_i64 : Option Int64 = f (sub_int 0 9223372036854775809)",
+            None,
+            "one below Int64 minimum",
+        ),
+    ] {
+        let result = env.elaborate_decl_v1(source).expect("boundary call checks");
+        let value = eval_def(&env, &mut make_store(&env), result.def_id);
+        match (expected, &value) {
+            (Some(expected), EvalVal::Ctor { id, args, .. })
+                if *id == some_id && args.len() == 2 =>
+            {
+                assert!(
+                    eval_vals_eq(&args[1], &EvalVal::from(expected)),
+                    "{boundary}: Some payload must equal {expected}, got {:?}",
+                    args[1]
+                );
+            }
+            (None, EvalVal::Ctor { id, args, .. }) if *id == none_id && args.len() == 1 => {}
+            _ => panic!("{boundary}: wrong Option constructor or payload: {value:?}"),
+        }
+    }
 }
 
 // ── AC6: Decimal exact / Float honest ────────────────────────────────────────
@@ -328,7 +373,7 @@ fn ac6_float_not_exact() {
 
 /// Not conformance cover; waits on integer division op registration.
 #[test]
-#[ignore = "integer division not yet in scope for L1; requires div op registration"]
+#[ignore = "needs operator-approved div_int/mod_int registration (18a GAP)"]
 fn sec31_int_div_zero_emits_obligation() {
     let mut env = ElabEnv::new().unwrap();
     let _result = env.elaborate_decl_v1(
@@ -423,11 +468,38 @@ fn sec62_abstract_add_is_neutral() {
 
 // ── §2.4: Char excludes surrogates ──────────────────────────────────────────
 
-/// Not conformance cover; waits on Char literal syntax.
+/// surface/numbers/char-excludes-surrogates (soundness)
+/// Promise class: durable invariant (31 §3, 35 §2).
+/// MEASURED: a Char literal and the scalars adjacent to the surrogate block
+/// check, while both surrogate endpoints reject with InvalidEscape. CLAIMED:
+/// the literal lexer excludes Unicode surrogates. THE GAP: named Int→Char
+/// refinement introductions are a separate obligation, not covered here.
 #[test]
-#[ignore = "Char literal syntax not yet in scope for L1"]
 fn sec24_char_excludes_surrogates() {
-    // Char literals + surrogate validation deferred to the surface syntax WP.
+    let mut env = ElabEnv::new().unwrap();
+    for source in [
+        "const valid : Char = 'a'",
+        r"const before_surrogate : Char = '\u{D7FF}'",
+        r"const after_surrogate : Char = '\u{E000}'",
+    ] {
+        env.elaborate_decl_v1(source)
+            .unwrap_or_else(|error| panic!("valid scalar {source:?} rejected: {error:?}"));
+    }
+    for source in [
+        r"const first_surrogate : Char = '\u{D800}'",
+        r"const last_surrogate : Char = '\u{DFFF}'",
+    ] {
+        let error = env
+            .elaborate_decl_v1(source)
+            .expect_err("a surrogate escape cannot construct a Char literal");
+        match error {
+            ElabError::InvalidEscape { reason, .. } => assert_eq!(
+                reason, "unicode escape is not a valid scalar value",
+                "wrong rejection for {source:?}"
+            ),
+            other => panic!("{source:?} must reject at the scalar screen: {other:?}"),
+        }
+    }
 }
 
 // ── Int8 obligation cross-case sweep ─────────────────────────────────────────
