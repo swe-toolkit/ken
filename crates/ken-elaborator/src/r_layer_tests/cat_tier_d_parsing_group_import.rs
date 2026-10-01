@@ -643,6 +643,7 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
             "DecoderPreserves",
             "DecoderRejected",
             "DecoderResult",
+            "DecoderResultPreserved",
             "decoder_alt",
             "decoder_alt_preserves",
             "decoder_alt_rejection_uses_second",
