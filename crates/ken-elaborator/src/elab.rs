@@ -15833,8 +15833,9 @@ fn infer_virtual_pattern_alias(
         .ok_or_else(|| ElabError::TypeMismatch {
             span: span.clone(),
             reason: format!(
-                "split-column binder '{name}' has no available matrix occurrence; \
-                 annotate the match result or use a separate match"
+                "split-column binder '{name}' is bound by a variable row while another field \
+                 of the same constructor is also split; bind it by its constructor pattern \
+                 in each arm or split it in a separate match"
             ),
         })?;
     materialize_pattern_alias(cx, alias, name).map(Some)
@@ -21974,6 +21975,125 @@ mod nested_lift_association_tests {
                 error: KernelError::VarOutOfScope { index: 100, depth: 3 },
                 span,
             }) if span == *recursive.span()
+        ));
+    }
+}
+
+/// Match-frame ownership controls for nested method closure and alias
+/// finalization. Source-level value controls live in the field-dependence suite.
+#[cfg(test)]
+mod nested_method_alias_frame_tests {
+    use super::{
+        assert_nested_method_alignment, finalize_alias_sentinels_for_check,
+        finish_pattern_alias_term_frame, nested_method_ih_positions, pattern_alias_sentinel,
+        weaken_woven, ElabCtx, InMatrixCheck, PatternAliasReplacement, PatternAliasTypeFrame,
+    };
+    use crate::{ElabEnv, ElabError};
+    use ken_kernel::{inductive::method_type, Level, Term};
+    use std::collections::{HashMap, HashSet};
+
+    fn push_frame(cx: &mut ElabCtx<'_>, root: usize, id: usize) {
+        cx.pattern_alias_replacement_frames.push(HashMap::from([(
+            id,
+            PatternAliasReplacement {
+                occurrence: Term::var(0),
+                real_depth: 0,
+            },
+        )]));
+        cx.pattern_alias_frame_roots.push(root);
+        cx.pattern_alias_type_frames.push(PatternAliasTypeFrame {
+            aliases: HashMap::new(),
+            or_slots: HashSet::new(),
+            or_common_depths: HashMap::new(),
+            type_mismatch: None,
+            hidden_slots: HashSet::new(),
+        });
+    }
+
+    #[test]
+    fn grouped_recursive_ih_domains_match_nested_method_telescope() {
+        // Durable invariant: the kernel's grouped IH positions, not field
+        // arithmetic alone, determine which method domains are IHs.
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_file(
+            "data Branch : Type where { Leaf : Branch; Node : Branch → Nat → Branch → Branch }",
+        )
+        .expect("binary constructor");
+        let branch = env.globals["Branch"];
+        let ind = env.env.inductive(branch).expect("checked inductive");
+        let motive = Term::lam(Term::indformer(branch, vec![]), Term::ty(Level::Zero));
+        let method = method_type(&env.env, ind, 1, &motive, &[], &[])
+            .expect("checked method type");
+        let positions = nested_method_ih_positions(&method, &motive, 5);
+        assert_eq!(positions, [3, 4]);
+        assert!(assert_nested_method_alignment(ind, 1, &positions, 3, 2, 0, 5).is_ok());
+        assert!(matches!(
+            assert_nested_method_alignment(ind, 1, &[2, 4], 3, 2, 0, 5),
+            Err(ElabError::Internal(reason)) if reason.contains("misaligned")
+        ));
+    }
+
+    #[test]
+    fn own_alias_is_ready_but_enclosing_alias_defers_the_inner_query() {
+        // Durable invariant: only the current match frame can finalize its
+        // own occurrence before its enclosing frame has woven its binders.
+        let mut env = ElabEnv::new().expect("prelude");
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "nested-alias-frame-test",
+        );
+        push_frame(&mut cx, 0, 0);
+        let InMatrixCheck::Ready(own) = finalize_alias_sentinels_for_check(
+            &cx, &pattern_alias_sentinel(0), 1,
+        ).expect("owned alias finalizes") else {
+            panic!("own-frame alias must be checked in matrix");
+        };
+        assert_eq!(own, Term::var(1));
+
+        push_frame(&mut cx, 1, 1);
+        let both = Term::app(pattern_alias_sentinel(1), pattern_alias_sentinel(0));
+        let InMatrixCheck::Deferred(inner) = finalize_alias_sentinels_for_check(
+            &cx, &both, 2,
+        ).expect("enclosing alias survives") else {
+            panic!("enclosing alias must defer the inner query");
+        };
+        assert_eq!(inner, Term::app(Term::var(1), pattern_alias_sentinel(0)));
+        assert_eq!(weaken_woven(&cx, &pattern_alias_sentinel(0), 1)
+            .expect("enclosing alias passes through"), pattern_alias_sentinel(0));
+        assert_eq!(weaken_woven(&cx, &pattern_alias_sentinel(1), 1)
+            .expect("current alias gains synthetic depth"),
+            Term::var(super::PATTERN_ALIAS_SENTINEL_BASE
+                + super::PATTERN_ALIAS_SENTINEL_STRIDE + 1));
+    }
+
+    #[test]
+    fn unregistered_alias_fails_at_query_woven_shift_and_outermost_pop() {
+        // Durable invariant: deferral is only for aliases owned by an
+        // enclosing frame; unknown sentinels cannot enter the kernel.
+        let mut env = ElabEnv::new().expect("prelude");
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "unknown-alias-test",
+        );
+        push_frame(&mut cx, 0, 0);
+        let unknown = pattern_alias_sentinel(7);
+        assert!(matches!(
+            finalize_alias_sentinels_for_check(&cx, &unknown, 1),
+            Err(ElabError::Internal(reason)) if reason.contains("registered in no active frame")
+        ));
+        assert!(matches!(
+            weaken_woven(&cx, &unknown, 1),
+            Err(ElabError::Internal(reason)) if reason.contains("registered in no active frame")
+        ));
+        assert!(matches!(
+            finish_pattern_alias_term_frame(&mut cx, Ok(unknown)),
+            Err(ElabError::Internal(reason)) if reason.contains("remained after the outermost match frame")
         ));
     }
 }
