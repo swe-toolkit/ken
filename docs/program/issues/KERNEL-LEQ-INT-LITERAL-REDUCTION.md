@@ -61,6 +61,11 @@ stop and report the mismatch.
   `evt_7sa4v62w5xqkj`, `evt_44a12zma9rzdn`; Architect `evt_4j4109frj9gq6`).
   - `spec/10-kernel/17-conversion.md` §1 (a **prim** row, the `Op` bullet,
     the neutral list) and the `whnf` pseudocode, per the Architect's text.
+    Also the termination rationale in §3.2 and §5.1, which says prim
+    strictly contracts and Const is the only source of term growth: it
+    accounts for the finite, size-increasing checked-literal
+    `string_to_list_char` view (CV `evt_4j6eg9eeh1pvt`). The Architect
+    approves that text; the termination claim itself is unchanged.
   - `spec/10-kernel/18-judgments.md` §4.2 and §5, and
     `spec/10-kernel/18a-primitive-registry.md` introduction, §5 and
     §5.2.2(3): name the pair, never "sole", and keep the interpreter's
