@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-REDUCT-WITNESS-TYPING
 title: "The observational reducer synthesizes Refl as the proof witness in four reducts where the stated Eq relates two different types, so each reduct fails to typecheck (subject reduction fails) and a J over such a reduct goes stuck. Derive each witness from the reduction's own evidence, as spec 16 §3.2 and §4.1 specify"
-status: ready
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -178,6 +178,22 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
     AC-2c's recorded-endpoint rows are exempt: their old `TypeMismatch`
     from whnf-derived endpoints is the contract's intended flip (Architect
     `evt_2phd95mnmawad`).
+
+## Closeout
+
+Merged `a02cecfed` (PR #4420), exact `85106634f`: Kernel QA
+`evt_7jqfz8kffx4zc`, Architect `evt_7dazvtjgv73jp`, Decision
+`dec_59ev8vgqkdv59`.
+
+- Sites 1, 2 and 4 derive each witness as a checked `J` along the
+  reduction's own evidence, and `type_eq_by_j` returns only checked
+  witnesses. No fabricated `Refl` remains at those sites.
+- `j_endpoints` reads a kernel-checked `Ascript(e, Eq A a b)` recording for
+  `infer_j` and `j_nonrefl`, and the elaborator's surface `infer_j` records
+  it. `trusted_base()` is unchanged.
+- The CAT provider-population pins are 145/62/50: the base 136/60/50 plus
+  9/2/0 calls inside J recordings.
+- Site 3 and the Class A rows move to `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
 
 ## Stop conditions
 
