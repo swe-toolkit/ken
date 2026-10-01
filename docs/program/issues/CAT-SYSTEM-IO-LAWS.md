@@ -86,6 +86,26 @@ The ruling decides three things:
   names;
 - how the host response premise is spelled.
 
+## AC-0 ruling (Architect `evt_22nte6kpr12t9`, probed at `3150e9331`)
+
+- **A named step function**, not a trace reading. `private_write_all_fuel`
+  is reshaped into `private_write_all_after_wrote`,
+  `private_write_all_step` and the loop, plus `private_write_all_next`
+  after `writeAll`. The four declarations are as given in the ruling.
+- **The laws live prelude-side**, after `writeAll` and before
+  `hide_prelude_names`. The new helpers and `write_all_refl` join
+  `private_names`, and the theorem names stay public. The step must stay
+  private: it would otherwise produce a public `BufferSpan`.
+- **The premise** (respelled by Architect `evt_7s1szzxdss4s6`).
+  `write_all_count_fits span count` in `System.IO` is
+  `add (transfer_count_nat count) (transfer_count_remaining count) =
+  buffer_span_budget span`, with `add` from `Data.Numeric.Nat.Arithmetic`.
+  It holds on each `Wrote` response, and `Err` responses carry no premise.
+  - `System.IO` does not import `Data.Numeric.Nat.Order`, whose trust
+    closure carries `LawfulClasses` axioms.
+  - The prelude adds the public `transfer_count_predecessor` and
+    `transfer_count_nat_succ`.
+
 ## Deliverable
 
 `System.IO` publishes kernel-checked theorems over `writeAll`, or over the
@@ -102,23 +122,53 @@ There is no `Axiom`, no `trusted_base()` change and no kernel change.
 
 ## Acceptance
 
-- **AC-1.**
-  - Each clause is a theorem whose statement names `writeAll` or the loop
-    AC-0 names.
-  - Each is checked in the `System.IO` load.
+- **AC-1 (amended to the AC-0 ruling, Architect `evt_22nte6kpr12t9`).**
+  - Each clause is a pairing. The loop half is a prelude law whose
+    statement names `writeAll` or the loop: `write_all_entry`, `_stop`,
+    `_request`, `_first_error_step`, `_done`, `_continue` and
+    `_advance_start`. The arithmetic half is a `System.IO` theorem (S1-S3,
+    in additive-witness form, `evt_7s1szzxdss4s6`) under
+    `write_all_count_fits`. No single catalog theorem can name the
+    loop (G1, G2, visibility).
+  - Both halves are checked in the `System.IO` load. The `System.IO` card
+    maps each §1.7.3 clause to its laws.
+  - `cat_capability_laws_prelude_move` passes unchanged, and `System.IO`
+    adds no trusted declaration.
 - **AC-2 (controls).**
   - Success completeness without the response premise is rejected, and the
     failure is the fuel-`Zero` case.
-  - First error with a different error on the right is rejected.
+  - First error with a different error on the right is rejected. It names
+    private constants, so it is a Rust-side test: it elaborates before
+    `hide_prelude_names`, or it kernel-checks the false `write_all_refl`
+    instance. If neither route exists without a production change, stop to
+    the Architect.
+  - The premise-free S2 is a `System.IO` `ken reject` fence.
+- **AC-2b (SEAL-2 oracle, Architect `evt_zek8rgw9ssg7`).** Scope adds
+  `crates/ken-elaborator/src/seal2_tests/support.rs` and
+  `seal2_tests/adversary_repros.rs`. This is test support only.
+  - `result_type_produces` classifies the unreduced type before it reduces
+    it. An Ω-sorted result is not a producer, so `write_all_request` stays
+    public with its statement unchanged.
+  - Reverting to reduce-then-classify turns both TransferCount closure pins
+    red with `{"write_all_request"}`.
+  - The alias-producer repro and every existing positive repro stay green.
+  - A new positive control: a public `fn` whose result is a `def` alias of
+    `TransferCount` under a Π is still flagged.
   - Each `ken reject` fence rejects a false claim and accepts its adjacent
     true twin. A fence closed by `Refl` on a closed inductive equation
     rejects true twins too, and does not count (Architect
     `evt_bbf8w6ww9208`).
 - **AC-3.** These suites stay green:
-  - `px8f_buffer_io_surface`;
+  - `px8f_buffer_io_surface`, with the new private names in its sealed
+    list;
   - `cat_capability_laws_prelude_move`;
   - the `System.IO` catalog load;
-  - `writeAll` execution behavior is unchanged.
+  - `seal2_tests::adversary_repros`;
+  - `writeAll` execution behavior is unchanged: the executing
+    `ken-verify` `px8f_write_partition` row and the buffer-io conformance
+    seed, since the step closure changes the lowered shape. The
+    `rt_parity_native.rs` range is a source-scope seal, not an execution
+    row.
 
 ## Stop conditions
 
@@ -132,3 +182,15 @@ needs a named continuation or a trace reading, so AC-0 rules it. Success
 completeness is false without the response premise (fuel `Zero` returns
 `Ok`). 3 fired: I grepped `.rs`, `.md` and `.ken` across the repository for
 the helper names and found six consumer sites, none of them migrated.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 2 (Architect `evt_zek8rgw9ssg7`).
+
+1. The premise was spelled over a prelude name that is migrating to a
+   catalog owner, and the bounds used a trust-carrying module (keyed on
+   assuming a name's home and its trust closure without measuring the
+   module graph). Ruled `evt_7s1szzxdss4s6`.
+2. A proof-only public theorem whose statement mentions private carriers
+   was classified as a producer (keyed on the reduced form of the type
+   rather than its sort).
