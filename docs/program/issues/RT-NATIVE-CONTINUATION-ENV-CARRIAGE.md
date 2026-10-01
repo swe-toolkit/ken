@@ -72,6 +72,30 @@ After an Architect-ruled AC-0, the recursive-position residual carries the
 captures the planner cannot recover as fields of its word. Both readers
 decode them from the word they hold, and the side slot is retired.
 
+**Residual key** (Architect `evt_ssrh7r6dx3ty`, after stop 3 and Research
+`evt_gxbcep9fm90s`). The label is the planner's continuation specialization,
+which is recorded at interning (`ContinuationSpecializationKey`). Nothing is
+reconstructed from term geometry.
+
+- **Issuer.** Each context C issues one disposition at its enclosing
+  specialization S's recorded creation site. That site gives the parent
+  (`producer_construct_origin`), the position, the owner (`emission_owner`)
+  and the label (`S.id`). The source-occurrence scan and its
+  constructor-identity key are deleted.
+- **Gate.** The candidate set is the specializations whose key names this
+  eliminator, constructor and position, sorted by
+  `ContinuationSpecializationId`. A set of size 1 behaves as today. A larger
+  set dispatches on the static label.
+- **The gate refuses, fail-closed,** on:
+  - a label out of range;
+  - a field-count mismatch;
+  - a candidate set that mixes specializations with and without a residual
+    disposition.
+- **ADR.** The WP's `docs/adr/0023-defunctionalized-recursive-position-residual.md`
+  is amended in the same build. Reynolds labels are
+  continuation specializations, which are creation sites recorded at
+  interning.
+
 ## Acceptance
 
 - **AC-0 (measure; no build).** Done so far: the suffix census, record
@@ -100,9 +124,26 @@ decode them from the word they hold, and the side slot is retired.
 
     No demand distinction, and no relaxation of side slots or captures.
   - The IR passes the Cranelift verifier.
+- **AC-3 (residual key, `evt_ssrh7r6dx3ty`).**
+  - **D0 (measure; no build).** For specializations 2 and 3, report:
+    - the expression kind at `args[recursive_position]`;
+    - the specialization's `emission_owner`;
+    - whether every W and M capture resolves under that owner through the
+      existing availability claims. `CurrentLexical` does not count as
+      resolved.
+  - **Controls.**
+    - Swapping the two labels at gate 12 reddens.
+    - Restoring the source scan changes the census or makes the gate refuse.
+  - **Census pins.**
+    - No disposition has a parent constructor that differs from its gate's.
+    - Each gate's candidate-set size is recorded, with a count of the gates
+      whose set is larger than 1.
+    - There are no mixed-disposition refusals.
 
 ## Stop conditions
 
+- A W or M capture that does not resolve at the creation site (AC-3 D0):
+  stop with that capture named, for the Architect to rule.
 - A suffix operand not in hand where the residual is materialized: the
   def-use rows name the carriage path, and the Architect sizes it. Do not
   add a second carriage mechanism.
