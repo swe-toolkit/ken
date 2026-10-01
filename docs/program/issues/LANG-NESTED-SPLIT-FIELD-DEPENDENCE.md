@@ -94,10 +94,19 @@ alias used across a nested-splitting inner match, reporting any runtime
    (`build_ctor_buckets`), so method domains are off by `n_args0 - 1`
    (`evt_24geh629pgfz1`, §1a 1). Repair: rebase the tail per constructor at
    the nested split; a two-field constructor pins the +1 direction.
-2. The IH tail entry of a reverted convoy was copied into a nested bucket
-   unrebased (the `ColKind::Ih` skip in the rebase). It was written under x',
-   in a bucket where x' is replaced by `n_args0` fields. Keyed on tail-entry
-   kind (`evt_378pchbn859mr`, §1a 2).
+2. Zero `ih'` `VarOutOfScope`; the Architect misattributed the cause to the
+   tail-rebase skip (`evt_378pchbn859mr`, §1a 2; corrected
+   `evt_4yewspasn0fps`).
+3. A woven IH domain in a nested bucket is produced from the root method's
+   cached domain by de Bruijn arithmetic (`indexed_root_ih_domain`: shift by
+   ordinal, weaken by `real_depth_so_far − field_count`). A nested split that
+   reverts the IH's field (`t` becomes `t'`) and replaces x' invalidates the
+   arithmetic. Keyed on the domain's producing frame (`evt_4yewspasn0fps`,
+   §1a 3; Research advisory pending).
+
+Shared predicate (`evt_4yewspasn0fps`): a nested method binder's domain is
+built by de Bruijn arithmetic on a term from another frame, not read from the
+eliminator it feeds.
 
 ## Stop conditions
 
