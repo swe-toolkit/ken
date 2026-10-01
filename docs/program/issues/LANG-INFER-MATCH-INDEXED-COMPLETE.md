@@ -114,6 +114,10 @@ that cannot be lowered each either check or give a surface diagnostic.
     these fixtures. Measure which branch the nested repro takes.
   - The landed `lang_infer_match_index_coverage.rs` rows keep their
     results.
+  - Name resolution across a split (`evt_1rhn5vnrq8egf`): a variable bound
+    on a split column is referenced in the arm body, and a later field is
+    referenced past the split. One row for a non-indexed family and one for
+    an indexed family, run in a debug build.
   - Each mutation reddens only its own row:
     - reverting the dispatch reddens the complete-match rows;
     - reverting the suffix application brings back `Internal`;
@@ -125,6 +129,16 @@ that cannot be lowered each either check or give a surface diagnostic.
   - A genuinely reachable missing constructor still raises
     `ExhaustivenessError`, and so does a nested-column omission.
   - The 61-file catalog census is byte-identical.
+  - Debug-profile gates (`evt_1rhn5vnrq8egf`; the census is release-built
+    and cannot see a `debug_assert`): `ken-cli --test rt_parity_native`,
+    every `lang_match_*` target, the `match_matrix_occurrence_tests` lib
+    module, and the targets behind CI shards 1, 4, 5, 6 and 7, each named
+    with its result.
+- **Column visibility stays uniform** (`evt_1rhn5vnrq8egf`). A column's
+  `surface_binder` is one value for every row (`elab.rs:17993`). A row whose
+  own pattern does not source-bind a surface-visible column records that
+  position on its `RowState` and hides it at the leaf, read from the
+  occurrence's `source_binding` flag. Changing a column-level flag is a stop.
 
 ## Stop conditions
 
@@ -135,7 +149,8 @@ that cannot be lowered each either check or give a surface diagnostic.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 3 (Architect `evt_2t2kabhh5rhgn`; research `evt_4m927ydg0rd7z`).
+§1a count: 4 (Architect `evt_2t2kabhh5rhgn`, `evt_1rhn5vnrq8egf`; research
+`evt_4m927ydg0rd7z`).
 
 1. The nested matrix split builds `Elim` with the indices inside `params`
    and `indices: []` (keyed on the construction site instead of the
@@ -146,6 +161,11 @@ that cannot be lowered each either check or give a surface diagnostic.
 3. Nested method domains carry `root_motive m tl` built under the nested
    motive's binder and reuse it under the constructor-field telescope.
 
-Shared predicate: the nested split hand-assembles a piece of an eliminator
-that the kernel re-derives from that eliminator's own inputs. Closed by
+4. A per-row source-slot difference (a variable row binds the split value,
+   a constructor row binds its fields) was expressed as the column-level
+   `surface_binder`, which the all-flat push requires to be uniform (keyed
+   on the column instead of the row).
+
+Entries 1-3 shared predicate: the nested split hand-assembles a piece of an
+eliminator that the kernel re-derives from that eliminator's own inputs. Closed by
 reverting dependent hypotheses (`evt_q0h185p9bckb`).
