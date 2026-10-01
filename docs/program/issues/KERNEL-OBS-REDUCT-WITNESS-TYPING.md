@@ -156,8 +156,11 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
     still rejected with `BadEliminator`.
   - `J` over an `Eq` reached only by δ-unfolding a def keeps today's
     verdict.
-  - The 57-package census shows no accept→reject flip. New accepts appear
-    only where the old verdict was this exact `BadEliminator`.
+  - The 57-package census shows no accept→reject flip. New census accepts
+    appear only where the old verdict was this exact `BadEliminator`.
+    AC-2c's recorded-endpoint rows are exempt: their old `TypeMismatch`
+    from whnf-derived endpoints is the contract's intended flip (Architect
+    `evt_2phd95mnmawad`).
 
 ## Stop conditions
 
