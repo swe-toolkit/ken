@@ -72,6 +72,24 @@ exercises**, exactly the way `DecEq Bool` already works via `eq_at_inductive`.
 - The **universal** laws (Layer 1) stay trusted; **concrete** equality no longer
   is.
 
+### Layer 2 extension — literal Int ordering (KERNEL-LEQ-INT-LITERAL-REDUCTION)
+
+The operator approved one additional kernel WHNF computation on 2026-10-01:
+
+```
+leq_int (IntLit m) (IntLit n)  ⇝  True   if m <= n
+                              ⇝  False  otherwise
+```
+
+This is the registered `leq_int : Int → Int → Bool` operation only, using the
+same arbitrary-precision `BigInt <=` comparison as the interpreter. Both
+operands weak-head normalize before the literal guard; if either is not a
+literal, the call remains neutral. The other Int operations, including
+`eq_int`, do not gain kernel Op reduction. This extends the audited kernel
+computation, not the trusted certificate or postulate inventory. It allows
+closed `isScalar` and `PosInt` refinement obligations to reduce without the
+elaborator asserting their truth. See spec `16 §2.2` for the reduction rule.
+
 ## Consequences
 
 - **`Char` rides free.** Refinement carrier-lowering means `Char` *is* `Int`

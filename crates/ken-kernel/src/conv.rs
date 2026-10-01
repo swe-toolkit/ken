@@ -16,7 +16,7 @@
 //! δ-unfolding terminates because `whnf`'s δ step only ever unfolds a
 //! definition the gate has already certified.
 
-use crate::env::{Context, GlobalEnv};
+use crate::env::{Context, Decl, GlobalEnv, PrimReduction};
 use crate::inductive::{iota_reduct, peel_app};
 use crate::subst::{subst0, subst_levels, weaken};
 use crate::term::{GlobalId, Level, Term};
@@ -148,6 +148,66 @@ fn whnf_progress_mode(
                 let (f_w, fp) =
                     whnf_progress_mode(env, ctx, f, defer_head_delta, defer_stuck_nested_delta);
                 iota |= fp.iota;
+                // ADR 0013 Layer 2: the registered leq_int on two IntLit
+                // values computes by the same BigInt <= as the interpreter.
+                // The operation must have the registered Int -> Int -> Bool
+                // signature; any non-literal operand leaves the call neutral.
+                if let Term::App(op, lhs) = &f_w {
+                    if let Term::Const { id, level_args } = op.as_ref() {
+                        if level_args.is_empty() {
+                            let bool_ctors = match (env.lookup(*id), env.int_lit_type()) {
+                                (
+                                    Some(Decl::Primitive {
+                                        ty: Term::Pi(first_ty, rest),
+                                        reduction: PrimReduction::Op { symbol: "leq_int" },
+                                        ..
+                                    }),
+                                    Some(int_id),
+                                ) if first_ty.as_ref() == &Term::const_(int_id, vec![]) => {
+                                    match rest.as_ref() {
+                                        Term::Pi(second_ty, result_ty)
+                                            if second_ty.as_ref()
+                                                == &Term::const_(int_id, vec![]) =>
+                                        {
+                                            match result_ty.as_ref() {
+                                                Term::IndFormer { id: bool_id, level_args }
+                                                    if level_args.is_empty() => env
+                                                        .inductive(*bool_id)
+                                                        .filter(|ind| {
+                                                            ind.params.is_empty()
+                                                                && ind.indices.is_empty()
+                                                                && ind.constructors.len() == 2
+                                                                && ind.constructors.iter().all(|c| {
+                                                                    c.args.is_empty()
+                                                                        && c.target_indices.is_empty()
+                                                                })
+                                                        })
+                                                        .map(|ind| {
+                                                            (
+                                                                ind.constructors[0].id,
+                                                                ind.constructors[1].id,
+                                                            )
+                                                        }),
+                                                _ => None,
+                                            }
+                                        }
+                                        _ => None,
+                                    }
+                                }
+                                _ => None,
+                            };
+                            if let Some((true_id, false_id)) = bool_ctors {
+                                let (lhs_w, lp) = whnf_progress(env, ctx, lhs);
+                                let (rhs_w, rp) = whnf_progress(env, ctx, a);
+                                if let (Term::IntLit(m), Term::IntLit(n)) = (&lhs_w, &rhs_w) {
+                                    iota |= lp.iota || rp.iota;
+                                    cur = Term::constructor(if m <= n { true_id } else { false_id }, vec![]);
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
                 // K3: only the registered String -> List Char operation on
                 // an immutable checked String literal. No other primitive
                 // call, nor a neutral String argument, gains reduction.
