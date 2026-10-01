@@ -764,8 +764,8 @@ pub(crate) fn j_endpoints(
     eq: &Term,
 ) -> KernelResult<(Term, Term, Term)> {
     if let Term::Ascript(_, recorded_ty) = eq {
+        infer(env, ctx, eq)?; // Check the recording before reducing it.
         if let Term::Eq(a, x, y) = eq_formation_head(env, recorded_ty) {
-            infer(env, ctx, eq)?; // Check the proof against its recording.
             return Ok((*a, *x, *y));
         }
     }

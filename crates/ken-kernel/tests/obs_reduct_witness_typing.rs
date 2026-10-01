@@ -1,4 +1,7 @@
 //! Observational reducts must remain typable at the redex's type (`16 §2.2`, §4.1).
+use std::sync::mpsc;
+use std::time::Duration;
+
 use ken_kernel::env::Context;
 use ken_kernel::term::{GlobalId, Level, LevelVar, Term};
 use ken_kernel::{
@@ -429,4 +432,36 @@ fn j_delta_alias_to_eq_keeps_prior_verdict() {
         &Term::J(Box::new(motive), Box::new(base), Box::new(e)),
         "delta alias",
     );
+}
+
+/// A recorded Eq type must be checked before head peeling. An ill-typed
+/// self-application in the annotation otherwise traps the J checker in
+/// reduction rather than rejecting its input. Durable invariant: MEASURED
+/// is an Err within 10 seconds; CLAIMED is checked-before-peel ordering;
+/// GAP is other ill-typed head forms not exercised by this fixture.
+#[test]
+fn ill_typed_recorded_eq_type_is_rejected_promptly() {
+    let (tx, rx) = mpsc::channel();
+    // Stated 64 MiB is the Architect's fixed timeout instrument: the c72
+    // unguarded loop times out at this size, while base and the fix return
+    // Err. The explicit Builder size removes the ambient thread-stack
+    // default from this comparison; it does not repair a stack regression.
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(move || {
+            let env = GlobalEnv::new();
+            let ctx = Context::new();
+            let ty0 = Term::Type(Level::zero());
+            let self_app = Term::lam(ty0.clone(), Term::app(Term::var(0), Term::var(0)));
+            let omega = Term::app(self_app.clone(), self_app);
+            let eq = Term::Ascript(Box::new(ty0.clone()), Box::new(omega));
+            let j = Term::J(Box::new(ty0.clone()), Box::new(ty0.clone()), Box::new(eq));
+            let r = infer(&env, &ctx, &j);
+            let _ = tx.send(format!("{r:?}"));
+        })
+        .unwrap();
+    match rx.recv_timeout(Duration::from_secs(10)) {
+        Ok(v) => assert!(v.starts_with("Err"), "unexpected accept: {v}"),
+        Err(_) => panic!("kernel did not return within 10s on ill-typed recorded Eq type"),
+    }
 }
