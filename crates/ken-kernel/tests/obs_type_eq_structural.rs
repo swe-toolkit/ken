@@ -485,6 +485,53 @@ fn unsupported_and_neutral_type_equalities_do_not_fabricate_components() {
     assert_eq!(whnf(&f.env, &ctx, &mismatch), mismatch);
 }
 
+/// Durable invariant: D/D only decomposes on fully applied families with
+/// equivalent level arguments. These raw controls make each guard reachable.
+#[test]
+fn inductive_arity_and_level_mismatches_stay_neutral() {
+    let f = Fixture::new();
+    let ctx = Context::new();
+    let partial = Term::app(Term::indformer(f.vec, vec![Level::zero()]), f.nat.clone());
+    let partial_eq = type_eq(partial.clone(), partial);
+    assert_eq!(whnf(&f.env, &ctx, &partial_eq), partial_eq);
+    let at_zero = f.vec(f.nat.clone(), f.zero.clone());
+    let at_one = Term::app(
+        Term::app(
+            Term::indformer(f.vec, vec![Level::zero().suc()]),
+            f.nat.clone(),
+        ),
+        f.zero.clone(),
+    );
+    let levels = eq(Term::Type(Level::zero().suc()), at_zero, at_one);
+    assert_eq!(whnf(&f.env, &ctx, &levels), levels);
+}
+
+/// Durable invariant: an Ω-level mismatch between quotient relations
+/// cannot be converted into a spurious structural component equality.
+#[test]
+fn quotient_relation_level_mismatch_stays_neutral() {
+    let f = Fixture::new();
+    let ctx = Context::new();
+    let relation = |omega: Level, body: Term| {
+        Term::Ascript(
+            Box::new(Term::lam(f.nat.clone(), Term::lam(f.nat.clone(), body))),
+            Box::new(Term::pi(
+                f.nat.clone(),
+                Term::pi(f.nat.clone(), Term::Omega(omega)),
+            )),
+        )
+    };
+    let low = relation(
+        Level::zero(),
+        eq(f.nat.clone(), f.zero.clone(), f.zero.clone()),
+    );
+    let high = relation(Level::zero().suc(), type_eq(f.nat.clone(), f.nat.clone()));
+    let a = Term::Quot(Box::new(f.nat.clone()), Box::new(low));
+    let b = Term::Quot(Box::new(f.nat.clone()), Box::new(high));
+    let pair = type_eq(a, b);
+    assert_eq!(whnf(&f.env, &ctx, &pair), pair);
+}
+
 /// Durable invariant: the domain pair of different rigid Π heads is
 /// impossible, not a spurious reflexive proof of the compound equality.
 #[test]

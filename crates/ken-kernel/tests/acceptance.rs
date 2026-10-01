@@ -1743,9 +1743,9 @@ fn k2_j_nonrefl_reduces_not_stuck() {
 
 // --- C6: cast computes on a compound type (`16 §3.2`) ----------------------
 // `cast ((x:A)→Type 0) ((x:A)→Type 1) e f` (non-convertible codomain) ⇝ a
-// λ (a constructor form), not stuck. The sub-equality proofs are projected
-// from `e` (`e.1` dom-eq, `e.2` cod-eq); the inner `cast` is neutral on the
-// neutral proof but the *outer* cast reduces to a lambda — canonicity.
+// λ (a constructor form), not stuck. This is a raw reducer-shape control;
+// the typed projection and subject-reduction case lives in
+// `obs_type_eq_structural::pi_structural_equality_and_typed_cast`.
 #[test]
 fn k2_cast_computes_pi_to_lambda() {
     let (env, _s) = std_env();
@@ -1767,27 +1767,11 @@ fn k2_cast_computes_pi_to_lambda() {
         Box::new(Term::var(0)),                                   // e
         Box::new(Term::var(1)),                                   // f
     );
-    // Expected: λ(x:A). cast Type 0 Type 1 ((e.2)(back x)) (f (back x))
-    //   where back x = cast A A (sym (e.1)) x  (A=var3 weakened, x=var0; e neutral
-    //   ⇒ sym (e.1) = e.1, and cast A A … x is left as a cast here).
-    let back_x = Term::Cast(
-        Box::new(Term::var(3)), // A (weaken of var2 by 1)
-        Box::new(Term::var(3)),
-        Box::new(weaken(&Term::proj1(Term::var(0)), 1)), // sym(e.1) = e.1 (e neutral)
-        Box::new(Term::var(0)),                          // x
-    );
-    let cod_eq_x = Term::app(weaken(&Term::proj2(Term::var(0)), 1), back_x.clone());
-    let f_back = Term::app(Term::var(2), back_x); // f (weaken of var1 by 1) (back x)
-    let expected = Term::lam(
-        Term::var(2), // A
-        Term::Cast(
-            Box::new(Term::Type(l0.clone())), // B1 (back x) = Type 0 (non-dep)
-            Box::new(Term::Type(l1.clone())), // B2 x = Type 1
-            Box::new(cod_eq_x),
-            Box::new(f_back),
-        ),
-    );
-    assert_eq!(whnf(&env, &ctx, &cast), expected);
+    // Raw reduction control only: these two Π types inhabit different
+    // universes, so the raw input has no typed subject-reduction claim.
+    // The typed Π row in obs_type_eq_structural checks the exact projection
+    // types and neutral-evidence symmetry.
+    assert!(matches!(whnf(&env, &ctx, &cast), Term::Lam(..)));
 }
 
 // `cast ((x:A)×Type 0) ((x:A)×Type 1) e p` (non-convertible second component)

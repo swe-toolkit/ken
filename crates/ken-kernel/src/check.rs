@@ -11,7 +11,7 @@
 //! Admission ([`declare_def`] … [`declare_primitive`]) re-checks every input and
 //! gates inductives on strict positivity (`14 §8`).
 
-use crate::conv::{convert, convert_type, level_eq, whnf};
+use crate::conv::{convert_type, level_eq, whnf};
 use crate::env::{
     telescope_to_pi, AllSupportSort, CheckedStringLiteral, Context, Decl, GlobalEnv, InductiveDecl,
     PrimReduction,
