@@ -61,11 +61,11 @@ stop and report the mismatch.
   `evt_7sa4v62w5xqkj`, `evt_44a12zma9rzdn`; Architect `evt_4j4109frj9gq6`).
   - `spec/10-kernel/17-conversion.md` §1 (a **prim** row, the `Op` bullet,
     the neutral list) and the `whnf` pseudocode, per the Architect's text.
-    Also the termination rationale in §3.2 and §5.1, which says prim
-    strictly contracts and Const is the only source of term growth: it
-    accounts for the finite, size-increasing checked-literal
-    `string_to_list_char` view (CV `evt_4j6eg9eeh1pvt`). The Architect
-    approves that text; the termination claim itself is unchanged.
+    Also the termination rationale: the §3.2 Termination bullet, §5
+    obligation 1, and the first sentence of §5 obligation 2. These take the
+    Architect's replacement text verbatim (`evt_5qck78fhxb98c`); any other
+    wording, or any other §17 sentence, needs the Architect's re-read. The
+    termination claim itself is unchanged (CV `evt_4j6eg9eeh1pvt`).
   - `spec/10-kernel/18-judgments.md` §4.2 and §5, and
     `spec/10-kernel/18a-primitive-registry.md` introduction, §5 and
     §5.2.2(3): name the pair, never "sole", and keep the interpreter's
@@ -94,6 +94,20 @@ stop and report the mismatch.
     `string_to_list_char` a `Neutral` stub. It distinguishes the
     installed-IDs `apply` path from the direct `prim_reduce` fallback, as
     §42 now states. Its deferred runtime face is otherwise unchanged.
+  - the CV's whole sweep at `32103f017` (`evt_2p6ar1p3jz0cp`), the closing
+    list. Each change names the two kernel-WHNF rules as the exceptions and
+    keeps every other `Op` runtime-only or K3-deferred:
+    - `conformance/README.md:183-186`: limit the collections seed's K3
+      deferral to the still-neutral operations;
+    - `conformance/surface/taxonomy/minimality.md:42`: separate interpreter
+      dispatch from kernel conversion;
+    - `conformance/surface/collections/seed-collections.md:72-79`: narrow
+      the general wording to `byte_length`/`char_length`, whose neutrality
+      expectations stay;
+    - `seed-decimal-char-demote.md:21-23`: qualify "only `eq_int` reduces"
+      as the pre-demote baseline, and separate the interpreter `leq_int` arm
+      from the kernel rule. The AC-L "no kernel backstop" text stays,
+      explicitly scoped to the runtime face.
 
 ## Acceptance
 
