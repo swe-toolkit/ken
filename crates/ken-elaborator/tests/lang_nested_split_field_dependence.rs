@@ -56,6 +56,35 @@ fn indexed_nested_sibling_type_keeps_outer_index_binder() {
 }
 
 #[test]
+fn flat_and_tail_split_controls_keep_distinct_indexed_values() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(&format!(
+        "{VEC}\ndata PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
+         fn flat (n : Nat) (xs : Vec Nat (Suc n)) : PairOut = \
+         match xs {{ VCons m x tl ↦ Out x m }}\n\
+         fn tail (n : Nat) (xs : Vec Nat (Suc n)) : PairOut = \
+         match xs {{ \
+           VCons m x VNil ↦ Out x Zero; \
+           VCons m x (VCons k y ys) ↦ Out x (Suc Zero) \
+         }}\n\
+         const flat_value : PairOut = flat Zero \
+           (VCons Nat Zero (Suc Zero) (VNil Nat))\n\
+         const tail_nil : PairOut = tail Zero \
+           (VCons Nat Zero (Suc Zero) (VNil Nat))\n\
+         const tail_cons : PairOut = tail (Suc Zero) \
+           (VCons Nat (Suc Zero) Zero \
+             (VCons Nat Zero (Suc Zero) (VNil Nat)))\n\
+         const expected_flat : PairOut = Out (Suc Zero) Zero\n\
+         const expected_nil : PairOut = Out (Suc Zero) Zero\n\
+         const expected_cons : PairOut = Out Zero (Suc Zero)"
+    ))
+    .expect("flat match and tail split retain their separate indexed values");
+    assert_normalized_equal(&env, "flat_value", "expected_flat");
+    assert_normalized_equal(&env, "tail_nil", "expected_nil");
+    assert_normalized_equal(&env, "tail_cons", "expected_cons");
+}
+
+#[test]
 fn indexed_split_result_type_keeps_ambient_parameter() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(&format!(
