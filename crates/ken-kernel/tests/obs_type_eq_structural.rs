@@ -546,6 +546,40 @@ fn two_index_changes_transport_each_dependent_field() {
     );
 }
 
+/// Durable invariant: a dependent D sub-cast retains open Γ variables
+/// when J binds its motive. A second shift by the constructor-arg count
+/// would send the type parameter out of scope and leave the cast stuck.
+#[test]
+fn open_parameter_index_rewrite_has_scoped_witness() {
+    let f = Fixture::new();
+    let mut ctx = Context::new();
+    ctx.push(Term::Type(Level::zero())); // a : Type 0
+    ctx.push(f.nat.clone()); // n : Nat
+    ctx.push(f.nat.clone()); // m : Nat
+    ctx.push(Term::var(2)); // x : a
+    ctx.push(f.vec(Term::var(3), Term::var(2))); // xs : Vec a n
+    let before_proof = type_eq(
+        f.vec(Term::var(4), f.suc(Term::var(3))),
+        f.vec(Term::var(4), f.suc(Term::var(2))),
+    );
+    ctx.push(before_proof);
+    let param = Term::var(5);
+    let n = Term::var(4);
+    let m = Term::var(3);
+    let value = [param.clone(), n.clone(), Term::var(2), Term::var(1)]
+        .into_iter()
+        .fold(Term::constructor(f.cons, vec![Level::zero()]), Term::app);
+    let source = f.vec(param.clone(), f.suc(n));
+    let target = f.vec(param, f.suc(m));
+    let redex = cast(source, target, Term::var(0), value);
+    let before = infer(&f.env, &ctx, &redex).expect("open redex typed");
+    let reduct = whnf(&f.env, &ctx, &redex);
+    assert_ne!(reduct, redex, "open indexed cast must fire");
+    assert_eq!(check(&f.env, &ctx, &reduct, &before), Ok(()));
+    let after = infer(&f.env, &ctx, &reduct).expect("inferable constructor");
+    assert!(convert_type(&f.env, &ctx, &before, &after));
+}
+
 /// Durable invariant: D/D only decomposes on fully applied families with
 /// equivalent level arguments. These raw controls make each guard reachable.
 #[test]

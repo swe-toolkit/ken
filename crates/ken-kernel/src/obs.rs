@@ -1107,7 +1107,10 @@ fn cast_at_inductive(
                         }
                     })
                     .collect::<Vec<_>>();
-                let family_at_y = subst_tel(&shift(&a_ty_tpl, j as i64 + 2, j), &family_args);
+                // Γ gains only the J motive's y and proof binders. The j
+                // constructor binders are removed by subst_tel below; unlike
+                // inductive_conjuncts, no j equality binders remain in Γ.
+                let family_at_y = subst_tel(&shift(&a_ty_tpl, 2, j), &family_args);
                 witness = type_eq_by_j_with_base(
                     env,
                     ctx,
