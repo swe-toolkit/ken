@@ -102,7 +102,11 @@ alias used across a nested-splitting inner match, reporting any runtime
    ordinal, weaken by `real_depth_so_far − field_count`). A nested split that
    reverts the IH's field (`t` becomes `t'`) and replaces x' invalidates the
    arithmetic. Keyed on the domain's producing frame (`evt_4yewspasn0fps`,
-   §1a 3; Research advisory pending).
+   §1a 3; Research advisory `evt_4p5eqpfdywk97`, ruled `evt_4jz9mx20gpqv`).
+4. Alias sentinels reach the in-matrix per-method kernel check, which is now
+   unconditional, on the formerly constant path before finalization. Keyed on
+   check-site order (`evt_434y2eqz37h5k`, §1a 4). F2 and `weaken_woven` pair
+   with the unconditional close; F2's call site widens to both paths.
 
 Shared predicate (`evt_4yewspasn0fps`): a nested method binder's domain is
 built by de Bruijn arithmetic on a term from another frame, not read from the
