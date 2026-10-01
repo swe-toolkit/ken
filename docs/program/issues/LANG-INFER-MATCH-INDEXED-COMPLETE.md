@@ -1,7 +1,7 @@
 ---
 id: LANG-INFER-MATCH-INDEXED-COMPLETE
 title: "An unannotated match on an indexed family elaborates only when it omits an arm: a complete match takes the non-indexed path and the kernel rejects it, and a root omission over a nested split reaches an Internal error. Every inferred match on an indexed family takes the one indexed path"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1
@@ -149,9 +149,8 @@ that cannot be lowered each either check or give a surface diagnostic.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 5 (Architect `evt_2t2kabhh5rhgn`, `evt_1rhn5vnrq8egf`,
-`evt_7adqqrt4k6ye9`; research `evt_4m927ydg0rd7z`). The 6th stop triggers
-research and the §1b predicate check.
+§1a count: 5, closed at landing (Architect `evt_2t2kabhh5rhgn`,
+`evt_1rhn5vnrq8egf`, `evt_7adqqrt4k6ye9`; research `evt_4m927ydg0rd7z`).
 
 1. The nested matrix split builds `Elim` with the indices inside `params`
    and `indices: []` (keyed on the construction site instead of the
@@ -175,3 +174,20 @@ research and the §1b predicate check.
 Entries 1-3 shared predicate: the nested split hand-assembles a piece of an
 eliminator that the kernel re-derives from that eliminator's own inputs. Closed by
 reverting dependent hypotheses (`evt_q0h185p9bckb`).
+
+## Closeout
+
+Merged `5d139f422` (PR #4421), exact `203f2e246`: Language QA
+`evt_18mx82ggrpv9t`, Architect `evt_1yw2sh9jtgzgv`, Decision
+`dec_6h6k27r2174er`.
+
+- Every inferred match on an indexed family takes the indexed path through
+  one builder, `matrix_family_elim`. Nested splits revert dependent
+  hypotheses, with method types from the kernel's `method_type`.
+- A variable bound on a split column resolves as a virtual alias through
+  the row's matrix occurrence. An escaping result gives
+  `InferredMatchResultEscapesPattern`.
+- The named-variable arms of `infer` and `elab_type` are `#[inline(never)]`
+  helpers, after the `map_build_acceptance` stack pin reddened CI on
+  `593cae3e6`.
+- Follow-on: `LANG-NESTED-SPLIT-CONSTANT-MOTIVE-INDEX` (`evt_5nq6e798cdgtf`).

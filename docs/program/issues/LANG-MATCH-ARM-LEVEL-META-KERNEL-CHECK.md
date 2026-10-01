@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-ARM-LEVEL-META-KERNEL-CHECK
 title: "A dependent-match arm is kernel-checked while a bare-Type level metavariable is still unsolved, so fn vid (a : Type) (n : Nat) (xs : Vec a n) : Vec a n = match xs { … } is falsely rejected with Type 0 vs Type u0 and the prelude routes 38 arms per environment into the generalized fallback. Zonk levels before any kernel query, as spec 39 requires"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
