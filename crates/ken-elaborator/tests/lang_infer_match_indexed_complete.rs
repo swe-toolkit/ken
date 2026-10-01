@@ -5,6 +5,7 @@
 //! source-to-eliminator path through `ElabEnv::elaborate_file`.
 
 use ken_elaborator::{ElabEnv, ElabError};
+use ken_kernel::{Decl, Term};
 
 const VEC: &str = r#"
 data Vec (a : Type) : Nat → Type where {
@@ -20,6 +21,36 @@ data Fin : Nat → Type where {
 }
 "#;
 
+/// A complete match has no nested eliminators: its indexed Elim is the root.
+/// Accepting the source alone cannot distinguish the dependent path from a
+/// constant indexed motive, because the shared Elim builder types both.
+fn assert_complete_match_has_index_premise(env: &ElabEnv, name: &str) {
+    fn indexed_elim(term: &Term) -> Option<&Term> {
+        if matches!(term, Term::Elim { indices, .. } if !indices.is_empty()) {
+            return Some(term);
+        }
+        term.children().into_iter().find_map(indexed_elim)
+    }
+    let id = *env.globals.get(name).expect("named checked definition");
+    let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) else {
+        panic!("named function has a kernel-checked body")
+    };
+    let Some(Term::Elim { motive, .. }) = indexed_elim(body) else {
+        panic!("complete match must emit an indexed root eliminator")
+    };
+    let Term::Ascript(expr, _) = motive.as_ref() else {
+        panic!("indexed root motive must be ascribed")
+    };
+    let mut body = expr.as_ref();
+    while let Term::Lam(_, rest) = body {
+        body = rest;
+    }
+    assert!(
+        matches!(body, Term::Pi(premise, _) if matches!(premise.as_ref(), Term::Eq(..))),
+        "indexed inferred root motive lacks its equality premise: {motive:?}"
+    );
+}
+
 #[test]
 fn complete_vec_at_variable_index_checks() {
     // MEASURED: both root methods are supplied and the indexed eliminator
@@ -32,6 +63,7 @@ fn complete_vec_at_variable_index_checks() {
          let r = match xs {{ VNil ↦ Zero; VCons m _ _ ↦ m }} in r"
     ))
     .expect("complete indexed Vec at n must check");
+    assert_complete_match_has_index_premise(&env, "complete");
 }
 
 #[test]
@@ -42,6 +74,7 @@ fn complete_vec_at_successor_index_checks() {
          let r = match xs {{ VNil ↦ Zero; VCons m _ _ ↦ m }} in r"
     ))
     .expect("adding a VNil arm to a well-typed omitted-index match must check");
+    assert_complete_match_has_index_premise(&env, "complete_suc");
 }
 
 #[test]
@@ -54,6 +87,7 @@ fn complete_fin_with_both_arms_checks() {
          let r = match i {{ FZ m ↦ Zero; FS m _ ↦ Suc m }} in r"
     ))
     .expect("complete indexed Fin with no parameters must check");
+    assert_complete_match_has_index_premise(&env, "complete_fin");
 }
 
 #[test]
