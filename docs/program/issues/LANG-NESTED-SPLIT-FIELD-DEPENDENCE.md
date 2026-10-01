@@ -57,8 +57,19 @@ together or in sequence.
 ## Deliverable
 
 The first two repros check, with arm values verified by full normalization.
-`finalize_pattern_aliases` fails closed on an unregistered sentinel. The third
-either checks or gives a diagnostic whose advice applies.
+An unregistered sentinel fails closed. The third either checks or gives a
+diagnostic whose advice applies.
+
+**Folded in: the cross-frame alias miscompilation** (Architect
+`evt_kzkfxd4aenqq`, measured `evt_358pbpsezs8`). On `5d5e7bf02`, an outer
+as-pattern alias used inside an inner match that splits a nested field
+reads the next variable in, which is a silent wrong value. The inner
+split's woven binder is counted twice. The repair is one frame-aware
+`weaken_woven` at every woven-binder site of the matrix, with the fan-in
+listed in the handoff. F2 builds on it. Owed with the handoff: a consumer
+sweep of `catalog/`, `examples/`, `conformance/` and `crates/*/tests` for an
+alias used across a nested-splitting inner match, reporting any runtime
+(non-proof) hit.
 
 ## Acceptance
 
@@ -67,8 +78,11 @@ either checks or gives a diagnostic whose advice applies.
 - **AC-2 (controls).**
   - The tail split, the no-split match and the landed IndexedPair rows keep
     their verdicts and values.
-  - Restoring the `else { term.clone() }` arm reddens a row that names a
-    sentinel leak.
+  - The cross-frame rows assert constructor values: M1, M2 and M3, two
+    levels deep, and a middle-frame alias. Reverting `weaken_woven` at the
+    nested-split site returns M2 to `Zero`.
+  - A sentinel registered in no active frame is an `Internal` error. The
+    enclosing-frame passthrough stays, per the Architect's correction.
   - Nested-column omission is still an `ExhaustivenessError`.
 - **AC-3.** The targeted match and pattern suites stay green, the catalog
   census is byte-identical, and `trusted_base()` is unchanged.
