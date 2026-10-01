@@ -224,6 +224,37 @@ fn type_eq_by_j(
         Box::new(source.clone()),
     );
     let base = canonical_type_eq_base(env, ctx, &base_ty)?;
+    type_eq_by_j_with_base(
+        env,
+        ctx,
+        domain,
+        start,
+        source,
+        target,
+        family_at_y,
+        evidence,
+        base,
+    )
+}
+
+/// Chain a J transport onto a previously checked Eq Type witness. The left
+/// endpoint remains the original source, while the right endpoint advances
+/// through the forced constructor arguments one index at a time.
+fn type_eq_by_j_with_base(
+    env: &GlobalEnv,
+    ctx: &Context,
+    domain: &Term,
+    start: &Term,
+    source: &Term,
+    target: &Term,
+    family_at_y: Term,
+    evidence: Term,
+    base: Term,
+) -> Option<Term> {
+    let level = match crate::check::infer(env, ctx, source).ok()? {
+        Term::Type(level) => level,
+        _ => return None,
+    };
     let proof_domain = Term::Eq(
         Box::new(weaken(domain, 1)),
         Box::new(weaken(start, 1)),
@@ -1028,11 +1059,10 @@ fn cast_at_inductive(
         } else if convert_type(env, ctx, &a_ty_j, &b_ty_j) {
             (ctor_arg_vals[j].clone(), ctor_arg_vals[j].clone())
         } else {
-            // The earlier forced constructor argument is exposed by the
-            // corresponding D-telescope index equality in `e`. One J over
-            // that equality transports the constructor argument's type.
-            // More than one changed earlier position has no single-variable
-            // family here, so conservatively leave the outer cast neutral.
+            // Each changed forced argument corresponds to an index equality
+            // projected from e. Change one earlier value at a time and chain
+            // J transports over its projected equality. If a dependency
+            // cannot be expressed by those checked projections, stay stuck.
             let changed = (0..j)
                 .filter(|&k| {
                     forced_values[k]
@@ -1040,39 +1070,63 @@ fn cast_at_inductive(
                         .is_some_and(|fv| !convert_type(env, ctx, &ctor_arg_vals[k], fv))
                 })
                 .collect::<Vec<_>>();
-            let [k] = changed.as_slice() else {
+            if changed.is_empty() {
                 return None;
-            };
-            let k = *k;
-            let index = forced_indices[k]?;
-            let target = forced_values[k].as_ref()?;
-            let domain = crate::check::infer(env, ctx, &ctor_arg_vals[k]).ok()?;
-            let index_evidence = telescope_projection(e, index, a_args.len());
-            let indexed_eq = Term::Eq(
-                Box::new(domain.clone()),
-                Box::new(ctor_arg_vals[k].clone()),
-                Box::new(target.clone()),
+            }
+            let level = type_level(env, ctx, &a_ty_j)?;
+            let base_ty = Term::Eq(
+                Box::new(Term::Type(level.clone())),
+                Box::new(a_ty_j.clone()),
+                Box::new(a_ty_j.clone()),
             );
-            let family_args = (0..j)
-                .map(|i| {
-                    if i == k {
-                        Term::var(1)
-                    } else {
-                        weaken(&ctor_arg_vals[i], 2)
-                    }
-                })
-                .collect::<Vec<_>>();
-            let family_at_y = subst_tel(&shift(&a_ty_tpl, j as i64 + 2, j), &family_args);
-            let witness = type_eq_by_j(
-                env,
-                ctx,
-                &domain,
-                &ctor_arg_vals[k],
-                &a_ty_j,
-                &b_ty_j,
-                family_at_y,
-                Term::Ascript(Box::new(index_evidence), Box::new(indexed_eq)),
-            )?;
+            let mut witness = canonical_type_eq_base(env, ctx, &base_ty)?;
+            let mut mixed = ctor_arg_vals[..j].to_vec();
+            let mut current_ty = a_ty_j.clone();
+            for k in changed {
+                let index = forced_indices[k]?;
+                let target = forced_values[k].as_ref()?;
+                mixed[k] = target.clone();
+                let next_ty = subst_tel(&a_ty_tpl, &mixed);
+                if convert_type(env, ctx, &current_ty, &next_ty) {
+                    current_ty = next_ty;
+                    continue;
+                }
+                let domain = crate::check::infer(env, ctx, &ctor_arg_vals[k]).ok()?;
+                let index_evidence = telescope_projection(e, index, a_args.len());
+                let indexed_eq = Term::Eq(
+                    Box::new(domain.clone()),
+                    Box::new(ctor_arg_vals[k].clone()),
+                    Box::new(target.clone()),
+                );
+                let family_args = (0..j)
+                    .map(|i| {
+                        if i == k {
+                            Term::var(1)
+                        } else {
+                            weaken(&mixed[i], 2)
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let family_at_y = subst_tel(&shift(&a_ty_tpl, j as i64 + 2, j), &family_args);
+                witness = type_eq_by_j_with_base(
+                    env,
+                    ctx,
+                    &domain,
+                    &ctor_arg_vals[k],
+                    &a_ty_j,
+                    &next_ty,
+                    family_at_y,
+                    Term::Ascript(Box::new(index_evidence), Box::new(indexed_eq)),
+                    witness,
+                )?;
+                current_ty = next_ty;
+            }
+            let expected = Term::Eq(
+                Box::new(Term::Type(level)),
+                Box::new(a_ty_j.clone()),
+                Box::new(b_ty_j.clone()),
+            );
+            crate::check::check(env, ctx, &witness, &expected).ok()?;
             let cast_val = Term::Cast(
                 Box::new(a_ty_j.clone()),
                 Box::new(b_ty_j),

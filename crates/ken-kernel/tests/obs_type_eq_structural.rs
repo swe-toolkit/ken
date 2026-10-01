@@ -485,6 +485,63 @@ fn unsupported_and_neutral_type_equalities_do_not_fabricate_components() {
     assert_eq!(whnf(&f.env, &ctx, &mismatch), mismatch);
 }
 
+/// Durable invariant: when both independent D indices change, each
+/// dependent constructor field transports over the projected index proofs;
+/// a field depending on both needs two chained J transports.
+#[test]
+fn two_index_changes_transport_each_dependent_field() {
+    let mut f = Fixture::new();
+    let nat = f.nat.clone();
+    let vec_id = f.vec;
+    let item = nat.clone();
+    let vec = move |i: Term| {
+        Term::app(
+            Term::app(Term::indformer(vec_id, vec![Level::zero()]), item.clone()),
+            i,
+        )
+    };
+    let twin = declare_inductive(&mut f.env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![nat.clone(), nat.clone()],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![
+                nat.clone(),
+                nat.clone(),
+                vec(Term::var(1)),
+                vec(Term::var(1)),
+                Term::sigma(vec(Term::var(3)), vec(Term::var(3))),
+            ],
+            target_indices: vec![Term::var(4), Term::var(3)],
+        }],
+    })
+    .expect("two-index family");
+    let ctor = f.env.inductive(twin).unwrap().constructors[0].id;
+    let n = f.opaque("n", nat.clone());
+    let m = f.opaque("m", nat.clone());
+    let n2 = f.opaque("n2", nat.clone());
+    let m2 = f.opaque("m2", nat.clone());
+    let xs = f.opaque("xs", vec(n.clone()));
+    let ys = f.opaque("ys", vec(m.clone()));
+    let z = f.opaque("z", Term::sigma(vec(n.clone()), vec(m.clone())));
+    let family = |i: Term, j: Term| Term::app(Term::app(Term::indformer(twin, vec![]), i), j);
+    let source = family(n.clone(), m.clone());
+    let target = family(n2.clone(), m2.clone());
+    let value = [n, m, xs, ys, z]
+        .into_iter()
+        .fold(Term::constructor(ctor, vec![]), Term::app);
+    assert_typed_cast(
+        &f,
+        &Context::new(),
+        source,
+        target,
+        value,
+        |t| matches!(t, Term::App(..)),
+        true,
+    );
+}
+
 /// Durable invariant: D/D only decomposes on fully applied families with
 /// equivalent level arguments. These raw controls make each guard reachable.
 #[test]
