@@ -47,9 +47,19 @@ omission check before it is unchanged, so an omitted constructor stays an
   needs distinct variable indices". If it is accepted, stop: the node is void.
 - **AC-1.** That program is accepted and evaluates to the expected value. A
   repeated-index twin with a constant result is accepted too.
-- **AC-2 (fence).** The same concrete-index and repeated-index splits with a
-  result that mentions the split value are still refused with today's
-  diagnostics. The pair differs only in the result type.
+- **AC-2 (fence, Architect `evt_6a1bennx1sc5s`).** The reachable reverting
+  trigger is a dependent tail: a result type never mentions the nested split
+  value (`ret_ty_slot` is set only through `lower_by`). The outer constructor
+  carries a second field, left `_` in the arm, whose type mentions the nested
+  field (`HoldD`/`HoldPairD`), and its twin has an unrelated second field
+  (`HoldN`/`HoldPairN`). The pair differs only in whether a pending sibling
+  field's type mentions the nested split field.
+  - The N twins are accepted.
+  - The concrete D twin is refused with a reason containing "nested indexed
+    split needs distinct variable indices". The repeated D twin's reason
+    contains "nested indexed split repeats an index".
+  - Assert the clause text. A D twin refused before the index clause is a
+    stop to the Architect.
 - **AC-3.** A nested omission at a concrete index is still an
   `ExhaustivenessError`. The targeted match and pattern suites stay green, and
   `trusted_base()` is unchanged.
