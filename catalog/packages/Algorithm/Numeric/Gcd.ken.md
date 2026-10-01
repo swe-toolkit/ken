@@ -8,16 +8,18 @@ the subtraction-based decrease visible to Ken's termination checker.
 ## Definition
 
 The package reuses canonical addition and multiplication from `Nat` arithmetic
-and reaches the canonical `leq_nat` identity through the `Nat` order facade.
-Saturating subtraction is supplied by that facade.  The three data carriers
-come first in loader dependency order; `divides_gcd` is then the first function
-in the uninterrupted checked function/proof run, followed by its increasingly
-fundamental implementation support.
+and imports the canonical `leq_nat` identity from its class-owning provider.
+Saturating subtraction and order bounds come from the `Nat` order facade.
+The three data carriers come first in loader dependency order. `divides_gcd`
+is then the first function in the uninterrupted checked function/proof run,
+followed by its increasingly fundamental implementation support.
 
 ```ken
+import Core.Classes.LawfulClasses (leq_nat)
+
 import Data.Numeric.Nat.Arithmetic (add, mul)
 
-import Data.Numeric.Nat.Order (leq_nat, sub)
+import Data.Numeric.Nat.Order (leq_nat_successor_bound, leq_nat_weaken_right, sub)
 
 data Divides (d : Nat) (n : Nat) : Type where {
   MkDivides : (quotient : Nat) → Equal Nat n (mul d quotient) → Divides d n
@@ -48,7 +50,11 @@ fn gcd_divides_right (a : Nat) (b : Nat) : Divides (gcd a b) b =
   gcd_spec_right a b (gcd a b) (gcd_spec a b)
 
 fn gcd_spec (a : Nat) (b : Nat) : GcdSpec a b (gcd a b) =
-  gcd_fuel_spec (Suc (add a b)) a b (leq_weaken_right (add a b) (add a b) (leq_refl (add a b)))
+  gcd_fuel_spec
+    (Suc (add a b))
+    a
+    b
+    (leq_nat_weaken_right (add a b) (add a b) ((proof refl for leq_nat) (add a b)))
 
 fn gcd_fuel_spec
       (fuel : Nat)
@@ -308,28 +314,9 @@ theorem leq_left_of_sum
         λbound.
           match bound {
             Zero ↦ λh. absurd h;
-            Suc bound2 ↦ λh. leq_weaken_right a bound2 (leq_left_of_sum a b2 bound2 h)
+            Suc bound2 ↦ λh. leq_nat_weaken_right a bound2 (leq_left_of_sum a b2 bound2 h)
           }
     }
-
-theorem leq_weaken_right
-      (a : Nat)
-    : (b : Nat) → Equal Bool (leq_nat a b) True → Equal Bool (leq_nat a (Suc b)) True =
-  match a {
-    Zero ↦ λb. λh. Proved;
-    Suc a2 ↦
-      λb.
-        match b {
-          Zero ↦ λh. absurd h;
-          Suc b2 ↦ λh. leq_weaken_right a2 b2 h
-        }
-  }
-
-theorem leq_refl (a : Nat) : Equal Bool (leq_nat a a) True =
-  match a {
-    Zero ↦ Proved;
-    Suc a2 ↦ leq_refl a2
-  }
 
 theorem add_sub_cancel_leq
       (a : Nat)
@@ -545,6 +532,18 @@ fn subst
   J (λy2 _. fam y2) px p
 ```
 
+The shared order laws remain usable at open arguments outside their owner:
+
+```ken example
+theorem gcd_example_canonical_successor (n : Nat) : Equal Bool (leq_nat n (Suc n)) True =
+  leq_nat_successor_bound n
+
+theorem gcd_example_canonical_weakening
+      (a : Nat)
+    : (b : Nat) → Equal Bool (leq_nat a b) True → Equal Bool (leq_nat a (Suc b)) True =
+  λb. λbound. leq_nat_weaken_right a b bound
+```
+
 ## Laws and proofs
 
 `gcd_fuel_spec` packages all three obligations in one invariant.  Its
@@ -561,6 +560,7 @@ quotient as proof-relevant data in `Type`.
 than the sum of the inputs; every positive subtraction step strictly lowers
 that sum.  `Divides` is witness-bearing data, and the required laws are checked
 proof terms.  `add` and `mul` retain their Arithmetic identities, `leq_nat`
-retains its LawfulClasses identity through the Order facade, and `sub` retains
-its Order identity.  This package introduces no axiom, postulate, primitive,
-foreign declaration, or local replacement for those providers.
+comes directly from LawfulClasses; `sub`, right weakening, and the successor
+bound retain their Order identities. This package introduces no axiom,
+postulate, primitive, foreign declaration, or local replacement for those
+providers.

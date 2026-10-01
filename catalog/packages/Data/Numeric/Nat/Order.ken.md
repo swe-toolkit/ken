@@ -238,15 +238,30 @@ pub proof gt_implies_reverse_leq for compare
   }
 ```
 
-Addition recurses on its second argument. The first bound carries an
-induction hypothesis through a successor using the canonical order's
-transitivity; the second bound reduces directly to its induction hypothesis.
+The successor and right-weakening laws make the elementary steps of the
+canonical order available to other packages. Addition recurses on its second
+argument. Its first bound carries an induction hypothesis through a successor
+using the canonical order's transitivity; the second bound reduces directly to
+its induction hypothesis.
 
 ```ken
-theorem leq_nat_successor_bound (n : Nat) : Equal Bool (leq_nat n (Suc n)) True =
+pub theorem leq_nat_successor_bound (n : Nat) : Equal Bool (leq_nat n (Suc n)) True =
   match n {
     Zero ↦ Proved;
     Suc rest ↦ leq_nat_successor_bound rest
+  }
+
+pub theorem leq_nat_weaken_right
+      (a : Nat)
+    : (b : Nat) → Equal Bool (leq_nat a b) True → Equal Bool (leq_nat a (Suc b)) True =
+  match a {
+    Zero ↦ λb. λbounded. Proved;
+    Suc earlier ↦
+      λb.
+        match b {
+          Zero ↦ λbounded. absurd bounded;
+          Suc later ↦ λbounded. leq_nat_weaken_right earlier later bounded
+        }
   }
 
 pub theorem leq_nat_add_left_bound (a : Nat) (b : Nat) : Equal Bool (leq_nat a (add a b)) True =
@@ -308,13 +323,17 @@ theorem order_example_right_add_bound
       (a : Nat) (b : Nat)
     : Equal Bool (leq_nat b (add a b)) True =
   leq_nat_add_right_bound a b
+
+theorem order_example_converse_premise : Equal Bool (leq_nat (Suc Zero) (Suc Zero)) True =
+  Proved
 ```
 
 ## 4. Laws & proofs
 
-The public addition bounds connect the canonical order to the canonical
-addition operation. For any `a` and `b`, both `a` and `b` are at most
-`add a b`; neither bound needs a new order dictionary.
+The public successor bound proves `n ≤ Suc n`; right weakening extends any
+`a ≤ b` to `a ≤ Suc b`. The public addition bounds connect the canonical order
+to the canonical addition operation. For any `a` and `b`, both `a` and `b` are
+at most `add a b`; none needs a new order dictionary.
 
 `min`/`max`/`sub` earn their place with three exported computation facts:
 `min::zero_left`, `max::zero_left`, and `sub::zero_right`.
@@ -353,6 +372,16 @@ goal. That is asserted here, not merely asserted about:
 proof self_is_zero_wrong for sub (n : Nat) : Equal Nat (sub n n) Zero = Refl
 ```
 
+Right weakening cannot be reversed. At `a = Suc Zero`, `b = Zero`, the
+converse's premise is true (checked above) but its conclusion is false:
+
+```ken reject
+theorem order_reject_weaken_converse
+    : Equal Bool (leq_nat (Suc Zero) (Suc Zero)) True
+      → Equal Bool (leq_nat (Suc Zero) Zero) True =
+  λforward. Proved
+```
+
 ## 5. Design notes
 
 **The facade preserves one identity.** The canonical relation, attached proofs,
@@ -382,9 +411,9 @@ canonical `leq_nat`.
 1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
    `leq_nat` with their provider identities. It exports its defined-at `min`,
    `max`, `sub`, and `compare` operations; their three zero computation facts;
-   the two addition bounds; the four `min`/`max` bounds; the three `compare`
-   agreements; and the four inductive `sub` proofs. `OrdResult` remains
-   package-local.
+   the successor and right-weakening laws; the two addition bounds; the four
+   `min`/`max` bounds; the three `compare` agreements; and the four inductive
+   `sub` proofs. `OrdResult` remains package-local.
 2. **Source map.**
 
    | Task | Section |
@@ -402,10 +431,10 @@ canonical `leq_nat`.
    declaration or trust. The local operations introduce no `Axiom`, primitive,
    or postulate.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
-   package's checked laws use structural recursion for the addition bounds,
-   `min`/`max` bounds, and subtraction theory, and case analysis on the canonical
-   relation for the `compare` agreements. The equality arm closes through
-   `leq_nat::antisym`.
+   package's checked laws use structural recursion for the successor,
+   right-weakening and addition bounds, `min`/`max` bounds, and subtraction
+   theory, and case analysis on the canonical relation for the `compare`
+   agreements. The equality arm closes through `leq_nat::antisym`.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can selectively import the local arithmetic and
    comparison operations.
