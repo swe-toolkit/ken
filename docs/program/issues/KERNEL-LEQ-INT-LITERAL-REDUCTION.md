@@ -64,7 +64,12 @@ stop and report the mismatch.
   - `spec/10-kernel/18-judgments.md` §4.2 and §5, and
     `spec/10-kernel/18a-primitive-registry.md` introduction, §5 and
     §5.2.2(3): name the pair, never "sole", and keep the interpreter's
-    tested-not-trusted arm separate from the kernel arm.
+    tested-not-trusted arm separate from the kernel arm. Also §5.9.1(1)'s
+    "`string_to_list_char` is a `Neutral` stub" parenthetical (CV
+    `evt_2q435bncamhkm`): it distinguishes the installed-IDs interpreter
+    `apply`/`build_list_char` path and the checked-literal kernel view from
+    the direct `prim_reduce` `Neutral` fallback, with no other change to
+    §5.9.1.
   - The general opacity sentences the Architect lists:
     `spec/10-kernel/14-inductive.md` item 5,
     `spec/30-surface/30-taxonomy.md:86`, `spec/30-surface/35-numbers.md`
