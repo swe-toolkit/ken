@@ -18346,7 +18346,9 @@ fn compile_match_matrix(
             }
             // A nested omission is checked above, before the index clause:
             // even at a concrete index it remains an exhaustiveness error.
-            check_nested_index_variables(cx, &params0[m0..], &split_span)?;
+            if needs_reverting {
+                check_nested_index_variables(cx, &params0[m0..], &split_span)?;
+            }
             let ret_sort = if needs_reverting {
                 // Here the codomain mentions the abstract split value x'.
                 // Classify it in that context, with universe metas zonked;
