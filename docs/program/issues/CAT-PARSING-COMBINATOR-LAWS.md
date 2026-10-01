@@ -107,6 +107,8 @@ Scope:
 
 ## Stop conditions
 
-- Any new import, primitive, postulate or axiom.
+- Any new module import, primitive, postulate or axiom. Adding
+  `nth_some_index_bound` to Parsing's existing `Data.Collections.Derived`
+  symbol list is in scope.
 - A `Decoder.ken.md` change.
 - Item 1 needs two public spellings of the bound: stop to the Architect.
