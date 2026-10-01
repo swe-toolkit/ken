@@ -71,7 +71,11 @@ No residual layout, gate or lowering consumer changes.
   Per owner, the finalized and unfinalizable counts. Positional reads and
   record959 reads: 0.
 - **AC-3 (control).** Delete one owner's finalization: the census pin goes red.
-- **AC-4.** No native census verdict changes. `rt_parity_native` and the
+- **AC-4.** Every interned `ContinuationSpecializationKey`, including its
+  `continuation_inputs` and availability drafts, is identical before and
+  after on the native census (Architect `evt_ew3tp9b71yaa`: the frame comes
+  from a factored `emitter_frame_for_owner`, and interning is
+  behavior-identical). No native census verdict changes. `rt_parity_native` and the
   one-bracket and two-bracket native controls stay green, and
   `trusted_base()` is unchanged.
 
