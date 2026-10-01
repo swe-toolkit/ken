@@ -438,6 +438,12 @@ struct ElabCtx<'e> {
     indexed_match_roots: Vec<IndexedMatchRootFrame>,
 }
 
+#[derive(Clone, Copy)]
+enum SurfaceBindingTarget {
+    Context(usize),
+    Virtual(usize),
+}
+
 impl<'e> ElabCtx<'e> {
     fn new(
         env: &'e mut GlobalEnv,
@@ -480,16 +486,16 @@ impl<'e> ElabCtx<'e> {
         }
     }
 
-    fn surface_binding_position(&self, index: usize) -> Option<usize> {
+    fn surface_binding_target(&self, index: usize) -> Option<SurfaceBindingTarget> {
         let mut remaining = index;
         for position in (0..self.ctx.len()).rev() {
             // A split lives after `position`, before later real fields. It
             // consumes a source slot although it has no `ctx` position.
-            for _ in self.matrix_virtual_surface_positions.iter()
-                .filter(|&&split| split == position + 1)
+            for (slot, _) in self.matrix_virtual_surface_positions.iter().enumerate()
+                .filter(|(_, &split)| split == position + 1)
             {
                 if remaining == 0 {
-                    return None;
+                    return Some(SurfaceBindingTarget::Virtual(slot));
                 }
                 remaining -= 1;
             }
@@ -497,11 +503,34 @@ impl<'e> ElabCtx<'e> {
                 continue;
             }
             if remaining == 0 {
-                return Some(position);
+                return Some(SurfaceBindingTarget::Context(position));
+            }
+            remaining -= 1;
+        }
+        // A split before the first real binder has position zero, too.
+        for (slot, _) in self.matrix_virtual_surface_positions.iter().enumerate()
+            .filter(|(_, &split)| split == 0)
+        {
+            if remaining == 0 {
+                return Some(SurfaceBindingTarget::Virtual(slot));
             }
             remaining -= 1;
         }
         None
+    }
+
+    fn surface_binding_position(&self, index: usize) -> Option<usize> {
+        match self.surface_binding_target(index)? {
+            SurfaceBindingTarget::Context(position) => Some(position),
+            SurfaceBindingTarget::Virtual(_) => None,
+        }
+    }
+
+    fn virtual_surface_binding_slot(&self, index: usize) -> Option<usize> {
+        match self.surface_binding_target(index)? {
+            SurfaceBindingTarget::Context(_) => None,
+            SurfaceBindingTarget::Virtual(slot) => Some(slot),
+        }
     }
 
     fn surface_var(&self, index: usize) -> Option<(usize, usize)> {
@@ -578,6 +607,15 @@ struct MatrixAliasType {
     install_depth: usize,
 }
 
+#[derive(Clone)]
+struct MatrixVirtualAlias {
+    slot: usize,
+    name: String,
+    occurrence: Term,
+    ty: Term,
+    install_depth: usize,
+}
+
 #[derive(Clone, Debug)]
 struct OrBinderTypeMismatch {
     name: String,
@@ -613,6 +651,7 @@ struct PatternAliasTypeFrame {
 #[derive(Clone)]
 struct ActivePatternAlias {
     slot: usize,
+    virtual_slot: Option<usize>,
     name: String,
     sentinel: usize,
     occurrence: Term,
@@ -889,15 +928,20 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             Ok(Term::app(f_k, a_k))
         }
 
-        RType::RVarTy(index, name, span) => cx
-            .surface_var(*index)
-            .map(|(_, actual_index)| Term::var(actual_index))
-            .ok_or_else(|| {
-                ElabError::Internal(format!(
-                    "type variable '{}' at {}-{} is out of range",
-                    name, span.start, span.end
-                ))
-            }),
+        RType::RVarTy(index, name, span) => {
+            if let Some((term, _)) = infer_virtual_pattern_alias(cx, *index, name, span)? {
+                Ok(term)
+            } else {
+                cx.surface_var(*index)
+                    .map(|(_, actual_index)| Term::var(actual_index))
+                    .ok_or_else(|| {
+                        ElabError::Internal(format!(
+                            "type variable '{}' at {}-{} is out of range",
+                            name, span.start, span.end
+                        ))
+                    })
+            }
+        },
         RType::RPatternAliasTy(slot, name, _) => {
             infer_active_pattern_alias(cx, *slot, name).map(|(term, _)| term)
         }
@@ -1351,12 +1395,27 @@ fn check_pair_or_record(
 /// kernel binding. If neither view is definitionally suitable, preserve the
 /// former behavior (return the refined alias and let ordinary meta unification
 /// plus the final kernel re-check decide the term).
-#[inline(never)]
+#[cfg(test)]
 fn check_variable_with_index_views(
     cx: &mut ElabCtx,
     surface_index: usize,
     expected: &Term,
 ) -> Result<Term, ElabError> {
+    check_variable_with_index_views_named(cx, surface_index, "", &Span::zero(), expected)
+}
+
+#[inline(never)]
+fn check_variable_with_index_views_named(
+    cx: &mut ElabCtx,
+    surface_index: usize,
+    name: &str,
+    span: &Span,
+    expected: &Term,
+) -> Result<Term, ElabError> {
+    if let Some((term, ty)) = infer_virtual_pattern_alias(cx, surface_index, name, span)? {
+        unify_types(&mut cx.metas, expected, &ty);
+        return Ok(term);
+    }
     let (position, actual_index) = cx
         .surface_var(surface_index)
         .ok_or_else(|| ElabError::Internal(format!("Var({surface_index}) out of range")))?;
@@ -1510,8 +1569,8 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         // original constructor-local type retained in the kernel context. The
         // expected type selects the view at checking boundaries (notably local
         // helper arguments); inference remains outer-refined by default.
-        RExpr::RVar(index, _, _) if !cx.var_refinements.is_empty() => {
-            check_variable_with_index_views(cx, *index, expected)
+        RExpr::RVar(index, name, span) if !cx.var_refinements.is_empty() => {
+            check_variable_with_index_views_named(cx, *index, name, span, expected)
         }
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
@@ -8872,7 +8931,10 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             Ok((result, result_type))
         }
         RExpr::RPatternAlias(slot, name, _span) => infer_active_pattern_alias(cx, *slot, name),
-        RExpr::RVar(i, _, _) => {
+        RExpr::RVar(i, name, span) => {
+            if let Some(alias) = infer_virtual_pattern_alias(cx, *i, name, span)? {
+                return Ok(alias);
+            }
             // An installed index refinement (constructor injectivity
             // / sibling convoy) replaces the bare `Var` with its `Cast`-
             // wrapped alias for the duration of one branch's body — see
@@ -15614,11 +15676,15 @@ fn infer_active_pattern_alias(
                 name
             ))
         })?;
-    let growth = cx
-        .ctx
-        .len()
-        .checked_sub(alias.install_depth)
-        .ok_or_else(|| {
+    materialize_pattern_alias(cx, alias, name)
+}
+
+fn materialize_pattern_alias(
+    cx: &ElabCtx<'_>,
+    alias: ActivePatternAlias,
+    name: &str,
+) -> Result<(Term, Term), ElabError> {
+    let growth = cx.ctx.len().checked_sub(alias.install_depth).ok_or_else(|| {
         ElabError::Internal(format!(
             "as-pattern alias '{}' escaped its installation context",
             name
@@ -15631,6 +15697,34 @@ fn infer_active_pattern_alias(
         pattern_alias_sentinel(alias.sentinel)
     };
     Ok((term, weaken(&alias.ty, growth as i64)))
+}
+
+/// Only a source index at a matrix split can take this route. Ordinary
+/// context binders keep their positional resolution and refinements.
+fn infer_virtual_pattern_alias(
+    cx: &mut ElabCtx<'_>,
+    index: usize,
+    name: &str,
+    span: &Span,
+) -> Result<Option<(Term, Term)>, ElabError> {
+    let Some(slot) = cx.virtual_surface_binding_slot(index) else {
+        return Ok(None);
+    };
+    let alias = cx
+        .active_pattern_aliases
+        .iter()
+        .rev()
+        .flat_map(|region| region.iter().rev())
+        .find(|alias| alias.virtual_slot == Some(slot) && alias.name == name)
+        .cloned()
+        .ok_or_else(|| ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: format!(
+                "split-column binder '{name}' has no available matrix occurrence; \
+                 annotate the match result or use a separate match"
+            ),
+        })?;
+    materialize_pattern_alias(cx, alias, name).map(Some)
 }
 
 #[inline(never)]
@@ -15906,6 +16000,9 @@ struct RowState {
     /// Source slots for split columns missing from `cx.ctx`, per arm. A
     /// constructor pattern does not create one; a wildcard/variable does.
     virtual_surface_positions: Vec<usize>,
+    /// Split-column variables have a whole-value matrix occurrence, not a
+    /// context binder. These entries align with the virtual slot above.
+    virtual_aliases: Vec<MatrixVirtualAlias>,
     /// Emitted flat columns visible to another row but not bound by this
     /// row's source pattern. Installed only while elaborating this leaf.
     row_hidden_surface_positions: Vec<usize>,
@@ -15929,6 +16026,9 @@ impl RowState {
         }
         for occurrence in self.binding_occurrences.iter_mut().flatten() {
             *occurrence = weaken(occurrence, 1);
+        }
+        for alias in &mut self.virtual_aliases {
+            alias.occurrence = weaken(&alias.occurrence, 1);
         }
         self
     }
@@ -16233,6 +16333,7 @@ fn build_alias_rows(
             real_occurrences: vec![MatrixOccurrence::live(scrut_core.clone())],
             binding_occurrences: Vec::new(),
             virtual_surface_positions: Vec::new(),
+            virtual_aliases: Vec::new(),
             row_hidden_surface_positions: Vec::new(),
             arm_idx: i,
         };
@@ -16253,6 +16354,7 @@ fn enter_pattern_alias_leaf(
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
     virtual_surface_positions: &[usize],
+    virtual_aliases: &[MatrixVirtualAlias],
     row_hidden_surface_positions: &[usize],
 ) -> PatternAliasLeafScope {
     let frame = cx
@@ -16271,7 +16373,7 @@ fn enter_pattern_alias_leaf(
         .filter(|(candidate, _)| *candidate == arm_idx)
         .map(|(_, slot)| *slot)
         .collect::<Vec<_>>();
-    let mut active_aliases = Vec::with_capacity(alias_types.len());
+    let mut active_aliases = Vec::with_capacity(alias_types.len() + virtual_aliases.len());
     for (slot, alias) in alias_types {
         let occurrence = binding_occurrences
             .get(slot)
@@ -16293,6 +16395,7 @@ fn enter_pattern_alias_leaf(
             );
         active_aliases.push(ActivePatternAlias {
             slot,
+            virtual_slot: None,
             name: alias.name,
             sentinel,
             occurrence,
@@ -16322,6 +16425,32 @@ fn enter_pattern_alias_leaf(
     let virtual_base = cx.matrix_virtual_surface_positions.len();
     cx.matrix_virtual_surface_positions
         .extend_from_slice(virtual_surface_positions);
+    for alias in virtual_aliases {
+        debug_assert!(alias.slot < virtual_surface_positions.len());
+        let sentinel = cx.next_pattern_alias_sentinel;
+        cx.next_pattern_alias_sentinel += 1;
+        cx.pattern_alias_replacement_frames
+            .last_mut()
+            .expect("infer_match replacement frame must span matrix compilation")
+            .insert(
+                sentinel,
+                PatternAliasReplacement {
+                    occurrence: alias.occurrence.clone(),
+                    real_depth,
+                },
+            );
+        active_aliases.push(ActivePatternAlias {
+            slot: alias.slot,
+            virtual_slot: Some(virtual_base + alias.slot),
+            name: alias.name.clone(),
+            sentinel,
+            occurrence: alias.occurrence.clone(),
+            occurrence_depth: cx.ctx.len(),
+            use_occurrence: false,
+            ty: alias.ty.clone(),
+            install_depth: alias.install_depth,
+        });
+    }
     cx.active_pattern_aliases.push(active_aliases);
     PatternAliasLeafScope { hidden_base, virtual_base }
 }
@@ -16350,11 +16479,12 @@ fn infer_arm_at_matrix_leaf(
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
     virtual_surface_positions: &[usize],
+    virtual_aliases: &[MatrixVirtualAlias],
     row_hidden_surface_positions: &[usize],
 ) -> Result<(Option<Term>, Term, Term), ElabError> {
     let scope = enter_pattern_alias_leaf(
         cx, arm_idx, binding_occurrences, real_depth, virtual_surface_positions,
-        row_hidden_surface_positions,
+        virtual_aliases, row_hidden_surface_positions,
     );
     let result = (|| {
         use_direct_pattern_alias_occurrences(cx, true);
@@ -16380,12 +16510,13 @@ fn check_arm_at_matrix_leaf(
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
     virtual_surface_positions: &[usize],
+    virtual_aliases: &[MatrixVirtualAlias],
     row_hidden_surface_positions: &[usize],
     expected: &Term,
 ) -> Result<(Option<Term>, Term), ElabError> {
     let scope = enter_pattern_alias_leaf(
         cx, arm_idx, binding_occurrences, real_depth, virtual_surface_positions,
-        row_hidden_surface_positions,
+        virtual_aliases, row_hidden_surface_positions,
     );
     let result = (|| {
         use_direct_pattern_alias_occurrences(cx, true);
@@ -17789,6 +17920,7 @@ fn compile_match_leaf(
         &first_occurrences,
         real_depth_so_far,
         &first_row.virtual_surface_positions,
+        &first_row.virtual_aliases,
         &first_row.row_hidden_surface_positions,
     )?;
     let mut branches = vec![(first_row.arm_idx, first_guard, first_body)];
@@ -17801,6 +17933,7 @@ fn compile_match_leaf(
             &occurrences,
             real_depth_so_far,
             &row.virtual_surface_positions,
+            &row.virtual_aliases,
             &row.row_hidden_surface_positions,
             &body_ty_ctx,
         )?;
@@ -18079,13 +18212,32 @@ fn compile_match_matrix(
             let rows: Vec<RowState> = rows
                 .into_iter()
                 .map(|mut row| {
-                    if row.real_occurrences[0].surface_binder && matches!(
-                        pattern_without_aliases(&row.real_pats[0]).kind,
+                    let pattern = pattern_without_aliases(&row.real_pats[0]);
+                    let split_name = match &pattern.kind {
+                        RPatKind::Var(name, None) if name != "_" => Some(name.clone()),
+                        _ => None,
+                    };
+                    let virtual_slot = if row.real_occurrences[0].surface_binder && matches!(
+                        pattern.kind,
                         RPatKind::Wild | RPatKind::Var(_, _)
                     ) {
+                        let slot = row.virtual_surface_positions.len();
                         row.virtual_surface_positions.push(split_depth);
+                        Some(slot)
+                    } else {
+                        None
+                    };
+                    row = row.enter_current_real_binder();
+                    if let (Some(slot), Some(name)) = (virtual_slot, split_name) {
+                        row.virtual_aliases.push(MatrixVirtualAlias {
+                            slot,
+                            name,
+                            occurrence: row.real_occurrences[0].term.clone(),
+                            ty: col_types[0].clone(),
+                            install_depth: split_depth,
+                        });
                     }
-                    row.enter_current_real_binder()
+                    row
                 })
                 .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
                 .collect();
@@ -21497,6 +21649,7 @@ mod match_matrix_occurrence_tests {
             real_occurrences: vec![MatrixOccurrence::live(occurrence)],
             binding_occurrences: Vec::new(),
             virtual_surface_positions: Vec::new(),
+            virtual_aliases: Vec::new(),
             row_hidden_surface_positions: Vec::new(),
             arm_idx: 0,
         }
@@ -21651,6 +21804,7 @@ mod match_matrix_occurrence_tests {
             ],
             binding_occurrences: vec![Some(Term::var(1))],
             virtual_surface_positions: Vec::new(),
+            virtual_aliases: Vec::new(),
             row_hidden_surface_positions: Vec::new(),
             arm_idx: 0,
         }
