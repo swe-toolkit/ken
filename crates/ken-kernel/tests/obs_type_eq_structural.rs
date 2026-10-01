@@ -18,6 +18,34 @@ fn cast(a: Term, b: Term, e: Term, value: Term) -> Term {
     Term::Cast(Box::new(a), Box::new(b), Box::new(e), Box::new(value))
 }
 
+// The shape oracle for the Π arm is written from AC-0 rather than invoking
+// the production helper; an unsound orientation cannot pass by self-agreement.
+fn expected_sym_type0(a: &Term, b: &Term, proof: Term) -> Term {
+    let sort = Term::Type(Level::zero());
+    let proof_domain = eq(sort.clone(), ken_kernel::subst::weaken(a, 1), Term::var(0));
+    let motive = Term::Ascript(
+        Box::new(Term::lam(
+            sort.clone(),
+            Term::lam(
+                proof_domain.clone(),
+                eq(sort.clone(), Term::var(1), ken_kernel::subst::weaken(a, 2)),
+            ),
+        )),
+        Box::new(Term::pi(
+            sort.clone(),
+            Term::pi(proof_domain, Term::Omega(Level::zero().suc())),
+        )),
+    );
+    Term::J(
+        Box::new(motive),
+        Box::new(Term::Refl(Box::new(a.clone()))),
+        Box::new(Term::Ascript(
+            Box::new(proof),
+            Box::new(eq(sort, a.clone(), b.clone())),
+        )),
+    )
+}
+
 struct Fixture {
     env: GlobalEnv,
     nat: Term,
@@ -158,7 +186,7 @@ fn pi_structural_equality_and_typed_cast() {
     let value = f.opaque("function", a.clone());
     let ctx = Context::new();
     let reduct = whnf(&f.env, &ctx, &type_eq(a.clone(), b.clone()));
-    let Term::Pi(source_dom, _) = &a else {
+    let Term::Pi(source_dom, source_cod) = &a else {
         unreachable!()
     };
     let Term::Pi(target_dom, target_cod) = &b else {
@@ -177,11 +205,28 @@ fn pi_structural_equality_and_typed_cast() {
         panic!("codomain must be a family")
     };
     assert_eq!(**cod_dom, ken_kernel::subst::weaken(target_dom, 1));
-    let Term::Eq(cod_sort, _, cod_target) = &**cod_eq else {
+    let Term::Eq(cod_sort, cod_source, cod_target) = &**cod_eq else {
         panic!("codomain must be a type equality")
     };
     assert_eq!(**cod_sort, Term::Type(Level::zero()));
     assert_eq!(**cod_target, ken_kernel::subst::shift(target_cod, 1, 1));
+    let mut cod_ctx = Context::new();
+    cod_ctx.push(type_eq((**source_dom).clone(), (**target_dom).clone()));
+    cod_ctx.push(ken_kernel::subst::weaken(target_dom, 1));
+    let source_at_x = ken_kernel::subst::weaken(source_dom, 2);
+    let target_at_x = ken_kernel::subst::weaken(target_dom, 2);
+    let back_x = cast(
+        target_at_x.clone(),
+        source_at_x.clone(),
+        expected_sym_type0(&source_at_x, &target_at_x, Term::var(1)),
+        Term::var(0),
+    );
+    let expected_source =
+        ken_kernel::subst::subst0(&ken_kernel::subst::shift(source_cod, 2, 1), &back_x);
+    assert!(
+        convert_type(&f.env, &cod_ctx, cod_source, &expected_source),
+        "Π codomain must be indexed by the typed back-cast"
+    );
     assert!(infer(&f.env, &ctx, &reduct).is_ok(), "formed reduct");
     assert_typed_cast(
         &f,
@@ -214,7 +259,10 @@ fn sigma_structural_equality_and_typed_cast() {
     let value = f.opaque("pair", a.clone());
     let ctx = Context::new();
     let reduct = whnf(&f.env, &ctx, &type_eq(a.clone(), b.clone()));
-    let Term::Sigma(source_dom, _) = &a else {
+    let Term::Sigma(source_dom, source_cod) = &a else {
+        unreachable!()
+    };
+    let Term::Sigma(target_dom, target_cod) = &b else {
         unreachable!()
     };
     let Term::Sigma(_, cod_family) = &reduct else {
@@ -224,7 +272,24 @@ fn sigma_structural_equality_and_typed_cast() {
         panic!("codomain must be a family")
     };
     assert_eq!(**cod_dom, ken_kernel::subst::weaken(source_dom, 1));
-    assert!(matches!(&**cod_eq, Term::Eq(sort, ..) if **sort == Term::Type(Level::zero())));
+    let Term::Eq(cod_sort, cod_source, cod_target) = &**cod_eq else {
+        panic!("Σ codomain must compare types")
+    };
+    assert_eq!(**cod_sort, Term::Type(Level::zero()));
+    let mut cod_ctx = Context::new();
+    cod_ctx.push(type_eq((**source_dom).clone(), (**target_dom).clone()));
+    cod_ctx.push(ken_kernel::subst::weaken(source_dom, 1));
+    let forward_x = cast(
+        ken_kernel::subst::weaken(source_dom, 2),
+        ken_kernel::subst::weaken(target_dom, 2),
+        Term::var(1),
+        Term::var(0),
+    );
+    let expected_source = ken_kernel::subst::shift(source_cod, 1, 1);
+    let expected_target =
+        ken_kernel::subst::subst0(&ken_kernel::subst::shift(target_cod, 2, 1), &forward_x);
+    assert!(convert_type(&f.env, &cod_ctx, cod_source, &expected_source));
+    assert!(convert_type(&f.env, &cod_ctx, cod_target, &expected_target));
     assert!(infer(&f.env, &ctx, &reduct).is_ok());
     assert_typed_cast(
         &f,
@@ -279,6 +344,12 @@ fn quotient_structural_equality_and_typed_cast() {
     let Term::Sigma(dom_eq, rel_family) = &reduct else {
         panic!("Quot/Quot must decompose")
     };
+    let Term::Quot(source_dom, source_rel) = &a else {
+        unreachable!()
+    };
+    let Term::Quot(target_dom, target_rel) = &b else {
+        unreachable!()
+    };
     assert!(convert_type(
         &f.env,
         &ctx,
@@ -293,7 +364,35 @@ fn quotient_structural_equality_and_typed_cast() {
         panic!("missing relation y binder")
     };
     assert_eq!(**y_type, ken_kernel::subst::weaken(&f.nat, 2));
-    assert!(matches!(&**rel_eq, Term::Eq(sort, ..) if **sort == Term::Omega(Level::zero())));
+    let Term::Eq(rel_sort, rel_source, rel_target) = &**rel_eq else {
+        panic!("Quot relation family must compare propositions")
+    };
+    assert_eq!(**rel_sort, Term::Omega(Level::zero()));
+    let mut rel_ctx = Context::new();
+    rel_ctx.push(type_eq((**source_dom).clone(), (**target_dom).clone()));
+    rel_ctx.push(ken_kernel::subst::weaken(source_dom, 1));
+    rel_ctx.push(ken_kernel::subst::weaken(source_dom, 2));
+    let expected_source = Term::app(
+        Term::app(ken_kernel::subst::weaken(source_rel, 3), Term::var(1)),
+        Term::var(0),
+    );
+    let forward = |v: Term| {
+        cast(
+            ken_kernel::subst::weaken(source_dom, 3),
+            ken_kernel::subst::weaken(target_dom, 3),
+            Term::var(2),
+            v,
+        )
+    };
+    let expected_target = Term::app(
+        Term::app(
+            ken_kernel::subst::weaken(target_rel, 3),
+            forward(Term::var(1)),
+        ),
+        forward(Term::var(0)),
+    );
+    assert!(convert_type(&f.env, &rel_ctx, rel_source, &expected_source));
+    assert!(convert_type(&f.env, &rel_ctx, rel_target, &expected_target));
     assert!(infer(&f.env, &ctx, &reduct).is_ok());
     let value = Term::QuotClass(Box::new(f.zero.clone()));
     assert_typed_cast(
@@ -313,6 +412,46 @@ fn quotient_structural_equality_and_typed_cast() {
             &type_eq(a.clone(), a)
         ),
         Ok(())
+    );
+}
+
+/// Durable invariant: the quotient-class payload moves from A to B along
+/// e.1. Distinct opaque domains make a reversed proof fail typing.
+#[test]
+fn quotient_cast_orients_distinct_underlying_domains() {
+    let mut f = Fixture::new();
+    let a = f.opaque("quot_source", Term::Type(Level::zero()));
+    let b = f.opaque("quot_target", Term::Type(Level::zero()));
+    let x = f.opaque("quot_member", a.clone());
+    let relation = |dom: Term| {
+        Term::Ascript(
+            Box::new(Term::lam(
+                dom.clone(),
+                Term::lam(
+                    dom.clone(),
+                    eq(
+                        ken_kernel::subst::weaken(&dom, 2),
+                        Term::var(1),
+                        Term::var(0),
+                    ),
+                ),
+            )),
+            Box::new(Term::pi(
+                dom.clone(),
+                Term::pi(dom, Term::Omega(Level::zero())),
+            )),
+        )
+    };
+    let source = Term::Quot(Box::new(a.clone()), Box::new(relation(a)));
+    let target = Term::Quot(Box::new(b.clone()), Box::new(relation(b)));
+    assert_typed_cast(
+        &f,
+        &Context::new(),
+        source,
+        target,
+        Term::QuotClass(Box::new(x)),
+        |t| matches!(t, Term::QuotClass(..)),
+        false,
     );
 }
 
