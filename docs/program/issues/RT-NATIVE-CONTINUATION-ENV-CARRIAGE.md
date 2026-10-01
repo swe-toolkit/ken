@@ -279,6 +279,22 @@ carrier slot has no planner-owned schema. This chain closes at §1a 5; the
 carrier-schema recut's own count starts at 0, and its 3rd advancing stop
 triggers hold-and-research.
 
+### Carrier-schema recut (§1a 3, Architect `evt_3v81hg9te2te2`)
+
+1. R coercion keyed on the transport call site (the routed answer), not on
+   the slot store (`evt_3hm46evkpr9g`).
+2. Slot-store existence decided from lowering SSA def-use, not from a
+   planner fact (`evt_7ybjzpeaa5xff`).
+3. The Child's specialization at a slot store comes from the lexical-closure
+   classifier, so a transfer-path store whose Child is a checked-IH
+   invocation thunk (S1/526, child 524) has no classification
+   (`evt_69ge14q5acsta`).
+
+Predicate: the planner assigns a slot Child's R variant statically per store
+site, but a relayed Child's producer is a labelled flow population known
+only at run time. Held at `c80b73e70` for the Research advisory on how a
+relay child is represented.
+
 ## Stop conditions
 
 - A W or C capture with no finalized claim (frame or transport) at its
