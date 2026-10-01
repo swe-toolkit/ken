@@ -250,6 +250,58 @@ fn pi_structural_equality_and_typed_cast() {
     }
 }
 
+/// Durable invariant: Π symmetry is indexed by the inferred domain level,
+/// not hardwired to Type 0. Distinct Type-1 domains force neutral evidence
+/// to travel through both the Eq-Type arm and the cast's back-transport.
+#[test]
+fn pi_type_one_structural_equality_and_typed_symmetry() {
+    let mut f = Fixture::new();
+    let high = Level::zero().suc();
+    let source_dom = f.opaque("type_one_source", Term::Type(high.clone()));
+    let target_dom = f.opaque("type_one_target", Term::Type(high.clone()));
+    let source = Term::pi(source_dom.clone(), Term::Type(Level::zero()));
+    let target = Term::pi(target_dom.clone(), Term::Type(Level::zero()));
+    let value = f.opaque("type_one_function", source.clone());
+    let ctx = Context::new();
+    let equality = eq(Term::Type(high.clone()), source.clone(), target.clone());
+    infer(&f.env, &ctx, &equality).expect("Type-1 Π equality is formed");
+    let structure = whnf(&f.env, &ctx, &equality);
+    let Term::Sigma(domain_eq, family) = &structure else {
+        panic!("Type-1 Π equality must structurally decompose")
+    };
+    assert!(convert_type(
+        &f.env,
+        &ctx,
+        domain_eq,
+        &eq(Term::Type(high.clone()), source_dom, target_dom),
+    ));
+    let Term::Pi(_, cod_eq) = &**family else {
+        panic!("Type-1 codomain equality must be a family")
+    };
+    assert!(matches!(&**cod_eq, Term::Eq(sort, ..) if **sort == Term::Type(high)));
+    infer(&f.env, &ctx, &structure).expect("decomposed Type-1 equality is typed");
+
+    let mut proof_ctx = ctx;
+    proof_ctx.push(equality);
+    let redex = cast(
+        source,
+        target,
+        Term::var(0),
+        ken_kernel::subst::weaken(&value, 1),
+    );
+    let before = infer(&f.env, &proof_ctx, &redex).expect("typed neutral-evidence cast");
+    let trusted = f.env.trusted_base();
+    let reduct = whnf(&f.env, &proof_ctx, &redex);
+    assert_ne!(redex, reduct, "Type-1 Π cast must fire");
+    assert!(matches!(reduct, Term::Lam(..)));
+    assert_eq!(
+        check(&f.env, &proof_ctx, &reduct, &before),
+        Ok(()),
+        "Type-1 back-cast must use symmetry at the inferred level"
+    );
+    assert_eq!(f.env.trusted_base(), trusted);
+}
+
 /// Durable invariant: Σ's codomain witness is indexed by the *source* fst.
 #[test]
 fn sigma_structural_equality_and_typed_cast() {
