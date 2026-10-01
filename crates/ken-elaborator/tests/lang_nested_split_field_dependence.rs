@@ -4,7 +4,7 @@
 //! Promise class: durable invariant. Every program enters via `elaborate_file`.
 
 use ken_elaborator::ElabEnv;
-use ken_kernel::{normalize, Context};
+use ken_kernel::{inductive::method_type, normalize, Context, Level, Term};
 
 const VEC: &str = r#"
 data Vec (a : Type) : Nat → Type where {
@@ -51,6 +51,28 @@ fn indexed_nested_sibling_type_keeps_outer_index_binder() {
     assert_normalized_equal(&env, "zero", "expected_zero");
     assert_normalized_equal(&env, "one", "expected_one");
     assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+#[test]
+fn diagnostic_m_align_two_recursive_field_method_telescope() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(
+        "data Branch : Type where { \
+           Leaf : Branch; Node : Branch → Nat → Branch → Branch \
+         }",
+    )
+    .expect("binary constructor");
+    let branch_id = env.globals["Branch"];
+    let ind = env.env.inductive(branch_id).expect("checked inductive");
+    let motive = Term::lam(Term::indformer(branch_id, vec![]), Term::ty(Level::Zero));
+    let method = method_type(&env.env, ind, 1, &motive, &[], &[]).expect("method type");
+    let mut cursor = &method;
+    let mut domains = Vec::new();
+    while let Term::Pi(domain, rest) = cursor {
+        domains.push(format!("{domain:?}"));
+        cursor = rest;
+    }
+    eprintln!("M-align domains: {domains:?}");
 }
 
 #[test]

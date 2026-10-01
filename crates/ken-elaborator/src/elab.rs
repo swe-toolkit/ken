@@ -18404,7 +18404,7 @@ fn compile_match_matrix(
                 Term::var(0),
                 needs_reverting,
             );
-            if needs_reverting {
+            {
                 let Term::Elim { motive, methods, .. } = &mut elim else {
                     unreachable!("shared matrix constructor returns an eliminator")
                 };
@@ -18428,12 +18428,23 @@ fn compile_match_matrix(
                             span: split_span.clone(),
                         })?
                         .len();
+                    let binder_count = ctor.args.len() + ih_count + col_types.len() - 1;
+                    let ih_positions = nested_method_ih_positions(&expected, motive, binder_count);
+                    assert_nested_method_alignment(
+                        &ind0,
+                        ordinal,
+                        &ih_positions,
+                        ctor.args.len(),
+                        ih_count,
+                        col_types.len() - 1,
+                        binder_count,
+                    )?;
                     let closed = close_nested_matrix_method(
                         cx,
                         &nested_ctx,
                         method.clone(),
                         expected.clone(),
-                        ctor.args.len() + ih_count + col_types.len() - 1,
+                        binder_count,
                     )?;
                     let checked = cx.metas.zonk_term(&closed);
                     let expected_checked = cx.metas.zonk_term(&expected);
@@ -18678,10 +18689,71 @@ fn matrix_family_elim(
     }
 }
 
+/// Locate the IH domains in method_type's binder spine by the motive
+/// application they contain. W-style and nested-positive lifts may carry
+/// that application under Π or Σ binders; their containing outer binder is
+/// still the IH position in the method's telescope.
+fn nested_method_ih_positions(expected: &Term, motive: &Term, binder_count: usize) -> Vec<usize> {
+    fn contains_motive(term: &Term, motive: &Term, depth: usize) -> bool {
+        let (head, args) = peel_app(term);
+        if !args.is_empty() && head == weaken(motive, depth as i64) {
+            return true;
+        }
+        match term {
+            Term::Pi(domain, body) | Term::Sigma(domain, body) | Term::Lam(domain, body) => {
+                contains_motive(domain, motive, depth)
+                    || contains_motive(body, motive, depth + 1)
+            }
+            Term::Let { ty, val, body } => {
+                contains_motive(ty, motive, depth)
+                    || contains_motive(val, motive, depth)
+                    || contains_motive(body, motive, depth + 1)
+            }
+            _ => term.children().into_iter().any(|child| contains_motive(child, motive, depth)),
+        }
+    }
+
+    let mut positions = Vec::new();
+    let mut cursor = expected;
+    for position in 0..binder_count {
+        let Term::Pi(domain, rest) = cursor else { break };
+        if contains_motive(domain, motive, position) {
+            positions.push(position);
+        }
+        cursor = rest;
+    }
+    positions
+}
+
+fn assert_nested_method_alignment(
+    ind: &InductiveDecl,
+    ordinal: usize,
+    ih_positions_in_method_type: &[usize],
+    n_args0: usize,
+    p_ihs0: usize,
+    tail_len: usize,
+    binder_count: usize,
+) -> Result<(), ElabError> {
+    let ctor = &ind.constructors[ordinal];
+    let grouped: Vec<usize> = (ctor.args.len()..ctor.args.len() + p_ihs0).collect();
+    if n_args0 != ctor.args.len()
+        || p_ihs0 != ih_positions_in_method_type.len()
+        || ih_positions_in_method_type != grouped.as_slice()
+        || n_args0 + p_ihs0 + tail_len != binder_count
+    {
+        return Err(ElabError::Internal(format!(
+            "nested method telescope misaligned for constructor {ordinal}: raw \
+             fields/IHs/tail {n_args0}/{p_ihs0}/{tail_len}, method_type IH positions \
+             {ih_positions_in_method_type:?}"
+        )));
+    }
+    Ok(())
+}
+
 /// A nested method's complete telescope is supplied by the very Elim it
 /// feeds. Its raw matrix body may end in another eliminator instead of an
 /// explicit lambda; η-apply the remaining expected binders before wrapping
-/// the kernel-derived domains. No raw domain becomes a checked method domain.
+/// kernel-derived domains. No raw domain becomes a checked method domain.
 fn close_nested_matrix_method(
     cx: &ElabCtx<'_>,
     context: &Context,
