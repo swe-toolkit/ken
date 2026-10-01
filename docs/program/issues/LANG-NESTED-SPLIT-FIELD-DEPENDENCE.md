@@ -7,7 +7,7 @@ size: M
 tier: T1
 gate: architect
 depends_on: [LANG-INFER-MATCH-INDEXED-COMPLETE]
-blocks: []
+blocks: [LANG-NESTED-MATRIX-DERIVED-TELESCOPE]
 github: null
 origin: "Adversary M8 findings evt_1vhs6demxejpg on 5d139f422 (LANG-INFER-MATCH-INDEXED-COMPLETE): elaborator correctness, no soundness issue (the kernel rejects every bad term). Reachable from well-formed source. Steward-filed per COORDINATION section 2."
 ---
@@ -87,6 +87,43 @@ alias used across a nested-splitting inner match, reporting any runtime
 - **AC-3.** The targeted match and pattern suites stay green, the catalog
   census is byte-identical, and `trusted_base()` is unchanged.
 
+## Narrowed acceptance (Steward `evt_7dwx0stmecwd8`, Architect `evt_5eahknef2gfbm`)
+
+After six advancing stops, this WP keeps what is proven at WIP `9a5b617c5`.
+It is F1, F2, F3, `weaken_woven` and the unconditional `method_type` close.
+The structural closure goes to `LANG-NESTED-MATRIX-DERIVED-TELESCOPE`. The
+Architect's Part 1 list in `evt_5eahknef2gfbm` is the pin set. Every value
+pin asserts the normalized constructor, not only that elaboration succeeds.
+
+- **AC-N1 (F1 and the close).**
+  - The exact repro checks, and both calls normalize to the expected `Out`.
+  - The tail-rebase pins hold: Zero, a two-field constructor and a Suc
+    guard.
+  - Restoring `if needs_reverting` reddens the exact repro.
+  - There is a unit test for `assert_nested_method_alignment`.
+  - The two-`Nat` collision control returns the second binder's value,
+    under Zero and under a two-field constructor.
+- **AC-N2 (F2 and `weaken_woven`).**
+  - The Dep row's value, which reddens when the in-matrix finalize is
+    removed.
+  - The unit test: own-frame gives `Ready`, enclosing-frame gives
+    `Deferred`.
+  - A deferred method with a type error is still rejected at `declare_def`.
+  - An unregistered sentinel at the helper and at the outermost pop is each
+    `Internal`.
+  - M1, M2, M3, two-deep and middle-frame assert values. Reverting to
+    `weaken` returns M2 to `Zero`.
+  - The fan-in list and the consumer sweep go in the handoff.
+- **AC-N3 (F3).** The diagnostic text ruled in `evt_hepczebkww5c`, or a
+  statement that F2 made the program check.
+- **AC-N4 (M-deep carve-out).** Measure the Zero fixture and its two-field
+  sibling on `5d5e7bf02` and on the candidate.
+  - If both are rejected on base, each gets a transition-sentinel pin on the
+    candidate. The pin asserts `KernelRejected`, never a value, and names
+    the successor that flips it.
+  - If either passes on base, or gives a wrong value on either side, that is
+    the 7th stop.
+
 ## Symptom inventory (§1b, Architect)
 
 1. A split column's pending tail types reach each constructor bucket without
@@ -132,3 +169,7 @@ pushes, framed on the stop-6 advisory and the M-deep base measurement.
 - The repair needs the kernel or a spec change.
 - A finding is the same defect as `LANG-NESTED-SPLIT-CONSTANT-MOTIVE-INDEX`
   scope: stop to the Architect to merge the frames.
+- Each of these is the 7th advancing stop: the AC-N4 base-pass or
+  wrong-value condition; a hardened value pin failing; a regression in
+  `lang_infer_match_indexed_complete` (20/20) or the as-pattern, nested-split
+  and tuple-pattern suites.
