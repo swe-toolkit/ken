@@ -23,13 +23,15 @@ operations. For the shared rules, the kernel reduces lazily to *weak-head*
 normal form to decide conversion (NbE, `17 §3`), while the interpreter reduces
 to **full values** to run the program; they MUST agree wherever both reduce.
 
-The interpreter dispatches `PrimReduction::Op` through `prim_reduce` on
-runtime values; kernel conversion never executes that interpreter function.
-Two separately implemented registered Ops do reduce in kernel WHNF:
-`leq_int` on two WHNF `IntLit` operands (`../10-kernel/16 §2.2`) and
-`string_to_list_char` on a checked `String` literal (`../10-kernel/17 §1`).
-Their kernel rules are trusted code, while the interpreter's runtime path
-remains independently tested. Every other registered Op stays neutral in
+The interpreter dispatches saturated `PrimReduction::Op` applications in
+`apply` on runtime values: `leq_int` uses `prim_reduce`, while the structural
+`string_to_list_char` view calls `build_list_char` with the installed
+`List Char` constructor identities. Kernel conversion executes neither
+interpreter path. Two separately implemented registered Ops do reduce in
+kernel WHNF: `leq_int` on two WHNF `IntLit` operands (`../10-kernel/16 §2.2`)
+and `string_to_list_char` on a checked `String` literal (`../10-kernel/17 §1`).
+Their kernel rules are trusted code, while the distinct interpreter runtime
+paths remain independently tested. Every other registered Op stays neutral in
 kernel conversion and requires a separate K3 decision to promote; its
 interpreter value alone cannot justify `Refl`.
 
@@ -49,10 +51,11 @@ A term with **no applicable head reduction** is **neutral** (a variable, an
 opaque constant, or an `elim`/`cast`/quotient-elim on a neutral target —
 `17 §1`). In kernel conversion, a registered `Op` application is neutral
 unless it is one of the two specified prim redexes (`17 §1`); in the
-interpreter, runtime-value arguments may dispatch the separate `prim_reduce`
-rule. For the **closed, ground** programs X1 runs,
-canonicity (§3.6) guarantees evaluation does not get stuck on a neutral: the
-only non-value residues are **`unknown`** (an open hole, §4) and, for an opt-in
+interpreter, saturated runtime-value arguments reach `apply`, which selects
+`prim_reduce` or a specialized structural-view path as applicable. For the
+**closed, ground** programs X1 runs, canonicity (§3.6) guarantees evaluation
+does not get stuck on a neutral: the only non-value residues are **`unknown`**
+(an open hole, §4) and, for an opt-in
 opaque non-total definition, **divergence** (§3.3, `43 §2, case 4`). The
 interpreter computes values; the kernel's **η** (`17 §2`, type-directed) and **Ω
 proof-irrelevance** are *conversion-time* equalities, not evaluation steps
