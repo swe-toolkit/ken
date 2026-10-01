@@ -33,6 +33,7 @@ the following reductions and the η rules (§2):
 |---|---|---|
 | **β** | `(λ (x:A). t) u → t[u/x]` | `13 §1` |
 | **Σ-β** | `(a,b).1 → a`, `(a,b).2 → b` | `13 §2` |
+| **ζ** | `let x := u : A in t → t[u/x]` (non-recursive) | `11 §1` |
 | **ι** | `elim_D M m̄ … (cₖ ā) → mₖ …` (structural) | `14 §3` |
 | **δ** | `c → t` for `(c : A := t) ∈ Σ` (transparent) | `11 §4` |
 | **prim** | registered `leq_int (IntLit m) (IntLit n)` → `True` if `m <= n`, else `False`; registered `string_to_list_char s` → the `cons`/`nil` list of `s`'s scalars as `IntLit`, for a checked `String` literal `s` | `16 §2.2`, ADR 0013; KERNEL-LITERAL-CHAR-VIEW |
@@ -201,20 +202,23 @@ Notes.
   run with δ **deferred** so heads can be compared before unfolding; δ fires
   only on the `conv` retry path of §3.5. This split is the whole point of "lazy
   δ" and is detailed in §3.5.
-- **Termination.** Termination is not a term-size argument: β/Σ-β
-  substitution can duplicate its argument, and the checked-literal
+- **Termination.** Termination is not a term-size argument: β/Σ-β and `let`
+  substitution can duplicate their argument, and the checked-literal
   `string_to_list_char` view replaces a literal by a list with one `Cons` per
-  scalar. The core reductions — β/Σ-β, ι, η, the two **prim** rules, and obs
-  — are strongly normalizing on well-typed terms (§5, obligation 1). The two
-  prim rules are first-order rewrite rules on literals whose right-hand sides
-  contain no `Op` application, so neither can fire on its own output. ι
-  follows the finite structural measures of `14 §9` (including Π-bound and
-  nested lifted recursive content); and obs descends on the type
-  (`16 §3.3`). `Let` is non-recursive (a `let` binds a value, no
-  self-reference). The `Const` branch (δ) is the one reduction outside that
-  strongly normalizing core. SCT (§4) bounds recursive re-entry within one
-  admitted group's call graph; the finite §3.5 boundary separately stops
-  cyclic cross-identity symbolic retry — see §5.
+  scalar. The core reductions — β/Σ-β, `let` substitution, ι, η, the two
+  **prim** rules, and obs (including quotient and truncation elimination, and
+  `J` via `cast`) — are strongly normalizing on well-typed terms (§5,
+  obligation 1); stripping an ascription only erases it. The two prim rules
+  are first-order rewrite rules on literals whose right-hand sides contain no
+  `Op` application, so neither can fire on its own output. ι follows the
+  finite structural measures of `14 §9` (including Π-bound and nested lifted
+  recursive content); and obs descends on the type (`16 §3.3`). `Let` is
+  non-recursive (a `let` binds a value, no self-reference): `let x := u : A
+  in t` reduces to `t[u/x]`, the reduct of the β-redex `(λ (x:A). t) u`. The
+  `Const` branch (δ) is the one reduction outside that strongly normalizing
+  core. SCT (§4) bounds recursive re-entry within one admitted group's call
+  graph; the finite §3.5 boundary separately stops cyclic cross-identity
+  symbolic retry — see §5.
 
 ### 3.3 `conv` — type-directed conversion
 
@@ -704,12 +708,16 @@ Conversion terminates on every well-typed input, so type-checking is
 semi-decision procedure. The argument has three obligations that meet at the
 `whnf`/`conv` boundary of §3.2–§3.5:
 
-1. **The core reductions are strongly normalizing.** β/Σ-β/ι/η/prim and the
-   observational `Eq`/`cast` reductions terminate on well-typed terms. The
-   argument is not by term size, since β-substitution can duplicate its
-   argument. Strong normalization of the β/Σ-β/ι/η/obs core is the standard
-   metatheorem for observational type theory with inductives (`TTobs`,
-   Pujet & Tabareau 2022; ADR 0005), which Ken follows; `18 §6` records its
+1. **The core reductions are strongly normalizing.** β/Σ-β, `let`
+   substitution, ι, η, prim, and the observational `Eq`/`cast` reductions
+   (with quotient and truncation elimination, and `J` via `cast`) terminate
+   on well-typed terms. The argument is not by term size, since β- and
+   `let`-substitution can duplicate their argument. Strong normalization of
+   the β/Σ-β/`let`/ι/η/obs core is the standard metatheorem for
+   observational type theory with inductives (`TTobs`, Pujet & Tabareau
+   2022; ADR 0005), which Ken follows; `let` substitution is CIC's
+   ζ-reduction, and a non-recursive `let x := u : A in t` has the reduct
+   `t[u/x]` of the β-redex `(λ (x:A). t) u`. `18 §6` records the core's
    status as argued, not mechanized. Within it, ι follows the finite
    structural measures for direct, Π-bound, and nested lifted recursive
    content (`14 §9.2`, `§9.4`, `§9.5`), and the `Eq`/`cast` mutual recursion
