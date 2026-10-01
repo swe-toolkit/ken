@@ -59,9 +59,11 @@ pub theorem parser_fail_laws (a : Type) : ParserLaws a (parser_fail a)
 the bespoke `parse_bool_expr_laws_if_decoder_bounded` composition is retired.
 The public theorems lead their section and the helpers follow.
 
-Scope: `Parsing.ken.md` and its acceptance test
-(`crates/ken-elaborator/tests/cat5_parsing_package.rs` or the existing
-Parsing acceptance target). No `Decoder.ken.md` change.
+Scope: `Parsing.ken.md`, its acceptance test
+(`crates/ken-elaborator/tests/cat5_parsing_package.rs`), and in
+`crates/ken-elaborator/src/r_layer_tests/cat_tier_d_parsing_group_import.rs`
+only the three new names in the expected public inventory (Steward
+`evt_2mjp2qrv96thc`). No `Decoder.ken.md` change.
 
 ## Acceptance
 
@@ -74,7 +76,8 @@ Parsing acceptance target). No `Decoder.ken.md` change.
   true twin.
 - **AC-3.** `trusted_base()` is unchanged, the 61-file catalog census is
   byte-identical except `Parsing.ken.md`, and the Parsing acceptance targets
-  stay green.
+  stay green, including `ken-elaborator --lib
+  parsing_module_loader_visible_inventory_is_exact_and_coherent`.
 
 ## Stop conditions
 
