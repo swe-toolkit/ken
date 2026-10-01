@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-CONTINUATION-ENV-CARRIAGE
 title: "A native function-typed recursive position whose closure escapes through a word-only call result gets its captures from a compile-time side slot, so two constructions of the same continuation cannot be told apart. Carry the suffix as fields of the residual word, in defunctionalized form"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
@@ -91,8 +91,14 @@ decode them from the word they hold, and the side slot is retired.
     consumers with their own captures. A mutation that shares one set of
     fields turns that row red. A missing field or a count mismatch
     refuses.
-  - The one-bracket control and the landed native census show no verdict
-    change.
+  - The landed native census shows no verdict change.
+  - One-bracket control (Architect `evt_5t9n4ycp2jp40`), in two parts:
+    - the measured Wrapped W5/M2 fixture keeps external stdout, stderr and
+      exit parity with base `c91f42e7b`;
+    - zero-disposition IR identity is checked separately, only on a fixture
+      measured at W=0, M empty and |S|=0.
+
+    No demand distinction, and no relaxation of side slots or captures.
   - The IR passes the Cranelift verifier.
 
 ## Stop conditions
