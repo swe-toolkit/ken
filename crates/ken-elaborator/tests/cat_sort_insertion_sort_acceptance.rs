@@ -377,9 +377,16 @@ fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
         "every Boolean decision site must retain its exact exhaustive classification after let provenance is substituted"
     );
 
+    // Measured against 65af5c7cd: each old body-call count survives when
+    // only a J equality argument's recorded ascription type is excluded.
+    // The checked Eq endpoint copies (evt_143zpap46cmfr) contribute:
+    // ord_leq_at 145 = 136 body + 9 recordings;
+    // eq_from_ord 62 = 60 body + 2 recordings;
+    // count 50 = 50 body + 0 recordings.
+    let mut provider_populations = Vec::new();
     for (provider_name, expected_calls) in [
-        ("Core.Classes.LawfulClasses.ord_leq_at", 136),
-        ("Data.Collections.Derived.eq_from_ord", 60),
+        ("Core.Classes.LawfulClasses.ord_leq_at", 145),
+        ("Data.Collections.Derived.eq_from_ord", 62),
         ("Data.Collections.Derived.count", 50),
     ] {
         let provider = env.globals[provider_name];
@@ -396,14 +403,24 @@ fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
                 collect_provider_typed_calls(&env, body, provider_type, &mut call_providers);
             }
         }
+        // Measure every provider before any count assertion can short-circuit
+        // a sibling's population; the identity assertion is retained below.
+        provider_populations.push((provider_name, provider, expected_calls, call_providers));
+    }
+    let measured_counts = provider_populations
+        .iter()
+        .map(|(name, _, _, calls)| format!("{name}={}", calls.len()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    for (provider_name, provider, expected_calls, call_providers) in provider_populations {
         assert!(
             call_providers.iter().all(|id| *id == provider),
-            "every call convertible to `{provider_name}` must use its exact GlobalId; got {call_providers:?}"
+            "every call convertible to `{provider_name}` must use its exact GlobalId; got {call_providers:?}; all populations: {measured_counts}"
         );
         assert_eq!(
             call_providers.len(),
             expected_calls,
-            "provider `{provider_name}` must retain its complete elaborated call population"
+            "provider `{provider_name}` must retain its complete elaborated call population; all populations: {measured_counts}"
         );
     }
     assert_eq!(
