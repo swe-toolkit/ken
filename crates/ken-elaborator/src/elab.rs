@@ -15906,6 +15906,9 @@ struct RowState {
     /// Source slots for split columns missing from `cx.ctx`, per arm. A
     /// constructor pattern does not create one; a wildcard/variable does.
     virtual_surface_positions: Vec<usize>,
+    /// Emitted flat columns visible to another row but not bound by this
+    /// row's source pattern. Installed only while elaborating this leaf.
+    row_hidden_surface_positions: Vec<usize>,
     arm_idx: usize,
 }
 
@@ -15984,8 +15987,7 @@ impl RowState {
         replacement_pats: Vec<RPattern>,
         replacement_source_bindings: bool,
     ) -> Self {
-        let surface_binder =
-            self.real_occurrences[0].surface_binder && replacement_source_bindings;
+        let surface_binder = self.real_occurrences[0].surface_binder;
         let source_bindings = vec![replacement_source_bindings; replacement_pats.len()];
         self.specialize_current_columns(replacement_pats, source_bindings, surface_binder)
     }
@@ -16231,6 +16233,7 @@ fn build_alias_rows(
             real_occurrences: vec![MatrixOccurrence::live(scrut_core.clone())],
             binding_occurrences: Vec::new(),
             virtual_surface_positions: Vec::new(),
+            row_hidden_surface_positions: Vec::new(),
             arm_idx: i,
         };
         rows.push(expose_current_pattern_aliases(cx, row, scrut_ty));
@@ -16250,6 +16253,7 @@ fn enter_pattern_alias_leaf(
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
     virtual_surface_positions: &[usize],
+    row_hidden_surface_positions: &[usize],
 ) -> PatternAliasLeafScope {
     let frame = cx
         .pattern_alias_type_frames
@@ -16309,6 +16313,12 @@ fn enter_pattern_alias_leaf(
             }
         }
     }
+    for &position in row_hidden_surface_positions {
+        debug_assert!(position < cx.ctx.len());
+        if !cx.hidden_positions.contains(&position) {
+            cx.hidden_positions.push(position);
+        }
+    }
     let virtual_base = cx.matrix_virtual_surface_positions.len();
     cx.matrix_virtual_surface_positions
         .extend_from_slice(virtual_surface_positions);
@@ -16340,9 +16350,11 @@ fn infer_arm_at_matrix_leaf(
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
     virtual_surface_positions: &[usize],
+    row_hidden_surface_positions: &[usize],
 ) -> Result<(Option<Term>, Term, Term), ElabError> {
     let scope = enter_pattern_alias_leaf(
         cx, arm_idx, binding_occurrences, real_depth, virtual_surface_positions,
+        row_hidden_surface_positions,
     );
     let result = (|| {
         use_direct_pattern_alias_occurrences(cx, true);
@@ -16368,10 +16380,12 @@ fn check_arm_at_matrix_leaf(
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
     virtual_surface_positions: &[usize],
+    row_hidden_surface_positions: &[usize],
     expected: &Term,
 ) -> Result<(Option<Term>, Term), ElabError> {
     let scope = enter_pattern_alias_leaf(
         cx, arm_idx, binding_occurrences, real_depth, virtual_surface_positions,
+        row_hidden_surface_positions,
     );
     let result = (|| {
         use_direct_pattern_alias_occurrences(cx, true);
@@ -17775,6 +17789,7 @@ fn compile_match_leaf(
         &first_occurrences,
         real_depth_so_far,
         &first_row.virtual_surface_positions,
+        &first_row.row_hidden_surface_positions,
     )?;
     let mut branches = vec![(first_row.arm_idx, first_guard, first_body)];
     for row in &candidates[1..=fallback] {
@@ -17786,6 +17801,7 @@ fn compile_match_leaf(
             &occurrences,
             real_depth_so_far,
             &row.virtual_surface_positions,
+            &row.row_hidden_surface_positions,
             &body_ty_ctx,
         )?;
         branches.push((row.arm_idx, guard, body));
@@ -18004,9 +18020,15 @@ fn compile_match_matrix(
                     cx.hidden_positions.push(cx.ctx.len() - 1);
                 }
                 let current_ty = weaken(&col_types[0], 1);
+                let visible_position = cx.ctx.len() - 1;
                 let new_rows: Vec<RowState> = rows
                     .into_iter()
-                    .map(RowState::enter_current_real_binder)
+                    .map(|mut row| {
+                        if surface_binder && !row.real_occurrences[0].source_binding {
+                            row.row_hidden_surface_positions.push(visible_position);
+                        }
+                        row.enter_current_real_binder()
+                    })
                     .map(|row| expose_current_pattern_aliases(cx, row, &current_ty))
                     .map(|row| row.bind_current_occurrence().drop_current_column())
                     .collect();
@@ -21475,6 +21497,7 @@ mod match_matrix_occurrence_tests {
             real_occurrences: vec![MatrixOccurrence::live(occurrence)],
             binding_occurrences: Vec::new(),
             virtual_surface_positions: Vec::new(),
+            row_hidden_surface_positions: Vec::new(),
             arm_idx: 0,
         }
     }
@@ -21628,6 +21651,7 @@ mod match_matrix_occurrence_tests {
             ],
             binding_occurrences: vec![Some(Term::var(1))],
             virtual_surface_positions: Vec::new(),
+            row_hidden_surface_positions: Vec::new(),
             arm_idx: 0,
         }
         .under_core_binder();

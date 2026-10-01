@@ -5,7 +5,7 @@
 //! source-to-eliminator path through `ElabEnv::elaborate_file`.
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{Decl, Term};
+use ken_kernel::{whnf, Context, Decl, Term};
 
 const VEC: &str = r#"
 data Vec (a : Type) : Nat → Type where {
@@ -255,5 +255,63 @@ fn nested_column_omission_stays_refused() {
         matches!(error, ElabError::ExhaustivenessError { ref missing, .. }
             if missing.constructor == "VCons"),
         "{error:?}"
+    );
+}
+
+fn assert_split_column_names(source: &str) {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(source)
+        .expect("split-column names and later fields must check");
+    let value = |name: &str| {
+        let id = *env.globals.get(name).expect("named checked constant");
+        let body = env.env.transparent_body(id).expect("transparent constant").1;
+        whnf(&env.env, &Context::new(), &body)
+    };
+    assert_eq!(value("selected"), value("expected_selected"));
+    assert_eq!(value("selected_zero"), value("expected_zero"));
+}
+
+#[test]
+fn nonindexed_split_variable_and_later_field_resolve_per_row() {
+    // Promise class: durable invariant. MEASURED: a constructor row's later
+    // field and a variable row's first and later fields normalize to distinct
+    // constructor arguments. CLAIMED: a column push stays uniform while each
+    // leaf hides only binders its own source row did not introduce. THE GAP:
+    // the Suc/Zero values differ, so a swapped or hidden source index changes
+    // the checked result, rather than merely preserving its type.
+    assert_split_column_names(
+        "data PairOut : Type where { Out : Nat → Nat → PairOut }\n\
+         data PlainPair : Type where { MkPlain : Nat → Nat → PlainPair }\n\
+         fn rebuild (p : PlainPair) : PairOut = let r = match p { \
+           MkPlain Zero later ↦ Out Zero later; \
+           MkPlain first later ↦ Out first later \
+         } in r\n\
+         const selected : PairOut = rebuild (MkPlain (Suc Zero) (Suc (Suc Zero)))\n\
+         const selected_zero : PairOut = rebuild (MkPlain Zero (Suc (Suc Zero)))\n\
+         const expected_selected : PairOut = Out (Suc Zero) (Suc (Suc Zero))\n\
+         const expected_zero : PairOut = Out Zero (Suc (Suc Zero))",
+    );
+}
+
+#[test]
+fn indexed_split_variable_and_later_field_resolve_per_row() {
+    // Same row-local source boundary under a dependent indexed root motive.
+    assert_split_column_names(
+        "data PairOut : Type where { Out : Nat → Nat → PairOut }\n\
+         data IndexedPair : Nat → Type where { \
+           IEmpty : IndexedPair Zero; \
+           MkIndexed : (n : Nat) → Nat → Nat → IndexedPair (Suc n) \
+         }\n\
+         fn rebuild (n : Nat) (p : IndexedPair (Suc n)) : PairOut = \
+         let r = match p { \
+           MkIndexed m Zero later ↦ Out Zero later; \
+           MkIndexed m first later ↦ Out first later \
+         } in r\n\
+         const selected : PairOut = rebuild Zero \
+           (MkIndexed Zero (Suc Zero) (Suc (Suc Zero)))\n\
+         const selected_zero : PairOut = rebuild Zero \
+           (MkIndexed Zero Zero (Suc (Suc Zero)))\n\
+         const expected_selected : PairOut = Out (Suc Zero) (Suc (Suc Zero))\n\
+         const expected_zero : PairOut = Out Zero (Suc (Suc Zero))",
     );
 }
