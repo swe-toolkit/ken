@@ -23,12 +23,17 @@ operations. For the shared rules, the kernel reduces lazily to *weak-head*
 normal form to decide conversion (NbE, `17 §3`), while the interpreter reduces
 to **full values** to run the program; they MUST agree wherever both reduce.
 
-`PrimReduction::Op` is the deliberate exception. The interpreter dispatches
-`prim_reduce` on runtime values, but landed kernel conversion has no `Op` arm
-and leaves the application neutral even on literal arguments. Thus an
-interpreter result is not a kernel reduct and cannot justify `Refl`. Kernel
-conversion for registered operations is K3-deferred; until then, primitive
-value correctness is tested against the independent runtime oracles.
+The interpreter dispatches saturated `PrimReduction::Op` applications in
+`apply` on runtime values: `leq_int` uses `prim_reduce`, while the structural
+`string_to_list_char` view calls `build_list_char` with the installed
+`List Char` constructor identities. Kernel conversion executes neither
+interpreter path. Two separately implemented registered Ops do reduce in
+kernel WHNF: `leq_int` on two WHNF `IntLit` operands (`../10-kernel/16 §2.2`)
+and `string_to_list_char` on a checked `String` literal (`../10-kernel/17 §1`).
+Their kernel rules are trusted code, while the distinct interpreter runtime
+paths remain independently tested. Every other registered Op stays neutral in
+kernel conversion and requires a separate K3 decision to promote; its
+interpreter value alone cannot justify `Refl`.
 
 The reduction set realized (`17 §1`, the normative source — verify each against
 the *landed* kernel, not a paraphrase):
@@ -39,16 +44,18 @@ the *landed* kernel, not a paraphrase):
 | **Σ-β** | `(a,b).1 → a`, `(a,b).2 → b` | `13 §2` |
 | **ι** | `elim_D M m̄ ī (cₖ ā) → mₖ ā [IH…]` (structural) | `14 §3`, `14 §7.3` |
 | **δ** | `c → t` for `(c : A := t) ∈ Σ` | `11 §4` |
-| **prim** | `op v̄ → v` (audited interpreter-only operation semantics) | `14 §5`, `18a` |
+| **prim** | `op v̄ → v` (audited interpreter operation semantics; distinct from the two kernel-WHNF prim rules) | `14 §5`, `18a`, `17 §1` |
 | **obs** | `cast A A refl a → a`; `cast`/`Eq`-by-type; quotient/trunc elim | `16 §2.2`, `16 §3.2`, `16 §5`, `16 §6` |
 
 A term with **no applicable head reduction** is **neutral** (a variable, an
 opaque constant, or an `elim`/`cast`/quotient-elim on a neutral target —
-`17 §1`). In kernel conversion, every registered `Op` application is also
-neutral; in the interpreter, its runtime-value arguments may dispatch the
-separate `prim_reduce` rule. For the **closed, ground** programs X1 runs,
-canonicity (§3.6) guarantees evaluation does not get stuck on a neutral: the
-only non-value residues are **`unknown`** (an open hole, §4) and, for an opt-in
+`17 §1`). In kernel conversion, a registered `Op` application is neutral
+unless it is one of the two specified prim redexes (`17 §1`); in the
+interpreter, saturated runtime-value arguments reach `apply`, which selects
+`prim_reduce` or a specialized structural-view path as applicable. For the
+**closed, ground** programs X1 runs, canonicity (§3.6) guarantees evaluation
+does not get stuck on a neutral: the only non-value residues are **`unknown`**
+(an open hole, §4) and, for an opt-in
 opaque non-total definition, **divergence** (§3.3, `43 §2, case 4`). The
 interpreter computes values; the kernel's **η** (`17 §2`, type-directed) and **Ω
 proof-irrelevance** are *conversion-time* equalities, not evaluation steps
@@ -266,8 +273,11 @@ arguments fully — so the **boundary** is:
 **Agreement with the kernel (`§1`).** On closed ground **data built only from
 the shared conversion rules**, the interpreter's full value and the kernel's
 WHNF-plus-congruence coincide (same constructor normal form). A value produced
-through `PrimReduction::Op` is excluded from this claim: it is specified by the
-runtime primitive registry and remains opaque to conversion. On **functions**
+through another `PrimReduction::Op` is excluded from this claim: it is
+specified by the runtime primitive registry and remains opaque to conversion.
+The two shared kernel-WHNF Op reductions (`§1`) instead require agreement
+between the independently implemented kernel and interpreter paths. On
+**functions**
 the interpreter stops at a closure while the kernel applies **η** (`17 §2`) and
 **Ω proof-irrelevance** at *conversion* time. Those are kernel comparisons of
 terms, not equality on runtime closures. The interpreter need not implement η;

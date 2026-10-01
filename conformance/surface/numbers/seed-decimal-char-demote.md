@@ -16,21 +16,25 @@ replaced by **derived Ken definitions over exact-`Int` arithmetic**:
   load-bearing soundness pins** (the `isScalar` Ω-encoding; extraction computes
   the scalar proof).
 
-**Ordering prerequisite (Steward ruling (A), thr_34jhda3bdrs8a).** The derived
-`add`/`sub`/`eq_decimal` (exponent alignment) and Char `isScalar` (range checks)
-need an `Int` **ordering** reduction; on main only `eq_int` reduces (`leq_int`
-is registered-but-unreduced, `lt_int` unregistered). This tranche therefore
-**pulls the `leq_int` `prim_reduce` arm up from F5** as a genuine prerequisite
-(a bignum `≤` mirroring the landed `eq_int` arm) — **`trusted_base`-neutral**
-(`leq_int` is already registered; wiring its outer-ring reduction adds no kernel
-primitive) and **netted by an independent differential oracle** (**AC-L**, the
-F1 AC2 discipline extended to comparison). **`<` / `min` / `|ea−eb|` are
-DERIVED** from `leq_int` at the derived-op level — **no `lt_int` primitive**
-(canonical `a < b := ¬ (leq b a)`, Steward's locked minimal form — pure `leq`,
-no `eq`; `min`/`|ea−eb|` via `leq`+`sub`). With `leq_int` reducing, **`Ord Char`
-lands this tranche** (`leq_char ⇒ leq_int ∘ proj` reduces) — the brief's earlier
-"Ord Char rides F5" carve-out was downstream of the disproven premise and is
-dropped.
+**Ordering prerequisite (Steward ruling (A), thr_34jhda3bdrs8a; pre-demote
+baseline).** The derived `add`/`sub`/`eq_decimal` (exponent alignment) and Char
+`isScalar` (range checks) need an `Int` **ordering** reduction. At that earlier
+interpreter baseline only `eq_int` reduced; `leq_int` was registered but lacked
+its interpreter `prim_reduce` arm, and `lt_int` was unregistered. This tranche
+therefore **pulled the `leq_int` `prim_reduce` arm up from F5** as a genuine
+prerequisite (a bignum `≤` mirroring the landed `eq_int` arm) —
+**`trusted_base`-neutral** (`leq_int` was already registered; wiring its
+outer-ring reduction added no kernel primitive) and **netted by an independent
+differential oracle** (**AC-L**, the F1 AC2 discipline extended to comparison).
+Separately, kernel WHNF now computes registered `leq_int` on two WHNF
+`IntLit`s and the checked-literal `string_to_list_char` view (`17 §1`);
+all other registered Ops remain runtime-only/K3-deferred. **`<` / `min` /
+`|ea−eb|` are DERIVED** from `leq_int` at the derived-op level —
+**no `lt_int` primitive** (canonical `a < b := ¬ (leq b a)`, Steward's
+locked minimal form — pure `leq`, no `eq`; `min`/`|ea−eb|` via `leq`+`sub`).
+With `leq_int` reducing, **`Ord Char` lands this tranche** (`leq_char ⇒
+leq_int ∘ proj` reduces) — the brief's earlier "Ord Char rides F5" carve-out
+was downstream of the disproven premise and is dropped.
 
 Anchors: `18a §5.6.1`/`§5.9.1` (the landed delivery contracts), `18a §5.2.2`
 (the `leq_int` prerequisite), `18a §5.6`/`§5.9` (the DEMOTE verdict rows),
@@ -93,13 +97,15 @@ home each; a one-line cross-reference is added to `seed-numbers.md` AC6 +
   derived def is the producer, not a hand-fed binding.
 - **AC-L is the pulled-up `leq_int` arm's INDEPENDENT differential oracle — the
   sole net for a native-tier reduction (`18a §3`, F1 AC2 discipline).** The
-  `leq_int` bignum reduce arm is an outer-ring reduction; a wrong `≤` is a wrong
-  value with no kernel backstop, so its net is a differential against an
-  **independent** oracle — golden comparison verdicts hand-determined by the
-  total order on ℤ, **never** `num_bigint`'s own `Ord` on both sides
-  ([[soundness-AC-static-vs-runtime-face]] runtime face; the green-vs-green trap
-  is using the production crate as its own oracle). Operands built via distinct
-  paths (`Shl`/`Sub`/`Neg`), straddling the 2⁶³/2¹²⁷ boundaries and mixed sign.
+  `leq_int` bignum `prim_reduce` arm is an outer-ring reduction; a wrong `≤`
+  there is a wrong runtime value with no kernel check of that interpreter
+  result (despite the separate kernel WHNF rule), so its net is a differential
+  against an **independent** oracle — golden comparison verdicts
+  hand-determined by the total order on ℤ, **never** `num_bigint`'s own
+  `Ord` on both sides ([[soundness-AC-static-vs-runtime-face]] runtime face;
+  the green-vs-green trap is using the production crate as its own oracle).
+  Operands built via distinct paths (`Shl`/`Sub`/`Neg`), straddling the
+  2⁶³/2¹²⁷ boundaries and mixed sign.
 - **AC-C3 is the predicate-definedness dual — the refinement obligation must
   actually REDUCE, not name-match.** `Int.toChar` on a surrogate / out-of-range
   `Int` must reduce to `None`; a valid scalar to `Some`. The case **flips
@@ -240,7 +246,7 @@ computed-proof grep) rather than a value the interpreter emits.
   `lt_int` primitive** (grep: `lt_int` unregistered; `<` is the derived
   composite).
 - why: the `leq_int` reduce arm is the ordering **prerequisite** ruling (A)
-  pulled into this tranche; it is a native-tier reduction with no kernel
+  pulled into this tranche; its interpreter runtime result has no kernel
   backstop, so an **independent** differential is its sole net — exactly the F1
   AC2 discipline (`seed-f1-bignum-int.md`) extended from `eq_int` to comparison.
   A differential that oracles against `num_bigint`'s own `Ord` is circular and
@@ -448,14 +454,18 @@ lawful-classes-lane WP — see the deferred section.
 ### surface/numbers/char-extraction-computes-scalar-proof  (soundness, deferred)
 - spec: `18a §5.9.1(4)` (pin 2, runtime face), `18a §5.9` pin 2, `37 §2`
   (`String` is NFC UTF-8), `docs/program/wp/decimal-char-demote.md` (Char pin 2)
-- status: **RUNTIME FACE DEFERRED** — `char_at` doesn't exist and
-  `string_to_list_char` is a pre-existing `Neutral` stub (`eval.rs:870`); real
-  UTF-8 `String → Char` extraction is a **new feature**, not a wire-up, out of
-  this demote's scope. **Safe to defer:** while the stub is stuck, **no `Char`
-  is ever constructed from a `String`** → no un-witnessed `Char` → **no hole**
-  (Architect-ruled). The **static face** (the requirement below + no-postulate)
-  stands now; the runtime face (extraction *computes* the `tt`) rides the
-  extraction-feature WP as a forward obligation (deferred section), gated then.
+- status: **RUNTIME FACE DEFERRED** — the registered
+  `string_to_list_char` operation is **not** an overall `Neutral` stub.
+  Saturated interpreter `apply` uses `build_list_char` with installed
+  `List Char` constructor identities to build the scalar view; the direct,
+  environment-free `prim_reduce` fallback returns `Neutral` because it lacks
+  those identities (`42 §1`). The separate checked-literal kernel-WHNF view
+  is specified at `17 §1`. None of these facts alone discharges this case's
+  **computed `isScalar` proof** obligation for the deferred `char_at` /
+  `String → Char` extraction runtime face. The **static face** (the
+  requirement below + no-postulate) stands now; the runtime face (extraction
+  *computes* the `tt`) remains a forward obligation of the extraction-feature
+  WP (deferred section), gated then.
 - given: `String → Char` extraction (`char_at` / `string_to_list_char`) on a
   valid `String`.
 - expect (producer-grep, structural): extraction constructs `(c, w)` where the
@@ -573,10 +583,13 @@ distinct future WP; flagged so none is silently dropped):
   quotient/setoid `Eq`), **not** a landed-floor structural proof. The demote
   here ships only the computational ops + primitive removal.
 - **pin-2 `String → Char` extraction computes-the-witness (runtime face) → the
-  extraction-feature WP.** `char_at`/`string_to_list_char` are unbuilt (a
-  `Neutral` stub — no `Char` from a `String` ⇒ no hole); when real UTF-8
-  extraction lands, verify it **reduces** the canonical `tt` scalar witness,
-  never postulates it.
+  extraction-feature WP.** The `string_to_list_char` scalar view already
+  computes through interpreter `apply` when `List Char` constructor identities
+  are installed; only direct `prim_reduce` remains `Neutral` (`42 §1`). That
+  value view does not by itself certify the deferred `char_at` / extraction
+  case's **computed `isScalar` witness**. When that runtime face is delivered,
+  verify it **reduces** the canonical `tt` scalar witness, never postulates
+  it.
 - **Unbounded-Δexp general Decimal `align` → the Int-recursion WP.** The demote
   ships a fixed-unrolled **exact-or-stuck** `align` (a general `10^|Δexp|`
   recursion over `Int` fails SCT — no structural descent on opaque `Int`); a

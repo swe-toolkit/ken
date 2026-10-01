@@ -95,7 +95,7 @@ sentinel). `Char` is a Unicode scalar value (`35 §2.4`: `u32`, range
 `U+0000–U+10FFFF` excluding the surrogate block `U+D800–U+DFFF` — a refinement
 on the carrier, so `List Char → String` cannot encode an invalid scalar).
 
-### 2.4 No new kernel rule — small primitive core, derived surface
+### 2.4 Small primitive core, derived surface and checked-literal view
 
 `String` attaches as a kernel **primitive** (`14 §5`): an opaque type constant
 whose inhabitants are **string literals** and the results of a **small,
@@ -105,25 +105,24 @@ round-trip (`string_to_list_char` / `list_char_to_string`, landed in slice 1
 `L3-strings-roundtrip`, `§2.3`), and the two length reads (`byte_length` over
 the packed NFC buffer and `char_length` over its Unicode scalar values).
 
-Registration does **not** currently give those operations a kernel conversion
-rule. Each is recorded as `PrimReduction::Op`, which is opaque to the landed
-conversion checker: weak-head reduction unfolds transparent definitions and
-performs β/ι reduction, but does not evaluate an `Op`. The interpreter evaluates
-the operations at runtime, so `byte_length "abc"` produces `3` as a value; the
-kernel nevertheless does **not** judge `byte_length "abc" ≡ 3`
-definitionally, and `Refl` cannot discharge that equation. This differs from a
-registered `PrimReduction::Literal`: the literal is a value, while applying an
-`Op` is the missing reduction step.
+Registration alone does **not** give an operation a kernel conversion rule.
+The registered `string_to_list_char` view already reduces in kernel WHNF on
+a checked `String` literal, to the list of its scalar `IntLit` values
+(`../10-kernel/17 §1`); a neutral String operand leaves the call neutral.
+The other String operations, including `list_char_to_string` and
+`byte_length`, remain conversion-opaque. The interpreter evaluates them at
+runtime, so `byte_length "abc"` produces `3` as a value, but the kernel does
+**not** judge `byte_length "abc" ≡ 3` definitionally; `Refl` cannot discharge
+that equation. A checked `PrimReduction::Literal` is itself a value, not a
+blanket reduction permission for applications of other Ops.
 
-Kernel conversion for registered operations is a **K3-deferred gap**, not a
-landed facility. Adding it would require a separate kernel-TCB decision about
-which computations conversion may trust. Until that decision lands, a proof
-by normalization cannot depend on the result of a primitive string operation:
-the direct literal equation needs the landed explicit, audited
-postulate/`Axiom` posture rather than an implied computation-by-`Refl`. A future
-independently checked certificate would be a separate design, not something
-registration provides today. Runtime evaluation remains fully specified; only
-its promotion into kernel definitional equality is deferred.
+Promoting any other registered String operation into kernel conversion
+remains a **K3-deferred gap** requiring a separate trusted-rule decision.
+A proof by normalization cannot depend on a still-neutral primitive result;
+its direct equation needs a visible proof or audited postulate rather than
+runtime computation by `Refl`. A future independently checked certificate
+would be a separate design, not something registration provides. Runtime
+evaluation remains fully specified independently of the checked-literal view.
 
 **The string *surface* — `concat` / `slice` / `char_at` / `eq` / the ordering op
 — is `derived`, not primitive (`§2.5`).** These lower to ordinary prelude
@@ -134,13 +133,16 @@ trivially-structural ops adds **zero** `trusted_base()` delta, where a native
 prim would grow the audited reduction surface for no benefit
 (subsume-don't-proliferate). So the
 primitive set stays small and audited (`18 §5`), and `String` adds **no**
-inductive declaration and **no** conversion rule.
+inductive declaration; only its checked-literal char view reduces in kernel
+WHNF (§2.4).
 
 String laws such as `byte_length (s ++ t) ≡ byte_length s + byte_length t` are
 **prelude propositions** (`14 §5`, `35 §6.2`), not kernel reductions. Merely
-stating the proposition does not make it proof-by-computation: while its
-primitive operations remain conversion-opaque, the current postulate/`Axiom`
-bridge is visible in `trusted_base()` rather than laundered as a `Refl` proof.
+stating the proposition does not make it proof-by-computation: the
+`byte_length`/`list_char_to_string` operations in such laws remain
+conversion-opaque, despite the checked-literal char view. Any required
+postulate/`Axiom` bridge stays visible in `trusted_base()`, not laundered as
+`Refl`.
 
 ### 2.5 The derived string surface (`concat` / `slice` / `char_at` / `eq` / …)
 
@@ -151,10 +153,11 @@ the `List Char` view (`§2.3`), routed through the native `string_to_list_char`
 transparent checked definition that unfolds to the `§4.1` `List Char`
 combinator floor over the real `elim_List` / `elim_Nat` (`34 §3`). Kernel
 conversion may unfold these checked wrappers, but
-then stops at the conversion-opaque `s2l`/`l2s` primitive operations (§2.4);
-the interpreter evaluates the complete operation at runtime. Thus the derived
-definitions add no trust, while equations over concrete `String` values do not
-become `Refl` proofs. The mandated bodies (Approach A,
+then reduces `s2l` on a checked String literal, but stays neutral at `s2l`
+on an abstract String and at the conversion-opaque `l2s` (§2.4). The
+interpreter evaluates the complete operation at runtime. Thus the derived
+definitions add no trust; their equations are not universally discharged by
+`Refl` just because the literal view computes. The mandated bodies (Approach A,
 `evt_4k1yqah3yvpds` — do **not** native-ize):
 
 ```
@@ -164,9 +167,9 @@ char_at i s   =  nth i (s2l s)                        -- : Option Char
 eq     a b   =  list_eq eqChar (s2l a) (s2l b)       -- : Bool
 ```
 
-The equations in this subsection specify runtime/value behavior. They are not
-claims that an application containing `s2l`, `l2s`, `eqChar`, or another
-primitive `Op` normalizes under kernel conversion (§2.4).
+The equations in this subsection specify runtime/value behavior. The
+checked-literal `s2l` case computes in kernel WHNF (§2.4); they do not claim
+that `l2s`, `eqChar`, or another registered Op computes there.
 
 - **`char_at` is total and honest about absence.** `nth` returns `None` on an
   out-of-range index and on the empty string — `char_at i "" ≡ None` and
@@ -752,12 +755,13 @@ law set (`§4`); the fuel-bounded unfold as the buildable-now infinitude
 demonstration; `sort`'s **`is_sorted ∧ Perm`** refinement; the no-coinduction
 absence; the L-classes staging boundary.
 
-**K3-deferred kernel/TCB gap (not an API deferral).** Registered
-`PrimReduction::Op` computations are opaque to kernel conversion today (§2.4).
-The interpreter behavior and operation signatures are pinned; only a future,
-operator-approved conversion mechanism could make their literal applications
-definitionally reduce. This chapter does not anticipate that decision with
-`Refl` examples or invented reduction rules.
+**K3-deferred kernel/TCB gap for other Ops (not an API deferral).** The
+registered checked-literal `string_to_list_char` view already computes in
+kernel WHNF (§2.4, `../10-kernel/17 §1`); `leq_int` is the other existing
+kernel-WHNF Op rule (`../10-kernel/16 §2.2`). Other registered Op applications
+remain conversion-opaque. The interpreter behavior and operation signatures
+are pinned; any further promotion needs a separate trusted-rule decision.
+This chapter does not invent `Refl` proofs for the still-neutral operations.
 
 **`(oracle)`-deferred to the build team / X2 (spelling, not concept).** The
 exact **method names** other than the landed primitive-core names

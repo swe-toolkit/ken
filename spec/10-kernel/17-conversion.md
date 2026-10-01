@@ -33,24 +33,32 @@ the following reductions and the η rules (§2):
 |---|---|---|
 | **β** | `(λ (x:A). t) u → t[u/x]` | `13 §1` |
 | **Σ-β** | `(a,b).1 → a`, `(a,b).2 → b` | `13 §2` |
+| **ζ** | `let x := u : A in t → t[u/x]` (non-recursive) | `11 §1` |
 | **ι** | `elim_D M m̄ … (cₖ ā) → mₖ …` (structural) | `14 §3` |
 | **δ** | `c → t` for `(c : A := t) ∈ Σ` (transparent) | `11 §4` |
+| **prim** | registered `leq_int (IntLit m) (IntLit n)` → `True` if `m <= n`, else `False`; registered `string_to_list_char s` → the `cons`/`nil` list of `s`'s scalars as `IntLit`, for a checked `String` literal `s` | `16 §2.2`, ADR 0013; KERNEL-LITERAL-CHAR-VIEW |
 | **obs** | `Eq`-by-type; `cast A A refl a → a` + `cast`-by-type; quotient elim | `16` |
 
 - δ (constant unfolding) is **controlled**: the conversion algorithm unfolds a
   definition only when needed to make progress (§3), never eagerly. Opaque
   constants (`11 §4`) never δ-reduce.
-- A `PrimReduction::Op` registration is **not** a rule in the landed conversion
-  relation. Even `add_int 2 3` remains a neutral application; its runtime value
-  is computed by `ken-interp`. Kernel conversion for registered operations is
-  K3-deferred, so an equation with an `Op` result does not close by `Refl`.
+- A `PrimReduction::Op` registration is **not**, by itself, a rule in the
+  landed conversion relation. Even `add_int 2 3` remains a neutral application;
+  its runtime value is computed by `ken-interp`. Exactly two registered
+  operations reduce in kernel WHNF, each by kernel code rather than the
+  interpreter's `prim_reduce` (the **prim** row): `leq_int` when both operands
+  weak-head reduce to `IntLit` (`16 §2.2`), and `string_to_list_char` when its
+  argument weak-head reduces to a checked `String` literal. Every other
+  registered operation is K3-deferred, so an equation with its result does
+  not close by `Refl`.
 - Checked literals themselves are values (`PrimReduction::Literal`). The
   registered decidable-equality gate may compare two literal values (`16 §2.2`,
-  ADR 0013); that distinct value case does not reduce an enclosing `Op`.
-- A term with no applicable reduction at its head is **neutral** (a variable, an
-  opaque constant, any primitive `Op` application, or an
-  `elim`/`cast`/quotient-elim on a neutral target). Conversion compares neutrals
-  structurally (§3).
+  ADR 0013); that distinct value comparison does not by itself authorize an
+  enclosing `Op` reduction outside the **prim** row.
+- A term with no applicable reduction at its head is **neutral** (a variable,
+  an opaque constant, any primitive `Op` application that is not a **prim**
+  redex, or an `elim`/`cast`/quotient-elim on a neutral target). Conversion
+  compares neutrals structurally (§3).
 
 **Confluence.** The reduction system is confluent (Church–Rosser); normal forms
 are unique up to α (de Bruijn identity) and Ω proof-irrelevance. This is a
@@ -130,11 +138,20 @@ function whnf(env, ctx, t):
     t := stripAscription(t)              // (t : A) ⇝ t   (11 §1; erased)
     match t:
 
-      // β  (13 §1)
+      // β  (13 §1), then prim  (§1 prim row)
       App(f, u):
         f := whnf(env, ctx, f)
         if f is Lam(x, A, body): t := subst(body, u); continue
-        else: return App(f, u)           // neutral application — f is stuck
+        if f is App(Const(c), m), c the registered leq_int
+           (Int → Int → Bool, Bool a closed two-constructor enum):
+          m' := whnf(env, ctx, m); n' := whnf(env, ctx, u)
+          if m' is IntLit(i) and n' is IntLit(j):
+            t := (i <= j ? Ctor(Bool.0) : Ctor(Bool.1)); continue
+        if f is Const(c), c the installed literal char view:
+          s := whnf(env, ctx, u)
+          if s is Const(l), l a checked String literal:
+            t := cons-list of l's scalars as IntLit, ending in nil; continue
+        return App(f, u)                 // neutral application
 
       // Σ-β  (13 §2)
       Proj(p, i):
@@ -185,13 +202,23 @@ Notes.
   run with δ **deferred** so heads can be compared before unfolding; δ fires
   only on the `conv` retry path of §3.5. This split is the whole point of "lazy
   δ" and is detailed in §3.5.
-- **Termination.** β/Σ-β/prim contract the term; ι follows the finite
-  structural measures of `14 §9` (including Π-bound and nested lifted
+- **Termination.** Termination is not a term-size argument: β/Σ-β and `let`
+  substitution can duplicate their argument, and the checked-literal
+  `string_to_list_char` view replaces a literal by a list with one `Cons` per
+  scalar. The core reductions — β/Σ-β, `let` substitution, ι, η, the two
+  **prim** rules, and obs (including quotient and truncation elimination, and
+  `J` via `cast`) — are strongly normalizing on well-typed terms (§5,
+  obligation 1); stripping an ascription only erases it. The two prim rules
+  are first-order rewrite rules on literals whose right-hand sides contain no
+  `Op` application, so neither can fire on its own output. ι follows the
+  finite structural measures of `14 §9` (including Π-bound and nested lifted
   recursive content); and obs descends on the type (`16 §3.3`). `Let` is
-  non-recursive (a `let` binds a value, no self-reference). The `Const` branch
-  is the only source of term growth. SCT (§4) bounds recursive re-entry within
-  one admitted group's call graph; the finite §3.5 boundary separately stops
-  cyclic cross-identity symbolic retry — see §5.
+  non-recursive (a `let` binds a value, no self-reference): `let x := u : A
+  in t` reduces to `t[u/x]`, the reduct of the β-redex `(λ (x:A). t) u`. The
+  `Const` branch (δ) is the one reduction outside that strongly normalizing
+  core. SCT (§4) bounds recursive re-entry within one admitted group's call
+  graph; the finite §3.5 boundary separately stops cyclic cross-identity
+  symbolic retry — see §5.
 
 ### 3.3 `conv` — type-directed conversion
 
@@ -314,8 +341,9 @@ synthesising coherence/transport terms (`16 §1.2`).
 
 ### 3.5 The δ-unfold trigger (lazy discipline)
 
-δ is the only reduction that can *grow* a term, so the algorithm unfolds a
-transparent definition as little as possible. Two `whnf` modes realise this:
+δ is the one reduction outside the strongly normalizing core (§5), and each
+unfolding can replace a short head by a large body, so the algorithm unfolds
+a transparent definition as little as possible. Two `whnf` modes realise this:
 
 - **`whnf_deferδ`** — weak-head-normalize but treat every transparent `Const(c)`
   at the head as **neutral** (do not unfold). Used by `conv` step (5) so the two
@@ -680,17 +708,33 @@ Conversion terminates on every well-typed input, so type-checking is
 semi-decision procedure. The argument has three obligations that meet at the
 `whnf`/`conv` boundary of §3.2–§3.5:
 
-1. **The core reductions are strongly normalizing.** β/Σ-β/ι/η/prim and the
-   observational `Eq`/`cast` reductions terminate on well-typed terms:
-   β/Σ-β/η/prim strictly contract the term; ι follows the finite structural
-   measures for direct, Π-bound, and nested lifted recursive content
-   (`14 §9.2`, `§9.4`, `§9.5`); and the `Eq`/`cast` mutual recursion descends on
-   the *type* being traversed, which is a finite tree (`16 §3.3`). None of these
-   can diverge.
+1. **The core reductions are strongly normalizing.** β/Σ-β, `let`
+   substitution, ι, η, prim, and the observational `Eq`/`cast` reductions
+   (with quotient and truncation elimination, and `J` via `cast`) terminate
+   on well-typed terms. The argument is not by term size, since β- and
+   `let`-substitution can duplicate their argument. Strong normalization of
+   the β/Σ-β/`let`/ι/η/obs core is the standard metatheorem for
+   observational type theory with inductives (`TTobs`, Pujet & Tabareau
+   2022; ADR 0005), which Ken follows; `let` substitution is CIC's
+   ζ-reduction, and a non-recursive `let x := u : A in t` has the reduct
+   `t[u/x]` of the β-redex `(λ (x:A). t) u`. `18 §6` records the core's
+   status as argued, not mechanized. Within it, ι follows the finite
+   structural measures for direct, Π-bound, and nested lifted recursive
+   content (`14 §9.2`, `§9.4`, `§9.5`), and the `Eq`/`cast` mutual recursion
+   descends on the *type* being traversed, which is a finite tree
+   (`16 §3.3`). The two **prim** rules are first-order rewrite rules on
+   literals whose right-hand sides contain no `Op` application — `leq_int`
+   rewrites to a constructor, and the checked-literal `string_to_list_char`
+   view expands to a finite constructor list fixed by its literal — so the
+   prim rule set terminates on its own, and adding a terminating first-order
+   algebraic rule set to a strongly normalizing typed calculus preserves
+   strong normalization (Breazu-Tannen & Gallier 1989; Jouannaud & Okada
+   1991). None of these can diverge.
 
-2. **Recursive re-entry within one admitted group is SCT-bounded.** The single
-   branch of §3.2 that can grow a term is `Const(c)` unfolding. Every
-   transparent recursive group in `env` passed the **SCT gate (§4)** at
+2. **Recursive re-entry within one admitted group is SCT-bounded.** The one
+   reduction of §3.2 outside the strongly normalizing core of (1) is
+   `Const(c)` unfolding (δ).
+   Every transparent recursive group in `env` passed the **SCT gate (§4)** at
    admission, so a call sequence that re-enters that group follows call-graph
    paths on which some parameter strictly decreases in the well-founded
    structural order. By the **size-change termination theorem** (Lee, Jones &

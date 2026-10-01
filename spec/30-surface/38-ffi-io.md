@@ -100,11 +100,13 @@ convention, not whitespace, and is a separate additive decision.)
 The core operations are primitive operations with registered
 `PrimReduction::Op` symbols (`14 §5`). The interpreter evaluates them over
 `Bytes` values at runtime, so `bytes_length 0x[deadbeef]` produces `4` as a
-value. The landed kernel does not execute an `Op` during conversion:
+value. The landed kernel does not execute these `Bytes` Ops during conversion:
 `bytes_length 0x[deadbeef] ≡ 4 : Int` is **not** definitional and the equation
-does not close by `Refl`. An `Op` remains neutral to conversion even when its
-arguments are literals. Kernel conversion of registered operations is
-K3-deferred; these declarations add no landed kernel reduction rule.
+does not close by `Refl`, even on literal operands. The separately specified
+registered `leq_int` literal rule and checked-literal `string_to_list_char`
+view compute in kernel WHNF (`../10-kernel/16 §2.2`, `../10-kernel/17 §1`);
+they do not promote any `Bytes` operation. Kernel conversion for these
+`Bytes` Ops remains K3-deferred; these declarations add no reduction rule.
 
 | Op | Type | Notes |
 |---|---|---|
