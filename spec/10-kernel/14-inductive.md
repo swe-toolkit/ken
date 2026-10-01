@@ -553,25 +553,26 @@ They attach as **primitives** (`11 §4`):
   the elaborator as opaque primitive values) and the results of primitive
   operations.
 - A primitive operation carries a registered `PrimReduction::Op` symbol (`41`).
-  In the landed system that registration is an **interpreter dispatch
-  descriptor**, not a kernel-conversion rule: `ken-interp` computes `add 2 3`
-  to `5` at runtime, while the kernel leaves the application neutral even when
-  every argument is a literal. Thus `add 2 3 ≡ 5` does not hold definitionally
-  and `Refl` cannot prove that equation.
+  Registration is an **interpreter dispatch descriptor**, not by itself a
+  kernel-conversion rule: `ken-interp` computes `add 2 3` to `5` at runtime,
+  while the kernel leaves that application neutral even on literal operands.
+  Thus `add 2 3 ≡ 5` does not hold definitionally. The separately specified
+  kernel-WHNF rules are `leq_int` on two WHNF `IntLit` operands (`16 §2.2`)
+  and `string_to_list_char` on a checked `String` literal (`17 §1`).
 - `PrimReduction::Literal` is a different case. A checked surface literal is
   already a value, not an operation application; registered literal equality
-  may compare two such values as specified in `16 §2.2` and ADR 0013. This does
-  not make an enclosing `Op` application reduce.
+  may compare two such values (`16 §2.2`, ADR 0013). That comparison alone
+  does not authorize any other `Op` application to reduce.
 - Primitive declarations and operation symbols are small, audited, and listed
-  by `trusted_base()` (`18 §5`). Correct `Op` results remain a semantic
-  correctness obligation on the interpreter's `prim_reduce`; a wrong result is
-  a wrong runtime value, not a false kernel proof, because conversion never
-  consumes that result. Kernel execution of registered operations is the
-  **K3-deferred** trusted-reduction design fork.
-- Equational properties of primitive operations, including equations on
-  concrete literals, are **propositions to prove**. Until K3 provides a
-  proof-relevant conversion or certificate mechanism, a direct law needs a
-  visible postulate/`Axiom` or a proof over an independent model, not `Refl`.
+  by `trusted_base()` (`18 §5`). Correct runtime `Op` results remain a semantic
+  correctness obligation on the interpreter's `prim_reduce`; its wrong result
+  alone is a wrong runtime value, not a false kernel proof. The two separately
+  implemented kernel-WHNF rules are trusted code; promoting other registered
+  operations into kernel conversion remains **K3-deferred**.
+- Equational properties of other primitive operations, even on concrete
+  literals, are **propositions to prove**. Without a specified kernel rule or
+  certificate, a direct law needs a visible postulate/`Axiom` or a proof over
+  an independent model, not `Refl`.
 
 ## 6. What the kernel checks here
 
@@ -597,8 +598,9 @@ A conforming kernel MUST:
 5. Treat **primitive** types/operations as opaque constants with registered,
    audited operation descriptors (§5), never as inductives. K1 defines only the
    interface; the runtime value model (`../40-runtime/41-values.md`) and
-   interpreter elaborate the current operation semantics. Kernel conversion for
-   registered operations remains K3-deferred.
+   interpreter elaborate runtime operation semantics. Only the two specified
+   kernel-WHNF `Op` rules compute in conversion (`16 §2.2`, `17 §1`);
+   promotion of any other registered operation remains K3-deferred.
 
 Conformance: `../../conformance/kernel/inductive/` — positivity acceptance and
 rejection, `elim_Nat`/`elim_Vec` ι-computation, large elimination (`elim_Bool`

@@ -11,15 +11,17 @@
 
 The trusted-base ledger (`18 §5`) enumerates primitive declarations and their
 operation symbols. Registered `PrimReduction::Op` semantics run in
-`ken-interp`. The sole separate kernel-WHNF exception is registered `leq_int`
-on two operands weak-head reducing to `IntLit` (`16 §2.2`): the kernel uses
-its own arbitrary-precision `BigInt <=`, not the interpreter's reducer. All
-other `Op` semantics remain opaque to kernel conversion and are
-interpreter-tested value semantics rather than proof-producing reductions.
+`ken-interp`. Two separately implemented `Op` reductions also run in kernel
+WHNF: registered `leq_int` on two operands weak-head reducing to `IntLit`
+(`16 §2.2`), using the kernel's own arbitrary-precision `BigInt <=`, and the
+registered `string_to_list_char` view on a checked `String` literal (`17 §1`).
+The kernel does not execute the interpreter's reducer; all other `Op`
+semantics remain opaque to conversion and are interpreter-tested value
+semantics rather than proof-producing reductions.
 This registry makes that surface auditable: what is native, why it *earns*
 native status, what class laws opacity forecloses, and the single external net
 (the differential oracle) that checks runtime values. Unless a paragraph
-explicitly cites the `16 §2.2` exception or says K3, “reduces” in this chapter
+explicitly cites `16 §2.2`, `17 §1`, or says K3, “reduces” in this chapter
 means **interpreter runtime evaluation**, not kernel conversion.
 
 ## 1. Schema
@@ -239,10 +241,11 @@ Registrars: `ken-elaborator/src/{numbers,bytes,prelude}.rs` (assembled in
 `ElabEnv::new`); runtime reductions in `ken-interp/src/eval.rs::prim_reduce`.
 Kernel admission: `declare_primitive` (`check.rs`), tag
 `PrimReduction = OpaqueType | Op { symbol }` (`env.rs`). Registered `leq_int`
-alone also reduces in kernel WHNF on two `IntLit` operands (`16 §2.2`); no
-other registry row gains kernel computation from its `Op` tag. The F1 and
-Decimal/Char tranche statements below about no kernel edits describe those
-earlier delivery scopes, not this separately authorized kernel rule.
+on two WHNF `IntLit` operands (`16 §2.2`) and registered
+`string_to_list_char` on a checked `String` literal (`17 §1`) also reduce in
+kernel WHNF; no other registry row gains kernel computation from its `Op`
+tag. The F1 and Decimal/Char tranche statements below about no kernel edits
+describe those earlier delivery scopes, not the later kernel rules.
 
 ### 5.1 Opaque primitive types
 
@@ -420,16 +423,16 @@ ordering is **derived at the definition level** — `lt a b := not (leq_int b a)
 direct `lt_int` primitive is a soundness-neutral ergonomics option, **out of
 scope** here (keeps the primitive set flat).
 
-**(3) Trust level — tier-b tested-not-trusted, zero `trusted_base()` delta.**
-The arm is an interpreter `prim_reduce` reduction (`ken-interp/eval.rs`) —
-**not** a kernel change and **not** a `declare_primitive`/`declare_postulate`:
-it emits a `Bool` value and never touches definitional equality — the
-kernel's
-neutral-`Eq`-at-primitive and `conv.rs` stay **byte-untouched** (`git diff
---stat ken-kernel/` empty). Same outer, tested-not-trusted ring as `eq_int`,
-structurally gated out of every proof-relevant position, so a bug is a **wrong
-value, never a false proof**. Because `leq_int` is already registered, adding
-the arm is **`trusted_base()`-neutral**.
+**(3) Trust level — interpreter and kernel paths are distinct.** The
+Decimal/Char tranche delivered the `leq_int` interpreter `prim_reduce` arm
+(`ken-interp/eval.rs`) in the tier-b tested-not-trusted ring, without changing
+the kernel or adding a `declare_primitive`/`declare_postulate`. An incorrect
+runtime result alone is a wrong value, not a kernel proof. Separately, the
+later registered `leq_int` kernel-WHNF arm (`16 §2.2`) compares two WHNF
+`IntLit` operands using the kernel's own `BigInt <=`. This kernel computation
+*does* enter definitional equality and is trusted code for proof soundness;
+it is not the interpreter reducer. Neither path adds a new declaration to
+`trusted_base()` because `leq_int` was already registered.
 
 **(4) Independent-oracle net (OF2, non-circular).** The single external net is
 the §3 differential oracle: golden comparison vectors across the sign / 2⁶³ /

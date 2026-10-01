@@ -11,10 +11,11 @@
 > a *sealed* op-class dispatch with no silent-wrap default (§3); the **built-in
 > literal default table** as a standalone elaborator rule (§4); explicit
 > **conversions** (§5); and the **prelude laws as propositions**, not kernel
-> rules (§6). **No kernel enlargement** — every numeric type is a `14 §5`
-> primitive (opaque constant + registered, audited runtime operation); the
-> operation applications remain opaque to landed kernel conversion, and their
-> laws are prelude propositions.
+> rules (§6). **L1 adds no kernel rule** — numeric types are `14 §5`
+> primitives with audited runtime operations, and their non-definitional laws
+> are prelude propositions. The later registered `leq_int` kernel-WHNF rule
+> computes on two `IntLit` operands (`../10-kernel/16 §2.2`); registration
+> alone still does not reduce the other numeric operations.
 >
 > **Staging boundary — flag, do not reopen.** L1 ships the *built-in* default
 > table (a fixed, form-keyed elaborator rule). The *polymorphic-over-user-types*
@@ -302,26 +303,27 @@ operands agree.
 
 ## 6. Kernel view and prelude laws
 
-### 6.1 Registered runtime operations, conversion-opaque
+### 6.1 Registered runtime operations and the literal-order exception
 
-All numeric types are **primitive types** (`14 §5`): opaque type constants with
+Numeric types are **primitive types** (`14 §5`): opaque type constants with
 registered, audited `PrimReduction::Op` symbols. The interpreter evaluates
-`2 + 3` to `5` at runtime. Landed kernel conversion does **not** execute an
-`Op`, however, so `2 + 3 ≡ 5 : Int` is not definitional and a proof of that
-equation does not close by `Refl`, even though every operand is a literal.
+`2 + 3` to `5` at runtime, but kernel conversion does not execute that
+interpreter reducer: `2 + 3 ≡ 5 : Int` is not definitional and does not close
+by `Refl` even on literal operands. Separately, registered `leq_int` on two
+WHNF `IntLit` operands reduces in the kernel by its own `BigInt <=` rule
+(`../10-kernel/16 §2.2`); other numeric Ops remain conversion-opaque.
 
-The set of primitive declarations and operation symbols is **small, audited,
-and listed by `trusted_base()`** (`18 §5`). A wrong `prim_reduce` result is a
-runtime semantic-correctness bug, caught by the independent value oracle; it is
-not a false kernel proof because the runtime result never enters conversion.
-**L1 adds no new kernel rules** — it specifies the surface, elaborator, and
-runtime face of the existing registrations. Kernel conversion of registered
-operations is the K3-deferred trusted-reduction decision.
+The primitive declarations and symbols are **small, audited, and listed by
+`trusted_base()`** (`18 §5`). A wrong interpreter `prim_reduce` result is a
+runtime semantic-correctness bug, not by itself a false kernel proof. The
+separate kernel `leq_int` computation is trusted proof-soundness code but
+adds no declaration to `trusted_base()`. **L1 added no kernel rule**; further
+numeric Op promotion beyond `leq_int` remains a K3 decision.
 
 ### 6.2 Non-definitional laws are prelude propositions
 
-Numeric equations over `Op` results — both concrete equations such as
-`2 + 3 == 5` and quantified laws such as commutativity
+Numeric equations over non-computing `Op` results — concrete equations such
+as `2 + 3 == 5` and quantified laws such as commutativity
 `a + b == b + a`, associativity, distributivity, and the ring/field axioms —
 are **propositions in the prelude** (`14 §5`, `50-stdlib/`), not kernel
 reductions. They are discharged one of two ways, kept small and visible (TCB
@@ -332,13 +334,14 @@ discipline):
 - **(b) axiomatized as a small, visible interface** — the audited primitive-law
   set, listed alongside the primitives in `18 §5`.
 
-The boundary is the point: **registered `Op` semantics are tested runtime
-operations; operation equations are prelude propositions.** A current direct
-proof over primitive output needs a visible postulate/`Axiom` unless it is
-proved through an independent model; `Refl` is not a runtime evaluator. L1 does
-not move a law into the kernel. Conformance nets that interpreter results
-**match the reference model** (§7), while a separate conversion discriminator
-rejects `Refl` for an `Op` equation.
+The boundary is the point: other registered numeric `Op` semantics are
+tested runtime operations; their laws are prelude propositions. A direct
+proof over a neutral primitive output needs a visible postulate/`Axiom`
+unless it is proved through an independent model; `Refl` is not a runtime
+evaluator. The specified `leq_int` literal rule (§6.1) is a separate kernel
+reduction, not a blanket promotion of laws. L1 did not move a law into the
+kernel. Conformance nets interpreter results against the reference model
+(§7), while a conversion discriminator rejects `Refl` for neutral Op results.
 
 ## 7. What WS-L must deliver here (L1) + acceptance
 

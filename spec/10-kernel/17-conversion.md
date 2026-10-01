@@ -35,22 +35,29 @@ the following reductions and the η rules (§2):
 | **Σ-β** | `(a,b).1 → a`, `(a,b).2 → b` | `13 §2` |
 | **ι** | `elim_D M m̄ … (cₖ ā) → mₖ …` (structural) | `14 §3` |
 | **δ** | `c → t` for `(c : A := t) ∈ Σ` (transparent) | `11 §4` |
+| **prim** | registered `leq_int (IntLit m) (IntLit n)` → `True` if `m <= n`, else `False`; registered `string_to_list_char s` → the `cons`/`nil` list of `s`'s scalars as `IntLit`, for a checked `String` literal `s` | `16 §2.2`, ADR 0013; KERNEL-LITERAL-CHAR-VIEW |
 | **obs** | `Eq`-by-type; `cast A A refl a → a` + `cast`-by-type; quotient elim | `16` |
 
 - δ (constant unfolding) is **controlled**: the conversion algorithm unfolds a
   definition only when needed to make progress (§3), never eagerly. Opaque
   constants (`11 §4`) never δ-reduce.
-- A `PrimReduction::Op` registration is **not** a rule in the landed conversion
-  relation. Even `add_int 2 3` remains a neutral application; its runtime value
-  is computed by `ken-interp`. Kernel conversion for registered operations is
-  K3-deferred, so an equation with an `Op` result does not close by `Refl`.
+- A `PrimReduction::Op` registration is **not**, by itself, a rule in the
+  landed conversion relation. Even `add_int 2 3` remains a neutral application;
+  its runtime value is computed by `ken-interp`. Exactly two registered
+  operations reduce in kernel WHNF, each by kernel code rather than the
+  interpreter's `prim_reduce` (the **prim** row): `leq_int` when both operands
+  weak-head reduce to `IntLit` (`16 §2.2`), and `string_to_list_char` when its
+  argument weak-head reduces to a checked `String` literal. Every other
+  registered operation is K3-deferred, so an equation with its result does
+  not close by `Refl`.
 - Checked literals themselves are values (`PrimReduction::Literal`). The
   registered decidable-equality gate may compare two literal values (`16 §2.2`,
-  ADR 0013); that distinct value case does not reduce an enclosing `Op`.
-- A term with no applicable reduction at its head is **neutral** (a variable, an
-  opaque constant, any primitive `Op` application, or an
-  `elim`/`cast`/quotient-elim on a neutral target). Conversion compares neutrals
-  structurally (§3).
+  ADR 0013); that distinct value comparison does not by itself authorize an
+  enclosing `Op` reduction outside the **prim** row.
+- A term with no applicable reduction at its head is **neutral** (a variable,
+  an opaque constant, any primitive `Op` application that is not a **prim**
+  redex, or an `elim`/`cast`/quotient-elim on a neutral target). Conversion
+  compares neutrals structurally (§3).
 
 **Confluence.** The reduction system is confluent (Church–Rosser); normal forms
 are unique up to α (de Bruijn identity) and Ω proof-irrelevance. This is a
@@ -130,11 +137,20 @@ function whnf(env, ctx, t):
     t := stripAscription(t)              // (t : A) ⇝ t   (11 §1; erased)
     match t:
 
-      // β  (13 §1)
+      // β  (13 §1), then prim  (§1 prim row)
       App(f, u):
         f := whnf(env, ctx, f)
         if f is Lam(x, A, body): t := subst(body, u); continue
-        else: return App(f, u)           // neutral application — f is stuck
+        if f is App(Const(c), m), c the registered leq_int
+           (Int → Int → Bool, Bool a closed two-constructor enum):
+          m' := whnf(env, ctx, m); n' := whnf(env, ctx, u)
+          if m' is IntLit(i) and n' is IntLit(j):
+            t := (i <= j ? Ctor(Bool.0) : Ctor(Bool.1)); continue
+        if f is Const(c), c the installed literal char view:
+          s := whnf(env, ctx, u)
+          if s is Const(l), l a checked String literal:
+            t := cons-list of l's scalars as IntLit, ending in nil; continue
+        return App(f, u)                 // neutral application
 
       // Σ-β  (13 §2)
       Proj(p, i):

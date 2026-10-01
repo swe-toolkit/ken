@@ -83,9 +83,12 @@ primitive Ken to define it from):
   arithmetic/comparison and the `String`/`Bytes` primitives, each a
   `Decl::Primitive` whose registered `Op` symbol dispatches runtime evaluation
   on values. These bottom out in the interpreter's audited `prim_reduce`
-  surface and are **not** Ken-definable. They remain opaque to kernel conversion
-  until K3; an operation equation over literals therefore needs a visible proof
-  assumption rather than `Refl` today.
+  surface and are **not** Ken-definable. Registration alone does not make an
+  operation compute in kernel conversion. The specified exceptions are
+  `leq_int` on two WHNF `IntLit` operands (`../10-kernel/16 §2.2`) and the
+  checked-literal `string_to_list_char` view (`../10-kernel/17 §1`); all other
+  registered Ops remain opaque until K3. An equation over a neutral Op result
+  needs a visible proof assumption rather than computation by `Refl`.
 - **The effect / FFI boundary** — `foreign` and the base `IO`/effect primitive
   (`[Console]`/`[FS]` etc., `38`, L5/L7). I/O cannot be pure Ken; the boundary
   is a listed assumption.
