@@ -160,21 +160,65 @@ fn nested_variable_index_without_a_dependent_tail_checks() {
     .expect("distinct variable index without a dependent tail checks");
 }
 
+fn assert_checked_nat_value(env: &ElabEnv, observed: &str, expected: &str) {
+    let value = |name: &str| {
+        let id = *env.globals.get(name).expect("named checked value");
+        let body = env
+            .env
+            .transparent_body(id)
+            .expect("checked transparent value")
+            .1;
+        whnf(&env.env, &Context::new(), &body)
+    };
+    assert_eq!(value(observed), value(expected));
+}
+
 #[test]
-fn nested_concrete_index_advises_an_annotation() {
+fn nested_concrete_index_constant_result_evaluates() {
+    // Promise class: durable invariant. MEASURED: a complete nested Vec
+    // split at index Zero checks, and its admitted call reduces to Zero.
+    // CLAIMED: a constant motive needs no equational generalization.
+    // THE GAP: this calls the checked function, not a fabricated core Elim;
+    // the dependent-result twin below checks the opposite gate.
     let mut env = ElabEnv::new().expect("prelude");
-    let error = env
-        .elaborate_file(&format!(
-            "{VEC}\ndata Holder (a : Type) : Type where {{ Hold : Vec a Zero → Holder a }}\n\
-         fn no_equational_generalization (a : Type) (h : Holder a) : Nat = \
-         let r = match h {{ Hold VNil ↦ Zero; Hold (VCons m _ _) ↦ m }} in r"
-        ))
-        .expect_err("concrete nested index needs an explicit separate match");
-    assert!(
-        matches!(&error, ElabError::TypeMismatch { reason, .. }
-        if reason.contains("nested indexed split") && reason.contains("annotate")),
-        "{error:?}"
-    );
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file(&format!(
+        "{VEC}\ndata Holder (a : Type) : Type where {{ Hold : Vec a Zero → Holder a }}\n\
+         fn concrete (a : Type) (h : Holder a) : Nat = \
+         let r = match h {{ Hold VNil ↦ Zero; Hold (VCons m _ _) ↦ m }} in r\n\
+         const observed : Nat = concrete Nat (Hold VNil)\n\
+         const expected : Nat = Zero"
+    ))
+    .expect("constant nested motive accepts concrete index");
+    assert_checked_nat_value(&env, "observed", "expected");
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+#[test]
+fn nested_repeated_index_constant_result_evaluates() {
+    // Promise class: durable invariant. Two distinct legal values exercise
+    // both branches of a nested family indexed twice by the same variable.
+    let mut env = ElabEnv::new().expect("prelude");
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file(
+        "data PairIx : Nat → Nat → Type where { \
+           PairZero : PairIx Zero Zero; \
+           PairSuc : (m : Nat) → PairIx (Suc m) (Suc m) \
+         }\n\
+         data HolderPair : Type where { HoldPair : (n : Nat) → PairIx n n → HolderPair }\n\
+         fn repeated (h : HolderPair) : Nat = let r = match h { \
+           HoldPair n PairZero ↦ Zero; \
+           HoldPair n (PairSuc m) ↦ Suc m \
+         } in r\n\
+         const observed_zero : Nat = repeated (HoldPair Zero PairZero)\n\
+         const observed_suc : Nat = repeated (HoldPair (Suc Zero) (PairSuc Zero))\n\
+         const expected_zero : Nat = Zero\n\
+         const expected_suc : Nat = Suc Zero",
+    )
+    .expect("constant nested motive accepts repeated index");
+    assert_checked_nat_value(&env, "observed_zero", "expected_zero");
+    assert_checked_nat_value(&env, "observed_suc", "expected_suc");
+    assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
 #[test]
