@@ -1,9 +1,9 @@
 ---
 id: CAT-PARSING-COMBINATOR-LAWS
-title: "parser_from_decoder_laws needs DecoderPreservesBounded, but that premise is private and duplicates Decoder's public DecoderPreserves, so no client can discharge it for any combinator decoder. Export the byte-cursor bound as DecoderPreserves, prove the cursor's locate and advance soundness, and instance satisfy and many, at zero TCB"
+title: "parser_from_decoder_laws needs DecoderPreservesBounded, but that premise is private and duplicates Decoder's public DecoderPreserves, so no client can discharge it for any combinator decoder. Export the byte-cursor bound as DecoderPreserves, export the existing cursor locate and advance proofs, and instance satisfy and many, at zero TCB"
 status: active
 owner: foundation
-size: M
+size: S
 tier: T1
 gate: architect
 depends_on: [CAT-PARSING-PARSER-LAWS]
@@ -49,29 +49,29 @@ stop and report the mismatch.
 
 ## Deliverable
 
+Export, subsume and instance: no re-derivation, and keep the existing names
+(Architect `evt_1x2anyf7dzsqy`, which corrects `evt_688y060mgq32r`; the
+first nomination missed the private obligations already in Parsing).
+
 1. **Subsume the duplicate.**
    - `pub fn DecoderPreservesBounded (a) (decoder) : Prop` becomes
      `(s : Source) → (start : Nat) → DecoderPreserves ByteCursor Span a
      (ByteCursorBounded s start) (ValidSpan s) decoder`.
-   - `ByteCursorBounded` becomes `pub`, and `DecoderOutcomeBounded` is
-     deleted.
-   - The private helpers are re-proved against the new definition.
-   - Fallback, only if conversion of the two stuck matches obstructs: keep
-     both definitions with one private bridge theorem. Never two public
-     spellings.
-2. **`pub theorem byte_cursor_locate_sound`.** This is
-   `byte_cursor_bounded_locate`, made public.
-3. **`pub theorem byte_cursor_advance_sound`.** A successful peek and a
-   bounded cursor give a bounded advanced cursor. It matches on a computed
-   `nth` result (check 11): bind it first, and carry the other side with
-   `cong`. Its end bound reuses Derived's existing
-   `pub proof some_below_length for nth` (`Derived.ken.md:228`), already
-   composed by Parsing's private `byte_cursor_peek_in_bounds`. No new list
-   lemma is added (implementer `evt_6662sym7ypjpr`: the Architect's item 4
-   would be a second spelling of it).
-4. **Public instances:** `byte_satisfy_parser_laws (accept)` and
-   `byte_many_parser_laws (a) (step) (h : DecoderPreservesBounded a step)`.
-   Each is a composition of the theorems above.
+   - `ByteCursorBounded` becomes `pub`. `DecoderOutcomeBounded` and the
+     bridges `decoder_bounded_as_public` (`:1860`) and
+     `decoder_public_as_bounded` (`:1870`), λ-identities under the new
+     definition, are deleted; callers use the premise directly.
+   - Re-prove what that touches (`parse_decoder_bounded_valid` and its
+     siblings). Check 11 applies.
+2. **Make public, unchanged:** `byte_cursor_bounded_locate` (`:614`) and
+   `byte_cursor_bounded_after_peek` (`:1812`, the advance-sound type, which
+   already composes Derived's `some_below_length for nth`).
+3. **New public instances**, each a composition:
+   - `byte_satisfy_parser_laws (accept)`, through `decoder_satisfy_preserves`
+     at a free `accept`. `byte_code_decoder_public_preserves` (`:1884`)
+     becomes a one-line instance of it or is deleted.
+   - `byte_many_parser_laws (a) (step) (step_safe : DecoderPreservesBounded
+     a step)`, through `decoder_many_preserves`.
 
 Scope:
 
@@ -83,12 +83,12 @@ Scope:
 
 ## Acceptance
 
-- **AC-1.** All four items check by `ken check`. The two instances are stated
+- **AC-1.** All three items check by `ken check`. The two instances are stated
   as public theorems that a client can apply.
 - **AC-2 (falsifiers).**
-  - Twin cursor ops whose advance is `Suc (Suc position)`: its
-    `advance_sound` fails at the end-position conjunct.
-  - A strengthened `byte_cursor_advance_sound` end bound,
+  - Twin cursor ops whose advance is `Suc (Suc position)`: the
+    advance-sound proof fails at the end-position conjunct.
+  - A strengthened `byte_cursor_bounded_after_peek` end bound,
     `LessEqNat (Suc (Suc position)) …`, fails for the real cursor ops.
 - **AC-2b (repair the PARSER-LAWS fence).** `unbounded_parser_laws_false_twin`
   (`Parsing.ken.md:647-698`) closes its end bound with `Proved` on a stuck
