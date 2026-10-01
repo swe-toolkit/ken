@@ -222,6 +222,97 @@ fn nested_repeated_index_constant_result_evaluates() {
 }
 
 #[test]
+fn concrete_index_dependent_tail_requires_reverting() {
+    // Promise class: durable invariant. MEASURED: adding a sibling field
+    // indexed by the nested Vec field changes the exact index-clause result.
+    // CLAIMED: a pending dependent tail requires reversion at a concrete
+    // index, while the independent tail remains a constant-motive split.
+    // THE GAP: these two fixtures differ only in the tail field's type;
+    // asserting the exact diagnostic excludes an unrelated rejection.
+    let mut env = ElabEnv::new().expect("prelude");
+    let trusted_before = env.env.trusted_base();
+    let declarations = format!(
+        "{VEC}\ndata Tag (a : Type) (n : Nat) : Vec a n → Type where {{ \
+           MkTag : (v : Vec a n) → Tag a n v \
+         }}\n\
+         data HolderN (a : Type) : Type where {{ \
+           HoldN : (v : Vec a Zero) → Nat → HolderN a \
+         }}\n\
+         data HolderD (a : Type) : Type where {{ \
+           HoldD : (v : Vec a Zero) → Tag a Zero v → HolderD a \
+         }}"
+    );
+    env.elaborate_file(&format!(
+        "{declarations}\nfn concrete_n (a : Type) (h : HolderN a) : Nat = \
+         let r = match h {{ HoldN VNil _ ↦ Zero; \
+           HoldN (VCons m _ _) _ ↦ m }} in r\n\
+         const observed : Nat = concrete_n Nat (HoldN Nat (VNil Nat) Zero)\n\
+         const expected : Nat = Zero"
+    ))
+    .expect("independent pending tail keeps the constant motive");
+    assert_checked_nat_value(&env, "observed", "expected");
+    let error = env
+        .elaborate_file(
+            "fn concrete_d (a : Type) (h : HolderD a) : Nat = \
+             let r = match h { HoldD VNil _ ↦ Zero; \
+               HoldD (VCons m _ _) _ ↦ m } in r",
+        )
+        .expect_err("a dependent pending tail requires reverting");
+    assert!(
+        matches!(&error, ElabError::TypeMismatch { reason, .. }
+            if reason.contains("nested indexed split needs distinct variable indices")),
+        "{error:?}"
+    );
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+#[test]
+fn repeated_index_dependent_tail_requires_reverting() {
+    // Promise class: durable invariant. The identical two-index family is
+    // accepted with an independent tail, refused at the repeated-index
+    // check when the pending tail's type mentions the nested split value.
+    let mut env = ElabEnv::new().expect("prelude");
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file(
+        "data PairIx : Nat → Nat → Type where { \
+           PairZero : PairIx Zero Zero; \
+           PairSuc : (m : Nat) → PairIx (Suc m) (Suc m) \
+         }\n\
+         data PTag : (i : Nat) → (j : Nat) → PairIx i j → Type where { \
+           MkPTag : (i : Nat) → (j : Nat) → (p : PairIx i j) → PTag i j p \
+         }\n\
+         data HolderPairN : Type where { \
+           HoldPairN : (n : Nat) → PairIx n n → Nat → HolderPairN \
+         }\n\
+         data HolderPairD : Type where { \
+           HoldPairD : (n : Nat) → (p : PairIx n n) → PTag n n p → HolderPairD \
+         }\n\
+         fn repeated_n (h : HolderPairN) : Nat = let r = match h { \
+           HoldPairN n PairZero _ ↦ Zero; \
+           HoldPairN n (PairSuc m) _ ↦ Suc m \
+         } in r\n\
+         const observed : Nat = repeated_n (HoldPairN Zero PairZero Zero)\n\
+         const expected : Nat = Zero",
+    )
+    .expect("independent pending tail keeps the repeated-index constant motive");
+    assert_checked_nat_value(&env, "observed", "expected");
+    let error = env
+        .elaborate_file(
+            "fn repeated_d (h : HolderPairD) : Nat = let r = match h { \
+               HoldPairD n PairZero _ ↦ Zero; \
+               HoldPairD n (PairSuc m) _ ↦ Suc m \
+             } in r",
+        )
+        .expect_err("a dependent pending tail requires reverting");
+    assert!(
+        matches!(&error, ElabError::TypeMismatch { reason, .. }
+            if reason.contains("nested indexed split repeats an index")),
+        "{error:?}"
+    );
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+#[test]
 fn nested_concrete_index_omission_reports_exhaustiveness() {
     // Promise class: durable invariant. MEASURED: omitting the nested VNil
     // arm at index Zero yields ExhaustivenessError naming VNil.
