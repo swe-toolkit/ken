@@ -177,9 +177,29 @@ into it.
 - **I4. Field reads are by role.** `Child`, `WorkerCapture{seat, ordinal}`
   and `ContinuationInput{ordinal}`, never a raw offset in a consumer. The
   transport W and C authorities are the role definitions.
+- **I5. One label per source creation occurrence, relays included**
+  (Architect `evt_1zhngrssvgwcz`, on Research `evt_2evsa31gr69q3`). A relay
+  child, such as the checked-IH invocation closure 524 stored at S1/526 field
+  1, is its own slot member with its own planner-issued variant. Existing
+  variants keep their roles.
+  - Its roles are its own environment: one per capture, as the planner
+    classifies it, plus any continuation inputs. The capture holding the
+    relayed slot value is `SlotWord { slot }`, the source R word kept as-is
+    with its own label.
+  - Forcing dispatches on the relay label, then on the captured source
+    word's label. The source label is never copied into the relay word.
+- **I6. Child classification is by label.** A child is a lexical closure
+  (the existing `LexicalClosure` arm) or an IH relay, a
+  `CheckedComputationalIHInvocation` whose callee resolves to
+  `InductionHypothesis` of the slot. Anything else is `planner_error`.
+- **I7. Issuance ranges over source aggregate occurrences,** not per-emitter
+  `ConstructEmission` points. A plan-time assertion requires exactly one edge
+  per slot each slot-shaped occurrence matches. Lowering's refusal of an
+  unissued store is the independent second derivation of the same set.
 - **Retained.** Owner-independent labels keyed `(construct, pos, spec id)`
   and the d099 interning-key pin; the `TransportCarriedClaim` census; the
-  three transport emission sites; the label-switch reuse with per-arm
+  three transport emission sites, which no longer wrap their answer; the
+  label-switch reuse with per-arm
   `Some(body)` and the `source.rs:4515` guard; the gate refusals.
 - **Replaced.** Every consumer-side classification in I3, and any producer
   writing a form other than its slot's schema.
@@ -206,14 +226,30 @@ into it.
   - Swapping the S3 and S4 variants in the `(533, 1)` record reddens.
   - The interning-key pin stays byte-identical.
   - The write fixture compiles and runs.
-- **Slot schemas (ruled, `evt_69ktj8b1xe8tc`).** Each slot's schema is its
-  issued R sum, label elided for a singleton flow set; K is never a slot
-  schema, only the `Child` of an R written at a transport point. Coercion
-  edges are the 11 construct points and 9 transport points. Direct, Tail,
-  the pass-through and the force read the `Child` role and assert it against
-  the transport's `source_record()`; only the labelled call path reads R's
-  own W and C roles. The doubled W at transport-written slots is recorded,
-  not simplified, in this WP.
+- **Slot schemas (`evt_69ktj8b1xe8tc`, `evt_6rtq4txgmrjpw`,
+  `evt_1zhngrssvgwcz`).** Each slot's schema is its issued R sum, with the
+  label elided for a singleton flow set. K is never a slot schema.
+  - Edges exist only where a store exists: the construct stores over source
+    aggregate occurrences, including relay occurrences. No transport edge is
+    recorded, and no routed answer is wrapped.
+  - Readers assert `Child` against its construct edge. A slot left with no
+    variant keeps main's plain representation and main's reader path.
+- **AC-R (relay representation, `evt_1zhngrssvgwcz`).**
+  - Measure first: M-a gives 524's captures as planner facts and names the
+    one carrying the relayed slot value. M-b gives the read fixture's
+    maximum relay-on-relay depth at force time, and whether forcing is a
+    nested native call.
+  - Read parity `fs_read_at_malformed_offset_narrows_to_invalid_offset` is
+    green, and write parity stays green.
+  - A planner census of slot (520,1) lists its variants, including 524's and
+    its roles, and every slot-shaped source aggregate occurrence with its
+    label. It agrees one-to-one with lowering's lookups.
+  - Removing the relay classifier arm refuses at plan time, naming 524 at
+    (S1, 526, 1), not the runtime `-1`.
+  - Writing the source label into the relay word refuses at the reader's
+    role-count check, or reddens.
+  - The Spec2 seven-capture accounting is stated, and so is M-b's force
+    recursion bound.
 - **AC-0 (measure; no build).** Done so far: the suffix census, record
   coverage, the seat relation (a checked parent→child edge, not equality),
   and the disposable trace. Remaining (`evt_2wywq8pmjerv8`): a compile-time
@@ -292,8 +328,9 @@ triggers hold-and-research.
 
 Predicate: the planner assigns a slot Child's R variant statically per store
 site, but a relayed Child's producer is a labelled flow population known
-only at run time. Held at `c80b73e70` for the Research advisory on how a
-relay child is represented.
+only at run time. Closed structurally by I5-I7: a relay is its own creation
+site with a static label, and the run-time member is read by nested dispatch
+(Architect `evt_1zhngrssvgwcz`). The recut count stays 3.
 
 ## Stop conditions
 
@@ -303,6 +340,9 @@ relay child is represented.
 - A suffix operand not in hand where the residual is materialized: the
   def-use rows name the carriage path, and the Architect sizes it. Do not
   add a second carriage mechanism.
+- Relay representation (each is the 4th advancing stop): 524 has no planner
+  capture provenance; the relayed value is not among 524's captures; or
+  forcing needs native recursion unbounded by the chain depth.
 - Any kernel, `trusted_base()` or spec change: an operator question.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
