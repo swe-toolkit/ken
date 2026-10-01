@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-ARM-LEVEL-META-KERNEL-CHECK
 title: "A dependent-match arm is kernel-checked while a bare-Type level metavariable is still unsolved, so fn vid (a : Type) (n : Nat) (xs : Vec a n) : Vec a n = match xs { … } is falsely rejected with Type 0 vs Type u0 and the prelude routes 38 arms per environment into the generalized fallback. Zonk levels before any kernel query, as spec 39 requires"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -75,3 +75,17 @@ levels are solved or zonked first, or the query waits until they are.
 - A level metavariable that cannot be solved before the arm's check without
   reordering elaboration: stop to the Architect.
 - Any kernel change.
+
+## Closeout
+
+Merged `abc35cbcf` (PR #4430), exact `455d4a209`: Language QA
+`evt_6zv655rf9xwxn`, Architect `evt_6nshs7j2we7zv`, Decision
+`dec_3gnf7d6nqv8q2`.
+
+- The two no-premise gateways zonk the context telescope and every operand
+  before the raw kernel query, as the active-premise path already did.
+- Prelude first-attempt arm failures of this kind went from 38 to 0, with 0
+  fallback entries.
+- Architect carry, non-blocking: the query default and the final default are
+  both `Zero`, so they can disagree only on a level solved after the arm
+  check.

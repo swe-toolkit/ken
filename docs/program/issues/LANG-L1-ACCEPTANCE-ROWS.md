@@ -1,15 +1,15 @@
 ---
 id: LANG-L1-ACCEPTANCE-ROWS
 title: "Un-ignore the three l1_acceptance rows (explicit Int.toInt64 conversion, the Int division-by-zero obligation, and Char literals excluding surrogates) as real assertions of the behaviour /spec already settles"
-status: ready
+status: active
 owner: language
 size: M
 gate: architect
 tier: T1
-depends_on: [LANG-SESSION-SCOPE]
+depends_on: []
 blocks: []
 github: null
-origin: "Operator 2026-09-26 ('concur with rec.'): the three l1_acceptance ignored rows go to L2. Operator 2026-09-27 ('concur with l1_acceptance disposition'): sequenced right after LANG-SESSION-SCOPE, ahead of LANG-EXPRESSION-SIGMA. Operator 2026-09-17 L1 directive (clear the ignored tests; top priority). Steward-filed per COORDINATION section 2."
+origin: "Operator 2026-09-26 ('concur with rec.'): the three l1_acceptance ignored rows go to L2. Operator 2026-09-27 ('concur with l1_acceptance disposition'): sequenced right after LANG-SESSION-SCOPE, ahead of LANG-EXPRESSION-SIGMA. Operator 2026-10-01 ('concur with rec.'): next on L2 after LANG-MATCH-ARM-LEVEL-META-KERNEL-CHECK. Operator 2026-09-17 L1 directive (clear the ignored tests; top priority). Steward-filed per COORDINATION section 2."
 ---
 
 # The three l1_acceptance rows
