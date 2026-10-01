@@ -170,24 +170,26 @@ fn whnf_progress_mode(
                                                 == &Term::const_(int_id, vec![]) =>
                                         {
                                             match result_ty.as_ref() {
-                                                Term::IndFormer { id: bool_id, level_args }
-                                                    if level_args.is_empty() => env
-                                                        .inductive(*bool_id)
-                                                        .filter(|ind| {
-                                                            ind.params.is_empty()
-                                                                && ind.indices.is_empty()
-                                                                && ind.constructors.len() == 2
-                                                                && ind.constructors.iter().all(|c| {
-                                                                    c.args.is_empty()
-                                                                        && c.target_indices.is_empty()
-                                                                })
-                                                        })
-                                                        .map(|ind| {
-                                                            (
-                                                                ind.constructors[0].id,
-                                                                ind.constructors[1].id,
-                                                            )
-                                                        }),
+                                                Term::IndFormer {
+                                                    id: bool_id,
+                                                    level_args,
+                                                } if level_args.is_empty() => env
+                                                    .inductive(*bool_id)
+                                                    .filter(|ind| {
+                                                        ind.params.is_empty()
+                                                            && ind.indices.is_empty()
+                                                            && ind.constructors.len() == 2
+                                                            && ind.constructors.iter().all(|c| {
+                                                                c.args.is_empty()
+                                                                    && c.target_indices.is_empty()
+                                                            })
+                                                    })
+                                                    .map(|ind| {
+                                                        (
+                                                            ind.constructors[0].id,
+                                                            ind.constructors[1].id,
+                                                        )
+                                                    }),
                                                 _ => None,
                                             }
                                         }
@@ -201,7 +203,10 @@ fn whnf_progress_mode(
                                 let (rhs_w, rp) = whnf_progress(env, ctx, a);
                                 if let (Term::IntLit(m), Term::IntLit(n)) = (&lhs_w, &rhs_w) {
                                     iota |= lp.iota || rp.iota;
-                                    cur = Term::constructor(if m <= n { true_id } else { false_id }, vec![]);
+                                    cur = Term::constructor(
+                                        if m <= n { true_id } else { false_id },
+                                        vec![],
+                                    );
                                     continue;
                                 }
                             }

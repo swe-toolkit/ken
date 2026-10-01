@@ -21,10 +21,25 @@ fn registered_kernel_and_interpreter_agree_at_signed_and_bignum_boundaries() {
         ("0 <= 5", BigInt::from(0), BigInt::from(5), true),
         ("1 > 0", BigInt::from(1), BigInt::from(0), false),
         ("negative order", BigInt::from(-5), BigInt::from(-3), true),
-        ("negative reverse", BigInt::from(-3), BigInt::from(-5), false),
+        (
+            "negative reverse",
+            BigInt::from(-3),
+            BigInt::from(-5),
+            false,
+        ),
         ("equal negative", BigInt::from(-5), BigInt::from(-5), true),
-        ("beyond i64", BigInt::from(i64::MAX), above_i64.clone(), true),
-        ("beyond i64 reverse", above_i64.clone(), BigInt::from(i64::MAX), false),
+        (
+            "beyond i64",
+            BigInt::from(i64::MAX),
+            above_i64.clone(),
+            true,
+        ),
+        (
+            "beyond i64 reverse",
+            above_i64.clone(),
+            BigInt::from(i64::MAX),
+            false,
+        ),
         ("below i64", below_i64, BigInt::from(i64::MIN), true),
         ("equal huge", huge.clone(), huge.clone(), true),
         ("huge reverse", huge, above_i64, false),
@@ -48,10 +63,17 @@ fn registered_kernel_and_interpreter_agree_at_signed_and_bignum_boundaries() {
             "kernel {label}: {m} <= {n}"
         );
         assert_eq!(
-            prim_reduce("leq_int", &[EvalVal::BigInt(m.clone()), EvalVal::BigInt(n.clone())]),
+            prim_reduce(
+                "leq_int",
+                &[EvalVal::BigInt(m.clone()), EvalVal::BigInt(n.clone())]
+            ),
             EvalVal::Bool(expected),
             "interpreter {label}: {m} <= {n}"
         );
     }
-    assert_eq!(elab.env.trusted_base(), before, "kernel computation adds no trust");
+    assert_eq!(
+        elab.env.trusted_base(),
+        before,
+        "kernel computation adds no trust"
+    );
 }
