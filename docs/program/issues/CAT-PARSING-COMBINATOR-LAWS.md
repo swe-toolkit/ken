@@ -24,10 +24,12 @@ combinator over Parsing's byte cursor, by composing Decoder's public
 
 - **The gap.** `parser_from_decoder_laws` takes
   `bounded : DecoderPreservesBounded a decoder`, which is private.
-- **The duplicate.** Parsing's private `DecoderOutcomeBounded`
-  (`Parsing.ken.md:410`) matches Decoder's public `DecoderResultPreserved`
-  arm for arm, at `good_cursor = ByteCursorBounded s start` and
-  `good_location = ValidSpan s`.
+- **The private abbreviation.** Parsing's private `DecoderOutcomeBounded`
+  (`Parsing.ken.md:410`) matches Decoder's `DecoderResultPreserved` arm for
+  arm, at `good_cursor = ByteCursorBounded s start` and
+  `good_location = ValidSpan s`. That Decoder predicate is private
+  (`Decoder.ken.md:1788`), so Parsing cannot spell it (Architect
+  `evt_3mttfykt8802n`).
 - **Delivered names.**
   - Decoder, all `pub`: `DecoderPreserves` and
     `decoder_{pure,fail,bind,seq,alt,satisfy,many,recursive}_preserves`.
@@ -53,16 +55,19 @@ Export, subsume and instance: no re-derivation, and keep the existing names
 (Architect `evt_1x2anyf7dzsqy`, which corrects `evt_688y060mgq32r`; the
 first nomination missed the private obligations already in Parsing).
 
-1. **Subsume the duplicate.**
+1. **Publish the bound over `DecoderPreserves`.**
    - `pub fn DecoderPreservesBounded (a) (decoder) : Prop` becomes
      `(s : Source) → (start : Nat) → DecoderPreserves ByteCursor Span a
      (ByteCursorBounded s start) (ValidSpan s) decoder`.
-   - `ByteCursorBounded` becomes `pub`. `DecoderOutcomeBounded` and the
-     bridges `decoder_bounded_as_public` (`:1860`) and
-     `decoder_public_as_bounded` (`:1870`), λ-identities under the new
-     definition, are deleted; callers use the premise directly.
-   - Re-prove what that touches (`parse_decoder_bounded_valid` and its
-     siblings). Check 11 applies.
+   - `ByteCursorBounded` becomes `pub`.
+   - `fn DecoderOutcomeBounded` stays private and textually unchanged, as
+     the helper types' abbreviation; do not inline a `match` into a
+     proposition type. A helper given the new premise converts arm for arm
+     to it, as the λ-identity bridges `decoder_bounded_as_public` (`:1860`)
+     and `decoder_public_as_bounded` (`:1870`) show.
+   - Delete those bridges if nothing still calls them; otherwise keep them
+     private. If conversion fails at a site, stop and post the site; add no
+     alias.
 2. **Make public, unchanged:** `byte_cursor_bounded_locate` (`:614`) and
    `byte_cursor_bounded_after_peek` (`:1812`, the advance-sound type, which
    already composes Derived's `some_below_length for nth`).

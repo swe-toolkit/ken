@@ -1,6 +1,6 @@
 ---
 id: RT-PLANNER-PER-EMITTER-AVAILABILITY
-title: "The continuation planner finalizes a specialization's capture availability claims only under its interning owner, but the same construct is materialized under other owners (Vis735 under Specialization(2) on all 15 measured emissions), so no lawful capture source exists there. Finalize the W and C claims per emitting owner at every materialization point, fail-closed"
+title: "The continuation planner finalizes a specialization's capture availability claims only under its interning owner, but the same construct is materialized under other owners (Vis735 under Specialization(2) on all 15 measured emissions), so no lawful capture source exists there. Finalize the W and C claims per emitting owner at every materialization point, recording each unfinalizable ordinal"
 status: active
 owner: runtime
 size: M
@@ -19,7 +19,7 @@ origin: "Architect evt_3yp3tea99hfta on RT-NATIVE-CONTINUATION-ENV-CARRIAGE rule
 At every point where a continuation specialization's construct is
 materialized, the planner holds one finalized availability claim for each of
 its W worker and C context capture ordinals, under the owner that emits that
-point, or it refuses naming the ordinal and owner.
+point, or it records that ordinal as unfinalizable with the owner and reason.
 
 ## Settled inputs (Architect `evt_3yp3tea99hfta`, measured at WIP `86b0ebb9b`)
 
@@ -39,12 +39,15 @@ point, or it refuses naming the ordinal and owner.
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
 
-## AC-0 (Architect, at kickoff)
+## AC-0 (Architect `evt_yajvrmbnkkzb`)
 
-No residual consumes these claims until ENV-CARRIAGE resumes. The Architect
-rules whether an unfinalizable ordinal refuses at planning in this WP, or is
-recorded for the consumer to refuse, so that no program accepted today is
-newly refused here.
+Record, do not refuse. Each ordinal yields `Finalized(claim)` or
+`Unfinalizable{ordinal, owner, reason}`; the fail-closed refusal belongs to
+ENV-CARRIAGE's residual builder at the point of use. One read-only accessor
+exposes the results, with no lowering call sites. D0 first: explain the W8
+discrepancy, and name the claim-discovery function behind spec 1's
+`Predeclared(4)` claims and show it runs for a given owner and origin, or stop
+where it is hard-keyed to the interned owner.
 
 ## Deliverable
 
@@ -62,21 +65,18 @@ No residual layout, gate or lowering consumer changes.
 
 ## Acceptance
 
-- **AC-1.** The direct-application fixture finalizes 14 claims (W8 + C6) for
-  spec 1 under `Specialization(2)`, or the planner refuses naming the ordinal
-  and owner. The D0 first explains the measured "W8 (seven carried
-  captures)" discrepancy at the Vis735 destination.
+- **AC-1.** Read through the accessor, spec 1 at Vis735 under
+  `Specialization(2)` yields 14 per-ordinal results (W8 + C6).
 - **AC-2 (pins).** Per specialization, the number of materialization points.
-  Per owner, the number of finalized claims. The number of positional reads is
-  0.
-- **AC-3 (control).** Delete one owner's finalization: the census pin goes red
-  or the planner refuses naming that owner.
+  Per owner, the finalized and unfinalizable counts. Positional reads and
+  record959 reads: 0.
+- **AC-3 (control).** Delete one owner's finalization: the census pin goes red.
 - **AC-4.** No native census verdict changes. `rt_parity_native` and the
   one-bracket and two-bracket native controls stay green, and
   `trusted_base()` is unchanged.
 
 ## Stop conditions
 
-- An ordinal cannot be finalized under some emitting owner on the census by
-  either existing mechanism: stop to the Architect, naming it.
+- Claim discovery is hard-keyed to the interned owner (D0): stop to the
+  Architect, naming where.
 - The work needs a residual layout or gate change.
