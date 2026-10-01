@@ -9,7 +9,7 @@ mod catalog_or;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_kernel::{Decl, GlobalId, KernelError, Term};
 use std::collections::{BTreeSet, HashSet};
 
 const PARSING_KEN_MD: &str =
@@ -1403,6 +1403,76 @@ fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
         env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
         before,
         "importing and applying ParserLaws proofs must not extend trust"
+    );
+}
+
+/// Promise class: durable invariant (CAT-5 bounded ParserLaws, AC-2b).
+///
+/// MEASURED: the real Parsing package's rejected checked fences are elaborated
+/// as ordinary source; at least one reaches the kernel's exact over-end
+/// LessEqNat obligation. CLAIMED: the false bounded-parser twin cannot pass
+/// its fence merely by failing to parse or resolve a name. THE GAP: the
+/// literate `ken reject` role itself only observes any error, so this client
+/// checks the error's typed payload independently, while the accepted twin
+/// remains checked by `ken check` on the same package.
+#[test]
+fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
+    let extracted = ken_elaborator::literate::extract_ken_md(PARSING_KEN_MD)
+        .expect("Parsing checked fences must extract");
+    let mut env = mk_env();
+    catalog_or::expose_module(&mut env, "Data.Numeric.Nat.Order");
+    let leq = env.globals["LessEqNat"];
+    let source_length = env.globals["source_length"];
+    let suc = env.prelude_env.suc_id;
+    let over_end = extracted.reject_ranges.iter().any(|range| {
+        let err = env
+            .elaborate_file(&PARSING_KEN_MD[range.clone()])
+            .expect_err("a reject fence must not elaborate");
+        let ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { expected, found },
+            ..
+        } = err
+        else {
+            return false;
+        };
+        // Derive n from the found goal rather than freezing a de Bruijn
+        // index: every binder renaming still observes the same bound.
+        let Term::App(found_leq, found_right) = found.as_ref() else {
+            return false;
+        };
+        let Term::App(found_head, found_left) = found_leq.as_ref() else {
+            return false;
+        };
+        let Term::App(length_head, source) = found_left.as_ref() else {
+            return false;
+        };
+        if !matches!(source.as_ref(), Term::Var(_))
+            || found_head.as_ref() != &Term::const_(leq, vec![])
+            || length_head.as_ref() != &Term::const_(source_length, vec![])
+        {
+            return false;
+        }
+        let length = Term::app(Term::const_(source_length, vec![]), *source.clone());
+        let true_endpoint = Term::app(
+            Term::app(Term::const_(leq, vec![]), length.clone()),
+            length.clone(),
+        );
+        let false_endpoint = Term::app(
+            Term::app(
+                Term::const_(leq, vec![]),
+                Term::app(Term::constructor(suc, vec![]), length.clone()),
+            ),
+            length,
+        );
+        *found_right.as_ref() == *found_left.as_ref()
+            && *found == true_endpoint
+            && *expected == false_endpoint
+    });
+    assert!(
+        over_end,
+        "a rejected Parsing fence must reach TypeMismatch with expected \
+         LessEqNat (Suc (source_length s)) (source_length s) and found \
+         LessEqNat (source_length s) (source_length s), not an unrelated error"
     );
 }
 
