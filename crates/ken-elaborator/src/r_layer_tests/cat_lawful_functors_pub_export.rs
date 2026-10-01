@@ -413,6 +413,39 @@ fn lawful_functors_list_instance_selects_derived_map_and_both_laws() {
     }
 }
 
+/// Promise class: durable invariant (CAT-3 structural map laws).
+/// MEASURED: a roots-loaded clean client imports only Derived's list_append
+/// and map, then checks the generic append proof at free types, function,
+/// and lists without adding trust. CLAIMED: map preserves append for all
+/// inputs through its public attached proof. THE GAP: the same free variables
+/// occur on both endpoints and in the proof call, with no closed fixtures.
+#[test]
+fn derived_map_append_is_publicly_instantiable_without_new_trust() {
+    let mut env = ElabEnv::new().expect("clean Derived client environment");
+    env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
+        .expect("Derived must load through the real roots loader");
+    let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    env.elaborate_file(
+        r#"
+        import Data.Collections.Derived (list_append, map)
+
+        theorem client_map_append
+            (a : Type) (b : Type) (f : a → b) (xs : List a) (ys : List a)
+            : Equal
+                (List b)
+                (map a b f (list_append a xs ys))
+                (list_append b (map a b f xs) (map a b f ys)) =
+          (proof append for map) a b f xs ys
+        "#,
+    )
+    .expect("a public generic map-append proof must check without another import");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        before,
+        "using the public map-append proof must not add trust"
+    );
+}
+
 /// MEASURED: the roots loader identifies LF's owned declarations separately
 /// from its dependency closure. LF owns no `bool_and`-family name and no owned
 /// transparent declaration kernel-equivalent to LC's operation, associativity,

@@ -155,9 +155,10 @@ adds a wrapper or a new trust assumption. The two attached `nth` laws connect
 successful lookup and out-of-bounds lookup to the structural `length` fold in
 both directions.
 
-The `map::id` and `map::fusion` proofs use structural induction and `cong` to
-lift the tail equation under `Cons`. They cite `idf` and `comp` from
-`Core.Function.Combinators` and live beside the operation they justify.
+The `map::id`, `map::fusion`, and `map::append` proofs use structural
+induction and `cong` to lift the tail equation under `Cons`. The first two
+cite `idf` and `comp` from `Core.Function.Combinators`; all three live beside
+the operation they justify.
 
 Migrated here per the attached-proof ownership rule — an attached proof
 `f::law` belongs to the module that defines `f` — the three `list_append`
@@ -197,6 +198,24 @@ pub proof fusion for map
         (map b c g (map a b h rest))
         (Cons c (g (h x)))
         ((proof fusion for map) a b c g h rest)
+  }
+
+pub proof append for map
+      (a : Type) (b : Type) (f : a → b) (xs : List a) (ys : List a)
+    : Equal
+        (List b)
+        (map a b f (list_append a xs ys))
+        (list_append b (map a b f xs) (map a b f ys)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons head tail ↦
+      cong
+        (List b)
+        (List b)
+        (map a b f (list_append a tail ys))
+        (list_append b (map a b f tail) (map a b f ys))
+        (Cons b (f head))
+        ((proof append for map) a b f tail ys)
   }
 
 pub fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
