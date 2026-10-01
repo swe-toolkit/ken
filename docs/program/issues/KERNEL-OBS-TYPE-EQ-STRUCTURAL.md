@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-TYPE-EQ-STRUCTURAL
 title: "Since the P0 fix, Eq Type between two same-former compound types (Π/Π, Σ/Σ, D/D, Quot/Quot) stays neutral, so every cast at a compound former projects witnesses (e.1, e.2, index equalities) that have no type, and the reducer's Phase 3 sub-cast synthesizes an ill-typed Refl. Add spec 16 §2.2's structural Eq Type arms, with Refl checked by conversion, behind one TCB Decision"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1
@@ -66,8 +66,10 @@ Under one TCB Decision:
 ## Acceptance
 
 The operator authorized the TCB change (2026-10-01). The Architect sets AC-0
-at kickoff, before any edit. It includes the Π-motive row and one typed-whnf subject-reduction row per
-former.
+at kickoff, before any edit. It includes the Π-motive row and one typed-whnf
+subject-reduction row per former.
+
+- **AC-0: ruled** (`evt_71pe5ka6mwg8r`, base `a02cecfed`). §1a count 0.
 
 ## Stop conditions
 
