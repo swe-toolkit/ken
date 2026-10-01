@@ -136,8 +136,8 @@ fn check_refl_at_abstract_int_equality(
 /// C1–C3, `[structural]`, durable invariant.
 ///
 /// MEASURED: in one two-binder context, the same `Refl x` certificate is
-/// accepted at `x = x` and rejected with `BadEliminator` at `x = y` by the
-/// four-argument kernel API.
+/// accepted at `x = x` and rejected at `x = y` with `TypeMismatch` whose
+/// two Eq types differ only in the right index, by the four-argument kernel API.
 /// CLAIMED: certificate admission at a genuinely Eq-shaped goal depends on
 /// index convertibility, not author provenance.
 /// THE GAP: distinct binders are unprovable rather than a closed false
@@ -151,10 +151,30 @@ fn kernel_check_flips_on_abstract_index_convertibility_without_provenance() {
         .expect("Refl x must prove the genuinely Eq-shaped x = x goal");
     let error = check_refl_at_abstract_int_equality(&elab, false)
         .expect_err("the same Refl x shape must not prove x = y");
-    assert!(
-        matches!(error, KernelError::BadEliminator(_)),
-        "distinct abstract indices must fail at conversion, got {error:?}"
-    );
+    let int_ty = Term::const_(elab.numeric_env.int_id, vec![]);
+    match error {
+        KernelError::TypeMismatch { expected, found } => {
+            assert_eq!(
+                *expected,
+                Term::Eq(
+                    Box::new(int_ty.clone()),
+                    Box::new(Term::var(1)),
+                    Box::new(Term::var(0)),
+                ),
+                "the offered goal must still be Eq Int x y",
+            );
+            assert_eq!(
+                *found,
+                Term::Eq(
+                    Box::new(int_ty),
+                    Box::new(Term::var(1)),
+                    Box::new(Term::var(1)),
+                ),
+                "distinct abstract indices must fail at conversion only on y",
+            );
+        }
+        other => panic!("distinct abstract indices must fail at conversion, got {other:?}"),
+    }
 }
 
 fn closed_int_equality(elab: &ElabEnv, left: i64, right: i64) -> Term {
@@ -168,8 +188,8 @@ fn closed_int_equality(elab: &ElabEnv, left: i64, right: i64) -> Term {
 /// Honest control for the superseded C1/C2 operands.
 ///
 /// MEASURED: the registered-literal reducer maps closed `0 = 0` to `Top` and
-/// `0 = 1` to `Bottom`; offering `Refl` at the latter rejects with
-/// `TypeMismatch` before the Eq conversion arm.
+/// `0 = 1` to `Bottom` (pinned by both `whnf` assertions); offering
+/// `Refl` at the Bottom-collapsed goal rejects as `TypeMismatch`.
 /// CLAIMED: the seed's closed pair does not measure AC3's conversion boundary.
 /// THE GAP: this pins landed reducer behavior only; it is not counted as the
 /// authorship-independence pair above.
