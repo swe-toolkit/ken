@@ -17,7 +17,7 @@ use ken_kernel::{
         RecursiveArgumentShape,
     },
     infer as kernel_infer_raw,
-    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
+    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, subst_var, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
 };
@@ -18302,6 +18302,11 @@ fn compile_match_matrix(
                 subsumed_by,
                 false,
                 false,
+                true,
+                match &head {
+                    Term::IndFormer { level_args, .. } => level_args,
+                    _ => unreachable!("nested split head is an inductive former"),
+                },
             );
             let raw_methods: Vec<Term> = raw_methods_result?
                 .into_iter()
@@ -18475,6 +18480,8 @@ fn build_ctor_buckets(
     subsumed_by: &mut [Vec<usize>],
     allow_index_omission: bool,
     indexed_root: bool,
+    tail_under_split: bool,
+    split_level_args: &[Level],
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
 
@@ -18549,7 +18556,41 @@ fn build_ctor_buckets(
         // existing nested/non-indexed continuation when `root` is absent.
         let mut new_col_types = field_types0;
         new_col_types.extend(std::iter::repeat(Term::ty(Level::Zero)).take(p_ihs0));
-        new_col_types.extend_from_slice(tail_col_types);
+        if tail_under_split {
+            // Each tail domain is relative to x' and its earlier real tail
+            // binders. In this bucket the n_args0 constructor fields replace
+            // x'; synthetic IH columns add no de Bruijn binder here.
+            let ctor_fields = (0..n_args0).map(|i| Term::var(n_args0 - 1 - i));
+            let ctor_value = params0[..m0]
+                .iter()
+                .map(|param| weaken(param, n_args0 as i64))
+                .chain(ctor_fields)
+                .fold(
+                    Term::Constructor {
+                        id: c0.id,
+                        level_args: split_level_args.to_vec(),
+                    },
+                    Term::app,
+                );
+            let mut real_tail_binders = 0;
+            for (ty, kind) in tail_col_types.iter().zip(tail_col_kinds) {
+                if matches!(kind, ColKind::Ih { .. }) {
+                    // IH slots are woven later, not part of the raw tail
+                    // type's real telescope.
+                    new_col_types.push(ty.clone());
+                    continue;
+                }
+                let above_split = shift(ty, n_args0 as i64, real_tail_binders + 1);
+                new_col_types.push(subst_var(
+                    &above_split,
+                    real_tail_binders,
+                    &weaken(&ctor_value, real_tail_binders as i64),
+                ));
+                real_tail_binders += 1;
+            }
+        } else {
+            new_col_types.extend_from_slice(tail_col_types);
+        }
         let mut new_col_kinds: Vec<ColKind> = vec![ColKind::Real; n_args0];
         new_col_kinds.extend((0..p_ihs0).map(|i| ColKind::Ih {
             remaining: p_ihs0 - 1 - i,
@@ -19368,6 +19409,11 @@ fn infer_match(
         &mut subsumed_by,
         indexed,
         indexed,
+        false,
+        match &head {
+            Term::IndFormer { level_args, .. } => level_args,
+            _ => unreachable!("match head is an inductive former"),
+        },
     );
     let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result)?;
 
