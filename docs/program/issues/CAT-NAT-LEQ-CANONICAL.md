@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-LEQ-CANONICAL
 title: "Six elementary leq_nat facts are proved privately in Map, Gcd and Parsing, each a copy of a law Nat.Order or its provider already owns. Publish the order laws once from Data.Numeric.Nat.Order and retire the private copies"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -83,6 +83,22 @@ stop and report the mismatch.
 - **AC-3.** `ds2_ord_nat_acceptance`, `map_build_acceptance`,
   `cat_gcd_acceptance`, `cat5_parsing_package` and `cc5_pretty_doc_acceptance`
   stay green.
+
+## Closeout
+
+Merged `3150e9331` (PR #4416), exact `88b452e10`: Foundation QA
+`evt_7e1n6hn3q4k1q`, Architect `evt_4g1270c99p7tc`, Decision
+`dec_7bpc5y4q319w8`.
+
+- Order publishes `leq_nat_successor_bound` and `leq_nat_weaken_right`.
+  The six private copies in Map, Gcd and Parsing are retired onto the
+  canonical laws. Map now imports Order, and the import graph stays
+  acyclic.
+- The first cut (`38f2d0510`) went red on the Parsing provider-closure pin
+  in `r_layer_tests`. The respin updates that one literal.
+- No trust change.
+- Carry: Parsing's `LessEqNat::refl` should delegate to the canonical law
+  (`evt_72rwdtbx9mdq1`).
 
 ## Stop conditions
 
