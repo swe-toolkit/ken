@@ -367,13 +367,11 @@ fn eq_inductive_dependent_telescope() {
 // Seam 2 — J at a dependent (non-constant) motive (§4.1)
 // =============================================================================
 
-/// `J (λb. λ_. Vec A (suc b)) base e_j` where `e_j : Eq Nat n m` and `n`, `m`
-/// are **neutral** (postulates). motive is non-constant since `Vec A (suc n)
-/// ≢ Vec A (suc m)`. Seam-2 fires J-cast; seam-1 fires on the outer index.
-///
-/// Discriminant: bug = stuck `Term::J`; correct = constructor-headed `vcons`.
+/// The historical bare-lambda J has no inferable motive; its `vcons` base
+/// also contains a `vnil A : Vec A zero` in the tail slot `Vec A n` for an
+/// opaque n. This raw term must stay neutral rather than fabricate a witness.
 #[test]
-fn j_dependent_motive_fires() {
+fn j_dependent_motive_raw_input_stays_neutral() {
     let (mut env, s) = std_env();
     let ctx = Context::new();
 
@@ -418,20 +416,43 @@ fn j_dependent_motive_fires() {
     let j_term = Term::J(Box::new(motive), Box::new(base), Box::new(e_j));
     let result = whnf(&env, &ctx, &j_term);
 
-    // J must NOT stay stuck (discriminant: bug leaves Term::J neutral)
-    assert!(
-        !matches!(result, Term::J(..)),
-        "J with non-constant motive must fire (seam 2); got stuck Term::J"
-    );
+    assert_eq!(infer(&env, &ctx, &j_term), Err(ken_kernel::KernelError::Msg(
+        "cannot infer an introduction form (λ/pair/refl/quotient class/truncation) without an expected type (use ascription)".into()
+    )));
+    assert_eq!(result, j_term, "no fabricated witness for a raw J input");
+}
 
-    // J-cast fired and seam-1 fired on the outer Vec index rewrite (suc n →
-    // suc m); result is vcons-headed.
-    let (head, _args) = peel_app(&result);
-    assert!(
-        matches!(head, Term::Constructor { id, .. } if id == s.vcons),
-        "J result should be vcons-headed after full reduction; got {:?}",
-        result
+/// Typed seam-2: a dependent Vec-valued motive transports along a neutral
+/// Nat equality. An opaque base leaves the full WHNF at a checked, neutral
+/// Cast; structural equality at a compound former belongs to the follow-on.
+#[test]
+fn j_dependent_motive_fires() {
+    let (mut env, s) = std_env();
+    let ctx = Context::new();
+    let nat = nat_t(&s);
+    let n = Term::const_(declare_postulate(&mut env, "n".into(), vec![], nat.clone()).unwrap(), vec![]);
+    let m = Term::const_(declare_postulate(&mut env, "m".into(), vec![], nat.clone()).unwrap(), vec![]);
+    let eq_nm = Term::Eq(Box::new(nat.clone()), Box::new(n.clone()), Box::new(m.clone()));
+    let e = Term::const_(declare_postulate(&mut env, "e".into(), vec![], eq_nm).unwrap(), vec![]);
+    let proof_b = Term::Eq(Box::new(nat.clone()), Box::new(n.clone()), Box::new(Term::var(0)));
+    let motive = Term::Ascript(
+        Box::new(Term::lam(nat.clone(), Term::lam(
+            proof_b.clone(), vec_t(&s, nat.clone(), Term::var(1)),
+        ))),
+        Box::new(Term::pi(nat.clone(), Term::pi(proof_b, Term::Type(Level::zero())))),
     );
+    let base_ty = vec_t(&s, nat.clone(), n);
+    let base = Term::const_(declare_postulate(&mut env, "base".into(), vec![], base_ty).unwrap(), vec![]);
+    let j = Term::J(Box::new(motive.clone()), Box::new(base.clone()), Box::new(e.clone()));
+    let expected = infer(&env, &ctx, &j).expect("dependent J must be typed");
+    let reduct = ken_kernel::obs::j_reduce(&env, &ctx, &motive, &base, &e)
+        .expect("non-Refl equality must trigger J-cast");
+    assert!(matches!(&reduct, Term::Cast(..)), "J-cast is the first reduct");
+    let inferred = infer(&env, &ctx, &reduct).expect("J-cast reduct must remain typed");
+    assert!(convert_type(&env, &ctx, &expected, &inferred));
+    let computed = whnf(&env, &ctx, &j);
+    assert!(matches!(&computed, Term::Cast(..)), "opaque base keeps the full WHNF neutral");
+    ken_kernel::check(&env, &ctx, &computed, &expected).expect("full WHNF checks at J's inferred type");
 }
 
 // =============================================================================
@@ -678,9 +699,10 @@ fn quotient_respect_direction_cast() {
 // Regression — existing seams must be unaffected
 // =============================================================================
 
-/// Constant-motive J (the K2 headline case) still reduces to `base`.
+/// The former constant-motive case used a raw lambda motive and never
+/// typechecked; no unchecked `Refl` may be synthesized for its J-cast.
 #[test]
-fn j_constant_motive_still_reduces() {
+fn j_constant_motive_raw_lambda_stays_neutral() {
     let (mut env, _s) = std_env();
     let ctx = Context::new();
 
@@ -709,19 +731,35 @@ fn j_constant_motive_still_reduces() {
     let j_term = Term::J(Box::new(motive), Box::new(small_a.clone()), Box::new(e));
     let result = whnf(&env, &ctx, &j_term);
 
-    // Constant motive: P(a, refl a) ≡ P(b, e) ≡ A → cast reduces by
-    // regularity → base.
-    assert!(
-        !matches!(result, Term::J(..)),
-        "constant-motive J must still fire"
+    assert_eq!(infer(&env, &ctx, &j_term), Err(ken_kernel::KernelError::Msg(
+        "cannot infer an introduction form (λ/pair/refl/quotient class/truncation) without an expected type (use ascription)".into()
+    )));
+    assert_eq!(result, j_term, "no fabricated witness for a raw J input");
+}
+
+/// Typed constant-motive J still computes to the checked base by regularity.
+#[test]
+fn j_constant_motive_still_reduces() {
+    let (mut env, _s) = std_env();
+    let ctx = Context::new();
+    let a_ty = Term::const_(declare_postulate(&mut env, "A".into(), vec![], Term::Type(Level::zero())).unwrap(), vec![]);
+    let a = Term::const_(declare_postulate(&mut env, "a".into(), vec![], a_ty.clone()).unwrap(), vec![]);
+    let b = Term::const_(declare_postulate(&mut env, "b".into(), vec![], a_ty.clone()).unwrap(), vec![]);
+    let e_ty = Term::Eq(Box::new(a_ty.clone()), Box::new(a.clone()), Box::new(b));
+    let e = Term::const_(declare_postulate(&mut env, "e".into(), vec![], e_ty).unwrap(), vec![]);
+    let proof_b = Term::Eq(Box::new(a_ty.clone()), Box::new(a.clone()), Box::new(Term::var(0)));
+    let motive = Term::Ascript(
+        Box::new(Term::lam(a_ty.clone(), Term::lam(proof_b.clone(), a_ty.clone()))),
+        Box::new(Term::pi(a_ty.clone(), Term::pi(proof_b, Term::Type(Level::zero())))),
     );
-    // For a constant motive, the cast's source ≡ target (A ≡ A), so
-    // regularity fires immediately and the result IS `small_a` (the base).
-    assert!(
-        convert_type(&env, &ctx, &result, &small_a),
-        "constant-motive J result should be the base; got {:?}",
-        result
-    );
+    let j = Term::J(Box::new(motive.clone()), Box::new(a.clone()), Box::new(e.clone()));
+    let expected = infer(&env, &ctx, &j).expect("checked constant-motive J");
+    let reduct = ken_kernel::obs::j_reduce(&env, &ctx, &motive, &a, &e)
+        .expect("J-cast must fire on non-Refl e");
+    assert!(matches!(&reduct, Term::Cast(..)));
+    assert!(convert_type(&env, &ctx, &expected,
+        &infer(&env, &ctx, &reduct).expect("reduct must be typed")));
+    assert_eq!(whnf(&env, &ctx, &j), a);
 }
 
 /// Ω-target quotient elim is still respect-free (K2 regression).

@@ -17,7 +17,7 @@
 use crate::conv::{convert_type, whnf};
 use crate::env::{Context, GlobalEnv};
 use crate::inductive::peel_app;
-use crate::subst::{apply_args, subst0, subst_levels, subst_outer, subst_tel, weaken};
+use crate::subst::{apply_args, shift, subst0, subst_levels, subst_outer, subst_tel, weaken};
 use crate::term::Term;
 
 // --- prelude proposition terms (`16 §1.3`) ---
@@ -75,7 +75,7 @@ fn mk_sym(proof: &Term) -> Term {
 pub fn eq_reduce(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term) -> Option<Term> {
     match ty {
         Term::Pi(a1, b1) => Some(eq_at_pi(a1, b1, a, b)),
-        Term::Sigma(a1, b1) => Some(eq_at_sigma(env, ctx, a1, b1, a, b)),
+        Term::Sigma(a1, b1) => eq_at_sigma(env, ctx, a1, b1, a, b),
         Term::Omega(_) => Some(eq_at_omega(a, b)),
         Term::Type(_) => eq_at_type(env, ctx, a, b),
         Term::Trunc(_) => Some(top_term(env)),
@@ -133,14 +133,85 @@ fn eq_at_pi(a1: &Term, b1: &Term, f: &Term, g: &Term) -> Term {
     )
 }
 
-/// `Eq ((x:A1)×B1) p q ⇝ Eq A1 p.1 q.1 and Eq (B1 q.1) (cast (B1 p.1) (B1 q.1)
-/// (cong (x.B1 x) eq-fst) p.2) q.2` (`16 §2.2`). The "and" is a Σ. The transport
-/// proof for `p.2` is `Eq Type (B1 p.1) (B1 q.1)`; when `B1` is non-dependent
-/// this is `refl` (and the `cast` reduces to `p.2` by regularity).
-fn eq_at_sigma(env: &GlobalEnv, ctx: &Context, a1: &Term, b1: &Term, p: &Term, q: &Term) -> Term {
-    let _ = (env, ctx);
-    let p1 = Term::proj1(p.clone());
-    let q1 = Term::proj1(q.clone());
+/// Introduce only a canonical, checked-by-shape base; a neutral proposition
+/// has no fabricated witness. The caller constructs `Eq Type X X` itself.
+fn canonical_type_eq_base(env: &GlobalEnv, ctx: &Context, base_ty: &Term) -> Option<Term> {
+    match whnf(env, ctx, base_ty) {
+        Term::Eq(_, x, _) => Some(Term::Refl(x)),
+        head if head == top_term(env) => Some(tt_term(env)),
+        _ => None,
+    }
+}
+
+/// Build `cong F h : Eq Type (F a) (F b)` by `J` over the evidence `h`.
+/// `family_at_y` lives under `y` and its equality proof (Var(1) and Var(0)).
+/// The base must have a canonical introduction after WHNF; otherwise leave
+/// the reduction neutral rather than fabricate a type-equality witness.
+fn type_eq_by_j(
+    env: &GlobalEnv,
+    ctx: &Context,
+    domain: &Term,
+    start: &Term,
+    source: &Term,
+    target: &Term,
+    family_at_y: Term,
+    evidence: Term,
+) -> Option<Term> {
+    let level = match crate::check::infer(env, ctx, source).ok()? {
+        Term::Type(level) => level,
+        _ => return None,
+    };
+    let base_ty = Term::Eq(
+        Box::new(Term::Type(level.clone())),
+        Box::new(source.clone()),
+        Box::new(source.clone()),
+    );
+    let base = canonical_type_eq_base(env, ctx, &base_ty)?;
+    let proof_domain = Term::Eq(
+        Box::new(weaken(domain, 1)),
+        Box::new(weaken(start, 1)),
+        Box::new(Term::var(0)),
+    );
+    let motive = Term::Ascript(
+        Box::new(Term::lam(
+            domain.clone(),
+            Term::lam(
+                proof_domain.clone(),
+                Term::Eq(
+                    Box::new(Term::Type(level.clone())),
+                    Box::new(weaken(source, 2)),
+                    Box::new(family_at_y),
+                ),
+            ),
+        )),
+        Box::new(Term::pi(
+            domain.clone(),
+            Term::pi(proof_domain, Term::Omega(level.clone().suc())),
+        )),
+    );
+    let result = Term::J(Box::new(motive), Box::new(base), Box::new(evidence));
+    let expected = Term::Eq(
+        Box::new(Term::Type(level)),
+        Box::new(source.clone()),
+        Box::new(target.clone()),
+    );
+    crate::check::check(env, ctx, &result, &expected).ok()?;
+    Some(result)
+}
+
+/// `Eq ((x:A1)×B1) p q ⇝ Eq A1 p.1 q.1 and Eq (B1 q.1)
+/// (cast (B1 p.1) (B1 q.1) (cong (x.B1 x) eq-fst) p.2) q.2` (`16 §2.2`).
+/// The equality proof is available only inside the Σ codomain.
+fn eq_at_sigma(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a1: &Term,
+    b1: &Term,
+    p: &Term,
+    q: &Term,
+) -> Option<Term> {
+    let p1 = whnf(env, ctx, &Term::proj1(p.clone()));
+    let q1 = whnf(env, ctx, &Term::proj1(q.clone()));
     let eq_fst = Term::Eq(
         Box::new(a1.clone()),
         Box::new(p1.clone()),
@@ -148,23 +219,34 @@ fn eq_at_sigma(env: &GlobalEnv, ctx: &Context, a1: &Term, b1: &Term, p: &Term, q
     );
     let b1_p1 = subst0(b1, &p1);
     let b1_q1 = subst0(b1, &q1);
-    // `cong B1 eq-fst` placeholder: `refl` (non-dep ⇒ exact; dep ⇒ the cast is
-    // stuck, sound — K2 conformance does not exercise dependent-Σ equality).
-    let proof = Term::Refl(Box::new(b1_p1.clone()));
+    let mut proof_ctx = ctx.clone();
+    proof_ctx.push(eq_fst.clone());
+    // At the motive's depth Γ, h, y, _ the original B1 is still under its
+    // x binder. Shift only its free outer variables by three, then replace
+    // x by y (Var(1)); h is the Σ proof's nearest binder in Γ, h.
+    let b1_at_y = subst0(&shift(b1, 3, 1), &Term::var(1));
+    let proof = type_eq_by_j(
+        env,
+        &proof_ctx,
+        &weaken(a1, 1),
+        &weaken(&p1, 1),
+        &weaken(&b1_p1, 1),
+        &weaken(&b1_q1, 1),
+        b1_at_y,
+        Term::Ascript(Box::new(Term::var(0)), Box::new(weaken(&eq_fst, 1))),
+    )?;
     let p2_cast = Term::Cast(
-        Box::new(b1_p1),
-        Box::new(b1_q1.clone()),
+        Box::new(weaken(&b1_p1, 1)),
+        Box::new(weaken(&b1_q1, 1)),
         Box::new(proof),
-        Box::new(Term::proj2(p.clone())),
+        Box::new(weaken(&whnf(env, ctx, &Term::proj2(p.clone())), 1)),
     );
     let second = Term::Eq(
-        Box::new(b1_q1),
+        Box::new(weaken(&b1_q1, 1)),
         Box::new(p2_cast),
-        Box::new(Term::proj2(q.clone())),
+        Box::new(weaken(&whnf(env, ctx, &Term::proj2(q.clone())), 1)),
     );
-    // `second` is built in the outer context. As the codomain of the Sigma
-    // proof, it lives under the newly-bound first-component equality proof.
-    Term::sigma(eq_fst, weaken(&second, 1))
+    Some(Term::sigma(eq_fst, second))
 }
 
 /// `Eq Ω P Q ⇝ (P → Q) and (Q → P)` — propext definitional (`16 §2.2`).
@@ -254,6 +336,131 @@ fn eq_at_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term
     }
 }
 
+/// A right-nested constructor prefix `(x1, (x2, ...))`, with the final
+/// field unpaired. This is the carrier of the earlier conjunct proofs.
+fn telescope_tuple(args: &[Term]) -> Term {
+    let mut value = args[args.len() - 1].clone();
+    for arg in args[..args.len() - 1].iter().rev() {
+        value = Term::pair(arg.clone(), value);
+    }
+    value
+}
+
+/// The kth element of a right-nested tuple `t` of `len` fields. The final
+/// projection is `t.2.2...`; every earlier one ends in `.1`.
+fn telescope_projection(t: &Term, k: usize, len: usize) -> Term {
+    let mut result = t.clone();
+    for _ in 0..k {
+        result = Term::proj2(result);
+    }
+    if k + 1 < len {
+        Term::proj1(result)
+    } else {
+        result
+    }
+}
+
+/// Build one inductive argument equality in the context where all preceding
+/// equality conjuncts are bound. Its dependent cast uses `J` over their
+/// right-nested proof tuple, then binds this conjunct for the suffix.
+fn inductive_conjuncts(
+    env: &GlobalEnv,
+    proof_ctx: &Context,
+    a_tpl: &[Term],
+    b_tpl: &[Term],
+    a_bar: &[Term],
+    b_bar: &[Term],
+    j: usize,
+) -> Option<Term> {
+    let a_ty = weaken(&subst_tel(&a_tpl[j], &a_bar[..j]), j as i64);
+    let b_ty = weaken(&subst_tel(&b_tpl[j], &b_bar[..j]), j as i64);
+    let lhs = if convert_type(env, proof_ctx, &a_ty, &b_ty) {
+        weaken(&a_bar[j], j as i64)
+    } else {
+        let prefix = (0..j).rev().fold(None, |tail: Option<Term>, k| {
+            Some(match tail {
+                Some(rest) => Term::sigma(a_tpl[k].clone(), rest),
+                None => a_tpl[k].clone(),
+            })
+        })?;
+        let prefix = weaken(&prefix, j as i64);
+        let a_values = a_bar[..j]
+            .iter()
+            .map(|x| weaken(x, j as i64))
+            .collect::<Vec<_>>();
+        let b_values = b_bar[..j]
+            .iter()
+            .map(|x| weaken(x, j as i64))
+            .collect::<Vec<_>>();
+        let (left, right) = if j == 1 {
+            (telescope_tuple(&a_values), telescope_tuple(&b_values))
+        } else {
+            (
+                Term::Ascript(
+                    Box::new(telescope_tuple(&a_values)),
+                    Box::new(prefix.clone()),
+                ),
+                Term::Ascript(
+                    Box::new(telescope_tuple(&b_values)),
+                    Box::new(prefix.clone()),
+                ),
+            )
+        };
+        let prefix_eq = Term::Eq(
+            Box::new(prefix.clone()),
+            Box::new(left.clone()),
+            Box::new(right),
+        );
+        let earlier = (0..j).map(|k| Term::var(j - 1 - k)).collect::<Vec<_>>();
+        let evidence = Term::Ascript(
+            Box::new(if j == 1 {
+                earlier[0].clone()
+            } else {
+                telescope_tuple(&earlier)
+            }),
+            Box::new(prefix_eq),
+        );
+        // Shift the outer context past the j constructor positions and the
+        // j+2 proof/motive binders; substitute projected tuple components for
+        // those constructor positions. The second motive binder is ignored.
+        let at_y = (0..j)
+            .map(|k| telescope_projection(&Term::var(1), k, j))
+            .collect::<Vec<_>>();
+        let family_at_y = subst_tel(&shift(&a_tpl[j], j as i64 + 2, j), &at_y);
+        let witness = type_eq_by_j(
+            env,
+            proof_ctx,
+            &prefix,
+            &left,
+            &a_ty,
+            &b_ty,
+            family_at_y,
+            evidence,
+        )?;
+        Term::Cast(
+            Box::new(a_ty),
+            Box::new(b_ty.clone()),
+            Box::new(witness),
+            Box::new(weaken(&a_bar[j], j as i64)),
+        )
+    };
+    let conjunct = Term::Eq(
+        Box::new(b_ty),
+        Box::new(lhs),
+        Box::new(weaken(&b_bar[j], j as i64)),
+    );
+    if j + 1 == a_tpl.len() {
+        Some(conjunct)
+    } else {
+        let mut next_ctx = proof_ctx.clone();
+        next_ctx.push(conjunct.clone());
+        Some(Term::sigma(
+            conjunct,
+            inductive_conjuncts(env, &next_ctx, a_tpl, b_tpl, a_bar, b_bar, j + 1)?,
+        ))
+    }
+}
+
 /// `Eq (D Δp ī) (c_k ā) (c_l b̄)` — equality at an inductive family (`16 §2.2`).
 /// Same constructor ⇒ the conjunction of argument-equalities, with later
 /// arguments transported along earlier-argument equalities (the dependent
@@ -298,9 +505,12 @@ fn eq_at_inductive(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term
     let n = c.args.len();
     let a_param_args = &a_ctor_args[..m];
     let b_param_args = &b_ctor_args[..m];
-    // Right-nested Σ (conjunction), `Top` the unit. A nullary ctor ⇒ `Top`.
-    let mut acc = top_term(env);
-    for j in (0..n).rev() {
+    if n == 0 {
+        return Some(top_term(env));
+    }
+    let mut a_tpl = Vec::with_capacity(n);
+    let mut b_tpl = Vec::with_capacity(n);
+    for j in 0..n {
         // `A_j` with the `m` params substituted; the `j` earlier-arg binders
         // (de Bruijn 0..j-1) remain. Instantiate them with the actual earlier
         // args — `a_bar[..j]` for the source, `b_bar[..j]` for the target — via
@@ -318,51 +528,10 @@ fn eq_at_inductive(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term
             &ind2.level_params,
             &a_level_args,
         );
-        let a_ty_j = subst_tel(&a_ty_tpl, &a_bar[..j]);
-        let b_ty_j = subst_tel(&b_ty_tpl, &b_bar[..j]);
-        // Dependent telescope: when a_ty_j ≡ b_ty_j, compare directly
-        // (non-dep position). When they differ, transport a_j to b_ty_j via
-        // cast — cast ignores its proof (§3.4), so refl(b_ty_j) is a valid
-        // Ω witness even though it has type Eq Type b_ty_j b_ty_j.
-        let lhs = if convert_type(env, ctx, &a_ty_j, &b_ty_j) {
-            a_bar[j].clone()
-        } else {
-            Term::Cast(
-                Box::new(a_ty_j),
-                Box::new(b_ty_j.clone()),
-                Box::new(Term::Refl(Box::new(b_ty_j.clone()))),
-                Box::new(a_bar[j].clone()),
-            )
-        };
-        let conjunct = Term::Eq(
-            Box::new(b_ty_j.clone()),
-            Box::new(lhs),
-            Box::new(b_bar[j].clone()),
-        );
-        // `conjunct` and the accumulated suffix `acc` are both built in the
-        // caller's `ctx`. Making `acc` the CODOMAIN of this Σ extends that
-        // context by one binder — the proof of `conjunct` — so every free
-        // caller-context index in `acc` must move by one. This is the same
-        // binder rule `eq_at_sigma` applies to its second conjunct
-        // (`weaken(&second, 1)`); omitting it lets the next proof binder
-        // capture a later field's outer references (visible only on a
-        // ≥2-field constructor with open endpoints under a trailing binder).
-        acc = Term::sigma(conjunct, weaken(&acc, 1));
+        a_tpl.push(a_ty_tpl);
+        b_tpl.push(b_ty_tpl);
     }
-    Some(strip_trailing_top(acc))
-}
-
-/// Peel the trailing `Top` (conjunction unit): a single argument yields its
-/// lone `Eq` conjunct; multiple yield the right-nested `Σ` ending in the last;
-/// a nullary constructor yields `Top`.
-fn strip_trailing_top(t: Term) -> Term {
-    match t {
-        Term::Sigma(first, rest) => match *rest {
-            Term::Const { .. } => *first,
-            other => Term::sigma(*first, strip_trailing_top(other)),
-        },
-        other => other,
-    }
+    inductive_conjuncts(env, ctx, &a_tpl, &b_tpl, a_bar, b_bar, 0)
 }
 
 // ===========================================================================
@@ -701,7 +870,8 @@ pub fn j_reduce(
         // J-β (`15 §4.2`): J A a P d a (refl a) ≡ d.
         return Some(base.clone());
     }
-    j_nonrefl(env, ctx, motive, base, &eq_w)
+    // Preserve the checked Eq ascription: whnf may erase its formation.
+    j_nonrefl(env, ctx, motive, base, eq)
 }
 
 /// `J` on a non-`refl` equality (`15 §4.3`): `J ≡ cast (P a (refl a)) (P b e)
@@ -716,23 +886,67 @@ fn j_nonrefl(
     base: &Term,
     eq: &Term,
 ) -> Option<Term> {
-    let eq_ty = crate::check::infer(env, ctx, eq).ok()?;
-    let (_a_type, a_idx, b_idx) = match whnf(env, ctx, &eq_ty) {
-        Term::Eq(a_t, x, y) => ((*a_t).clone(), (*x).clone(), (*y).clone()),
-        _ => return None,
-    };
+    let (a_type, a_idx, b_idx) = crate::check::j_endpoints(env, ctx, eq).ok()?;
     let p_a_refl = apply_args(
         motive.clone(),
         &[a_idx.clone(), Term::Refl(Box::new(a_idx.clone()))],
     );
     let p_b_e = apply_args(motive.clone(), &[b_idx.clone(), eq.clone()]);
-    // J-cast fires for every non-refl e (§4.1). pair-eq is a typing witness
-    // only, never inspected by cast (§3.4).
-    let pair_eq = Term::Refl(Box::new(p_a_refl.clone()));
+    // The singleton's equality e transports the motive's output type from
+    // (a, refl a) to (b, e); the cast ignores the proof after typing it.
+    let motive_at_y = apply_args(weaken(motive, 2), &[Term::var(1), Term::var(0)]);
+    let pair_eq = type_eq_by_j(
+        env,
+        ctx,
+        &a_type,
+        &a_idx,
+        &p_a_refl,
+        &p_b_e,
+        motive_at_y,
+        Term::Ascript(
+            Box::new(eq.clone()),
+            Box::new(Term::Eq(
+                Box::new(a_type.clone()),
+                Box::new(a_idx.clone()),
+                Box::new(b_idx),
+            )),
+        ),
+    )?;
     Some(Term::Cast(
         Box::new(p_a_refl),
         Box::new(p_b_e),
         Box::new(pair_eq),
         Box::new(base.clone()),
     ))
+}
+
+#[cfg(test)]
+mod witness_base_tests {
+    use super::*;
+    use crate::term::Level;
+
+    /// Guard-local control: a raw neutral proposition supplies no witness.
+    /// P0 keeps well-typed `Eq Type X X` neutral or Top, so this tests the
+    /// fallback branch directly, not its reach from a checked reduct.
+    #[test]
+    fn neutral_base_does_not_fabricate_a_type_equality_witness() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        ctx.push(Term::Omega(Level::zero()));
+        assert_eq!(canonical_type_eq_base(&env, &ctx, &Term::var(0)), None);
+        assert_eq!(
+            canonical_type_eq_base(&env, &ctx, &top_term(&env)),
+            Some(tt_term(&env))
+        );
+        let ty = Term::pi(Term::Type(Level::zero()), Term::Type(Level::zero()));
+        let base = Term::Eq(
+            Box::new(Term::Type(Level::zero().suc())),
+            Box::new(ty.clone()),
+            Box::new(ty.clone()),
+        );
+        assert_eq!(
+            canonical_type_eq_base(&env, &ctx, &base),
+            Some(Term::Refl(Box::new(ty)))
+        );
+    }
 }

@@ -9478,20 +9478,26 @@ fn infer_j(
     let (body_core, body_ty) = body_result?;
 
     let motive_lam = Term::lam(a_ty.clone(), Term::lam(eq_dom_ty.clone(), body_core));
-    let motive_ty = Term::pi(a_ty, Term::pi(eq_dom_ty, body_ty));
+    let motive_ty = Term::pi(a_ty.clone(), Term::pi(eq_dom_ty, body_ty));
     let motive_core = Term::Ascript(Box::new(motive_lam.clone()), Box::new(motive_ty));
 
     let base_expected_ty = Term::app(
         Term::app(motive_lam.clone(), a.clone()),
-        Term::Refl(Box::new(a)),
+        Term::Refl(Box::new(a.clone())),
     );
     let base_core = check(cx, base_expr, &base_expected_ty, span)?;
 
-    let result_ty = Term::app(Term::app(motive_lam, b), eq_core.clone());
+    let result_ty = Term::app(Term::app(motive_lam, b.clone()), eq_core.clone());
+    // Record the exact Eq formation the surface rule used. The kernel's J
+    // reader must not re-derive endpoints from an Eq head's later reduct.
+    let eq_recorded = Term::Ascript(
+        Box::new(eq_core),
+        Box::new(Term::Eq(Box::new(a_ty), Box::new(a), Box::new(b))),
+    );
     let term_j = Term::J(
         Box::new(motive_core),
         Box::new(base_core),
-        Box::new(eq_core),
+        Box::new(eq_recorded),
     );
 
     // Whole-result admission (`declare_def`, or standalone

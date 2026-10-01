@@ -57,11 +57,28 @@ fn j_elaborates_to_a_real_term_j_node() {
         )
         .expect("J on refl should elaborate and kernel-check");
     let id = ids[0];
-    let (_, body) = env.env.transparent_body(id).expect("theorem must be transparent");
+    let (_, body) = env
+        .env
+        .transparent_body(id)
+        .expect("theorem must be transparent");
+    // Durable invariant. MEASURED: each J in this checked surface theorem
+    // records an Eq head. CLAIMED: surface J emission preserves its chosen
+    // endpoints. GAP: this fixture does not cover the other J builders.
+    let mut pending = vec![&body];
+    let mut j_count = 0;
+    while let Some(node) = pending.pop() {
+        if let Term::J(_, _, evidence) = node {
+            j_count += 1;
+            assert!(
+                matches!(&**evidence, Term::Ascript(_, ty) if matches!(&**ty, Term::Eq(..))),
+                "a surface J must record the Eq formation used to infer it: {evidence:?}"
+            );
+        }
+        pending.extend(node.children());
+    }
     assert!(
-        mentions_j(&body),
-        "elaborated body must contain a real Term::J node, got {:?}",
-        body
+        j_count > 0,
+        "elaborated body must contain a real Term::J: {body:?}"
     );
 }
 
