@@ -23,8 +23,9 @@ corpus, not a single input.
 which has no SCT gate (SCT is K2c's net-new headline). Observational expected
 results re-use the locked reductions of `observational/seed-observational.md`.
 The expected results below are determined by the on-`main` spec (`16`/`17`/`18`)
-and the settled `(oracle)` size order (primitives neutral, `cast`-under-
-recursion conservatively `?` — pinned by spec-leader + Architect, `17 §4`); none
+and the settled `(oracle)` size order (primitives without a specified WHNF
+rule neutral, `cast`-under-recursion conservatively `?` — pinned by spec-leader
++ Architect, `17 §4`); none
 required reading the prototype to author. Citations to `17-conversion.md` are
 reconciled against spec-author's **landed** elaboration (`spec-author/work`
 `cd3b19d`): §3.2 whnf, §3.3 conv, §3.4 convSpine, §3.5 δ-unfold trigger, §3.6
@@ -367,6 +368,62 @@ conversion must consume the obs WHNF rules and decide.
 - expect: **convertible (true)** — quotient equality **is** the relation
 - why: `Eq (A/R) [a] [b]` whnf-reduces to `R a b`; conversion uses the reduct.
   Definitional, no setoid boilerplate. Open `a`,`b`,`R`.
+
+---
+
+## Registered primitive kernel-WHNF conversion (KERNEL-LEQ-INT-LITERAL-REDUCTION)
+
+These cases exercise `convert`/kernel WHNF directly, **not** the interpreter's
+runtime `prim_reduce` or `apply`. The two operations below are the specified
+kernel-WHNF `Op` exceptions (`17 §1`); registration alone leaves other Ops
+neutral. Both cases have **durable-invariant** promise class: an extension to
+unrelated registered operations must not change their verdicts.
+
+### conversion/leq-int-registered-literal-order (soundness)
+- spec: `16 §2.2`, `17 §1` (prim row), `18a §5.2.2(3)`
+- given: a kernel environment with registered `IntLit : Int`, registered
+  `leq_int : Int → Int → Bool`, and the two Bool constructors. Let
+  `L = IntLit(170141183460469231731687303715884105727)` (`2^127 - 1`) and
+  `H = IntLit(170141183460469231731687303715884105728)` (`2^127`). Query
+  kernel `whnf` and `convert(Bool, leq_int L H, True)`; reverse the operands
+  and query `convert(Bool, leq_int H L, True)` and
+  `convert(Bool, leq_int H L, False)`. In an open context `x : Int`, query
+  `whnf(leq_int x 0)` and `convert(Bool, leq_int x 0, True)`.
+- expect: `whnf(leq_int L H) = True` and the corresponding conversion is
+  **true**; `whnf(leq_int H L) = False`, conversion to `True` is **false**,
+  and conversion to `False` is **true**. The open `leq_int x 0` remains the
+  same neutral application under WHNF and does **not** convert to `True`.
+- why: the independent total-order verdicts straddle signed `i128`; a
+  truncating or reversed comparison fails at least one direction. The
+  false-side fence rejects an always-`True` reducer, and the open neutral
+  control rejects unguarded reduction. These are proof-relevant kernel
+  conversion queries; an interpreter value cannot make them pass.
+
+### conversion/string-to-list-char-checked-literal-view (soundness)
+- spec: `17 §1` (prim row), `37 §2.4`, `42 §1`
+- given: a kernel environment with checked `String` and `Char` carriers,
+  registered `string_to_list_char : String → List Char`, its installed
+  literal-view identity, and the `List Char` `Nil`/`Cons` constructors. Let
+  `s` be the admitted checked String literal `"A😀"` (scalars `U+0041` and
+  `U+1F600`), and let `xs = Cons Char (IntLit 65)
+  (Cons Char (IntLit 128512) (Nil Char))`. Query kernel `whnf` of the view
+  applied to `s` and `convert(List Char, string_to_list_char s, xs)`;
+  compare also with the otherwise identical list in **reversed** order.
+  Separately, use an open variable `z : String` and a closed **non-literal**
+  neutral `list_char_to_string (Nil Char)` (the registered inverse, which
+  has no kernel reduction rule) as view arguments. Compare the open view
+  with `xs` and the closed inverse-view with `Nil Char` at `List Char`.
+- expect: `whnf(string_to_list_char s) = xs` and conversion to `xs` is
+  **true**; conversion to the reversed list is **false**. For both
+  non-literal arguments WHNF preserves the neutral application. The open
+  view does **not** convert to `xs`; the closed inverse-view does **not**
+  convert to `Nil Char`.
+- why: `U+1F600` occupies four UTF-8 bytes but one `Char` scalar; the exact
+  constructor list pins scalar values and order, not a byte view. The open
+  and closed non-literal controls pin the checked-literal guard. In
+  particular, interpreter `apply` can evaluate the closed inverse-view to
+  `Nil Char`, whereas kernel conversion must keep that application neutral:
+  runtime value agreement alone cannot satisfy this case.
 
 ---
 

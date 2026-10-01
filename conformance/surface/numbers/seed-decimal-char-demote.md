@@ -448,14 +448,18 @@ lawful-classes-lane WP — see the deferred section.
 ### surface/numbers/char-extraction-computes-scalar-proof  (soundness, deferred)
 - spec: `18a §5.9.1(4)` (pin 2, runtime face), `18a §5.9` pin 2, `37 §2`
   (`String` is NFC UTF-8), `docs/program/wp/decimal-char-demote.md` (Char pin 2)
-- status: **RUNTIME FACE DEFERRED** — `char_at` doesn't exist and
-  `string_to_list_char` is a pre-existing `Neutral` stub (`eval.rs:870`); real
-  UTF-8 `String → Char` extraction is a **new feature**, not a wire-up, out of
-  this demote's scope. **Safe to defer:** while the stub is stuck, **no `Char`
-  is ever constructed from a `String`** → no un-witnessed `Char` → **no hole**
-  (Architect-ruled). The **static face** (the requirement below + no-postulate)
-  stands now; the runtime face (extraction *computes* the `tt`) rides the
-  extraction-feature WP as a forward obligation (deferred section), gated then.
+- status: **RUNTIME FACE DEFERRED** — the registered
+  `string_to_list_char` operation is **not** an overall `Neutral` stub.
+  Saturated interpreter `apply` uses `build_list_char` with installed
+  `List Char` constructor identities to build the scalar view; the direct,
+  environment-free `prim_reduce` fallback returns `Neutral` because it lacks
+  those identities (`42 §1`). The separate checked-literal kernel-WHNF view
+  is specified at `17 §1`. None of these facts alone discharges this case's
+  **computed `isScalar` proof** obligation for the deferred `char_at` /
+  `String → Char` extraction runtime face. The **static face** (the
+  requirement below + no-postulate) stands now; the runtime face (extraction
+  *computes* the `tt`) remains a forward obligation of the extraction-feature
+  WP (deferred section), gated then.
 - given: `String → Char` extraction (`char_at` / `string_to_list_char`) on a
   valid `String`.
 - expect (producer-grep, structural): extraction constructs `(c, w)` where the
@@ -573,10 +577,13 @@ distinct future WP; flagged so none is silently dropped):
   quotient/setoid `Eq`), **not** a landed-floor structural proof. The demote
   here ships only the computational ops + primitive removal.
 - **pin-2 `String → Char` extraction computes-the-witness (runtime face) → the
-  extraction-feature WP.** `char_at`/`string_to_list_char` are unbuilt (a
-  `Neutral` stub — no `Char` from a `String` ⇒ no hole); when real UTF-8
-  extraction lands, verify it **reduces** the canonical `tt` scalar witness,
-  never postulates it.
+  extraction-feature WP.** The `string_to_list_char` scalar view already
+  computes through interpreter `apply` when `List Char` constructor identities
+  are installed; only direct `prim_reduce` remains `Neutral` (`42 §1`). That
+  value view does not by itself certify the deferred `char_at` / extraction
+  case's **computed `isScalar` witness**. When that runtime face is delivered,
+  verify it **reduces** the canonical `tt` scalar witness, never postulates
+  it.
 - **Unbounded-Δexp general Decimal `align` → the Int-recursion WP.** The demote
   ships a fixed-unrolled **exact-or-stuck** `align` (a general `10^|Δexp|`
   recursion over `Int` fails SCT — no structural descent on opaque `Int`); a
