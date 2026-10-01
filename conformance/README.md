@@ -182,8 +182,11 @@ claim with no conformance case is a claim no one can rely on
   extraction **computing** the scalar proof (runtime face deferred).
 - `surface/collections/seed-collections.md` — L3 strings & collections (`37`):
   `String` as a canonically encoded **NFC UTF-8 primitive**: byte-length ≠
-  char-length through live interpreter values; primitive-`Op` conversion and
-  `Refl` explicitly deferred to K3; **not** `List Char`;
+  char-length through live interpreter values; `byte_length`/`char_length`
+  and other unpromoted Ops remain opaque to kernel conversion, with their
+  `Refl` equations deferred to K3. Registered `leq_int` on two WHNF `IntLit`s
+  and checked-literal `string_to_list_char` are the two kernel-WHNF Op rules
+  (`../spec/10-kernel/17-conversion.md §1`); **not** `List Char`;
   `List`/`Option`/`Result` transparent
   inductive (L2) and `Array` abstract with durable kind `0x06` and extensional
   persistent behavior (the heap `Map`/`Set` `0x07`/`0x08`

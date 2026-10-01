@@ -201,13 +201,18 @@ Notes.
   run with δ **deferred** so heads can be compared before unfolding; δ fires
   only on the `conv` retry path of §3.5. This split is the whole point of "lazy
   δ" and is detailed in §3.5.
-- **Termination.** β/Σ-β/prim contract the term; ι follows the finite
-  structural measures of `14 §9` (including Π-bound and nested lifted
-  recursive content); and obs descends on the type (`16 §3.3`). `Let` is
-  non-recursive (a `let` binds a value, no self-reference). The `Const` branch
-  is the only source of term growth. SCT (§4) bounds recursive re-entry within
-  one admitted group's call graph; the finite §3.5 boundary separately stops
-  cyclic cross-identity symbolic retry — see §5.
+- **Termination.** β/Σ-β and the `leq_int` **prim** rule contract the term.
+  The checked-literal `string_to_list_char` **prim** rule is the one prim rule
+  that grows a term, and its growth is bounded: it replaces the view applied to
+  a checked `String` literal `l` by a constructor list with one `Cons` per scalar
+  of `l`, `IntLit` leaves, and no `Op` application, so it cannot fire on its own
+  output (§5). ι follows the finite structural measures of `14 §9` (including
+  Π-bound and nested lifted recursive content); and obs descends on the type
+  (`16 §3.3`). `Let` is non-recursive (a `let` binds a value, no
+  self-reference). Apart from that bounded view step, the `Const` branch is the
+  only source of term growth. SCT (§4) bounds recursive re-entry within one
+  admitted group's call graph; the finite §3.5 boundary separately stops cyclic
+  cross-identity symbolic retry — see §5.
 
 ### 3.3 `conv` — type-directed conversion
 
@@ -698,14 +703,21 @@ semi-decision procedure. The argument has three obligations that meet at the
 
 1. **The core reductions are strongly normalizing.** β/Σ-β/ι/η/prim and the
    observational `Eq`/`cast` reductions terminate on well-typed terms:
-   β/Σ-β/η/prim strictly contract the term; ι follows the finite structural
-   measures for direct, Π-bound, and nested lifted recursive content
-   (`14 §9.2`, `§9.4`, `§9.5`); and the `Eq`/`cast` mutual recursion descends on
-   the *type* being traversed, which is a finite tree (`16 §3.3`). None of these
-   can diverge.
+   β/Σ-β/η strictly contract the term; the two **prim** rules are first-order
+   rewrite rules on literals whose right-hand sides contain no `Op`
+   application — `leq_int` contracts to a constructor, and the checked-literal
+   `string_to_list_char` view expands to a finite constructor list fixed by its
+   literal — so the prim rule set terminates on its own, and adding a
+   terminating first-order algebraic rule set to a strongly normalizing typed
+   calculus preserves strong normalization (Breazu-Tannen & Gallier 1989;
+   Jouannaud & Okada 1991); ι follows the finite structural measures for
+   direct, Π-bound, and nested lifted recursive content (`14 §9.2`, `§9.4`,
+   `§9.5`); and the `Eq`/`cast` mutual recursion descends on the *type* being
+   traversed, which is a finite tree (`16 §3.3`). None of these can diverge.
 
-2. **Recursive re-entry within one admitted group is SCT-bounded.** The single
-   branch of §3.2 that can grow a term is `Const(c)` unfolding. Every
+2. **Recursive re-entry within one admitted group is SCT-bounded.** Apart from
+   the bounded checked-literal view of (1), the single branch of §3.2 that can
+   grow a term is `Const(c)` unfolding. Every
    transparent recursive group in `env` passed the **SCT gate (§4)** at
    admission, so a call sequence that re-enters that group follows call-graph
    paths on which some parameter strictly decreases in the well-founded

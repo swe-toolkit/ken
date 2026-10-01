@@ -69,14 +69,16 @@ at each target; no dangling forward-ref.
 
 **Three staging facts that gate how a case is tagged (verified against the code,
 not the frame):**
-- **Primitive `Op` evaluation is runtime-only today.** `byte_length` and
-  `char_length` are registered as `PrimReduction::Op` and have live
-  interpreter value behavior, but `ken-kernel::conv::whnf` has no
-  primitive-`Op` reduction arm. Therefore the byte/char **value discriminator is
-  LIVE** through the interpreter, while any claim that the same equations close
-  definitionally or by `Refl` is **DEFERRED/RED-UNTIL-K3**, conditional on K3
-  actually registering those operations for conversion. Runtime evaluation is
-  not evidence of kernel conversion.
+- **The String length Ops evaluate only at runtime.** `byte_length` and
+  `char_length` are registered as `PrimReduction::Op` with live interpreter
+  value behavior but stay neutral in kernel WHNF even on literal operands.
+  Registered `leq_int` on two WHNF `IntLit`s and checked-literal
+  `string_to_list_char` are the two kernel-WHNF Op exceptions (`17 §1`);
+  neither promotes either length operation. Therefore the byte/char **value
+  discriminator is LIVE** through the interpreter, while any claim that those
+  length equations close definitionally or by `Refl` remains
+  **DEFERRED/RED-UNTIL-K3** pending separate kernel rules. Other Ops stay
+  runtime-only/K3-deferred; runtime evaluation does not imply conversion.
 - **NFC normalization is currently STUBBED** (landed runtime inspection:
   strings are encoded as-is). The spec pins NFC-aware equality as **normative**
   (`37 §2.1`), but the canonically-equivalent-string behavior **depends on real
