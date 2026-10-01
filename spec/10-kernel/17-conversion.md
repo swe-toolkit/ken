@@ -201,18 +201,20 @@ Notes.
   run with δ **deferred** so heads can be compared before unfolding; δ fires
   only on the `conv` retry path of §3.5. This split is the whole point of "lazy
   δ" and is detailed in §3.5.
-- **Termination.** β/Σ-β and the `leq_int` **prim** rule contract the term.
-  The checked-literal `string_to_list_char` **prim** rule is the one prim rule
-  that grows a term, and its growth is bounded: it replaces the view applied to
-  a checked `String` literal `l` by a constructor list with one `Cons` per scalar
-  of `l`, `IntLit` leaves, and no `Op` application, so it cannot fire on its own
-  output (§5). ι follows the finite structural measures of `14 §9` (including
-  Π-bound and nested lifted recursive content); and obs descends on the type
+- **Termination.** Termination is not a term-size argument: β/Σ-β
+  substitution can duplicate its argument, and the checked-literal
+  `string_to_list_char` view replaces a literal by a list with one `Cons` per
+  scalar. The core reductions — β/Σ-β, ι, η, the two **prim** rules, and obs
+  — are strongly normalizing on well-typed terms (§5, obligation 1). The two
+  prim rules are first-order rewrite rules on literals whose right-hand sides
+  contain no `Op` application, so neither can fire on its own output. ι
+  follows the finite structural measures of `14 §9` (including Π-bound and
+  nested lifted recursive content); and obs descends on the type
   (`16 §3.3`). `Let` is non-recursive (a `let` binds a value, no
-  self-reference). Apart from that bounded view step, the `Const` branch is the
-  only source of term growth. SCT (§4) bounds recursive re-entry within one
-  admitted group's call graph; the finite §3.5 boundary separately stops cyclic
-  cross-identity symbolic retry — see §5.
+  self-reference). The `Const` branch (δ) is the one reduction outside that
+  strongly normalizing core. SCT (§4) bounds recursive re-entry within one
+  admitted group's call graph; the finite §3.5 boundary separately stops
+  cyclic cross-identity symbolic retry — see §5.
 
 ### 3.3 `conv` — type-directed conversion
 
@@ -335,8 +337,9 @@ synthesising coherence/transport terms (`16 §1.2`).
 
 ### 3.5 The δ-unfold trigger (lazy discipline)
 
-δ is the only reduction that can *grow* a term, so the algorithm unfolds a
-transparent definition as little as possible. Two `whnf` modes realise this:
+δ is the one reduction outside the strongly normalizing core (§5), and each
+unfolding can replace a short head by a large body, so the algorithm unfolds
+a transparent definition as little as possible. Two `whnf` modes realise this:
 
 - **`whnf_deferδ`** — weak-head-normalize but treat every transparent `Const(c)`
   at the head as **neutral** (do not unfold). Used by `conv` step (5) so the two
@@ -702,23 +705,28 @@ semi-decision procedure. The argument has three obligations that meet at the
 `whnf`/`conv` boundary of §3.2–§3.5:
 
 1. **The core reductions are strongly normalizing.** β/Σ-β/ι/η/prim and the
-   observational `Eq`/`cast` reductions terminate on well-typed terms:
-   β/Σ-β/η strictly contract the term; the two **prim** rules are first-order
-   rewrite rules on literals whose right-hand sides contain no `Op`
-   application — `leq_int` contracts to a constructor, and the checked-literal
-   `string_to_list_char` view expands to a finite constructor list fixed by its
-   literal — so the prim rule set terminates on its own, and adding a
-   terminating first-order algebraic rule set to a strongly normalizing typed
-   calculus preserves strong normalization (Breazu-Tannen & Gallier 1989;
-   Jouannaud & Okada 1991); ι follows the finite structural measures for
-   direct, Π-bound, and nested lifted recursive content (`14 §9.2`, `§9.4`,
-   `§9.5`); and the `Eq`/`cast` mutual recursion descends on the *type* being
-   traversed, which is a finite tree (`16 §3.3`). None of these can diverge.
+   observational `Eq`/`cast` reductions terminate on well-typed terms. The
+   argument is not by term size, since β-substitution can duplicate its
+   argument. Strong normalization of the β/Σ-β/ι/η/obs core is the standard
+   metatheorem for observational type theory with inductives (`TTobs`,
+   Pujet & Tabareau 2022; ADR 0005), which Ken follows; `18 §6` records its
+   status as argued, not mechanized. Within it, ι follows the finite
+   structural measures for direct, Π-bound, and nested lifted recursive
+   content (`14 §9.2`, `§9.4`, `§9.5`), and the `Eq`/`cast` mutual recursion
+   descends on the *type* being traversed, which is a finite tree
+   (`16 §3.3`). The two **prim** rules are first-order rewrite rules on
+   literals whose right-hand sides contain no `Op` application — `leq_int`
+   rewrites to a constructor, and the checked-literal `string_to_list_char`
+   view expands to a finite constructor list fixed by its literal — so the
+   prim rule set terminates on its own, and adding a terminating first-order
+   algebraic rule set to a strongly normalizing typed calculus preserves
+   strong normalization (Breazu-Tannen & Gallier 1989; Jouannaud & Okada
+   1991). None of these can diverge.
 
-2. **Recursive re-entry within one admitted group is SCT-bounded.** Apart from
-   the bounded checked-literal view of (1), the single branch of §3.2 that can
-   grow a term is `Const(c)` unfolding. Every
-   transparent recursive group in `env` passed the **SCT gate (§4)** at
+2. **Recursive re-entry within one admitted group is SCT-bounded.** The one
+   reduction of §3.2 outside the strongly normalizing core of (1) is
+   `Const(c)` unfolding (δ).
+   Every transparent recursive group in `env` passed the **SCT gate (§4)** at
    admission, so a call sequence that re-enters that group follows call-graph
    paths on which some parameter strictly decreases in the well-founded
    structural order. By the **size-change termination theorem** (Lee, Jones &
