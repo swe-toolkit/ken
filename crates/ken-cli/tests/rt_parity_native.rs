@@ -2705,12 +2705,13 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
         assert_eq!(read_availability.len(), 1);
         let census = &read_availability[0];
         // Promise class: transition sentinel. The checked read fixture's
-        // complete keys were recorded on 5d139f4 with the original interning
-        // frame construction; the factored construction produced byte-identical
-        // keys, including all input availability drafts. Re-record this vector
-        // only when specialization identity intentionally changes.
+        // complete keys were re-recorded on 1d8267b5 after literal leq_int
+        // reduction. Specialization identity is unchanged up to origin numbering
+        // (Architect evt_531qbtbnf8y1d); the vector includes availability
+        // drafts. Re-record only when specialization identity intentionally
+        // changes or another lawful upstream normalization shifts origins.
         assert_eq!(census.interned_keys.join("\n"),
-            include_str!("rt_per_emitter_read_keys.5d139f4.txt"));
+            include_str!("rt_per_emitter_read_keys.1d8267b5.txt"));
         assert_eq!(census.materializations.len(), 7);
         assert_eq!(census.unclassified.len(), 6);
         let points_by_specialization = census.materializations.iter()

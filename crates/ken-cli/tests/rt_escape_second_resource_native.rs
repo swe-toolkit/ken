@@ -780,11 +780,13 @@ fn buffer_freeze_outcome(
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
 /// Promise class: transition sentinel. The fixture's planner-issued origins
-/// are rechecked if its compiler shape changes. MEASURED: owner 1298's exact
-/// planned returned-set contains a relay and opts the whole owner out.
-/// CLAIMED: the pending-Vis protocol must never run partially on this owner.
+/// are rechecked if its compiler shape changes. MEASURED: exactly two
+/// error-free, relay-excluded protocols each have one returned relay without
+/// a successor and one non-relay member with a static successor.
+/// CLAIMED: the pending-Vis protocol must never run partially on either owner.
 /// THE GAP: emission is not installed yet; the ignored native row separately
 /// preserves today's exact -1 Ret-tag failure until the successor repairs K.
+/// Architect evt_1jnjtntg7wej: the shape-match count, not owner order, is the gate.
 #[test]
 fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
     in_large_stack_thread("rt-escape-r2-protocol-exclusion", || {
@@ -798,18 +800,33 @@ fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
         });
         let _output = compiled.expect("r2 compiles to the current fail-closed artifact");
         let protocols = diagnostics.iter().flat_map(|plan| &plan.returned_vis_protocols)
-            .filter(|protocol| protocol.owner_origin == 1298).collect::<Vec<_>>();
-        assert_eq!(protocols.len(), 1, "one r2 response owner exists");
-        let protocol = protocols[0];
-        assert!(protocol.error.is_none(), "r2 return analysis refused: {:?}", protocol.error);
-        assert!(protocol.excluded_by_relay, "r2 cannot take the partial pending-Vis route");
-        eprintln!("RT-OWNER-VIS EXCLUDED R2 {protocol:?}");
-        let members = protocol.contexts.iter().flat_map(|(_, members)| members)
+            .filter(|protocol| {
+                if !protocol.excluded_by_relay || protocol.error.is_some() {
+                    return false;
+                }
+                let members = protocol.contexts.iter().flat_map(|(_, members)| members)
+                    .collect::<Vec<_>>();
+                members.len() == 2
+                    && members.iter().filter(|member| member.relay
+                        && member.successor_id.is_none()).count() == 1
+                    && members.iter().filter(|member| !member.relay
+                        && member.successor_id.is_some()).count() == 1
+            }).collect::<Vec<_>>();
+        assert_eq!(protocols.len(), 2, "exactly two relay-excluded response owners have the r2 shape");
+        let mut owners = protocols.iter().map(|protocol| protocol.owner_origin)
             .collect::<Vec<_>>();
-        assert!(members.iter().any(|member| member.origin == 577 && member.relay
-            && member.successor_id.is_none()), "r2's live returned relay has no K value");
-        assert!(members.iter().any(|member| member.origin == 746 && !member.relay
-            && member.successor_id.is_some()), "r2 still has an independent static successor");
+        owners.sort_unstable();
+        eprintln!("RT-OWNER-VIS EXCLUDED R2 owners={owners:?}");
+        for protocol in protocols {
+            assert!(protocol.error.is_none(), "r2 return analysis refused: {:?}", protocol.error);
+            assert!(protocol.excluded_by_relay, "r2 cannot take the partial pending-Vis route");
+            let members = protocol.contexts.iter().flat_map(|(_, members)| members)
+                .collect::<Vec<_>>();
+            assert!(members.iter().any(|member| member.relay
+                && member.successor_id.is_none()), "r2's live returned relay has no K value");
+            assert!(members.iter().any(|member| !member.relay
+                && member.successor_id.is_some()), "r2 still has an independent static successor");
+        }
     });
 }
 
