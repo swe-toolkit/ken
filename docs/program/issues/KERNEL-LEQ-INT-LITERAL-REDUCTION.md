@@ -117,6 +117,21 @@ stop and report the mismatch.
       from the kernel rule. The AC-L "no kernel backstop" text stays,
       explicitly scoped to the runtime face.
 
+- Two runtime pins move with the arm (Architect `evt_531qbtbnf8y1d`). The
+  arm reduces always-true window guards in the prelude, so the dead branches
+  go and planner origins renumber, monotonically. Every protocol's shape and
+  every transparent declaration are unchanged.
+  - `crates/ken-cli/tests/rt_parity_native.rs` `:2712` sentinel: re-record
+    `rt_per_emitter_read_keys` from the candidate. The new recording's note
+    says identity is unchanged up to origin numbering and cites
+    `evt_531qbtbnf8y1d`. Only the `include_str!` line, its note and the
+    recording file change.
+  - `crates/ken-cli/tests/rt_escape_second_resource_native.rs` `:783-802`:
+    select the owner by its shape rather than the literal `1298`. That shape
+    is the relay-excluded protocol with exactly one relay member without a
+    successor and one non-relay member with a successor. Assert exactly one
+    such protocol. The `:817` ignored row is untouched.
+
 ## Acceptance
 
 - **AC-1.**
