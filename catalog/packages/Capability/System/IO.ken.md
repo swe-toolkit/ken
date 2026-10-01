@@ -288,25 +288,22 @@ proof all_success for write_all_all_success
   }
 ```
 
-Fuel sufficiency requires the response premise. Without it, a count with
-remaining budget greater than `rest` can reach the fuel-zero success case
-while bytes remain. The attempted premise-free statement is rejected; adding
-the premise lets the same conclusion check through the proved theorem.
+Fuel sufficiency requires the response premise. For budget one, fuel one,
+slack zero, count predecessor zero, and count remaining two, the premise is
+false (`1 + 2 ≠ 1`), the request reaches fuel zero with bytes left, and S2's
+conclusion demands `2 = 0`. The closed false equation is rejected by `Proved`;
+changing only remaining to zero makes the same terminal check. The generic
+true twin below uses the premise-bearing theorem itself.
 
 ```ken reject
-theorem write_all_reject_premise_free_fuel
-      (span : BufferSpan)
-      (count : TransferCount)
-      (rest : Nat)
-      (slack : Nat)
-      (fuel : Equal Nat (add (buffer_span_budget span) slack) (Suc rest))
-    : Equal Nat
-        (add (transfer_count_remaining count) (add slack (transfer_count_predecessor count)))
-        rest =
+theorem write_all_reject_premise_free_fuel_at_exhaustion
+    : Equal Nat (add (Suc (Suc Zero)) (add Zero Zero)) Zero =
   Proved
 ```
 
 ```ken example
+theorem write_all_example_zero_remaining : Equal Nat (add Zero (add Zero Zero)) Zero = Proved
+
 theorem write_all_example_fuel_with_premise
       (span : BufferSpan)
       (count : TransferCount)
