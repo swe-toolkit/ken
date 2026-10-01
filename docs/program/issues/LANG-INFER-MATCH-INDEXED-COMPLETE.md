@@ -149,8 +149,9 @@ that cannot be lowered each either check or give a surface diagnostic.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 4 (Architect `evt_2t2kabhh5rhgn`, `evt_1rhn5vnrq8egf`; research
-`evt_4m927ydg0rd7z`).
+§1a count: 5 (Architect `evt_2t2kabhh5rhgn`, `evt_1rhn5vnrq8egf`,
+`evt_7adqqrt4k6ye9`; research `evt_4m927ydg0rd7z`). The 6th stop triggers
+research and the §1b predicate check.
 
 1. The nested matrix split builds `Elim` with the indices inside `params`
    and `indices: []` (keyed on the construction site instead of the
@@ -165,6 +166,11 @@ that cannot be lowered each either check or give a surface diagnostic.
    a constructor row binds its fields) was expressed as the column-level
    `surface_binder`, which the all-flat push requires to be uniform (keyed
    on the column instead of the row).
+5. A source variable bound at a split column has no `cx.ctx` binder, so
+   positional resolution has nothing to return (keyed on resolving a name by
+   context position when its value is a matrix occurrence). Ruled: it is an
+   as-pattern over the row's constructor and resolves through the alias
+   frame (`evt_7adqqrt4k6ye9`).
 
 Entries 1-3 shared predicate: the nested split hand-assembles a piece of an
 eliminator that the kernel re-derives from that eliminator's own inputs. Closed by
