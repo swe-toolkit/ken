@@ -89,14 +89,32 @@ reconstructed from term geometry.
   record, never from a frame. Each capture comes from the claims
   `RT-PLANNER-PER-EMITTER-AVAILABILITY` finalizes under the emitting owner
   (`evt_3yp3tea99hfta`).
-- **Transport** (rule 4, `evt_1myz2wkf66w8a`, capture source as corrected in
-  `evt_3yp3tea99hfta`). A checked-IH transport whose destination is the
-  field `(P, f)` of a disposition `(P, f, S)`, with S its source
-  specialization, is a materialization point. The residual is built there:
-  child `claimed.answer.value`, W and C from the destination owner's
-  finalized claims, and the label as at a construct emission. The child's own
-  construction (Ret721) is never wrapped, and no gate inspects the child's
-  constructor.
+- **Transport** (rule 4, `evt_1myz2wkf66w8a`; capture source revised in
+  `evt_64jeybga2y9fy`, which withdraws that part of `evt_3yp3tea99hfta`). A
+  checked-IH transport whose destination is the field `(P, f)` of a
+  disposition `(P, f, S)`, with S its source specialization, is a
+  materialization point. The residual is built there, in the
+  `CheckedIhApplicationResult` lowering: child `claimed.answer.value`, and
+  the label as at a construct emission. W and C come from the transport, not
+  the destination owner's frame:
+  - W_j is field j of `transport.source_record()`, after the record's
+    `Constructor` shape and declared-children count check;
+  - C_k is `transport.continuation_input_index(k, coordinate_k)`.
+
+  Reuse the emitted `captures` operands and the morphism-read inputs; do not
+  re-derive them. The census gains `FinalizedTransport(TransportCarriedClaim)`
+  for transport-destination points; construct-emission points keep the frame
+  path. The child's own construction (Ret721) is never wrapped, and no gate
+  inspects the child's constructor.
+  - **D0 before building** (`evt_64jeybga2y9fy`): at Vis735 S1→S2, W0-W7 are
+    `WorkerRecordField` on a record with 8 declared children, and C0-C5 are
+    `ContinuationInput` with their destinations; census totals move only at
+    transport-destination points; every transport destination in the read
+    and write fixtures is a `CheckedIhApplicationResult` site. Any miss:
+    stop.
+  - **Mutation.** Swapping two `WorkerRecordField` ordinals at Vis735
+    reddens at the residual, or the existing `PermuteCaptures` control
+    covers it.
 - **Gate.** The candidate set is the specializations whose key names this
   eliminator, constructor and position, sorted by
   `ContinuationSpecializationId`. A set of size 1 behaves as today. A larger
@@ -164,8 +182,9 @@ reconstructed from term geometry.
 
 ## Stop conditions
 
-- A W or C capture with no finalized claim under its emitting owner: stop
-  with that capture and owner named, for the Architect to rule.
+- A W or C capture with no finalized claim (frame or transport) at its
+  materialization point: stop with that capture and owner named, for the
+  Architect to rule.
 - A suffix operand not in hand where the residual is materialized: the
   def-use rows name the carriage path, and the Architect sizes it. Do not
   add a second carriage mechanism.
