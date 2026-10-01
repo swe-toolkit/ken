@@ -675,6 +675,7 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
             "list_append::assoc",
             "list_append::right_unit",
             "map",
+            "map::append",
             "nth",
             "nth::some_below_length"
         ])

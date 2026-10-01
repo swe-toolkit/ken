@@ -671,24 +671,6 @@ theorem list_ap_pure_left
     : Equal (List b) (list_ap a b (list_pure (a → b) g) xs) (DC.map a b g xs) =
   proof right_unit for list_append b (DC.map a b g xs)
 
-theorem list_map_append_distrib
-      (a : Type) (b : Type) (g : a → b) (xs : List a) (ys : List a)
-    : Equal
-        (List b)
-        (DC.map a b g (list_append a xs ys))
-        (list_append b (DC.map a b g xs) (DC.map a b g ys)) =
-  match xs {
-    Nil ↦ Refl;
-    Cons h t ↦
-      cong
-        (List b)
-        (List b)
-        (DC.map a b g (list_append a t ys))
-        (list_append b (DC.map a b g t) (DC.map a b g ys))
-        (Cons b (g h))
-        (list_map_append_distrib a b g t ys)
-  }
-
 fn compose_f_g (a : Type) (b : Type) (c : Type) (f : b → List c) (g : a → b) (x : a) : List c =
   f (g x)
 
@@ -727,7 +709,7 @@ theorem list_map_concat_map_fusion
         (DC.map b c g (list_append b (f h) (concat_map a b f t)))
         (list_append c (DC.map b c g (f h)) (DC.map b c g (concat_map a b f t)))
         (list_append c (map_after a b c g f h) (concat_map a c (map_after a b c g f) t))
-        (list_map_append_distrib b c g (f h) (concat_map a b f t))
+        ((proof append for DC.map) b c g (f h) (concat_map a b f t))
         (cong
           (List c)
           (List c)
@@ -771,8 +753,7 @@ lift through the outer `ap` via `cong`, fuse via `concat_map_map_fusion`),
 the MIDDLE (`list_bind::assoc` for the outer `concat_map`-after-`concat_map`,
 `concat_map_map_fusion` again for the inner one), and the END (an inductive
 reconciliation of the two remaining `concat_map`/`DC.map` orderings,
-needing `DC.map::fusion` plus
-`list_map_append_distrib`):
+needing `DC.map::fusion` plus Derived's `DC.map::append`):
 
 ```ken
 fn ap_map_v (a : Type) (b : Type) (c : Type) (v : List (a → b)) (g1 : b → c) : List (a → c) =
@@ -885,7 +866,7 @@ theorem pf_probe
             c
             (DC.map b c g1 (DC.map a b h0 w))
             (DC.map b c g1 (concat_map (a → b) b (λh1. DC.map a b h1 w) t)))
-          (list_map_append_distrib
+          ((proof append for DC.map)
             b
             c
             g1
@@ -1170,7 +1151,7 @@ reconciliation (`§2.3`) tried to state the fact as `sym(trans(...))`,
 composing already-proved fusion lemmas algebraically rather than
 inducting directly. It failed twice, both times with a genuine bug (a
 `sym` argument-direction mistake, and — more fundamentally — a missing
-`list_map_append_distrib` step that the algebraic framing quietly assumed
+Derived `DC.map::append` step that the algebraic framing quietly assumed
 away). Direct induction on the same carrier, following the SAME shape as
 every other proof in this entry, surfaced both mistakes immediately via
 the kernel's own error messages and was the reliable fix. The general

@@ -155,9 +155,10 @@ adds a wrapper or a new trust assumption. The two attached `nth` laws connect
 successful lookup and out-of-bounds lookup to the structural `length` fold in
 both directions.
 
-The `map::id` and `map::fusion` proofs use structural induction and `cong` to
-lift the tail equation under `Cons`. They cite `idf` and `comp` from
-`Core.Function.Combinators` and live beside the operation they justify.
+The `map::id`, `map::fusion`, and `map::append` proofs use structural
+induction and `cong` to lift the tail equation under `Cons`. The first two
+cite `idf` and `comp` from `Core.Function.Combinators`; all three live beside
+the operation they justify.
 
 Migrated here per the attached-proof ownership rule — an attached proof
 `f::law` belongs to the module that defines `f` — the three `list_append`
@@ -197,6 +198,24 @@ pub proof fusion for map
         (map b c g (map a b h rest))
         (Cons c (g (h x)))
         ((proof fusion for map) a b c g h rest)
+  }
+
+pub proof append for map
+      (a : Type) (b : Type) (f : a → b) (xs : List a) (ys : List a)
+    : Equal
+        (List b)
+        (map a b f (list_append a xs ys))
+        (list_append b (map a b f xs) (map a b f ys)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons head tail ↦
+      cong
+        (List b)
+        (List b)
+        (map a b f (list_append a tail ys))
+        (list_append b (map a b f tail) (map a b f ys))
+        (Cons b (f head))
+        ((proof append for map) a b f tail ys)
   }
 
 pub fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
@@ -2565,8 +2584,9 @@ reference implementation.
 2. **Public API.** Operations: `bytes_nat_length`, `concat_map`, `count`,
    `eq_from_ord`, `filter`, `length`, `list_append`, `map`, `nth`, `reverse`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
-   `list_append::right_unit`, `list_append::length`, `map::fusion`, `map::id`,
-   `nth::at_or_beyond_is_none`, `nth::some_below_length`,
+   `list_append::right_unit`, `list_append::length`, `map::append`,
+   `map::fusion`, `map::id`, `nth::at_or_beyond_is_none`,
+   `nth::some_below_length`,
    `reverse::involutive`. All other definitions in this package are
    package-local; `cat_derived_pub_export.rs` is the authoritative inventory,
    and publishing another name is a separate change to both.
@@ -2597,10 +2617,10 @@ reference implementation.
    The generic sort proofs consume an explicit totality premise only for
    sortedness; they neither add an axiom nor invoke the inherited `Ord Int`
    assumptions.
-6. **Proof families.** `map::id` and `map::fusion` induct over `List`,
-   lifting the tail proof under `Cons` with `cong`; `§4.1`/`§4.2` also use
-   structural induction + `cong`/`trans` under the head constructor. Private
-   `mem_filter` and `mem_filter_sound` split named predicate/comparator
+6. **Proof families.** `map::id`, `map::fusion`, and `map::append` induct
+   over `List`, lifting the tail proof under `Cons` with `cong`. `§4.1`/`§4.2`
+   also use structural induction + `cong`/`trans` under the head constructor.
+   Private `mem_filter` and `mem_filter_sound` split named predicate/comparator
    outcomes and use `cong` over this module's `filter` branch, with
    compatibility needed only for the first law. `list_append::length` combines
    the list induction with the canonical `add` successor law; `length_drop`
@@ -2623,10 +2643,12 @@ reference implementation.
 7. **Consumers.** `Application.CommandLine.ArgParse`,
    `Capability.Filesystem.Path.Posix`, `Data.Binary.BytesPrimitiveContracts`,
    `Data.Collections.NonEmpty`, and `Tooling.Testing.Property` import the
-   checked `map`; `Core.Classes.LawfulFunctors` uses `map` and both laws in
-   `Functor List`, and `Core.Classes.EffectfulClasses` cites them through a
-   qualified alias. The module's `map_length` and filter-membership laws use
-   its structural operations locally. `Application.Configuration.Decoder`
+   checked `map`; `Core.Classes.LawfulFunctors` uses `map` with its `id` and
+   `fusion` laws in `Functor List`. `Core.Classes.EffectfulClasses` cites
+   these and `map::append` through a qualified alias, while
+   `Capability.Parsing.Parsing` uses `map::append` for byte-code lists.
+   Derived's `map_length` and filter-membership laws use its structural
+   operations locally. `Application.Configuration.Decoder`
    imports this module wholesale. `catalog/packages/Data/Collections/Map.ken`
    (the proved `Map`/`Set` BST) depends on its `list_append`.
    `crates/ken-elaborator/tests/cat1_lawful_functors_package.rs`,

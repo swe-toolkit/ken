@@ -1283,24 +1283,6 @@ fn ascii_encoded_byte_codes (s : String) (ascii : AllAscii s) : AsciiBytes (byte
 theorem ascii_encoded_utf8 (s : String) (ascii : AllAscii s) : IsUtf8 (bytes_encode s) =
   ascii_bytes_utf8 (bytes_encode s) (ascii_encoded_byte_codes s ascii)
 
-theorem map_appends
-      (a : Type) (b : Type) (f : a → b) (xs : List a) (ys : List a)
-    : Equal
-        (List b)
-        (map a b f (list_append a xs ys))
-        (list_append b (map a b f xs) (map a b f ys)) =
-  match xs {
-    Nil ↦ Refl;
-    Cons head tail ↦
-      cong
-        (List b)
-        (List b)
-        (map a b f (list_append a tail ys))
-        (list_append b (map a b f tail) (map a b f ys))
-        (Cons b (f head))
-        (map_appends a b f tail ys)
-  }
-
 fn all_ascii_codes_append
       (xs : List Int) (ys : List Int) (left : AllAsciiCodes xs) (right : AllAsciiCodes ys)
     : AllAsciiCodes (list_append Int xs ys) =
@@ -1340,7 +1322,7 @@ fn ascii_bytes_concat
             Int
             (map UInt8 Int uint8_to_int (bytes_to_list a))
             (map UInt8 Int uint8_to_int (bytes_to_list b)))
-          (map_appends UInt8 Int uint8_to_int (bytes_to_list a) (bytes_to_list b)))
+          ((proof append for map) UInt8 Int uint8_to_int (bytes_to_list a) (bytes_to_list b)))
   in
     J
       (λview _. AllAsciiCodes (map UInt8 Int uint8_to_int view))

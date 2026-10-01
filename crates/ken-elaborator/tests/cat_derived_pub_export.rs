@@ -3,7 +3,7 @@
 //! Promise class: durable invariants. The ten public collection operations
 //! retain their `Data.Collections.Derived` identities. The two `nth` bound
 //! proofs, four `list_append` attached proofs (the three monoid laws and
-//! `list_append::length`), the `map::{id, fusion}`
+//! `list_append::length`), the `map::{id, fusion, append}`
 //! proofs, and the checked `reverse::involutive` proof are published beside
 //! their subjects.
 //! The helper `reverse_snoc` and verified-sort carrier remain private.
@@ -69,6 +69,7 @@ fn derived_exports_all_ten_operation_identities() {
         ("map", "cat_derived_pub_map"),
         ("map::id", "cat_derived_pub_map_id"),
         ("map::fusion", "cat_derived_pub_map_fusion"),
+        ("map::append", "cat_derived_pub_map_append"),
         ("filter", "cat_derived_pub_filter"),
         ("list_append", "cat_derived_pub_list_append"),
         ("nth", "cat_derived_pub_nth"),
@@ -101,6 +102,12 @@ fn derived_exports_all_ten_operation_identities() {
            (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (xs : List a) : \
            Equal (List c) (map a c (comp a b c g h) xs) (map b c g (map a b h xs)) = \
            map::fusion a b c g h xs\n\
+         theorem cat_derived_pub_map_append \
+           (a : Type) (b : Type) (f : a → b) (xs : List a) (ys : List a) : \
+           Equal (List b) \
+             (map a b f (list_append a xs ys)) \
+             (list_append b (map a b f xs) (map a b f ys)) = \
+           map::append a b f xs ys\n\
          fn cat_derived_pub_filter (xs : List Bool) : List Bool = \
            filter Bool (\\x. x) xs\n\
          fn cat_derived_pub_list_append (xs : List Bool) (ys : List Bool) : List Bool = \
@@ -234,8 +241,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// compared with an independent literal contract set. CLAIMED: Derived's
 /// complete loader-visible export surface is exactly the ten authorized
 /// operations, two `nth` bound proofs, four `list_append` attached proofs
-/// (the three monoid laws and `length`), and the one
-/// `map::{id, fusion}` proofs and `reverse::involutive` attached proof.
+/// (the three monoid laws and `length`), three `map` proofs (`id`, `fusion`,
+/// `append`), and the `reverse::involutive` attached proof.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
@@ -285,6 +292,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "list_append::length".to_owned(),
             "list_append::right_unit".to_owned(),
             "map".to_owned(),
+            "map::append".to_owned(),
             "map::fusion".to_owned(),
             "map::id".to_owned(),
             "nth".to_owned(),
@@ -294,6 +302,6 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "reverse::involutive".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         ten operations, two map proofs, two nth proofs, four list_append proofs and reverse::involutive"
+         ten operations, three map proofs, two nth proofs, four list_append proofs and reverse::involutive"
     );
 }
