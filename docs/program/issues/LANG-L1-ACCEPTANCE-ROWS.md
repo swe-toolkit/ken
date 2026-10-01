@@ -56,6 +56,11 @@ is expected; both behaviours are delivered at zero TCB.
   spells it `Int.toInt64`; no alias is added.
 - **Row 3.** `'a'`, `'\u{D7FF}'` and `'\u{E000}'` elaborate. `'\u{D800}'` and
   `'\u{DFFF}'` fail with `ElabError::InvalidEscape`, matched structurally.
+- **Exemption registry.** In `.github/ignored-test-exemptions.toml`, delete
+  exactly the `ac5_explicit_conversion_is_partial_option` and
+  `sec24_char_excludes_surrogates` `placeholder-no-assertions` blocks, which
+  the CI ignored-test sweep rejects once those rows run (PR #4433). The
+  `sec31_int_div_zero_emits_obligation` block stays.
 
 ## Acceptance
 
