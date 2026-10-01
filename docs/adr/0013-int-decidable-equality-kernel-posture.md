@@ -88,12 +88,13 @@ literal, the call remains neutral. The other Int operations, including
 `eq_int`, do not gain kernel Op reduction. This extends the audited kernel
 computation, not the trusted certificate or postulate inventory. It supports
 closed literal comparison goals and a kernel-local Bool elimination over their
-results. It does not by itself close the current `isScalar` or `PosInt`
-consumer obligations: `isScalar` still passes through `inRangeBool`, which
-composes comparisons with unreduced `and_bool` and `or_bool` operations.
-The separately routed Language consumer work must supply transparent Bool
-elimination where needed before those obligations close. No elaborator-side
-assertion of their truth is licensed. See spec `16 §2.2` for the rule.
+results. The guide's `const five : PosInt = 5` closes because `PosInt` uses
+`Equal Bool (leq_int 0 n) True` directly. By contrast, the current `isScalar`
+definition stays stuck: `inRangeBool` composes its comparisons with unreduced
+`and_bool` and `or_bool` operations. The separately routed Language consumer
+work must replace that composition with transparent Bool elimination before
+closed scalar obligations can reduce. No elaborator-side assertion of their
+truth is licensed. See spec `16 §2.2` for the rule.
 
 ## Consequences
 
