@@ -64,18 +64,18 @@ stop and report the mismatch.
 3. **`pub theorem byte_cursor_advance_sound`.** A successful peek and a
    bounded cursor give a bounded advanced cursor. It matches on a computed
    `nth` result (check 11): bind it first, and carry the other side with
-   `cong`.
-4. **`pub theorem nth_some_index_bound`** in `Data/Collections/Derived`:
-   `Equal (Option a) (nth a n xs) (Some a v) → Equal Bool (leq_nat (Suc n)
-   (length a xs)) True`.
-5. **Public instances:** `byte_satisfy_parser_laws (accept)` and
+   `cong`. Its end bound reuses Derived's existing
+   `pub proof some_below_length for nth` (`Derived.ken.md:228`), already
+   composed by Parsing's private `byte_cursor_peek_in_bounds`. No new list
+   lemma is added (implementer `evt_6662sym7ypjpr`: the Architect's item 4
+   would be a second spelling of it).
+4. **Public instances:** `byte_satisfy_parser_laws (accept)` and
    `byte_many_parser_laws (a) (step) (h : DecoderPreservesBounded a step)`.
    Each is a composition of the theorems above.
 
 Scope:
 
 - `catalog/packages/Capability/Parsing/Parsing.ken.md`;
-- `catalog/packages/Data/Collections/Derived.ken.md`, for item 4 only;
 - the Parsing acceptance tests and the public-inventory pin;
 - `crates/ken-elaborator/src/r_layer_tests/cat_tier_d_decoder_import.rs`
   (`:294`). That fixture records the private predicate as a gap. It imports
@@ -83,13 +83,13 @@ Scope:
 
 ## Acceptance
 
-- **AC-1.** All five items check by `ken check`. The two instances are stated
+- **AC-1.** All four items check by `ken check`. The two instances are stated
   as public theorems that a client can apply.
 - **AC-2 (falsifiers).**
   - Twin cursor ops whose advance is `Suc (Suc position)`: its
     `advance_sound` fails at the end-position conjunct.
-  - A weakened `nth_some_index_bound`, with `leq_nat n (length xs)`, still
-    checks, and a strengthened one, with `leq_nat (Suc (Suc n)) …`, fails.
+  - A strengthened `byte_cursor_advance_sound` end bound,
+    `LessEqNat (Suc (Suc position)) …`, fails for the real cursor ops.
 - **AC-2b (repair the PARSER-LAWS fence).** `unbounded_parser_laws_false_twin`
   (`Parsing.ken.md:647-698`) closes its end bound with `Proved` on a stuck
   goal (`:674`), so its same-shape true twin is rejected too (Adversary
@@ -101,14 +101,12 @@ Scope:
     found `LessEqNat n n`.
 - **AC-3.**
   - `trusted_base()` is unchanged.
-  - The catalog census is byte-identical except for the two named packages.
+  - The catalog census is byte-identical except for `Parsing.ken.md`.
   - The Parsing, Decoder and Derived acceptance targets stay green, as does
     the serial `lang_mod_strict_resolution_d0`.
 
 ## Stop conditions
 
-- Any new module import, primitive, postulate or axiom. Adding
-  `nth_some_index_bound` to Parsing's existing `Data.Collections.Derived`
-  symbol list is in scope.
-- A `Decoder.ken.md` change.
+- Any new import, primitive, postulate or axiom.
+- A `Decoder.ken.md` or `Derived.ken.md` change.
 - Item 1 needs two public spellings of the bound: stop to the Architect.
