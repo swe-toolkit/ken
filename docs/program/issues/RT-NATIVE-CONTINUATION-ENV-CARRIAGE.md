@@ -201,8 +201,19 @@ into it.
   - A writer emitting the other schema into a slot reddens at the
     assertion, not at a later field read.
   - Dropping a recorded coercion edge reddens.
+  - Each of the 8 slots asserts at its readers: a writer storing a bare K,
+    skipping the injection, reddens at the reader assertion.
+  - Swapping the S3 and S4 variants in the `(533, 1)` record reddens.
   - The interning-key pin stays byte-identical.
   - The write fixture compiles and runs.
+- **Slot schemas (ruled, `evt_69ktj8b1xe8tc`).** Each slot's schema is its
+  issued R sum, label elided for a singleton flow set; K is never a slot
+  schema, only the `Child` of an R written at a transport point. Coercion
+  edges are the 11 construct points and 9 transport points. Direct, Tail,
+  the pass-through and the force read the `Child` role and assert it against
+  the transport's `source_record()`; only the labelled call path reads R's
+  own W and C roles. The doubled W at transport-written slots is recorded,
+  not simplified, in this WP.
 - **AC-0 (measure; no build).** Done so far: the suffix census, record
   coverage, the seat relation (a checked parent→child edge, not equality),
   and the disposable trace. Remaining (`evt_2wywq8pmjerv8`): a compile-time
