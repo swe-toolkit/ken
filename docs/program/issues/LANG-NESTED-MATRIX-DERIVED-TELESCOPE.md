@@ -57,9 +57,9 @@ Two increments, each a straight-ancestor cut that may land alone.
      raised there; "the split reverts" is not the test.
    - Occurrence terms replace sentinel depth arithmetic, and the four
      mechanisms above are deleted.
-   - The in-matrix per-method kernel check runs in the derived telescope on
-     every path. The `&& needs_reverting` conjunct is removed
-     (`evt_4c4tgkc2gvypk`, input f).
+   - The in-matrix alias finalize and per-method kernel check run in the
+     derived telescope on every path. Both `needs_reverting` gates are
+     removed (`evt_4c4tgkc2gvypk`, `evt_qh7m7erbc5f6`, input f).
 
 ## Acceptance
 

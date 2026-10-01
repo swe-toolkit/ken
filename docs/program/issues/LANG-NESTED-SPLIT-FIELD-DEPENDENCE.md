@@ -125,8 +125,13 @@ pin asserts the normalized constructor, not only that elaboration succeeds.
     an advancing stop.
 - **AC-N5 (check gate, `evt_4c4tgkc2gvypk`).**
   - `lang_match_record_pattern` is 9/9 with its value pins.
-  - Dropping `&& needs_reverting` reddens the record row with
-    `VarOutOfScope {4,3}`.
+  - On the constant path, finalize and check are both gated off and the
+    close runs over the raw method (`evt_qh7m7erbc5f6`).
+  - Dropping `&& needs_reverting` from the check reddens the record row with
+    `VarOutOfScope {4,3}`; ungating finalize (`39cb0195b`) gives `{7,6}` at
+    `declare_def`.
+  - F2's pins (Ready/Deferred, deferred type error, fail-closed) sit on
+    reverting rows.
   - Gating the whole block, close included, still reddens the F1 repro.
   - Every verdict, value or diagnostic moved by the gate is reported.
   - A reverting nested split under a woven Var column (P5) is measured on
@@ -172,12 +177,19 @@ pin asserts the normalized constructor, not only that elaboration succeeds.
    variables index through those binders, so a record/tuple leaf that
    returns a woven Var column gets `VarOutOfScope {4,3}`. Keyed on the check
    context being built from `cx.ctx` (`evt_4c4tgkc2gvypk`, §1a 7). Repair:
-   finalize and close stay unconditional; the in-matrix check runs only where
-   base ran it (`ready && needs_reverting`).
+   close stays unconditional; the in-matrix check runs only where base ran
+   it (`ready && needs_reverting`).
+8. The in-matrix alias finalize (F2), left unconditional on the constant
+   path, computes alias depth from `nested_ctx.len()`, which omits woven
+   binders. Its result is written back, so the wrong index reaches
+   `declare_def`. Keyed on finalize depth taken from `cx.ctx`
+   (`evt_qh7m7erbc5f6`, §1a 8). Repair: on the constant path the block is
+   close-only over the raw method, so the constant path is base plus the
+   kernel-derived close.
 
 Shared predicate (`evt_4yewspasn0fps`, restated `evt_7ve4bw9145c1x`): a term
 in one frame's coordinates is used in another frame's context through depth
-arithmetic. Entries 1, 2, 3, 5, 6 and 7 are this predicate; entry 4 is a
+arithmetic. Entries 1, 2, 3, 5, 6, 7 and 8 are this predicate; entry 4 is a
 consequence of the closure. The closure is the successor WP, nested matrix
 construction in the derived telescope with woven binders as real context
 pushes, framed on the stop-6 advisory and the M-deep base measurement.
@@ -187,9 +199,12 @@ pushes, framed on the stop-6 advisory and the M-deep base measurement.
 - The repair needs the kernel or a spec change.
 - A finding is the same defect as `LANG-NESTED-SPLIT-CONSTANT-MOTIVE-INDEX`
   scope: stop to the Architect to merge the frames.
-- Each of these is an advancing stop (the 8th after `evt_4c4tgkc2gvypk`):
-  the AC-N4 base-pass or wrong-value condition; a hardened value pin
-  failing; a regression in `lang_infer_match_indexed_complete` (20/20), the
-  record-pattern suite, or the as-pattern, nested-split and tuple-pattern
-  suites; the record row red with the check gated; P5 green on base and red
-  on the candidate, or a wrong value anywhere.
+- Each of these is an advancing stop, the 9th being a research hold
+  (`evt_qh7m7erbc5f6`):
+  - any constant-path value change;
+  - the AC-N4 base-pass or wrong-value condition;
+  - a hardened value pin failing;
+  - a regression in `lang_infer_match_indexed_complete` (20/20), the
+    record-pattern suite, or the as-pattern, nested-split and tuple-pattern
+    suites;
+  - P5 green on base and red on the candidate, or a wrong value anywhere.
