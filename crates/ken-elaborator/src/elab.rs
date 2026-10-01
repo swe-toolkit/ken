@@ -21474,6 +21474,7 @@ mod match_matrix_occurrence_tests {
             real_pats: vec![pattern],
             real_occurrences: vec![MatrixOccurrence::live(occurrence)],
             binding_occurrences: Vec::new(),
+            virtual_surface_positions: Vec::new(),
             arm_idx: 0,
         }
     }
@@ -21626,6 +21627,7 @@ mod match_matrix_occurrence_tests {
                 MatrixOccurrence::pending_field(true, true),
             ],
             binding_occurrences: vec![Some(Term::var(1))],
+            virtual_surface_positions: Vec::new(),
             arm_idx: 0,
         }
         .under_core_binder();
