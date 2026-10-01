@@ -54,6 +54,37 @@ fn indexed_nested_sibling_type_keeps_outer_index_binder() {
 }
 
 #[test]
+fn indexed_exact_adversary_repro_checks() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(&format!(
+        "{VEC}\ndata PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
+         fn f (n : Nat) (xs : Vec Nat (Suc n)) : PairOut = \
+         match xs {{ \
+           VCons _ Zero _ ↦ Out Zero Zero; \
+           VCons _ _ _ ↦ Out Zero Zero \
+         }}"
+    ))
+    .expect("exact original F1 finding checks after shift and domain weaken");
+}
+
+#[test]
+fn outer_as_alias_with_flat_inner_match_keeps_whole_constructor() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(
+        "data NatBox : Type where { BoxNat : Nat → NatBox }\n\
+         fn outer_flat (h : NatBox) (x : Nat) : Nat = \
+         let r = match x { \
+           Zero as saved ↦ match h { BoxNat z ↦ saved }; \
+           (Suc k) as saved ↦ match h { BoxNat z ↦ saved } \
+         } in r\n\
+         const observed : Nat = outer_flat (BoxNat Zero) (Suc Zero)\n\
+         const expected : Nat = Suc Zero",
+    )
+    .expect("flat inner match preserves the outer alias");
+    assert_normalized_equal(&env, "observed", "expected");
+}
+
+#[test]
 fn enclosing_as_alias_survives_constant_inner_match_frame() {
     // MEASURED: an outer match alias is used from both arms of a nested
     // constant-motive match, and the closed call reduces to its actual value.
@@ -84,6 +115,43 @@ fn enclosing_as_alias_survives_constant_inner_match_frame() {
 }
 
 #[test]
+fn diagnostic_outer_alias_inside_reverting_nested_split() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let result = env.elaborate_file(&format!(
+        "{VEC}\ndata Tag (n : Nat) : Vec Nat n → Type where {{ \
+           MkTag : (v : Vec Nat n) → Tag n v \
+         }}\n\
+         data HolderD : Type where {{ \
+           HoldD : (n : Nat) → (v : Vec Nat n) → Tag n v → HolderD \
+         }}\n\
+         fn outer_revert (h : HolderD) (x : Nat) : Nat = \
+         let r = match x {{ \
+           Zero as saved ↦ let q = match h {{ \
+             HoldD n VNil _ ↦ saved; \
+             HoldD n (VCons m _ _) _ ↦ saved \
+           }} in q; \
+           (Suc k) as saved ↦ let q = match h {{ \
+             HoldD n VNil _ ↦ saved; \
+             HoldD n (VCons m _ _) _ ↦ saved \
+           }} in q \
+         }} in r\n\
+         const observed : Nat = outer_revert \
+           (HoldD Zero (VNil Nat) (MkTag Zero (VNil Nat))) \
+           (Suc Zero)\n\
+         const expected : Nat = Suc Zero"
+    ));
+    eprintln!("M3 elaborate: {result:?}");
+    if result.is_ok() {
+        let normal = |name: &str| {
+            let id = env.globals[name];
+            let body = env.env.transparent_body(id).expect("checked").1;
+            normalize(&env.env, &Context::new(), &body)
+        };
+        eprintln!("M3 normalized observed={:?}, expected={:?}", normal("observed"), normal("expected"));
+    }
+}
+
+#[test]
 fn nonindexed_nested_list_split_domain_uses_ambient_parameter() {
     // MEASURED: with a closed Nat result, the nested List a column checks
     // and its Nil/Cons closed calls normalize distinctly. CLAIMED: the
@@ -93,10 +161,7 @@ fn nonindexed_nested_list_split_domain_uses_ambient_parameter() {
     let mut env = ElabEnv::new().expect("prelude");
     let trusted_before = env.env.trusted_base();
     env.elaborate_file(
-        "data List (a : Type) : Type where { \
-           Nil : List a; Cons : a → List a → List a \
-         }\n\
-         data BoxList (a : Type) : Type where { \
+        "data BoxList (a : Type) : Type where { \
            MkBoxList : List a → Nat → BoxList a \
          }\n\
          fn list_split (a : Type) (b : BoxList a) : Nat = \

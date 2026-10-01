@@ -18385,17 +18385,14 @@ fn compile_match_matrix(
             // The dependent motive is built inside the enclosing split
             // lambda. The codomain was formed under x' alone; move its
             // outer variables past that lambda, leaving x' at Var(0).
-            let motive_body = if needs_reverting {
-                shift(&codomain, 1, 1)
-            } else {
-                codomain
-            };
+            let motive_body = shift(&codomain, 1, 1);
+            let scrut_ty_under_split = weaken(&col_types[0], 1);
             let mut elim = matrix_family_elim(
                 &ind0,
                 d_id0,
                 &level_args,
                 &args,
-                &col_types[0],
+                &scrut_ty_under_split,
                 motive_body,
                 ret_level,
                 methods,
