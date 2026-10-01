@@ -104,4 +104,3 @@ Merged `5e0a97be5` (PR #4428), exact `a9ef373d7`: Foundation QA
 
 §1a count: 1 (arrangement). The placement assumed module-wide forward
 references, which the loader does not deliver (`evt_4js9vdbbcgmb2`).
-
