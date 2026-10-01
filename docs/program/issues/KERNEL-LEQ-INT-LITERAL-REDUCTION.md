@@ -129,8 +129,10 @@ stop and report the mismatch.
   - `crates/ken-cli/tests/rt_escape_second_resource_native.rs` `:783-802`:
     select the owner by its shape rather than the literal `1298`. That shape
     is the relay-excluded protocol with exactly one relay member without a
-    successor and one non-relay member with a successor. Assert exactly one
-    such protocol. The `:817` ignored row is untouched.
+    successor and one non-relay member with a successor. Exactly two
+    protocols have that shape; assert the count and take the one with the
+    lower owner origin, which a monotone relabeling preserves
+    (`evt_6c6n2n63v9cx2`). The `:817` ignored row is untouched.
 
 ## Acceptance
 
