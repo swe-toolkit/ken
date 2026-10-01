@@ -1704,143 +1704,6 @@ theorem byte_cursor_advance_bounded
       (leq_nat_successor_bound position))
     (byte_cursor_peek_in_bounds s position value peeked)
 
-theorem option_prop_elim
-      (a : Type)
-      (motive : Option a → Prop)
-      (option : Option a)
-      (none : motive (None a))
-      (some : (value : a) → motive (Some a value))
-    : motive option =
-  match option {
-    None ↦ none;
-    Some value ↦ some value
-  }
-
-theorem bool_prop_elim
-      (motive : Bool → Prop) (value : Bool) (on_true : motive True) (on_false : motive False)
-    : motive value =
-  match value {
-    True ↦ on_true;
-    False ↦ on_false
-  }
-
-fn byte_code_decoder_accepted
-      (s : Source) (position : Nat) (value : UInt8) (accepted : Bool)
-    : DecoderResult ByteCursor Span UInt8 =
-  match accepted {
-    True ↦ Decoded ByteCursor Span UInt8 value (MkByteCursor s (Suc position));
-    False ↦
-      DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (MkSpan position position))
-  }
-
-fn byte_code_decoder_outcome
-      (s : Source) (position : Nat) (code : Int) (observed : Option UInt8)
-    : DecoderResult ByteCursor Span UInt8 =
-  match observed {
-    None ↦
-      DecoderFailed ByteCursor Span UInt8 (DecoderRejected Span (MkSpan position position));
-    Some value ↦ byte_code_decoder_accepted s position value (eq_int (uint8_to_int value) code)
-  }
-
-theorem byte_code_decoder_preserves
-      (code : Int)
-    : DecoderPreservesBounded UInt8 (byte_code_decoder code) =
-  λs.
-    λstart.
-      λcur.
-        match cur {
-          MkByteCursor t position ↦
-            λsafe.
-              let
-                same_bytes : Equal Bytes (source_bytes t) (source_bytes s) =
-                  and_fst
-                    (Equal Bytes (source_bytes t) (source_bytes s))
-                    (And (LessEqNat start position) (LessEqNat position (source_length s)))
-                    safe;
-                valid_bounds : And
-                  (LessEqNat start position)
-                  (LessEqNat position (source_length s)) =
-                  and_snd
-                    (Equal Bytes (source_bytes t) (source_bytes s))
-                    (And (LessEqNat start position) (LessEqNat position (source_length s)))
-                    safe
-              in
-                byte_code_decoder_bounded
-                  s
-                  t
-                  start
-                  position
-                  code
-                  same_bytes
-                  (and_fst
-                    (LessEqNat start position)
-                    (LessEqNat position (source_length s))
-                    valid_bounds)
-                  (and_snd
-                    (LessEqNat start position)
-                    (LessEqNat position (source_length s))
-                    valid_bounds)
-        }
-
-theorem byte_code_decoder_outcome_equation
-      (s : Source) (position : Nat) (code : Int)
-    : Equal
-        (DecoderResult ByteCursor Span UInt8)
-        (byte_code_decoder code (MkByteCursor s position))
-        (byte_code_decoder_outcome
-          s
-          position
-          code
-          (byte_cursor_peek (MkByteCursor s position))) =
-  Refl
-
-theorem byte_code_decoder_bounded
-      (s : Source)
-      (t : Source)
-      (start : Nat)
-      (position : Nat)
-      (code : Int)
-      (same_bytes : Equal Bytes (source_bytes t) (source_bytes s))
-      (start_bounded : LessEqNat start position)
-      (position_bounded : LessEqNat position (source_length s))
-    : DecoderOutcomeBounded UInt8 s start (byte_code_decoder code (MkByteCursor t position)) =
-  option_prop_elim
-    UInt8
-    (λobserved.
-      Equal (Option UInt8) (byte_cursor_peek (MkByteCursor t position)) observed
-      → DecoderOutcomeBounded
-        UInt8
-        s
-        start
-        (byte_code_decoder_outcome t position code observed))
-    (byte_cursor_peek (MkByteCursor t position))
-    (λnone_peeked. valid_zero_width_span s position position_bounded)
-    (λvalue.
-      λsome_peeked.
-        bool_prop_elim
-          (λaccepted.
-            DecoderOutcomeBounded
-              UInt8
-              s
-              start
-              (byte_code_decoder_accepted t position value accepted))
-          (eq_int (uint8_to_int value) code)
-          (and_intro
-            (Equal Bytes (source_bytes t) (source_bytes s))
-            (And (LessEqNat start (Suc position)) (LessEqNat (Suc position) (source_length s)))
-            same_bytes
-            (byte_cursor_advance_bounded_for_source
-              s
-              t
-              start
-              position
-              value
-              same_bytes
-              start_bounded
-              some_peeked))
-          (valid_zero_width_span s position position_bounded))
-    Refl
-
 theorem parser_from_decoder_outcome_equation
       (a : Type)
       (decoder : Decoder ByteCursor Span a)
@@ -1901,6 +1764,23 @@ pub theorem byte_cursor_bounded_after_peek
                   peeked)
   }
 
+pub theorem byte_satisfy_bounded
+      (accept : UInt8 → Bool)
+    : DecoderPreservesBounded UInt8
+        (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops accept) =
+  λs.
+    λstart.
+      decoder_satisfy_preserves
+        ByteCursor
+        UInt8
+        Span
+        byte_cursor_ops
+        accept
+        (ByteCursorBounded s start)
+        (ValidSpan s)
+        (byte_cursor_bounded_locate s start)
+        (byte_cursor_bounded_after_peek s start)
+
 pub theorem byte_satisfy_parser_laws
       (accept : UInt8 → Bool)
     : ParserLaws UInt8
@@ -1910,18 +1790,7 @@ pub theorem byte_satisfy_parser_laws
   parser_from_decoder_laws
     UInt8
     (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops accept)
-    (λs.
-      λstart.
-        decoder_satisfy_preserves
-          ByteCursor
-          UInt8
-          Span
-          byte_cursor_ops
-          accept
-          (ByteCursorBounded s start)
-          (ValidSpan s)
-          (byte_cursor_bounded_locate s start)
-          (byte_cursor_bounded_after_peek s start))
+    (byte_satisfy_bounded accept)
 
 pub theorem byte_many_parser_laws
       (a : Type) (step : Decoder ByteCursor Span a) (step_safe : DecoderPreservesBounded a step)
@@ -1950,18 +1819,7 @@ pub theorem byte_many_parser_laws
 theorem byte_code_decoder_public_bounded
       (code : Int)
     : DecoderPreservesBounded UInt8 (byte_code_decoder code) =
-  λs.
-    λstart.
-      decoder_satisfy_preserves
-        ByteCursor
-        UInt8
-        Span
-        byte_cursor_ops
-        (λbyte. eq_int (uint8_to_int byte) code)
-        (ByteCursorBounded s start)
-        (ValidSpan s)
-        (byte_cursor_bounded_locate s start)
-        (byte_cursor_bounded_after_peek s start)
+  byte_satisfy_bounded (λbyte. eq_int (uint8_to_int byte) code)
 
 theorem decoder_seq_public_bounded
       (a : Type)
