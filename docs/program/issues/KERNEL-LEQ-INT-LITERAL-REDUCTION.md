@@ -1,6 +1,6 @@
 ---
 id: KERNEL-LEQ-INT-LITERAL-REDUCTION
-title: "The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as isScalar 55295 or PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs"
+title: "The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs"
 status: active
 owner: kernel
 size: S
@@ -34,9 +34,10 @@ to `Equal Bool True True` or `Equal Bool False True`.
 - **The runtime decider.** `ken-interp/src/eval.rs:1999`
   (`("leq_int", [a, b])` over `eval_to_bigint`).
 - **The consumers it unblocks.**
-  - `isScalar 55295` δ-unfolds to four `leq_int` literal tests and closes
-    with `tt`. `55296` stays `Equal Bool False True`, which is open, as the
-    seed-numbers row requires.
+  - `isScalar 55295` closes once `inRangeBool` is respelled by transparent
+    Bool elimination, which `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` carries.
+    Today it composes the tests with `and_bool`/`or_bool`, also stuck Ops
+    (Architect `evt_pawgvbeevyg2`, after stop `evt_n6w1rkyqkhw2`).
   - The guide's `PosInt` (`library/guide/surface-reference.ken.md:108`)
     closes `const five : PosInt = 5`.
 - **Scope.** Only `leq_int`. The other Int ops stay K3.
@@ -58,7 +59,10 @@ stop and report the mismatch.
 
 - **AC-1.**
   - `Equal Bool (leq_int 0 5) True` checks by `Proved`.
-  - `isScalar 55295` closes.
+  - `leq_int 55295 55295` reduces to `True`.
+  - Kernel-local row: the closed term `match (leq_int 0 55295) { True |->
+    leq_int 55295 55295 ; False |-> False }` whnfs to `True`. No prelude
+    edit (`evt_pawgvbeevyg2`).
   - A cross-layer test pins agreement between the kernel and
     `ken-interp` on a boundary set that includes negatives, equality and
     values beyond `i64`.
