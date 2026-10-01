@@ -430,6 +430,9 @@ struct ElabCtx<'e> {
     active_pattern_aliases: Vec<Vec<ActivePatternAlias>>,
     pattern_alias_replacement_frames: Vec<HashMap<usize, PatternAliasReplacement>>,
     next_pattern_alias_sentinel: usize,
+    /// Inferred indexed matches may nest inside arm bodies. Only the top
+    /// frame's memoized motive types this matrix's root IH columns.
+    indexed_match_roots: Vec<IndexedMatchRootFrame>,
 }
 
 impl<'e> ElabCtx<'e> {
@@ -469,6 +472,7 @@ impl<'e> ElabCtx<'e> {
             active_pattern_aliases: Vec::new(),
             pattern_alias_replacement_frames: Vec::new(),
             next_pattern_alias_sentinel: 0,
+            indexed_match_roots: Vec::new(),
         }
     }
 
@@ -15778,11 +15782,30 @@ fn finalize_pattern_aliases(
 /// Compiles to `Term::Elim` with one method per constructor in declaration order.
 /// Constant-motive variant: return type inferred from the first arm, checked
 /// consistent across all arms by kernel type-checking the Elim.
+struct IndexedMatchRootFrame {
+    outer: Context,
+    ind: InductiveDecl,
+    family: GlobalId,
+    level_args: Vec<Level>,
+    params: Vec<Term>,
+    scrut_indices: Vec<Term>,
+    motive: Option<Box<Term>>,
+    /// Kernel `method_type` domains after each constructor's field telescope.
+    ih_domains: Vec<Vec<Term>>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct RootIhColumn {
+    constructor: usize,
+    ordinal: usize,
+    field_count: usize,
+}
+
 /// A pending column in the pattern-matrix compiler (`34-data-match.md §3.1`):
 /// either a genuine surface column (tracked per-row in `RowState::real_pats`)
 /// or a synthetic induction-hypothesis slot the eliminator's method type
 /// requires but no surface pattern ever names.
-/// `Ih(remaining)`: `remaining` is how many MORE `Ih` columns immediately
+/// `Ih { remaining, .. }`: `remaining` is how many MORE `Ih` columns immediately
 /// following this one belong to the *same* constructor bucket (the same
 /// `build_ctor_buckets` call that produced this one) — 0 for the last (or
 /// only) `Ih` in its own batch. This lets `compile_match_matrix` tell "my
@@ -15793,7 +15816,12 @@ fn finalize_pattern_aliases(
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ColKind {
     Real,
-    Ih(usize),
+    Ih {
+        remaining: usize,
+        /// Present only on an indexed root constructor's IH columns. Nested
+        /// eliminators retain their existing independent continuation types.
+        root: Option<RootIhColumn>,
+    },
 }
 
 /// The core occurrence of one pending pattern-matrix column.
@@ -16369,42 +16397,133 @@ fn guarded_leaf_missing_witness(pattern: &RPattern) -> MissingPatternWitness {
     }
 }
 
-/// The type every raw method built from `col_types`/`col_kinds` (a suffix of
-/// still-pending columns) ultimately has, as a Pi-chain ending in `ret_ty`:
-/// each `Real` column contributes one arrow (regardless of whether it is
-/// later bound flatly or split further — that happens *inside* the arrow's
-/// codomain, never changing the arrow's own presence), each `Ih` column
-/// contributes an arrow of type `ret_ty` weakened to its own position. This
-/// is exactly what a split's motive must compute once applied to a
-/// scrutinee value — a nested `elim_D` still owes whatever the tail owes.
+/// Memoize the indexed root motive at the leaf that first determines its
+/// result type. Kernel method types then supply the exact IH domains for the
+/// matrix and the final root eliminator consumes this same motive term.
+fn memoize_indexed_root_motive(
+    cx: &mut ElabCtx,
+    ret_ty: &Term,
+    span: &Span,
+) -> Result<(), ElabError> {
+    let Some(root) = cx.indexed_match_roots.last() else {
+        return Ok(());
+    };
+    if root.motive.is_some() {
+        return Ok(());
+    }
+    let (outer, ind, family, level_args, params, scrut_indices) = (
+        root.outer.clone(),
+        root.ind.clone(),
+        root.family,
+        root.level_args.clone(),
+        root.params.clone(),
+        root.scrut_indices.clone(),
+    );
+    let zonked_outer = Context {
+        types: outer.types.iter().map(|ty| cx.metas.zonk_term(ty)).collect(),
+    };
+    let motive_ctx = motive_context_at(&zonked_outer, &ind, &params, &level_args);
+    let motive = build_checked_dependent_motive(
+        cx,
+        &motive_ctx,
+        &ind,
+        family,
+        &params,
+        &scrut_indices,
+        weaken(ret_ty, (ind.indices.len() + 1) as i64),
+        false,
+        RecursiveFieldIndexPath::CoupledRefinement,
+        span,
+    )?;
+    let mut ih_domains = Vec::with_capacity(ind.constructors.len());
+    for (ordinal, ctor) in ind.constructors.iter().enumerate() {
+        let ih_count = recursive_shapes(cx.env, ctor, family, ind.params.len())
+            .map_err(|error| ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            })?
+            .len();
+        let mut ty = method_type(cx.env, &ind, ordinal, &motive, &params, &level_args)
+            .map_err(|error| ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            })?;
+        let mut domains = Vec::with_capacity(ih_count);
+        for position in 0..ctor.args.len() + ih_count {
+            let Term::Pi(domain, codomain) = ty else {
+                return Err(ElabError::Internal(
+                    "indexed root method lost a field/IH domain".into(),
+                ));
+            };
+            if position >= ctor.args.len() {
+                domains.push(*domain);
+            }
+            ty = *codomain;
+        }
+        ih_domains.push(domains);
+    }
+    let root = cx.indexed_match_roots.last_mut().expect("root frame remains installed");
+    root.motive = Some(motive);
+    root.ih_domains = ih_domains;
+    Ok(())
+}
+
+fn indexed_root_ih_domain(
+    cx: &ElabCtx<'_>,
+    column: RootIhColumn,
+    depth: usize,
+) -> Result<Term, ElabError> {
+    let domain = cx
+        .indexed_match_roots
+        .last()
+        .and_then(|root| root.motive.as_ref().map(|_| &root.ih_domains))
+        .and_then(|ctors| ctors.get(column.constructor))
+        .and_then(|domains| domains.get(column.ordinal))
+        .ok_or_else(|| ElabError::Internal(
+            "indexed root IH needs an inferred result before its nested motive".into(),
+        ))?;
+    // The kernel domain is under all root constructor fields and earlier
+    // IHs. Real nested columns may insert further binders inside that prefix.
+    Ok(weaken(domain, depth.saturating_sub(column.field_count) as i64))
+}
+
+/// A split's motive must compute the Pi-chain owed by its pending columns.
+/// Root IH domains come from the root eliminator's method type, not from R.
 fn tail_codomain(
+    cx: &ElabCtx<'_>,
     tail_col_types: &[Term],
     tail_col_kinds: &[ColKind],
     ret_ty_base: &Term,
     depth_before_tail: usize,
-) -> Term {
+) -> Result<Term, ElabError> {
     if tail_col_types.is_empty() {
-        return weaken(ret_ty_base, depth_before_tail as i64);
+        return Ok(weaken(ret_ty_base, depth_before_tail as i64));
     }
     match tail_col_kinds[0] {
-        ColKind::Ih(_) => {
-            let ih_ty = weaken(ret_ty_base, depth_before_tail as i64);
+        ColKind::Ih { root, .. } => {
+            let ih_ty = if let Some(root) = root {
+                indexed_root_ih_domain(cx, root, depth_before_tail)?
+            } else {
+                weaken(ret_ty_base, depth_before_tail as i64)
+            };
             let rest = tail_codomain(
+                cx,
                 &tail_col_types[1..],
                 &tail_col_kinds[1..],
                 ret_ty_base,
                 depth_before_tail,
-            );
-            Term::pi(ih_ty, weaken(&rest, 1))
+            )?;
+            Ok(Term::pi(ih_ty, weaken(&rest, 1)))
         }
         ColKind::Real => {
             let rest = tail_codomain(
+                cx,
                 &tail_col_types[1..],
                 &tail_col_kinds[1..],
                 ret_ty_base,
                 depth_before_tail + 1,
-            );
-            Term::pi(tail_col_types[0].clone(), rest)
+            )?;
+            Ok(Term::pi(tail_col_types[0].clone(), rest))
         }
     }
 }
@@ -17031,11 +17150,12 @@ fn compile_literal_column(
             .expect("literal compilation reaches a body leaf")
             .clone();
         let branch_ty = tail_codomain(
+            cx,
             &col_types[1..],
             &col_kinds[1..],
             &ret_ty,
             real_depth_so_far + 1,
-        );
+        )?;
         for (condition, then_branch) in compiled.into_iter().rev() {
             body = make_if_elim(cx, condition, then_branch, body, &branch_ty, top_span)?;
         }
@@ -17172,11 +17292,12 @@ fn compile_tuple_column(
         .expect("tuple component compilation reaches a body leaf")
         .clone();
     let continuation_ty = tail_codomain(
+        cx,
         &component_types,
         &component_kinds,
         &ret_ty,
         real_depth_so_far,
-    );
+    )?;
     let continuation = if current_is_live {
         Term::Ascript(Box::new(continuation), Box::new(continuation_ty))
     } else {
@@ -17395,7 +17516,7 @@ fn compile_record_column(
         .as_ref()
         .expect("record field compilation reaches a body leaf")
         .clone();
-    let continuation_ty = tail_codomain(&field_types, &field_kinds, &ret_ty, real_depth_so_far);
+    let continuation_ty = tail_codomain(cx, &field_types, &field_kinds, &ret_ty, real_depth_so_far)?;
     let continuation = if current_is_live {
         Term::Ascript(Box::new(continuation), Box::new(continuation_ty))
     } else {
@@ -17588,6 +17709,7 @@ fn compile_match_leaf(
                 ),
             }
         })?;
+        memoize_indexed_root_motive(cx, &lowered, top_span)?;
         *ret_ty_slot = Some(lowered);
     }
     Ok(body_core)
@@ -17631,7 +17753,7 @@ fn compile_match_matrix(
     }
 
     match col_kinds[0] {
-        ColKind::Ih(remaining) => {
+        ColKind::Ih { remaining, root } => {
             // A synthetic induction-hypothesis slot: never resolver-counted,
             // so it is woven in via weaken-then-wrap rather than a real push.
             //
@@ -17672,12 +17794,17 @@ fn compile_match_matrix(
                 .as_ref()
                 .expect("IH column reached before return type known")
                 .clone();
-            let ih_ty = tail_codomain(
-                &col_types[remaining + 1..],
-                &col_kinds[remaining + 1..],
-                &ret_ty,
-                real_depth_so_far,
-            );
+            let ih_ty = if let Some(root) = root {
+                indexed_root_ih_domain(cx, root, real_depth_so_far)?
+            } else {
+                tail_codomain(
+                    cx,
+                    &col_types[remaining + 1..],
+                    &col_kinds[remaining + 1..],
+                    &ret_ty,
+                    real_depth_so_far,
+                )?
+            };
             Ok(Term::lam(ih_ty, weaken(&inner, 1)))
         }
         ColKind::Real => {
@@ -17834,6 +17961,7 @@ fn compile_match_matrix(
                 arm_used,
                 subsumed_by,
                 false,
+                false,
             )?
             .into_iter()
             .map(|method| method.expect("nested constructor coverage checked in bucket builder"))
@@ -17853,11 +17981,12 @@ fn compile_match_matrix(
                 .expect("split column reached before return type known")
                 .clone();
             let codomain = tail_codomain(
+                cx,
                 &col_types[1..],
                 &col_kinds[1..],
                 &ret_ty_base,
                 real_depth_so_far + 1,
-            );
+            )?;
             let ret_level = match kernel_infer_current(cx, &codomain) {
                 Ok(Term::Type(level)) => level,
                 Ok(_) => Level::Zero,
@@ -17921,6 +18050,7 @@ fn build_ctor_buckets(
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
     allow_index_omission: bool,
+    indexed_root: bool,
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
 
@@ -17990,14 +18120,21 @@ fn build_ctor_buckets(
             })?
             .len();
 
-        // `col_types`/`col_kinds` stay index-aligned; an `Ih` slot's own type
-        // entry is never read (its lambda domain is computed from `ret_ty`
-        // instead) but must still occupy a position.
+        // IH entries keep the columns index-aligned; their actual domains
+        // come from the indexed root's kernel method type, or from the
+        // existing nested/non-indexed continuation when `root` is absent.
         let mut new_col_types = field_types0;
         new_col_types.extend(std::iter::repeat(Term::ty(Level::Zero)).take(p_ihs0));
         new_col_types.extend_from_slice(tail_col_types);
         let mut new_col_kinds: Vec<ColKind> = vec![ColKind::Real; n_args0];
-        new_col_kinds.extend((0..p_ihs0).map(|i| ColKind::Ih(p_ihs0 - 1 - i)));
+        new_col_kinds.extend((0..p_ihs0).map(|i| ColKind::Ih {
+            remaining: p_ihs0 - 1 - i,
+            root: indexed_root.then_some(RootIhColumn {
+                constructor: k0,
+                ordinal: i,
+                field_count: n_args0,
+            }),
+        }));
         new_col_kinds.extend_from_slice(tail_col_kinds);
 
         let inner = compile_match_matrix(
@@ -18131,27 +18268,13 @@ fn finish_inferred_indexed_match(
     span: &Span,
 ) -> Result<Term, ElabError> {
     let sentinel_region = cx.match_field_regions.len();
-    let zonked_ctx = Context {
-        types: cx
-            .ctx
-            .types
-            .iter()
-            .map(|ty| cx.metas.zonk_term(ty))
-            .collect(),
-    };
-    let motive_ctx = motive_context_at(&zonked_ctx, ind, params, level_args);
-    let motive = build_checked_dependent_motive(
-        cx,
-        &motive_ctx,
-        ind,
-        family,
-        params,
-        scrut_indices,
-        weaken(result_ty, (ind.indices.len() + 1) as i64),
-        false,
-        RecursiveFieldIndexPath::CoupledRefinement,
-        span,
-    )?;
+    let motive = cx
+        .indexed_match_roots
+        .last()
+        .and_then(|root| root.motive.clone())
+        .ok_or_else(|| ElabError::Internal(
+            "indexed inferred match has no memoized root motive".into(),
+        ))?;
     let mut methods = Vec::with_capacity(ind.constructors.len());
     for (ordinal, (ctor, raw)) in ind.constructors.iter().zip(raw_methods).enumerate() {
         let field_count = ctor.args.len();
@@ -18732,6 +18855,24 @@ fn infer_match(
     // constructor is written. Only a missing root bucket uses the omission
     // permission, with the existing absurd-method proof as its authority.
     let indexed = !ind.indices.is_empty();
+    let root_frame_depth = cx.indexed_match_roots.len();
+    if indexed {
+        let Term::IndFormer { level_args, .. } = &head else {
+            unreachable!("inductive scrutinee head checked above")
+        };
+        let (params, scrut_indices) = params_terms.split_at(m);
+        cx.indexed_match_roots.push(IndexedMatchRootFrame {
+            outer: cx.ctx.clone(),
+            ind: ind.clone(),
+            family: d_id,
+            level_args: level_args.clone(),
+            params: params.to_vec(),
+            scrut_indices: scrut_indices.to_vec(),
+            motive: None,
+            ih_domains: Vec::new(),
+        });
+    }
+    let result = (|| {
     let raw_methods_result = build_ctor_buckets(
         cx,
         arms,
@@ -18747,6 +18888,7 @@ fn infer_match(
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
+        indexed,
         indexed,
     );
     let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result)?;
@@ -18829,6 +18971,9 @@ fn infer_match(
     );
 
     Ok((elim, ret_ty))
+    })();
+    cx.indexed_match_roots.truncate(root_frame_depth);
+    result
 }
 
 fn ensure_pattern_constructors_resolve(
