@@ -8387,8 +8387,22 @@ fn active_premise_kernel_view(
     active_premise_kernel_view_for_context(cx, &cx.ctx)
 }
 
+/// The ordinary query route has no expanded frame to zonk its own context.
+fn zonked_kernel_query_context(cx: &ElabCtx<'_>, context: &Context) -> Context {
+    Context {
+        types: context
+            .types
+            .iter()
+            .map(|ty| cx.metas.zonk_term(ty))
+            .collect(),
+    }
+}
+
 /// Check original owner-local operands in a disposable premise-expanded view.
 /// No translated operand or context entry is returned.
+/// Even without a premise frame, the kernel must see resolved level terms in
+/// both the local telescope and the operands (`39 §5.7`).
+#[inline(never)]
 fn kernel_check_in_context_current(
     cx: &ElabCtx<'_>,
     original_context: &Context,
@@ -8398,7 +8412,10 @@ fn kernel_check_in_context_current(
     let Some(view) = active_premise_kernel_view_for_context(cx, original_context)
         .map_err(CurrentKernelQueryError::View)?
     else {
-        return kernel_check_raw(cx.env, original_context, checked, expected)
+        let context = zonked_kernel_query_context(cx, original_context);
+        let checked = cx.metas.zonk_term(checked);
+        let expected = cx.metas.zonk_term(expected);
+        return kernel_check_raw(cx.env, &context, &checked, &expected)
             .map_err(CurrentKernelQueryError::Kernel);
     };
     let checked = cx.metas.zonk_term(checked);
@@ -8433,6 +8450,9 @@ fn kernel_infer_in_zonked_current(
 
 /// Infer an original owner-local term in a disposable premise-expanded view,
 /// then invert only its inferred type back to original coordinates/sentinels.
+/// The no-premise path must apply the same level substitution as the expanded
+/// path before a kernel query sees the local telescope or inferred term.
+#[inline(never)]
 fn kernel_infer_in_context_current(
     cx: &ElabCtx<'_>,
     original_context: &Context,
@@ -8441,7 +8461,9 @@ fn kernel_infer_in_context_current(
     let Some(view) = active_premise_kernel_view_for_context(cx, original_context)
         .map_err(CurrentKernelQueryError::View)?
     else {
-        return kernel_infer_raw(cx.env, original_context, inferred)
+        let context = zonked_kernel_query_context(cx, original_context);
+        let inferred = cx.metas.zonk_term(inferred);
+        return kernel_infer_raw(cx.env, &context, &inferred)
             .map_err(CurrentKernelQueryError::Kernel);
     };
     let inferred = cx.metas.zonk_term(inferred);
@@ -20212,6 +20234,72 @@ mod result_transport_control_flow_tests {
             sentinel_region: 0,
             install_depth,
         }
+    }
+
+    #[test]
+    fn ordinary_kernel_queries_zonk_unconstrained_level_in_context_and_operand() {
+        // Promise class: durable invariant (spec 39 §5.7). A query may
+        // default a fresh declaration level for kernel admission without
+        // committing that choice to the elaborator's metavariable store.
+        // Both no-premise gateways must apply the same substitution.
+        let mut env = ElabEnv::new().expect("base environment");
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "no-premise-level-query-control",
+        );
+        let level = cx.metas.fresh();
+        cx.ctx.push(Term::ty(level.clone())); // A : Type ?u
+        assert_eq!(
+            kernel_infer_current(&cx, &Term::var(0)).expect("infer A"),
+            Term::ty(Level::Zero),
+            "kernel inference may not return an elaborator level meta"
+        );
+        assert_eq!(
+            kernel_infer_current(&cx, &Term::ty(level.clone())).expect("infer Type ?u"),
+            Term::ty(Level::Suc(Box::new(Level::Zero))),
+            "the operand itself must be zonked before kernel inference"
+        );
+        kernel_check_current(&cx, &Term::var(0), &Term::ty(Level::Zero))
+            .expect("A : Type 0 after contextual level zonking");
+        kernel_check_current(
+            &cx,
+            &Term::ty(level),
+            &Term::ty(Level::Suc(Box::new(Level::Zero))),
+        )
+        .expect("Type ?u : Type 1 after operand level zonking");
+        assert!(
+            cx.metas.metas[0].is_none(),
+            "a read-only kernel query must not solve a declaration level meta"
+        );
+    }
+
+    #[test]
+    fn ordinary_kernel_check_zonks_expected_level_independently() {
+        // Promise class: durable invariant (spec 39 §5.7).
+        // MEASURED: a concrete `A : Type 0` checks against `Type ?u` while
+        // that meta remains unsolved in the elaborator. CLAIMED: the expected
+        // operand reaching the kernel has no declaration-level meta. THE GAP:
+        // this private query pins the shared gateway; the source-level Vec
+        // twins independently pin the production match-arm path.
+        let mut env = ElabEnv::new().expect("base environment");
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "expected-only-level-control",
+        );
+        cx.ctx.push(Term::ty(Level::Zero)); // A : Type 0
+        let expected_level = cx.metas.fresh();
+        kernel_check_current(&cx, &Term::var(0), &Term::ty(expected_level))
+            .expect("the expected Type ?u must be zonked without changing A");
+        assert!(
+            cx.metas.metas[0].is_none(),
+            "query-local zonking must not solve the elaborator meta"
+        );
     }
 
     #[test]
