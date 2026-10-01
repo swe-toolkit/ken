@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{whnf, Context, Decl, GlobalId, Term};
+use ken_kernel::{whnf, Context, Decl, GlobalId, KernelError, Term};
 
 const BUFFER_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/System/Buffer.ken.md");
@@ -184,6 +184,16 @@ proc px8f_readsome_public_consumers
         "spanBytes",
         "freeze",
         "writeAll",
+        "transfer_count_predecessor",
+        "transfer_count_nat_succ",
+        "write_all_entry",
+        "write_all_stop",
+        "write_all_request",
+        "write_all_first_error_step",
+        "write_all_done",
+        "write_all_continue",
+        "write_all_advance_start_prop",
+        "write_all_advance_start",
         "write_all_exact_prefix_prop",
         "write_all_exact_prefix_prop::exact_prefix",
     ] {
@@ -201,6 +211,10 @@ proc px8f_readsome_public_consumers
         "PrivateBufferFreeze",
         "private_read_at_positive",
         "private_write_all_fuel",
+        "private_write_all_step",
+        "private_write_all_after_wrote",
+        "private_write_all_next",
+        "write_all_refl",
     ] {
         assert!(!env.globals.contains_key(private), "`{private}` escaped");
     }
@@ -212,6 +226,18 @@ proc px8f_readsome_public_consumers
         "write_all_success_is_complete",
         "write_all_preserves_first_error",
         "write_all_all_success_holds",
+        "transfer_count_nat_succ",
+        "write_all_entry",
+        "write_all_stop",
+        "write_all_request",
+        "write_all_first_error_step",
+        "write_all_done",
+        "write_all_continue",
+        "write_all_advance_start",
+        "write_all_strict_decrease",
+        "write_all_fuel_sufficient",
+        "write_all_complete_after_wrote",
+        "write_all_zero_budget",
     ] {
         assert!(
             env.env.transparent_body(env.globals[law]).is_some(),
@@ -224,6 +250,94 @@ proc px8f_readsome_public_consumers
     );
     assert!(!BUFFER_KEN_MD.contains("Axiom"));
     assert!(!IO_KEN_MD.contains("Axiom"));
+}
+
+/// Promise class: durable invariant (`38 §1.7.3`). MEASURED: the actual
+/// checked step referenced by the public loop law returns the very first
+/// response error. The test-only alias lets the kernel check both twins while
+/// production still hides the step from source. CLAIMED: a writeAt error
+/// cannot turn into a different ResourceError. THE GAP: the separately
+/// checked `write_all_request` statement must bind the loop's continuation to
+/// this same step; this twin does not test host dispatch or file-side effects.
+/// The write-partition conformance row checks the latter.
+#[test]
+fn write_all_checked_step_preserves_the_exact_first_error() {
+    let mut env = ElabEnv::empty().expect("checked prelude");
+    let law = env.globals["write_all_first_error_step"];
+    let Some(Decl::Transparent { ty, .. }) = env.env.lookup(law) else {
+        panic!("first-error law must have a checked body");
+    };
+    let mut conclusion = ty;
+    while let Term::Pi(_, body) = conclusion {
+        conclusion = body;
+    }
+    let Term::App(equal_and_left, _) = conclusion else {
+        panic!("first-error law must state an Equal application");
+    };
+    let Term::App(equal_and_type, left) = equal_and_left.as_ref() else {
+        panic!("first-error law must carry a left endpoint");
+    };
+    let Term::App(equal_head, _) = equal_and_type.as_ref() else {
+        panic!("first-error law must carry a type parameter");
+    };
+    assert!(matches!(
+        equal_head.as_ref(),
+        Term::Const { id, .. } if *id == env.globals["Equal"]
+    ));
+    let mut head = left.as_ref();
+    while let Term::App(function, _) = head {
+        head = function;
+    }
+    let Term::Const {
+        id: private_step, ..
+    } = head
+    else {
+        panic!("first-error law must name the real checked step");
+    };
+    assert!(env.env.transparent_body(*private_step).is_some());
+    assert!(!env.globals.values().any(|id| id == private_step));
+    // Reintroduce the already-checked private identity in this one disposable
+    // test environment only. No production name map is changed.
+    env.globals
+        .insert("private_write_all_step".to_string(), *private_step);
+
+    let true_twin = r#"
+theorem first_error_is_no_progress
+  (a : Auth) (file : Resource ResourceKind.FsHandle)
+  (offset : Int) (buffer : BufferHandle) (span : BufferSpan)
+  (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit))
+  : Equal (HostIO a (Result ResourceError Unit))
+      (private_write_all_step a offset span next
+        (Err ResourceError WriteProgress NoProgress))
+      (Ret (Coproduct (FSOp a) AmbientOp)
+        (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+        (Result ResourceError Unit) (Err ResourceError Unit NoProgress)) =
+  write_all_first_error_step a file offset buffer span next NoProgress
+"#;
+    env.elaborate_decl(true_twin)
+        .expect("the actual error must check against the named loop step");
+
+    let wrong_error = true_twin.replace(
+        "(Err ResourceError Unit NoProgress)) =",
+        "(Err ResourceError Unit Closed)) =",
+    );
+    assert_ne!(
+        wrong_error, true_twin,
+        "wrong-error twin must actually differ"
+    );
+    let rejection = env
+        .elaborate_decl(&wrong_error.replace("first_error_is_no_progress", "first_error_is_closed"))
+        .expect_err("the checked step cannot return a different error");
+    assert!(
+        matches!(
+            rejection,
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "wrong error must reach the kernel equality, got {rejection:?}"
+    );
 }
 
 /// Promise class: normative compatibility vector (`38 §1.9`). The public

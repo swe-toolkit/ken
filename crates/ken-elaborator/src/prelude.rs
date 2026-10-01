@@ -1818,14 +1818,19 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "theorem transfer_count_positive (count : TransferCount) : transfer_count_positive_prop count = match count { PrivateTransferCount predecessor remaining |-> Refl }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude transfer_count_nat::positive failed: {e}")))?;
-    // Constructor privacy leaves the count opaque to catalog clients; expose
-    // only this checked positivity elimination, not its predecessor witness.
+    // The checked predecessor projection exposes the count's structural
+    // successor witness without exposing the constructor or another count.
     elab.elaborate_decl(
-        "theorem transfer_count_nat_nonzero (count : TransferCount) \
-           : Equal Nat (transfer_count_nat count) Zero -> Bottom = \
-         match count { PrivateTransferCount predecessor remaining |-> \\h. absurd h }",
+        "fn transfer_count_predecessor (count : TransferCount) : Nat = \
+         match count { PrivateTransferCount predecessor remaining |-> predecessor }",
     )
-    .map_err(|e| ElabError::Internal(format!("prelude transfer_count_nat_nonzero failed: {e}")))?;
+    .map_err(|e| ElabError::Internal(format!("prelude transfer_count_predecessor failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem transfer_count_nat_succ (count : TransferCount) \
+           : Equal Nat (transfer_count_nat count) (Suc (transfer_count_predecessor count)) = \
+         match count { PrivateTransferCount predecessor remaining |-> Refl }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude transfer_count_nat_succ failed: {e}")))?;
     elab.elaborate_decl(
         "proof bounded for transfer_count_request_budget (count : TransferCount) : Equal Nat (transfer_count_request_budget count) (buffer_nat_add (transfer_count_nat count) (transfer_count_remaining count)) = Refl",
     )
@@ -2609,7 +2614,9 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
              (write_all_advance_span span count) \
          }",
     )
-    .map_err(|e| ElabError::Internal(format!("prelude private_write_all_after_wrote failed: {e}")))?;
+    .map_err(|e| {
+        ElabError::Internal(format!("prelude private_write_all_after_wrote failed: {e}"))
+    })?;
     elab.elaborate_decl(
         "fn private_write_all_step (a : Auth) (file_offset : Int) (span : BufferSpan) \
            (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit)) \
@@ -2659,10 +2666,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
          private_write_all_fuel a file file_offset buffer span rest",
     )
     .map_err(|e| ElabError::Internal(format!("prelude private_write_all_next failed: {e}")))?;
-    elab.elaborate_decl(
-        "theorem write_all_refl (t : Type) (x : t) : Equal t x x = Refl",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude write_all_refl failed: {e}")))?;
+    elab.elaborate_decl("theorem write_all_refl (t : Type) (x : t) : Equal t x x = Refl")
+        .map_err(|e| ElabError::Internal(format!("prelude write_all_refl failed: {e}")))?;
     elab.elaborate_decl(
         "theorem write_all_entry (a : Auth) (file : Resource ResourceKind.FsHandle) \
            (file_offset : Int) (buffer : BufferHandle) (span : BufferSpan) \
@@ -2763,7 +2768,9 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
            : Prop = Equal Int (buffer_span_start (write_all_advance_span span count)) \
              (add_int (buffer_span_start span) (transfer_count_int count))",
     )
-    .map_err(|e| ElabError::Internal(format!("prelude write_all_advance_start_prop failed: {e}")))?;
+    .map_err(|e| {
+        ElabError::Internal(format!("prelude write_all_advance_start_prop failed: {e}"))
+    })?;
     elab.elaborate_decl(
         "theorem write_all_advance_start (span : BufferSpan) (count : TransferCount) \
            : write_all_advance_start_prop span count = Refl",

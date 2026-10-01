@@ -62,10 +62,31 @@ fn capability_laws_have_checked_local_owners_without_prelude_fallthrough() {
         ),
     ] {
         let mut env = without_prelude_copies();
-        env.elaborate_module_from_roots(&[catalog_root()], module)
+        let owned = env
+            .elaborate_module_from_roots(&[catalog_root()], module)
             .unwrap_or_else(|error| {
                 panic!("{module} must check without prelude copies: {error:?}")
             });
+        if module == "Capability.System.IO" {
+            for name in [
+                "write_all_count_fits",
+                "write_all_strict_decrease",
+                "write_all_fuel_sufficient",
+                "write_all_complete_after_wrote",
+                "write_all_zero_budget",
+            ] {
+                let qualified = format!("{module}.{name}");
+                let id = *env
+                    .globals
+                    .get(&qualified)
+                    .unwrap_or_else(|| panic!("{qualified} must be public and roots-resolvable"));
+                assert!(owned.contains(&id), "{qualified} must belong to System.IO");
+                assert!(
+                    matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+                    "{qualified} must have a checked body"
+                );
+            }
+        }
         for (function, proof) in attached {
             for name in [(*function).to_owned(), format!("{function}::{proof}")] {
                 let qualified = format!("{module}.{name}");
