@@ -96,8 +96,15 @@ The ruling decides three things:
   `hide_prelude_names`. The new helpers and `write_all_refl` join
   `private_names`, and the theorem names stay public. The step must stay
   private: it would otherwise produce a public `BufferSpan`.
-- **The premise.** `write_all_count_fits span count` in `System.IO`, on
-  each `Wrote` response. `Err` responses carry no premise.
+- **The premise** (respelled by Architect `evt_7s1szzxdss4s6`).
+  `write_all_count_fits span count` in `System.IO` is
+  `add (transfer_count_nat count) (transfer_count_remaining count) =
+  buffer_span_budget span`, with `add` from `Data.Numeric.Nat.Arithmetic`.
+  It holds on each `Wrote` response, and `Err` responses carry no premise.
+  - `System.IO` does not import `Data.Numeric.Nat.Order`, whose trust
+    closure carries `LawfulClasses` axioms.
+  - The prelude adds the public `transfer_count_predecessor` and
+    `transfer_count_nat_succ`.
 
 ## Deliverable
 
@@ -119,13 +126,14 @@ There is no `Axiom`, no `trusted_base()` change and no kernel change.
   - Each clause is a pairing. The loop half is a prelude law whose
     statement names `writeAll` or the loop: `write_all_entry`, `_stop`,
     `_request`, `_first_error_step`, `_done`, `_continue` and
-    `_advance_start`. The arithmetic half is a `System.IO` theorem (S1-S4)
-    under `write_all_count_fits`. No single catalog theorem can name the
+    `_advance_start`. The arithmetic half is a `System.IO` theorem (S1-S3,
+    in additive-witness form, `evt_7s1szzxdss4s6`) under
+    `write_all_count_fits`. No single catalog theorem can name the
     loop (G1, G2, visibility).
   - Both halves are checked in the `System.IO` load. The `System.IO` card
     maps each §1.7.3 clause to its laws.
-  - A bridge lemma relates `buffer_nat_add` to `Arithmetic.add`. Their
-    agreement is proved, not assumed.
+  - `cat_capability_laws_prelude_move` passes unchanged, and `System.IO`
+    adds no trusted declaration.
 - **AC-2 (controls).**
   - Success completeness without the response premise is rejected, and the
     failure is the fuel-`Zero` case.
@@ -179,6 +187,10 @@ the helper names and found six consumer sites, none of them migrated.
 
 §1a count: 2 (Architect `evt_zek8rgw9ssg7`).
 
+1. The premise was spelled over a prelude name that is migrating to a
+   catalog owner, and the bounds used a trust-carrying module (keyed on
+   assuming a name's home and its trust closure without measuring the
+   module graph). Ruled `evt_7s1szzxdss4s6`.
 2. A proof-only public theorem whose statement mentions private carriers
    was classified as a producer (keyed on the reduced form of the type
    rather than its sort).
