@@ -188,6 +188,27 @@ fn wrapped_return_is_seen_by_the_closed_oracle() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: a public function returning a
+/// transparent alias of TransferCount, under a Pi and with a Type-sorted
+/// result, is in the closed producer set. CLAIMED: checking an unreduced
+/// source type for Omega cannot hide real value producers. THE GAP: this
+/// exercises alias-through-result under Pi; other namespaces and positions
+/// are exercised by the existing positive repros below and in producer_closure.
+#[test]
+fn type_sorted_transfer_count_alias_under_pi_is_still_a_producer() {
+    let mut env = ElabEnv::empty().expect("prelude");
+    env.elaborate_file(
+        "def TransferCountAlias = TransferCount\n\
+         pub fn aliased_transfer_count (count : TransferCount) : TransferCountAlias = count",
+    )
+    .expect("public function returning a Type-sorted transparent alias must elaborate");
+    assert!(env.globals.contains_key("aliased_transfer_count"));
+    assert!(
+        closed_producers(&env, "TransferCount").contains("aliased_transfer_count"),
+        "classifying an unreduced type must not discard a real TransferCount producer"
+    );
+}
+
 /// S1 family (B): an unenumerated namespace. Class field types live in
 /// `class_env.class_entries()` and are source-reachable by `d.field`
 /// projection; they never enter `globals`.
