@@ -122,6 +122,21 @@ reconstructed from term geometry.
        it is, stop and name the captures and the owner.
   - **Mutation.** Swapping two W operands at site 1 (Vis735) reddens at the
     residual.
+- **Labelled force** (`evt_550cpvt3p4qw5`). At a checked-IH force whose
+  arriving population is a labelled candidate set, the carried label selects
+  through the existing `call_selected_recursive_position_unit` switch
+  (`calls.rs:830`), generalized so each arm gets its candidate's exact worker
+  body; no second switch. Each arm looks up the transport with `Some(body)`:
+  a transport takes its Direct or Tail route, and `None` takes the existing
+  exact-body non-transport path. Every arm ends in a carried value at the
+  join; no forward-Ret collapse inside an arm. The `source.rs` guard against
+  `Labelled` with body `None` stays. The switch is a selection site, not a
+  materialization point.
+  - **D0'' before the full build:** (a) what the S3 arm's route reads at
+    `env[selected_index]` and its arity; if it is the labelled residual,
+    stop and report the shape; (b) dynamic per-arm reach in the write
+    fixture, saying explicitly whether the S4 arm is reached; (c) swapping
+    the arm order reddens the write test.
 - **Gate.** The candidate set is the specializations whose key names this
   eliminator, constructor and position, sorted by
   `ContinuationSpecializationId`. A set of size 1 behaves as today. A larger
@@ -186,6 +201,18 @@ reconstructed from term geometry.
     Record-class refusal.
   - **Census.** Per creation construct, its emitting owners; per label, the
     gate owners it is dispatched under.
+
+## Symptom inventory (§1b, Architect)
+
+1. Shape.
+2. Range containment.
+3. Positional index and `Var` syntax.
+4. Single emission owner.
+5. Transport target at a force site whose arriving population is a labelled
+   {S3, S4} set: there is no static body to key the planner lookup on, and
+   the WIP refuses rather than reconstructing it (`evt_550cpvt3p4qw5`, §1a
+   5). The formal §1b predicate question falls due at entry 6, where the
+   Architect holds and calls Research.
 
 ## Stop conditions
 
