@@ -114,12 +114,18 @@ alias used across a nested-splitting inner match, reporting any runtime
    finalize only the current frame's sentinels and defer the in-matrix check
    for a method carrying an enclosing frame's sentinel; `declare_def` stays
    the authority.
+6. A second split inside a Zero bucket, with the root IH still in its tail.
+   The interior motive's IH domain comes from `indexed_root_ih_domain`
+   arithmetic, which gives `VarOutOfScope {6, 6}`. Keyed on the IH domain's
+   producing frame (`evt_6xyk9hsbe6h7m`, §1a 6, M-deep at `9a5b617c5`;
+   research hold).
 
 Shared predicate (`evt_4yewspasn0fps`, restated `evt_7ve4bw9145c1x`): a term
 in one frame's coordinates is used in another frame's context through depth
-arithmetic. Entries 1, 2, 3 and 5 are this predicate. Pre-staged recut at the
-6th stop: nested matrix construction with woven binders as real context
-pushes, as its own WP.
+arithmetic. Entries 1, 2, 3, 5 and 6 are this predicate; entry 4 is a
+consequence of the closure. The closure is the successor WP, nested matrix
+construction in the derived telescope with woven binders as real context
+pushes, framed on the stop-6 advisory and the M-deep base measurement.
 
 ## Stop conditions
 
