@@ -54,11 +54,24 @@ stop and report the mismatch.
   application on literals stays neutral under conversion (K3-deferred), so
   this is a spec change and needs the Spec vote (Architect
   `evt_4r2mqaavb9gbh`).
-- Companion corrections that state the `leq_int` exception where the spec
-  still calls registered `Op` reductions opaque to kernel conversion:
-  `spec/10-kernel/18-judgments.md` §4.2 and §5, and
-  `spec/10-kernel/18a-primitive-registry.md` introduction and §5 (CV
-  `evt_7sa4v62w5xqkj`). Wording only; no other rule changes.
+- Companion corrections so the spec states both kernel-WHNF `Op` rules:
+  this `leq_int` arm and the landed `string_to_list_char` view on a checked
+  `String` literal (`conv.rs:216`, bfdbb9789). Every other registered `Op`
+  stays K3-deferred. Wording only; no code, test or other rule change (CV
+  `evt_7sa4v62w5xqkj`, `evt_44a12zma9rzdn`; Architect `evt_4j4109frj9gq6`).
+  - `spec/10-kernel/17-conversion.md` §1 (a **prim** row, the `Op` bullet,
+    the neutral list) and the `whnf` pseudocode, per the Architect's text.
+  - `spec/10-kernel/18-judgments.md` §4.2 and §5, and
+    `spec/10-kernel/18a-primitive-registry.md` introduction, §5 and
+    §5.2.2(3): name the pair, never "sole", and keep the interpreter's
+    tested-not-trusted arm separate from the kernel arm.
+  - The general opacity sentences the Architect lists:
+    `spec/10-kernel/14-inductive.md` item 5,
+    `spec/30-surface/30-taxonomy.md:86`, `spec/30-surface/35-numbers.md`
+    (`:15-16`, §6.1), `spec/30-surface/37-strings-collections.md` (`:109`,
+    `:142`, `:154`, `:756`), `spec/30-surface/38-ffi-io.md:103-105` and
+    `spec/40-runtime/42-evaluation.md:268-270`. Their examples
+    stay; only the general claim is qualified.
 
 ## Acceptance
 
