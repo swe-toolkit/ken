@@ -1,7 +1,7 @@
 ---
 id: CAT-SYSTEM-IO-LAWS
 title: "System.IO's five writeAll theorems prove facts about helper functions, not about writeAll: write_all_first_error error = Err error, write_all_complete Zero = True. Spec 38 §1.7.3 requires kernel-checked terms over the real loop for strict decrease, fuel sufficiency, success-implies-full-transfer and error-prefix preservation. Prove them over the actual writeAll tree at zero TCB"
-status: ready
+status: merged
 owner: foundation
 size: M
 tier: T1
@@ -178,6 +178,24 @@ There is no `Axiom`, no `trusted_base()` change and no kernel change.
     `transfer_count_nat_succ`, `transfer_count_predecessor` and
     `transfer_count_remaining`, with a comment saying why. If any other row
     moves, stop to the Architect.
+
+## Closeout
+
+Merged `c55e9c23c` (PR #4423), exact `4c3b428c2`: Foundation QA
+`evt_2n292fqtsc5n3`, Architect `evt_wja6s2yxnnar`, Decision
+`dec_67scmfsked0gw`.
+
+- `writeAll` is a named step-function loop in the prelude. Its loop laws
+  are proved prelude-side, and System.IO proves each spec 38 §1.7.3 clause
+  over the real loop. The premise is `write_all_count_fits`, stated over
+  `add`.
+- The SEAL-2 oracle classifies a type's sort before reducing it.
+- The ambient census pins five prelude-intrinsic names on the System.IO row
+  (`evt_70qeaw87agv03`).
+- `trusted_base()` is unchanged.
+- Follow-on, not funded: dropping `write_all_suc_cancel` and
+  `write_all_nat_predecessor` if the hypothesis checks directly
+  (`evt_teeyv4pmqezw`).
 
 ## Stop conditions
 
