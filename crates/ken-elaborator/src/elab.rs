@@ -18600,7 +18600,11 @@ fn compile_match_matrix(
                         expected.clone(),
                         binder_count,
                     )?;
-                    if check {
+                    // The constant path's woven Var columns and enclosing split
+                    // lambdas are absent from nested_ctx. Only the reverting
+                    // path had an in-matrix check on the landed base; the final
+                    // declare_def checks the assembled term on both paths.
+                    if check && needs_reverting {
                         let checked = cx.metas.zonk_term(&closed);
                         let expected_checked = cx.metas.zonk_term(&expected);
                         kernel_check_in_context_current(cx, &nested_ctx, &checked, &expected_checked)
