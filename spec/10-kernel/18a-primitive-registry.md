@@ -10,14 +10,17 @@
 > as-currently-built where the build diverges from the seal.
 
 The trusted-base ledger (`18 §5`) enumerates primitive declarations and their
-operation symbols. In the landed system their `PrimReduction::Op` semantics run
-in `ken-interp`, remain opaque to kernel conversion, and are therefore
-tested-not-trusted value semantics rather than proof-producing reductions.
+operation symbols. Registered `PrimReduction::Op` semantics run in
+`ken-interp`. The sole separate kernel-WHNF exception is registered `leq_int`
+on two operands weak-head reducing to `IntLit` (`16 §2.2`): the kernel uses
+its own arbitrary-precision `BigInt <=`, not the interpreter's reducer. All
+other `Op` semantics remain opaque to kernel conversion and are
+interpreter-tested value semantics rather than proof-producing reductions.
 This registry makes that surface auditable: what is native, why it *earns*
 native status, what class laws opacity forecloses, and the single external net
-(the differential oracle) that checks it. Unless a paragraph explicitly says
-K3, “reduces” in this chapter means **interpreter runtime evaluation**, never
-kernel conversion.
+(the differential oracle) that checks runtime values. Unless a paragraph
+explicitly cites the `16 §2.2` exception or says K3, “reduces” in this chapter
+means **interpreter runtime evaluation**, not kernel conversion.
 
 ## 1. Schema
 
@@ -233,9 +236,13 @@ unaffected — none of it the comparison arm needs.
 ## 5. The registry
 
 Registrars: `ken-elaborator/src/{numbers,bytes,prelude}.rs` (assembled in
-`ElabEnv::new`); reductions in `ken-interp/src/eval.rs::prim_reduce`. Kernel
-admission: `declare_primitive` (`check.rs`), tag
-`PrimReduction = OpaqueType | Op { symbol }` (`env.rs`).
+`ElabEnv::new`); runtime reductions in `ken-interp/src/eval.rs::prim_reduce`.
+Kernel admission: `declare_primitive` (`check.rs`), tag
+`PrimReduction = OpaqueType | Op { symbol }` (`env.rs`). Registered `leq_int`
+alone also reduces in kernel WHNF on two `IntLit` operands (`16 §2.2`); no
+other registry row gains kernel computation from its `Op` tag. The F1 and
+Decimal/Char tranche statements below about no kernel edits describe those
+earlier delivery scopes, not this separately authorized kernel rule.
 
 ### 5.1 Opaque primitive types
 

@@ -284,7 +284,7 @@ entry may return.
 | `declare_recursive_group` | one `(level_params, ty)` per member; `bodies_fn` returns one body per member, in order | each `ty` checked; all members pre-admitted opaque; each body checked; **SCT on the whole group**; accept ⇒ all transparent; **reject ⇒ the whole group rolled back** | as `declare_def`; `NotTerminating` rolls back every member |
 | `declare_inductive` | `build(id)` yields a well-formed host `InductiveSpec` self-referencing `id`; callers cannot mark a spec as terminal support | the host signatures, universes, **strict positivity** (`14 §8`), **W-style boundary** (`14 §8.4`), and **nested-positive boundary** (`14 §8.5`) check. If the host has `p` checked positive carriers, exactly `2p` first-order `All^Type` / `All^Omega` families then pass ordinary indexed-inductive checks (`14 §1`/`§3.2`). Kernel provenance classifies them as terminal support: each stored `InductiveDecl` carries its constructor records, its generic `Term::Elim { fam, … }` form checks ordinarily, and it triggers neither support generation nor general enclosing-former registration. Success atomically appends the host and fixed support set as `Decl::Inductive` entries; no eliminator declaration or `GlobalId` is created. Nested method types and ι use those same family applications (`14 §7.8`). Any failure rolls the entire transaction back, so `Σ` is unchanged. The admission subset is landed; only the independently marked nested completeness residuals remain gated on `KERNEL-NESTED-IND` | `PositivityViolation`, `IllFormedDecl`, `ConstructorUniverseViolation`, `LevelArityMismatch` |
 | `declare_postulate` | `name` is a non-positional audit label; `ty` raw-well-formed over `·` | `· ⊢ ty type`; `id` admitted **opaque** with `name`; **recorded in the trusted base** (appears as a named entry in `trusted_base()`). A postulate of an empty type is admitted but **visible** as an assumption | `TypeMismatch`, `UniverseInconsistency` |
-| `declare_primitive` | `ty` raw-well-formed; `reduction` the registered operation descriptor | `· ⊢ ty type`; `id` admitted opaque + descriptor **registered in the trusted-base ledger**. `Literal` records a value class; `Op` is opaque to landed conversion and names interpreter dispatch (§5) | `TypeMismatch`, `UniverseInconsistency` |
+| `declare_primitive` | `ty` raw-well-formed; `reduction` the registered operation descriptor | `· ⊢ ty type`; `id` admitted opaque + descriptor **registered in the trusted-base ledger**. `Literal` records a value class; `Op` names interpreter dispatch (§5). Only registered `leq_int` on two WHNF `IntLit` operands also reduces in kernel WHNF (`16 §2.2`); other Ops remain opaque to conversion | `TypeMismatch`, `UniverseInconsistency` |
 | `infer` | `ctx` well-formed; `t` raw-well-formed | returns the **unique** `A` with `ctx ⊢ t ⇒ A` (§3.1) | `VarOutOfScope`, `NotAFunction`, `NotASigma`, `LevelArityMismatch`, `TypeMismatch`; a non-inferable head ⇒ error |
 | `check` | `ctx` well-formed; `t` raw-well-formed; **`ty` a well-formed type** | `ctx ⊢ t ⇐ ty` (§3.2); the single conversion call is the mode switch | `TypeMismatch` (the two non-converting types), plus any from `infer` |
 | `convert` | `a`, `b` both check at `ty` | `true` ⇔ `ctx ⊢ a ≡ b : ty` (`17`); **total + decidable**. Threads `ty` for η + the Ω-PI shortcut (`16 §8.2`) | none — returns `bool`; the caller manufactures the error |
@@ -445,9 +445,12 @@ relies on the interpreter semantics named by (2):
    `declare_primitive` (`14 §5`) — opaque constants enumerated for audit. Their
    declared types are part of the proof-soundness TCB. In the landed system an
    `Op` symbol dispatches the interpreter's `prim_reduce`; that implementation
-   is not executed by kernel conversion. Its specified partial function must be
-   correct for runtime semantic correctness, but a wrong result is a wrong
-   runtime value rather than an inhabitant of a false proposition.
+   is not executed by kernel conversion. The sole separate kernel-WHNF `Op`
+   exception is registered `leq_int` on two operands reducing to `IntLit`
+   (`16 §2.2`), using the kernel's own arbitrary-precision `BigInt <=`. That
+   kernel comparison is trusted code for proof soundness. The interpreter's
+   specified partial functions must be correct for runtime semantic
+   correctness; an incorrect runtime result alone is not a kernel proof.
 3. **Any postulates** admitted via `declare_postulate` — each is an *assumed*
    axiom carrying the stable audit label required by §4.2; a postulate of an
    empty type would make the system inconsistent.
@@ -466,11 +469,13 @@ surface `Axiom` expressions. Idiomatic Ken adds **no** postulates; classical
 axioms, if used, appear here and are visible (`16 §1.3` — Ω is
 intuitionistic, excluded middle is not assumed).
 
-The enumeration records the trusted primitive declarations/signatures while
-current `Op` execution remains in the tested-not-trusted interpreter ring. It
-does not imply that the kernel executes the registered operation. Promoting
-those operations into conversion would enlarge the kernel TCB and is the
-separate K3 decision.
+The enumeration records trusted primitive declarations/signatures, not a
+blanket permission to compute registered operations in conversion. Other
+`Op` execution remains in the tested-not-trusted interpreter ring; the
+specific `leq_int` WHNF rule in `16 §2.2` is the sole kernel-executed `Op`
+exception and enlarges trusted kernel code without adding a declaration to
+`trusted_base()`. Promoting any other `Op` into conversion remains a separate
+K3 decision.
 
 The concrete enumeration of clause (2) — every native (`declare_primitive`)
 operation, **adversarially** re-adjudicated against the surface chapters
