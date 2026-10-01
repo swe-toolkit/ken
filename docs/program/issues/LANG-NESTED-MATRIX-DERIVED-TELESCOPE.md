@@ -57,6 +57,9 @@ Two increments, each a straight-ancestor cut that may land alone.
      raised there; "the split reverts" is not the test.
    - Occurrence terms replace sentinel depth arithmetic, and the four
      mechanisms above are deleted.
+   - The in-matrix per-method kernel check runs in the derived telescope on
+     every path. The `&& needs_reverting` conjunct is removed
+     (`evt_4c4tgkc2gvypk`, input f).
 
 ## Acceptance
 
@@ -67,6 +70,9 @@ Two increments, each a straight-ancestor cut that may land alone.
     That includes the collision control and M1, M2 and M3.
   - A dependent-R fixture in inference mode gives the precise diagnostic.
   - A constant-R fixture in inference mode still checks.
+  - The `lang_match_record_pattern` record row and the reverting
+    woven-column fixture (FIELD-DEPENDENCE P5) are value-pinned and checked
+    in-matrix.
 - **AC-3.** `lang_infer_match_indexed_complete` and the as-pattern,
   nested-split and tuple-pattern suites stay green. The catalog census is
   byte-identical, and `trusted_base()` is unchanged.
