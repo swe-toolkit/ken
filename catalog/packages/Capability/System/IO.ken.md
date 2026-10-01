@@ -38,33 +38,6 @@ pub fn write_all_count_fits (span : BufferSpan) (count : TransferCount) : Prop =
     (add (transfer_count_nat count) (transfer_count_remaining count))
     (buffer_span_budget span)
 
-theorem write_all_successor_sum
-      (predecessor : Nat) (remaining : Nat)
-    : Equal Nat (add (Suc remaining) predecessor) (add (Suc predecessor) remaining) =
-  trans
-    Nat
-    (add (Suc remaining) predecessor)
-    (Suc (add remaining predecessor))
-    (add (Suc predecessor) remaining)
-    ((proof suc_l for add) remaining predecessor)
-    (trans
-      Nat
-      (Suc (add remaining predecessor))
-      (Suc (add predecessor remaining))
-      (add (Suc predecessor) remaining)
-      (cong
-        Nat
-        Nat
-        (add remaining predecessor)
-        (add predecessor remaining)
-        Suc
-        ((proof comm for add) remaining predecessor))
-      (sym
-        Nat
-        (add (Suc predecessor) remaining)
-        (Suc (add predecessor remaining))
-        ((proof suc_l for add) predecessor remaining)))
-
 pub theorem write_all_strict_decrease
       (span : BufferSpan) (count : TransferCount) (fits : write_all_count_fits span count)
     : Equal Nat
@@ -95,46 +68,6 @@ pub theorem write_all_strict_decrease
           (Suc (transfer_count_predecessor count))
           (transfer_count_nat_succ count))))
     fits
-
-fn write_all_nat_predecessor (n : Nat) : Nat =
-  match n {
-    Zero ↦ Zero;
-    Suc earlier ↦ earlier
-  }
-
-theorem write_all_suc_cancel
-      (left : Nat) (right : Nat) (same_successor : Equal Nat (Suc left) (Suc right))
-    : Equal Nat left right =
-  cong Nat Nat (Suc left) (Suc right) write_all_nat_predecessor same_successor
-
-theorem write_all_fuel_shape
-      (remaining : Nat) (predecessor : Nat) (slack : Nat)
-    : Equal Nat
-        (add (add (Suc remaining) predecessor) slack)
-        (Suc (add remaining (add slack predecessor))) =
-  trans
-    Nat
-    (add (add (Suc remaining) predecessor) slack)
-    (add (Suc remaining) (add predecessor slack))
-    (Suc (add remaining (add slack predecessor)))
-    (sym
-      Nat
-      (add (Suc remaining) (add predecessor slack))
-      (add (add (Suc remaining) predecessor) slack)
-      ((proof assoc for add) (Suc remaining) predecessor slack))
-    (trans
-      Nat
-      (add (Suc remaining) (add predecessor slack))
-      (Suc (add remaining (add predecessor slack)))
-      (Suc (add remaining (add slack predecessor)))
-      ((proof suc_l for add) remaining (add predecessor slack))
-      (cong
-        Nat
-        Nat
-        (add predecessor slack)
-        (add slack predecessor)
-        (λother. Suc (add remaining other))
-        ((proof comm for add) predecessor slack)))
 
 pub theorem write_all_fuel_sufficient
       (span : BufferSpan)
@@ -231,6 +164,73 @@ theorem write_all_all_success_holds
       (fuel : Nat)
     : Equal Bool (write_all_all_success fuel) True =
   proof all_success for write_all_all_success fuel
+
+theorem write_all_fuel_shape
+      (remaining : Nat) (predecessor : Nat) (slack : Nat)
+    : Equal Nat
+        (add (add (Suc remaining) predecessor) slack)
+        (Suc (add remaining (add slack predecessor))) =
+  trans
+    Nat
+    (add (add (Suc remaining) predecessor) slack)
+    (add (Suc remaining) (add predecessor slack))
+    (Suc (add remaining (add slack predecessor)))
+    (sym
+      Nat
+      (add (Suc remaining) (add predecessor slack))
+      (add (add (Suc remaining) predecessor) slack)
+      ((proof assoc for add) (Suc remaining) predecessor slack))
+    (trans
+      Nat
+      (add (Suc remaining) (add predecessor slack))
+      (Suc (add remaining (add predecessor slack)))
+      (Suc (add remaining (add slack predecessor)))
+      ((proof suc_l for add) remaining (add predecessor slack))
+      (cong
+        Nat
+        Nat
+        (add predecessor slack)
+        (add slack predecessor)
+        (λother. Suc (add remaining other))
+        ((proof comm for add) predecessor slack)))
+
+theorem write_all_successor_sum
+      (predecessor : Nat) (remaining : Nat)
+    : Equal Nat (add (Suc remaining) predecessor) (add (Suc predecessor) remaining) =
+  trans
+    Nat
+    (add (Suc remaining) predecessor)
+    (Suc (add remaining predecessor))
+    (add (Suc predecessor) remaining)
+    ((proof suc_l for add) remaining predecessor)
+    (trans
+      Nat
+      (Suc (add remaining predecessor))
+      (Suc (add predecessor remaining))
+      (add (Suc predecessor) remaining)
+      (cong
+        Nat
+        Nat
+        (add remaining predecessor)
+        (add predecessor remaining)
+        Suc
+        ((proof comm for add) remaining predecessor))
+      (sym
+        Nat
+        (add (Suc predecessor) remaining)
+        (Suc (add predecessor remaining))
+        ((proof suc_l for add) predecessor remaining)))
+
+theorem write_all_suc_cancel
+      (left : Nat) (right : Nat) (same_successor : Equal Nat (Suc left) (Suc right))
+    : Equal Nat left right =
+  cong Nat Nat (Suc left) (Suc right) write_all_nat_predecessor same_successor
+
+fn write_all_nat_predecessor (n : Nat) : Nat =
+  match n {
+    Zero ↦ Zero;
+    Suc earlier ↦ earlier
+  }
 
 fn write_all_call_bound (fuel : Nat) : Nat =
   match fuel {
