@@ -53,8 +53,9 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
 2. **Class A (5 rows): the J-base `Refl` inside a `Cast`, f7 and f4's
    inner `ys`.** This is a kernel reducer defect (Architect
    `evt_449gyxrrejte1`): the reducer emits ill-typed `Cast` reducts.
-   Increment 2 waits for `KERNEL-OBS-REDUCT-WITNESS-TYPING`, and the five
-   rows may then go green. A B row that involves a reducer-synthesized
+   Increment 2 waits for `KERNEL-OBS-TYPE-EQ-STRUCTURAL` (site 3, recut
+   `evt_229qe9tgfetw1` and `evt_4sj0kg0kd2qbz`), and the five rows may then
+   go green. A B row that involves a reducer-synthesized
    reduct moves here too.
 
 ## Acceptance
@@ -112,7 +113,7 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
     admission (`ds5b` row).
   - Architect residual, diagnostic only: a no-op with nonempty leaves still
     builds the expanded view.
-- Open: increment 2 (Class A) waits on `KERNEL-OBS-REDUCT-WITNESS-TYPING`.
+- Open: increment 2 (Class A) waits on `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
   The WP stays open.
 
 ## Residual (carried, not closed)

@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ENV-RAW-INSTALL-CRATE-PRIVATE
 title: "Code outside the kernel can still install a Decl::Transparent body or pop a declaration with no check, because GlobalEnv::add_decl and remove_last are pub. Route every external use through a checked kernel entry point and make both raw primitives crate-private"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -59,6 +59,25 @@ that cannot reach production.
 - **AC-2 (controls).**
   - The 57-package census shows no verdict change.
   - `trusted_base()` is unchanged on the targeted suites.
+
+## Closeout
+
+Merged `032bc7b75` (PR #4414), exact `6fde118aa`: Kernel QA
+`evt_2vgtyt843k4wv`, Architect `evt_3dj22arjesbg4`, Decision
+`dec_5e35mvvrwpcxh`.
+
+- `GlobalEnv::add_decl`, `remove_last` and `release_unused_id` are
+  `pub(crate)`, pinned by compile_fail doctests. A body reaches
+  `Decl::Transparent` only through `check::admit_bodies`.
+- Staged admission goes through a move-only `PendingAdmission` handle. It is
+  checked for env instance, intact staged tail and body count before any
+  mutation, which closes a latent partial-admission hole.
+- `trusted_base()` is unchanged.
+
+Carried:
+- `register_int_lit_type` is the same latent class, a public unchecked
+  kernel mutator (Architect `evt_3dj22arjesbg4`). It is framed as
+  `KERNEL-INT-LIT-CARRIER-CHECKED`.
 
 ## Stop conditions
 

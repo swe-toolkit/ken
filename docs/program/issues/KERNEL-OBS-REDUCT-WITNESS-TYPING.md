@@ -6,8 +6,8 @@ owner: kernel
 size: M
 tier: T1
 gate: architect
-depends_on: []
-blocks: [KERNEL-OBS-NESTED-CAST-LINEAR]
+depends_on: [KERNEL-OBS-EQ-AT-TYPE-RIGID-BOTTOM]
+blocks: [KERNEL-OBS-NESTED-CAST-LINEAR, KERNEL-OBS-TYPE-EQ-STRUCTURAL]
 github: null
 origin: "Architect stop ruling evt_449gyxrrejte1 on LANG-SIBLING-GOAL-REFINEMENT Class A: a kernel reducer defect, not an elaborator one. Trust-root work. Steward-filed per COORDINATION section 2."
 ---
@@ -53,28 +53,111 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-All four sites build their witness from the reduction's own `e`: the
-decomposition projections, then `cong` via `J` along `eq'`, accumulated
-along the telescope per §3.2, or §4.1's singleton schema for `pair-eq`.
+Recut by the Architect in `evt_229qe9tgfetw1`, after AC-0 landed at
+`aa51bf9d7`. **Sites 1, 2 and 4 only.** Production edits wait until
+`KERNEL-OBS-EQ-AT-TYPE-RIGID-BOTTOM` merges. Until then, a witness at a Π
+or Σ type is still ill-typed, because its base type is `Bottom`.
+
+Each witness is a `J` along evidence the reduction already has, with an
+ascribed motive, as in the elaborator's `build_index_type_cong`:
+
+- **Site 1.** Built inside the Σ codomain along `Var(0) : Eq A1 p.1 q.1`.
+- **Site 2.** Built along the Σ-telescope pair `E_j = (h_1, (h_2, …))` of
+  the earlier conjunct proofs.
+- **Site 4.** Built directly along `e`.
+
+The base is the canonical proof of `Eq Type X X`. It is `Refl x'` if whnf
+gives `Eq _ x' _`, and `tt` if it gives `Top`. Otherwise the reducer
+returns `None` and fabricates no witness.
+
+**J reads its recorded endpoints** (Architect `evt_143zpap46cmfr`, on
+research `evt_4vn1evrd2cn38`; it replaces the `eq_formation` ruling
+`evt_3qfzytddvnjkn`). A J's endpoints are an input recorded once in the
+term, and no consumer re-derives them from `whnf`.
+- **Kernel.** One reader, `j_endpoints(env, ctx, eq)`, over the eq
+  *term*. If `eq` is `Ascript(_, T)` and `T`'s head is `Eq` after β, δ and
+  let only (never `eq_reduce`), it returns `T`'s `(A, a, b)`. Otherwise it
+  falls back to today's `whnf(infer(eq))` and `Eq` shape demand. `infer_j`
+  (`check.rs:742-750`) and `obs.rs::j_nonrefl` both use it, and nothing
+  else reads J endpoints.
+- **Elaborator.** Surface `infer_j` (`elab.rs` ~9435-9446) derives
+  `(A, a, b)` exactly as today and emits `eq` as `Ascript(eq, Eq A a b)`.
+  Nothing else in the elaborator changes.
+- **Kernel witnesses record their evidence.** Site 1:
+  `Ascript(Var(0), Eq A1 p.1 q.1)`, weakened into the codomain. Site 2:
+  `E_j`, already ascribed. Site 4: `Ascript(e, Eq A a b)` with the
+  `(A, a, b)` that `j_endpoints` gave `j_nonrefl`.
+- This widens J admission to recorded formations whose `Eq` reduces. The
+  merge Decision reviews that widening explicitly.
+
+**Site 3 (`cast_at_inductive` Phase 3) moves to
+`KERNEL-OBS-TYPE-EQ-STRUCTURAL`.** Its `e` has no projections, because
+`eq_at_type` leaves same-former compound pairs neutral. The five Class A
+fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
+`cast_at_sigma` and `cast_at_quot` (Architect `evt_4sj0kg0kd2qbz`).
 
 ## Acceptance
 
-- **AC-0 (no fix).**
-  - For each site, a subject-reduction row: a well-typed redex whose
-    reduct fails `infer` today.
-  - Name the consumer that re-types the reduct on the five Class A rows.
-  - Measure the witness-construction cost on the nested-`Cast` shape,
-    because the reducer is hot.
-  - The Kernel leader asks the Spec leader to confirm that the four witness
-    schemas are the normative ones. The Architect then rules the repair.
+- **AC-0: done** (`evt_1r571tvqwhywe`, `evt_1xa46f5v6661`).
+  - Four subject-reduction rows reach the `Refl` guard at `aa51bf9d7`.
+  - The Class A consumer is `check_dependent_branch_body`'s
+    `kernel_check_current`.
+  - The nested-Cast baseline cost is measured.
 - **AC-1.**
-  - `infer(reduct)` is convertible to `infer(redex)` at each site.
-  - The five Class A kernel pairs are committed as fixtures.
-  - A `j_reduce` row whose proof carries a Phase 3 reduct now computes.
+  - At sites 1, 2 and 4, `infer(reduct)` is convertible to
+    `infer(redex)`, on the AC-0 rows.
+  - Each of those sites also has a row where X is a Π or Σ type.
 - **AC-2 (controls).**
-  - Reverting any one site reddens its subject-reduction row.
+  - Reverting any one site reddens its row.
+  - A base that does not whnf to `Eq` or `Top` leaves the reduct neutral.
   - The 57-package census shows no conversion verdict change.
   - `trusted_base()` is unchanged.
+  - The nested-Cast cost is re-measured against the AC-0 baseline.
+- **AC-2b (legacy raw fixtures, Architect `evt_7k85x8en4fekz`).** Scope adds
+  `crates/ken-kernel/tests/acceptance.rs` and
+  `crates/ken-kernel/tests/k2c_series2.rs` (`j_dependent_motive_fires` and
+  `j_constant_motive_still_reduces`, found by the every-target sweep).
+  - `k2_j_nonrefl_reduces_not_stuck` moves to a typed redex with an
+    ascribed motive, and J-cast still fires.
+  - `k2_seam1b_eq_inductive_dependent_stuck` instantiates the `Vec` level
+    and asserts the §2.2 reduct with a typed witness. If the spec makes it
+    neutral, it asserts neutral and is renamed to match.
+  - Each legacy ill-typed redex gets a control that asserts it stays
+    neutral, with no fabricated witness and no panic.
+  - `j_dependent_motive_fires` moves to `P(y,h) = Vec Nat y` over an opaque
+    `base` (Architect `evt_4sj0kg0kd2qbz`). J-cast fires,
+    `infer(reduct) ≡ infer(redex)`, and the full whnf ends at a neutral,
+    typed `Cast` that checks against `infer(J)`. The Π-motive row moves to
+    `KERNEL-OBS-TYPE-EQ-STRUCTURAL` as its motivating red.
+  - Every `ken-kernel` test target and the kernel conformance suites are
+    run scoped before QA, and every changed raw-fixture observation is
+    listed. A change on a typed input is a stop to the Architect.
+  - The nested-Cast series at depths 8/16/32/64 is reported beside the AC-0
+    baseline. A super-linear jump is a stop to the Architect.
+- **AC-2c (recorded endpoints, `evt_143zpap46cmfr`).** Scope adds
+  `crates/ken-elaborator/src/elab.rs` (surface `infer_j` only) and
+  `crates/ken-elaborator/tests/surface_transport_acceptance.rs`.
+  - `j_elaborates_to_a_real_term_j_node` also asserts that the `Term::J`
+    equality argument is `Ascript(_, Eq A a b)`. Removing the recording
+    reddens it.
+  - The 57-package census returns to 57/57 accept, with no verdict change
+    against `65af5c7cd`.
+  - A J recorded at `Eq Nat (suc a) (suc b)` and a J recorded at
+    `Eq Nat a b`, over the same `e`, each infer their own recorded result
+    type.
+  - An unrecorded raw J keeps today's type.
+  - The span-55965 probe is posted with the candidate.
+- **AC-3 (J admission fences).**
+  - The committed third-field row (`Nat; Vec Nat x1; Vec Nat x1`) computes,
+    and `infer(reduct) ≡ infer(redex)`.
+  - `J` over a variable `h : Eq (Σ x:Nat. Vec Nat x) p q` with a dependent
+    motive typechecks.
+  - `J` over `h : Top`, or over any proof whose type has no `Eq` head, is
+    still rejected with `BadEliminator`.
+  - `J` over an `Eq` reached only by δ-unfolding a def keeps today's
+    verdict.
+  - The 57-package census shows no accept→reject flip. New accepts appear
+    only where the old verdict was this exact `BadEliminator`.
 
 ## Stop conditions
 
@@ -84,3 +167,27 @@ along the telescope per §3.2, or §4.1's singleton schema for `pair-eq`.
 - Any change to what the kernel accepts, beyond reducts that now compute:
   stop to the Architect.
 - A spec change: an operator question.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 3 (Architect `evt_1m0z85kjtyzbe`; research `evt_4vn1evrd2cn38`).
+
+1. J cannot eliminate a proof whose Eq formation reduces. `infer_j` reads
+   `whnf(e_ty)` and demands the `Eq` shape, but `Eq` at Σ reduces to a Σ
+   (keyed on reading an Eq formation after its own reduction). The same
+   shape sits in `check`'s `Refl` rule (`check.rs:483`), which is left to
+   `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
+2. `cast_at_pi` projects `e.1` from a Π/Π type equality that has no Σ
+   reduct (keyed on the absent structural decomposition of `Eq Type` at a
+   same-former compound pair). Recut to `KERNEL-OBS-TYPE-EQ-STRUCTURAL`.
+3. Under the `eq_formation` WIP, 22 catalog packages rejected. The
+   Architect's reading was that J's reading of a proof's `Eq` changed for
+   proofs whose `Eq` reduces to another `Eq`. **Measured cause**
+   (`evt_1k071x8epb5t1`, `evt_6a3p14yjwh8fc`): the failing J at span 55965
+   has `eq = Refl(@0.1)`. Kernel-generated site-1 evidence lost its `Eq`
+   on substitution to a bare `Refl`, so `infer(eq)` fails before any `Eq`
+   is read. Dropping only site 1's recorded ascription restores that
+   rejection, and restoring it returns 57/57. Shared predicate with entries
+   1 and 2: each `Eq` consumer re-derives the proof's `Eq` from its type
+   instead of reading a recorded input. Ruled: endpoints recorded once,
+   `evt_143zpap46cmfr`.

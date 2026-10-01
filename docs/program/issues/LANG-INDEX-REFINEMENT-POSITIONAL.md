@@ -1,7 +1,7 @@
 ---
 id: LANG-INDEX-REFINEMENT-POSITIONAL
 title: "Refining one index of a constructor arm's type rewrites every equal value in the family application, so a sibling index that happens to hold the same value is captured and a well-typed match on a multi-index family is falsely rejected. Rewrite only the refined index position"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1
@@ -59,6 +59,19 @@ second rewrite rule beside it.
   - A genuinely ill-typed arm on the same family is still rejected.
   - Reverting the helper at `:6825` alone reddens the overlap row.
   - The 61-file catalog census shows no verdict change.
+
+## Closeout
+
+Merged `65af5c7cd` (PR #4418), exact `867b54339`: Language QA
+`evt_2deka8mk3xxbv`, Architect `evt_6yxkyf2m7vf31`, Decision
+`dec_4v0wtq28w3pdy`.
+
+- Branch-goal restoration targets the pre-image goal over the caller's
+  forward family; no endpoint is recovered by inverse substitution.
+- `Mat a` rows at `(Zero, Zero)` and `(Suc Zero, Zero)` check, and the
+  controls keep their verdicts. Reverting the call site fails exactly the
+  two overlap rows.
+- Elaborator only; no trust change.
 
 ## Stop conditions
 
