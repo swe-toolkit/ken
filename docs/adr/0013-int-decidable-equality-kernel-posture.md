@@ -86,9 +86,14 @@ same arbitrary-precision `BigInt <=` comparison as the interpreter. Both
 operands weak-head normalize before the literal guard; if either is not a
 literal, the call remains neutral. The other Int operations, including
 `eq_int`, do not gain kernel Op reduction. This extends the audited kernel
-computation, not the trusted certificate or postulate inventory. It allows
-closed `isScalar` and `PosInt` refinement obligations to reduce without the
-elaborator asserting their truth. See spec `16 §2.2` for the reduction rule.
+computation, not the trusted certificate or postulate inventory. It supports
+closed literal comparison goals and a kernel-local Bool elimination over their
+results. It does not by itself close the current `isScalar` or `PosInt`
+consumer obligations: `isScalar` still passes through `inRangeBool`, which
+composes comparisons with unreduced `and_bool` and `or_bool` operations.
+The separately routed Language consumer work must supply transparent Bool
+elimination where needed before those obligations close. No elaborator-side
+assertion of their truth is licensed. See spec `16 §2.2` for the rule.
 
 ## Consequences
 
