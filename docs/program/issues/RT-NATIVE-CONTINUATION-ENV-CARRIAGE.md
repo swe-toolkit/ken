@@ -89,32 +89,39 @@ reconstructed from term geometry.
   record, never from a frame. Each capture comes from the claims
   `RT-PLANNER-PER-EMITTER-AVAILABILITY` finalizes under the emitting owner
   (`evt_3yp3tea99hfta`).
-- **Transport** (rule 4, `evt_1myz2wkf66w8a`; capture source revised in
-  `evt_64jeybga2y9fy`, which withdraws that part of `evt_3yp3tea99hfta`). A
-  checked-IH transport whose destination is the field `(P, f)` of a
-  disposition `(P, f, S)`, with S its source specialization, is a
-  materialization point. The residual is built there, in the
-  `CheckedIhApplicationResult` lowering: child `claimed.answer.value`, and
-  the label as at a construct emission. W and C come from the transport, not
-  the destination owner's frame:
-  - W_j is field j of `transport.source_record()`, after the record's
-    `Constructor` shape and declared-children count check;
-  - C_k is `transport.continuation_input_index(k, coordinate_k)`.
-
-  Reuse the emitted `captures` operands and the morphism-read inputs; do not
-  re-derive them. The census gains `FinalizedTransport(TransportCarriedClaim)`
-  for transport-destination points; construct-emission points keep the frame
-  path. The child's own construction (Ret721) is never wrapped, and no gate
-  inspects the child's constructor.
-  - **D0 before building** (`evt_64jeybga2y9fy`): at Vis735 S1→S2, W0-W7 are
-    `WorkerRecordField` on a record with 8 declared children, and C0-C5 are
-    `ContinuationInput` with their destinations; census totals move only at
-    transport-destination points; every transport destination in the read
-    and write fixtures is a `CheckedIhApplicationResult` site. Any miss:
-    stop.
-  - **Mutation.** Swapping two `WorkerRecordField` ordinals at Vis735
-    reddens at the residual, or the existing `PermuteCaptures` control
-    covers it.
+- **Transport** (rule 4, `evt_1myz2wkf66w8a`; capture source and placement
+  as revised in `evt_64jeybga2y9fy` and `evt_5np6k589ze5na`). A checked-IH
+  transport whose destination is the field `(P, f)` of a disposition
+  `(P, f, S)`, with S its source specialization, is a materialization point.
+  - **Placement.** Each transport emission: the three
+    `checked_ih_transport_emissions.push` sites in lowering `core.rs`
+    (`call_checked_ih_environment_transport`, the Direct and the Tail case
+    transports). Immediately after `call_declared_unit_target`, each builds
+    its own residual `[child = returned, label, W, C]`, with the label as at a
+    construct emission. Vis735's 15 emissions build 15.
+  - **W and C** are the operands that site just passed to the call; never
+    re-read or re-derived. Sites 1 and Tail record
+    `worker_captures: Vec<(u32, LoweringOperand)>` in their `WorkerCapture`
+    arm; Direct already has `captures`. C is the continuation-input operands
+    in ordinal order, as resolved through the morphism.
+  - **Census.** At a transport-destination point every W and C is
+    `FinalizedTransport(TransportCarriedClaim)`: `WorkerCapture { seat,
+    ordinal }` or `ContinuationInput { ordinal, destination }`. Frame claims
+    are not consulted there. Construct-emission points keep the frame path.
+    Interning keys stay byte-identical to the d099 pin.
+  - The child's own construction (Ret721) is never wrapped, and no gate
+    inspects the child's constructor.
+  - **D0' before building** (`evt_5np6k589ze5na`), measure only:
+    1. `checked_ih_transport_emissions.push` has exactly the three sites on
+       the WIP, and every read and write transport point emits at least once
+       across them;
+    2. the read census after reclassification (predicted: S2 owner from
+       4/44 to 41/7);
+    3. whether the construct-emission point holding the 7 that stay
+       unfinalizable is emitted on the AC-1 read path, by static count. If
+       it is, stop and name the captures and the owner.
+  - **Mutation.** Swapping two W operands at site 1 (Vis735) reddens at the
+    residual.
 - **Gate.** The candidate set is the specializations whose key names this
   eliminator, constructor and position, sorted by
   `ContinuationSpecializationId`. A set of size 1 behaves as today. A larger
