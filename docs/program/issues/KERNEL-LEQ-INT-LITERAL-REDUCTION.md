@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LEQ-INT-LITERAL-REDUCTION
 title: "The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as isScalar 55295 or PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
