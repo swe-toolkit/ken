@@ -429,6 +429,7 @@ pub struct PerEmitterMaterializationDiagnostic {
     pub recursive_position: u32,
     pub emission_origin: u32,
     pub owner: String,
+    pub owner_id: PerEmitterOwnerDiagnostic,
     pub kind: String,
     pub captures: Vec<PerEmitterCaptureDiagnostic>,
 }
@@ -481,6 +482,7 @@ pub(super) fn record_per_emitter_availability_diagnostic(plan: &StaticTransition
                     recursive_position: point.recursive_position,
                     emission_origin: point.emission_origin.0,
                     owner: format!("{:?}", point.owner),
+                    owner_id: diagnostic_owner(point.owner),
                     kind: format!("{:?}", point.kind),
                     captures: point
                         .captures

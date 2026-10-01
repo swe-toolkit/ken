@@ -2725,10 +2725,14 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
                 let entry = counts.entry(point.owner.as_str()).or_insert((0usize, 0usize));
                 for capture in &point.captures {
                     if capture.result.starts_with("Finalized(") {
+                        assert_eq!(capture.unfinalizable_owner, None,
+                            "finalized captures cannot carry an unfinalizable owner");
                         entry.0 += 1;
                     } else {
                         assert!(capture.result.starts_with("Unfinalizable {"),
                             "the census must classify every ordinal: {capture:?}");
+                        assert_eq!(capture.unfinalizable_owner, Some(point.owner_id),
+                            "each unfinalizable result must name its own emitting point's owner");
                         entry.1 += 1;
                     }
                 }
@@ -2746,6 +2750,8 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
                 && point.kind == "CheckedIhTransportDestination"
                 && point.owner == "Specialization(ContinuationSpecializationId(2))"
         }).expect("Vis735 has one checked-IH transport destination for spec 1");
+        assert_eq!(destination.owner_id,
+            ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2));
         assert_eq!(destination.captures.len(), 14);
         assert_eq!(destination.captures.iter().filter(|capture| capture.run == "Worker").count(), 8);
         assert_eq!(destination.captures.iter().filter(|capture| capture.run == "Context").count(), 6);
