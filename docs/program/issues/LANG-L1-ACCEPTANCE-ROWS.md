@@ -1,7 +1,7 @@
 ---
 id: LANG-L1-ACCEPTANCE-ROWS
 title: "Un-ignore two l1_acceptance rows as real assertions of settled behaviour: the explicit Int to Int64 conversion (delivered as intToInt64) and Char literals excluding surrogates. The Int division row stays ignored until the operator rules on registering div_int and mod_int"
-status: active
+status: merged
 owner: language
 size: S
 gate: architect
@@ -92,3 +92,19 @@ is expected; both behaviours are delivered at zero TCB.
 - A row whose behaviour `/spec` does not settle: stop to the Spec leader.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Merged `ab476663a` (PR #4433), exact `a916fda42`: Language QA
+`evt_6dsnddvc26b6h`, Architect `evt_4a363dtqtaqzn`, Decision
+`dec_2586vsffx0h3x`.
+
+- Row 1 asserts `intToInt64` gives `Some` at the `i64` bounds and `None`
+  just outside, checked against the env's `Option` constructor ids.
+- Row 3 asserts `'\u{D800}'` and `'\u{DFFF}'` reject as
+  `ElabError::InvalidEscape`.
+- Row 2 stays ignored pending the operator's `div_int`/`mod_int` ruling.
+- The two rows' exemption blocks are deleted and the sweep unit's
+  registry counts follow. Its pre-existing `policy-cost` failure is
+  unchanged.
+- No production, kernel, spec or catalog change; zero TCB.

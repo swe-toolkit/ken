@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-SPLIT-CONSTANT-MOTIVE-INDEX
 title: "A nested indexed split whose motive is constant is refused when its index is concrete or repeated, although a constant motive does not depend on the index. Run the distinct-variable-index check only when the split needs reverting"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
