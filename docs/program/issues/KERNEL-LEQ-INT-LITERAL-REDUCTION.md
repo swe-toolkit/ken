@@ -72,6 +72,18 @@ stop and report the mismatch.
     `:142`, `:154`, `:756`), `spec/30-surface/38-ffi-io.md:103-105` and
     `spec/40-runtime/42-evaluation.md:268-270`. Their examples
     stay; only the general claim is qualified.
+- Conformance for both kernel-WHNF `Op` rules (CV `evt_27q51k32zhqs`):
+  - in `conformance/kernel/conversion/seed-conversion.md`, one discriminating
+    kernel-conversion case per rule. `leq_int` on two literals converts to the
+    `Bool` its `BigInt <=` gives, with a false-side fence and a
+    variable-operand neutral control. `string_to_list_char` on a checked
+    `String` literal converts to its `List Char`, with a non-literal operand
+    neutral control;
+  - in `conformance/surface/numbers/seed-decimal-char-demote.md`,
+    `char-extraction-computes-scalar-proof` no longer calls
+    `string_to_list_char` a `Neutral` stub. It distinguishes the
+    installed-IDs `apply` path from the direct `prim_reduce` fallback, as
+    §42 now states. Its deferred runtime face is otherwise unchanged.
 
 ## Acceptance
 
