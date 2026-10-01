@@ -90,6 +90,15 @@ Scope:
     `advance_sound` fails at the end-position conjunct.
   - A weakened `nth_some_index_bound`, with `leq_nat n (length xs)`, still
     checks, and a strengthened one, with `leq_nat (Suc (Suc n)) …`, fails.
+- **AC-2b (repair the PARSER-LAWS fence).** `unbounded_parser_laws_false_twin`
+  (`Parsing.ken.md:647-698`) closes its end bound with `Proved` on a stuck
+  goal (`:674`), so its same-shape true twin is rejected too (Adversary
+  `evt_16nvfbkpgkvt3`).
+  - Close the bound with `(proof refl for LessEqNat) (source_length s)`.
+  - Add the true twin, with the decoder ending at `source_length s`, as a
+    checked block that is accepted.
+  - The false twin must be rejected with `expected LessEqNat (Suc n) n`,
+    found `LessEqNat n n`.
 - **AC-3.**
   - `trusted_base()` is unchanged.
   - The catalog census is byte-identical except for the two named packages.
