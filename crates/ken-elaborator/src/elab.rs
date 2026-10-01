@@ -18362,10 +18362,11 @@ fn build_ctor_buckets(
     Ok(methods)
 }
 
-/// One constructor for every matrix-compiler family eliminator. The motive
-/// is constant in the family's indices, but still has the full index
-/// telescope. `motive_body` lives under its scrutinee binder at Var(0):
-/// insert the index binders only above its free variables, not above x.
+/// One constructor for every matrix-compiler family eliminator. Even a
+/// constant motive has the full family-index telescope. A nested dependent
+/// split instead abstracts its actual indices into the motive when requested.
+/// `motive_body` lives under its scrutinee binder at Var(0): insert the
+/// index binders above free variables, never above the scrutinee.
 #[allow(clippy::too_many_arguments)]
 fn matrix_family_elim(
     ind: &InductiveDecl,
