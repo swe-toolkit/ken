@@ -169,6 +169,15 @@ There is no `Axiom`, no `trusted_base()` change and no kernel change.
     seed, since the step closure changes the lowered shape. The
     `rt_parity_native.rs` range is a source-scope seal, not an execution
     row.
+  - the full `lang_mod_strict_resolution_d0` target (Architect
+    `evt_70qeaw87agv03`). Scope adds
+    `crates/ken-elaborator/tests/lang_mod_strict_resolution_d0.rs`, for one
+    change: the `Capability.System.IO` row of
+    `catalog_ambient_passthrough_migration_census` gains the five
+    prelude-intrinsic names `buffer_span_budget`, `transfer_count_nat`,
+    `transfer_count_nat_succ`, `transfer_count_predecessor` and
+    `transfer_count_remaining`, with a comment saying why. If any other row
+    moves, stop to the Architect.
 
 ## Stop conditions
 

@@ -1,7 +1,7 @@
 ---
 id: CI-TEST-BUILD-PER-SHARD
 title: "Cut the per-shard test-build phase of Full CI: each workspace test shard builds only the test binaries it runs (whole binaries assigned to shards, balanced by build plus run time), with a first-party dependency cache only if measured to help; measured first, stop if the predicted saving is under two minutes"
-status: active
+status: closed
 owner: verify
 size: M
 gate: verify-qa
@@ -105,7 +105,13 @@ Measured on main run 36726390202 (`79a6e5ac7`), Verify `evt_6fkmxqx2rwhav`.
   target for inventory discovery, so ownership would also need a
   discovery path that does not.
 
-Step 2 is not built. The rest of the WP returns to the operator.
+Step 2 is not built.
+
+## Closeout
+
+Closed by the operator (2026-10-01: "CI is good enough for now."). The
+landed increments `22093cfcd` and `a0c194ee8` stay. Steps 2 and 3 are not
+funded.
 
 ## Scope
 
