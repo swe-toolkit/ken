@@ -107,10 +107,19 @@ alias used across a nested-splitting inner match, reporting any runtime
    unconditional, on the formerly constant path before finalization. Keyed on
    check-site order (`evt_434y2eqz37h5k`, §1a 4). F2 and `weaken_woven` pair
    with the unconditional close; F2's call site widens to both paths.
+5. An enclosing frame's alias sentinel was finalized at an inner in-matrix
+   check against `cx.ctx`. That context lacks the enclosing frame's
+   not-yet-woven binders, so it resolved to a sibling parameter. Keyed on the
+   frame coordinates of the occurrence (`evt_7ve4bw9145c1x`, §1a 5). Repair:
+   finalize only the current frame's sentinels and defer the in-matrix check
+   for a method carrying an enclosing frame's sentinel; `declare_def` stays
+   the authority.
 
-Shared predicate (`evt_4yewspasn0fps`): a nested method binder's domain is
-built by de Bruijn arithmetic on a term from another frame, not read from the
-eliminator it feeds.
+Shared predicate (`evt_4yewspasn0fps`, restated `evt_7ve4bw9145c1x`): a term
+in one frame's coordinates is used in another frame's context through depth
+arithmetic. Entries 1, 2, 3 and 5 are this predicate. Pre-staged recut at the
+6th stop: nested matrix construction with woven binders as real context
+pushes, as its own WP.
 
 ## Stop conditions
 
