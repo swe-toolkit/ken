@@ -85,6 +85,31 @@ fn flat_and_tail_split_controls_keep_distinct_indexed_values() {
 }
 
 #[test]
+fn reverting_split_under_woven_var_column_returns_that_column() {
+    // On landed base and on this candidate the tag split reverts a Vec tail:
+    // needs_reverting=true, dependent_tail=[0]. The preceding seed is a
+    // woven Var column, returned by both leaves as a normalized Nat value.
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(
+        "data Vec (a : Type) : Nat → Type where { \
+           VNil : Vec a Zero; \
+           VCons : (n : Nat) → a → Vec a n → Vec a (Suc n) } \
+         data Carrier : Type where { \
+           MkCarrier : (seed : Nat) → (tag : Nat) → Vec Nat tag → Carrier } \
+         fn keep (c : Carrier) : Nat = match c { \
+           MkCarrier seed Zero _ ↦ seed; \
+           MkCarrier seed (Suc k) _ ↦ seed } \
+         const observed_zero : Nat = keep (MkCarrier (Suc Zero) Zero (VNil Nat)) \
+         const observed_suc : Nat = keep (MkCarrier (Suc Zero) (Suc Zero) \
+           (VCons Nat Zero Zero (VNil Nat))) \
+         const expected : Nat = Suc Zero",
+    )
+    .expect("reverting split beneath woven Var column kernel-checks");
+    assert_normalized_equal(&env, "observed_zero", "expected");
+    assert_normalized_equal(&env, "observed_suc", "expected");
+}
+
+#[test]
 fn indexed_split_result_type_keeps_ambient_parameter() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(&format!(
@@ -440,6 +465,39 @@ fn deferred_enclosing_alias_does_not_skip_final_kernel_type_check() {
         if span.start == source.find("fn ill_typed").expect("fixture declaration")
             && span.end == source.len()),
         "the final declaration kernel gate must reject after in-matrix deferral"
+    );
+}
+
+#[test]
+fn reverting_deferred_alias_still_rejects_mistyped_method_at_declare_def() {
+    // The nested Vec split reverts the Tag n v tail and sees an enclosing
+    // alias sentinel. Its in-matrix check is deferred, not skipped forever.
+    let mut env = ElabEnv::new().expect("prelude");
+    let source = format!(
+        "{VEC}\ndata Tag (n : Nat) : Vec Nat n → Type where {{ \
+           MkTag : (v : Vec Nat n) → Tag n v \
+         }}\n\
+         data HolderD : Type where {{ \
+           HoldD : (n : Nat) → (v : Vec Nat n) → Tag n v → HolderD \
+         }}\n\
+         data NatBox : Type where {{ BoxNat : Nat → NatBox }}\n\
+         fn ill_typed (h : HolderD) (x : Nat) : Nat = \
+         match x {{ \
+           Zero ↦ Zero; \
+           (Suc k) as saved ↦ let q = match h {{ \
+             HoldD n VNil _ ↦ saved; \
+             HoldD n (VCons m _ _) _ ↦ BoxNat saved \
+           }} in q \
+         }}"
+    );
+    let error = env
+        .elaborate_file(&source)
+        .expect_err("reverting deferred alias cannot conceal a wrong method type");
+    assert!(
+        matches!(&error, ElabError::KernelRejected { span, .. }
+        if span.start == source.find("fn ill_typed").expect("declaration")
+            && span.end == source.len()),
+        "final declare_def must reject mistyped reverting method: {error:?}"
     );
 }
 

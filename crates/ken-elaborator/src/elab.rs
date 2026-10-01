@@ -18582,11 +18582,13 @@ fn compile_match_matrix(
                         col_types.len() - 1,
                         binder_count,
                     )?;
-                    let (finalized, check) = match finalize_alias_sentinels_for_check(
-                        cx, method, nested_ctx.len(),
-                    )? {
-                        InMatrixCheck::Ready(term) => (term, true),
-                        InMatrixCheck::Deferred(term) => (term, false),
+                    let (finalized, check) = if needs_reverting {
+                        match finalize_alias_sentinels_for_check(cx, method, nested_ctx.len())? {
+                            InMatrixCheck::Ready(term) => (term, true),
+                            InMatrixCheck::Deferred(term) => (term, false),
+                        }
+                    } else {
+                        (method.clone(), false)
                     };
                     debug_assert_eq!(
                         nested_ctx.len() - *cx.pattern_alias_frame_roots.last()
@@ -18601,9 +18603,10 @@ fn compile_match_matrix(
                         binder_count,
                     )?;
                     // The constant path's woven Var columns and enclosing split
-                    // lambdas are absent from nested_ctx. Only the reverting
-                    // path had an in-matrix check on the landed base; the final
-                    // declare_def checks the assembled term on both paths.
+                    // lambdas are absent from nested_ctx. Its length is not a
+                    // sound alias-finalization depth or method-check context.
+                    // Close both paths; finalize and check only the reverting
+                    // path, and let declare_def check the assembled term.
                     if check && needs_reverting {
                         let checked = cx.metas.zonk_term(&closed);
                         let expected_checked = cx.metas.zonk_term(&expected);
