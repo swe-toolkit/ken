@@ -382,6 +382,7 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "DecoderPreservesBounded",
         "byte_cursor_bounded_locate",
         "byte_cursor_bounded_after_peek",
+        "byte_satisfy_bounded",
         "byte_satisfy_parser_laws",
         "byte_many_parser_laws",
         "LessEqNat",
@@ -1344,9 +1345,13 @@ fn cat5_d1_reflexive_utf8_proof_rejected() {
 #[test]
 fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
     // Promise class: durable invariant (CAT-5 §4, ParserLaws). This fixture
-    // imports the generic, pure, fail, satisfy and many laws through the
-    // real roots-loaded package. The many instance needs a checked decoder
-    // preservation premise; the package's paired fences exercise its bound.
+    // imports generic, pure, fail, satisfy, and many laws through the real
+    // roots-loaded package. A separate clean client proves many(satisfy accept)
+    // for a free predicate without importing decoder or cursor soundness laws.
+    // MEASURED: the generic checked theorem closes and trust is unchanged.
+    // CLAIMED: the bound works for any UInt8 predicate, not a fixed predicate.
+    // THE GAP: the client is quantified over accept and passes that same
+    // accept to the many step and the published bounded proof.
     let mut env = mk_env();
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     env.elaborate_cat5_client(
@@ -1403,6 +1408,45 @@ fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
         env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
         before,
         "importing and applying ParserLaws proofs must not extend trust"
+    );
+
+    let mut generic_env = ElabEnv::new().expect("clean generic client environment");
+    generic_env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("generic client must load the checked Parsing package");
+    let generic_before = generic_env
+        .env
+        .trusted_base()
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    generic_env
+        .elaborate_file(
+            r#"
+            import Capability.Parsing.Parsing
+              (ParserLaws, parser_from_decoder, ByteCursor, Span, byte_cursor_ops,
+               byte_many_parser_laws, byte_satisfy_bounded)
+            import Capability.Parsing.Decoder (decoder_many, decoder_satisfy)
+
+            theorem client_many_satisfy_parser_laws (accept : UInt8 → Bool)
+                : ParserLaws (List UInt8)
+                    (parser_from_decoder (List UInt8)
+                      (decoder_many ByteCursor UInt8 Span UInt8 byte_cursor_ops
+                        (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops accept))) =
+              byte_many_parser_laws
+                UInt8
+                (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops accept)
+                (byte_satisfy_bounded accept)
+            "#,
+        )
+        .expect("generic many(satisfy accept) client must close without cursor proof imports");
+    assert_eq!(
+        generic_env
+            .env
+            .trusted_base()
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
+        generic_before,
+        "generic many(satisfy accept) must not extend trust"
     );
 }
 
