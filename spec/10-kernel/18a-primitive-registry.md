@@ -723,7 +723,10 @@ This subsection is the **normative contract** the §5.9 DEMOTE satisfies
 **type** registration (`reg_ty!("Char")`) is **deleted**; `Char` becomes the
 refinement `{ c : Int | isScalar c }` over `Int`. `Char` has **no** native
 computing ops on main today (no `eq_char`/`leq_char`/`Char.toInt`/`Int.toChar`
-arm — `string_to_list_char` is a `Neutral` stub), so this is a type-conversion +
+arm — `string_to_list_char` computes through interpreter
+`apply`/`build_list_char` with installed `List Char` constructor IDs and
+through the checked-literal kernel view (`17 §1`); only direct `prim_reduce`
+returns `Neutral`), so this is a type-conversion +
 **net-new derived ops**, not the removal of working native ops. **No** surviving
 primitive `Char` type; **no** new kernel flag / `Decl` variant (AC-G).
 
