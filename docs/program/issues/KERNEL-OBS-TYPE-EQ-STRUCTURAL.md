@@ -66,8 +66,10 @@ Under one TCB Decision:
 ## Acceptance
 
 The operator authorized the TCB change (2026-10-01). The Architect sets AC-0
-at kickoff, before any edit. It includes the Π-motive row and one typed-whnf subject-reduction row per
-former.
+at kickoff, before any edit. It includes the Π-motive row and one typed-whnf
+subject-reduction row per former.
+
+- **AC-0: ruled** (`evt_71pe5ka6mwg8r`, base `a02cecfed`). §1a count 0.
 
 ## Stop conditions
 
