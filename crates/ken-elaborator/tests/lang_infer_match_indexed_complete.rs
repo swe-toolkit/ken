@@ -264,7 +264,11 @@ fn assert_split_column_names(source: &str) {
         .expect("split-column names and later fields must check");
     let value = |name: &str| {
         let id = *env.globals.get(name).expect("named checked constant");
-        let body = env.env.transparent_body(id).expect("transparent constant").1;
+        let body = env
+            .env
+            .transparent_body(id)
+            .expect("transparent constant")
+            .1;
         whnf(&env.env, &Context::new(), &body)
     };
     assert_eq!(value("selected"), value("expected_selected"));
