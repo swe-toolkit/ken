@@ -435,7 +435,9 @@ Eq Int (literal m) (literal n)  ⇝  Bottom when m ≠ n
 
 This is a `PrimReduction::Literal` value comparison, not execution of an
 operation registered as `PrimReduction::Op`. Separately, ADR 0013 Layer 2
-admits exactly one `Op` computation in kernel weak-head reduction:
+adds registered `leq_int` to kernel weak-head `Op` computation, alongside
+the existing registered `string_to_list_char` view on a checked `String`
+literal (`17 §1`):
 
 ```
 leq_int (IntLit m) (IntLit n)  ⇝  True   when m <= n
@@ -448,7 +450,8 @@ neutral, the application stays neutral. An `Op` application such as
 `eq_int 5 5` still stays neutral under conversion even with literal
 arguments, as do all other Int operations. An unregistered primitive type,
 or a registered type with either operand non-literal, likewise leaves `Eq`
-neutral. Other registered-operation reductions remain K3-deferred.
+neutral. All registered `Op` reductions other than `leq_int` and the
+checked-literal `string_to_list_char` view (`17 §1`) remain K3-deferred.
 
 ---
 
