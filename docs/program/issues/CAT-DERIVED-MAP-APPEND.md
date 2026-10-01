@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-MAP-APPEND
 title: "Derived owns map and list_append but does not publish that map distributes over list_append, so Parsing and EffectfulClasses each re-prove it privately. Publish proof append for map in Derived at zero TCB and retire both private copies"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-SATISFY-BOUNDED
 title: "A client proving ParserLaws for many over a consuming satisfy step must rebuild the byte-cursor bound from four pieces, and the package re-derives that fact three times. Publish byte_satisfy_bounded as one generic law at zero TCB, route the existing instances through it, and delete the unused private re-derivation"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -95,3 +95,18 @@ Scope:
   `Derived.ken.md` change.
 - A deleted theorem or helper has a consumer that was not counted: stop and
   name it.
+
+## Closeout
+
+Merged `c8d90c19a` (PR #4434), exact `d775f479f`: Foundation QA
+`evt_1qjgzs2stm3k9`, Architect `evt_6wfwngvaz0f0r`, Decision
+`dec_5wz7zmhydvej9`.
+
+- `byte_satisfy_bounded (accept)` is a public law at a free `accept`.
+- `byte_satisfy_parser_laws` and `byte_code_decoder_public_bounded` are
+  one-line instances of it, with unchanged signatures.
+- The private re-derivation and the helpers it left unreferenced are
+  deleted, seven names in all.
+- The CAT5 client closes `many (satisfy accept)` generically, without the
+  cursor proofs.
+- Zero TCB; only `Parsing.ken.md` changed in the catalog census.
