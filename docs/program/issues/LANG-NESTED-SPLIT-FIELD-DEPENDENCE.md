@@ -87,6 +87,14 @@ alias used across a nested-splitting inner match, reporting any runtime
 - **AC-3.** The targeted match and pattern suites stay green, the catalog
   census is byte-identical, and `trusted_base()` is unchanged.
 
+## Symptom inventory (§1b, Architect)
+
+1. A split column's pending tail types reach each constructor bucket without
+   being rebased from the split binder onto that constructor's fields
+   (`build_ctor_buckets`), so method domains are off by `n_args0 - 1`
+   (`evt_24geh629pgfz1`, §1a 1). Repair: rebase the tail per constructor at
+   the nested split; a two-field constructor pins the +1 direction.
+
 ## Stop conditions
 
 - The repair needs the kernel or a spec change.
