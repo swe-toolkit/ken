@@ -186,7 +186,7 @@ fn nested_concrete_index_constant_result_evaluates() {
         "{VEC}\ndata Holder (a : Type) : Type where {{ Hold : Vec a Zero → Holder a }}\n\
          fn concrete (a : Type) (h : Holder a) : Nat = \
          let r = match h {{ Hold VNil ↦ Zero; Hold (VCons m _ _) ↦ m }} in r\n\
-         const observed : Nat = concrete Nat (Hold VNil)\n\
+         const observed : Nat = concrete Nat (Hold Nat (VNil Nat))\n\
          const expected : Nat = Zero"
     ))
     .expect("constant nested motive accepts concrete index");
@@ -218,6 +218,30 @@ fn nested_repeated_index_constant_result_evaluates() {
     .expect("constant nested motive accepts repeated index");
     assert_checked_nat_value(&env, "observed_zero", "expected_zero");
     assert_checked_nat_value(&env, "observed_suc", "expected_suc");
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+#[test]
+fn nested_concrete_index_omission_reports_exhaustiveness() {
+    // Promise class: durable invariant. MEASURED: omitting the nested VNil
+    // arm at index Zero yields ExhaustivenessError naming VNil.
+    // CLAIMED: the constant-motive relaxation does not bypass coverage.
+    // THE GAP: an omitted nested arm must reach the earlier coverage check,
+    // not the relaxed index clause; the complete sibling above is accepted.
+    let mut env = ElabEnv::new().expect("prelude");
+    let trusted_before = env.env.trusted_base();
+    let error = env
+        .elaborate_file(&format!(
+            "{VEC}\ndata Holder (a : Type) : Type where {{ Hold : Vec a Zero → Holder a }}\n\
+             fn omitted (a : Type) (h : Holder a) : Nat = \
+             let r = match h {{ Hold (VCons m _ _) ↦ m }} in r"
+        ))
+        .expect_err("missing VNil must be reported before nested index check");
+    assert!(
+        matches!(error, ElabError::ExhaustivenessError { ref missing, .. }
+            if missing.constructor == "VNil"),
+        "{error:?}"
+    );
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
