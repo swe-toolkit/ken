@@ -484,27 +484,19 @@ pub fn check(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResul
             // `refl a : Eq A a a` checks against `Eq A x y` iff `a ≡ x ≡ y`
             // (`15 §2`). (`Eq : Ω` makes proofs irrelevant, but `refl a` is the
             // canonical proof, so its index must match.)
-            let ty_w = whnf(env, ctx, ty);
-            match &ty_w {
-                Term::Eq(a_ty, x, y) => {
-                    let a_infer = infer(env, ctx, a)?;
-                    if !convert_type(env, ctx, &a_infer, a_ty) {
-                        return Err(KernelError::TypeMismatch {
-                            expected: (*a_ty).clone(),
-                            found: Box::new(a_infer),
-                        });
-                    }
-                    if !convert(env, ctx, a_ty, a, x) || !convert(env, ctx, a_ty, a, y) {
-                        return Err(KernelError::BadEliminator(
-                            "refl a does not match Eq A x y (a ≢ x or a ≢ y)".into(),
-                        ));
-                    }
-                    Ok(())
-                }
-                _ => Err(KernelError::TypeMismatch {
+            let a_infer = infer(env, ctx, a)?;
+            let inferred = Term::Eq(
+                Box::new(a_infer),
+                Box::new((**a).clone()),
+                Box::new((**a).clone()),
+            );
+            if convert_type(env, ctx, ty, &inferred) {
+                Ok(())
+            } else {
+                Err(KernelError::TypeMismatch {
                     expected: Box::new(ty.clone()),
-                    found: Box::new(ty_w.clone()),
-                }),
+                    found: Box::new(inferred),
+                })
             }
         }
         Term::QuotClass(a) => {
