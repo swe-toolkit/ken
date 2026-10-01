@@ -63,7 +63,11 @@ Scope:
 - `catalog/packages/Data/Collections/Derived.ken.md`;
 - `catalog/packages/Capability/Parsing/Parsing.ken.md`;
 - `catalog/packages/Core/Classes/EffectfulClasses.ken.md`;
-- `crates/ken-elaborator/src/r_layer_tests/cat_lawful_functors_pub_export.rs`.
+- `crates/ken-elaborator/src/r_layer_tests/cat_lawful_functors_pub_export.rs`;
+- `crates/ken-elaborator/src/r_layer_tests/cat_tier_d_parsing_group_import.rs`:
+  only the `map::append` entry in the exact expected Derived provider set of
+  `parsing_module_provider_closure_is_exact_and_sibling_disjoint` (~`:660`),
+  since Parsing now reuses the Derived law (implementer `evt_1ap6mqgabpdhs`).
 
 ## Acceptance
 
