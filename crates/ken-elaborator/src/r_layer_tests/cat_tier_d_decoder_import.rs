@@ -290,8 +290,9 @@ fn parsing_decoder_unconsumed_siblings_remain_private() {
 /// advances.
 /// CLAIMED: the provider's laws are usable over actual client carriers
 /// without exposing private Decoder constructors or fuel helpers. THE GAP:
-/// this public-API fixture does not identify the held Parsing branch's
-/// private ByteCursorBounded predicate.
+/// this fixture uses a stronger test-local finite-path cursor predicate; it
+/// does not itself exercise Parsing's now-public ByteCursorBounded predicate
+/// or the byte-cursor preservation laws, which the CAT-5 client test checks.
 #[test]
 fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
     let mut loaded = load_decoder();

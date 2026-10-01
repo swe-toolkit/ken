@@ -420,19 +420,20 @@ fn DecoderOutcomeBounded
     DecoderFailed err ↦ ValidSpan s (decoder_error_location Span err)
   }
 
-fn ByteCursorBounded (s : Source) (start : Nat) (cur : ByteCursor) : Prop =
+pub fn ByteCursorBounded (s : Source) (start : Nat) (cur : ByteCursor) : Prop =
   And
     (Equal Bytes (source_bytes (byte_cursor_source cur)) (source_bytes s))
     (And
       (LessEqNat start (byte_cursor_position cur))
       (LessEqNat (byte_cursor_position cur) (source_length s)))
 
-fn DecoderPreservesBounded (a : Type) (decoder : Decoder ByteCursor Span a) : Prop =
+pub fn DecoderPreservesBounded (a : Type) (decoder : Decoder ByteCursor Span a) : Prop =
   (s : Source)
     → (start : Nat)
-    → (cur : ByteCursor)
-    → ByteCursorBounded s start cur → DecoderOutcomeBounded a s start
-    (decoder cur)
+    → DecoderPreserves ByteCursor Span a
+    (ByteCursorBounded s start)
+    (ValidSpan s)
+    decoder
 ```
 
 ### 4.3 Bounded parsers and a worked Boolean grammar
@@ -441,8 +442,8 @@ fn DecoderPreservesBounded (a : Type) (decoder : Decoder ByteCursor Span a) : Pr
 
 The public law follows from the decoder's checked bound. `parser_pure` returns
 its input cursor unchanged; `parser_fail` locates its error at that cursor.
-The private cursor and outcome bridges below establish the premises without
-adding trust.
+The checked cursor and private outcome lemmas below establish the premises
+without adding trust.
 
 ```ken
 pub theorem parser_from_decoder_laws
@@ -611,7 +612,7 @@ theorem parser_from_decoder_valid_if_bounded
                 ((proof refl for LessEqNat) start)
                 h)))
 
-theorem byte_cursor_bounded_locate
+pub theorem byte_cursor_bounded_locate
       (s : Source) (start : Nat) (cur : ByteCursor)
     : ByteCursorBounded s start cur
       → ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur) =
@@ -631,9 +632,10 @@ theorem byte_cursor_bounded_locate
   }
 ```
 
-The bounded true twin uses a closed decoder that returns its input cursor. The
-unbounded false twin returns `Suc (source_length s)` instead; its attempted
-`ParserLaws` proof must fail at the end-position bound, not at name resolution.
+The first true twin returns its input cursor. The second ends at
+`source_length s`, with an explicit reflexive end-bound proof. The false twin
+ends at `Suc (source_length s)`; its attempted `ParserLaws` proof must fail at
+the end-position bound, not at name resolution.
 
 ```ken example
 theorem bounded_parser_laws_true_twin
@@ -642,6 +644,48 @@ theorem bounded_parser_laws_true_twin
     Bool
     (decoder_pure ByteCursor Span Bool True)
     (λs. λstart. λcur. λsafe. safe)
+```
+
+```ken example
+fn bounded_at_end_parser_laws_decoder (cur : ByteCursor) : DecoderResult ByteCursor Span Bool =
+  match cur {
+    MkByteCursor s start ↦ Decoded ByteCursor Span Bool True (MkByteCursor s (source_length s))
+  }
+
+theorem bounded_at_end_parser_laws_true_twin
+    : ParserLaws Bool (parser_from_decoder Bool bounded_at_end_parser_laws_decoder) =
+  let valid : ParserValid Bool (parser_from_decoder Bool bounded_at_end_parser_laws_decoder) =
+    λs.
+      λstart.
+        λh.
+          and_intro
+            (ValidSpan s (MkSpan start (source_length s)))
+            (And (Equal Nat start start) (Equal Nat (source_length s) (source_length s)))
+            (and_intro
+              (LessEqNat start (source_length s))
+              (LessEqNat (source_length s) (source_length s))
+              h
+              ((proof refl for LessEqNat) (source_length s)))
+            (and_intro
+              (Equal Nat start start)
+              (Equal Nat (source_length s) (source_length s))
+              Refl
+              Refl)
+  in
+    and_intro
+      (ParserValid Bool (parser_from_decoder Bool bounded_at_end_parser_laws_decoder))
+      (And
+        (ParserTotal Bool (parser_from_decoder Bool bounded_at_end_parser_laws_decoder))
+        (ParserSourceLocal Bool (parser_from_decoder Bool bounded_at_end_parser_laws_decoder)))
+      valid
+      (and_intro
+        (ParserTotal Bool (parser_from_decoder Bool bounded_at_end_parser_laws_decoder))
+        (ParserSourceLocal Bool (parser_from_decoder Bool bounded_at_end_parser_laws_decoder))
+        (λs. λstart. λh. Proved)
+        (parser_valid_source_local
+          Bool
+          (parser_from_decoder Bool bounded_at_end_parser_laws_decoder)
+          valid))
 ```
 
 ```ken reject
@@ -671,7 +715,7 @@ theorem unbounded_parser_laws_false_twin
                 (Suc (source_length s))
                 h
                 (leq_nat_successor_bound (source_length s)))
-              Proved)
+              ((proof refl for LessEqNat) (source_length s)))
             (and_intro
               (Equal Nat start start)
               (Equal Nat (Suc (source_length s)) (Suc (source_length s)))
@@ -1809,7 +1853,7 @@ theorem parser_from_decoder_outcome_equation
         (parse_decoder_outcome a s start (decoder (MkByteCursor s start))) =
   Refl
 
-theorem byte_cursor_bounded_after_peek
+pub theorem byte_cursor_bounded_after_peek
       (s : Source) (start : Nat) (cur : ByteCursor)
     : (value : UInt8)
       → Equal
@@ -1857,54 +1901,67 @@ theorem byte_cursor_bounded_after_peek
                   peeked)
   }
 
-theorem decoder_bounded_as_public
-      (a : Type)
-      (decoder : Decoder ByteCursor Span a)
-      (s : Source)
-      (start : Nat)
-      (bounded : DecoderPreservesBounded a decoder)
-    : DecoderPreserves ByteCursor Span a (ByteCursorBounded s start) (ValidSpan s) decoder =
-  λcur. λgood. bounded s start cur good
-
-theorem decoder_public_as_bounded
-      (a : Type)
-      (decoder : Decoder ByteCursor Span a)
-      (preserves : (s : Source)
-        → (start : Nat)
-        → DecoderPreserves
-        ByteCursor
-        Span
-        a
-        (ByteCursorBounded s start)
-        (ValidSpan s)
-        decoder)
-    : DecoderPreservesBounded a decoder =
-  λs. λstart. λcur. λgood. preserves s start cur good
-
-theorem byte_code_decoder_public_preserves
-      (s : Source) (start : Nat) (code : Int)
-    : DecoderPreserves ByteCursor Span UInt8
-        (ByteCursorBounded s start)
-        (ValidSpan s)
-        (byte_code_decoder code) =
-  decoder_satisfy_preserves
-    ByteCursor
+pub theorem byte_satisfy_parser_laws
+      (accept : UInt8 → Bool)
+    : ParserLaws UInt8
+        (parser_from_decoder
+          UInt8
+          (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops accept)) =
+  parser_from_decoder_laws
     UInt8
-    Span
-    byte_cursor_ops
-    (λbyte. eq_int (uint8_to_int byte) code)
-    (ByteCursorBounded s start)
-    (ValidSpan s)
-    (byte_cursor_bounded_locate s start)
-    (byte_cursor_bounded_after_peek s start)
+    (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops accept)
+    (λs.
+      λstart.
+        decoder_satisfy_preserves
+          ByteCursor
+          UInt8
+          Span
+          byte_cursor_ops
+          accept
+          (ByteCursorBounded s start)
+          (ValidSpan s)
+          (byte_cursor_bounded_locate s start)
+          (byte_cursor_bounded_after_peek s start))
+
+pub theorem byte_many_parser_laws
+      (a : Type) (step : Decoder ByteCursor Span a) (step_safe : DecoderPreservesBounded a step)
+    : ParserLaws
+        (List a)
+        (parser_from_decoder
+          (List a)
+          (decoder_many ByteCursor UInt8 Span a byte_cursor_ops step)) =
+  parser_from_decoder_laws
+    (List a)
+    (decoder_many ByteCursor UInt8 Span a byte_cursor_ops step)
+    (λs.
+      λstart.
+        decoder_many_preserves
+          ByteCursor
+          UInt8
+          Span
+          a
+          byte_cursor_ops
+          step
+          (ByteCursorBounded s start)
+          (ValidSpan s)
+          (byte_cursor_bounded_locate s start)
+          (step_safe s start))
 
 theorem byte_code_decoder_public_bounded
       (code : Int)
     : DecoderPreservesBounded UInt8 (byte_code_decoder code) =
-  decoder_public_as_bounded
-    UInt8
-    (byte_code_decoder code)
-    (λs. λstart. byte_code_decoder_public_preserves s start code)
+  λs.
+    λstart.
+      decoder_satisfy_preserves
+        ByteCursor
+        UInt8
+        Span
+        byte_cursor_ops
+        (λbyte. eq_int (uint8_to_int byte) code)
+        (ByteCursorBounded s start)
+        (ValidSpan s)
+        (byte_cursor_bounded_locate s start)
+        (byte_cursor_bounded_after_peek s start)
 
 theorem decoder_seq_public_bounded
       (a : Type)
@@ -1914,22 +1971,19 @@ theorem decoder_seq_public_bounded
       (first_safe : DecoderPreservesBounded a first)
       (second_safe : DecoderPreservesBounded b second)
     : DecoderPreservesBounded b (decoder_seq ByteCursor Span a b first second) =
-  decoder_public_as_bounded
-    b
-    (decoder_seq ByteCursor Span a b first second)
-    (λs.
-      λstart.
-        decoder_seq_preserves
-          ByteCursor
-          Span
-          a
-          b
-          (ByteCursorBounded s start)
-          (ValidSpan s)
-          first
-          second
-          (decoder_bounded_as_public a first s start first_safe)
-          (decoder_bounded_as_public b second s start second_safe))
+  λs.
+    λstart.
+      decoder_seq_preserves
+        ByteCursor
+        Span
+        a
+        b
+        (ByteCursorBounded s start)
+        (ValidSpan s)
+        first
+        second
+        (first_safe s start)
+        (second_safe s start)
 
 theorem prepend_byte_token_bounded
       (code : Int)
@@ -2052,22 +2106,19 @@ theorem and_open_token_bounded : DecoderPreservesBounded UInt8 and_open_token_de
   five_byte_token_bounded (40 : Int) (97 : Int) (110 : Int) (100 : Int) (32 : Int)
 
 theorem spaces_decoder_bounded : DecoderPreservesBounded (List UInt8) spaces_decoder =
-  decoder_public_as_bounded
-    (List UInt8)
-    spaces_decoder
-    (λs.
-      λstart.
-        decoder_many_preserves
-          ByteCursor
-          UInt8
-          Span
-          UInt8
-          byte_cursor_ops
-          (byte_code_decoder (32 : Int))
-          (ByteCursorBounded s start)
-          (ValidSpan s)
-          (byte_cursor_bounded_locate s start)
-          (byte_code_decoder_public_preserves s start (32 : Int)))
+  λs.
+    λstart.
+      decoder_many_preserves
+        ByteCursor
+        UInt8
+        Span
+        UInt8
+        byte_cursor_ops
+        (byte_code_decoder (32 : Int))
+        (ByteCursorBounded s start)
+        (ValidSpan s)
+        (byte_cursor_bounded_locate s start)
+        (byte_code_decoder_public_bounded (32 : Int) s start)
 
 fn decoder_then_result
       (a : Type)
@@ -2768,12 +2819,7 @@ theorem bool_decoder_layer_bounded
         (ValidSpan s)
         bool_false_decoder
         recursive_alternatives
-        (decoder_bounded_as_public
-          (Syntax BoolExpr)
-          bool_false_decoder
-          s
-          start
-          bool_false_decoder_bounded)
+        (bool_false_decoder_bounded s start)
         recursive_alternatives_safe
   in
     decoder_alt_preserves
@@ -2784,32 +2830,24 @@ theorem bool_decoder_layer_bounded
       (ValidSpan s)
       bool_true_decoder
       other_alternatives
-      (decoder_bounded_as_public
-        (Syntax BoolExpr)
-        bool_true_decoder
-        s
-        start
-        bool_true_decoder_bounded)
+      (bool_true_decoder_bounded s start)
       other_alternatives_safe
 
 theorem bool_expression_decoder_bounded
     : DecoderPreservesBounded (Syntax BoolExpr) bool_expression_decoder =
-  decoder_public_as_bounded
-    (Syntax BoolExpr)
-    bool_expression_decoder
-    (λs.
-      λstart.
-        decoder_recursive_preserves
-          ByteCursor
-          UInt8
-          Span
-          (Syntax BoolExpr)
-          byte_cursor_ops
-          bool_decoder_layer
-          (ByteCursorBounded s start)
-          (ValidSpan s)
-          (byte_cursor_bounded_locate s start)
-          (λrecur. λrecur_safe. bool_decoder_layer_bounded s start recur recur_safe))
+  λs.
+    λstart.
+      decoder_recursive_preserves
+        ByteCursor
+        UInt8
+        Span
+        (Syntax BoolExpr)
+        byte_cursor_ops
+        bool_decoder_layer
+        (ByteCursorBounded s start)
+        (ValidSpan s)
+        (byte_cursor_bounded_locate s start)
+        (λrecur. λrecur_safe. bool_decoder_layer_bounded s start recur recur_safe)
 
 fn complete_bool_finish_result
       (syntax : Syntax BoolExpr) (end : ByteCursor) (remaining : Nat)

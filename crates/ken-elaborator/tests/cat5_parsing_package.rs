@@ -99,7 +99,10 @@ impl Cat5ClientElaboration for ElabEnv {
               ParseError, MkParseError, Syntax, MkSyntax, parse_bool_expr, format_bool_expr, print_bool_expr, \
               print_bool_expr_utf8, source_length, source_bytes, erase_spans, ValidSpan, \
               ValidLocated, ValidSyntax, valid_zero_width_span, ParserLaws, ParserValid, \
-              ParserTotal, ParserSourceLocal, parser_pure, parser_fail, \
+              ParserTotal, ParserSourceLocal, parser_pure, parser_fail, parser_from_decoder, \
+              ByteCursor, ByteCursorBounded, DecoderPreservesBounded, byte_cursor_ops, \
+              byte_cursor_bounded_locate, byte_cursor_bounded_after_peek, \
+              byte_satisfy_parser_laws, byte_many_parser_laws, \
               parser_from_decoder_laws, parser_pure_laws, parser_fail_laws, source_id, \
               span_start, span_end, located_source, located_span, error_source, error_span)\n\
              {source}"
@@ -375,6 +378,12 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "byte_cursor_advance",
         "byte_cursor_locate",
         "byte_cursor_ops",
+        "ByteCursorBounded",
+        "DecoderPreservesBounded",
+        "byte_cursor_bounded_locate",
+        "byte_cursor_bounded_after_peek",
+        "byte_satisfy_parser_laws",
+        "byte_many_parser_laws",
         "LessEqNat",
         "LessEqNat::refl",
         "LessEqNat::zero_left",
@@ -1335,19 +1344,58 @@ fn cat5_d1_reflexive_utf8_proof_rejected() {
 #[test]
 fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
     // Promise class: durable invariant (CAT-5 §4, ParserLaws). This fixture
-    // imports all three public laws through the real roots-loaded package;
-    // the pure and fail instances inhabit the unchanged ParserLaws predicate.
-    // A new parser may use the generic theorem only with a checked decoder
-    // bound; the package's paired literate fences exercise that distinction.
+    // imports the generic, pure, fail, satisfy and many laws through the
+    // real roots-loaded package. The many instance needs a checked decoder
+    // preservation premise; the package's paired fences exercise its bound.
     let mut env = mk_env();
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     env.elaborate_cat5_client(
         r#"
+        import Capability.Parsing.Decoder
+          (decoder_pure, decoder_pure_preserves, decoder_satisfy, decoder_many)
+        import Capability.Parsing.Cursor (cursor_locate, cursor_peek, cursor_advance)
+
         theorem client_pure_parser_laws : ParserLaws Bool (parser_pure Bool True) =
           parser_pure_laws Bool True
 
         theorem client_fail_parser_laws : ParserLaws Bool (parser_fail Bool) =
           parser_fail_laws Bool
+
+        theorem client_locate_sound (s : Source) (start : Nat) (cur : ByteCursor)
+            : ByteCursorBounded s start cur
+              → ValidSpan s (cursor_locate ByteCursor UInt8 Span byte_cursor_ops cur) =
+          byte_cursor_bounded_locate s start cur
+
+        theorem client_advance_sound (s : Source) (start : Nat) (cur : ByteCursor)
+            : (v : UInt8)
+              → Equal (Option UInt8)
+                (cursor_peek ByteCursor UInt8 Span byte_cursor_ops cur)
+                (Some UInt8 v)
+              → ByteCursorBounded s start cur
+              → ByteCursorBounded s start
+                (cursor_advance ByteCursor UInt8 Span byte_cursor_ops cur) =
+          byte_cursor_bounded_after_peek s start cur
+
+        fn client_accept_every_byte (byte : UInt8) : Bool = True
+
+        theorem client_satisfy_parser_laws
+            : ParserLaws UInt8
+                (parser_from_decoder UInt8
+                  (decoder_satisfy ByteCursor UInt8 Span byte_cursor_ops
+                    client_accept_every_byte)) =
+          byte_satisfy_parser_laws client_accept_every_byte
+
+        theorem client_many_parser_laws
+            : ParserLaws (List Bool)
+                (parser_from_decoder (List Bool)
+                  (decoder_many ByteCursor UInt8 Span Bool byte_cursor_ops
+                    (decoder_pure ByteCursor Span Bool True))) =
+          byte_many_parser_laws
+            Bool
+            (decoder_pure ByteCursor Span Bool True)
+            (λs. λstart.
+              decoder_pure_preserves
+                ByteCursor Span Bool (ByteCursorBounded s start) (ValidSpan s) True)
         "#,
     )
     .expect("public parser_pure and parser_fail laws must instantiate for a client");
