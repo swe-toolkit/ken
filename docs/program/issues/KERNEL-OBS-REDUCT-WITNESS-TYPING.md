@@ -147,6 +147,23 @@ fixtures move with it, and so do the `e.1`/`e.2` witnesses of `cast_at_pi`,
     type.
   - An unrecorded raw J keeps today's type.
   - The span-55965 probe is posted with the candidate.
+- **AC-2d (elaborated-term pins, Architect `evt_7qq3b4xjgpj8a`).** The
+  FULL run on `20185bc0c` went red on
+  `cat_sort_insertion_sort_acceptance.rs:403`: the `ord_leq_at` population
+  was 145 against a pin of 136. Scope adds that file.
+  - Measure all three providers (`ord_leq_at`, `eq_from_ord`, `count`)
+    with the full scan, and with a scan that excludes only the type of a
+    `Term::J` eq-argument `Ascript`.
+  - The excluded count must equal the `65af5c7cd` pin (136/60/50). The
+    difference must equal the provider calls inside J recordings. Pin the
+    full counts with a comment giving the composition.
+  - If an excluded count differs from its pin, stop to the Architect.
+  - `collect_provider_typed_calls` is unchanged, and it still descends into
+    ascription types.
+  - Before the respin, sweep every source root by mechanism for pins over
+    elaborated-term structure: provider counts, term-size or node counts,
+    pretty-printed bodies, subterm counts, and snapshots containing `J`.
+    Run each match at the candidate and list the verdicts in the handoff.
 - **AC-3 (J admission fences).**
   - The committed third-field row (`Nat; Vec Nat x1; Vec Nat x1`) computes,
     and `infer(reduct) ≡ infer(redex)`.
