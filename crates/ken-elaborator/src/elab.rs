@@ -20277,6 +20277,32 @@ mod result_transport_control_flow_tests {
     }
 
     #[test]
+    fn ordinary_kernel_check_zonks_expected_level_independently() {
+        // Promise class: durable invariant (spec 39 §5.7).
+        // MEASURED: a concrete `A : Type 0` checks against `Type ?u` while
+        // that meta remains unsolved in the elaborator. CLAIMED: the expected
+        // operand reaching the kernel has no declaration-level meta. THE GAP:
+        // this private query pins the shared gateway; the source-level Vec
+        // twins independently pin the production match-arm path.
+        let mut env = ElabEnv::new().expect("base environment");
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "expected-only-level-control",
+        );
+        cx.ctx.push(Term::ty(Level::Zero)); // A : Type 0
+        let expected_level = cx.metas.fresh();
+        kernel_check_current(&cx, &Term::var(0), &Term::ty(expected_level))
+            .expect("the expected Type ?u must be zonked without changing A");
+        assert!(
+            cx.metas.metas[0].is_none(),
+            "query-local zonking must not solve the elaborator meta"
+        );
+    }
+
+    #[test]
     fn active_premise_frame_authority_fails_closed() {
         // Promise class: durable invariant.
         // MEASURED: malformed private frame metadata is rejected before a
