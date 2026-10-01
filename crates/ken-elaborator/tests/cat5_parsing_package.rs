@@ -99,7 +99,8 @@ impl Cat5ClientElaboration for ElabEnv {
               ParseError, MkParseError, Syntax, MkSyntax, parse_bool_expr, format_bool_expr, print_bool_expr, \
               print_bool_expr_utf8, source_length, source_bytes, erase_spans, ValidSpan, \
               ValidLocated, ValidSyntax, valid_zero_width_span, ParserLaws, ParserValid, \
-              ParserTotal, ParserSourceLocal, parser_pure, parser_fail, source_id, \
+              ParserTotal, ParserSourceLocal, parser_pure, parser_fail, \
+              parser_from_decoder_laws, parser_pure_laws, parser_fail_laws, source_id, \
               span_start, span_end, located_source, located_span, error_source, error_span)\n\
              {source}"
         ))
@@ -1328,6 +1329,32 @@ fn cat5_d1_reflexive_utf8_proof_rejected() {
             || msg.contains("Type mismatch")
             || msg.contains("Kernel rejected"),
         "fake UTF-8 Refl proof should reject by proof checking, got {msg}"
+    );
+}
+
+#[test]
+fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
+    // Promise class: durable invariant (CAT-5 §4, ParserLaws). This fixture
+    // imports all three public laws through the real roots-loaded package;
+    // the pure and fail instances inhabit the unchanged ParserLaws predicate.
+    // A new parser may use the generic theorem only with a checked decoder
+    // bound; the package's paired literate fences exercise that distinction.
+    let mut env = mk_env();
+    let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    env.elaborate_cat5_client(
+        r#"
+        theorem client_pure_parser_laws : ParserLaws Bool (parser_pure Bool True) =
+          parser_pure_laws Bool True
+
+        theorem client_fail_parser_laws : ParserLaws Bool (parser_fail Bool) =
+          parser_fail_laws Bool
+        "#,
+    )
+    .expect("public parser_pure and parser_fail laws must instantiate for a client");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        before,
+        "importing and applying ParserLaws proofs must not extend trust"
     );
 }
 
