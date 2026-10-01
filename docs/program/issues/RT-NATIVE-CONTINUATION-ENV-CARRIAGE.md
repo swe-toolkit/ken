@@ -177,21 +177,23 @@ into it.
 - **I4. Field reads are by role.** `Child`, `WorkerCapture{seat, ordinal}`
   and `ContinuationInput{ordinal}`, never a raw offset in a consumer. The
   transport W and C authorities are the role definitions.
-- **I5. One label per source creation occurrence, relays included**
-  (Architect `evt_1zhngrssvgwcz`, on Research `evt_2evsa31gr69q3`). A relay
-  child, such as the checked-IH invocation closure 524 stored at S1/526 field
-  1, is its own slot member with its own planner-issued variant. Existing
-  variants keep their roles.
-  - Its roles are its own environment: one per capture, as the planner
-    classifies it, plus any continuation inputs. The capture holding the
-    relayed slot value is `SlotWord { slot }`, the source R word kept as-is
-    with its own label.
-  - Forcing dispatches on the relay label, then on the captured source
-    word's label. The source label is never copied into the relay word.
-- **I6. Child classification is by label.** A child is a lexical closure
-  (the existing `LexicalClosure` arm) or an IH relay, a
-  `CheckedComputationalIHInvocation` whose callee resolves to
-  `InductionHypothesis` of the slot. Anything else is `planner_error`.
+- **I5. Child classification is by the record that minted the child**
+  (Architect `evt_7tg07nnz0656z`). There are two populations.
+  - Lexical-closure environments: the existing
+    `boundary_closure_crossing_environment` arm, unchanged.
+  - Checked-IH force environments: a `CheckedComputationalIHInvocation`
+    child of arity 0, whose callee resolves to `InductionHypothesis(slot)`,
+    stored by a construct emitted under `Specialization(u)`. It classifies as
+    variant `u`, through `checked_ih_captured_environment_record
+    (Specialization(u), unit(u).worker_closure_origin())`. Plan-time
+    assertions: `u` is in the slot's flow, the variant's worker-capture seat
+    is that seat, and the record's children equal the variant's
+    `WorkerCapture` roles.
+  - Anything else, including an IH application on the non-functional
+    `call_static_worker` route, is `planner_error` naming the occurrence.
+- **I6. The store at (S1, 526, 1) writes R's S1 variant with K8 as `Child`,**
+  through the existing `slot_store_obligation`. The S1 reader arm is
+  unchanged, and the slot's sum gains no label.
 - **I7. Issuance ranges over source aggregate occurrences,** not per-emitter
   `ConstructEmission` points. A plan-time assertion requires exactly one edge
   per slot each slot-shaped occurrence matches. Lowering's refusal of an
@@ -227,29 +229,29 @@ into it.
   - The interning-key pin stays byte-identical.
   - The write fixture compiles and runs.
 - **Slot schemas (`evt_69ktj8b1xe8tc`, `evt_6rtq4txgmrjpw`,
-  `evt_1zhngrssvgwcz`).** Each slot's schema is its issued R sum, with the
+  `evt_7tg07nnz0656z`).** Each slot's schema is its issued R sum, with the
   label elided for a singleton flow set. K is never a slot schema.
   - Edges exist only where a store exists: the construct stores over source
-    aggregate occurrences, including relay occurrences. No transport edge is
-    recorded, and no routed answer is wrapped.
+    aggregate occurrences, including checked-IH force children. No transport
+    edge is recorded, and no routed answer is wrapped.
   - Readers assert `Child` against its construct edge. A slot left with no
     variant keeps main's plain representation and main's reader path.
-- **AC-R (relay representation, `evt_1zhngrssvgwcz`).**
-  - Measure first: M-a gives 524's captures as planner facts and names the
-    one carrying the relayed slot value. M-b gives the read fixture's
-    maximum relay-on-relay depth at force time, and whether forcing is a
-    nested native call.
+- **AC-F (IH-force classification, `evt_7tg07nnz0656z`).**
+  - Measure first. M-c: `unit(S1).worker_closure_origin()` and the S1
+    variant's `WorkerCapture` roles equal the (S1, 730) record's children,
+    729..722. M-d: every `CheckedComputationalIHInvocation` child stored into
+    a slot-shaped field across the read and write fixtures, with owner,
+    forced seat and route.
   - Read parity `fs_read_at_malformed_offset_narrows_to_invalid_offset` is
     green, and write parity stays green.
-  - A planner census of slot (520,1) lists its variants, including 524's and
-    its roles, and every slot-shaped source aggregate occurrence with its
-    label. It agrees one-to-one with lowering's lookups.
-  - Removing the relay classifier arm refuses at plan time, naming 524 at
+  - A planner census of slot (520,1) lists every slot-shaped source
+    aggregate occurrence with its Child's minting record and variant. It
+    agrees one-to-one with lowering's lookups, and the variant set stays
+    {S0, S1, S3}.
+  - Removing the IH-force classifier arm refuses at plan time, naming 524 at
     (S1, 526, 1), not the runtime `-1`.
-  - Writing the source label into the relay word refuses at the reader's
-    role-count check, or reddens.
-  - The Spec2 seven-capture accounting is stated, and so is M-b's force
-    recursion bound.
+  - Classifying 524 as S3 refuses at the plan-time seat assertion.
+  - The Spec2 seven-capture accounting is stated.
 - **AC-0 (measure; no build).** Done so far: the suffix census, record
   coverage, the seat relation (a checked parent→child edge, not equality),
   and the disposable trace. Remaining (`evt_2wywq8pmjerv8`): a compile-time
@@ -315,7 +317,7 @@ carrier slot has no planner-owned schema. This chain closes at §1a 5; the
 carrier-schema recut's own count starts at 0, and its 3rd advancing stop
 triggers hold-and-research.
 
-### Carrier-schema recut (§1a 3, Architect `evt_3v81hg9te2te2`)
+### Carrier-schema recut (§1a 4, Architect `evt_3v81hg9te2te2`, `evt_7tg07nnz0656z`)
 
 1. R coercion keyed on the transport call site (the routed answer), not on
    the slot store (`evt_3hm46evkpr9g`).
@@ -325,12 +327,16 @@ triggers hold-and-research.
    classifier, so a transfer-path store whose Child is a checked-IH
    invocation thunk (S1/526, child 524) has no classification
    (`evt_69ge14q5acsta`).
+4. Child classification is keyed on the lexical-closure population only. A
+   checked-IH force child (524, the K8 minted by the (S1, 730)
+   `CheckedIhCapturedEnvironment` record) has no arm. Keyed on minting
+   population (`evt_3evd30345myh2`, §1a 4).
 
-Predicate: the planner assigns a slot Child's R variant statically per store
-site, but a relayed Child's producer is a labelled flow population known
-only at run time. Closed structurally by I5-I7: a relay is its own creation
-site with a static label, and the run-time member is read by nested dispatch
-(Architect `evt_1zhngrssvgwcz`). The recut count stays 3.
+Predicate (corrected, `evt_7tg07nnz0656z`): Child classification consulted
+only the lexical-closure and `ConstructEmission` populations, and missed the
+checked-IH force records that mint every K word. The Child at (S1, 526, 1)
+is statically S1's variant; it is not run-time dynamic. The predicate
+question is next due at entry 6.
 
 ## Stop conditions
 
@@ -340,9 +346,10 @@ site with a static label, and the run-time member is read by nested dispatch
 - A suffix operand not in hand where the residual is materialized: the
   def-use rows name the carriage path, and the Architect sizes it. Do not
   add a second carriage mechanism.
-- Relay representation (each is the 4th advancing stop): 524 has no planner
-  capture provenance; the relayed value is not among 524's captures; or
-  forcing needs native recursion unbounded by the chain depth.
+- IH-force classification (each is the 5th advancing stop): M-c disagrees,
+  meaning the variant's seat is not 730 or its roles differ from the record;
+  or M-d finds a stored IH child on the non-functional route, or a store
+  whose owner is not a specialization unit.
 - Any kernel, `trusted_base()` or spec change: an operator question.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
