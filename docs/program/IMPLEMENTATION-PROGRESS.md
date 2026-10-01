@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-01 13:28:54Z — from 817 issue file(s) in `docs/program/issues/`.
+2026-10-01 14:54:17Z — from 817 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -247,7 +247,7 @@ the committed file matches the generator's output.
 | `KERNEL-ENV-RAW-INSTALL-CRATE-PRIVATE` | Code outside the kernel can still install a Decl::Transparent body or pop a declaration with no check, because GlobalEnv::add_decl and remove_last are pub. Route every external use through a checked kernel entry point and make both raw primitives crate-private | merged | kernel | M | architect | — |
 | `KERNEL-INT-LIT-CARRIER-CHECKED` | Code outside the kernel can make every IntLit check at any type, because GlobalEnv::register_int_lit_type is pub and unchecked. Register the Int literal carrier through a checked kernel entry point, as the String and Char carriers already are, and make the raw setter crate-private | ready | kernel | S | architect | — |
 | `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` | Complete the intrinsic All former-lift guest-path resolution to descend through NESTED positive formers (List (Pair String X)), so the eliminator of a strictly-positive inductive whose recursive occurrence sits one former-nesting deeper than a direct application can be built — preserving strict positivity (positive former nestings only, never a negative-position path). | merged | kernel | M | kernel | — |
-| `KERNEL-LEQ-INT-LITERAL-REDUCTION` | The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as isScalar 55295 or PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs | active | kernel | S | architect | — |
+| `KERNEL-LEQ-INT-LITERAL-REDUCTION` | The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs | active | kernel | S | architect | — |
 | `KERNEL-LITERAL-CHAR-VIEW` | K3: the kernel reduces string_to_list_char on a checked String literal to its List Char and charToInt on a checked Char literal to its IntLit codepoint, so a generic client can build a checked ASCII witness for a fresh literal; no other primitive gains reduction | merged | kernel | M | architect | — |
 | `KERNEL-LITERAL-ROLLBACK-PURGE` | Soundness repair for K3: rolling back a declaration must drop its checked String literal payload, so a later declaration that reuses the freed id cannot inherit it -- the kernel must not convert string_to_list_char of an unrelated foreign String to a stale literal's characters, and the interpreter must not evaluate an Int definition to a String | merged | kernel | S | architect | — |
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | merged | kernel | L | none | — |

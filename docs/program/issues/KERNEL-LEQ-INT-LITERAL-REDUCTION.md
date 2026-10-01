@@ -54,6 +54,11 @@ stop and report the mismatch.
   application on literals stays neutral under conversion (K3-deferred), so
   this is a spec change and needs the Spec vote (Architect
   `evt_4r2mqaavb9gbh`).
+- Companion corrections that state the `leq_int` exception where the spec
+  still calls registered `Op` reductions opaque to kernel conversion:
+  `spec/10-kernel/18-judgments.md` §4.2 and §5, and
+  `spec/10-kernel/18a-primitive-registry.md` introduction and §5 (CV
+  `evt_7sa4v62w5xqkj`). Wording only; no other rule changes.
 
 ## Acceptance
 
