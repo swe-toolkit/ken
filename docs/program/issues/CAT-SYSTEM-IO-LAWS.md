@@ -135,6 +135,17 @@ There is no `Axiom`, no `trusted_base()` change and no kernel change.
     instance. If neither route exists without a production change, stop to
     the Architect.
   - The premise-free S2 is a `System.IO` `ken reject` fence.
+- **AC-2b (SEAL-2 oracle, Architect `evt_zek8rgw9ssg7`).** Scope adds
+  `crates/ken-elaborator/src/seal2_tests/support.rs` and
+  `seal2_tests/adversary_repros.rs`. This is test support only.
+  - `result_type_produces` classifies the unreduced type before it reduces
+    it. An Ω-sorted result is not a producer, so `write_all_request` stays
+    public with its statement unchanged.
+  - Reverting to reduce-then-classify turns both TransferCount closure pins
+    red with `{"write_all_request"}`.
+  - The alias-producer repro and every existing positive repro stay green.
+  - A new positive control: a public `fn` whose result is a `def` alias of
+    `TransferCount` under a Π is still flagged.
   - Each `ken reject` fence rejects a false claim and accepts its adjacent
     true twin. A fence closed by `Refl` on a closed inductive equation
     rejects true twins too, and does not count (Architect
@@ -144,9 +155,12 @@ There is no `Axiom`, no `trusted_base()` change and no kernel change.
     list;
   - `cat_capability_laws_prelude_move`;
   - the `System.IO` catalog load;
-  - `writeAll` execution behavior is unchanged: the `writeAll` rows of
-    `crates/ken-cli/tests/rt_parity_native.rs` and the buffer-io conformance
-    seed, since the step closure changes the lowered shape.
+  - `seal2_tests::adversary_repros`;
+  - `writeAll` execution behavior is unchanged: the executing
+    `ken-verify` `px8f_write_partition` row and the buffer-io conformance
+    seed, since the step closure changes the lowered shape. The
+    `rt_parity_native.rs` range is a source-scope seal, not an execution
+    row.
 
 ## Stop conditions
 
@@ -160,3 +174,11 @@ needs a named continuation or a trace reading, so AC-0 rules it. Success
 completeness is false without the response premise (fuel `Zero` returns
 `Ok`). 3 fired: I grepped `.rs`, `.md` and `.ken` across the repository for
 the helper names and found six consumer sites, none of them migrated.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 2 (Architect `evt_zek8rgw9ssg7`).
+
+2. A proof-only public theorem whose statement mentions private carriers
+   was classified as a producer (keyed on the reduced form of the type
+   rather than its sort).
