@@ -88,8 +88,15 @@ reconstructed from term geometry.
   child for a size>1 gate. The gate and retarget read every capture from the
   record, never from a frame. Each capture comes from the claims
   `RT-PLANNER-PER-EMITTER-AVAILABILITY` finalizes under the emitting owner
-  (`evt_3yp3tea99hfta`). A checked-IH transport is not a creation site and
-  forwards its value unchanged.
+  (`evt_3yp3tea99hfta`).
+- **Transport** (rule 4, `evt_1myz2wkf66w8a`, capture source as corrected in
+  `evt_3yp3tea99hfta`). A checked-IH transport whose destination is the
+  field `(P, f)` of a disposition `(P, f, S)`, with S its source
+  specialization, is a materialization point. The residual is built there:
+  child `claimed.answer.value`, W and C from the destination owner's
+  finalized claims, and the label as at a construct emission. The child's own
+  construction (Ret721) is never wrapped, and no gate inspects the child's
+  constructor.
 - **Gate.** The candidate set is the specializations whose key names this
   eliminator, constructor and position, sorted by
   `ContinuationSpecializationId`. A set of size 1 behaves as today. A larger
@@ -150,6 +157,8 @@ reconstructed from term geometry.
     - Gate and retarget capture reads from any frame: 0.
   - **Mutation.** Dropping the last C capture from the record refuses at the
     creator or goes red.
+  - **Mutation.** Omitting the transport wrap reproduces the measured
+    Record-class refusal.
   - **Census.** Per creation construct, its emitting owners; per label, the
     gate owners it is dispatched under.
 
