@@ -60,6 +60,10 @@ Two increments, each a straight-ancestor cut that may land alone.
    - The in-matrix alias finalize and per-method kernel check run in the
      derived telescope on every path. Both `needs_reverting` gates are
      removed (`evt_4c4tgkc2gvypk`, `evt_qh7m7erbc5f6`, input f).
+   - Representation (input g, `evt_71d3p2fwxtqj1`): locally nameless. Matrix
+     binders are elaborator-only fresh free variables, refused at the kernel
+     boundary, so the kernel `Term` is unchanged. One `abstract` function
+     does the index arithmetic, once, at closing.
 
 ## Acceptance
 
@@ -71,8 +75,9 @@ Two increments, each a straight-ancestor cut that may land alone.
   - A dependent-R fixture in inference mode gives the precise diagnostic.
   - A constant-R fixture in inference mode still checks.
   - The `lang_match_record_pattern` record row and the reverting
-    woven-column fixture (FIELD-DEPENDENCE P5) are value-pinned and checked
-    in-matrix.
+    woven-column fixture (FIELD-DEPENDENCE P5), the Dep row and the deferred
+    wrong-method fixture are discriminating value pins, checked in-matrix.
+  - `PatternVariableAcrossDependentSplit` is removed (input h).
 - **AC-3.** `lang_infer_match_indexed_complete` and the as-pattern,
   nested-split and tuple-pattern suites stay green. The catalog census is
   byte-identical, and `trusted_base()` is unchanged.
