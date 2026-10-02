@@ -89,6 +89,59 @@ fn order_sub_add_cancel_rejects_swapped_conclusion_at_type_boundary() {
     }
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: a real selected-import client sees Order-owned `lt_nat` and
+/// applies its public `self_suc`, `trans`, and `leq_suc` proofs in checked
+/// theorems at general Nat arguments, with exact provider GlobalIds retained
+/// in their bodies and no added trust. CLAIMED: strict order and the attached
+/// laws are usable from their one canonical owner. THE GAP: the concrete
+/// successor bridge checks one finite input, while the generic transitivity
+/// and successor proofs exercise free arguments; package checking owns the
+/// universal law bodies.
+#[test]
+fn order_strict_order_and_attached_proofs_are_selectively_usable() {
+    assert_order_has_zero_provider_relative_trust_delta();
+    let mut env = load_order();
+    let before_trust = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    let lt_nat = env.globals[&format!("{ORDER}.lt_nat")];
+    let self_suc = env.globals[&format!("{ORDER}.lt_nat::self_suc")];
+    let trans = env.globals[&format!("{ORDER}.lt_nat::trans")];
+    let leq_suc = env.globals[&format!("{ORDER}.lt_nat::leq_suc")];
+    for id in [lt_nat, self_suc, trans, leq_suc] {
+        assert!(
+            env.env.transparent_body(id).is_some(),
+            "strict order and its selected public laws must be checked"
+        );
+    }
+    env.elaborate_file(
+        r#"
+import Data.Numeric.Nat.Order (lt_nat)
+fn selected_lt_nat (a : Nat) (b : Nat) : Bool = lt_nat a b
+theorem selected_lt_self_suc (n : Nat) : Equal Bool (lt_nat n (Suc n)) True =
+  (proof self_suc for lt_nat) n
+theorem selected_lt_trans
+    (left : Nat) (middle : Nat) (right : Nat)
+    (first : Equal Bool (lt_nat left middle) True)
+    (second : Equal Bool (lt_nat middle right) True)
+    : Equal Bool (lt_nat left right) True =
+  (proof trans for lt_nat) left middle right first second
+theorem selected_lt_suc_bridge : Equal Bool (lt_nat Zero (Suc Zero)) True =
+  (proof leq_suc for lt_nat) Zero (Suc Zero)
+"#,
+    )
+    .expect("selected strict-order law client must elaborate without extra imports");
+    let after_trust = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    assert_eq!(
+        before_trust, after_trust,
+        "strict-order client adds no trust"
+    );
+    assert_transparent_body_mentions(&env, "selected_lt_nat", lt_nat);
+    assert_transparent_body_mentions(&env, "selected_lt_self_suc", self_suc);
+    assert_transparent_body_mentions(&env, "selected_lt_trans", trans);
+    assert_transparent_body_mentions(&env, "selected_lt_suc_bridge", leq_suc);
+}
+
 fn term_mentions(term: &Term, target: GlobalId) -> bool {
     match term {
         Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. }

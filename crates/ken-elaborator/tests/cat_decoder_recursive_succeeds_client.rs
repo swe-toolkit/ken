@@ -32,7 +32,8 @@ fn printed_input_decodes_via_public_recursive_success_theorem() {
 
     env.elaborate_file(
         r#"
-import Capability.Parsing.Cursor (CursorOps, MkCursorOps, cursor_nat_lt, cursor_remaining)
+import Capability.Parsing.Cursor (CursorOps, MkCursorOps, cursor_remaining)
+import Data.Numeric.Nat.Order (lt_nat)
 import Capability.Parsing.Decoder
   (Decoder, DecoderResult, Decoded, decoder_recursive, decoder_recursive_succeeds)
 import Data.Collections.Derived (length)
@@ -61,7 +62,7 @@ fn sample_spec (cur : List UInt8) (v : Bool) (next : List UInt8) : Prop =
 
 theorem sample_nil_lt_cons (head : UInt8) (tail : List UInt8)
     : Equal Bool
-        (cursor_nat_lt
+        (lt_nat
           (cursor_remaining (List UInt8) UInt8 Nat sample_ops (Nil UInt8))
           (cursor_remaining (List UInt8) UInt8 Nat sample_ops (Cons UInt8 head tail))) True =
   Proved
@@ -74,7 +75,7 @@ theorem sample_step
     : (cur : List UInt8)
       → ((inner : List UInt8) → (v : Bool) → (next : List UInt8)
         → Equal Bool
-            (cursor_nat_lt
+            (lt_nat
               (cursor_remaining (List UInt8) UInt8 Nat sample_ops inner)
               (cursor_remaining (List UInt8) UInt8 Nat sample_ops cur)) True
         → sample_spec inner v next

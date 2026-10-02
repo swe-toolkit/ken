@@ -403,7 +403,6 @@ fn json_and_all_six_constructors_are_real_globals() {
         "char_cursor_peek",
         "char_cursor_advance",
         "char_cursor_locate",
-        "char_cursor_lt_suc",
     ] {
         assert_transparent_global(&env, name);
     }

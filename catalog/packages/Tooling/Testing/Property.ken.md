@@ -30,7 +30,11 @@ use the ordinary error-biased `Result`: an error is the first counterexample,
 while success carries `Unit`.
 
 ```ken
+import Core.Classes.LawfulClasses (bytes_deceq_eq)
+
 import Data.Collections.Derived (length, map, nth)
+
+import Data.Numeric.Nat.Order (lt_nat)
 
 data Gen a = MkGen (List a)
 
@@ -120,24 +124,13 @@ fn byte_cursor_advance (cursor : ByteCursor) : ByteCursor =
 
 fn byte_cursor_stuck_advance (cursor : ByteCursor) : ByteCursor = cursor
 
-fn property_nat_lt (left : Nat) (right : Nat) : Bool =
-  match right {
-    Zero ↦ False;
-    Suc right2 ↦
-      match left {
-        Zero ↦ True;
-        Suc left2 ↦ property_nat_lt left2 right2
-      }
-  }
-
 fn cursor_progress_with (advance : ByteCursor → ByteCursor) (input : Bytes) : Bool =
   let cursor : ByteCursor =
     byte_cursor_start input
   in
     match byte_cursor_peek cursor {
       None ↦ True;
-      Some byte ↦
-        property_nat_lt (byte_cursor_remaining (advance cursor)) (byte_cursor_remaining cursor)
+      Some byte ↦ lt_nat (byte_cursor_remaining (advance cursor)) (byte_cursor_remaining cursor)
     }
 
 fn cursor_progress (input : Bytes) : Bool = cursor_progress_with byte_cursor_advance input
@@ -149,7 +142,9 @@ fn cursor_stuck_progress (input : Bytes) : Bool =
 ## Using it
 
 `check` stops at the first false predicate. These helpers inspect its ordinary
-`Result` value without turning a test outcome into a proof.
+`Result` value without turning a test outcome into a proof. Counterexample
+witnesses compare bytes with the checked `bytes_deceq_eq` operation from
+`Core.Classes.LawfulClasses` rather than redefining byte equality.
 
 ```ken
 fn property_result_is_held (a : Type) (outcome : Result a Unit) : Bool =
@@ -157,30 +152,6 @@ fn property_result_is_held (a : Type) (outcome : Result a Unit) : Bool =
     Err counterexample ↦ False;
     Ok unit ↦ True
   }
-
-fn property_uint8_eq (left : UInt8) (right : UInt8) : Bool =
-  eq_int (uint8_to_int left) (uint8_to_int right)
-
-fn property_list_uint8_eq (left : List UInt8) (right : List UInt8) : Bool =
-  match left {
-    Nil ↦
-      match right {
-        Nil ↦ True;
-        Cons head tail ↦ False
-      };
-    Cons left_head left_tail ↦
-      match right {
-        Nil ↦ False;
-        Cons right_head right_tail ↦
-          match property_uint8_eq left_head right_head {
-            True ↦ property_list_uint8_eq left_tail right_tail;
-            False ↦ False
-          }
-      }
-  }
-
-fn property_bytes_eq (left : Bytes) (right : Bytes) : Bool =
-  property_list_uint8_eq (bytes_to_list left) (bytes_to_list right)
 
 fn property_result_failed_with
       (a : Type) (eq : a → a → Bool) (expected : a) (outcome : Result a Unit)
@@ -199,7 +170,7 @@ const zero_byte_sample : Bytes = list_to_bytes (Cons UInt8 0 (Nil UInt8))
 const first_counterexample_witness : Bool =
   property_result_failed_with
     Bytes
-    property_bytes_eq
+    bytes_deceq_eq
     empty_byte_sample
     (check Bytes gen_bytes reject_every_byte_sample)
 ```
@@ -463,7 +434,7 @@ proof first_counterexample for check_samples
             → (v : a)
             → Equal
             Bool
-            (property_nat_lt j i)
+            (lt_nat j i)
             True
             → Equal
             (Option a)
@@ -569,7 +540,7 @@ const cursor_progress_witness : Bool =
 const cursor_stuck_counterexample_witness : Bool =
   property_result_failed_with
     Bytes
-    property_bytes_eq
+    bytes_deceq_eq
     zero_byte_sample
     (check Bytes gen_bytes cursor_stuck_progress)
 ```

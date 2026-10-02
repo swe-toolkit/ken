@@ -29,10 +29,11 @@ pairs; duplicate-key rejection belongs to decoding rather than to the carrier.
 ```ken
 import Data.Collections.Derived (length)
 
+import Data.Numeric.Nat.Order (lt_nat)
+
 import Capability.Parsing.Cursor
   (CursorOps,
     MkCursorOps,
-    cursor_nat_lt,
     CursorPeekHasRemaining,
     CursorAdvanceProgress,
     CursorEndValid,
@@ -140,17 +141,12 @@ position without routing the proof-bearing core through a byte cursor.
 
 ## 4. Laws & proofs
 
-The cursor laws follow by case analysis on the unconsumed list. A successful
+The cursor laws follow by case analysis on the unconsumed list and the
+checked `lt_nat::self_suc` proof from `Data.Numeric.Nat.Order`. A successful
 peek exposes a `Cons`; advancing that branch removes exactly one constructor.
 The empty branch is the only one with zero remaining input.
 
 ```ken
-theorem char_cursor_lt_suc (n : Nat) : Equal Bool (cursor_nat_lt n (Suc n)) True =
-  match n {
-    Zero ↦ Proved;
-    Suc rest ↦ char_cursor_lt_suc rest
-  }
-
 pub theorem char_cursor_peek_has_remaining
     : CursorPeekHasRemaining (List Char) Char Nat char_cursor_ops =
   λcur.
@@ -164,7 +160,7 @@ pub theorem char_cursor_advance_progress
   λcur.
     match cur {
       Nil ↦ λvalue. λpeeked. absurd peeked;
-      Cons head tail ↦ λvalue. λpeeked. char_cursor_lt_suc (char_cursor_remaining tail)
+      Cons head tail ↦ λvalue. λpeeked. (proof self_suc for lt_nat) (char_cursor_remaining tail)
     }
 
 pub theorem char_cursor_end_valid : CursorEndValid (List Char) Char Nat char_cursor_ops =

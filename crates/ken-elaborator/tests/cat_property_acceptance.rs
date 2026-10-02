@@ -75,6 +75,16 @@ fn transparent_property_bodies_with_saturated_provider_occurrence(
         .collect()
 }
 
+fn application_head_and_arguments(mut term: &Term) -> (&Term, Vec<&Term>) {
+    let mut arguments = Vec::new();
+    while let Term::App(function, argument) = term {
+        arguments.push(argument.as_ref());
+        term = function;
+    }
+    arguments.reverse();
+    (term, arguments)
+}
+
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
     match value {
         NumericLitVal::Int(n) => EvalVal::from(n.clone()),
@@ -305,6 +315,78 @@ fn property_length_occurrence_and_selective_import_are_pinned() {
         matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "reverse"),
         "the non-import control must fail at the omitted binding, got {error:?}"
     );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: each of the two real checked counterexample witnesses passes the
+/// exact LawfulClasses `bytes_deceq_eq` GlobalId as the equality operation of
+/// `property_result_failed_with`. All four retired Property-local helpers are
+/// absent from the roots-loaded environment, and loading adds no trust.
+/// CLAIMED: Property reuses canonical byte equality and Nat strict order
+/// rather than minting local copies. THE GAP: the witness-body pin reaches only
+/// these two consumers; the scope sweep and the package's proof-checking cover
+/// other possible uses.
+#[test]
+fn property_counterexample_witnesses_use_canonical_byte_equality() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let root = catalog_or::catalog_root();
+    for provider in [
+        "Core.Classes.LawfulClasses",
+        "Data.Collections.Derived",
+        "Data.Numeric.Nat.Order",
+    ] {
+        env.elaborate_module_from_roots(std::slice::from_ref(&root), provider)
+            .unwrap_or_else(|error| panic!("Property provider {provider} must load: {error:?}"));
+    }
+    let before_trust = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    env.elaborate_module_from_roots(std::slice::from_ref(&root), "Tooling.Testing.Property")
+        .expect("Property must roots-load against its providers");
+    let after_trust = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    assert_eq!(
+        before_trust, after_trust,
+        "Property adds no provider-relative trust"
+    );
+
+    let byte_eq = env.globals["Core.Classes.LawfulClasses.bytes_deceq_eq"];
+    let failed_with = env.globals["Tooling.Testing.Property.property_result_failed_with"];
+    assert!(env.env.transparent_body(byte_eq).is_some());
+    for name in [
+        "first_counterexample_witness",
+        "cursor_stuck_counterexample_witness",
+    ] {
+        let witness = env.globals[&format!("Tooling.Testing.Property.{name}")];
+        let (_, body) = env
+            .env
+            .transparent_body(witness)
+            .expect("counterexample witness must be checked and transparent");
+        let (head, arguments) = application_head_and_arguments(&body);
+        assert!(
+            matches!(head, Term::Const { id, .. } if *id == failed_with),
+            "{name} must apply the checked counterexample helper"
+        );
+        assert_eq!(
+            arguments.len(),
+            4,
+            "{name} must pass the four helper arguments"
+        );
+        assert!(
+            matches!(arguments[1], Term::Const { id, .. } if *id == byte_eq),
+            "{name} must pass canonical LawfulClasses.bytes_deceq_eq"
+        );
+    }
+    for retired in [
+        "property_nat_lt",
+        "property_uint8_eq",
+        "property_list_uint8_eq",
+        "property_bytes_eq",
+    ] {
+        assert!(
+            !env.globals
+                .contains_key(&format!("Tooling.Testing.Property.{retired}")),
+            "retired Property helper {retired} must be absent"
+        );
+    }
 }
 
 /// Promise class: normative compatibility vectors.

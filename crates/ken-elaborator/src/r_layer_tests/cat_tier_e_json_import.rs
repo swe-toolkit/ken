@@ -126,7 +126,7 @@ fn assert_private(surface: &str) {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the real Ken parser reads Json's module dependency interface and
-/// returns exactly the two D0-ledger module/name sets. CLAIMED: Json adopts the
+/// returns exactly the three Order-factored module/name sets. CLAIMED: Json adopts the
 /// measured selective imports without an unused addition or ambient residue.
 /// THE GAP: AST equality establishes the declared dependency interface but not
 /// that each name reaches checked code, which the provider-identity test covers.
@@ -160,7 +160,6 @@ fn json_selective_import_ledger_is_exact() {
             names(&[
                 "CursorOps",
                 "MkCursorOps",
-                "cursor_nat_lt",
                 "CursorPeekHasRemaining",
                 "CursorAdvanceProgress",
                 "CursorEndValid",
@@ -168,6 +167,7 @@ fn json_selective_import_ledger_is_exact() {
             ]),
         ),
         ("Data.Collections.Derived".to_string(), names(&["length"])),
+        ("Data.Numeric.Nat.Order".to_string(), names(&["lt_nat"])),
     ]);
     assert_eq!(actual, expected);
 }
@@ -213,7 +213,7 @@ fn json_loader_visible_inventory_is_exact() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every non-base identity in Json's checked declarations is exactly
-/// one of the D0-measured Derived or Cursor identities, including the three
+/// one of the Derived, Cursor or Order identities, including the three
 /// Cursor selectors retained inside normalized law types. CLAIMED: Json has no
 /// undeclared provider or unexpected Tier-E edge. THE GAP: checked-core identity
 /// closure cannot distinguish an unused extra source import, while the strict
@@ -229,10 +229,11 @@ fn json_checked_provider_identity_closure_is_exact() {
         "Capability.Parsing.Cursor.CursorPeekHasRemaining",
         "Capability.Parsing.Cursor.MkCursorOps",
         "Capability.Parsing.Cursor.cursor_advance",
-        "Capability.Parsing.Cursor.cursor_nat_lt",
         "Capability.Parsing.Cursor.cursor_peek",
         "Capability.Parsing.Cursor.cursor_remaining",
         "Data.Collections.Derived.length",
+        "Data.Numeric.Nat.Order.lt_nat",
+        "Data.Numeric.Nat.Order.lt_nat::self_suc",
     ]);
     let expected_ids = expected_names
         .iter()
@@ -263,7 +264,8 @@ fn json_checked_provider_identity_closure_is_exact() {
         .filter(|(name, identity)| {
             external.contains(identity)
                 && (name.starts_with("Capability.Parsing.Cursor.")
-                    || name.starts_with("Data.Collections.Derived."))
+                    || name.starts_with("Data.Collections.Derived.")
+                    || name.starts_with("Data.Numeric.Nat.Order."))
         })
         .map(|(name, _)| name.clone())
         .collect::<BTreeSet<_>>();
@@ -280,14 +282,18 @@ fn json_checked_provider_identity_closure_is_exact() {
 /// not a permanent source-text test.
 #[test]
 fn json_publication_is_visibility_only() {
-    let _ = load_json();
+    let (env, _, _) = load_json();
     for surface in [
         "char_cursor_remaining",
         "char_cursor_peek",
         "char_cursor_advance",
         "char_cursor_locate",
-        "char_cursor_lt_suc",
     ] {
         assert_private(surface);
     }
+    assert!(
+        !env.globals
+            .contains_key(&format!("{JSON}.char_cursor_lt_suc")),
+        "retired Json-local strict-order proof must be absent from the loaded environment"
+    );
 }

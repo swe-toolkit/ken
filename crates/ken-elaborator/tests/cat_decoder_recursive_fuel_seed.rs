@@ -55,7 +55,8 @@ fn recursive_seed_reaches_terminal_layer_with_honest_remaining() {
         r#"
 import Capability.Parsing.Cursor
   (CursorOps, MkCursorOps, CursorLaws, CursorPeekHasRemaining,
-    CursorAdvanceProgress, CursorEndValid, cursor_nat_lt, cursor_remaining)
+    CursorAdvanceProgress, CursorEndValid, cursor_remaining)
+import Data.Numeric.Nat.Order (lt_nat)
 import Capability.Parsing.Decoder
   (Decoder, DecoderResult, decoder_recursive, decoder_alt, decoder_seq,
     decoder_satisfy, decoder_pure)
@@ -77,7 +78,7 @@ const honest_ops : CursorOps (List Bool) Bool Nat =
   MkCursorOps (List Bool) Bool Nat
     honest_remaining list_peek list_advance list_locate
 
-theorem lt_suc (n : Nat) : Equal Bool (cursor_nat_lt n (Suc n)) True =
+theorem lt_suc (n : Nat) : Equal Bool (lt_nat n (Suc n)) True =
   match n { Zero ↦ Proved; Suc rest ↦ lt_suc rest }
 
 theorem honest_peek_has_remaining
