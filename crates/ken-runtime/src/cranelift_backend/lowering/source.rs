@@ -1714,6 +1714,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         static_origin,
                                         &constructor,
                                         &lowered,
+                                        Some(&env),
                                     )?)
                                 } else {
                                     LoweringOperand::Specialized(self.finish_source_constructor(
@@ -3667,8 +3668,26 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             // case header and a boundary value belongs.
             Self::require_i64(builder, field_count, binders);
             let mut projected = Vec::with_capacity(cases[index].binders);
+            let constructor_identity = self.static_transition_plan
+                .case_constructor_identity(static_origin, index)?;
             for position in 0..cases[index].binders {
                 let child = self.emit_carrier_field(builder, scrutinee, position)?;
+                let expected = self.static_transition_plan
+                    .recursive_residual_binder_affected(constructor_identity, position);
+                #[cfg(feature = "px8-ds-test-support")]
+                let before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+                #[cfg(feature = "px8-ds-test-support")]
+                let emit = recursive_residual_guard_enabled(expected);
+                #[cfg(not(feature = "px8-ds-test-support"))]
+                let emit = expected;
+                if emit {
+                    self.refuse_private_recursive_residual(builder, child)?;
+                }
+                #[cfg(feature = "px8-ds-test-support")]
+                record_recursive_residual_match_guard(
+                    "source", constructor_identity, position, expected,
+                    recursive_residual_class_calls(builder.func, self.carrier_refs()?.class) - before,
+                )?;
                 projected.push(child.word.into());
             }
             builder.ins().jump(leaf, &projected);
@@ -4493,6 +4512,188 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             None
                         } else {
                             let body = invocation.recursive_unit_body;
+                            if let Some(selection) = body {
+                                // A checked transport can return before the
+                                // shared unit selector, so guard its retained
+                                // selection at this source-machine consumer.
+                                selection.require_trivial_residual_continuation()?;
+                            }
+                            if let Some(selection @ RecursiveUnitBodySelection::Labelled { .. }) = body {
+                                // The sole switch is in calls.rs. Its callback
+                                // receives an exact body in each arm, so an S4
+                                // arrival cannot borrow S3's unique transport.
+                                let coordinates = CarriedInvocationCoordinates::of(invocation)?;
+                                let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+                                    "CheckedIhEnvironmentTransport", "a labelled force has no destination owner",
+                                ))?;
+                                let projection = current_checked_ih_projection.clone();
+                                // As on the ordinary exact-body force path,
+                                // install the invocation segment before the
+                                // returned word resumes source control. Without
+                                // this, R itself is tested as a Result.
+                                let checked_ih_invocation =
+                                    self.mint_checked_computational_ih_instance(&mut recursor)?;
+                                if let Some(CheckedRecursiveInvocationInstance {
+                                    source: InvocationTemplateRef::ComputationalIHCall(call_template_id), ..
+                                }) = checked_ih_invocation {
+                                    let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(||
+                                        unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation has no oriented plan"))?;
+                                    let call = plan.computational_ih_call(call_template_id).ok_or_else(||
+                                        unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation has no call template"))?;
+                                    let open = control.selected.selected_scope.as_ref().ok_or_else(||
+                                        unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation has no selected parent occurrence"))?;
+                                    self.validate_source_dynamic_splice_parent(
+                                        checked_ih_invocation.expect("matched checked IH invocation"), open,
+                                    )?;
+                                    if call.parent_frame_template_id != open.frame.checked_frame_id
+                                        || call.parent_segment_site_id != open.frame.checked_frame_id
+                                            .and_then(|frame_id| plan.frame(frame_id)
+                                                .map(|frame| frame.segment_site_id)) {
+                                        return Err(unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation's parent differs from the active open occurrence"));
+                                    }
+                                }
+                                let (base, boundary) = decompose_computational_recursor(
+                                    LoweringOperand::Specialized(recursor),
+                                );
+                                let (activation, invocation) = boundary.ok_or_else(|| unsupported(
+                                    "RecursiveResidual", "a labelled force lost its invocation segment",
+                                ))?;
+                                let LoweringOperand::Carried(word) = base else {
+                                    return Err(unsupported("RecursiveResidual", "a labelled force has no carried slot word"));
+                                };
+                                if source_active_cursor(&control.selected, &control.selected_lineage,
+                                    invocation.resume_cursor).is_none()
+                                    && !recursor_invocation_is_checked(&invocation) {
+                                    return Err(unsupported("ComputationalRecursor",
+                                        "a labelled invocation cursor is not live in source control"));
+                                }
+                                let mut suspended = control;
+                                if source_active_cursor(&suspended.selected, &suspended.selected_lineage,
+                                    invocation.resume_cursor).is_none()
+                                    && !recursor_invocation_is_checked(&invocation) {
+                                    return Err(unsupported("ComputationalRecursor",
+                                        "a labelled armed endpoint changed selected cursor"));
+                                }
+                                suspended.continuation = self.install_recursor_invocation(
+                                    suspended.continuation, activation, invocation,
+                                    checked_ih_invocation,
+                                )?;
+                                let value = self.select_recursive_position_unit(
+                                    builder, selection, Some(coordinates), Some(word),
+                                    |this, builder, body, carried_base| {
+                                        let transport = this.static_transition_plan
+                                            .checked_ih_environment_transport_for_invocation(
+                                                owner, Some(body),
+                                                coordinates.continuation_origin,
+                                                coordinates.recursive_position,
+                                            )?.cloned();
+                                        if let Some(transport) = transport {
+                                            let word = carried_base.ok_or_else(|| unsupported(
+                                                "RecursiveResidual", "the force arm lost its selected R word",
+                                            ))?;
+                                            // The selected S3 arm validates R15's
+                                            // Child against its independent K7
+                                            // source record before taking its route.
+                                            let _ = this.checked_ih_transport_child(
+                                                builder, word, &transport,
+                                            )?;
+                                            let authority = match this.function_local
+                                                .checked_ih_generated_entry_access.as_ref() {
+                                                Some(access) => this.composed_return_forward_ret_authority(
+                                                    access, &transport,
+                                                )?,
+                                                None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+                                            };
+                                            match authority {
+                                                #[cfg(feature = "px8-ds-test-support")]
+                                                ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                                                    return Err(unsupported("ComposedReturnForwardRetAuthority",
+                                                        "a validated Tail producer-to-Ret route has no exact post-selection authority"));
+                                                }
+                                                #[cfg(feature = "px8-ds-test-support")]
+                                                ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                                                    return Err(unsupported("ComposedReturnForwardRetAuthority",
+                                                        "a validated Tail producer-to-Ret route formed more than one post-selection authority"));
+                                                }
+                                                ComposedReturnForwardRetAuthorityOutcome::NonApplicable
+                                                | ComposedReturnForwardRetAuthorityOutcome::Formed(_) => {}
+                                                #[cfg(feature = "px8-ds-test-support")]
+                                                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
+                                            }
+                                            if let Some((projection, pending, callee_origin)) = &projection {
+                                                match projection.fresh_result_route() {
+                                                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                                                        return Ok(this.call_direct_checked_ih_transport_from_case_environment(
+                                                            builder, &transport, projection, *pending, *callee_origin,
+                                                            &env,
+                                                        )?.into_routed_answer().value);
+                                                    }
+                                                    CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                                                        // A labelled arm returns a value;
+                                                        // no forward-Ret collapse inside the switch.
+                                                        return this.call_tail_checked_ih_transport_from_case_environment(
+                                                            builder, &transport, &env,
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            this.call_tail_checked_ih_transport_from_case_environment(
+                                                builder, &transport, &env,
+                                            )
+                                        } else {
+                                            // S4 has no transport; None is the
+                                            // ordinary exact-body path, not refusal.
+                                            let mut inputs = this.carry_source_call_inputs(
+                                                builder, body, args.clone(),
+                                            )?;
+                                            if !inputs.is_empty() {
+                                                return Err(unsupported("RecursiveResidual",
+                                                    "an exact labelled force has unexpected explicit ordinary arguments"));
+                                            }
+                                            let units = this.static_transition_plan.continuation_units()?;
+                                            let mut matching = units.iter().filter(|unit|
+                                                unit.worker_body_origin() == body
+                                                    && unit.continuation_origin() == coordinates.continuation_origin
+                                                    && unit.recursive_position() == coordinates.recursive_position);
+                                            let unit = matching.next().ok_or_else(|| unsupported(
+                                                "RecursiveResidual", "an exact labelled force has no selected unit envelope",
+                                            ))?;
+                                            if matching.next().is_some() {
+                                                return Err(unsupported("RecursiveResidual",
+                                                    "an exact labelled force has ambiguous selected unit envelopes"));
+                                            }
+                                            let field_start = unit.recursive_positions().len();
+                                            for role in unit.ordinary_envelope()? {
+                                                if let ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
+                                                    source_position,
+                                                } = role {
+                                                    let index = field_start.checked_add(source_position as usize)
+                                                        .ok_or_else(|| unsupported("RecursiveResidual",
+                                                            "an exact force's ordinary source field exceeds the case environment"))?;
+                                                    inputs.push(env.get(index).ok_or_else(|| unsupported(
+                                                        "RecursiveResidual", "an exact force is missing its planned nonrecursive field",
+                                                    ))?.value_at("an exact labelled force ordinary field")?.clone());
+                                                }
+                                            }
+                                            this.call_declared_recursive_position_unit(
+                                                builder, body, &inputs, Some(coordinates), carried_base,
+                                            )
+                                        }
+                                    },
+                                )?;
+                                return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
+                                    value: RoutedAnswer::direct(value), control: suspended,
+                                }));
+                            }
+                            let body = body.and_then(|selected| match selected {
+                                RecursiveUnitBodySelection::Exact(body)
+                                | RecursiveUnitBodySelection::ResidualExact { body, .. } => Some(body),
+                                RecursiveUnitBodySelection::Labelled { .. } => None,
+                            });
                             let coordinates = CarriedInvocationCoordinates::of(invocation)?;
                             let destination_owner = self.defining_emission_owner.ok_or_else(|| {
                                 unsupported(
@@ -4992,12 +5193,11 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                     ));
                     if let Some(body) = recursive_unit_body {
                         let coordinates = carried_coordinates;
-                        let args = self.carry_source_call_inputs(builder, body, args)?;
-                        let value = self.call_declared_recursive_position_unit(
-                            builder,
-                            body,
-                            &args,
-                            Some(coordinates),
+                        let value = self.call_selected_recursive_position_unit(
+                            builder, body, Some(coordinates), Some(word),
+                            |this, builder, body| {
+                                this.carry_source_call_inputs(builder, body, args.clone())
+                            },
                         )?;
                         #[cfg(test)]
                         d5a_trace(format!(
@@ -5092,6 +5292,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         body,
                         &call_inputs,
                         Some(coordinates),
+                        None,
                     )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
                         // A declared recursive-position unit call is not a

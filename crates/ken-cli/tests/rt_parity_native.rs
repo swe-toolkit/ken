@@ -2725,7 +2725,8 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             .fold(std::collections::BTreeMap::new(), |mut counts, point| {
                 let entry = counts.entry(point.owner.as_str()).or_insert((0usize, 0usize));
                 for capture in &point.captures {
-                    if capture.result.starts_with("Finalized(") {
+                    if capture.result.starts_with("FinalizedFrame(")
+                        || capture.result.starts_with("FinalizedTransport(") {
                         assert_eq!(capture.unfinalizable_owner, None,
                             "finalized captures cannot carry an unfinalizable owner");
                         entry.0 += 1;
@@ -2743,7 +2744,7 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             [
                 ("Predeclared(PredeclaredFunctionId(4))", (30usize, 0usize)),
                 ("Predeclared(PredeclaredFunctionId(5))", (9, 0)),
-                ("Specialization(ContinuationSpecializationId(2))", (4, 44)),
+                ("Specialization(ContinuationSpecializationId(2))", (41, 7)),
             ].into());
         let destination = census.materializations.iter().find(|point| {
             point.specialization == 1
@@ -2759,13 +2760,10 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
         for (index, capture) in destination.captures.iter().enumerate() {
             assert_eq!(capture.run, if index < 8 { "Worker" } else { "Context" });
             assert_eq!(capture.ordinal, if index < 8 { index as u32 } else { (index - 8) as u32 });
-            assert!(capture.result.contains("reason: NoClaim"),
-                "Spec2 lacks the source specialization's exact capture coordinate: {capture:?}");
-            // The result's typed owner is independent of the enclosing point.
-            // On Vis735 the producer's interning owner is P4, not emitter S2.
-            assert_eq!(capture.unfinalizable_owner,
-                Some(ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2)),
-                "every unfinalizable capture must name the actual emitting owner");
+            assert!(capture.result.starts_with("FinalizedTransport("),
+                "Vis735 receives its own finalized W/C transport claim: {capture:?}");
+            assert_eq!(capture.unfinalizable_owner, None,
+                "a finalized transport claim cannot borrow an unfinalizable owner");
         }
         assert_eq!(write_availability.len(), 1);
         assert_eq!(write_availability[0].materializations.len(), 13);

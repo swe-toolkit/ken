@@ -2208,6 +2208,22 @@ impl<'a> Lowering<'a> {
                 "a carried constructor seat has no artifact-static dispatch path",
             ));
         }
+        #[cfg(test)]
+        let word = self.test_private_word_at_reader(builder, word, PrivateResidualReaderSite::HostWireRoot)?;
+        #[cfg(test)]
+        let guard_before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+        #[cfg(test)]
+        let guard_enabled = !private_reader_guard_deleted(PrivateResidualReaderSite::HostWireRoot);
+        #[cfg(not(test))]
+        let guard_enabled = true;
+        if guard_enabled {
+            self.refuse_private_recursive_residual(builder, word)?;
+        }
+        #[cfg(test)]
+        record_private_reader_guard(PrivateResidualReaderSite::HostWireRoot, guard_before,
+            builder.func, self.carrier_refs()?.class);
+        #[cfg(test)]
+        self.test_private_reader_fallthrough_poison(builder, PrivateResidualReaderSite::HostWireRoot);
         let root_tag = self.emit_carrier_tag(builder, word)?;
         let root_field_count = self.emit_carrier_field_count(builder, word)?;
         let done = builder.create_block();
@@ -2256,6 +2272,24 @@ impl<'a> Lowering<'a> {
                         )
                     })?;
                     let child = self.emit_carrier_field(builder, word, child_position)?;
+                    #[cfg(test)]
+                    let child = self.test_private_word_at_reader(builder, child,
+                        PrivateResidualReaderSite::HostWireChild)?;
+                    #[cfg(test)]
+                    let guard_before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+                    #[cfg(test)]
+                    let guard_enabled = !private_reader_guard_deleted(PrivateResidualReaderSite::HostWireChild);
+                    #[cfg(not(test))]
+                    let guard_enabled = true;
+                    if guard_enabled {
+                        self.refuse_private_recursive_residual(builder, child)?;
+                    }
+                    #[cfg(test)]
+                    record_private_reader_guard(PrivateResidualReaderSite::HostWireChild, guard_before,
+                        builder.func, self.carrier_refs()?.class);
+                    #[cfg(test)]
+                    self.test_private_reader_fallthrough_poison(builder,
+                        PrivateResidualReaderSite::HostWireChild);
                     let child_tag = self.emit_carrier_tag(builder, child)?;
                     let child_fields = self.emit_carrier_field_count(builder, child)?;
                     Self::require_i64(builder, child_fields, i64::from(*child_field_count));

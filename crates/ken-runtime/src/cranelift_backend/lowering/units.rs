@@ -4530,6 +4530,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 compiler.transfer_constructor_operands(
                     &mut builder, vis_origin, &constructor,
                     &[LoweringOperand::Carried(returned), LoweringOperand::Carried(returned)],
+                    None,
                 )?
             } else {
                 returned
@@ -9620,6 +9621,8 @@ fn define_unit_body<M: Module>(
     compiler.commit_aggregate_events()?;
     #[cfg(test)]
     scale_b_record_unit_body(&func);
+    #[cfg(feature = "px8-ds-test-support")]
+    record_plain_native_unit_ir(id, &func);
     let mut ctx = module.make_context();
     std::mem::swap(&mut ctx.func, &mut func);
     module

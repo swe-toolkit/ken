@@ -263,7 +263,6 @@ fn run_dynamic_constructor_dispatch_fixture(
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -2218,7 +2217,6 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -2818,6 +2816,115 @@ pub(super) fn c2_run_edge_with_arg(
     let function: extern "C" fn(*const u64, i64) -> i64 =
         unsafe { std::mem::transmute(code) };
     function(arena, argument)
+}
+
+/// Promise class: durable invariant. The exact private Record discriminator
+/// refuses the carried tag-1 record but not a tag-0 user Record or a legitimate
+/// Constructor whose checked identity is also 1. The synthetic words enter the
+/// emitted ABI reader, not a Rust-only duplicate predicate.
+#[test]
+fn private_record_reader_checks_class_and_tag_without_refusing_public_values() {
+    use crate::boundary_value::{
+        BoundaryArenaBuilder, BoundaryClass, BoundaryTag, NODE_TAG_ID,
+    };
+    let source = RuntimeExpr::Value(RuntimeValue::Int(1.into()));
+    let (plan, _) = planned_root_occurrence(&source);
+    let seed = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let (_module, code) = c2_compile_edge_with_arg(
+        "private_record_reader_class_and_tag", &seed, plan,
+        |compiler, builder, argument| {
+            compiler.refuse_private_recursive_residual(
+                builder, CarriedBoundaryWord { word: argument },
+            )?;
+            Ok(builder.ins().iconst(types::I64, 42))
+        },
+    );
+    let mut values = BoundaryArenaBuilder::new();
+    let private = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Record, 0, &[],
+    );
+    let public = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Record, 0, &[],
+    );
+    let constructor = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Constructor, 0, &[],
+    );
+    let mut arena = values.finish();
+    arena.0.poke_node_field(private.payload(), NODE_TAG_ID, 1);
+    arena.0.poke_node_field(constructor.payload(), NODE_TAG_ID, 1);
+    let pointer = arena.publish();
+    assert_eq!(c2_run_edge_with_arg(code, pointer, private.0 as i64), -1);
+    assert_eq!(c2_run_edge_with_arg(code, pointer, public.0 as i64), 42);
+    assert_eq!(c2_run_edge_with_arg(code, pointer, constructor.0 as i64), 42);
+}
+
+/// Promise class: durable invariant. The decoder validates the private
+/// record's exact 1 + worker + missing-context count before projecting any
+/// capture, and a valid record retains the two runs in planner order.
+#[test]
+fn private_residual_decoder_keeps_two_capture_runs_and_refuses_missing_or_extra_field() {
+    use crate::boundary_value::{
+        BoundaryArenaBuilder, BoundaryClass, BoundaryTag, BoundaryWord, NODE_TAG_ID,
+    };
+    let source = RuntimeExpr::Construct {
+        constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+        args: Vec::new(),
+    };
+    let (plan, root) = planned_root_occurrence(&source);
+    let constructor = plan.constructor_symbol_identity(root)
+        .expect("the checked root has a constructor identity");
+    let disposition = RecursiveResidualDisposition::synthetic_for_decoder_test(
+        constructor, 2, vec![0, 2],
+    );
+    assert_eq!(disposition.field_count(), 5);
+    let seed = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let (_module, code) = c2_compile_edge_with_arg(
+        "private_residual_decoder_capture_runs", &seed, plan,
+        |compiler, builder, argument| {
+            let (forwarded, workers, missing) = compiler.decode_recursive_residual(
+                builder, CarriedBoundaryWord { word: argument }, &disposition,
+            )?;
+            let all = std::iter::once(forwarded)
+                .chain(workers.into_iter().chain(missing).map(|operand| match operand {
+                    LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Specialized(_) => panic!("the decoder returns only words"),
+                }));
+            let mut accumulator = builder.ins().iconst(types::I64, 0);
+            for word in all {
+                let value = compiler.emit_carrier_scalar(builder, word)?;
+                let shifted = builder.ins().imul_imm(accumulator, 100);
+                accumulator = builder.ins().iadd(shifted, value);
+            }
+            Ok(accumulator)
+        },
+    );
+    let fields = [7, 11, 13, 17, 19, 23]
+        .map(|n| BoundaryWord::immediate(BoundaryTag::ImmediateInt, n));
+    let mut values = BoundaryArenaBuilder::new();
+    let good = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Record, 0, &fields[..5],
+    );
+    let missing = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Record, 0, &fields[..4],
+    );
+    let extra = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Record, 0, &fields[..6],
+    );
+    let mut arena = values.finish();
+    for word in [good, missing, extra] {
+        arena.0.poke_node_field(word.payload(), NODE_TAG_ID, 1);
+    }
+    let pointer = arena.publish();
+    assert_eq!(c2_run_edge_with_arg(code, pointer, good.0 as i64),
+        711_131_719, "the ordered worker and context captures remain distinct");
+    assert_eq!(c2_run_edge_with_arg(code, pointer, missing.0 as i64), -1,
+        "a missing context field must refuse before projection");
+    assert_eq!(c2_run_edge_with_arg(code, pointer, extra.0 as i64), -1,
+        "a surplus field must not be silently discarded");
 }
 
 /// The expected semantic environment for one declared source parameter, four

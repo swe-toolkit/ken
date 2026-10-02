@@ -28,9 +28,21 @@ pub(in crate::cranelift_backend) enum UnfinalizableReason {
     ForeignOwner,
 }
 
+/// A transport owns the relation between the selected worker's captures and
+/// this destination. Its claims do not borrow the destination owner's frame.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum TransportCarriedClaim {
+    WorkerCapture { seat: StaticOriginId, ordinal: u32 },
+    ContinuationInput {
+        ordinal: u32,
+        destination: CheckedIhTransportInputDestination,
+    },
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum PerEmitterCaptureClaim {
-    Finalized(ContinuationEnvironmentClaim),
+    FinalizedFrame(ContinuationEnvironmentClaim),
+    FinalizedTransport(TransportCarriedClaim),
     Unfinalizable {
         ordinal: u32,
         owner: ContinuationEmissionOwner,
@@ -211,7 +223,7 @@ fn capture_result(
     let claim = match (source, frame) {
         (Some(source), Some(frame)) => {
             match point_claim(plan, unit, source, emission_origin, frame)? {
-                Ok(claim) => PerEmitterCaptureClaim::Finalized(claim),
+                Ok(claim) => PerEmitterCaptureClaim::FinalizedFrame(claim),
                 Err(reason) => PerEmitterCaptureClaim::Unfinalizable {
                     ordinal,
                     owner,
@@ -331,52 +343,104 @@ pub(super) fn build_per_emitter_availability(
     ) in points
     {
         let unit = &plan.continuation_specializations[specialization.0 as usize];
-        let frame = match owner {
-            ContinuationEmissionOwner::Fusion(_) => None,
-            _ => Some(continuations::emitter_frame_for_owner(
-                &plan.continuation_specializations,
-                owner,
-            )?),
+        let transport = if kind == MaterializationKind::CheckedIhTransportDestination {
+            let mut matching = plan.checked_ih_environment_transports.iter().filter(|transport| {
+                transport.source_specialization() == specialization
+                    && transport.destination_construct_origin() == emission_origin
+                    && transport.recursive_position() == recursive_position
+                    && transport.destination_owner() == owner
+            });
+            let transport = matching.next().ok_or_else(|| {
+                planner_error("a transport materialization has no exact planner edge")
+            })?;
+            if matching.next().is_some() {
+                return Err(planner_error("a transport materialization has ambiguous planner edges"));
+            }
+            Some(transport)
+        } else {
+            None
+        };
+        let frame = if transport.is_some() {
+            None
+        } else {
+            match owner {
+                ContinuationEmissionOwner::Fusion(_) => None,
+                _ => Some(continuations::emitter_frame_for_owner(
+                    &plan.continuation_specializations,
+                    owner,
+                )?),
+            }
         };
         let mut captures =
             Vec::with_capacity(unit.key.worker.captures.len() + unit.key.continuation_inputs.len());
-        for capture in &unit.key.worker.captures {
-            let source = worker_source_slot(plan, capture)?;
-            let (source, missing_reason) = match source {
-                Ok(source) => (Some(source), UnfinalizableReason::NoClaim),
-                Err(reason) => (None, reason),
-            };
-            captures.push(capture_result(
-                plan,
-                unit,
-                CaptureRun::Worker,
-                capture.ordinal,
-                source.as_ref(),
-                missing_reason,
-                owner,
-                emission_origin,
-                frame.as_ref(),
-            )?);
-        }
-        for input in &unit.key.continuation_inputs {
-            let source = ContinuationSourceSlotAuthority {
-                coordinate: input.coordinate,
-                carrier: input.carrier,
-                ownership: input.ownership,
-                storage_owner: input.storage_owner,
-                referent_affinity: input.referent_affinity.clone(),
-            };
-            captures.push(capture_result(
-                plan,
-                unit,
-                CaptureRun::Context,
-                input.ordinal,
-                Some(&source),
-                UnfinalizableReason::NoClaim,
-                owner,
-                emission_origin,
-                frame.as_ref(),
-            )?);
+        match transport {
+            Some(transport) => {
+                let record = plan.aggregate_record_view(transport.source_record())?;
+                let worker_ready = record.shape() == PlannedAggregateShape::Constructor
+                    && record.declared_children().map(|children| children.len())
+                        == Some(unit.key.worker.captures.len());
+                let context_ready = transport.continuation_input_count()
+                    == unit.key.continuation_inputs.len();
+                for capture in &unit.key.worker.captures {
+                    let claim = if worker_ready {
+                        PerEmitterCaptureClaim::FinalizedTransport(
+                            TransportCarriedClaim::WorkerCapture {
+                                seat: transport.seat(), ordinal: capture.ordinal,
+                            },
+                        )
+                    } else {
+                        PerEmitterCaptureClaim::Unfinalizable {
+                            ordinal: capture.ordinal, owner, reason: UnfinalizableReason::NoClaim,
+                        }
+                    };
+                    captures.push(PerEmitterCaptureResult {
+                        run: CaptureRun::Worker, ordinal: capture.ordinal,
+                        source: None, claim,
+                    });
+                }
+                for input in &unit.key.continuation_inputs {
+                    let destination = context_ready.then(|| transport
+                        .continuation_input_index(input.ordinal, input.coordinate)).flatten();
+                    let claim = match destination {
+                        Some(destination) => PerEmitterCaptureClaim::FinalizedTransport(
+                            TransportCarriedClaim::ContinuationInput {
+                                ordinal: input.ordinal, destination,
+                            },
+                        ),
+                        None => PerEmitterCaptureClaim::Unfinalizable {
+                            ordinal: input.ordinal, owner, reason: UnfinalizableReason::NoClaim,
+                        },
+                    };
+                    captures.push(PerEmitterCaptureResult {
+                        run: CaptureRun::Context, ordinal: input.ordinal,
+                        source: Some(input.coordinate), claim,
+                    });
+                }
+            }
+            None => {
+                for capture in &unit.key.worker.captures {
+                    let source = worker_source_slot(plan, capture)?;
+                    let (source, missing_reason) = match source {
+                        Ok(source) => (Some(source), UnfinalizableReason::NoClaim),
+                        Err(reason) => (None, reason),
+                    };
+                    captures.push(capture_result(
+                        plan, unit, CaptureRun::Worker, capture.ordinal, source.as_ref(),
+                        missing_reason, owner, emission_origin, frame.as_ref(),
+                    )?);
+                }
+                for input in &unit.key.continuation_inputs {
+                    let source = ContinuationSourceSlotAuthority {
+                        coordinate: input.coordinate, carrier: input.carrier,
+                        ownership: input.ownership, storage_owner: input.storage_owner,
+                        referent_affinity: input.referent_affinity.clone(),
+                    };
+                    captures.push(capture_result(
+                        plan, unit, CaptureRun::Context, input.ordinal, Some(&source),
+                        UnfinalizableReason::NoClaim, owner, emission_origin, frame.as_ref(),
+                    )?);
+                }
+            }
         }
         results.push(PerEmitterMaterialization {
             specialization,
@@ -493,7 +557,8 @@ pub(super) fn record_per_emitter_availability_diagnostic(plan: &StaticTransition
                             source: capture.source.map(|source| format!("{source:?}")),
                             result: format!("{:?}", capture.claim),
                             unfinalizable_owner: match capture.claim {
-                                PerEmitterCaptureClaim::Finalized(_) => None,
+                                PerEmitterCaptureClaim::FinalizedFrame(_)
+                                | PerEmitterCaptureClaim::FinalizedTransport(_) => None,
                                 PerEmitterCaptureClaim::Unfinalizable { owner, .. } => {
                                     Some(diagnostic_owner(owner))
                                 }

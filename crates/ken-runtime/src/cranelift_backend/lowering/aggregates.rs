@@ -1852,8 +1852,20 @@ impl<'a> Lowering<'a> {
                                     schema_origin
                                 ))
                             })?,
+                    };
+                    // This transfer has no selected-case environment from
+                    // which to fill a residual suffix. A source-identity
+                    // slot allocation must use the creation-site builder;
+                    // never store its bare K child as though it were R.
+                    for position in 0..args.len() {
+                        if self.static_transition_plan.slot_store_obligation(
+                            self.defining_emission_owner, occurrence, identity, position as u32,
+                        )?.is_some() {
+                            return Err(unsupported("RecursiveResidual",
+                                "a source slot constructor reached generic transfer without its creation-site suffix"));
+                        }
                     }
-                    .tag_abi_word()?;
+                    let identity = identity.tag_abi_word()?;
                     // The fields are read BEFORE the allocation, deliberately. This
                     // arm materializes the constructor, so a field read placed
                     // inside the store loop below would refuse only after
@@ -3173,6 +3185,18 @@ impl<'a> Lowering<'a> {
                         ));
                     }
                 };
+                // An alternative retains its own Source occurrence when it
+                // materializes a source Construct. A synthesized alternative
+                // has no source identity and is outside the slot population.
+                for position in 0..alternative.fields.len() {
+                    if self.static_transition_plan.slot_store_obligation(
+                        self.defining_emission_owner, occurrence, alternative.identity,
+                        position as u32,
+                    )?.is_some() {
+                        return Err(unsupported("RecursiveResidual",
+                            "a source slot alternative reached generic transfer without its creation-site suffix"));
+                    }
+                }
                 let word = self.emit_checked_aggregate_alloc(
                     builder,
                     GovernedAllocationSite::DynamicAlternative,
@@ -3857,7 +3881,8 @@ impl<'a> Lowering<'a> {
                                     })?,
                                 SynthesizedAggregateRoot::HostResultError
                                 | SynthesizedAggregateRoot::HostResultOk
-                                | SynthesizedAggregateRoot::UnitBoundaryEnvironment => {
+                                | SynthesizedAggregateRoot::UnitBoundaryEnvironment
+                                | SynthesizedAggregateRoot::RecursivePositionResidual => {
                                     return Err(unsupported(
                                         "BoundaryClosureEnvironment",
                                         "a positional closure capture was reconciled under a non-capture aggregate root",
@@ -3999,6 +4024,8 @@ impl<'a> Lowering<'a> {
                 &template,
                 PlannedAggregateShape::Constructor,
             )?;
+            // A planner-synthesized checked-IH positional environment has no
+            // source Construct identity; R2's source-store predicate excludes it.
             let word = self.emit_checked_aggregate_alloc(
                 builder,
                 GovernedAllocationSite::SourceConstructor,
@@ -4127,6 +4154,8 @@ impl<'a> Lowering<'a> {
                 &template,
                 PlannedAggregateShape::Constructor,
             )?;
+            // A planner-synthesized closure positional environment has no
+            // source Construct identity; R2's source-store predicate excludes it.
             let word = self.emit_checked_aggregate_alloc(
                 builder,
                 GovernedAllocationSite::SourceConstructor,

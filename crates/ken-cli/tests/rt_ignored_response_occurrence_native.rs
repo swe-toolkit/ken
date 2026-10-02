@@ -1,11 +1,16 @@
-//! A two-sequential-bracket witness for distinct host response occurrences.
+//! Two sequential resource brackets: native/interpreter observation parity.
 //!
-//! The source is checked by the ordinary compiler, not a hand-authored runtime
-//! tree. Its native first refusal is a transition sentinel for the independent
-//! carried-IH successor, not a claim that either bracket runs natively yet.
+//! The checked source builds two constructions of one continuation. Dynamic
+//! recursive-position captures must travel with each construction's value.
 
 #[cfg(target_os = "linux")]
 const TWO_BUFFER_WITNESS: &str = include_str!("rt_ignored_two_buffer_witness.ken");
+#[cfg(target_os = "linux")]
+const ONE_BUFFER_WITNESS: &str = include_str!("rt_one_buffer_residual_layout.ken");
+#[cfg(target_os = "linux")]
+const PLAIN_MATCH_WITNESS: &str = include_str!("rt_plain_match_layout.ken");
+#[cfg(target_os = "linux")]
+const PLAIN_MATCH_C91_IR: &str = include_str!("rt_plain_match_layout.c91.clif");
 
 // Measured on this exact checked witness: a stated 2 MiB worker aborts from
 // stack overflow; 4 MiB completes the planner and reaches BoundaryCarrier.
@@ -17,7 +22,7 @@ const WITNESS_STACK_BYTES: usize = 4 * 1024 * 1024 + 4 * 1024 * 1024;
 
 #[cfg(target_os = "linux")]
 #[test]
-fn sequential_brackets_reach_the_carried_ih_successor_boundary() {
+fn sequential_brackets_carry_independent_residuals_with_native_parity() {
     std::thread::Builder::new()
         .name("rt-ignored-sequential-brackets".to_string())
         .stack_size(WITNESS_STACK_BYTES)
@@ -27,21 +32,222 @@ fn sequential_brackets_reach_the_carried_ih_successor_boundary() {
         .expect("sequential-brackets witness thread");
 }
 
+/// Promise class: durable invariant. The one-bracket baseline retains its
+/// native/interpreter observation even if its private field layout changes.
+#[cfg(target_os = "linux")]
+#[test]
+fn one_bracket_retains_native_parity() {
+    std::thread::Builder::new()
+        .name("rt-residual-one-bracket".to_string())
+        .stack_size(WITNESS_STACK_BYTES)
+        .spawn(run_one_bracket_layout)
+        .expect("spawn stated-stack one-bracket witness")
+        .join()
+        .expect("one-bracket witness thread");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn ordinary_match_has_empty_residual_population_and_c91_identical_unit_ir() {
+    std::thread::Builder::new()
+        .name("rt-residual-plain-match".to_string())
+        .stack_size(WITNESS_STACK_BYTES)
+        .spawn(run_plain_recursive_match_census)
+        .expect("spawn stated-stack plain match")
+        .join()
+        .expect("plain match thread");
+}
+
+#[cfg(target_os = "linux")]
+fn run_plain_recursive_match_census() {
+    let output = tempfile::Builder::new()
+        .prefix("ken-rt-residual-plain-match-")
+        .tempdir()
+        .expect("unique plain match output root");
+    let (((compiled, guards), plans), emitted_ir) =
+        ken_runtime::with_plain_native_unit_ir_observations(|| {
+            ken_runtime::with_recursive_residual_disposition_census(|| {
+                ken_runtime::with_recursive_residual_match_guard_observations(
+                    ken_runtime::RecursiveResidualMatchGuardMutation::Exact,
+                    || ken_cli::build_native_program(
+                        PLAIN_MATCH_WITNESS, ken_cli::SourceFormat::Ken,
+                        "native-program", output.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    ),
+                )
+            })
+        });
+    compiled.expect("ordinary match builds natively");
+    assert!(!plans.is_empty(), "the planner must report the actual context population");
+    assert!(plans.iter().all(|plan| plan.parent_sites == 0 && plan.checked_s.is_empty()
+        && plan.contexts.iter().all(|&(worker, captures, missing)|
+            worker == 0 && captures == 0 && missing == 0)),
+        "the measured ordinary-match plan must have W=0, M=empty, and S=empty: {plans:?}");
+    assert!(!guards.is_empty(), "the emitted IR must contain ordinary match binders");
+    assert!(guards.iter().all(|row| !row.planned_in_s && row.emitted_class_calls == 0),
+        "empty S must emit zero ordinary match guards: {guards:?}");
+    // Promise class: transition sentinel for this exact-base WP. The fixture
+    // records the emitted checked unit bodies on c91, not repository prose.
+    // Future intentional codegen changes must replace the c91 baseline in a
+    // newly framed criterion; this WP cannot charge zero-S programs extra IR.
+    assert_eq!(emitted_ir.as_bytes(), PLAIN_MATCH_C91_IR.as_bytes(),
+        "the measured zero-S native unit IR differs byte-for-byte from c91");
+}
+
+#[cfg(target_os = "linux")]
+fn run_one_bracket_layout() {
+    let output = tempfile::Builder::new()
+        .prefix("ken-rt-residual-one-bracket-")
+        .tempdir()
+        .expect("unique one-bracket output root");
+    let ((compiled, rows), dispositions) =
+        ken_runtime::with_recursive_residual_disposition_census(|| {
+            ken_runtime::with_recursive_residual_match_guard_observations(
+                ken_runtime::RecursiveResidualMatchGuardMutation::Exact,
+                || ken_cli::build_native_program(
+                    ONE_BUFFER_WITNESS, ken_cli::SourceFormat::Ken,
+                    "rt_one_buffer_residual_layout", output.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                ),
+            )
+        });
+    let compiled = compiled.expect("one checked bracket builds natively");
+    assert!(dispositions.iter().any(|plan| plan.parent_sites == 1
+        && plan.checked_s.len() == 1
+        && plan.contexts.iter().any(|&(worker, captures, missing)|
+            worker == 5 && captures == 4 && missing == 2)),
+        "the one-bracket fixture must MEASURE one Vis creation site with Wrapped W5/C4/M2 and |S|=1: {dispositions:?}");
+    assert!(rows.iter().all(|row| row.emitted_class_calls == usize::from(row.planned_in_s)),
+        "the one-bracket emitter must respect its planned exact S");
+    // Promise class: normative compatibility vector for this exact-base WP.
+    // The same fixture on clean c91 emitted zero stdout/stderr bytes and exited
+    // 0. The W5-suppression control separately proves the private carriage is
+    // necessary; external equality is not used to infer an internal Plain tag.
+    let process = std::process::Command::new(&compiled.artifact.executable_path)
+        .current_dir(output.path())
+        .output()
+        .expect("execute the linked one-bracket native artifact");
+    assert_eq!(process.stdout, b"", "stdout must match the c91 native artifact");
+    assert_eq!(process.stderr, b"", "stderr must match the c91 native artifact");
+    assert_eq!(process.status.code(), Some(0), "exit must match the c91 native artifact");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &compiled.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(), environment: Vec::new(),
+            cwd: output.path().to_owned(), plan_hash: compiled.plan_transport_hash,
+        },
+    ).expect("one native bracket executes");
+    let mut host = ken_interp::PosixHost::new_at(output.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        ONE_BUFFER_WITNESS, ken_cli::SourceFormat::Ken, &[], &[],
+        output.path().as_os_str().as_encoded_bytes(), &mut host,
+    ).expect("one checked bracket interprets");
+    assert_eq!(native, interpreted, "one-bracket observation is byte-identical by value");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable negative control. Removing the measured W5
+/// carriage recovers the exact base refusal on each bracket population.
+#[cfg(target_os = "linux")]
+#[test]
+fn suppressing_w5_cannot_publish_either_bracket_witness() {
+    std::thread::Builder::new()
+        .name("rt-residual-w5-suppression".to_string())
+        .stack_size(WITNESS_STACK_BYTES)
+        .spawn(|| {
+            for (name, source) in [
+                ("one", ONE_BUFFER_WITNESS),
+                ("two", TWO_BUFFER_WITNESS),
+            ] {
+                let output = tempfile::Builder::new()
+                    .prefix("ken-rt-residual-suppressed-")
+                    .tempdir()
+                    .expect("unique suppressed-bracket output root");
+                let (built, applied) =
+                    ken_runtime::with_recursive_residual_disposition_mutation(
+                        ken_runtime::RecursiveResidualDispositionMutation::SuppressW5,
+                        || ken_cli::build_native_program(
+                            source, ken_cli::SourceFormat::Ken, name, output.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        ),
+                    );
+                assert!(applied > 0, "the {name}-bracket suppression must reach W5");
+                let error = built.expect_err("missing W5 must refuse the native build");
+                let reason = format!("{error:?}");
+                assert!(reason.contains("BoundaryCarrier")
+                    && reason.contains("call provides 1"),
+                    "the {name}-bracket mutation must restore the exact base refusal: {reason}");
+            }
+        })
+        .expect("spawn stated-stack suppression control")
+        .join()
+        .expect("suppression-control thread");
+}
+
+/// Promise class: durable negative control. Worker Parameter-tail cardinality
+/// and context Capture cardinality are distinct contracts; corrupt each
+/// independently on the real checked two-bracket plan and require refusal.
+#[cfg(target_os = "linux")]
+#[test]
+fn worker_and_context_capture_counts_each_refuse_when_corrupted() {
+    std::thread::Builder::new()
+        .name("rt-residual-separate-cardinalities".to_string())
+        .stack_size(WITNESS_STACK_BYTES)
+        .spawn(|| {
+            use ken_runtime::RecursiveResidualDispositionMutation as Mutation;
+            for (name, mutation) in [
+                ("worker", Mutation::WorkerCardinalityPlusOne),
+                ("context", Mutation::ContextCardinalityPlusOne),
+            ] {
+                let output = tempfile::Builder::new()
+                    .prefix("ken-rt-residual-bad-capture-count-")
+                    .tempdir()
+                    .expect("unique corrupt-cardinality output root");
+                let (built, applied) =
+                    ken_runtime::with_recursive_residual_disposition_mutation(
+                        mutation,
+                        || ken_cli::build_native_program(
+                            TWO_BUFFER_WITNESS, ken_cli::SourceFormat::Ken,
+                            name, output.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        ),
+                    );
+                assert!(applied > 0, "{name} capture mutation must reach a descriptor");
+                let error = built.expect_err("a mismatched capture run must refuse");
+                let reason = format!("{error:?}");
+                assert!(reason.contains("recursive residual"),
+                    "the {name} cardinality must refuse at the residual contract: {reason}");
+            }
+        })
+        .expect("spawn stated-stack capture-cardinality control")
+        .join()
+        .expect("capture-cardinality control thread");
+}
+
 #[cfg(target_os = "linux")]
 fn run_sequential_brackets_witness() {
     let output = tempfile::Builder::new()
         .prefix("ken-rt-ignored-two-buffer-")
         .tempdir()
         .expect("unique native output root");
-    let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-        ken_cli::build_native_program(
-            TWO_BUFFER_WITNESS,
-            ken_cli::SourceFormat::Ken,
-            "rt_ignored_two_buffer_witness",
-            output.path(),
-            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-        )
-    });
+    let ((compiled, diagnostics), dispositions) =
+        ken_runtime::with_recursive_residual_disposition_census(|| {
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    TWO_BUFFER_WITNESS,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_ignored_two_buffer_witness",
+                    output.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                )
+            })
+        });
+    let compiled_output = compiled.expect("both checked brackets must build as a native object");
+    assert!(dispositions.iter().any(|plan| plan.parent_sites == 2
+        && plan.contexts.len() == 2 && plan.checked_s.len() == 1
+        && plan.contexts.contains(&(5, 4, 2))
+        && plan.contexts.contains(&(7, 6, 4))),
+        "the two Vis creation sites must retain W5/C4/M2 and W7/C6/M4 contexts: {dispositions:?}");
     let rows = diagnostics
         .iter()
         .flat_map(|plan| &plan.all_static_response_rows)
@@ -76,19 +282,49 @@ fn run_sequential_brackets_witness() {
     }
     assert_ne!(rows[0].eliminating_cm, rows[1].eliminating_cm);
 
-    let error = compiled.expect_err("the independent carried-IH successor is still required");
-    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(error) = error else {
-        panic!("the native refusal must occur in packaging, not earlier: {error:?}");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &compiled_output.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: output.path().to_owned(),
+            plan_hash: compiled_output.plan_transport_hash,
+        },
+    )
+    .expect("the linked two-bracket object executes without a runtime trap");
+    let mut host = ken_interp::PosixHost::new_at(output.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        TWO_BUFFER_WITNESS,
+        ken_cli::SourceFormat::Ken,
+        &[],
+        &[],
+        output.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("the same checked source executes under the interpreter");
+    assert_eq!(native.exit_status, interpreted.exit_status);
+    assert_eq!(native.terminal_error, interpreted.terminal_error);
+    assert_eq!(native.terminal_exit, interpreted.terminal_exit);
+    assert_eq!(native.exit_status, 0, "both brackets finish at Success");
+    assert_eq!(native.terminal_error, None);
+    let non_release = |observed: &ken_runtime::EffectObservation| {
+        observed.effect_trace.iter()
+            .filter(|event| event.operation != ken_runtime::HostOpV1::ResourceRelease)
+            .cloned().collect::<Vec<_>>()
     };
-    assert_eq!(
-        error.stage,
-        ken_runtime::ObjectLinkerPackagingStage::ObjectEmission,
-        "the planner must admit both host response occurrences"
-    );
-    assert_eq!(error.field, "checked_process_object");
-    assert_eq!(
-        error.reason,
-        "unsupported runtime-IR lowering: BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1",
-        "this refusal is the new first native boundary, not a successful run"
-    );
+    assert_eq!(non_release(&native), non_release(&interpreted));
+    // RT-BRACKET-RELEASE-ORDER-PARITY tracks the independent ordering gap.
+    // The pair of release observations must agree as a set, not in chronology.
+    let releases = |observed: &ken_runtime::EffectObservation| {
+        let mut events = observed.effect_trace.iter()
+            .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
+            .map(|event| format!("{:?}", (
+                event.resource_bindings.clone(), event.request.clone(), event.outcome.clone(),
+            ))).collect::<Vec<_>>();
+        events.sort();
+        events
+    };
+    let native_releases = releases(&native);
+    assert_eq!(native_releases.len(), 2, "the witness executes both release effects");
+    assert_eq!(native_releases, releases(&interpreted));
 }

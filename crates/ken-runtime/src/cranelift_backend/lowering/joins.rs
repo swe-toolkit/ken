@@ -1142,11 +1142,10 @@ impl<'a> Lowering<'a> {
                 // origin and the case's ordinal. ⚠ `case.constructor`, the
                 // **string**, is deliberately not the key: keying on the spelling
                 // would be the second derivation `D2` forbids.
-                let identity = self
+                let constructor_identity = self
                     .static_transition_plan
-                    .case_constructor_identity(static_origin, index)?
-                    .tag_abi_word()?;
-                let identity = Self::carrier_identity_immediate(builder, identity);
+                    .case_constructor_identity(static_origin, index)?;
+                let identity = Self::carrier_identity_immediate(builder, constructor_identity.tag_abi_word()?);
                 let selected = builder.create_block();
                 let next = builder.create_block();
                 let matched = builder.ins().icmp(
@@ -1178,9 +1177,24 @@ impl<'a> Lowering<'a> {
                 // phase** — which is the exact clause `§2h`'s control demands.
                 let mut bindings = Vec::with_capacity(case.binders);
                 for position in 0..case.binders {
-                    bindings.push(LoweringOperand::Carried(
-                        self.emit_carrier_field(builder, scrutinee, position)?,
-                    ));
+                    let child = self.emit_carrier_field(builder, scrutinee, position)?;
+                    let expected = self.static_transition_plan
+                        .recursive_residual_binder_affected(constructor_identity, position);
+                    #[cfg(feature = "px8-ds-test-support")]
+                    let before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+                    #[cfg(feature = "px8-ds-test-support")]
+                    let emit = recursive_residual_guard_enabled(expected);
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    let emit = expected;
+                    if emit {
+                        self.refuse_private_recursive_residual(builder, child)?;
+                    }
+                    #[cfg(feature = "px8-ds-test-support")]
+                    record_recursive_residual_match_guard(
+                        "joins", constructor_identity, position, expected,
+                        recursive_residual_class_calls(builder.func, self.carrier_refs()?.class) - before,
+                    )?;
+                    bindings.push(LoweringOperand::Carried(child));
                 }
                 let case_env = env_with_operands(bindings, env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;

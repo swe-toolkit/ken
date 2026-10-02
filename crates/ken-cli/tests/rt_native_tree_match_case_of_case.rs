@@ -424,12 +424,15 @@ fn option_outer_family_refuses_before_artifact_while_exit_code_uses_d1() {
         )
     });
     assert_eq!(d1_hits, 0, "Option must not enter the ExitCode D1 route");
+    // R2 now refuses this source-identity slot allocation at generic
+    // transfer before the old source-join boundary can inspect the Option.
+    // Preserve the fail-closed, no-artifact contract and name the new arm.
     let error = build.expect_err("untested Option family must refuse before artifact emission");
     let message = format!("{error:?}");
     assert!(
-        message.contains("planned source join")
-            && message.contains("neither emitted nor statically unselected"),
-        "the prior join boundary must refuse: {message}"
+        message.contains("RecursiveResidual: a source slot constructor reached generic transfer")
+            && message.contains("without its creation-site suffix"),
+        "the source-store guard must refuse before the prior join boundary: {message}"
     );
     assert!(
         std::fs::read_dir(dir.path()).unwrap().next().is_none(),

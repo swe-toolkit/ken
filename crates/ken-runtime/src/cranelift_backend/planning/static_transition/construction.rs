@@ -48,9 +48,10 @@ use super::aggregates::{
 };
 #[allow(unused_imports)]
 use super::aggregates::{
-    build_aggregate_ownership_plan, build_checked_ih_continuation_inheritances,
-    build_checked_ih_environment_transports, build_checked_ih_generated_entry_accesses,
+    build_aggregate_ownership_plan, build_recursive_residual_dispositions,
     derive_checked_ih_transport_source_population,
+    build_checked_ih_continuation_inheritances,
+    build_checked_ih_environment_transports, build_checked_ih_generated_entry_accesses,
     build_checked_ih_generated_entry_confluences,
     lifetime_referent_affinity, validate_aggregate_ownership_plan,
     validate_checked_ih_continuation_inheritances, validate_checked_ih_environment_transports,
@@ -294,6 +295,8 @@ impl<'src> Planner<'src> {
                 aggregate_ownership: Vec::new(),
                 pre_schema_transport_sources: BTreeSet::new(),
                 preselected_response_callers: BTreeSet::new(),
+                recursive_residual_dispositions: Vec::new(),
+                recursive_carrier_slots: Vec::new(),
                 checked_ih_environment_transports: Vec::new(),
                 per_emitter_materializations: Vec::new(),
                 unclassified_materializations: Vec::new(),
@@ -1432,14 +1435,11 @@ impl<'src> Planner<'src> {
         // earliest possible view is built after this line.
         finalize_continuation_availability_plan(&mut self.plan)?;
         self.plan.join_results = build_join_result_plan(&self.plan, functionized_units)?;
-        // Phase A and the continuation/source plan already exist, whereas
-        // ownership and transports do not. Derive only their call-edge source
-        // identities here, then select response callers against that fixed set.
         self.plan.pre_schema_transport_sources =
             derive_checked_ih_transport_source_population(&self.plan)?;
-        self.plan.preselected_response_callers = self
-            .plan
-            .preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
+        self.plan.preselected_response_callers =
+            self.plan.preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
+        self.plan.recursive_residual_dispositions = build_recursive_residual_dispositions(&self.plan)?;
         // `D7` — the aggregate occurrence population is built HERE, last, and
         // deliberately not beside the occurrence authorities it also reads.
         //
@@ -1482,26 +1482,34 @@ impl<'src> Planner<'src> {
         self.plan.immediate_bridge_realizations =
             publish_immediate_bridge_realization_plan(&self.plan)?;
         self.plan.install_static_response_context_plan_phase_b()?;
-        let installed_response_callers = self.plan.static_response_owner_specializations()?
-            .map(|owners| {
-                owners
-                    .into_iter()
+        match self.plan.static_response_owner_specializations()? {
+            Ok(owners) => {
+                let installed_response_callers = owners.into_iter()
                     .map(|owner| owner.selected_caller().clone())
-                    .collect::<BTreeSet<_>>()
-            })
-            .unwrap_or_default();
-        if installed_response_callers != self.plan.preselected_response_callers {
-            return Err(planner_error(
-                "preselected response callers disagree with the installed response owners",
-            ));
+                    .collect::<BTreeSet<_>>();
+                if installed_response_callers != self.plan.preselected_response_callers {
+                    return Err(planner_error(
+                        "preselected response callers disagree with the installed response owners",
+                    ));
+                }
+            }
+            Err(infeasible) => {
+                // Phase A's typed refusal is already installed in the plan:
+                // retain its own reason rather than comparing an invented empty
+                // owner population with the preselected feasible callers.
+                if self.plan.static_response_infeasible.as_ref() != Some(&infeasible) {
+                    return Err(planner_error(infeasible.reason()));
+                }
+            }
         }
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing
         // derived planes before any inheritance is built. The transport source
-        // population is fixed before schema issuance. Both post-ownership
-        // transport builds must equal that source-plane set, or phase B would
-        // depend on the representation it is supposed to constrain.
+        // population is fixed before schema issuance. Phase B consumes the
+        // transport-source identities built after ownership; both builds must
+        // equal the independent pre-schema population, or the phase selection
+        // would depend on the representation it is supposed to constrain.
         self.plan.aggregate_ownership = build_aggregate_ownership_plan(&self.plan)?;
         validate_aggregate_ownership_plan(&self.plan, &self.plan.aggregate_ownership)?;
         self.plan.checked_ih_environment_transports =
@@ -1524,6 +1532,8 @@ impl<'src> Planner<'src> {
             per_emitter_availability::build_per_emitter_availability(&self.plan)?;
         self.plan.per_emitter_materializations = materializations;
         self.plan.unclassified_materializations = unclassified;
+        self.plan.install_recursive_residual_record_identities()?;
+        self.plan.recursive_carrier_slots = self.plan.build_recursive_carrier_slots()?;
         self.plan.checked_ih_continuation_inheritances =
             build_checked_ih_continuation_inheritances(&self.plan)?;
         #[cfg(feature = "px8-ds-test-support")]

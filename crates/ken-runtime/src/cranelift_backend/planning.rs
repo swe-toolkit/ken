@@ -15,6 +15,8 @@ mod static_transition;
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use static_transition::{
+    with_recursive_residual_disposition_census, RecursiveResidualDispositionCensus,
+    with_recursive_residual_disposition_mutation, RecursiveResidualDispositionMutation,
     checked_ih_continuation_inheritance_mutation_is_exact,
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,
@@ -81,6 +83,7 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 #[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
 pub(in crate::cranelift_backend) use static_transition::{
+    CaptureRun, MaterializationKind, PerEmitterCaptureClaim, TransportCarriedClaim,
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
     FusionRegionClaimLedger, PendingVisFrameOwner, PendingVisFrameRegion,
     PendingVisRecordProtocol,
@@ -140,7 +143,9 @@ pub(super) use static_transition::{
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
-    PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
+    RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
+    RecursiveCarrierStoreKind, RecursiveCarrierVariant,
+    RecursiveResidualChildKind, PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRoot,
 };
 // `RT-DECL-CLOSURE-PORT` `D7` — the host-effect semantic-seat authority, read

@@ -9,7 +9,7 @@ const TWO: &str = include_str!("rt_ignored_two_buffer_witness.ken");
 
 #[cfg(target_os = "linux")]
 #[test]
-fn one_and_two_brackets_keep_their_native_refusal_and_exact_emitter_census() {
+fn one_and_two_brackets_run_natively_with_exact_emitter_census() {
     // The two-bracket predecessor measured a 2 MiB worker stack overflow;
     // provision its measured 4 MiB baseline plus 4 MiB of headroom.
     std::thread::Builder::new()
@@ -31,23 +31,12 @@ fn one_and_two_brackets_keep_their_native_refusal_and_exact_emitter_census() {
                     )
                 });
                 assert_eq!(reports.len(), 1, "one checked source has one static plan");
-                if label == "rt_per_emitter_one" {
-                    let compiled = built.expect("the one-bracket c91 control builds natively");
-                    let process = std::process::Command::new(&compiled.artifact.executable_path)
-                        .current_dir(root.path()).output().expect("run one bracket");
-                    assert_eq!(process.stdout, b"");
-                    assert_eq!(process.stderr, b"");
-                    assert_eq!(process.status.code(), Some(0));
-                } else {
-                    let error = built.expect_err("two brackets still need the held residual WP");
-                    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(error) = error else {
-                        panic!("the planner may not newly refuse the witness: {error:?}");
-                    };
-                    assert_eq!(error.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
-                    assert_eq!(error.field, "checked_process_object");
-                    assert_eq!(error.reason,
-                        "unsupported runtime-IR lowering: BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1");
-                }
+                let compiled = built.expect("each bracket witness builds natively");
+                let process = std::process::Command::new(&compiled.artifact.executable_path)
+                    .current_dir(root.path()).output().expect("run bracket witness");
+                assert_eq!(process.stdout, b"");
+                assert_eq!(process.stderr, b"");
+                assert_eq!(process.status.code(), Some(0));
                 reports.into_iter().next().unwrap()
             };
             let one = compile("rt_per_emitter_one", ONE);
@@ -89,7 +78,7 @@ fn capture_counts(
     let finalized = point
         .captures
         .iter()
-        .filter(|capture| capture.result.starts_with("Finalized("))
+        .filter(|capture| capture.result.starts_with("Finalized"))
         .count();
     let unfinalizable = point.captures.len() - finalized;
     assert_eq!(w + c, finalized + unfinalizable);

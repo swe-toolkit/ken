@@ -11,6 +11,9 @@ mod closure;
 mod construction;
 mod continuations;
 mod per_emitter_availability;
+pub(in crate::cranelift_backend) use per_emitter_availability::{
+    CaptureRun, MaterializationKind, PerEmitterCaptureClaim, TransportCarriedClaim,
+};
 #[cfg(feature = "px8-ds-test-support")]
 pub use per_emitter_availability::{
     with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,
@@ -168,6 +171,8 @@ use continuations::ContinuationProductionMutation;
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use aggregates::{
+    with_recursive_residual_disposition_census, RecursiveResidualDispositionCensus,
+    with_recursive_residual_disposition_mutation, RecursiveResidualDispositionMutation,
     checked_ih_continuation_inheritance_mutation_is_exact,
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,
@@ -223,9 +228,13 @@ pub(in crate::cranelift_backend) use aggregates::{
     CheckedIhGeneratedEntryProjection,
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
-    PlannedAggregateAllocation, PlannedAggregateOwnership,
-    PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
-    SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
+    PlannedAggregateAllocation, PlannedAggregateOwnership, RecursiveResidualDisposition,
+    PlannedAggregateShape, RecursiveCarrierChild, RecursiveCarrierEdge,
+    RecursiveCarrierRole, RecursiveCarrierSlot, RecursiveCarrierStoreKind,
+    RecursiveResidualChildKind,
+    RecursiveCarrierVariant,
+    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
+    SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
 use aggregates::{
     lifetime_referent_affinity, CheckedIhGeneratedEntryConfluence,
@@ -690,11 +699,16 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// HAS a lowering accessor — the allocation lane is unreadable at the
     /// producer without it.
     aggregate_ownership: Vec<PlannedAggregateOwnership>,
-    /// Ownership-independent transport sources, fixed before carrier schema.
+    /// Representation-independent transport sources, derived before residual
+    /// issuance and checked against both post-ownership transport builds.
     pre_schema_transport_sources: BTreeSet<ContinuationCallIdentity>,
-    /// Phase-A demands selected against that fixed population. Nothing consumes
-    /// this set for emission until the subsequent carrier-schema increment.
+    /// Phase-A response demands selected against those fixed transport sources.
+    /// Phase B must resolve exactly this caller set before any lowering.
     preselected_response_callers: BTreeSet<ContinuationCallIdentity>,
+    /// Exact parent-field/owner dispositions, installed before ownership.
+    recursive_residual_dispositions: Vec<RecursiveResidualDisposition>,
+    /// Issued sum schema and exact writer edges for each wrapped recursive slot.
+    recursive_carrier_slots: Vec<RecursiveCarrierSlot>,
     /// The exact two-endpoint transports that carry a force-materialized
     /// checked-IH environment to an escaping closure crossing. These reference
     /// `aggregate_ownership`; they never issue a second record.
@@ -1103,7 +1117,8 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
-    /// Test-only projections for exact early/late identity comparison.
+    /// Planner-only, pre-schema identities, exposed solely to test whether
+    /// the early and late strata agree on exact members rather than counts.
     pub pre_schema_transport_sources: Vec<String>,
     pub preselected_response_callers: Vec<String>,
     /// The complete Deferred residual: P1 plus ineligible or test-suppressed
