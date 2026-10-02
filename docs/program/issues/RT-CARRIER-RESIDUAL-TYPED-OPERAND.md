@@ -212,6 +212,49 @@ ABI change.
   `residual_across_untyped_abi_transitional`. Each call names its site.
   Nothing else may use it.
 
+**I-0, the mixed slot: one representation per slot** (Architect
+`evt_1ns21bwepgvqv`, on WIP `a12a5db40` and research `evt_4ejgpwpmk763g`).
+The ruling carries the code and is authoritative where this summary differs.
+- **The rule.** A slot is issued iff some candidate in its flow has a
+  `wrapped()` LexicalClosure disposition, as today. Every flow member of an
+  issued slot stores R. A member without a wrapped disposition is boxed K→R
+  at its writer into `[Child, Label]`.
+- **Schema** (aggregates.rs):
+  - `RecursiveCarrierMemberSchema::{Residual, Boxed}`;
+  - `RecursiveCarrierVariant` gains `schema` and a declared `child_arity`;
+  - a planner-issued `RecursiveCarrierBoxedStore`, a closed population
+    issued beside the dispositions. Each store's label is the member's
+    ordinal in `recursive_residual_candidates`, with `candidates.len() >= 2`
+    asserted.
+- **Rekeyed, the 4 representation consumers:**
+  - ownership and records: one box Record per store, in the parent's meet;
+  - `build_recursive_carrier_slots`: a Boxed variant per variant-less
+    member, with one ConstructEmission edge per store;
+  - the rewalk: `owes_edge := slot.flow.contains(..)`, which supersedes the
+    `recursive_residual_for_specialization` key of `evt_34wv6tryq2v64`;
+  - `slot_store_obligation`: returns a sealed `Residual | Boxed` with no
+    `_ =>` arm at the writer;
+  - the decoder's arity check reads `variant.child_arity`, not the
+    `WorkerCapture` count.
+- The totality invariant (`:10671`) and the decoder loop are unchanged and
+  now hold by construction.
+- A checked-IH force store of a Boxed member is refused by the planner with
+  a named error.
+- **Unchanged, the 7 capture-recovery consumers of `wrapped()`** named in the
+  ruling: calls.rs:1146, core.rs:15238, ownership :5423/:5436/:5778, :10836
+  and :10687.
+- **D0 before building (non-advancing).** At G6/Node/0 of
+  `invocation_return_transport_selection_is_per_producer_in_production`,
+  measure:
+  - S1's worker-capture count;
+  - S1's context and disposition, and its `wrapped()`;
+  - the G31 field-0 expression kind;
+  - `boundary_closure_crossing_environment(Specialization(S0), child)` and
+    its arity.
+
+  A None environment, or a Child that is not Constructor-class, is a stop
+  to the Architect.
+
 **I-1: planner-issued representation, and the escape removed.**
 - `AbiSlot` (`abi.rs:448-462`) gets a planner-issued `representation`. It
   is R only where a transport or W/C consumer is proven downstream, and K
@@ -253,7 +296,20 @@ ABI change.
   - Label mutations: the default arm falling through to arm 0 stays green
     on id41, which is S3 at arm 0. Swapping arms 0 and 1 fails id41's
     record or count assert.
-  - One full `rt_parity_native` run, with verdicts unchanged.
+  - **Mixed slot.**
+    - The exact row `invocation_return_transport_selection_is_per_producer_in_production`
+      passes 1/1. It is red on held `d9b8d81a8` and green on main.
+    - Planner census over the parity corpus: issued slots, mixed slots and
+      boxed stores. A Boxed member with a checked-IH force store is a stop
+      to the Architect.
+    - Mutations:
+      - dropping Boxed variant issuance refuses at `:10671`;
+      - a writer storing bare K for a Boxed member fails closed at the
+        decoder's `class == Record` check, with -1;
+      - reverting the decoder arity to the `WorkerCapture` count reddens
+        the row.
+  - One full `rt_parity_native` run on the candidate itself (186/186), with
+    verdicts unchanged. The pre-D0 186/186 does not transfer.
   - Every I-2 acceptance row of `RT-NATIVE-CONTINUATION-ENV-CARRIAGE`
     holds, as do the 13-row log, mutations 1-3 and the class guard at
     `joins.rs:1109-1124`.
@@ -285,9 +341,9 @@ ABI change.
 
 **Shared predicate (Architect `evt_65eqjan51qtgp`):** the R/K representation
 of a position (an operand, a field or a slot member) is read off a nearby
-proxy instead of being declared per position. The mixed-slot representation
-waits on the Architect's ruling after the research advisory. The next
-re-trigger is the 6th.
+proxy instead of being declared per position. Closed by declaring
+representation per slot (`evt_1ns21bwepgvqv`). The next re-trigger is the
+6th.
 
 ## Stop conditions
 
@@ -297,5 +353,4 @@ re-trigger is the 6th.
 - Any change to the kernel, the spec or a verdict outside the runtime rows
   named here. A currently passing `rt_parity_native` row that is newly
   refused, including through an F disposition, is a stop to the Architect.
-- §1a is at 3 (held for the mixed-slot ruling). The 6th advancing stop is a
-  hold plus research.
+- §1a is at 3. The 6th advancing stop is a hold plus research.
