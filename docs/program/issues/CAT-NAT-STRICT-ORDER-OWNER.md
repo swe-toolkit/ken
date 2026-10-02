@@ -62,7 +62,7 @@ renamed only.
 
 1. **Order.**
    - Widen the Transport import to `(cong, sym, trans)`.
-   - Add `pub fn lt_nat` beside `compare`, with its 13 attached laws after
+   - Add `pub fn lt_nat` beside `compare`, with its 12 attached laws after
      `compare`'s.
    - Add `pub theorem leq_nat_suc_add_right` with the other `leq_nat_*`
      bounds.
