@@ -4,6 +4,7 @@
 //! `declare_postulate`, honesty guard via `GlobalEnv::trusted_base()`, refinement
 //! lowering to carrier, `prove`/`law` declaration elaboration, `old` elaboration.
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
 // Raw query aliases are intentionally conspicuous: any active-frame-reachable
@@ -118,6 +119,7 @@ impl ElabResult {
 #[derive(Default)]
 struct MetaCtx {
     metas: Vec<Option<Level>>,
+    defaulted: Cell<bool>,
 }
 
 impl MetaCtx {
@@ -136,7 +138,10 @@ impl MetaCtx {
             }
             Level::Var(LevelVar(m)) => match &self.metas[*m as usize] {
                 Some(sol) => self.zonk_level(sol),
-                None => Level::Zero,
+                None => {
+                    self.defaulted.set(true);
+                    Level::Zero
+                }
             },
         }
     }
@@ -19091,6 +19096,16 @@ fn finish_inferred_indexed_match(
     Ok(elim)
 }
 
+/// Seed a check-mode matrix only when all levels in its goal are known.
+/// Reading an unsolved level metavariable as Zero would prevent the first
+/// leaf from solving it against the actual result type.
+fn check_mode_result_seed(cx: &ElabCtx<'_>, expected: Option<&Term>) -> Option<Term> {
+    let ty = expected?;
+    cx.metas.defaulted.set(false);
+    let zonked = cx.metas.zonk_term(ty);
+    (!cx.metas.defaulted.replace(false)).then_some(zonked)
+}
+
 #[inline(never)]
 fn infer_tuple_match(
     cx: &mut ElabCtx,
@@ -19137,7 +19152,7 @@ fn infer_tuple_match(
         }
     });
 
-    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
+    let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19220,7 +19235,7 @@ fn infer_record_match(
         }
     });
 
-    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
+    let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19367,7 +19382,7 @@ fn infer_or_match(
     };
 
     let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
-    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
+    let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19477,7 +19492,7 @@ fn infer_literal_match(
 
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
     let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
-    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
+    let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19613,7 +19628,7 @@ fn infer_match(
 
     // In check mode the goal is known before any bucket is compiled. Pure
     // inference still lets the first reachable leaf discover the result type.
-    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
+    let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by: Vec<Vec<usize>> = vec![Vec::new(); arms.len()];
 
