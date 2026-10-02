@@ -4010,6 +4010,8 @@ struct CarriedBoundaryWord {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ResidualLoweringCounters {
     pub site_a_none_arrivals: usize,
+    /// Counted while emitting the labelled arm, not when native execution selects it.
+    pub boxed_decode_arms_emitted: usize,
     pub transitional_escapes: usize,
     pub synthesized_checked_ih_capture_escapes: usize,
 }
@@ -4019,6 +4021,7 @@ thread_local! {
     static RESIDUAL_LOWERING_COUNTERS: std::cell::Cell<ResidualLoweringCounters> =
         const { std::cell::Cell::new(ResidualLoweringCounters {
             site_a_none_arrivals: 0,
+            boxed_decode_arms_emitted: 0,
             transitional_escapes: 0,
             synthesized_checked_ih_capture_escapes: 0,
         }) };
@@ -4042,7 +4045,7 @@ fn record_residual_counter_event(site: &'static str) {
         writeln!(
             std::fs::OpenOptions::new().create(true).append(true).open(path)
                 .expect("residual diagnostic log is writable"),
-            "{site}"
+            "{} {site}", std::thread::current().name().unwrap_or("unnamed")
         ).expect("residual diagnostic event is written");
     }
 }
@@ -4055,6 +4058,19 @@ fn record_site_a_residual_none_arrival() {
         counter.set(measured);
     });
     record_residual_counter_event("site_a_none");
+}
+
+// Site A is counted during lowering. Keep the Boxed-arm counter in the
+// same measurement plane: emission of an arm is not evidence it was selected
+// at runtime. A targeted execution mutation must prove that separately.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_boxed_decode_arm_emitted() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.boxed_decode_arms_emitted += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("boxed_decode_arm_emitted");
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]

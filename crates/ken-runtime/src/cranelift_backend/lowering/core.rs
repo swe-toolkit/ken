@@ -14284,11 +14284,9 @@ impl<'a> Lowering<'a> {
             return Ok(Some(RecursiveUnitBodySelection::Exact(body)));
         }
         // A carried scrutinee is not a literal source Construct, so the
-        // source-only fast path cannot name its lexical body. The planner's
-        // exact (eliminator, constructor, position) specialization can still
-        // name that body, provided a value-carried residual was issued at
-        // its actual worker parent fields. No disposition means the original
-        // body=None refusal remains, including structural-data positions.
+        // source-only fast path cannot name its lexical body. A planner-issued
+        // slot declares R for every member of its exact flow, including any
+        // Boxed members. An absent slot retains the ordinary Active descent.
         let case_index = cases.iter().position(|case| &case.constructor == selected_constructor)
             .ok_or_else(|| unsupported("RecursiveResidual", "the selected constructor is absent from its computational frame"))?;
         let identity = self.static_transition_plan.case_constructor_identity(eliminator_origin, case_index)?;
@@ -14298,13 +14296,13 @@ impl<'a> Lowering<'a> {
         let candidates = self.static_transition_plan.recursive_residual_candidates(
             eliminator_origin, identity, position,
         )?;
-        let issued = candidates.iter().map(|candidate| {
-            self.static_transition_plan.recursive_residual_for_specialization(*candidate)
-        }).collect::<Result<Vec<_>, _>>()?;
-        if candidates.len() > 1 && issued.iter().any(|entry| entry.is_some())
-            && issued.iter().any(|entry| entry.is_none())
-        {
-            return Err(unsupported("RecursiveResidual", "the gate's candidate set mixes residual dispositions with unissued specializations"));
+        let slot = self.static_transition_plan.recursive_carrier_slot(
+            eliminator_origin, identity, position,
+        )?;
+        if let Some(slot) = slot {
+            if slot.flow != candidates {
+                return Err(unsupported("RecursiveResidual", "the gate's candidate flow changed after slot issuance"));
+            }
         }
         // A residual may replace the Active descent only when the source
         // machine has no pending outer frame. Count both directly pending
@@ -14313,29 +14311,32 @@ impl<'a> Lowering<'a> {
         if pending_outer_frames > 0 {
             return Ok(None);
         }
-        match (candidates.as_slice(), issued.as_slice()) {
-            ([], []) => Ok(None),
-            ([candidate], [Some(disposition)]) if disposition.wrapped() => {
+        match (slot, candidates.as_slice()) {
+            (None, _) => Ok(None),
+            (Some(slot), [candidate]) => {
+                // A singleton issued slot has a wrapped member by the slot
+                // issuer's rule; an unwrapped singleton cannot mint Boxed.
+                if slot.variant(*candidate)?.schema != RecursiveCarrierMemberSchema::Residual {
+                    return Err(unsupported("RecursiveResidual", "a singleton residual gate has a boxed member"));
+                }
                 let body = self.static_transition_plan.continuation_units()?.into_iter()
                     .find(|unit| unit.id() == *candidate)
                     .ok_or_else(|| unsupported("RecursiveResidual", "the gate's sole candidate has no worker body"))?
                     .worker_body_origin();
                 Ok(Some(RecursiveUnitBodySelection::ResidualExact {
-                    body,
-                    pending_outer_frames,
+                    body, pending_outer_frames,
                 }))
             }
-            ([candidate], [None | Some(_)]) => {
-                let _ = candidate;
-                Ok(None)
-            }
-            (_, issued) if issued.iter().all(|entry| entry.is_some_and(|entry| entry.wrapped())) => {
+            (Some(slot), [_, _, ..]) => {
+                for candidate in candidates {
+                    slot.variant(candidate)?;
+                }
                 Ok(Some(RecursiveUnitBodySelection::Labelled {
                     eliminator: eliminator_origin, constructor: identity, position,
                     pending_outer_frames,
                 }))
             }
-            _ => Err(unsupported("RecursiveResidual", "the multi-body gate has no complete labelled residual population")),
+            (Some(_), []) => Err(unsupported("RecursiveResidual", "an issued slot has no gate candidates")),
         }
     }
 

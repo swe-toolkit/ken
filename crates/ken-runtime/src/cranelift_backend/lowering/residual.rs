@@ -237,6 +237,11 @@ impl<'a> Lowering<'a> {
                 );
                 builder.ins().brif(chosen, selected, &[], next, &[]);
                 builder.switch_to_block(selected);
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                match variant.schema {
+                    RecursiveCarrierMemberSchema::Boxed => record_boxed_decode_arm_emitted(),
+                    RecursiveCarrierMemberSchema::Residual => {}
+                }
                 Some(next)
             } else {
                 None

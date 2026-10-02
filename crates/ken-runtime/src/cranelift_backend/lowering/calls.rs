@@ -912,12 +912,28 @@ impl<'a> Lowering<'a> {
                 builder, join, Representation::Value,
             ) else { unreachable!("labelled answer joins in the value plane") };
             for (index, candidate) in candidates.iter().enumerate() {
-                let disposition = self.static_transition_plan
-                    .recursive_residual_for_specialization(*candidate)?
-                    .filter(|entry| entry.wrapped() && entry.label == Some(index as u32))
-                    .cloned().ok_or_else(|| unsupported(
-                        "RecursiveResidual", "a labelled invocation has an unissued or mismatched candidate",
-                    ))?;
+                let variant = slot.variant(*candidate)?.clone();
+                let label = u32::try_from(index).map_err(|_| unsupported(
+                    "RecursiveResidual", "a candidate label exceeds the carrier ABI",
+                ))?;
+                if variant.label != Some(label) {
+                    return Err(unsupported("RecursiveResidual", "a labelled candidate changed its issued label"));
+                }
+                let disposition = match variant.schema {
+                    RecursiveCarrierMemberSchema::Residual => Some(self.static_transition_plan
+                        .recursive_residual_for_specialization(*candidate)?
+                        .filter(|entry| entry.wrapped() && entry.label == Some(label))
+                        .cloned().ok_or_else(|| unsupported(
+                            "RecursiveResidual", "a residual candidate has no matching capture disposition",
+                        ))?),
+                    RecursiveCarrierMemberSchema::Boxed => {
+                        if self.static_transition_plan.recursive_residual_for_specialization(*candidate)?
+                            .is_some() {
+                            return Err(unsupported("RecursiveResidual", "a boxed candidate gained a residual disposition"));
+                        }
+                        None
+                    }
+                };
                 let body = self.static_transition_plan.continuation_units()?.into_iter()
                     .find(|unit| unit.id() == *candidate)
                     .ok_or_else(|| unsupported("RecursiveResidual", "a labelled candidate has no worker unit"))?
@@ -932,7 +948,14 @@ impl<'a> Lowering<'a> {
                 );
                 builder.ins().brif(matched, selected, &[], next, &[]);
                 builder.switch_to_block(selected);
-                let _ = self.assert_recursive_carrier_variant(builder, word, &disposition)?;
+                if let Some(disposition) = disposition.as_ref() {
+                    let _ = self.assert_recursive_carrier_variant(builder, word, disposition)?;
+                } else {
+                    if word.slot() != RecursiveCarrierSlotKey::of(&slot) {
+                        return Err(unsupported("RecursiveResidual", "a boxed candidate has a foreign slot key"));
+                    }
+                    let _ = self.decode_residual_child(builder, word)?;
+                }
                 let returned = arm(self, builder, body, Some(word))?;
                 let answer = match returned {
                     LoweringOperand::Carried(k) => k,

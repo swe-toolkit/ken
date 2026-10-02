@@ -10884,6 +10884,31 @@ impl<'src> StaticTransitionPlan<'src> {
                 return Err(planner_error("recursive carrier slot has an unissued member or construct edge"));
             }
         }
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        if let Some(path) = std::env::var_os("KEN_RT_CARRIER_CENSUS_LOG") {
+            use std::io::Write;
+            let mixed = slots.iter().filter(|slot|
+                slot.variants.iter().any(|variant| variant.schema == RecursiveCarrierMemberSchema::Boxed)
+                    && slot.variants.iter().any(|variant| variant.schema == RecursiveCarrierMemberSchema::Residual)
+            ).count();
+            let boxed_stores = slots.iter().map(|slot| slot.edges.iter().filter(|edge|
+                edge.kind == RecursiveCarrierStoreKind::ConstructEmission
+                    && slot.variant(edge.specialization).is_ok_and(|variant|
+                        variant.schema == RecursiveCarrierMemberSchema::Boxed)
+            ).count()).sum::<usize>();
+            let boxed_force = slots.iter().map(|slot| slot.edges.iter().filter(|edge|
+                edge.kind == RecursiveCarrierStoreKind::CheckedIhForce
+                    && slot.variant(edge.specialization).is_ok_and(|variant|
+                        variant.schema == RecursiveCarrierMemberSchema::Boxed)
+            ).count()).sum::<usize>();
+            writeln!(
+                std::fs::OpenOptions::new().create(true).append(true).open(path)
+                    .expect("carrier census log is writable"),
+                "{} slots={} mixed={} boxed_stores={} boxed_force={}",
+                std::thread::current().name().unwrap_or("unnamed"), slots.len(), mixed,
+                boxed_stores, boxed_force,
+            ).expect("carrier census row is written");
+        }
         Ok(slots)
     }
 
