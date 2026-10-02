@@ -44,7 +44,9 @@ package keeps a private copy of `subst`, `cong`, `sym` or `trans`.
 - **Consumers.** Outside their own packages, the retired names occur only in
   `crates/ken-elaborator/tests/cat_deque_closeout.rs` (one reference). No
   kenfmt byte pin covers a migrated package. Steward grep on `7ba09867b`:
-  `kenfmt_signature_layout.rs` pins only LawfulFunctors and Order.
+  `kenfmt_signature_layout.rs` pins only LawfulFunctors and Order. Three
+  r-layer rows pin the exact provider set of a migrated module (Posix, E
+  Decoder, E Schema), so Transport becomes a provider there.
 - **Spellings.** Posix's copies use `Eq a` and the rest use `Equal`. Both
   already meet Transport elsewhere in the catalog.
 
@@ -60,6 +62,12 @@ stop and report the mismatch.
    to each package's Transport import, or add the import.
 3. **Tests.**
    - Migrate `cat_deque_closeout.rs`'s reference.
+   - Add `Transport` as a provider in the three exact import-inventory pins
+     over migrated modules, in `r_layer_tests/`: `cat_tier_d_posix_import.rs`
+     (`cong`, `sym`, `trans`), `cat_tier_e_decoder_import.rs` (`sym`,
+     `trans`) and `cat_tier_e_schema_import.rs` (`sym`). Each stays an
+     exact-equality check, and its provider count in prose is corrected
+     (Architect audit `evt_1dcrt57kechyh`).
    - Add `cat_transport_pub_export` in `r_layer_tests`.
    - Add one whole-root absence test.
 
