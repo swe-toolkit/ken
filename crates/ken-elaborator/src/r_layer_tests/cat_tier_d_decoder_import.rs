@@ -13,6 +13,7 @@ use ken_kernel::{Decl as KernelDecl, GlobalId, Term};
 const DIAGNOSTICS_CORE: &str = "Capability.Diagnostics.Core";
 const PARSING_CURSOR: &str = "Capability.Parsing.Cursor";
 const PARSING_DECODER: &str = "Capability.Parsing.Decoder";
+const NAT_ORDER: &str = "Data.Numeric.Nat.Order";
 const PARSING_DECODER_SOURCE: &str =
     include_str!("../../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 
@@ -24,6 +25,7 @@ struct LoadedDecoder {
     env: ElabEnv,
     diagnostics_owned: BTreeSet<GlobalId>,
     cursor_owned: BTreeSet<GlobalId>,
+    order_owned: BTreeSet<GlobalId>,
     decoder_owned: BTreeSet<GlobalId>,
 }
 
@@ -33,6 +35,11 @@ fn load_decoder() -> LoadedDecoder {
     let diagnostics_owned = env
         .elaborate_module_from_roots(std::slice::from_ref(&root), DIAGNOSTICS_CORE)
         .expect("Diagnostics.Core provider must roots-load")
+        .into_iter()
+        .collect();
+    let order_owned = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), NAT_ORDER)
+        .expect("Nat.Order provider must roots-load")
         .into_iter()
         .collect();
     let cursor_owned = env
@@ -67,6 +74,7 @@ fn load_decoder() -> LoadedDecoder {
         env,
         diagnostics_owned,
         cursor_owned,
+        order_owned,
         decoder_owned,
     }
 }
@@ -215,9 +223,10 @@ fn parsing_decoder_loader_visible_inventory_is_exact() {
 ///
 /// MEASURED: Decoder roots-loads after its published Cursor provider with zero
 /// trust/class/instance growth, and the checked Decoder declarations reference
-/// exactly the six D0-measured Cursor-owned identities and no Diagnostics.Core
-/// identity directly. CLAIMED: the sole Capability edge is Cursor -> Decoder
-/// and every direct provider dependency is canonical. THE GAP: the three
+/// exactly five Cursor-owned identities and four Order-owned strict-order
+/// identities, with no direct Diagnostics.Core identity. CLAIMED: the Capability
+/// edge is Cursor -> Decoder while strict order comes directly from its owner.
+/// THE GAP: the three
 /// compiler conveniences retained by strict-resolution D0 are outside the
 /// catalog-provider claim; individual import necessity is established by the
 /// population-side removal campaign.
@@ -233,7 +242,6 @@ fn parsing_decoder_imports_exact_canonical_cursor_surface() {
         "CursorOps",
         "cursor_advance",
         "cursor_locate",
-        "cursor_nat_lt",
         "cursor_peek",
         "cursor_remaining",
     ]
@@ -241,6 +249,23 @@ fn parsing_decoder_imports_exact_canonical_cursor_surface() {
     .map(|surface| loaded.env.globals[&format!("{PARSING_CURSOR}.{surface}")])
     .collect::<BTreeSet<_>>();
     assert_eq!(actual_cursor, expected_cursor);
+    let actual_order = referenced
+        .intersection(&loaded.order_owned)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let expected_order = [
+        "lt_nat",
+        "lt_nat::self_suc",
+        "lt_nat::shrink_suc",
+        "lt_nat::zero_right_absurd",
+    ]
+    .into_iter()
+    .map(|surface| loaded.env.globals[&format!("{NAT_ORDER}.{surface}")])
+    .collect::<BTreeSet<_>>();
+    assert_eq!(
+        actual_order, expected_order,
+        "Decoder must reference exactly its four Order-owned strict-order identities"
+    );
     assert!(
         referenced.is_disjoint(&loaded.diagnostics_owned),
         "Decoder must not acquire a direct Diagnostics.Core edge"
@@ -249,12 +274,11 @@ fn parsing_decoder_imports_exact_canonical_cursor_surface() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: real selective-import clients cannot name any private sibling
-/// constructor, combinator worker, convenience combinator, or fuel-law helper.
-/// CLAIMED: publication does not expose implementation state beyond the
-/// deliberate checked proof-law inventory. THE GAP: new clients may
-/// require a deliberate additive publication; the exact inventory must then
-/// move rather than silently inherit visibility.
+/// MEASURED: real selective-import clients cannot name private Decoder
+/// siblings, while the loaded environment contains none of the three retired
+/// Decoder-local strict-order proofs. CLAIMED: publication does not expose
+/// implementation state or retain duplicate Nat order proofs. THE GAP: exact
+/// public inventory is independently asserted by the sibling surface test.
 #[test]
 fn parsing_decoder_unconsumed_siblings_remain_private() {
     for surface in [
@@ -266,15 +290,26 @@ fn parsing_decoder_unconsumed_siblings_remain_private() {
         "decoder_some",
         "decoder_recursive_fuel",
         "decoder_recursive_fuel_succeeds",
-        "decoder_positive_excludes_zero_fuel",
-        "decoder_lt_shrink",
-        "decoder_lt_self_suc",
         "DecoderProgress",
         "DecoderConsumesAll",
         "DecoderRejectsOnlyAtEnd",
         "DecoderManyConsumesAllLaw",
     ] {
         assert_private(surface);
+    }
+    let loaded = load_decoder();
+    for retired in [
+        "decoder_positive_excludes_zero_fuel",
+        "decoder_lt_shrink",
+        "decoder_lt_self_suc",
+    ] {
+        assert!(
+            !loaded
+                .env
+                .globals
+                .contains_key(&format!("{PARSING_DECODER}.{retired}")),
+            "retired Decoder-local strict-order proof {retired} must be absent"
+        );
     }
 }
 

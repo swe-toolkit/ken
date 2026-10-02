@@ -48,13 +48,7 @@ import Capability.Diagnostics.Core
     origin_source_id)
 
 import Capability.Parsing.Cursor
-  (CursorOps,
-    MkCursorOps,
-    cursor_advance,
-    cursor_locate,
-    cursor_nat_lt,
-    cursor_peek,
-    cursor_remaining)
+  (CursorOps, MkCursorOps, cursor_advance, cursor_locate, cursor_peek, cursor_remaining)
 
 import Capability.Parsing.Decoder
   (Decoded,
@@ -112,7 +106,7 @@ import Data.Binary.BytesPrimitiveContracts
 
 import Data.Collections.Derived (bytes_nat_length, length, list_append, map, nth)
 
-import Data.Numeric.Nat.Order (leq_nat_successor_bound, sub)
+import Data.Numeric.Nat.Order (leq_nat_successor_bound, lt_nat, sub)
 
 pub fn IsUtf8 (bs : Bytes) : Prop =
   match bytes_decode bs {
@@ -3084,18 +3078,18 @@ theorem source_suffix_positive
       (head : UInt8)
       (rest : List UInt8)
       (starts_with : Equal (List UInt8) (source_suffix cur) (Cons UInt8 head rest))
-    : Equal Bool (cursor_nat_lt Zero (byte_cursor_remaining cur)) True =
+    : Equal Bool (lt_nat Zero (byte_cursor_remaining cur)) True =
   trans
     Bool
-    (cursor_nat_lt Zero (byte_cursor_remaining cur))
-    (cursor_nat_lt Zero (length UInt8 (source_suffix cur)))
+    (lt_nat Zero (byte_cursor_remaining cur))
+    (lt_nat Zero (length UInt8 (source_suffix cur)))
     True
     (cong
       Nat
       Bool
       (byte_cursor_remaining cur)
       (length UInt8 (source_suffix cur))
-      (λn. cursor_nat_lt Zero n)
+      (λn. lt_nat Zero n)
       (sym
         Nat
         (length UInt8 (source_suffix cur))
@@ -3103,34 +3097,22 @@ theorem source_suffix_positive
         (source_suffix_length cur)))
     (trans
       Bool
-      (cursor_nat_lt Zero (length UInt8 (source_suffix cur)))
-      (cursor_nat_lt Zero (length UInt8 (Cons UInt8 head rest)))
+      (lt_nat Zero (length UInt8 (source_suffix cur)))
+      (lt_nat Zero (length UInt8 (Cons UInt8 head rest)))
       True
       (cong
         (List UInt8)
         Bool
         (source_suffix cur)
         (Cons UInt8 head rest)
-        (λxs. cursor_nat_lt Zero (length UInt8 xs))
+        (λxs. lt_nat Zero (length UInt8 xs))
         starts_with)
       Proved)
-
-theorem cursor_nat_lt_from_leq_nat
-      (left : Nat) (right : Nat)
-    : Equal Bool (cursor_nat_lt left right) (leq_nat (Suc left) right) =
-  match right {
-    Zero ↦ Proved;
-    Suc right2 ↦
-      match left {
-        Zero ↦ Proved;
-        Suc left2 ↦ cursor_nat_lt_from_leq_nat left2 right2
-      }
-  }
 
 theorem sub_positive_in_bounds
       (len : Nat)
     : (position : Nat)
-      → Equal Bool (cursor_nat_lt Zero (sub len position)) True
+      → Equal Bool (lt_nat Zero (sub len position)) True
       → LessEqNat (Suc position) len =
   match len {
     Zero ↦
@@ -3149,25 +3131,23 @@ theorem sub_positive_in_bounds
 
 theorem byte_cursor_advance_strict
       (cur : ByteCursor)
-    : Equal Bool (cursor_nat_lt Zero (byte_cursor_remaining cur)) True
+    : Equal Bool (lt_nat Zero (byte_cursor_remaining cur)) True
       → Equal Bool
-        (cursor_nat_lt
-          (byte_cursor_remaining (byte_cursor_advance cur))
-          (byte_cursor_remaining cur))
+        (lt_nat (byte_cursor_remaining (byte_cursor_advance cur)) (byte_cursor_remaining cur))
         True =
   match cur {
     MkByteCursor source position ↦
       λpositive.
         trans
           Bool
-          (cursor_nat_lt
+          (lt_nat
             (sub (source_length source) (Suc position))
             (sub (source_length source) position))
           (leq_nat
             (Suc (sub (source_length source) (Suc position)))
             (sub (source_length source) position))
           True
-          (cursor_nat_lt_from_leq_nat
+          ((proof leq_suc for lt_nat)
             (sub (source_length source) (Suc position))
             (sub (source_length source) position))
           ((proof suc_decreases for sub)
@@ -3207,62 +3187,12 @@ theorem source_suffix_after_codes
       codes
       starts_with
 
-theorem cursor_nat_lt_trans
-      (left : Nat)
-      (middle : Nat)
-      (right : Nat)
-      (first : Equal Bool (cursor_nat_lt left middle) True)
-      (second : Equal Bool (cursor_nat_lt middle right) True)
-    : Equal Bool (cursor_nat_lt left right) True =
-  let
-    left_to_middle : Equal Bool (leq_nat (Suc left) middle) True =
-      trans
-        Bool
-        (leq_nat (Suc left) middle)
-        (cursor_nat_lt left middle)
-        True
-        (sym
-          Bool
-          (cursor_nat_lt left middle)
-          (leq_nat (Suc left) middle)
-          (cursor_nat_lt_from_leq_nat left middle))
-        first;
-    middle_to_right : Equal Bool (leq_nat (Suc middle) right) True =
-      trans
-        Bool
-        (leq_nat (Suc middle) right)
-        (cursor_nat_lt middle right)
-        True
-        (sym
-          Bool
-          (cursor_nat_lt middle right)
-          (leq_nat (Suc middle) right)
-          (cursor_nat_lt_from_leq_nat middle right))
-        second;
-    left_to_middle_suc : Equal Bool (leq_nat (Suc left) (Suc middle)) True =
-      (proof trans for leq_nat)
-        (Suc left)
-        middle
-        (Suc middle)
-        left_to_middle
-        (leq_nat_successor_bound middle);
-    left_to_right : Equal Bool (leq_nat (Suc left) right) True =
-      (proof trans for leq_nat) (Suc left) (Suc middle) right left_to_middle_suc middle_to_right
-  in
-    trans
-      Bool
-      (cursor_nat_lt left right)
-      (leq_nat (Suc left) right)
-      True
-      (cursor_nat_lt_from_leq_nat left right)
-      left_to_right
-
 theorem cursor_after_codes_nonempty_strict
       (cur : ByteCursor) (first : UInt8) (more : List UInt8)
     : (rest : List UInt8)
       → Equal (List UInt8) (source_suffix cur) (list_append UInt8 (Cons UInt8 first more) rest)
       → Equal Bool
-        (cursor_nat_lt
+        (lt_nat
           (byte_cursor_remaining (cursor_after_codes cur (Cons UInt8 first more)))
           (byte_cursor_remaining cur))
         True =
@@ -3277,7 +3207,7 @@ theorem cursor_after_codes_nonempty_strict
           let
             after_first : ByteCursor = byte_cursor_advance cur;
             first_strict : Equal Bool
-              (cursor_nat_lt (byte_cursor_remaining after_first) (byte_cursor_remaining cur))
+              (lt_nat (byte_cursor_remaining after_first) (byte_cursor_remaining cur))
               True =
               byte_cursor_advance_strict
                 cur
@@ -3296,14 +3226,14 @@ theorem cursor_after_codes_nonempty_strict
                 (list_append UInt8 (Cons UInt8 second tail) rest)
                 starts_with;
             rest_strict : Equal Bool
-              (cursor_nat_lt
+              (lt_nat
                 (byte_cursor_remaining
                   (cursor_after_codes after_first (Cons UInt8 second tail)))
                 (byte_cursor_remaining after_first))
               True =
               cursor_after_codes_nonempty_strict after_first second tail rest rest_starts
           in
-            cursor_nat_lt_trans
+            (proof trans for lt_nat)
               (byte_cursor_remaining (cursor_after_codes after_first (Cons UInt8 second tail)))
               (byte_cursor_remaining after_first)
               (byte_cursor_remaining cur)
@@ -5568,7 +5498,7 @@ theorem cursor_after_nonempty_strict
       → Equal (List UInt8) (source_suffix cur) (list_append UInt8 codes rest)
       → ListNonempty UInt8 codes
       → Equal Bool
-        (cursor_nat_lt
+        (lt_nat
           (byte_cursor_remaining (cursor_after_codes cur codes))
           (byte_cursor_remaining cur))
         True =
@@ -6132,7 +6062,7 @@ theorem bool_not_decoder_succeeds_printed
         → (next : ByteCursor)
         → Equal
         Bool
-        (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+        (lt_nat (byte_cursor_remaining inner) (byte_cursor_remaining cur))
         True
         → PrintedBoolSpec
         inner
@@ -6183,7 +6113,7 @@ theorem bool_not_decoder_succeeds_printed
       (list_append UInt8 close_bytes rest) =
       source_suffix_after_codes after_open child_bytes child_rest child_starts;
     strict_child : Equal Bool
-      (cursor_nat_lt (byte_cursor_remaining after_open) (byte_cursor_remaining cur))
+      (lt_nat (byte_cursor_remaining after_open) (byte_cursor_remaining cur))
       True =
       cursor_after_nonempty_strict
         open_bytes
@@ -6348,7 +6278,7 @@ theorem bool_layer_not_succeeds_printed
         → (next : ByteCursor)
         → Equal
         Bool
-        (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+        (lt_nat (byte_cursor_remaining inner) (byte_cursor_remaining cur))
         True
         → PrintedBoolSpec
         inner
@@ -6678,7 +6608,7 @@ theorem bool_and_decoder_succeeds_printed
         → (next : ByteCursor)
         → Equal
         Bool
-        (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+        (lt_nat (byte_cursor_remaining inner) (byte_cursor_remaining cur))
         True
         → PrintedBoolSpec
         inner
@@ -6746,7 +6676,7 @@ theorem bool_and_decoder_succeeds_printed
       (list_append UInt8 close_bytes rest) =
       source_suffix_after_codes after_separator right_bytes right_rest right_starts;
     strict_open : Equal Bool
-      (cursor_nat_lt (byte_cursor_remaining after_open) (byte_cursor_remaining cur))
+      (lt_nat (byte_cursor_remaining after_open) (byte_cursor_remaining cur))
       True =
       cursor_after_nonempty_strict
         open_bytes
@@ -6755,7 +6685,7 @@ theorem bool_and_decoder_succeeds_printed
         open_starts
         and_open_encoded_nonempty;
     strict_left : Equal Bool
-      (cursor_nat_lt (byte_cursor_remaining left_end) (byte_cursor_remaining after_open))
+      (lt_nat (byte_cursor_remaining left_end) (byte_cursor_remaining after_open))
       True =
       cursor_after_nonempty_strict
         left_bytes
@@ -6764,7 +6694,7 @@ theorem bool_and_decoder_succeeds_printed
         left_starts
         (print_bool_expr_nonempty left);
     strict_separator : Equal Bool
-      (cursor_nat_lt (byte_cursor_remaining after_separator) (byte_cursor_remaining left_end))
+      (lt_nat (byte_cursor_remaining after_separator) (byte_cursor_remaining left_end))
       True =
       cursor_after_nonempty_strict
         separator_bytes
@@ -6773,14 +6703,14 @@ theorem bool_and_decoder_succeeds_printed
         separator_starts
         separator_encoded_nonempty;
     strict_right : Equal Bool
-      (cursor_nat_lt (byte_cursor_remaining after_separator) (byte_cursor_remaining cur))
+      (lt_nat (byte_cursor_remaining after_separator) (byte_cursor_remaining cur))
       True =
-      cursor_nat_lt_trans
+      (proof trans for lt_nat)
         (byte_cursor_remaining after_separator)
         (byte_cursor_remaining left_end)
         (byte_cursor_remaining cur)
         strict_separator
-        (cursor_nat_lt_trans
+        ((proof trans for lt_nat)
           (byte_cursor_remaining left_end)
           (byte_cursor_remaining after_open)
           (byte_cursor_remaining cur)
@@ -7200,7 +7130,7 @@ theorem bool_layer_and_succeeds_printed
         → (next : ByteCursor)
         → Equal
         Bool
-        (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+        (lt_nat (byte_cursor_remaining inner) (byte_cursor_remaining cur))
         True
         → PrintedBoolSpec
         inner
@@ -7306,7 +7236,7 @@ theorem bool_layer_succeeds_for_expr
           → (next : ByteCursor)
           → Equal
           Bool
-          (cursor_nat_lt (byte_cursor_remaining inner) (byte_cursor_remaining cur))
+          (lt_nat (byte_cursor_remaining inner) (byte_cursor_remaining cur))
           True
           → PrintedBoolSpec
           inner

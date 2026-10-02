@@ -4,7 +4,7 @@
 zero-`Axiom` dictionary. The canonical relation, laws, and dictionary live with
 the `Ord` class in `Core.Classes.LawfulClasses`. This entry re-exports that
 surface under the natural-number path and keeps the small `Nat` operations
-`min`, `max`, `sub`, and `compare` beside their readers.
+`min`, `max`, `sub`, `compare`, and strict `lt_nat` beside their readers.
 
 ## Contents
 
@@ -23,7 +23,7 @@ antisymmetric, transitive, and total. The class-owning package defines that
 single canonical dictionary for the compiler-floor `Nat` identity. This entry
 re-exports the class surface without redeclaration, so generic code sees the
 same dictionary through either package path. It also provides the everyday
-operations `min`, `max`, `sub`, and `compare`.
+operations `min`, `max`, `sub`, `compare`, and `lt_nat`.
 
 ## 2. Canonical order facade
 
@@ -36,7 +36,7 @@ single class-owned dictionary available through this path.
 ```ken
 import Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 
-import Core.Logic.Transport (cong)
+import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
@@ -44,8 +44,9 @@ export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 ```
 
 `min` and `max` follow `leq_nat`'s recursion directly. `sub` is saturating
-natural-number subtraction, and `compare` returns the three-way result
-`OrdResult`:
+natural-number subtraction; `compare` returns the three-way result
+`OrdResult`. Strict `lt_nat` recurses on its right argument so the checked
+successor-order bridge has the same reduction order:
 
 ```ken
 data OrdResult = Lt | Eq | Gt
@@ -195,6 +196,16 @@ pub fn compare (a : Nat) (b : Nat) : OrdResult =
     False ↦ Gt
   }
 
+pub fn lt_nat (a : Nat) (b : Nat) : Bool =
+  match b {
+    Zero ↦ False;
+    Suc b2 ↦
+      match a {
+        Zero ↦ True;
+        Suc a2 ↦ lt_nat a2 b2
+      }
+  }
+
 pub proof lt_implies_leq for compare
       (a : Nat)
     : (b : Nat) → Equal OrdResult (compare a b) Lt → IsTrue (leq_nat a b) =
@@ -252,9 +263,191 @@ pub proof gt_implies_reverse_leq for compare
           Suc b2 ↦ λh. (proof gt_implies_reverse_leq for compare) a2 b2 h
         }
   }
+
+pub proof leq_suc for lt_nat
+      (left : Nat) (right : Nat)
+    : Equal Bool (lt_nat left right) (leq_nat (Suc left) right) =
+  match right {
+    Zero ↦ Proved;
+    Suc right2 ↦
+      match left {
+        Zero ↦ Proved;
+        Suc left2 ↦ (proof leq_suc for lt_nat) left2 right2
+      }
+  }
+
+pub proof from_leq_suc for lt_nat
+      (a : Nat)
+    : (b : Nat) → IsTrue (leq_nat (Suc a) b) → Equal Bool (lt_nat a b) True =
+  λb.
+    match b {
+      Zero ↦ λh. absurd h;
+      Suc b2 ↦
+        match a {
+          Zero ↦ λh. Proved;
+          Suc a2 ↦ λh. (proof from_leq_suc for lt_nat) a2 b2 h
+        }
+    }
+
+pub proof to_leq_suc for lt_nat
+      (a : Nat)
+    : (b : Nat) → Equal Bool (lt_nat a b) True → IsTrue (leq_nat (Suc a) b) =
+  λb.
+    match b {
+      Zero ↦ λh. absurd h;
+      Suc b2 ↦
+        match a {
+          Zero ↦ λh. Proved;
+          Suc a2 ↦ λh. (proof to_leq_suc for lt_nat) a2 b2 h
+        }
+    }
+
+pub proof false_reverse_leq for lt_nat
+      (a : Nat)
+    : (b : Nat) → Equal Bool (lt_nat a b) False → IsTrue (leq_nat b a) =
+  λb.
+    match b {
+      Zero ↦ λh. Proved;
+      Suc b2 ↦
+        match a {
+          Zero ↦ λh. absurd h;
+          Suc a2 ↦ λh. (proof false_reverse_leq for lt_nat) a2 b2 h
+        }
+    }
+
+pub proof self_suc for lt_nat (n : Nat) : Equal Bool (lt_nat n (Suc n)) True =
+  match n {
+    Zero ↦ Proved;
+    Suc n2 ↦ (proof self_suc for lt_nat) n2
+  }
+
+pub proof trans for lt_nat
+      (left : Nat)
+      (middle : Nat)
+      (right : Nat)
+      (first : Equal Bool (lt_nat left middle) True)
+      (second : Equal Bool (lt_nat middle right) True)
+    : Equal Bool (lt_nat left right) True =
+  let
+    left_to_middle : Equal Bool (leq_nat (Suc left) middle) True =
+      trans
+        Bool
+        (leq_nat (Suc left) middle)
+        (lt_nat left middle)
+        True
+        (sym
+          Bool
+          (lt_nat left middle)
+          (leq_nat (Suc left) middle)
+          ((proof leq_suc for lt_nat) left middle))
+        first;
+    middle_to_right : Equal Bool (leq_nat (Suc middle) right) True =
+      trans
+        Bool
+        (leq_nat (Suc middle) right)
+        (lt_nat middle right)
+        True
+        (sym
+          Bool
+          (lt_nat middle right)
+          (leq_nat (Suc middle) right)
+          ((proof leq_suc for lt_nat) middle right))
+        second;
+    left_to_middle_suc : Equal Bool (leq_nat (Suc left) (Suc middle)) True =
+      (proof trans for leq_nat)
+        (Suc left)
+        middle
+        (Suc middle)
+        left_to_middle
+        (leq_nat_successor_bound middle);
+    left_to_right : Equal Bool (leq_nat (Suc left) right) True =
+      (proof trans for leq_nat) (Suc left) (Suc middle) right left_to_middle_suc middle_to_right
+  in
+    trans
+      Bool
+      (lt_nat left right)
+      (leq_nat (Suc left) right)
+      True
+      ((proof leq_suc for lt_nat) left right)
+      left_to_right
+
+pub proof shrink_suc for lt_nat
+      (fuel : Nat)
+    : (x : Nat)
+      → (y : Nat)
+      → Equal Bool (lt_nat x y) True
+      → Equal Bool (lt_nat y (Suc fuel)) True
+      → Equal Bool (lt_nat x fuel) True =
+  match fuel {
+    Zero ↦
+      λx.
+        λy.
+          match y {
+            Zero ↦ λsmaller. λbounded. absurd smaller;
+            Suc y2 ↦ λsmaller. λbounded. absurd bounded
+          };
+    Suc fuel2 ↦
+      λx.
+        λy.
+          match y {
+            Zero ↦ λsmaller. λbounded. absurd smaller;
+            Suc y2 ↦
+              match x {
+                Zero ↦ λsmaller. λbounded. Proved;
+                Suc x2 ↦
+                  λsmaller. λbounded. (proof shrink_suc for lt_nat) fuel2 x2 y2 smaller bounded
+              }
+          }
+  }
+
+pub proof zero_right_absurd for lt_nat (n : Nat) : Equal Bool (lt_nat n Zero) True → Bottom =
+  λbound. absurd bound
+
+pub proof zero_add_suc for lt_nat
+      (n : Nat) (rest : Nat)
+    : Equal Bool (lt_nat Zero (add (Suc n) rest)) True =
+  match rest {
+    Zero ↦ Proved;
+    Suc rest2 ↦ Proved
+  }
+
+pub proof zero_from_leq_suc for lt_nat
+      (witness : Nat)
+    : (larger : Nat)
+      → IsTrue (leq_nat (Suc witness) larger)
+      → Equal Bool (lt_nat Zero larger) True =
+  λlarger.
+    match larger {
+      Zero ↦ λordered. absurd ordered;
+      Suc larger2 ↦ λordered. Proved
+    }
+
+pub proof zero_add_positive for lt_nat
+      (n : Nat) (rest : Nat)
+    : Equal Bool (lt_nat Zero n) True → Equal Bool (lt_nat Zero (add n rest)) True =
+  match n {
+    Zero ↦ λpositive. absurd positive;
+    Suc n2 ↦ λpositive. (proof zero_add_suc for lt_nat) n2 rest
+  }
+
+pub proof zero_not_empty for lt_nat
+      (n : Nat)
+    : Equal Bool (lt_nat Zero n) True → Equal Nat n Zero → Bottom =
+  λpositive.
+    λempty.
+      absurd
+        (trans
+          Bool
+          True
+          (lt_nat Zero n)
+          False
+          (sym Bool (lt_nat Zero n) True positive)
+          (cong Nat Bool n Zero (lt_nat Zero) empty))
 ```
 
-The successor and right-weakening laws make the elementary steps of the
+The attached strict-order laws connect `lt_nat` to `leq_nat`, prove
+transitivity and successor bounds, and exclude impossible zero and empty
+cases. The successor and right-weakening laws make the elementary steps of the
 canonical order available to other packages. Addition recurses on its second
 argument. Its first bound carries an induction hypothesis through a successor
 using the canonical order's transitivity; the second bound reduces directly to
@@ -299,6 +492,15 @@ pub theorem leq_nat_add_right_bound
     Zero ↦ Proved;
     Suc rest ↦ leq_nat_add_right_bound a rest
   }
+
+pub theorem leq_nat_suc_add_right
+      (smaller : Nat) (larger : Nat) (rest : Nat)
+    : IsTrue (leq_nat (Suc smaller) larger)
+      → IsTrue (leq_nat (Suc (add smaller rest)) (add larger rest)) =
+  match rest {
+    Zero ↦ λh. h;
+    Suc rest2 ↦ λh. leq_nat_suc_add_right smaller larger rest2 h
+  }
 ```
 
 ## 3. Using it
@@ -310,6 +512,9 @@ proof two_leq_three for leq_nat : IsTrue (leq_nat (Suc (Suc Zero)) (Suc (Suc (Su
 const min_of_two_and_three : Nat = min (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))
 
 const max_of_two_and_three : Nat = max (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))
+
+theorem order_example_zero_lt_one : Equal Bool (lt_nat Zero (Suc Zero)) True =
+  (proof self_suc for lt_nat) Zero
 
 const compare_two_three : OrdResult = compare (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))
 
@@ -349,7 +554,8 @@ theorem order_example_converse_premise : Equal Bool (leq_nat (Suc Zero) (Suc Zer
 The public successor bound proves `n ≤ Suc n`; right weakening extends any
 `a ≤ b` to `a ≤ Suc b`. The public addition bounds connect the canonical order
 to the canonical addition operation. For any `a` and `b`, both `a` and `b` are
-at most `add a b`; none needs a new order dictionary.
+at most `add a b`; the strict-successor bound preserves `Suc smaller ≤ larger`
+under addition on the right. None needs a new order dictionary.
 
 `min`/`max`/`sub` earn their place with three exported computation facts:
 `min::zero_left`, `max::zero_left`, and `sub::zero_right`.
@@ -410,10 +616,10 @@ imports the relation for its own `compare` implementation and re-exports the
 same identities for readers. A facade export changes reachability, not
 provenance, so it cannot create a second comparator or dictionary.
 
-**Local operations keep computation direct.** `min`, `max`, `sub`, and
-`compare` remain structural definitions in this package. Their computation
-rules stay visible beside their laws, while `compare` consumes the imported
-canonical `leq_nat`.
+**Local operations keep computation direct.** `min`, `max`, `sub`, `compare`, and `lt_nat` remain structural definitions in
+this package. Their computation rules stay visible beside their laws: `compare`
+consumes the imported canonical `leq_nat`, while strict `lt_nat` recurses on
+its right argument and its bridge exposes the canonical successor relation.
 
 ## 6. References
 
@@ -430,8 +636,9 @@ canonical `leq_nat`.
 
 1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
    `leq_nat` with their provider identities. It exports its defined-at `min`,
-   `max`, `sub`, and `compare` operations; their three zero computation facts;
-   the successor and right-weakening laws; the two addition bounds; the four
+   `max`, `sub`, `compare`, and `lt_nat` operations; their three zero computation
+   facts; twelve attached `lt_nat` proofs; the successor and right-weakening
+   laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the four
    `min`/`max` bounds; the three `compare` agreements; and the five inductive
    `sub` proofs, including `sub::add_cancel`. `OrdResult` remains package-local.
 2. **Source map.**
@@ -445,20 +652,22 @@ canonical `leq_nat`.
 
 3. **Derivation path.** The imported `leq_nat` and carried `Ord Nat` dictionary
    come from `Core.Classes.LawfulClasses`. The facade republishes their existing
-   identities. `min`, `max`, `sub`, and `compare` are ordinary recursive
-   functions; `compare` uses the imported relation.
+   identities. `min`, `max`, `sub`, `compare`, and `lt_nat` are ordinary recursive functions;
+   `compare` uses the imported relation, and `lt_nat` is linked to its successor
+   relation by a checked attached proof.
 4. **`trusted_base()` delta.** **Zero.** Re-exporting a checked identity adds no
    declaration or trust. The local operations introduce no `Axiom`, primitive,
    or postulate.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
-   package's checked laws use structural recursion for the successor,
-   right-weakening and addition bounds, `min`/`max` bounds, and subtraction
-   theory, including the cancellation law; and case analysis on the canonical
-   relation for the `compare` agreements. The equality arm closes through
+   package's checked laws use structural recursion for the strict-order and
+   successor/weakening/addition bounds, `min`/`max` bounds, and subtraction
+   theory, including cancellation; and case analysis on the canonical relation
+   for the `compare` agreements. The equality arm closes through
    `leq_nat::antisym`.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can selectively import the local arithmetic and
-   comparison operations, including subtraction's checked cancellation law.
+   comparison operations and strict-order proofs, including subtraction's
+   checked cancellation law.
 7. **Validation evidence.** Deferred-boundary and compatibility-root identity
    controls check the carried dictionary, canonical relation and bridge
    identities, zero local registration, zero trust delta, examples, and

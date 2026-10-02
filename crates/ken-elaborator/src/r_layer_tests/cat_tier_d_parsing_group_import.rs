@@ -629,7 +629,6 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
             "MkCursorOps",
             "cursor_advance",
             "cursor_locate",
-            "cursor_nat_lt",
             "cursor_peek",
             "cursor_remaining",
         ])
@@ -714,7 +713,14 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
     );
     assert_eq!(
         intersection_names("Data.Numeric.Nat.Order", &loaded.nat_order),
-        names(&["leq_nat_successor_bound", "sub", "sub::suc_decreases"])
+        names(&[
+            "leq_nat_successor_bound",
+            "lt_nat",
+            "lt_nat::leq_suc",
+            "lt_nat::trans",
+            "sub",
+            "sub::suc_decreases",
+        ])
     );
     assert!(
         refs.is_disjoint(&loaded.numeric_sibling),

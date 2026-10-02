@@ -12,13 +12,15 @@ named, non-backtrackable failures so repetition cannot silently loop or
 truncate. A strictly decreasing recursive layer has enough fuel for its final
 call at the exhausted cursor.
 
-decoder combinators preserve the supplied instance location opaquely; errors
+Decoder combinators preserve the supplied instance location opaquely; errors
 from different `CursorOps` instances are not position-comparable without an
 explicit conversion chosen by the caller.
 
 ```ken
 import Capability.Parsing.Cursor
-  (CursorOps, cursor_advance, cursor_locate, cursor_nat_lt, cursor_peek, cursor_remaining)
+  (CursorOps, cursor_advance, cursor_locate, cursor_peek, cursor_remaining)
+
+import Data.Numeric.Nat.Order (lt_nat)
 
 import Core.Logic.Transport (trans)
 
@@ -147,7 +149,7 @@ fn decoder_many_fuel
             DecoderFuelExhausted at ↦ DecoderFailed c loc (List a) (DecoderFuelExhausted loc at)
           };
         Decoded value next ↦
-          match cursor_nat_lt
+          match lt_nat
             (cursor_remaining c el loc ops next)
             (cursor_remaining c el loc ops cur) {
             False ↦
@@ -187,9 +189,7 @@ fn decoder_some
     match step cur {
       DecoderFailed err ↦ DecoderFailed c loc (List a) err;
       Decoded value next ↦
-        match cursor_nat_lt
-          (cursor_remaining c el loc ops next)
-          (cursor_remaining c el loc ops cur) {
+        match lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur) {
           False ↦
             DecoderFailed
               c
@@ -275,7 +275,7 @@ fn DecoderProgress
     (step cur)
     (Decoded c loc a value next)
     → Equal Bool
-    (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+    (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
     True
 
 fn DecoderConsumesAll
@@ -610,9 +610,7 @@ fn decoder_many_fuel_outcome
             cur
             value
             next
-            (cursor_nat_lt
-              (cursor_remaining c el loc ops next)
-              (cursor_remaining c el loc ops cur))
+            (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
             (decoder_many_fuel c el loc a ops step fuel2 next)
       }
   }
@@ -946,7 +944,7 @@ theorem decoder_many_decoded_success
       (recursive_outcome : DecoderResult c loc (List a))
       (comparison_is_actual : Equal
         Bool
-        (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+        (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
         comparison)
       (recursive_is_actual : Equal
         (DecoderResult c loc (List a))
@@ -1014,7 +1012,7 @@ theorem decoder_many_decoded_success
         cur
         value
         next
-        (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+        (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
         (decoder_many_fuel c el loc a ops step fuel next))
       (decoder_many_decoded_result
         c
@@ -1038,7 +1036,7 @@ theorem decoder_many_decoded_success
         cur
         value
         next
-        (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+        (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
         comparison
         (decoder_many_fuel c el loc a ops step fuel next)
         recursive_outcome
@@ -1057,7 +1055,7 @@ theorem decoder_many_decoded_success
         cur
         value
         next
-        (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+        (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
         (decoder_many_fuel c el loc a ops step fuel next))
       (decoder_many_decoded_result
         c
@@ -1089,7 +1087,7 @@ theorem decoder_many_decoded_false_consumes_all
       (recursive_outcome : DecoderResult c loc (List a))
       (comparison_is_actual : Equal
         Bool
-        (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+        (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
         False)
       (recursive_is_actual : Equal
         (DecoderResult c loc (List a))
@@ -1118,7 +1116,7 @@ theorem decoder_many_decoded_false_consumes_all
   absurd
     (decoder_equal_after_left_replacement
       Bool
-      (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+      (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
       False
       True
       comparison_is_actual
@@ -1137,7 +1135,7 @@ theorem decoder_many_decoded_true_consumes_all
       → (next : c)
       → (recursive_outcome : DecoderResult c loc (List a))
       → Equal Bool
-        (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+        (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
         True
       → Equal
         (DecoderResult c loc (List a))
@@ -1330,7 +1328,7 @@ theorem decoder_many_decoded_consumes_all
       → (next : c)
       → (recursive_outcome : DecoderResult c loc (List a))
       → Equal Bool
-        (cursor_nat_lt (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
+        (lt_nat (cursor_remaining c el loc ops next) (cursor_remaining c el loc ops cur))
         comparison
       → Equal
         (DecoderResult c loc (List a))
@@ -1574,7 +1572,7 @@ theorem decoder_many_fuel_consumes_all
                                               recursive_succeeded
                                   in
                                     decoder_many_decoded_consumes_all
-                                      (cursor_nat_lt
+                                      (lt_nat
                                         (cursor_remaining c el loc ops next)
                                         (cursor_remaining c el loc ops cur))
                                       c
@@ -2313,7 +2311,7 @@ theorem decoder_many_fuel_preserves
                           next
                           comparison
                           (decoder_many_fuel c el loc a ops step fuel2 next)))
-                    (cursor_nat_lt
+                    (lt_nat
                       (cursor_remaining c el loc ops next)
                       (cursor_remaining c el loc ops cur))
                     (decoder_many_decoded_success_preserves
@@ -2507,45 +2505,6 @@ pub theorem decoder_recursive_preserves
         cur
         good
 
-theorem decoder_positive_excludes_zero_fuel
-      (n : Nat)
-    : Equal Bool (cursor_nat_lt n Zero) True → Bottom =
-  λbound. absurd bound
-
-theorem decoder_lt_shrink
-      (fuel : Nat)
-    : (x : Nat)
-      → (y : Nat)
-      → Equal Bool (cursor_nat_lt x y) True
-      → Equal Bool (cursor_nat_lt y (Suc fuel)) True
-      → Equal Bool (cursor_nat_lt x fuel) True =
-  match fuel {
-    Zero ↦
-      λx.
-        λy.
-          match y {
-            Zero ↦ λsmaller. λbounded. absurd smaller;
-            Suc y2 ↦ λsmaller. λbounded. absurd bounded
-          };
-    Suc fuel2 ↦
-      λx.
-        λy.
-          match y {
-            Zero ↦ λsmaller. λbounded. absurd smaller;
-            Suc y2 ↦
-              match x {
-                Zero ↦ λsmaller. λbounded. Proved;
-                Suc x2 ↦ λsmaller. λbounded. decoder_lt_shrink fuel2 x2 y2 smaller bounded
-              }
-          }
-  }
-
-theorem decoder_lt_self_suc (n : Nat) : Equal Bool (cursor_nat_lt n (Suc n)) True =
-  match n {
-    Zero ↦ Proved;
-    Suc n2 ↦ decoder_lt_self_suc n2
-  }
-
 theorem decoder_recursive_fuel_succeeds
       (fuel : Nat)
       (c : Type)
@@ -2562,9 +2521,7 @@ theorem decoder_recursive_fuel_succeeds
           → (next : c)
           → Equal
           Bool
-          (cursor_nat_lt
-            (cursor_remaining c el loc ops inner)
-            (cursor_remaining c el loc ops cur))
+          (lt_nat (cursor_remaining c el loc ops inner) (cursor_remaining c el loc ops cur))
           True
           → spec
           inner
@@ -2588,7 +2545,7 @@ theorem decoder_recursive_fuel_succeeds
       → (v : a)
       → (next : c)
       → spec cur v next
-      → Equal Bool (cursor_nat_lt (cursor_remaining c el loc ops cur) fuel) True
+      → Equal Bool (lt_nat (cursor_remaining c el loc ops cur) fuel) True
       → Equal
         (DecoderResult c loc a)
         (decoder_recursive_fuel c el loc a ops layer fuel cur)
@@ -2601,7 +2558,7 @@ theorem decoder_recursive_fuel_succeeds
             λholds.
               λbounded.
                 absurd
-                  (decoder_positive_excludes_zero_fuel
+                  ((proof zero_right_absurd for lt_nat)
                     (cursor_remaining c el loc ops cur)
                     bounded);
     Suc fuel2 ↦
@@ -2632,7 +2589,7 @@ theorem decoder_recursive_fuel_succeeds
                               inner_v
                               inner_next
                               inner_holds
-                              (decoder_lt_shrink
+                              ((proof shrink_suc for lt_nat)
                                 fuel2
                                 (cursor_remaining c el loc ops inner)
                                 (cursor_remaining c el loc ops cur)
@@ -2658,9 +2615,7 @@ pub theorem decoder_recursive_succeeds
           → (next : c)
           → Equal
           Bool
-          (cursor_nat_lt
-            (cursor_remaining c el loc ops inner)
-            (cursor_remaining c el loc ops cur))
+          (lt_nat (cursor_remaining c el loc ops inner) (cursor_remaining c el loc ops cur))
           True
           → spec
           inner
@@ -2706,7 +2661,7 @@ pub theorem decoder_recursive_succeeds
             v
             next
             holds
-            (decoder_lt_self_suc (cursor_remaining c el loc ops cur))
+            ((proof self_suc for lt_nat) (cursor_remaining c el loc ops cur))
 
 pub theorem decoder_many_rejected_succeeds
       (c : Type)

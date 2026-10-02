@@ -30,7 +30,8 @@ import Data.Collections.Derived (bytes_nat_length, length, nth)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
-import Data.Numeric.Nat.Order (IsTrue as NatOrderIsTrue, leq_nat, sub)
+import Data.Numeric.Nat.Order
+  (IsTrue as NatOrderIsTrue, leq_nat, leq_nat_suc_add_right, lt_nat, sub)
 
 import Core.Logic.Transport (cong, sym, trans)
 
@@ -135,16 +136,6 @@ fn arg_cursor_offset (cur : ArgCursor) : Nat =
     MkArgCursor args index offset ↦ offset
   }
 
-pub fn cursor_nat_lt (a : Nat) (b : Nat) : Bool =
-  match b {
-    Zero ↦ False;
-    Suc b2 ↦
-      match a {
-        Zero ↦ True;
-        Suc a2 ↦ cursor_nat_lt a2 b2
-      }
-  }
-
 fn arg_lengths_sum (args : List Bytes) : Nat =
   match args {
     Nil ↦ Zero;
@@ -183,7 +174,7 @@ fn arg_cursor_normalize
       match nth Bytes index args {
         None ↦ MkArgCursor args index offset;
         Some arg ↦
-          match cursor_nat_lt offset (arg_length arg) {
+          match lt_nat offset (arg_length arg) {
             True ↦ MkArgCursor args index offset;
             False ↦ arg_cursor_normalize fuel2 args (Suc index) Zero
           }
@@ -220,9 +211,9 @@ The laws are predicates over an explicit dictionary. A successful peek must
 have positive remaining input, advancing such a cursor must strictly reduce
 that computed bound, and a zero remaining count must be an end position.
 
-`arg_cursor_laws` proves all three for the shipped byte cursor. Its private
-bridge identifies strict `cursor_nat_lt a b` with the canonical
-`leq_nat (Suc a) b` evidence used by the imported subtraction laws. The
+`arg_cursor_laws` proves all three for the shipped byte cursor. The `lt_nat::leq_suc` proof from `Data.Numeric.Nat.Order` identifies strict
+`lt_nat a b` with the canonical `leq_nat (Suc a) b` evidence used by the
+imported subtraction laws. The
 normalization proof preserves the computed remaining count while it skips
 exhausted or empty arguments; the progress proof then reduces to the strict
 subtraction step at the currently selected byte.
@@ -238,7 +229,7 @@ pub fn CursorPeekHasRemaining
     (cursor_peek c el loc ops cur)
     (Some el value)
     → Equal Bool
-    (cursor_nat_lt Zero (cursor_remaining c el loc ops cur))
+    (lt_nat Zero (cursor_remaining c el loc ops cur))
     True
 
 pub fn CursorAdvanceProgress
@@ -251,7 +242,7 @@ pub fn CursorAdvanceProgress
     (cursor_peek c el loc ops cur)
     (Some el value)
     → Equal Bool
-    (cursor_nat_lt
+    (lt_nat
       (cursor_remaining c el loc ops (cursor_advance c el loc ops cur))
       (cursor_remaining c el loc ops cur))
     True
@@ -270,89 +261,13 @@ pub fn CursorLaws (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc)
     (CursorPeekHasRemaining c el loc ops)
     (And (CursorAdvanceProgress c el loc ops) (CursorEndValid c el loc ops))
 
-theorem cursor_nat_lt_from_leq_suc
-      (a : Nat)
-    : (b : Nat) → NatOrderIsTrue (leq_nat (Suc a) b) → Equal Bool (cursor_nat_lt a b) True =
-  λb.
-    match b {
-      Zero ↦ λh. absurd h;
-      Suc b2 ↦
-        match a {
-          Zero ↦ λh. Proved;
-          Suc a2 ↦ λh. cursor_nat_lt_from_leq_suc a2 b2 h
-        }
-    }
-
-theorem cursor_nat_lt_to_leq_suc
-      (a : Nat)
-    : (b : Nat) → Equal Bool (cursor_nat_lt a b) True → NatOrderIsTrue (leq_nat (Suc a) b) =
-  λb.
-    match b {
-      Zero ↦ λh. absurd h;
-      Suc b2 ↦
-        match a {
-          Zero ↦ λh. Proved;
-          Suc a2 ↦ λh. cursor_nat_lt_to_leq_suc a2 b2 h
-        }
-    }
-
-theorem cursor_nat_not_lt_to_reverse_leq
-      (a : Nat)
-    : (b : Nat) → Equal Bool (cursor_nat_lt a b) False → NatOrderIsTrue (leq_nat b a) =
-  λb.
-    match b {
-      Zero ↦ λh. Proved;
-      Suc b2 ↦
-        match a {
-          Zero ↦ λh. absurd h;
-          Suc a2 ↦ λh. cursor_nat_not_lt_to_reverse_leq a2 b2 h
-        }
-    }
-
-theorem cursor_nat_lt_zero_add_suc
-      (n : Nat) (rest : Nat)
-    : Equal Bool (cursor_nat_lt Zero (add (Suc n) rest)) True =
-  match rest {
-    Zero ↦ Proved;
-    Suc rest2 ↦ Proved
-  }
-
-theorem cursor_nat_lt_zero_from_leq_suc
-      (witness : Nat)
-    : (larger : Nat)
-      → NatOrderIsTrue (leq_nat (Suc witness) larger)
-      → Equal Bool (cursor_nat_lt Zero larger) True =
-  λlarger.
-    match larger {
-      Zero ↦ λordered. absurd ordered;
-      Suc larger2 ↦ λordered. Proved
-    }
-
-theorem cursor_nat_lt_zero_add_from_positive
-      (n : Nat) (rest : Nat)
-    : Equal Bool (cursor_nat_lt Zero n) True
-      → Equal Bool (cursor_nat_lt Zero (add n rest)) True =
-  match n {
-    Zero ↦ λpositive. absurd positive;
-    Suc n2 ↦ λpositive. cursor_nat_lt_zero_add_suc n2 rest
-  }
-
-theorem cursor_leq_suc_add_right
-      (smaller : Nat) (larger : Nat) (rest : Nat)
-    : NatOrderIsTrue (leq_nat (Suc smaller) larger)
-      → NatOrderIsTrue (leq_nat (Suc (add smaller rest)) (add larger rest)) =
-  match rest {
-    Zero ↦ λh. h;
-    Suc rest2 ↦ λh. cursor_leq_suc_add_right smaller larger rest2 h
-  }
-
 theorem arg_remaining_shift_past_end
       (args : List Bytes)
     : (index : Nat)
       → (offset : Nat)
       → (arg : Bytes)
       → Equal (Option Bytes) (nth Bytes index args) (Some Bytes arg)
-      → Equal Bool (cursor_nat_lt offset (arg_length arg)) False
+      → Equal Bool (lt_nat offset (arg_length arg)) False
       → Equal Nat
         (arg_remaining_from args index offset)
         (arg_remaining_from args (Suc index) Zero) =
@@ -380,7 +295,7 @@ theorem arg_remaining_shift_past_end
                   in
                     J
                       (λarg' _.
-                        Equal Bool (cursor_nat_lt offset (arg_length arg')) False
+                        Equal Bool (lt_nat offset (arg_length arg')) False
                         → Equal
                           Nat
                           (arg_remaining_from (Cons Bytes head tail) Zero offset)
@@ -400,7 +315,10 @@ theorem arg_remaining_shift_past_end
                             ((proof saturates for sub)
                               (arg_length head)
                               offset
-                              (cursor_nat_not_lt_to_reverse_leq offset (arg_length head) past)))
+                              ((proof false_reverse_leq for lt_nat)
+                                offset
+                                (arg_length head)
+                                past)))
                           ((proof zero_l for add) (arg_lengths_sum tail)))
                       same_arg;
           Suc index2 ↦
@@ -416,7 +334,7 @@ fn arg_cursor_normalize_step
   match selected {
     None ↦ MkArgCursor args index offset;
     Some arg ↦
-      match cursor_nat_lt offset (arg_length arg) {
+      match lt_nat offset (arg_length arg) {
         True ↦ MkArgCursor args index offset;
         False ↦ arg_cursor_normalize fuel args (Suc index) Zero
       }
@@ -431,7 +349,7 @@ theorem arg_cursor_normalize_suc_unfold
 
 theorem arg_cursor_normalize_step_in_bounds
       (fuel : Nat) (args : List Bytes) (index : Nat) (offset : Nat) (arg : Bytes)
-    : Equal Bool (cursor_nat_lt offset (arg_length arg)) True
+    : Equal Bool (lt_nat offset (arg_length arg)) True
       → Equal ArgCursor
         (arg_cursor_normalize_step fuel args index offset (Some Bytes arg))
         (MkArgCursor args index offset) =
@@ -439,7 +357,7 @@ theorem arg_cursor_normalize_step_in_bounds
     cong
       Bool
       ArgCursor
-      (cursor_nat_lt offset (arg_length arg))
+      (lt_nat offset (arg_length arg))
       True
       (λcomparison.
         match comparison {
@@ -450,7 +368,7 @@ theorem arg_cursor_normalize_step_in_bounds
 
 theorem arg_cursor_normalize_step_past_end
       (fuel : Nat) (args : List Bytes) (index : Nat) (offset : Nat) (arg : Bytes)
-    : Equal Bool (cursor_nat_lt offset (arg_length arg)) False
+    : Equal Bool (lt_nat offset (arg_length arg)) False
       → Equal ArgCursor
         (arg_cursor_normalize_step fuel args index offset (Some Bytes arg))
         (arg_cursor_normalize fuel args (Suc index) Zero) =
@@ -458,7 +376,7 @@ theorem arg_cursor_normalize_step_past_end
     cong
       Bool
       ArgCursor
-      (cursor_nat_lt offset (arg_length arg))
+      (lt_nat offset (arg_length arg))
       False
       (λcomparison.
         match comparison {
@@ -474,7 +392,7 @@ theorem arg_cursor_normalize_some_preserves
       → (index : Nat)
       → (offset : Nat)
       → (arg : Bytes)
-      → Equal Bool comparison (cursor_nat_lt offset (arg_length arg))
+      → Equal Bool comparison (lt_nat offset (arg_length arg))
       → Equal (Option Bytes) (Some Bytes arg) (nth Bytes index args)
       → Equal Nat
         (arg_cursor_remaining (arg_cursor_normalize fuel args (Suc index) Zero))
@@ -514,7 +432,7 @@ theorem arg_cursor_normalize_some_preserves
                             (sym
                               Bool
                               True
-                              (cursor_nat_lt offset (arg_length arg))
+                              (lt_nat offset (arg_length arg))
                               comparison_is_cursor)))
                         Refl;
     False ↦
@@ -547,7 +465,7 @@ theorem arg_cursor_normalize_some_preserves
                             (sym
                               Bool
                               False
-                              (cursor_nat_lt offset (arg_length arg))
+                              (lt_nat offset (arg_length arg))
                               comparison_is_cursor)))
                         (trans
                           Nat
@@ -573,7 +491,7 @@ theorem arg_cursor_normalize_some_preserves
                               (sym
                                 Bool
                                 False
-                                (cursor_nat_lt offset (arg_length arg))
+                                (lt_nat offset (arg_length arg))
                                 comparison_is_cursor))))
   }
 
@@ -600,7 +518,7 @@ theorem arg_cursor_normalize_selected_preserves
               λselected_is_nth.
                 λrecursive.
                   arg_cursor_normalize_some_preserves
-                    (cursor_nat_lt offset (arg_length arg))
+                    (lt_nat offset (arg_length arg))
                     fuel
                     args
                     index
@@ -642,20 +560,6 @@ theorem arg_cursor_normalize_preserves_remaining
           (arg_cursor_normalize_preserves_remaining fuel2 args (Suc index) Zero))
   }
 
-theorem cursor_nat_lt_zero_contradicts_empty
-      (n : Nat)
-    : Equal Bool (cursor_nat_lt Zero n) True → Equal Nat n Zero → Bottom =
-  λpositive.
-    λempty.
-      absurd
-        (trans
-          Bool
-          True
-          (cursor_nat_lt Zero n)
-          False
-          (sym Bool (cursor_nat_lt Zero n) True positive)
-          (cong Nat Bool n Zero (cursor_nat_lt Zero) empty))
-
 theorem arg_cursor_peek_has_remaining_from
       (args : List Bytes)
     : (index : Nat)
@@ -665,7 +569,7 @@ theorem arg_cursor_peek_has_remaining_from
         (Option UInt8)
         (arg_cursor_peek (MkArgCursor args index offset))
         (Some UInt8 value)
-      → Equal Bool (cursor_nat_lt Zero (arg_remaining_from args index offset)) True =
+      → Equal Bool (lt_nat Zero (arg_remaining_from args index offset)) True =
   match args {
     Nil ↦ λindex. λoffset. λvalue. λpeeked. absurd peeked;
     Cons arg rest ↦
@@ -688,15 +592,13 @@ theorem arg_cursor_peek_has_remaining_from
                         (Suc (sub (arg_length arg) (Suc offset)))
                         (sub (arg_length arg) offset)) =
                       (proof suc_decreases for sub) (arg_length arg) offset in_bounds;
-                    positive_sub : Equal Bool
-                      (cursor_nat_lt Zero (sub (arg_length arg) offset))
-                      True =
-                      cursor_nat_lt_zero_from_leq_suc
+                    positive_sub : Equal Bool (lt_nat Zero (sub (arg_length arg) offset)) True =
+                      (proof zero_from_leq_suc for lt_nat)
                         (sub (arg_length arg) (Suc offset))
                         (sub (arg_length arg) offset)
                         decreases
                   in
-                    cursor_nat_lt_zero_add_from_positive
+                    (proof zero_add_positive for lt_nat)
                       (sub (arg_length arg) offset)
                       (arg_lengths_sum rest)
                       positive_sub;
@@ -717,7 +619,7 @@ theorem arg_remaining_advance_decreases_from_peek
         (arg_cursor_peek (MkArgCursor args index offset))
         (Some UInt8 value)
       → Equal Bool
-        (cursor_nat_lt
+        (lt_nat
           (arg_remaining_from args index (Suc offset))
           (arg_remaining_from args index offset))
         True =
@@ -747,13 +649,13 @@ theorem arg_remaining_advance_decreases_from_peek
                       (leq_nat
                         (Suc (add (sub (arg_length arg) (Suc offset)) (arg_lengths_sum rest)))
                         (add (sub (arg_length arg) offset) (arg_lengths_sum rest))) =
-                      cursor_leq_suc_add_right
+                      leq_nat_suc_add_right
                         (sub (arg_length arg) (Suc offset))
                         (sub (arg_length arg) offset)
                         (arg_lengths_sum rest)
                         decreases
                   in
-                    cursor_nat_lt_from_leq_suc
+                    (proof from_leq_suc for lt_nat)
                       (add (sub (arg_length arg) (Suc offset)) (arg_lengths_sum rest))
                       (add (sub (arg_length arg) offset) (arg_lengths_sum rest))
                       lifted;
@@ -770,7 +672,7 @@ theorem arg_cursor_end_valid_at_current
     : (arg : Bytes)
       → (rest : List Bytes)
       → (offset : Nat)
-      → Equal Bool comparison (cursor_nat_lt offset (arg_length arg))
+      → Equal Bool comparison (lt_nat offset (arg_length arg))
       → Equal Nat (add (sub (arg_length arg) offset) (arg_lengths_sum rest)) Zero
       → Equal (Option UInt8) (nth UInt8 offset (bytes_to_list arg)) (None UInt8) =
   match comparison {
@@ -782,38 +684,30 @@ theorem arg_cursor_end_valid_at_current
               λempty.
                 let
                   in_bounds : NatOrderIsTrue (leq_nat (Suc offset) (arg_length arg)) =
-                    cursor_nat_lt_to_leq_suc
+                    (proof to_leq_suc for lt_nat)
                       offset
                       (arg_length arg)
-                      (sym
-                        Bool
-                        True
-                        (cursor_nat_lt offset (arg_length arg))
-                        comparison_is_cursor);
+                      (sym Bool True (lt_nat offset (arg_length arg)) comparison_is_cursor);
                   decreases : NatOrderIsTrue
                     (leq_nat
                       (Suc (sub (arg_length arg) (Suc offset)))
                       (sub (arg_length arg) offset)) =
                     (proof suc_decreases for sub) (arg_length arg) offset in_bounds;
-                  positive_sub : Equal Bool
-                    (cursor_nat_lt Zero (sub (arg_length arg) offset))
-                    True =
-                    cursor_nat_lt_zero_from_leq_suc
+                  positive_sub : Equal Bool (lt_nat Zero (sub (arg_length arg) offset)) True =
+                    (proof zero_from_leq_suc for lt_nat)
                       (sub (arg_length arg) (Suc offset))
                       (sub (arg_length arg) offset)
                       decreases;
                   positive_remaining : Equal Bool
-                    (cursor_nat_lt
-                      Zero
-                      (add (sub (arg_length arg) offset) (arg_lengths_sum rest)))
+                    (lt_nat Zero (add (sub (arg_length arg) offset) (arg_lengths_sum rest)))
                     True =
-                    cursor_nat_lt_zero_add_from_positive
+                    (proof zero_add_positive for lt_nat)
                       (sub (arg_length arg) offset)
                       (arg_lengths_sum rest)
                       positive_sub
                 in
                   absurd
-                    (cursor_nat_lt_zero_contradicts_empty
+                    ((proof zero_not_empty for lt_nat)
                       (add (sub (arg_length arg) offset) (arg_lengths_sum rest))
                       positive_remaining
                       empty);
@@ -827,14 +721,10 @@ theorem arg_cursor_end_valid_at_current
                   UInt8
                   offset
                   (bytes_to_list arg)
-                  (cursor_nat_not_lt_to_reverse_leq
+                  ((proof false_reverse_leq for lt_nat)
                     offset
                     (arg_length arg)
-                    (sym
-                      Bool
-                      False
-                      (cursor_nat_lt offset (arg_length arg))
-                      comparison_is_cursor))
+                    (sym Bool False (lt_nat offset (arg_length arg)) comparison_is_cursor))
   }
 
 theorem arg_cursor_end_valid_from
@@ -851,7 +741,7 @@ theorem arg_cursor_end_valid_from
           Zero ↦
             λoffset.
               arg_cursor_end_valid_at_current
-                (cursor_nat_lt offset (arg_length arg))
+                (lt_nat offset (arg_length arg))
                 arg
                 rest
                 offset
@@ -876,7 +766,7 @@ theorem arg_cursor_advance_progress
           λpeeked.
             let
               raw_progress : Equal Bool
-                (cursor_nat_lt
+                (lt_nat
                   (arg_remaining_from args index (Suc offset))
                   (arg_remaining_from args index offset))
                 True =
@@ -893,10 +783,7 @@ theorem arg_cursor_advance_progress
             in
               J
                 (λadvanced _.
-                  Equal
-                    Bool
-                    (cursor_nat_lt advanced (arg_remaining_from args index offset))
-                    True)
+                  Equal Bool (lt_nat advanced (arg_remaining_from args index offset)) True)
                 raw_progress
                 (sym
                   Nat
