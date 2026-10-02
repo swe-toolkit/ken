@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-MATRIX-DERIVED-TELESCOPE
 title: "The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or a metavariable"
-status: ready
+status: active
 owner: language
 size: L
 tier: T1
@@ -37,6 +37,11 @@ occurrence is computed by depth arithmetic on a term from another frame.
 - **What it retires**: entry 1's tail rebase, the nested use of
   `indexed_root_ih_domain`, the `close_nested_matrix_method` re-wrap, and
   the enclosing-frame sentinel deferral.
+
+- **Carry from the landed parent** (`7450a0b17`). The Architect's approval
+  `evt_618n96gqvzeza` (`dec_1s48xec2d7m1x`) left a non-blocking census note
+  on the guard direct-occurrence path. Read it at kickoff. The census here
+  covers that path.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.

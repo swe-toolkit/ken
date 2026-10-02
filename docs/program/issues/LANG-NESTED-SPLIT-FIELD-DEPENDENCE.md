@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-SPLIT-FIELD-DEPENDENCE
 title: "A nested split whose constructor's other fields depend on the split column or the constructor's index fails in the kernel: a sibling field typed by the index gives TypeMismatch on the constant-motive path, and a variable row binding a split column a later field depends on leaks a pattern-alias sentinel as VarOutOfScope. Both checks or gives a surface diagnostic"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -241,3 +241,15 @@ pushes, framed on the stop-6 advisory and the M-deep base measurement.
   - an AC-N6 census program can be neither value-pinned nor refused;
   - a regression in `lang_infer_match_indexed_complete` (20/20), the
     record-pattern suite, or the 21 targeted suites.
+
+## Closeout
+
+Merged `7450a0b17`, exact `11f13ae27`: Language QA `evt_n2jpqmx04y03`,
+Architect `evt_618n96gqvzeza`, Decision `dec_1s48xec2d7m1x`.
+
+- Nested splits respect sibling-field dependence, and the cross-frame alias
+  miscompile on main (an M2 or two-deep alias returning `Zero`) is fixed.
+- F2 is removed. A reverting split that carries an alias sentinel is
+  refused as `PatternVariableAcrossDependentSplit` at the split span.
+- Carried: the Architect's non-blocking census note on the guard
+  direct-occurrence path goes to `LANG-NESTED-MATRIX-DERIVED-TELESCOPE`.
