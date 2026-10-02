@@ -48,8 +48,24 @@ stop and report the mismatch.
 
 ## Deliverable
 
-Two increments, each a straight-ancestor cut that may land alone.
+Three increments, each a straight-ancestor cut that may land alone.
 
+0. **Fail closed on an outer alias inside an indexed inner match** (Adversary
+   M8 on `7450a0b17`, `evt_1bspdnet7a87s`). Main gives silent wrong values
+   when an outer `as` alias is read inside a match on an indexed family:
+   - **R1**, a regression: base-rejected at `90ca730f6`, and now accepted
+     with `f 1 (VCons Nat 1 5 (VCons Nat Zero 7 (VNil Nat))) 3 ⇝ 1`, where
+     3 is expected;
+   - **R2**, wrong on base too: `f Zero (VNil Nat) 3 ⇝ 2`, which is `j`.
+
+   Both take the non-reverting path, where the in-matrix kernel check is
+   gated off. One measured cause is `finalize_refined_body` (`elab.rs:7804`)
+   shifting alias sentinels by `premise_count`. R1 has a second, unisolated
+   mis-shift. The Architect rules at AC-0 whether this increment repairs
+   both rows or refuses them. Either way, each row gives 3 or is refused,
+   never a wrong value. Every M1, M2, two-deep and middle-frame value pin,
+   and the tuple and `List` alias controls the finding reports correct, stay
+   green.
 1. **Seed `ret_ty_slot` from the check-mode expected type.** Report how many
    of the 24 entries become `Some`.
 2. **Open each nested bucket in the derived telescope before its leaves.**
@@ -72,6 +88,11 @@ Two increments, each a straight-ancestor cut that may land alone.
 
 ## Acceptance
 
+- **AC-0a (increment 0).** The R1 and R2 rows, inferred and checked, with
+  `let` and without, are committed as value-or-refusal pins over an indexed
+  inner match. All four existing alias pins use non-indexed `NatBox`, so
+  they cannot observe this path. Under increment 2 the refusal, if ruled,
+  becomes a value pin.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
 - **AC-2 (controls).**
