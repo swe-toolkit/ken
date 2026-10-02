@@ -2043,6 +2043,250 @@ mod tests {
         }
     }
 
+    fn cast_chain(env: &GlobalEnv, ctx: &mut Context, depth: usize) -> Term {
+        let mut level = Level::zero();
+        for _ in 0..depth {
+            level = level.suc();
+        }
+        ctx.push(Term::Type(level.clone())); // X : Type depth
+        let mut current = Term::var(0);
+        for i in 1..=depth {
+            let lower = (0..depth - i).fold(Level::zero(), |acc, _| acc.suc());
+            let target = Term::Type(lower.clone());
+            let evidence_ty = Term::Eq(
+                Box::new(Term::Type(level)),
+                Box::new(current.clone()),
+                Box::new(target.clone()),
+            );
+            ctx.push(evidence_ty);
+            current = weaken(&current, 1);
+            ctx.push(current.clone()); // t_i : L_(i-1)
+            current = Term::Cast(
+                Box::new(weaken(&current, 1)),
+                Box::new(target.clone()),
+                Box::new(Term::var(1)),
+                Box::new(Term::var(0)),
+            );
+            assert_eq!(
+                crate::check::infer(env, ctx, &current),
+                Ok(target),
+                "nested type-valued cast at level {i} must be typed"
+            );
+            level = lower;
+        }
+        current
+    }
+
+    /// AC-1: two independently typed, stuck Cast chains under public `whnf`.
+    /// MEASURED: reducer entries in the public reducer after construction, not
+    /// in a private conversion path. CLAIMED: T1/T2 at these depths are linear
+    /// in nesting. GAP: this bounds entry counts, not allocation or all Cast
+    /// inputs. Each measurement suppresses the test-only fixed-point
+    /// assertion that deliberately redoes the work being measured; the N2
+    /// premise is also run separately with that assertion on at k=8.
+    #[test]
+    fn nested_cast_public_whnf_has_linear_reducer_entries() {
+        let mut env = GlobalEnv::new();
+        let sentinel = declare_postulate(
+            &mut env,
+            "unchanged_trust_sentinel".into(),
+            vec![],
+            Term::Type(Level::zero()),
+        )
+        .expect("well-formed trust sentinel");
+        let trust = env.trusted_base();
+        assert!(trust.contains(&sentinel), "trust comparison is nonempty");
+        for k in [8, 16, 20] {
+            let _measurement = delta_probe::DeferredFixedPointAssertionsGuard::suppress();
+            let mut ctx = Context::new();
+            let left = cast_chain(&env, &mut ctx, k);
+            delta_probe::reset();
+            assert_eq!(whnf(&env, &ctx, &left), left, "T1 k={k} stuck result");
+            let t1 = delta_probe::reducer_entries();
+            assert!(t1 > 0 && t1 <= 4 * k as u64, "T1 k={k}: {t1} entries");
+
+            let mut left = weaken(&left, 1);
+            let mut right = cast_chain(&env, &mut ctx, k);
+            // `cast_chain` pushed X and 2k evidence/value binders after L_k.
+            left = weaken(&left, 2 * k as i64);
+            let e_type = Term::Eq(
+                Box::new(Term::Type(Level::zero())),
+                Box::new(left.clone()),
+                Box::new(right.clone()),
+            );
+            ctx.push(e_type);
+            left = weaken(&left, 1);
+            right = weaken(&right, 1);
+            ctx.push(left.clone());
+            let outer = Term::Cast(
+                Box::new(weaken(&left, 1)),
+                Box::new(weaken(&right, 1)),
+                Box::new(Term::var(1)),
+                Box::new(Term::var(0)),
+            );
+            assert_eq!(
+                crate::check::infer(&env, &ctx, &outer),
+                Ok(weaken(&right, 1)),
+                "T2 k={k} redex must be typed"
+            );
+            delta_probe::reset();
+            assert_eq!(whnf(&env, &ctx, &outer), outer, "T2 k={k} stuck result");
+            let t2 = delta_probe::reducer_entries();
+            assert!(t2 > 0 && t2 <= 8 * k as u64, "T2 k={k}: {t2} entries");
+            eprintln!("nested Cast T1/T2 k={k}: {t1}/{t2} reducer entries");
+            if k == 8 {
+                // Exercise the exact measured shapes once with the fixed-point
+                // assertion enabled. Its reducer work is not part of AC-1's
+                // suppressed measurement.
+                drop(_measurement);
+                let left_at_outer = weaken(&left, 1);
+                assert_eq!(whnf(&env, &ctx, &left_at_outer), left_at_outer);
+                assert_eq!(whnf(&env, &ctx, &outer), outer);
+            }
+        }
+        assert_eq!(env.trusted_base(), trust, "no new trusted declarations");
+    }
+
+    /// AC-1 successor fixture: a source-writable `step_i` telescope, where
+    /// each transparent helper's body is `J (λx _. x) t e`. Inline J in the
+    /// dependent parameter type does not parse on the surface; the helper
+    /// form was source-checked separately in AC-0b (`evt_27neq92xrvanm`).
+    /// At k=4 the N0–N2 kernel-local check measured 560,397 reducer entries;
+    /// this is deliberately a VERDICT pin, not a linear-work count: the
+    /// multiplying non-refl J endpoints belong to the J-sharing successor.
+    #[test]
+    fn source_derived_nested_j_cast_check_accepts_at_four() {
+        let mut env = GlobalEnv::new();
+        let type0 = Term::Type(Level::zero());
+        let type_id = crate::check::declare_def(
+            &mut env,
+            vec![],
+            Term::pi(type0.clone(), type0.clone()),
+            Term::lam(type0.clone(), Term::var(0)),
+        )
+        .expect("transparent type identity");
+        let trust = env.trusted_base();
+        let k = 4;
+        let mut ctx = Context::new();
+        ctx.push(Term::Type((0..k).fold(Level::zero(), |l, _| l.suc())));
+        let mut current = Term::var(0);
+        for i in 1..=k {
+            let high = (0..k - i + 1).fold(Level::zero(), |l, _| l.suc());
+            let lower = (0..k - i).fold(Level::zero(), |l, _| l.suc());
+            let high_type = Term::Type(high.clone());
+            let low_type = Term::Type(lower);
+            let domain_eq = Term::Eq(
+                Box::new(high_type.clone()),
+                Box::new(Term::var(0)),
+                Box::new(low_type.clone()),
+            );
+            let helper_ty = Term::pi(
+                high_type.clone(),
+                Term::pi(domain_eq.clone(), Term::pi(Term::var(1), low_type.clone())),
+            );
+            // Under A, e, t, x, p: A is @4 and x is @1. `J` returns x.
+            let eq_at_x = Term::Eq(
+                Box::new(high_type.clone()),
+                Box::new(Term::var(3)),
+                Box::new(Term::var(0)),
+            );
+            let motive = Term::Ascript(
+                Box::new(Term::lam(
+                    high_type.clone(),
+                    Term::lam(eq_at_x.clone(), Term::var(1)),
+                )),
+                Box::new(Term::pi(
+                    high_type.clone(),
+                    Term::pi(eq_at_x, high_type.clone()),
+                )),
+            );
+            let helper = crate::check::declare_def(
+                &mut env,
+                vec![],
+                helper_ty,
+                Term::lam(
+                    high_type.clone(),
+                    Term::lam(
+                        domain_eq,
+                        Term::lam(
+                            Term::var(1),
+                            Term::J(
+                                Box::new(motive),
+                                Box::new(Term::var(0)),
+                                Box::new(Term::var(1)),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            .expect("source-derived transparent step_i helper");
+            ctx.push(Term::Eq(
+                Box::new(high_type),
+                Box::new(current.clone()),
+                Box::new(low_type),
+            ));
+            current = weaken(&current, 1);
+            ctx.push(current.clone());
+            let source = weaken(&current, 1);
+            current = Term::app(
+                Term::app(
+                    Term::app(Term::const_(helper, vec![]), source),
+                    Term::var(1),
+                ),
+                Term::var(0),
+            );
+        }
+        let equality = Term::Eq(
+            Box::new(type0),
+            Box::new(current.clone()),
+            Box::new(Term::app(Term::const_(type_id, vec![]), current.clone())),
+        );
+        let proof = Term::Refl(Box::new(current));
+        // Unlike the T1/T2 count rows, leave the N2 fixed-point assertion on.
+        assert_eq!(crate::check::check(&env, &ctx, &proof, &equality), Ok(()));
+        assert_eq!(env.trusted_base(), trust);
+    }
+
+    /// AC-2: the regularity arm still reduces, while a neutral cast stays
+    /// neutral. Both are typed and pass through the public reducer.
+    #[test]
+    fn nested_cast_repair_preserves_regularity_and_neutral_cast() {
+        let env = GlobalEnv::new();
+        let trust = env.trusted_base();
+        let a = Term::Type(Level::zero().suc());
+        let value = Term::Type(Level::zero());
+        let regular = Term::Cast(
+            Box::new(a.clone()),
+            Box::new(a.clone()),
+            Box::new(Term::Refl(Box::new(a))),
+            Box::new(value.clone()),
+        );
+        assert_eq!(
+            crate::check::infer(&env, &Context::new(), &regular),
+            Ok(Term::Type(Level::zero().suc()))
+        );
+        assert_eq!(whnf(&env, &Context::new(), &regular), value);
+
+        let mut ctx = Context::new();
+        ctx.push(Term::Type(Level::zero())); // A
+        ctx.push(Term::Type(Level::zero())); // B
+        ctx.push(Term::Eq(
+            Box::new(Term::Type(Level::zero())),
+            Box::new(Term::var(1)),
+            Box::new(Term::var(0)),
+        ));
+        ctx.push(Term::var(2)); // t : A
+        let stuck = Term::Cast(
+            Box::new(Term::var(3)),
+            Box::new(Term::var(2)),
+            Box::new(Term::var(1)),
+            Box::new(Term::var(0)),
+        );
+        assert_eq!(crate::check::infer(&env, &ctx, &stuck), Ok(Term::var(2)));
+        assert_eq!(whnf(&env, &ctx, &stuck), stuck);
+        assert_eq!(env.trusted_base(), trust);
+    }
+
     /// Durable reducer-work invariant: a stuck component is reduced once,
     /// even when conversion defers its head δ. MEASURED: reducer entries at
     /// depths 16/32/64 across every nested-consumer arm, against public whnf
