@@ -755,6 +755,12 @@ fn eq_at_inductive(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term
 // cast-by-type (`16 §3.2`)
 // ===========================================================================
 
+/// A Σ or quotient cast may project `e.1`/`e.2` only if its Eq-at-Type arm
+/// exposes a Σ of component equalities. Neutral Eq Type stays neutral.
+fn type_eq_has_components(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> bool {
+    matches!(eq_at_type(env, ctx, a, b), Some(Term::Sigma(..)))
+}
+
 /// Reduce `cast a b e t` by recursion on the (whnf'd) types `a`,`b` (`16 §3.2`).
 /// Returns the reduct, or `None` if the cast is stuck. `a`,`b` are whnf'd by the
 /// caller. The proof `e` is **never inspected** for content — `cast` computes
@@ -775,14 +781,16 @@ pub fn cast_reduce(
     }
     match (a, b) {
         (Term::Pi(a1, b1), Term::Pi(a2, b2)) => cast_at_pi(env, ctx, a1, b1, a2, b2, e, t),
-        (Term::Sigma(a1, b1), Term::Sigma(a2, b2)) => {
+        (Term::Sigma(a1, b1), Term::Sigma(a2, b2)) if type_eq_has_components(env, ctx, a, b) => {
             Some(cast_at_sigma(env, ctx, a1, b1, a2, b2, e, t))
         }
         (Term::Omega(_), Term::Omega(_)) => Some(t.clone()), // cast Ω Ω e P ⇝ P
         (Term::App(_, _) | Term::IndFormer { .. }, Term::App(_, _) | Term::IndFormer { .. }) => {
             cast_at_inductive(env, ctx, a, b, e, t)
         }
-        (Term::Quot(_, _), Term::Quot(_, _)) => cast_at_quot(a, b, e, t),
+        (Term::Quot(_, _), Term::Quot(_, _)) if type_eq_has_components(env, ctx, a, b) => {
+            cast_at_quot(a, b, e, t)
+        }
         // `cast Type Type (refl _) A ⇝ A`; non-refl type-equality at a universe
         // is (oracle) neutral (`16 §3.2`).
         (Term::Type(_), Term::Type(_)) if is_refl(e) => Some(t.clone()),
