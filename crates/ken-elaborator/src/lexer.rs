@@ -2,7 +2,7 @@
 //!
 //! Recognises the token subset for G1 (V0), V1 spec-annotation keywords,
 //! L1 numeric literals (integer, float, decimal with `d`-suffix, float32 with
-//! `f32`-suffix), infix arithmetic operators `+`, `+%`, `*`, `==`,
+//! `f32`-suffix), infix arithmetic operators `+`, `+%`, `*`, `/`, `%`, `==`,
 //! L2 sum-type/pattern-match keywords (`data`, `match`, `def`, `|->`
 //! arm separators), and L7 `foreign` declaration tokens (`38 §2.1`, `(oracle)`
 //! keyword spellings). `type` is reserved (SURF-def-refinement; `33 §1`)
@@ -101,6 +101,8 @@ pub enum Token {
     PlusPercent, // `+%` — explicit wrapping add
     Minus,       // `-`  — type-directed infix subtraction (VAL2 #11)
     Star,        // `*`  — type-directed infix multiply
+    Slash,       // `/`  — type-directed Int division
+    Percent,     // `%`  — type-directed Int remainder
     EqEq,        // `==` — structural equality
     PropEq,      // `===` / `≡` — propositional equality notation
     Le,          // `<=` / `≤`
@@ -503,7 +505,7 @@ impl<'s> Lexer<'s> {
     }
 
     /// ASCII characters occurring in `31 §1b`'s operator transliterations,
-    /// plus §4's fixed arithmetic spellings `+`, `+%`, and `*`. Delimiters,
+    /// plus §4's fixed arithmetic spellings `+`, `+%`, `*`, `/`, and `%`. Delimiters,
     /// projection `.`, annotation `@`, and unlisted conventional operator
     /// characters remain outside the user-name surface.
     fn is_symbolic_operator_char(c: char) -> bool {
@@ -558,6 +560,8 @@ impl<'s> Lexer<'s> {
             "+" => Token::Plus,
             "+%" => Token::PlusPercent,
             "*" => Token::Star,
+            "/" => Token::Slash,
+            "%" => Token::Percent,
             "-" => Token::Minus,
             "->" => Token::Arrow,
             "<=" => Token::Le,

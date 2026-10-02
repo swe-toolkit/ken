@@ -1829,7 +1829,8 @@ mod atom_start_premise {
             | Token::Semicolon | Token::LBrace | Token::RBrace | Token::Pipe
             | Token::LBracket | Token::RBracket | Token::Comma | Token::Str(_)
             | Token::CharLit(_) | Token::ByteStr(_) | Token::Plus | Token::PlusPercent
-            | Token::Minus | Token::Star | Token::EqEq | Token::PropEq | Token::FlowsTo
+            | Token::Minus | Token::Star | Token::Slash | Token::Percent
+            | Token::EqEq | Token::PropEq | Token::FlowsTo
             | Token::Join | Token::Meet | Token::Times | Token::MapsTo | Token::TruncBar
             | Token::IntLit(_) | Token::FloatLit(_) | Token::DecimalLit(_, _)
             | Token::Float32Lit(_) | Token::Ident(_) | Token::ConId(_) | Token::Nat(_)
@@ -4308,7 +4309,7 @@ impl Parser {
         Ok(lhs)
     }
 
-    /// Select the exact merge-base fixed-arithmetic parser for a source with
+    /// Select the fixed-arithmetic parser for a source with
     /// no user operator. Sources that can contain a declared operator retain
     /// a neutral mixed run until canonical identities and fixities are known.
     #[inline(always)]
@@ -4350,14 +4351,20 @@ impl Parser {
         Ok(lhs)
     }
 
-    /// Merge-base `*` level for sources with no user-defined operators.
+    /// Fixed `*`/`/`/`%` level for sources with no user-defined operators.
     fn parse_fixed_multiplicative_expr(&mut self) -> Result<Expr, ElabError> {
         let mut lhs = self.parse_app_expr()?;
-        while matches!(self.peek(), Token::Star) {
+        loop {
+            let operator = match self.peek() {
+                Token::Star => BinOp::Mul,
+                Token::Slash => BinOp::Div,
+                Token::Percent => BinOp::Mod,
+                _ => break,
+            };
             self.advance();
             let rhs = self.parse_app_expr()?;
             let span = Span::merge(lhs.span(), rhs.span());
-            lhs = Expr::EBinOp(BinOp::Mul, Box::new(lhs), Box::new(rhs), span);
+            lhs = Expr::EBinOp(operator, Box::new(lhs), Box::new(rhs), span);
         }
         Ok(lhs)
     }
@@ -4378,6 +4385,8 @@ impl Parser {
                 }
                 Token::Minus => InfixOperator::Builtin(BinOp::Sub, self.peek_span().clone()),
                 Token::Star => InfixOperator::Builtin(BinOp::Mul, self.peek_span().clone()),
+                Token::Slash => InfixOperator::Builtin(BinOp::Div, self.peek_span().clone()),
+                Token::Percent => InfixOperator::Builtin(BinOp::Mod, self.peek_span().clone()),
                 other => match canonical_operator_name(&other) {
                     Some(name) => InfixOperator::User(name.to_owned(), self.peek_span().clone()),
                     None => break,
@@ -5496,7 +5505,7 @@ fn default_precedence(operator: &InfixOperator) -> u8 {
     match operator {
         InfixOperator::Builtin(BinOp::EqEq, _) => 4,
         InfixOperator::Builtin(BinOp::Add | BinOp::WrappingAdd | BinOp::Sub, _) => 6,
-        InfixOperator::Builtin(BinOp::Mul, _) => 7,
+        InfixOperator::Builtin(BinOp::Mul | BinOp::Div | BinOp::Mod, _) => 7,
         InfixOperator::User(_, _) => Fixity::DEFAULT.precedence,
     }
 }

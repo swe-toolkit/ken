@@ -20,8 +20,8 @@
 use std::collections::HashMap;
 
 use ken_kernel::{
-    declare_deceq_certificate, declare_postulate, declare_primitive, GlobalEnv, GlobalId, Level,
-    Term,
+    declare_deceq_certificate, declare_def, declare_postulate, declare_primitive, GlobalEnv,
+    GlobalId, Level, Term,
 };
 use ken_kernel::env::PrimReduction;
 use num_bigint::BigInt;
@@ -84,6 +84,16 @@ pub struct BinOpEntry {
     pub op_id: GlobalId,
     /// GlobalId of the result type.
     pub result_id: GlobalId,
+}
+
+/// Int-only dispatch for the two partial division operations.
+#[derive(Clone, Debug)]
+pub struct DivEntry {
+    pub div_id: GlobalId,
+    pub mod_id: GlobalId,
+    pub result_id: GlobalId,
+    /// Transparent `NonZeroDivisor : Int → Ω₀`, not a trusted postulate.
+    pub nonzero_id: GlobalId,
 }
 
 // ── NumericEnv ─────────────────────────────────────────────────────────────
@@ -150,6 +160,9 @@ pub struct NumericEnv {
 
     // --- `*` dispatch table (keyed by the type's GlobalId, VAL2 #11) ---
     mul_table: HashMap<GlobalId, BinOpEntry>,
+
+    // --- `/` and `%` dispatch (Int only; partial obligation at the site) ---
+    div_table: HashMap<GlobalId, DivEntry>,
 }
 
 struct FixedIntLiteralDescriptor {
@@ -228,6 +241,15 @@ impl NumericEnv {
         match ty {
             Term::Const { id, .. } => self.mul_table.get(id),
             Term::IndFormer { id, .. } => self.mul_table.get(id),
+            _ => None,
+        }
+    }
+
+    /// Int is the only type with raw division/remainder operations.
+    pub fn classify_div(&self, ty: &Term) -> Option<&DivEntry> {
+        match ty {
+            Term::Const { id, .. } => self.div_table.get(id),
+            Term::IndFormer { id, .. } => self.div_table.get(id),
             _ => None,
         }
     }
@@ -387,8 +409,8 @@ pub fn register_numeric_env(
 
     // Partial Int ops: the kernel admits their types but never computes them.
     // Their runtime reductions fault on zero; surface use owes an obligation.
-    reg_binop!("div_int", int_id);
-    reg_binop!("mod_int", int_id);
+    let div_int_id = reg_binop!("div_int", int_id);
+    let mod_int_id = reg_binop!("mod_int", int_id);
 
     // Register `Int`'s decidable-equality certificate
     // (`docs/adr/0013-int-decidable-equality-kernel-posture.md` Layer 1):
@@ -417,6 +439,25 @@ pub fn register_numeric_env(
     // committed follow-up), so this registration is inert until then —
     // `infer`/`eq_reduce`'s new `IntLit` arms simply have nothing to see.
     env.register_int_lit_type(int_id);
+
+    // Internal, transparent NonZeroDivisor b := Eq Int b 0 → Bottom.
+    // Keep it out of the global surface-name table: only `/` and `%` gain
+    // surface spellings, and this definition adds nothing to trusted_base().
+    let int = Term::const_(int_id, vec![]);
+    let nonzero_ty = Term::pi(int.clone(), omega0.clone());
+    let nonzero_body = Term::lam(
+        int.clone(),
+        Term::pi(
+            Term::Eq(
+                Box::new(int),
+                Box::new(Term::var(0)),
+                Box::new(Term::IntLit(BigInt::from(0u8))),
+            ),
+            Term::const_(env.bottom_id(), vec![]),
+        ),
+    );
+    let nonzero_id = declare_def(env, vec![], nonzero_ty, nonzero_body)
+        .map_err(|e| ElabError::Internal(format!("NonZeroDivisor definition failed: {e}")))?;
 
     // `Int`'s ordering comparison (`30-taxonomy.md §4`'s "comparison
     // primitives `Int → Int → Bool`" — plural, already assumed to justify
@@ -574,6 +615,14 @@ pub fn register_numeric_env(
     sub_table.insert(float_id, BinOpEntry { op_id: sub_float_id, result_id: float_id });
     mul_table.insert(float_id, BinOpEntry { op_id: mul_float_id, result_id: float_id });
 
+    let mut div_table = HashMap::new();
+    div_table.insert(int_id, DivEntry {
+        div_id: div_int_id,
+        mod_id: mod_int_id,
+        result_id: int_id,
+        nonzero_id,
+    });
+
     let signed_descriptor = |type_id: GlobalId, type_name: &'static str, bits: usize| {
         let boundary = BigInt::from(1u8) << (bits - 1);
         FixedIntLiteralDescriptor {
@@ -618,6 +667,7 @@ pub fn register_numeric_env(
         eq_table,
         sub_table,
         mul_table,
+        div_table,
     })
 }
 

@@ -29,7 +29,7 @@ use crate::ast::{
 use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceHeadKey, InstanceInfo};
 use crate::data;
 use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
-use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
+use crate::numbers::{AddEntry, BinOpEntry, DivEntry, NumericEnv, NumericLitVal};
 use crate::standard_operators::StandardOperatorRole;
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInfixOperator, RInstanceConstraint, RMatchArm, RPatKind,
@@ -10107,6 +10107,45 @@ fn elab_binop(
             Ok((applied, result_ty))
         }
 
+        BinOp::Div | BinOp::Mod => {
+            let symbol = if matches!(op, BinOp::Div) { "/" } else { "%" };
+            let entry: &DivEntry =
+                cx.numeric_env
+                    .classify_div(&lhs_ty_wh)
+                    .ok_or_else(|| ElabError::TypeMismatch {
+                        span: span.clone(),
+                        reason: format!("'{symbol}' not supported on this type"),
+                    })?;
+            let result_ty = Term::const_(entry.result_id, vec![]);
+            let rhs_core = check(cx, rhs, &result_ty, span)?;
+            let op_id = if matches!(op, BinOp::Div) { entry.div_id } else { entry.mod_id };
+            let applied = Term::app(
+                Term::app(Term::const_(op_id, vec![]), lhs_core),
+                rhs_core.clone(),
+            );
+
+            // A raw Int division/remainder creates one proof obligation at its
+            // operation site. The predicate is a transparent definition, never
+            // a new trusted primitive or a conversion rule for either Op.
+            let goal = Term::app(Term::const_(entry.nonzero_id, vec![]), rhs_core);
+            let closed = close_goal(&cx.ctx, goal);
+            let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
+                .map_err(|error| ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                })?;
+            let obl_id = cx.obl_counter;
+            cx.obl_counter += 1;
+            cx.obligations.push(Obligation {
+                id: obl_id,
+                hole_id,
+                goal_closed: closed,
+                span: span.clone(),
+                kind: ObligationKind::PartialPrim,
+            });
+            Ok((applied, result_ty))
+        }
+
         BinOp::EqEq => {
             let eq_entry =
                 cx.numeric_env
@@ -11610,7 +11649,7 @@ fn builtin_fixity(operator: BinOp) -> Fixity {
             associativity: FixityAssoc::Left,
             precedence: 6,
         },
-        BinOp::Mul => Fixity {
+        BinOp::Mul | BinOp::Div | BinOp::Mod => Fixity {
             associativity: FixityAssoc::Left,
             precedence: 7,
         },

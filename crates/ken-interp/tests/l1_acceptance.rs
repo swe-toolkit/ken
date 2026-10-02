@@ -1,16 +1,14 @@
 //! `l1_acceptance.rs` holds L1 numeric tower acceptance tests.
 //!
-//! `CI-ASSERTIONLESS-L1` establishes only that AC-2 now has its production-fed
-//! witness and that the three named ignored placeholders are honestly marked
-//! as non-cover. The machine-checked exemption artifact and its readmission
-//! conditions live in `.github/ignored-test-exemptions.toml`. This header makes
-//! no claim about any other row's conformance-cover status.
+//! `CI-ASSERTIONLESS-L1` established AC-2's production-fed witness; the
+//! formerly ignored §3.1 division row now asserts its emitted obligation and
+//! zero-divisor boundary. This header makes no claim about other rows' status.
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal, ObligationKind};
 use ken_elaborator::extract::{v2_extract, ProvKind};
 use ken_interp::eval::{eval, eval_vals_eq, EvalStore, EvalVal};
 use ken_kernel::env::Context;
-use ken_kernel::{convert, Decl, GlobalId, KernelError, Term};
+use ken_kernel::{check, convert, infer, whnf, Decl, GlobalId, KernelError, Term};
 
 // ── test infrastructure ──────────────────────────────────────────────────────
 
@@ -371,14 +369,66 @@ fn ac6_float_not_exact() {
 
 // ── §3.1: Int div-by-zero obligation ────────────────────────────────────────
 
-/// Not conformance cover; waits on integer division op registration.
+/// Durable invariant: raw Int division issues a divisor-indexed PartialPrim
+/// goal; at zero it reduces to Top → Bottom, never a valid proof obligation.
 #[test]
-#[ignore = "needs operator-approved div_int/mod_int registration (18a GAP)"]
 fn sec31_int_div_zero_emits_obligation() {
-    let mut env = ElabEnv::new().unwrap();
-    let _result = env.elaborate_decl_v1(
-        "fn f (a : Int) (b : Int) = a / b"
-    ).unwrap();
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let result = env.elaborate_decl_v1("fn f (a : Int) (b : Int) : Int = a / b")
+        .expect("raw Int division must elaborate with an obligation");
+    assert_eq!(result.obligations.len(), 1);
+    let open = &result.obligations[0];
+    assert!(matches!(open.kind, ObligationKind::PartialPrim));
+    let int = Term::const_(env.globals["Int"], vec![]);
+    let nonzero_id = env.numeric_env.classify_div(&int).expect("Int division").nonzero_id;
+    assert!(env.env.transparent_body(nonzero_id).is_some());
+    assert!(!env.env.trusted_base().contains(&nonzero_id));
+    let Term::Pi(a_ty, rest) = &open.goal_closed else { panic!("quantify a") };
+    let Term::Pi(b_ty, goal) = rest.as_ref() else { panic!("quantify b") };
+    assert_eq!((a_ty.as_ref(), b_ty.as_ref()), (&int, &int));
+    assert_eq!(goal.as_ref(), &Term::app(Term::const_(nonzero_id, vec![]), Term::var(0)));
+    assert!(env.is_open_hole(open.hole_id));
+
+    let zero = env.elaborate_decl_v1("fn fZero (a : Int) : Int = a / (0 : Int)")
+        .expect("zero divisor must emit an unsatisfiable obligation, not a value");
+    assert_eq!(zero.obligations.len(), 1);
+    let Term::Pi(_, zero_goal) = &zero.obligations[0].goal_closed else {
+        panic!("zero obligation closes over a")
+    };
+    let Term::Pi(eq_zero, bottom) = whnf(&env.env, &Context::new(), zero_goal) else {
+        panic!("NonZeroDivisor zero unfolds to a negation")
+    };
+    assert_eq!(whnf(&env.env, &Context::new(), &eq_zero),
+        Term::const_(env.env.top_id(), vec![]), "Eq Int 0 0 reduces to Top");
+    assert_eq!(*bottom, Term::const_(env.env.bottom_id(), vec![]));
+
+    // If the zero obligation were inhabited, applying it to the delivered
+    // `tt : Top` would construct Bottom. No Bottom introduction exists.
+    let mut assumed = Context::new();
+    assumed.push(zero_goal.as_ref().clone());
+    let contradiction = Term::app(Term::var(0), Term::const_(env.env.tt_id(), vec![]));
+    assert_eq!(infer(&env.env, &assumed, &contradiction).unwrap(),
+        Term::const_(env.env.bottom_id(), vec![]));
+
+    // Nonzero control: Eq Int 1 0 reduces to Bottom, so the negation has
+    // the ordinary identity proof. This separates zero refusal from a broken
+    // fixture that would make every literal obligation unprovable.
+    let one = env.elaborate_decl_v1("fn fOne (a : Int) : Int = a / (1 : Int)")
+        .expect("nonzero division emits the same obligation kind");
+    assert_eq!(one.obligations.len(), 1);
+    let Term::Pi(_, one_goal) = &one.obligations[0].goal_closed else {
+        panic!("one obligation closes over a")
+    };
+    let Term::Pi(eq_one, _) = whnf(&env.env, &Context::new(), one_goal) else {
+        panic!("NonZeroDivisor one unfolds to a negation")
+    };
+    assert_eq!(whnf(&env.env, &Context::new(), &eq_one),
+        Term::const_(env.env.bottom_id(), vec![]));
+    let proof = Term::lam(int, Term::lam(
+        Term::const_(env.env.bottom_id(), vec![]), Term::var(0),
+    ));
+    check(&env.env, &Context::new(), &proof, &one.obligations[0].goal_closed)
+        .expect("NonZeroDivisor 1 has a kernel-checked proof");
 }
 
 // ── §6.1: primitive op runtime value and neutral conversion ──────────────────
