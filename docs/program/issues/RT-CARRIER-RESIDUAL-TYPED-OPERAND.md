@@ -275,8 +275,19 @@ ABI change.
    (`evt_3266hq42hc17h`, recut §1a 1).
 2. R is stored as is into an ordinary constructor field, because
    `residual_fields[pos] == None` was read as a pass-through instead of as a
-   K destination (`evt_2gq38tz4qy735`, recut §1a 2). The next re-trigger is
-   the 3rd, which is a hold plus research.
+   K destination (`evt_2gq38tz4qy735`, recut §1a 2).
+3. Wrapped-ness was read from slot flow membership, by the rewalk, the
+   totality invariant and the decoder. Keyed on `slot.flow`
+   (`evt_4pwphh759tcqf`, recut §1a 3, advancing; hold and research
+   `evt_65eqjan51qtgp`). The rewalk obligation is keyed on
+   `recursive_residual_for_specialization` (`evt_34wv6tryq2v64`); that much
+   is retained.
+
+**Shared predicate (Architect `evt_65eqjan51qtgp`):** the R/K representation
+of a position (an operand, a field or a slot member) is read off a nearby
+proxy instead of being declared per position. The mixed-slot representation
+waits on the Architect's ruling after the research advisory. The next
+re-trigger is the 6th.
 
 ## Stop conditions
 
@@ -286,4 +297,5 @@ ABI change.
 - Any change to the kernel, the spec or a verdict outside the runtime rows
   named here. A currently passing `rt_parity_native` row that is newly
   refused, including through an F disposition, is a stop to the Architect.
-- The 3rd advancing stop is a hold plus research (§1a is at 2).
+- §1a is at 3 (held for the mixed-slot ruling). The 6th advancing stop is a
+  hold plus research.
