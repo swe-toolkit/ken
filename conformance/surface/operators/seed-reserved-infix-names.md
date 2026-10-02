@@ -2,8 +2,9 @@
 
 Format: `../../README.md`. These cases pin the bounded name-admission
 contract in `spec/30-surface/31-lexical.md §1c` and
-`spec/30-surface/32-grammar.md §§1,3,6`. They assign no standard meaning to an
-operator.
+`spec/30-surface/32-grammar.md §§1,3,6`. The generic fixtures assign no
+standard meaning to their operators; a separate control pins `/` and `%` to
+the fixed arithmetic grammar and precedence.
 
 **Status and reachability.** Every case whose subject is one of the six reserved
 notation identities is **RED-UNTIL-LANG-RESERVED-INFIX-NAMES**. On grounding
@@ -512,13 +513,26 @@ add a tree node.
 ### surface/operators/generic-symbolic-names-remain-live (control)
 
 - spec: `31 §2`; `32 §1`/§3/§6; `33 §6`
-- given: four isolated common fixtures with `OP` respectively `<`, `>`, `/`,
-  and `%`
+- given: two isolated common fixtures with `OP` respectively `<` and `>`.
 - expect: **LIVE — accepted** with the same four common observations for each
   generic symbolic name.
-- why: a replacement that recognizes only the six dedicated notation tokens
-  regresses the existing generic-operator path. The control also proves the
-  common fixture does not require a standard operator meaning.
+- why: a replacement that recognizes only dedicated or fixed tokens regresses
+  the existing generic-operator path. The control also proves the common
+  fixture does not require a standard operator meaning.
+
+### surface/operators/fixed-div-mod-tokens-not-generic (control)
+
+- spec: `31 §2`/§4; `32 §1`/§3/§6
+- given: parse independently `a + b / c`, `a / b * c`, `a + b % c`, and
+  `a % b * c`. Also attempt `fn / (x : Nat) (y : Nat) : Nat = x` and
+  `fn % (x : Nat) (y : Nat) : Nat = x`.
+- expect: `/` and `%` use §3's fixed `binop ::= fixed_binop` route, not
+  `operator_name`. The parse trees are `a + (b / c)`, `(a / b) * c`,
+  `a + (b % c)`, and `(a % b) * c`. Both declarations reject and bind no
+  generic operator global. `<` and `>` remain live in the preceding control.
+- why: §31 classifies `/` and `%` as fixed tokens, and §32 fixes their level
+  and grammar route. The pair distinguishes these built-ins from the still-live
+  generic symbolic-name path.
 
 ### surface/operators/fixed-and-protected-token-roles-remain-distinct (control)
 
