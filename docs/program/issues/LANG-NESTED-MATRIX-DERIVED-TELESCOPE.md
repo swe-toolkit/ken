@@ -140,6 +140,21 @@ alone.
      depth + 1`. Fixtures p1 (inner inference match) and p2 (inner checked
      match) give `Suc Zero` from `f Zero (VNil Nat)`. Both fail closed on
      main with `KernelRejected TypeMismatch`.
+   - **Alias occurrences and the checked path** (Architect
+     `evt_635vc9mxvmnq2`, on the checked-sibling stop). The sentinel's only
+     producer is `materialize_pattern_alias`'s sentinel arm; the flat
+     checked path only consumes it.
+     - INV-1: an alias use materializes as an occurrence term, in the same
+       representation as a plain reference to its binders.
+     - INV-2: the checked path gets no design change. Its edits are the
+       mechanical fallout of deleting the sentinel type, which is in scope:
+       the `wrap_premise_*_finalized` pair returns `Term` again, and the ten
+       `AliasAcrossPremiseWrap` `map_err` arms go. The index-refinement
+       sentinels stay byte-identical. Any other edit in the checked or
+       convoy builders is a stop to the Architect.
+     - Migration: every sentinel constant, finalizer, guard and
+       `PatternVariableAcrossDependentSplit` goes in the same commit that
+       deletes the producer arm, never earlier.
    - Representation (input g, `evt_71d3p2fwxtqj1`): locally nameless. Matrix
      binders are elaborator-only fresh free variables, refused at the kernel
      boundary, so the kernel `Term` is unchanged. One `abstract` function
@@ -226,6 +241,10 @@ alone.
     woven-column fixture (FIELD-DEPENDENCE P5), the Dep row and the deferred
     wrong-method fixture are discriminating value pins, checked in-matrix.
   - `PatternVariableAcrossDependentSplit` is removed (input h).
+  - The checked single-arm sibling (`let r : Nat = match xs { VCons m e tl
+    ↦ ... }`) stays green with arm bodies `Suc j` ⇒ 3, `j` ⇒ 2 and `e` ⇒ 5,
+    and the nested-woven `BoxNat (Suc saved)` row ⇒ 3; AC-1's `saved` row ⇒
+    3 is the flip (`evt_635vc9mxvmnq2`).
 - **AC-3.** `lang_infer_match_indexed_complete` and the as-pattern,
   nested-split and tuple-pattern suites stay green. The catalog census is
   byte-identical, and `trusted_base()` is unchanged.
