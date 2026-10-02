@@ -432,7 +432,6 @@ struct ElabCtx<'e> {
     pattern_alias_type_frames: Vec<PatternAliasTypeFrame>,
     active_pattern_aliases: Vec<Vec<ActivePatternAlias>>,
     pattern_alias_replacement_frames: Vec<HashMap<usize, PatternAliasReplacement>>,
-    pattern_alias_frame_roots: Vec<usize>,
     next_pattern_alias_sentinel: usize,
     /// Inferred indexed matches may nest inside arm bodies. Only the top
     /// frame's memoized motive types this matrix's root IH columns.
@@ -482,7 +481,6 @@ impl<'e> ElabCtx<'e> {
             pattern_alias_type_frames: Vec::new(),
             active_pattern_aliases: Vec::new(),
             pattern_alias_replacement_frames: Vec::new(),
-            pattern_alias_frame_roots: Vec::new(),
             next_pattern_alias_sentinel: 0,
             indexed_match_roots: Vec::new(),
         }
@@ -15850,7 +15848,6 @@ fn finish_pattern_alias_frame(
         .pattern_alias_replacement_frames
         .pop()
         .expect("infer_match replacement frame must balance");
-    cx.pattern_alias_frame_roots.pop().expect("infer_match root frame must balance");
     let type_frame = cx
         .pattern_alias_type_frames
         .pop()
@@ -15881,7 +15878,6 @@ fn finish_pattern_alias_term_frame(
         .pattern_alias_replacement_frames
         .pop()
         .expect("infer_match replacement frame must balance");
-    cx.pattern_alias_frame_roots.pop().expect("infer_match root frame must balance");
     let type_frame = cx
         .pattern_alias_type_frames
         .pop()
@@ -15979,66 +15975,6 @@ fn first_alias_sentinel(term: &Term) -> Option<usize> {
             Some((*index - PATTERN_ALIAS_SENTINEL_BASE) / PATTERN_ALIAS_SENTINEL_STRIDE)
         }
         _ => term.children().into_iter().find_map(first_alias_sentinel),
-    }
-}
-
-fn first_unregistered_alias_sentinel(
-    term: &Term,
-    frames: &[HashMap<usize, PatternAliasReplacement>],
-) -> Option<usize> {
-    match term {
-        Term::Var(index) if *index >= PATTERN_ALIAS_SENTINEL_BASE => {
-            let id = (*index - PATTERN_ALIAS_SENTINEL_BASE) / PATTERN_ALIAS_SENTINEL_STRIDE;
-            (!frames.iter().any(|frame| frame.contains_key(&id))).then_some(id)
-        }
-        _ => term.children().into_iter().find_map(|child| {
-            first_unregistered_alias_sentinel(child, frames)
-        }),
-    }
-}
-
-enum InMatrixCheck {
-    Ready(Term),
-    Deferred(Term),
-}
-
-/// Finalize only this match's aliases before a method query. An enclosing
-/// frame's binders have not all been woven into its result yet, so its alias
-/// sentinel must survive until that frame finishes and the final definition
-/// is kernel-checked.
-fn finalize_alias_sentinels_for_check(
-    cx: &ElabCtx<'_>,
-    term: &Term,
-    check_ctx_len: usize,
-) -> Result<InMatrixCheck, ElabError> {
-    debug_assert_eq!(cx.pattern_alias_replacement_frames.len(), cx.pattern_alias_frame_roots.len());
-    let (Some(frame), Some(&root_len)) = (
-        cx.pattern_alias_replacement_frames.last(),
-        cx.pattern_alias_frame_roots.last(),
-    ) else {
-        if let Some(id) = first_alias_sentinel(term) {
-            return Err(ElabError::Internal(format!(
-                "alias sentinel {id} reached a kernel query with no active match frame"
-            )));
-        }
-        return Ok(InMatrixCheck::Ready(term.clone()));
-    };
-    let depth = check_ctx_len.checked_sub(root_len).ok_or_else(|| {
-        ElabError::Internal("in-matrix check context is above its match root".into())
-    })?;
-    let term = finalize_pattern_aliases(term, depth, frame)?;
-    if let Some(id) = first_unregistered_alias_sentinel(&term, &cx.pattern_alias_replacement_frames) {
-        return Err(ElabError::Internal(format!(
-            "alias sentinel {id} reached a kernel query but is registered in no active frame"
-        )));
-    }
-    match first_alias_sentinel(&term) {
-        None => Ok(InMatrixCheck::Ready(term)),
-        Some(id) if cx.pattern_alias_replacement_frames.iter().rev().skip(1)
-            .any(|enclosing| enclosing.contains_key(&id)) => Ok(InMatrixCheck::Deferred(term)),
-        Some(id) => Err(ElabError::Internal(format!(
-            "alias sentinel {id} remained after its owning frame's in-matrix finalization"
-        ))),
     }
 }
 
@@ -16507,7 +16443,6 @@ fn build_alias_rows(
         hidden_slots: HashSet::new(),
     });
     cx.pattern_alias_replacement_frames.push(HashMap::new());
-    cx.pattern_alias_frame_roots.push(cx.ctx.len());
     let mut rows = Vec::with_capacity(arms.len());
     for (i, arm) in arms.iter().enumerate() {
         let row = RowState {
@@ -18582,32 +18517,25 @@ fn compile_match_matrix(
                         col_types.len() - 1,
                         binder_count,
                     )?;
-                    let (finalized, check) = if needs_reverting {
-                        match finalize_alias_sentinels_for_check(cx, method, nested_ctx.len())? {
-                            InMatrixCheck::Ready(term) => (term, true),
-                            InMatrixCheck::Deferred(term) => (term, false),
-                        }
-                    } else {
-                        (method.clone(), false)
-                    };
-                    debug_assert_eq!(
-                        nested_ctx.len() - *cx.pattern_alias_frame_roots.last()
-                            .expect("nested matrix has an active match frame"),
-                        real_depth_so_far + 1,
-                    );
+                    // The matrix weaves binders absent from nested_ctx. A
+                    // virtual alias or as-pattern sentinel in a reverting
+                    // method cannot be assigned an index here: a wrong
+                    // same-typed binder would pass the kernel check. Keep the
+                    // landed base's fail-closed boundary until L2 builds in
+                    // the derived telescope.
+                    if needs_reverting && first_alias_sentinel(method).is_some() {
+                        return Err(ElabError::PatternVariableAcrossDependentSplit {
+                            span: split_span.clone(),
+                        });
+                    }
                     let closed = close_nested_matrix_method(
                         cx,
                         &nested_ctx,
-                        finalized,
+                        method.clone(),
                         expected.clone(),
                         binder_count,
                     )?;
-                    // The constant path's woven Var columns and enclosing split
-                    // lambdas are absent from nested_ctx. Its length is not a
-                    // sound alias-finalization depth or method-check context.
-                    // Close both paths; finalize and check only the reverting
-                    // path, and let declare_def check the assembled term.
-                    if check && needs_reverting {
+                    if needs_reverting {
                         let checked = cx.metas.zonk_term(&closed);
                         let expected_checked = cx.metas.zonk_term(&expected);
                         kernel_check_in_context_current(cx, &nested_ctx, &checked, &expected_checked)
@@ -22011,21 +21939,20 @@ mod nested_lift_association_tests {
     }
 }
 
-/// Match-frame ownership controls for nested method closure and alias
-/// finalization. Source-level value controls live in the field-dependence suite.
+/// Grouped-IH alignment and the surviving frame-finish fail-closed boundary.
+/// Source-level value and refusal controls live in the field-dependence suite.
 #[cfg(test)]
 mod nested_method_alias_frame_tests {
     use super::{
-        assert_nested_method_alignment, finalize_alias_sentinels_for_check,
-        finish_pattern_alias_term_frame, kernel_check_in_context_current,
+        assert_nested_method_alignment, finish_pattern_alias_term_frame,
         nested_method_ih_positions, pattern_alias_sentinel, weaken_woven, ElabCtx,
-        InMatrixCheck, PatternAliasReplacement, PatternAliasTypeFrame,
+        PatternAliasReplacement, PatternAliasTypeFrame,
     };
     use crate::{ElabEnv, ElabError};
-    use ken_kernel::{inductive::method_type, Context, Level, Term};
+    use ken_kernel::{inductive::method_type, Level, Term};
     use std::collections::{HashMap, HashSet};
 
-    fn push_frame(cx: &mut ElabCtx<'_>, root: usize, id: usize) {
+    fn push_frame(cx: &mut ElabCtx<'_>, id: usize) {
         cx.pattern_alias_replacement_frames.push(HashMap::from([(
             id,
             PatternAliasReplacement {
@@ -22033,7 +21960,6 @@ mod nested_method_alias_frame_tests {
                 real_depth: 0,
             },
         )]));
-        cx.pattern_alias_frame_roots.push(root);
         cx.pattern_alias_type_frames.push(PatternAliasTypeFrame {
             aliases: HashMap::new(),
             or_slots: HashSet::new(),
@@ -22067,57 +21993,7 @@ mod nested_method_alias_frame_tests {
     }
 
     #[test]
-    fn own_alias_is_ready_but_enclosing_alias_defers_the_inner_query() {
-        // Durable invariant: only the current match frame can finalize its
-        // own occurrence before its enclosing frame has woven its binders.
-        let mut env = ElabEnv::new().expect("prelude");
-        let mut cx = ElabCtx::new(
-            &mut env.env,
-            &env.globals,
-            &mut env.num_values,
-            &env.numeric_env,
-            "nested-alias-frame-test",
-        );
-        push_frame(&mut cx, 0, 0);
-        let InMatrixCheck::Ready(own) = finalize_alias_sentinels_for_check(
-            &cx, &pattern_alias_sentinel(0), 1,
-        ).expect("owned alias finalizes") else {
-            panic!("own-frame alias must be checked in matrix");
-        };
-        assert_eq!(own, Term::var(1));
-        let nat = Term::indformer(cx.globals["Nat"], vec![]);
-        let mut check_ctx = Context::new();
-        check_ctx.push(nat.clone());
-        check_ctx.push(nat.clone());
-        kernel_check_in_context_current(&cx, &check_ctx, &own, &nat)
-            .expect("own-frame-only term is actually checked at the in-matrix gateway");
-
-        push_frame(&mut cx, 1, 1);
-        let unknown_after_enclosing = Term::app(pattern_alias_sentinel(0),
-            pattern_alias_sentinel(7));
-        assert!(matches!(
-            finalize_alias_sentinels_for_check(&cx, &unknown_after_enclosing, 2),
-            Err(ElabError::Internal(reason)) if reason.contains("alias sentinel 7")
-        ));
-        let both = Term::app(pattern_alias_sentinel(1), pattern_alias_sentinel(0));
-        let InMatrixCheck::Deferred(inner) = finalize_alias_sentinels_for_check(
-            &cx, &both, 2,
-        ).expect("enclosing alias survives") else {
-            panic!("enclosing alias must defer the inner query");
-        };
-        assert_eq!(inner, Term::app(Term::var(1), pattern_alias_sentinel(0)));
-        assert_eq!(weaken_woven(&cx, &pattern_alias_sentinel(0), 1)
-            .expect("enclosing alias passes through"), pattern_alias_sentinel(0));
-        assert_eq!(weaken_woven(&cx, &pattern_alias_sentinel(1), 1)
-            .expect("current alias gains synthetic depth"),
-            Term::var(super::PATTERN_ALIAS_SENTINEL_BASE
-                + super::PATTERN_ALIAS_SENTINEL_STRIDE + 1));
-    }
-
-    #[test]
-    fn unregistered_alias_fails_at_query_woven_shift_and_outermost_pop() {
-        // Durable invariant: deferral is only for aliases owned by an
-        // enclosing frame; unknown sentinels cannot enter the kernel.
+    fn unregistered_alias_fails_at_woven_shift_and_outermost_pop() {
         let mut env = ElabEnv::new().expect("prelude");
         let mut cx = ElabCtx::new(
             &mut env.env,
@@ -22126,21 +22002,8 @@ mod nested_method_alias_frame_tests {
             &env.numeric_env,
             "unknown-alias-test",
         );
+        push_frame(&mut cx, 0);
         let unknown = pattern_alias_sentinel(7);
-        assert!(matches!(
-            finalize_alias_sentinels_for_check(&cx, &unknown, 0),
-            Err(ElabError::Internal(reason)) if reason.contains("no active match frame")
-        ));
-        push_frame(&mut cx, 0, 0);
-        assert!(matches!(
-            finalize_alias_sentinels_for_check(&cx, &unknown, 1),
-            Err(ElabError::Internal(reason)) if reason.contains("registered in no active frame")
-        ));
-        let mixed = Term::app(pattern_alias_sentinel(0), unknown.clone());
-        assert!(matches!(
-            finalize_alias_sentinels_for_check(&cx, &mixed, 1),
-            Err(ElabError::Internal(reason)) if reason.contains("alias sentinel 7")
-        ));
         assert!(matches!(
             weaken_woven(&cx, &unknown, 1),
             Err(ElabError::Internal(reason)) if reason.contains("registered in no active frame")

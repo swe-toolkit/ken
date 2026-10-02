@@ -1,5 +1,5 @@
-//! Nested constructor-field splits preserve the motive's outer binders and
-//! resolve pattern aliases before an in-matrix kernel query.
+//! Nested constructor-field splits preserve the motive's outer binders,
+//! and refuse unresolved virtual aliases on the reverting path.
 //! Spec: `spec/30-surface/34-data-match.md §3.1–3.2, §4.4`.
 //! Promise classes: durable invariants except the two explicitly named
 //! transition sentinels for the derived-telescope successor. Every program
@@ -44,8 +44,12 @@ fn indexed_nested_sibling_type_keeps_outer_index_binder() {
            VCons _ Zero _ ↦ Out Zero Zero; \
            VCons _ _ _ ↦ Out (Suc Zero) Zero \
          }} in r\n\
-         const zero : PairOut = f Zero (VCons Nat Zero Zero (VNil Nat))\n\
-         const one : PairOut = f Zero (VCons Nat Zero (Suc Zero) (VNil Nat))\n\
+         const zero : PairOut = f (Suc Zero) \
+           (VCons Nat (Suc Zero) Zero \
+             (VCons Nat Zero (Suc (Suc Zero)) (VNil Nat)))\n\
+         const one : PairOut = f (Suc Zero) \
+           (VCons Nat (Suc Zero) (Suc (Suc (Suc Zero))) \
+             (VCons Nat Zero (Suc (Suc Zero)) (VNil Nat)))\n\
          const expected_zero : PairOut = Out Zero Zero\n\
          const expected_one : PairOut = Out (Suc Zero) Zero"
     ))
@@ -71,12 +75,14 @@ fn flat_and_tail_split_controls_keep_distinct_indexed_values() {
            (VCons Nat Zero (Suc Zero) (VNil Nat))\n\
          const tail_nil : PairOut = tail Zero \
            (VCons Nat Zero (Suc Zero) (VNil Nat))\n\
-         const tail_cons : PairOut = tail (Suc Zero) \
-           (VCons Nat (Suc Zero) Zero \
-             (VCons Nat Zero (Suc Zero) (VNil Nat)))\n\
+         const tail_cons : PairOut = tail (Suc (Suc Zero)) \
+           (VCons Nat (Suc (Suc Zero)) (Suc (Suc (Suc (Suc Zero)))) \
+             (VCons Nat (Suc Zero) (Suc (Suc (Suc (Suc (Suc Zero))))) \
+               (VCons Nat Zero Zero (VNil Nat))))\n\
          const expected_flat : PairOut = Out (Suc Zero) Zero\n\
          const expected_nil : PairOut = Out (Suc Zero) Zero\n\
-         const expected_cons : PairOut = Out Zero (Suc Zero)"
+         const expected_cons : PairOut = Out (Suc (Suc (Suc (Suc Zero)))) \
+           (Suc Zero)"
     ))
     .expect("flat match and tail split retain their separate indexed values");
     assert_normalized_equal(&env, "flat_value", "expected_flat");
@@ -85,10 +91,11 @@ fn flat_and_tail_split_controls_keep_distinct_indexed_values() {
 }
 
 #[test]
-fn reverting_split_under_woven_var_column_returns_that_column() {
+fn reverting_split_after_real_seed_column_returns_seed() {
     // On landed base and on this candidate the tag split reverts a Vec tail:
-    // needs_reverting=true, dependent_tail=[0]. The preceding seed is a
-    // woven Var column, returned by both leaves as a normalized Nat value.
+    // needs_reverting=true, dependent_tail=[0]. The preceding seed is a real
+    // constructor-field binder (ctx=3, root=1, real_depth=1), not a woven
+    // nested-sub-pattern binder. Both leaves return the distinct seed.
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(
         "data Vec (a : Type) : Nat → Type where { \
@@ -99,14 +106,18 @@ fn reverting_split_under_woven_var_column_returns_that_column() {
          fn keep (c : Carrier) : Nat = match c { \
            MkCarrier seed Zero _ ↦ seed; \
            MkCarrier seed (Suc k) _ ↦ seed } \
-         const observed_zero : Nat = keep (MkCarrier (Suc Zero) Zero (VNil Nat)) \
-         const observed_suc : Nat = keep (MkCarrier (Suc Zero) (Suc Zero) \
-           (VCons Nat Zero Zero (VNil Nat))) \
-         const expected : Nat = Suc Zero",
+         const observed_zero : Nat = keep \
+           (MkCarrier (Suc (Suc (Suc (Suc Zero)))) Zero (VNil Nat)) \
+         const observed_suc : Nat = keep \
+           (MkCarrier (Suc (Suc (Suc (Suc (Suc Zero))))) (Suc (Suc Zero)) \
+             (VCons Nat (Suc Zero) Zero \
+               (VCons Nat Zero Zero (VNil Nat)))) \
+         const expected_zero : Nat = Suc (Suc (Suc (Suc Zero))) \
+         const expected_suc : Nat = Suc (Suc (Suc (Suc (Suc Zero))))",
     )
-    .expect("reverting split beneath woven Var column kernel-checks");
-    assert_normalized_equal(&env, "observed_zero", "expected");
-    assert_normalized_equal(&env, "observed_suc", "expected");
+    .expect("reverting split after real seed column kernel-checks");
+    assert_normalized_equal(&env, "observed_zero", "expected_zero");
+    assert_normalized_equal(&env, "observed_suc", "expected_suc");
 }
 
 #[test]
@@ -117,8 +128,10 @@ fn indexed_split_result_type_keeps_ambient_parameter() {
            (d : List a) : List a = let r = match xs {{ \
              VCons m Zero tl ↦ d; VCons m (Suc k) tl ↦ d \
            }} in r\n\
-         const observed : List Nat = ambient Nat Zero \
-           (VCons Nat Zero Zero (VNil Nat)) (Cons Nat (Suc Zero) (Nil Nat))\n\
+         const observed : List Nat = ambient Nat (Suc Zero) \
+           (VCons Nat (Suc Zero) Zero \
+             (VCons Nat Zero (Suc (Suc Zero)) (VNil Nat))) \
+           (Cons Nat (Suc Zero) (Nil Nat))\n\
          const expected : List Nat = Cons Nat (Suc Zero) (Nil Nat)"
     ))
     .expect("ambient result type survives the nested motive binder");
@@ -137,8 +150,11 @@ fn indexed_split_with_zero_index_and_suc_field_preserves_tail() {
            VCons m (Suc k) tl ↦ Out (Suc Zero) Zero \
          }}\n\
          const nil : PairOut = at_index Zero (VNil Nat)\n\
-         const suc : PairOut = at_index (Suc Zero) \
-           (VCons Nat Zero (Suc Zero) (VNil Nat))\n\
+         const suc : PairOut = at_index (Suc (Suc (Suc Zero))) \
+           (VCons Nat (Suc (Suc Zero)) \
+             (Suc (Suc (Suc (Suc (Suc Zero))))) \
+             (VCons Nat (Suc Zero) (Suc (Suc Zero)) \
+               (VCons Nat Zero Zero (VNil Nat))))\n\
          const expected_nil : PairOut = Out Zero Zero\n\
          const expected_suc : PairOut = Out (Suc Zero) Zero"
     ))
@@ -178,8 +194,9 @@ fn nonrecursive_indexed_sibling_depends_on_constructor_index() {
            MkIP m Zero tl ↦ Out Zero Zero; \
            MkIP m (Suc k) tl ↦ Out (Suc Zero) Zero \
          }}\n\
-         const observed : PairOut = nonrec Zero \
-           (MkIP Zero (Suc Zero) (VNil Nat))\n\
+         const observed : PairOut = nonrec (Suc Zero) \
+           (MkIP (Suc Zero) (Suc (Suc (Suc Zero))) \
+             (VCons Nat Zero Zero (VNil Nat)))\n\
          const expected : PairOut = Out (Suc Zero) Zero"
     ))
     .expect("nonrecursive indexed family retains its dependent sibling type");
@@ -198,13 +215,55 @@ fn two_field_nested_constructor_keeps_indexed_root_ih_tail() {
          data PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
          fn pair_fields (n : Nat) (xs : Vec TwoTag (Suc n)) : PairOut = \
          match xs {{ VCons m (Two a b) tl ↦ Out a b }}\n\
-         const observed : PairOut = pair_fields Zero \
-           (VCons TwoTag Zero (Two Zero (Suc Zero)) (VNil TwoTag))\n\
+         const observed : PairOut = pair_fields (Suc (Suc Zero)) \
+           (VCons TwoTag (Suc (Suc Zero)) (Two Zero (Suc Zero)) \
+             (VCons TwoTag (Suc Zero) \
+               (Two (Suc (Suc (Suc Zero))) \
+                 (Suc (Suc (Suc (Suc Zero))))) \
+               (VCons TwoTag Zero (Two Zero Zero) (VNil TwoTag))))\n\
          const expected : PairOut = Out Zero (Suc Zero)"
     ))
     .expect("two-field nested method checks with indexed root IH in tail");
     assert_normalized_equal(&env, "observed", "expected");
     assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+#[test]
+fn reverting_record_tuple_var_is_refused_before_wrong_binder_selection() {
+    // Base rejects a sentinel at the inner split. The removed in-matrix
+    // finalizer made this same source check while returning `prefix` instead
+    // of `seed`. Refusal must happen before either closed call gets a value.
+    let mut env = ElabEnv::new().expect("prelude");
+    let source = "data Vec (a : Type) : Nat → Type where { \
+        VNil : Vec a Zero; \
+        VCons : (n : Nat) → a → Vec a n → Vec a (Suc n) } \
+        record Envelope { payload : (x : Nat) × Nat, enabled : Bool } \
+        data Carrier : Type where { \
+          MkCarrier : Nat → Envelope → (tag : Nat) → Vec Nat tag → Carrier } \
+        fn keep (c : Carrier) : Nat = match c { \
+          MkCarrier prefix { payload = (Zero, seed), enabled = True } Zero _ ↦ seed; \
+          MkCarrier prefix { payload = (Zero, seed), enabled = True } (Suc k) _ ↦ seed; \
+          MkCarrier prefix { payload = (Suc i, seed), enabled = True } Zero _ ↦ seed; \
+          MkCarrier prefix { payload = (Suc i, seed), enabled = True } (Suc k) _ ↦ seed; \
+          MkCarrier prefix { enabled = False } _ _ ↦ Zero } \
+        const observed_zero : Nat = keep (MkCarrier Zero \
+          { payload = (Zero, Suc Zero), enabled = True } Zero (VNil Nat)) \
+        const observed_suc : Nat = keep (MkCarrier Zero \
+          { payload = (Suc Zero, Suc Zero), enabled = True } (Suc Zero) \
+          (VCons Nat Zero Zero (VNil Nat))) \
+        const expected : Nat = Suc Zero";
+    let error = env
+        .elaborate_file(source)
+        .expect_err("woven Var column under reverting split cannot select a binder by depth");
+    assert!(
+        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
+        if span.start == source.find("enabled = True } Zero _").expect("reverting tag split")
+            + "enabled = True } ".len()
+            && span.end == span.start + "Zero".len()),
+        "reverting split must refuse before resolving `seed`: {error:?}"
+    );
+    assert_eq!(error.to_string(),
+        "a variable bound inside a nested sub-pattern (or an `as`-alias) cannot be used beneath a dependent nested split yet; bind it at the top level of the arm");
 }
 
 #[test]
@@ -287,6 +346,33 @@ fn indexed_exact_adversary_repro_checks() {
 }
 
 #[test]
+fn indexed_f1_adjacent_variant_discriminates_arms_and_independent_binders() {
+    // Same constructor and nested element split as the exact repro, but its
+    // two results differ. At n=m=1 (forced by Suc m = Suc n), the element
+    // is 0 or 3; the independent Nat values cannot be confused.
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(&format!(
+        "{VEC}\ndata PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
+         fn adjacent (n : Nat) (xs : Vec Nat (Suc n)) : PairOut = \
+         match xs {{ \
+           VCons _ Zero _ ↦ Out Zero (Suc (Suc Zero)); \
+           VCons _ _ _ ↦ Out (Suc Zero) (Suc (Suc Zero)) \
+         }}\n\
+         const observed_zero : PairOut = adjacent (Suc Zero) \
+           (VCons Nat (Suc Zero) Zero \
+             (VCons Nat Zero (Suc (Suc Zero)) (VNil Nat)))\n\
+         const observed_suc : PairOut = adjacent (Suc Zero) \
+           (VCons Nat (Suc Zero) (Suc (Suc (Suc Zero))) \
+             (VCons Nat Zero (Suc (Suc Zero)) (VNil Nat)))\n\
+         const expected_zero : PairOut = Out Zero (Suc (Suc Zero))\n\
+         const expected_suc : PairOut = Out (Suc Zero) (Suc (Suc Zero))"
+    ))
+    .expect("adjacent F1 split closes method with distinct arm results");
+    assert_normalized_equal(&env, "observed_zero", "expected_zero");
+    assert_normalized_equal(&env, "observed_suc", "expected_suc");
+}
+
+#[test]
 fn two_nat_tail_fields_keep_the_second_under_zero_and_two_field_splits() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(
@@ -300,14 +386,18 @@ fn two_nat_tail_fields_keep_the_second_under_zero_and_two_field_splits() {
          fn pick_duo (t : TwinD) : Nat = match t { \
            PackD (PairDuo x y) a b ↦ b \
          }\n\
-         const from_zero : Nat = pick_zero (PackZ Zero Zero (Suc Zero))\n\
+         const from_zero : Nat = pick_zero \
+           (PackZ Zero (Suc (Suc (Suc Zero))) \
+             (Suc (Suc (Suc (Suc (Suc Zero))))))\n\
          const from_duo : Nat = pick_duo \
-           (PackD (PairDuo Zero (Suc Zero)) Zero (Suc Zero))\n\
-         const expected : Nat = Suc Zero",
+           (PackD (PairDuo Zero (Suc Zero)) (Suc (Suc Zero)) \
+             (Suc (Suc (Suc Zero))))\n\
+         const expected_zero : Nat = Suc (Suc (Suc (Suc (Suc Zero))))\n\
+         const expected_duo : Nat = Suc (Suc (Suc Zero))",
     )
     .expect("two sibling Nat fields remain distinct beneath nested methods");
-    assert_normalized_equal(&env, "from_zero", "expected");
-    assert_normalized_equal(&env, "from_duo", "expected");
+    assert_normalized_equal(&env, "from_zero", "expected_zero");
+    assert_normalized_equal(&env, "from_duo", "expected_duo");
 }
 
 #[test]
@@ -320,8 +410,9 @@ fn outer_as_alias_with_flat_inner_match_keeps_whole_constructor() {
            Zero as saved ↦ match h { BoxNat z ↦ saved }; \
            (Suc k) as saved ↦ match h { BoxNat z ↦ saved } \
          } in r\n\
-         const observed : Nat = outer_flat (BoxNat Zero) (Suc Zero)\n\
-         const expected : Nat = Suc Zero",
+         const observed : Nat = outer_flat \
+           (BoxNat (Suc (Suc (Suc (Suc Zero))))) (Suc (Suc Zero))\n\
+         const expected : Nat = Suc (Suc Zero)",
     )
     .expect("flat inner match preserves the outer alias");
     assert_normalized_equal(&env, "observed", "expected");
@@ -349,11 +440,16 @@ fn enclosing_as_alias_survives_constant_inner_match_frame() {
              BoxNat (Suc m) ↦ saved \
            }} in q \
          }} in r\n\
-         const observed : Nat = outer_const (BoxNat Zero) (Suc Zero)\n\
-         const expected : Nat = Suc Zero"
+         const observed_zero : Nat = outer_const (BoxNat Zero) \
+           (Suc (Suc (Suc Zero)))\n\
+         const observed_suc : Nat = outer_const \
+           (BoxNat (Suc (Suc (Suc (Suc (Suc Zero)))))) \
+           (Suc (Suc (Suc Zero)))\n\
+         const expected : Nat = Suc (Suc (Suc Zero))"
     ))
     .expect("inner frame must retain the enclosing as-alias");
-    assert_normalized_equal(&env, "observed", "expected");
+    assert_normalized_equal(&env, "observed_zero", "expected");
+    assert_normalized_equal(&env, "observed_suc", "expected");
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
@@ -366,18 +462,20 @@ fn enclosing_alias_survives_two_nested_match_frames() {
          match x { \
            Zero ↦ Zero; \
            (Suc k) as saved ↦ let q = match h { \
-             BoxNat Zero ↦ let r = match g { \
+             BoxNat (Suc z) ↦ let r = match g { \
                BoxNat Zero ↦ saved; \
                BoxNat (Suc m) ↦ saved \
              } in r; \
-             BoxNat (Suc z) ↦ saved \
+             BoxNat Zero ↦ saved \
            } in q \
          }\n\
          const observed_zero : Nat = outer_two \
-           (BoxNat Zero) (BoxNat Zero) (Suc Zero)\n\
+           (BoxNat (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))) \
+           (BoxNat Zero) (Suc (Suc (Suc (Suc Zero))))\n\
          const observed_suc : Nat = outer_two \
-           (BoxNat Zero) (BoxNat (Suc Zero)) (Suc Zero)\n\
-         const expected : Nat = Suc Zero",
+           (BoxNat (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))) \
+           (BoxNat (Suc (Suc Zero))) (Suc (Suc (Suc (Suc Zero))))\n\
+         const expected : Nat = Suc (Suc (Suc (Suc Zero)))",
     )
     .expect("enclosing alias passes through two nested splitting frames");
     assert_normalized_equal(&env, "observed_zero", "expected");
@@ -403,18 +501,22 @@ fn middle_frame_alias_is_finalized_by_its_owner_not_the_inner_or_outer_match() {
              } in r \
            } in q \
          }\n\
-         const observed : NatBox = middle (Suc Zero) \
-           (BoxNat (Suc Zero)) (BoxNat Zero)\n\
-         const expected : NatBox = BoxNat (Suc Zero)",
+         const observed_zero : NatBox = middle (Suc (Suc (Suc Zero))) \
+           (BoxNat (Suc (Suc (Suc (Suc (Suc Zero)))))) (BoxNat Zero)\n\
+         const observed_suc : NatBox = middle (Suc (Suc (Suc Zero))) \
+           (BoxNat (Suc (Suc (Suc (Suc (Suc Zero)))))) \
+           (BoxNat (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))\n\
+         const expected : NatBox = BoxNat (Suc (Suc (Suc (Suc (Suc Zero)))))",
     )
     .expect("middle match owns the alias across inner split under outer match");
-    assert_normalized_equal(&env, "observed", "expected");
+    assert_normalized_equal(&env, "observed_zero", "expected");
+    assert_normalized_equal(&env, "observed_suc", "expected");
 }
 
 #[test]
-fn outer_alias_inside_reverting_nested_split_keeps_suc_value() {
+fn outer_alias_inside_reverting_nested_split_refused() {
     let mut env = ElabEnv::new().expect("prelude");
-    env.elaborate_file(&format!(
+    let source = format!(
         "{VEC}\ndata Tag (n : Nat) : Vec Nat n → Type where {{ \
            MkTag : (v : Vec Nat n) → Tag n v \
          }}\n\
@@ -436,15 +538,22 @@ fn outer_alias_inside_reverting_nested_split_keeps_suc_value() {
            (HoldD Zero (VNil Nat) (MkTag Zero (VNil Nat))) \
            (Suc Zero)\n\
          const expected : Nat = Suc Zero"
-    ))
-    .expect("reverting inner match preserves the outer Suc alias");
-    assert_normalized_equal(&env, "observed", "expected");
+    );
+    let error = env
+        .elaborate_file(&source)
+        .expect_err("an outer alias cannot cross a reverting nested split yet");
+    assert!(
+        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
+        if span.start == source.find("HoldD n VNil").expect("nested split") + "HoldD n ".len()
+            && span.end == span.start + "VNil".len()),
+        "the dependent split must refuse its unresolved alias: {error:?}"
+    );
 }
 
 #[test]
-fn deferred_enclosing_alias_does_not_skip_final_kernel_type_check() {
-    // Durable invariant: an outer-alias method can defer its in-matrix query,
-    // but the final definition must still reject a mistyped nested arm.
+fn constant_inner_alias_does_not_skip_final_kernel_type_check() {
+    // The constant inner split retains base-style frame-finish finalization;
+    // the final definition still rejects a mistyped nested arm.
     let mut env = ElabEnv::new().expect("prelude");
     let source = "data NatBox : Type where { BoxNat : Nat → NatBox }\n\
                   fn ill_typed (h : NatBox) (x : Nat) : Nat = \
@@ -457,9 +566,9 @@ fn deferred_enclosing_alias_does_not_skip_final_kernel_type_check() {
                   }";
     let error = env
         .elaborate_file(source)
-        .expect_err("a deferred alias does not authorize the ill-typed arm");
-    // The declaration's span is attached by declare_def. An in-matrix query
-    // would instead report its narrower inner split span.
+        .expect_err("a constant-path alias does not authorize the ill-typed arm");
+    // The declaration's span is attached by declare_def; no in-matrix query
+    // runs on the constant path.
     assert!(
         matches!(error, ElabError::KernelRejected { span, .. }
         if span.start == source.find("fn ill_typed").expect("fixture declaration")
@@ -469,9 +578,9 @@ fn deferred_enclosing_alias_does_not_skip_final_kernel_type_check() {
 }
 
 #[test]
-fn reverting_deferred_alias_still_rejects_mistyped_method_at_declare_def() {
-    // The nested Vec split reverts the Tag n v tail and sees an enclosing
-    // alias sentinel. Its in-matrix check is deferred, not skipped forever.
+fn reverting_outer_alias_in_mistyped_method_is_refused_before_kernel() {
+    // The nested Vec split reverts the Tag n v tail. Its enclosing alias
+    // sentinel is refused rather than resolved at a miscounted depth.
     let mut env = ElabEnv::new().expect("prelude");
     let source = format!(
         "{VEC}\ndata Tag (n : Nat) : Vec Nat n → Type where {{ \
@@ -492,20 +601,20 @@ fn reverting_deferred_alias_still_rejects_mistyped_method_at_declare_def() {
     );
     let error = env
         .elaborate_file(&source)
-        .expect_err("reverting deferred alias cannot conceal a wrong method type");
+        .expect_err("reverting alias cannot be resolved inside the matrix");
     assert!(
-        matches!(&error, ElabError::KernelRejected { span, .. }
-        if span.start == source.find("fn ill_typed").expect("declaration")
-            && span.end == source.len()),
-        "final declare_def must reject mistyped reverting method: {error:?}"
+        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
+        if span.start == source.find("HoldD n VNil").expect("nested split") + "HoldD n ".len()
+            && span.end == span.start + "VNil".len()),
+        "the reverting method must be refused before kernel checking: {error:?}"
     );
 }
 
 #[test]
-fn dependent_later_field_variable_row_uses_nested_split_occurrence() {
+fn dependent_later_field_variable_row_is_refused_until_derived_telescope() {
     let mut env = ElabEnv::new().expect("prelude");
     let trusted_before = env.env.trusted_base();
-    env.elaborate_file(&format!(
+    let source = format!(
         "{VEC}\ndata PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
          data Dep : Type where {{ MkDep : (n : Nat) → Vec Nat n → Dep }}\n\
          fn dep (d : Dep) : PairOut = let r = match d {{ \
@@ -517,10 +626,16 @@ fn dependent_later_field_variable_row_uses_nested_split_occurrence() {
            (MkDep (Suc Zero) (VCons Nat Zero Zero (VNil Nat)))\n\
          const expected_zero : PairOut = Out Zero Zero\n\
          const expected_one : PairOut = Out (Suc Zero) (Suc Zero)"
-    ))
-    .expect("dependent later field split must finalize its owned alias before the kernel query");
-    assert_normalized_equal(&env, "zero", "expected_zero");
-    assert_normalized_equal(&env, "one", "expected_one");
+    );
+    let error = env
+        .elaborate_file(&source)
+        .expect_err("virtual nested-pattern variable cannot be guessed from cx.ctx");
+    assert!(
+        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
+        if span.start == source.find("MkDep Zero v").expect("nested split") + "MkDep ".len()
+            && span.end == span.start + "Zero".len()),
+        "the dependent row must refuse the sentinel before finalization: {error:?}"
+    );
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
@@ -561,9 +676,12 @@ fn nonindexed_nested_list_split_domain_uses_ambient_parameter() {
            MkBoxList Nil _ ↦ Zero; \
            MkBoxList (Cons _ _) _ ↦ Suc Zero \
          } in r\n\
-         const nil : Nat = list_split Nat (MkBoxList Nat (Nil Nat) Zero)\n\
+         const nil : Nat = list_split Nat \
+           (MkBoxList Nat (Nil Nat) (Suc (Suc Zero)))\n\
          const cons : Nat = list_split Nat \
-           (MkBoxList Nat (Cons Nat Zero (Nil Nat)) Zero)\n\
+           (MkBoxList Nat \
+             (Cons Nat (Suc (Suc (Suc Zero))) (Nil Nat)) \
+             (Suc (Suc Zero)))\n\
          const expected_nil : Nat = Zero\n\
          const expected_cons : Nat = Suc Zero",
     )

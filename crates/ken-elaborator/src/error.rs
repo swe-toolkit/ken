@@ -260,6 +260,10 @@ pub enum ElabError {
         missing: MissingPatternWitness,
         span: Span,
     },
+    /// A virtual nested-pattern variable or as-alias cannot be resolved
+    /// beneath a dependent nested split until its binders live in the
+    /// derived telescope. Refuse rather than select a same-typed wrong binder.
+    PatternVariableAcrossDependentSplit { span: Span },
     /// An inferred result type still mentions a pattern-local binder after
     /// leaving the arm; only an annotated, checked match can type that body.
     InferredMatchResultEscapesPattern {
@@ -762,6 +766,10 @@ impl fmt::Display for ElabError {
                     span.start, span.end, missing
                 )
             }
+            ElabError::PatternVariableAcrossDependentSplit { .. } => write!(
+                f,
+                "a variable bound inside a nested sub-pattern (or an `as`-alias) cannot be used beneath a dependent nested split yet; bind it at the top level of the arm"
+            ),
             ElabError::InferredMatchResultEscapesPattern {
                 match_span,
                 arm_span,
