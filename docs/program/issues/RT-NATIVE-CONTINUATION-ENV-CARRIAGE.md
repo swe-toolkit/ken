@@ -408,6 +408,21 @@ triggers hold-and-research.
    → checked-IH transports → response phase B → selected callers, all of
    which it feeds. Keyed on plan-construction order (`evt_k50enr3zpmp8`,
    §1a 6).
+7. The issuance guard skipped a disposition whenever the eliminator's whole
+   subtree held a preselected caller. That over-blocks read G12, whose
+   residual is needed (forced Active gives `BoundaryCarrier`), and 528 lies
+   under G25, not G533. Keyed on whole-subtree containment at issuance
+   (`evt_4hg93gfaf76y4`, §1a 7).
+8. The preservation guard was keyed on a static body at the residual
+   selection point: first the own case body, then the immediately pending
+   frame. Rows of the same static shape disagree on displacement:
+   - at G533 under S5, the residual drops S5/528 (main 2, residual 0);
+   - at G751 and G755 under S3, it keeps S3/746 at 3/3 and S3/750 at 40/40,
+     although each caller sits in the pending frame exactly as 528 does.
+
+   Keyed on static containment at the selection point (`evt_30etv9z3ddq4t`,
+   §1a 8; Architect `evt_62fpkx7marckq`). Entries 7 and 8 share entry 6's
+   predicate. Entry 9 is the next predicate checkpoint.
 
 Predicate (Architect `evt_2bq826gvr9cvz`, held for the Research advisory):
 the carrier schema is decided upstream of the checked-IH
