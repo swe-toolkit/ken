@@ -36,6 +36,8 @@ single class-owned dictionary available through this path.
 ```ken
 import Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 
+import Core.Logic.Transport (cong)
+
 import Data.Numeric.Nat.Arithmetic (add)
 
 export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
@@ -166,6 +168,20 @@ pub proof suc_decreases for sub
         match b {
           Zero ↦ λh. proof refl for leq_nat a2;
           Suc b2 ↦ λh. proof suc_decreases for sub a2 b2 h
+        }
+  }
+
+pub proof add_cancel for sub
+      (a : Nat)
+    : (b : Nat) → IsTrue (leq_nat a b) → Equal Nat (add (sub b a) a) b =
+  match a {
+    Zero ↦ λb. λh. Refl;
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λh. absurd h;
+          Suc b2 ↦
+            λh. cong Nat Nat (add (sub b2 a2) a2) b2 Suc ((proof add_cancel for sub) a2 b2 h)
         }
   }
 
@@ -348,14 +364,18 @@ appear literally unchanged on the reduced side without any further
 constructor-level reduction — the goal stays `Eq`-shaped, not collapsed to
 `Top`.
 
-The four further subtraction laws use structural induction. `self_is_zero`
-and `zero_left` close the two zero endpoints. `saturates` proves that
-`sub a b` is `Zero` whenever `a ≤ b`, while `suc_decreases` proves
-`Suc (sub a (Suc b)) ≤ sub a b` whenever `Suc b ≤ a`.
+The subtraction laws use structural induction. `self_is_zero` and
+`zero_left` close the two zero endpoints. `saturates` proves that `sub a b`
+is `Zero` whenever `a ≤ b`, while `suc_decreases` proves
+`Suc (sub a (Suc b)) ≤ sub a b` whenever `Suc b ≤ a`. The cancellation
+law proves `add (sub b a) a = b` given `a ≤ b`: the zero case reduces
+directly, and the successor case lifts the tail equality under `Suc` with
+`cong`.
 
-Both conditional laws carry their Boolean hypotheses as `IsTrue` propositions,
-matching this package's order examples and letting downstream consumers pass
-canonical `leq_nat` evidence without restating the underlying Boolean equation.
+These conditional subtraction laws carry their Boolean hypotheses as `IsTrue`
+propositions, matching this package's order examples and letting downstream
+consumers pass canonical `leq_nat` evidence without restating the underlying
+Boolean equation.
 The four `min`/`max` bounds use the same form. The three `compare` agreements
 return the forward order for `Lt`, propositional equality for `Eq`, and the
 reverse order for `Gt`. The equality proof recurses through the two `Nat`
@@ -412,8 +432,8 @@ canonical `leq_nat`.
    `leq_nat` with their provider identities. It exports its defined-at `min`,
    `max`, `sub`, and `compare` operations; their three zero computation facts;
    the successor and right-weakening laws; the two addition bounds; the four
-   `min`/`max` bounds; the three `compare` agreements; and the four inductive
-   `sub` proofs. `OrdResult` remains package-local.
+   `min`/`max` bounds; the three `compare` agreements; and the five inductive
+   `sub` proofs, including `sub::add_cancel`. `OrdResult` remains package-local.
 2. **Source map.**
 
    | Task | Section |
@@ -433,11 +453,12 @@ canonical `leq_nat`.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
    package's checked laws use structural recursion for the successor,
    right-weakening and addition bounds, `min`/`max` bounds, and subtraction
-   theory, and case analysis on the canonical relation for the `compare`
-   agreements. The equality arm closes through `leq_nat::antisym`.
+   theory, including the cancellation law; and case analysis on the canonical
+   relation for the `compare` agreements. The equality arm closes through
+   `leq_nat::antisym`.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can selectively import the local arithmetic and
-   comparison operations.
+   comparison operations, including subtraction's checked cancellation law.
 7. **Validation evidence.** Deferred-boundary and compatibility-root identity
    controls check the carried dictionary, canonical relation and bridge
    identities, zero local registration, zero trust delta, examples, and

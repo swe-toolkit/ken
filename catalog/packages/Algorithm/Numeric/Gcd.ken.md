@@ -7,9 +7,11 @@ the subtraction-based decrease visible to Ken's termination checker.
 
 ## Definition
 
-The package reuses canonical addition and multiplication from `Nat` arithmetic
-and imports the canonical `leq_nat` identity from its class-owning provider.
-Saturating subtraction and order bounds come from the `Nat` order facade.
+The package reuses canonical addition, multiplication, and right
+multiplication distributivity from `Nat` arithmetic and imports the canonical
+`leq_nat` identity from its class-owning provider. Saturating subtraction, its
+cancellation and zero-left laws, and order bounds come from the `Nat` order
+facade. Equality transport comes from `Core.Logic.Transport`.
 The three data carriers come first in loader dependency order. `divides_gcd`
 is then the first function in the uninterrupted checked function/proof run,
 followed by its increasingly fundamental implementation support.
@@ -17,7 +19,9 @@ followed by its increasingly fundamental implementation support.
 ```ken
 import Core.Classes.LawfulClasses (leq_nat)
 
-import Data.Numeric.Nat.Arithmetic (add, mul)
+import Core.Logic.Transport (cong, sym, trans)
+
+import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_r)
 
 import Data.Numeric.Nat.Order (leq_nat_successor_bound, leq_nat_weaken_right, sub)
 
@@ -125,7 +129,7 @@ fn gcd_fuel_spec
                                 g
                                 (add (sub (Suc b2) (Suc a2)) (Suc a2))
                                 (Suc b2)
-                                (add_sub_cancel_leq (Suc a2) (Suc b2) order)
+                                ((proof add_cancel for sub) (Suc a2) (Suc b2) order)
                                 (divides_add g (sub (Suc b2) (Suc a2)) (Suc a2) gr ga))
                               (λd.
                                 λda. λdb. greatest d da (divides_sub d (Suc b2) (Suc a2) db da))
@@ -163,7 +167,7 @@ fn gcd_fuel_spec
                                 g
                                 (add (sub (Suc a2) (Suc b2)) (Suc b2))
                                 (Suc a2)
-                                (add_sub_cancel_leq
+                                ((proof add_cancel for sub)
                                   (Suc b2)
                                   (Suc a2)
                                   (leq_not_flip (Suc a2) (Suc b2) order))
@@ -248,8 +252,8 @@ theorem fuel_bound_sub_right
         (add (Suc a) (sub (Suc b) (Suc a)))
         (add (sub (Suc b) (Suc a)) (Suc a))
         (Suc b)
-        (add_comm (Suc a) (sub (Suc b) (Suc a)))
-        (add_sub_cancel_leq (Suc a) (Suc b) order)))
+        ((proof comm for add) (Suc a) (sub (Suc b) (Suc a)))
+        ((proof add_cancel for sub) (Suc a) (Suc b) order)))
     (leq_right_of_positive_sum a (Suc b) fuel bound)
 
 theorem fuel_bound_sub_left
@@ -270,7 +274,7 @@ theorem fuel_bound_sub_left
       (add (sub (Suc a) (Suc b)) (Suc b))
       (Suc a)
       (λz. leq_nat z fuel)
-      (add_sub_cancel_leq (Suc b) (Suc a) (leq_not_flip (Suc a) (Suc b) order)))
+      ((proof add_cancel for sub) (Suc b) (Suc a) (leq_not_flip (Suc a) (Suc b) order)))
     (leq_left_of_sum (Suc a) b fuel bound)
 
 theorem leq_right_of_positive_sum
@@ -298,7 +302,7 @@ theorem leq_right_of_positive_sum
           (add (Suc a) b)
           (add b (Suc a))
           (λz. leq_nat z (Suc bound))
-          (add_comm (Suc a) b)))
+          ((proof comm for add) (Suc a) b)))
       h)
 
 theorem leq_left_of_sum
@@ -317,19 +321,6 @@ theorem leq_left_of_sum
             Suc bound2 ↦ λh. leq_nat_weaken_right a bound2 (leq_left_of_sum a b2 bound2 h)
           }
     }
-
-theorem add_sub_cancel_leq
-      (a : Nat)
-    : (b : Nat) → Equal Bool (leq_nat a b) True → Equal Nat (add (sub b a) a) b =
-  match a {
-    Zero ↦ λb. λh. Refl;
-    Suc a2 ↦
-      λb.
-        match b {
-          Zero ↦ λh. absurd h;
-          Suc b2 ↦ λh. cong Nat Nat (add (sub b2 a2) a2) b2 Suc (add_sub_cancel_leq a2 b2 h)
-        }
-  }
 
 theorem leq_not_flip
       (a : Nat)
@@ -394,7 +385,11 @@ fn divides_add
                 (add (mul d qx) (mul d qy))
                 (mul d (add qx qy))
                 (cong Nat Nat y (mul d qy) (λz. add (mul d qx) z) ey)
-                (sym Nat (mul d (add qx qy)) (add (mul d qx) (mul d qy)) (mul_add d qx qy))))
+                (sym
+                  Nat
+                  (mul d (add qx qy))
+                  (add (mul d qx) (mul d qy))
+                  (mul_add_distrib_r d qx qy))))
       }
   }
 
@@ -406,7 +401,13 @@ fn divides_self (d : Nat) : Divides d d =
         (Suc d2)
         (Suc d2)
         (Suc Zero)
-        (cong Nat Nat d2 (add Zero d2) Suc (sym Nat (add Zero d2) d2 (add_zero_left d2)))
+        (cong
+          Nat
+          Nat
+          d2
+          (add Zero d2)
+          Suc
+          (sym Nat (add Zero d2) d2 ((proof zero_l for add) d2)))
   }
 
 fn divides_zero (d : Nat) : Divides d Zero = MkDivides d Zero Zero Proved
@@ -423,7 +424,7 @@ theorem mul_sub
     Zero ↦ Refl;
     Suc y2 ↦
       match x {
-        Zero ↦ sub_zero_left (mul d (Suc y2));
+        Zero ↦ (proof zero_left for sub) (mul d (Suc y2));
         Suc x2 ↦
           trans
             Nat
@@ -443,88 +444,11 @@ theorem sub_add_same
     Suc z2 ↦ sub_add_same x y z2
   }
 
-theorem sub_zero_left (n : Nat) : Equal Nat (sub Zero n) Zero =
-  match n {
-    Zero ↦ Proved;
-    Suc n2 ↦ Proved
-  }
-
-theorem mul_add
-      (d : Nat) (x : Nat) (y : Nat)
-    : Equal Nat (mul d (add x y)) (add (mul d x) (mul d y)) =
-  match y {
-    Zero ↦ Refl;
-    Suc y2 ↦
-      trans
-        Nat
-        (add (mul d (add x y2)) d)
-        (add (add (mul d x) (mul d y2)) d)
-        (add (mul d x) (add (mul d y2) d))
-        (cong
-          Nat
-          Nat
-          (mul d (add x y2))
-          (add (mul d x) (mul d y2))
-          (λz. add z d)
-          (mul_add d x y2))
-        (sym
-          Nat
-          (add (mul d x) (add (mul d y2) d))
-          (add (add (mul d x) (mul d y2)) d)
-          (add_assoc (mul d x) (mul d y2) d))
-  }
-
-theorem add_comm (a : Nat) (b : Nat) : Equal Nat (add a b) (add b a) =
-  match b {
-    Zero ↦ sym Nat (add Zero a) a (add_zero_left a);
-    Suc b2 ↦
-      trans
-        Nat
-        (add a (Suc b2))
-        (Suc (add b2 a))
-        (add (Suc b2) a)
-        (cong Nat Nat (add a b2) (add b2 a) Suc (add_comm a b2))
-        (sym Nat (add (Suc b2) a) (Suc (add b2 a)) (add_suc_left b2 a))
-  }
-
-theorem add_assoc
-      (a : Nat) (b : Nat) (c : Nat)
-    : Equal Nat (add a (add b c)) (add (add a b) c) =
-  match c {
-    Zero ↦ Refl;
-    Suc c2 ↦ cong Nat Nat (add a (add b c2)) (add (add a b) c2) Suc (add_assoc a b c2)
-  }
-
-theorem add_suc_left (a : Nat) (b : Nat) : Equal Nat (add (Suc a) b) (Suc (add a b)) =
-  match b {
-    Zero ↦ Refl;
-    Suc b2 ↦ cong Nat Nat (add (Suc a) b2) (Suc (add a b2)) Suc (add_suc_left a b2)
-  }
-
-theorem add_zero_left (a : Nat) : Equal Nat (add Zero a) a =
-  match a {
-    Zero ↦ Proved;
-    Suc a2 ↦ cong Nat Nat (add Zero a2) a2 Suc (add_zero_left a2)
-  }
-
 fn bool_view (value : Bool) : BoolView value =
   match value {
     True ↦ BoolIsTrue True Proved;
     False ↦ BoolIsFalse False Proved
   }
-
-theorem trans
-      (ty : Type) (x : ty) (y : ty) (z : ty) (p : Equal ty x y) (q : Equal ty y z)
-    : Equal ty x z =
-  J (λz2 _. Equal ty x z2) p q
-
-theorem sym (ty : Type) (x : ty) (y : ty) (p : Equal ty x y) : Equal ty y x =
-  J (λy2 _. Equal ty y2 x) Refl p
-
-theorem cong
-      (ty : Type) (ty2 : Type) (x : ty) (y : ty) (f : ty → ty2) (p : Equal ty x y)
-    : Equal ty2 (f x) (f y) =
-  J (λy2 _. Equal ty2 (f x) (f y2)) Refl p
 
 fn subst
       (ty : Type) (x : ty) (y : ty) (fam : ty → Type) (p : Equal ty x y) (px : fam x)
@@ -556,11 +480,13 @@ quotient as proof-relevant data in `Type`.
 
 ## Trust and derivation
 
-`gcd_fuel` is structural on its explicit fuel.  The public fuel is one more
+`gcd_fuel` is structural on its explicit fuel. The public fuel is one more
 than the sum of the inputs; every positive subtraction step strictly lowers
-that sum.  `Divides` is witness-bearing data, and the required laws are checked
-proof terms.  `add` and `mul` retain their Arithmetic identities, `leq_nat`
-comes directly from LawfulClasses; `sub`, right weakening, and the successor
-bound retain their Order identities. This package introduces no axiom,
+that sum. `Divides` is witness-bearing data, and the required laws are checked
+proof terms. `add`, its algebraic laws, `mul`, and `mul_add_distrib_r` retain
+their Arithmetic identities; `leq_nat` comes directly from LawfulClasses;
+`sub`, its cancellation and zero-left laws, right weakening, and the successor
+bound retain their Order identities. Equality transport uses `cong`, `sym`,
+and `trans` from their canonical provider. This package introduces no axiom,
 postulate, primitive, foreign declaration, or local replacement for those
 providers.

@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::ElabEnv;
-use ken_interp::eval::{EvalStore, EvalVal, eval};
+use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const GCD: &str = "Algorithm.Numeric.Gcd";
@@ -114,6 +114,28 @@ fn roots_loader_registers_gcd_artifacts_with_exact_catalog_provider_identities()
         );
     }
 
+    // MEASURED: none of the ten former Gcd-local law artifacts exists after
+    // roots loading. CLAIMED: Gcd no longer declares those copies. THE GAP:
+    // provider-identity checks below show that its retained proofs actually
+    // use canonical checked laws rather than merely losing the local names.
+    for duplicate in [
+        "add_sub_cancel_leq",
+        "mul_add",
+        "add_comm",
+        "add_zero_left",
+        "sub_zero_left",
+        "add_assoc",
+        "add_suc_left",
+        "trans",
+        "sym",
+        "cong",
+    ] {
+        assert!(
+            !env.globals.contains_key(&format!("{GCD}.{duplicate}")),
+            "Gcd must not mint a local duplicate for {duplicate}"
+        );
+    }
+
     let add = global(&env, ARITHMETIC, "add");
     let mul = global(&env, ARITHMETIC, "mul");
     let leq = global(&env, LAWFUL, "leq_nat");
@@ -131,9 +153,19 @@ fn roots_loader_registers_gcd_artifacts_with_exact_catalog_provider_identities()
     let (_, fuel_body) = transparent(&env, global(&env, GCD, "gcd_fuel"));
     assert!(term_mentions(fuel_body, leq));
     assert!(term_mentions(fuel_body, sub));
-    let (_, mul_add_body) = transparent(&env, global(&env, GCD, "mul_add"));
+    let (_, mul_add_body) = transparent(&env, global(&env, ARITHMETIC, "mul_add_distrib_r"));
     assert!(term_mentions(mul_add_body, add));
     assert!(term_mentions(mul_add_body, mul));
+    let (_, right_fuel_body) = transparent(&env, global(&env, GCD, "fuel_bound_sub_right"));
+    assert!(term_mentions(
+        right_fuel_body,
+        global(&env, ORDER, "sub::add_cancel")
+    ));
+    let (_, divides_add_body) = transparent(&env, global(&env, GCD, "divides_add"));
+    assert!(term_mentions(
+        divides_add_body,
+        global(&env, ARITHMETIC, "mul_add_distrib_r")
+    ));
 
     let constructor = global(&env, GCD, "MkDivides");
     let (family, index) = env

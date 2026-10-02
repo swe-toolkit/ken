@@ -6,10 +6,11 @@
 //! These controls use the roots loader, kernel artifacts, and class-registry
 //! provenance; repository text and numeric allocation order are not oracles.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{GlobalId, Term};
+use ken_kernel::{GlobalId, KernelError, Term};
 
 const ORDER: &str = "Data.Numeric.Nat.Order";
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
@@ -25,6 +26,67 @@ fn load_order() -> ElabEnv {
     env.elaborate_module_from_roots(&[catalog_root()], ORDER)
         .expect("Order facade must elaborate through the real roots loader");
     env
+}
+
+fn assert_order_has_zero_provider_relative_trust_delta() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_root()], LAWFUL)
+        .expect("canonical order provider must elaborate");
+    env.elaborate_module_from_roots(&[catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("canonical arithmetic provider must elaborate");
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_module_from_roots(&[catalog_root()], ORDER)
+        .expect("Order facade must elaborate after its providers");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(
+        before, after,
+        "Order must add no trust beyond its provider closure"
+    );
+}
+
+const CANCEL_CLIENT: &str =
+    "import Data.Numeric.Nat.Order (sub, leq_nat, IsTrue as NatOrderIsTrue)\n\
+    import Data.Numeric.Nat.Arithmetic (add)\n\
+    theorem cancel_with_bound (a : Nat) (b : Nat) (h : NatOrderIsTrue (leq_nat a b))\n\
+      : Equal Nat (add (sub b a) a) b = (proof add_cancel for sub) a b h";
+
+/// MEASURED: an independent roots-loaded consumer selectively imports only
+/// Order's `sub`, `leq_nat`, `IsTrue` and Arithmetic's `add`, closes the generic
+/// cancellation equation, and separately checks Order adds zero trust beyond
+/// its preloaded provider closure.
+/// CLAIMED: the public attached proof is usable at free Nat arguments without
+/// trusting a new law. THE GAP: the swapped-conclusion sibling tests that the
+/// client depends on the claimed statement, not only the proof's name.
+#[test]
+fn order_sub_add_cancel_is_publicly_instantiable_without_new_trust() {
+    assert_order_has_zero_provider_relative_trust_delta();
+    let mut env = load_order();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_file(CANCEL_CLIENT)
+        .expect("the generic selected-import client must check");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "the checked client adds no trust");
+}
+
+/// MEASURED: only the conclusion operands change while the source imports and
+/// public proof call stay identical; the kernel rejects its typed equation.
+/// CLAIMED: the public proof cannot be used to derive swapped subtraction.
+/// THE GAP: rejection must be `TypeMismatch`, not a missing import or syntax.
+#[test]
+fn order_sub_add_cancel_rejects_swapped_conclusion_at_type_boundary() {
+    let original = "Equal Nat (add (sub b a) a) b";
+    let swapped = "Equal Nat (add (sub a b) b) a";
+    assert_eq!(CANCEL_CLIENT.matches(original).count(), 1);
+    let mutant = CANCEL_CLIENT.replacen(original, swapped, 1);
+    let mut env = load_order();
+    match env.elaborate_file(&mutant) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            ..
+        }) => {}
+        Err(other) => panic!("swapped law must fail at typed equality: {other:?}"),
+        Ok(_) => panic!("swapped law must not elaborate"),
+    }
 }
 
 fn term_mentions(term: &Term, target: GlobalId) -> bool {
