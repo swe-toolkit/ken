@@ -1,7 +1,7 @@
 ---
 id: KERNEL-INT-DIV-MOD-NATIVE
 title: "Int has no division: spec 18a lists div_int and mod_int as a GAP with a NATIVE verdict, and the l1_acceptance division row stays ignored. Register both as neutral kernel Ops, give raw / and % on Int a non-zero-divisor obligation, and un-ignore the row"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1
