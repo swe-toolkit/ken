@@ -158,7 +158,9 @@ fn refined_divisor_needs_no_new_operation_obligation_or_hole() {
 
 #[test]
 fn directly_required_nonzero_divisor_needs_no_new_operation_obligation_or_hole() {
-    for spelling in ["/", "%"] {
+    // Start with % so an unconditional-push mutation is observed at both
+    // operation identities across the two independent zero-obligation tests.
+    for spelling in ["%", "/"] {
         assert_operation_obligations(
             spelling,
             "direct requires",
