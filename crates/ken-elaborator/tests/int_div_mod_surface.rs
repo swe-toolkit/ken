@@ -355,6 +355,41 @@ fn requires_body_and_ensures_obligations_are_all_reported_in_order() {
 }
 
 #[test]
+fn result_lambda_is_not_a_declared_refined_parameter() {
+    let mut env = ElabEnv::new().unwrap();
+    let result = env
+        .elaborate_decl_v1("fn f (n : {z : Int | Equal Int z 5}) : Int -> Int = \\x. n / x")
+        .expect("a return-value lambda must not extend the declaration's parameter list");
+    let [obligation] = result.obligations.as_slice() else {
+        panic!("division in the returned lambda still owes one side condition")
+    };
+    let int = Term::const_(env.globals["Int"], vec![]);
+    let Term::Pi(n, rest) = &obligation.goal_closed else {
+        panic!("the declared n parameter must be outermost")
+    };
+    assert_eq!(n.as_ref(), &int);
+    let Term::Pi(n_refine, rest) = rest.as_ref() else {
+        panic!("n's refinement must precede the returned lambda's x binder")
+    };
+    let mut ctx = Context::new();
+    ctx.push(int.clone());
+    assert!(convert_type(
+        &env.env,
+        &ctx,
+        n_refine,
+        &Term::Eq(
+            Box::new(int.clone()),
+            Box::new(Term::var(0)),
+            Box::new(Term::IntLit(5.into()))
+        )
+    ));
+    let Term::Pi(x, _) = rest.as_ref() else {
+        panic!("the returned lambda's argument is still in the goal context")
+    };
+    assert_eq!(x.as_ref(), &int);
+}
+
+#[test]
 fn refined_parameter_predicate_must_be_a_checked_proposition() {
     let mut env = ElabEnv::new().unwrap();
     let valid = env.elaborate_decl_v1("fn valid (d : {z : Int | Equal Int z 0}) : Int = d");

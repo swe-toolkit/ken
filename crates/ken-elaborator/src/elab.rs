@@ -11332,6 +11332,13 @@ fn leading_lambda_count(expr: &RExpr) -> usize {
     }
 }
 
+fn view_param_count(rdecl: &RDecl) -> usize {
+    match &rdecl.kind {
+        RDeclKind::View { param_count, .. } => *param_count,
+        _ => 0,
+    }
+}
+
 fn explicit_value_param_count(rdecl: &RDecl) -> usize {
     rdecl
         .ty
@@ -11661,6 +11668,7 @@ pub(crate) fn check_surface_purity(
             is_space_op,
             visits,
             constraints,
+            ..
         } => (*keyword, *is_space_op, visits, constraints.as_slice()),
         _ => return Ok(()),
     };
@@ -14541,7 +14549,7 @@ fn elaborate_v0(
                 &mut cx,
                 ty,
                 &ty_c,
-                leading_lambda_count(&rdecl.body),
+                view_param_count(rdecl),
             )?;
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
             (body_c, ty_c)
@@ -14666,7 +14674,7 @@ fn elaborate_recursive_view(
             &mut cx,
             ty,
             &ty_c,
-            leading_lambda_count(&rdecl.body),
+            view_param_count(rdecl),
         )?;
         (
             cx.metas.zonk_term(&ty_c),
@@ -14913,7 +14921,7 @@ pub(crate) fn elaborate_mutual_group(
                     &mut cx,
                     source_ty,
                     ty_core,
-                    leading_lambda_count(&rdecl.body),
+                    view_param_count(rdecl),
                 )?;
             }
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
@@ -15101,7 +15109,7 @@ fn elaborate_view_with_spec(
         // param-only propositions have been elaborated. Keep one cx for the
         // non-recursive type + body so level metas continue to unify together.
         let is_recursive = rexpr_mentions_name(&rdecl.body, &rdecl.name);
-        let param_count = leading_lambda_count(&rdecl.body);
+        let param_count = view_param_count(rdecl);
         let mut decl_obligations = Vec::new();
         let (body_raw, carrier_ty_raw, pre_admit_id, req_cores) = if is_recursive {
             let (carrier_ty, assumptions, req_cores) = {

@@ -2677,11 +2677,13 @@ fn rewrite_rdecl(
         RDeclKind::View {
             keyword,
             is_space_op,
+            param_count,
             constraints,
             visits,
         } => RDeclKind::View {
             keyword,
             is_space_op,
+            param_count,
             constraints: constraints
                 .into_iter()
                 .map(|constraint| {
