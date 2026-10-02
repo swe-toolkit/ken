@@ -8541,6 +8541,23 @@ impl<'a> Lowering<'a> {
         Ok(builder.ins().stack_load(types::I64, slot, 0))
     }
 
+    /// Issued residual labels are ImmediateInt words, not arena nodes. Read
+    /// their tag and signed ordinal from the word, never through node accessors.
+    fn emit_carrier_label_ordinal(
+        builder: &mut FunctionBuilder<'_>,
+        label: CarriedBoundaryWord,
+    ) -> cranelift_codegen::ir::Value {
+        let tag = builder.ins().band_imm(
+            label.word,
+            crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+        );
+        Self::require_i64(builder, tag, BoundaryTag::ImmediateInt as i64);
+        builder.ins().sshr_imm(
+            label.word,
+            i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
+        )
+    }
+
     fn emit_carrier_host_success(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -8861,9 +8878,7 @@ impl<'a> Lowering<'a> {
             let label = self.emit_carrier_field(
                 builder, word, variant.role_index(RecursiveCarrierRole::Label)?,
             )?;
-            let label_tag = self.emit_carrier_tag(builder, label)?;
-            Self::require_i64(builder, label_tag, BoundaryTag::ImmediateInt as i64);
-            let ordinal = self.emit_carrier_scalar(builder, label)?;
+            let ordinal = Self::emit_carrier_label_ordinal(builder, label);
             Self::require_i64(builder, ordinal, i64::from(expected_label));
         }
         Ok(variant)

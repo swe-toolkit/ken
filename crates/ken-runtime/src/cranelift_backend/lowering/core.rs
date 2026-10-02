@@ -14270,9 +14270,7 @@ impl<'a> Lowering<'a> {
         let tag = self.emit_carrier_tag(builder, word)?;
         Self::require_i64(builder, tag, 1);
         let label = self.emit_carrier_field(builder, word, label_index)?;
-        let label_tag = self.emit_carrier_tag(builder, label)?;
-        Self::require_i64(builder, label_tag, BoundaryTag::ImmediateInt as i64);
-        let ordinal = self.emit_carrier_scalar(builder, label)?;
+        let ordinal = Self::emit_carrier_label_ordinal(builder, label);
         let done = builder.create_block();
         for (index, candidate) in candidates.iter().enumerate() {
             let disposition = self.static_transition_plan
