@@ -1774,11 +1774,13 @@ fn k2_cast_computes_pi_to_lambda() {
     assert!(matches!(whnf(&env, &ctx, &cast), Term::Lam(..)));
 }
 
-// `cast ((x:A)×Type 0) ((x:A)×Type 1) e p` (non-convertible second component)
-// ⇝ a pair (constructor form), not stuck. `p` is a variable so its projections
-// stay neutral; the outer cast still reduces to a pair — canonicity.
+// Raw reduction control only: `(x:A)×Type 1 : Type 2`, so `e : Eq (Type 1) _ _`
+// is ill-typed input and carries no canonicity claim. Its Eq Type does not
+// decompose (codomain levels 1 vs 2), so the cast stays neutral instead of
+// projecting `e.1`/`e.2` from non-Σ evidence. The typed neutral-evidence
+// positive is obs_sigma_quot_cast_gate::sigma_decomposition_still_fires_with_typed_reduct.
 #[test]
-fn k2_cast_computes_sigma_to_pair() {
+fn k2_cast_sigma_codomain_level_mismatch_stays_neutral() {
     let (env, _s) = std_env();
     let l0 = Level::zero();
     let l1 = Level::suc(Level::zero());
@@ -1786,7 +1788,7 @@ fn k2_cast_computes_sigma_to_pair() {
     ctx.push(Term::Type(l0.clone())); // A : Type 0  (A=0)
     ctx.push(Term::sigma(Term::var(0), Term::Type(l0.clone()))); // p : (x:A)×Type 0
                                                                  // (p=0, A=1)
-                                                                 // e : Eq Type ((x:A)×Type 0) ((x:A)×Type 1).  Σ lands in Type (max 0 1) = 1.
+                                                                 // e is raw: source : Type 1, target : Type 2.
     ctx.push(Term::Eq(
         Box::new(Term::Type(l1.clone())),
         Box::new(Term::sigma(Term::var(1), Term::Type(l0.clone()))),
@@ -1798,23 +1800,7 @@ fn k2_cast_computes_sigma_to_pair() {
         Box::new(Term::var(0)), // e
         Box::new(Term::var(1)), // p
     );
-    // ⇝ (cast A A (e.1) p.1, cast Type 0 Type 1 ((e.2) p.1) p.2)
-    let p1 = Term::proj1(Term::var(1));
-    let expected = Term::pair(
-        Term::Cast(
-            Box::new(Term::var(2)),
-            Box::new(Term::var(2)),
-            Box::new(Term::proj1(Term::var(0))), // e.1
-            Box::new(p1.clone()),
-        ),
-        Term::Cast(
-            Box::new(Term::Type(l0.clone())), // B1 p.1 = Type 0 (non-dep)
-            Box::new(Term::Type(l1.clone())), // B2 (p.1 cast) = Type 1
-            Box::new(Term::app(Term::proj2(Term::var(0)), p1)), // (e.2) p.1
-            Box::new(Term::proj2(Term::var(1))), // p.2
-        ),
-    );
-    assert_eq!(whnf(&env, &ctx, &cast), expected);
+    assert_eq!(whnf(&env, &ctx, &cast), cast);
 }
 
 // `cast (A/R) (A/R) e [a] ⇝ [a]` — casting a quotient class across a reflexive
