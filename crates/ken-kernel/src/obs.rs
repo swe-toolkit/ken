@@ -14,7 +14,7 @@
 //! a sub-proof the kernel cannot build leaves the `Eq`/`cast` **neutral**
 //! (stuck) — sound: a stuck `Eq`/`cast` simply does not reduce.
 
-use crate::conv::{convert_type, whnf};
+use crate::conv::{convert_type, convert_type_deferred_operands, whnf};
 use crate::env::{Context, GlobalEnv};
 use crate::inductive::peel_app;
 use crate::subst::{apply_args, shift, subst0, subst_levels, subst_outer, subst_tel, weaken};
@@ -770,7 +770,7 @@ pub fn cast_reduce(
     // Regularity (`16 §3.2`): `cast A A refl a ⇝ a`. More generally, if `A ≡ B`
     // the transport is the identity (`e` is proof-irrelevant — `Eq Type A B : Ω`
     // when `A ≡ B`).
-    if convert_type(env, ctx, a, b) {
+    if convert_type_deferred_operands(env, ctx, a, b) {
         return Some(t.clone());
     }
     match (a, b) {
