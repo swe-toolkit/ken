@@ -1,7 +1,7 @@
 ---
 id: SPEC-CORE-LET-TYPING
 title: "Spec 18 has no typing rule for the core Let former the kernel already checks in both modes. State the existing infer and check rules, and dispatch cases, so the contract matches landed acceptance; then return the ζ conformance case"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -86,3 +86,16 @@ stop and report the mismatch.
 - Any kernel, elaborator or `trusted_base()` change.
 - A seeded case that the current kernel does not decide as AC-2 states.
   Stop and report it; do not change the rule to fit.
+
+## Closeout
+
+Merged `b540ebb0f` (PR #4451), exact `e27d5a5f8`: conformance validator
+`evt_77gnvcxsy71c5`, Architect `evt_3bpahwyabbz5y`, Decision
+`dec_6adymtz3csp5a`.
+
+- Spec 18 §2 states the core `Let` rule: classify `A`, check the RHS at `A`,
+  and type `body[val/0]` in `Γ`. §3.1 and §3.2 give the infer and check
+  dispatch cases, each cited to its kernel arm.
+- The ζ conformance seed is in `conformance/kernel/conversion/seed-conversion.md`.
+  That discharges the ζ carry in the `KERNEL-REFL-ENDPOINT-TYPED-CONVERSION`
+  closeout.
