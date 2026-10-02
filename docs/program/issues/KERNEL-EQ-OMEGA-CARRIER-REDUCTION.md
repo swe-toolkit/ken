@@ -21,7 +21,7 @@ for `P : Ω_l` at `Ω_l` and never reduces. The subset Σ and inductive Eq
 reducts form when a component is Ω. No term reduces Eq to `Top` at the
 wrong level.
 
-## Fixed inputs (Architect `evt_7tnycbxzgp75x`, amended `evt_sbv31qypx3j7`, read at `948864d3e`)
+## Fixed inputs (Architect `evt_7tnycbxzgp75x`, amended `evt_sbv31qypx3j7` and `evt_5hryk5pap4q78`, read at `948864d3e`)
 
 - **Eq-Form** (`check.rs:324-330`) uses `synth_type`, which refuses Ω
   (`check.rs:180`). Cast admission (`:331-340`) also uses `synth_type`, and
@@ -51,7 +51,9 @@ stop and report the mismatch; do not build around it.
 3. **R2.** In `eq_at_sigma`, an Ω-classified codomain gives the second
    conjunct `Eq (B1 q.1) q.2 q.2`, with no Cast.
 4. **R3.** In `inductive_conjuncts`, an Ω-classified field gives
-   `Eq (A_j[b̄]) b_j b_j`, with no J witness.
+   `Eq (A_j[b̄]) b_j b_j`, with no J witness, at the field's own level.
+   Add no level lift or guard: the inductive rule's level gap is
+   pre-existing and is a separate question (`evt_5hryk5pap4q78`).
 5. **Rows.** The five `SPEC-EQ-FORM-OMEGA-CARRIER` conformance rows pass, as
    kernel tests beside `obs_sigma_quot_cast_gate.rs`.
 
@@ -62,8 +64,8 @@ stop and report the mismatch; do not build around it.
   - Sweep every source root (`crates/*/tests`, `catalog/`, `conformance/`,
     `examples/`) for a row that asserts Eq-Form refuses an Ω carrier, or
     that Eq at Trunc is Top. List each one; it flips or is reported.
-- **AC-1.** The five rows pass. Row 2 uses two syntactically distinct
-  Ω-field proofs.
+- **AC-1.** The five rows pass. Row 2 is a `Type 0` family with two
+  syntactically distinct Ω-field proofs.
 - **AC-2 (falsifiers; each must redden).**
   - Removing the R1 guard reddens row 4's whnf assertion.
   - Restoring Trunc→Top without the guard reddens row 3.

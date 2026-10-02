@@ -21,7 +21,7 @@ reduce, and is inhabited by `refl`. Its Σ and inductive rules discard an
 Ω-classified component instead of transporting it. Conformance carries the
 five rows below.
 
-## Fixed inputs (Architect `evt_7tnycbxzgp75x`, amended `evt_sbv31qypx3j7`, measured at `948864d3e`)
+## Fixed inputs (Architect `evt_7tnycbxzgp75x`, amended `evt_sbv31qypx3j7` and `evt_5hryk5pap4q78`, measured at `948864d3e`)
 
 - **R1 (amended).** Eq at an Ω-classified carrier is neutral at every head,
   Π and Σ included. `refl u : Eq P u v` checks because `u ≡ v` at `P : Ω`
@@ -32,7 +32,8 @@ five rows below.
   no `cast` and no `cong`.
 - **R3.** For a same-constructor inductive, a field `j` whose target-side
   type is Ω-classified has the conjunct `Eq (A_j[b̄]) b_j b_j`, with no
-  `cast` and no J witness. Later dependent fields keep the prefix transport.
+  `cast` and no J witness, at the field's own level with no lift. Later
+  dependent fields keep the prefix transport.
 - **Unchanged.** Cast admission stays Type-only. The Type-carrier Σ rule
   that J's singleton uses is untouched. The cast-side Ω siblings stay stuck.
 - **Prior art** (Research `evt_782fh9yxr4xk8`). The result is OTT's
@@ -44,22 +45,25 @@ stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-1. **Spec 16 text.**
+1. **Spec 16 text** (`spec/10-kernel/16-observational.md`).
    - §2.1: Eq-Form admits an Ω-classified carrier at its own level.
    - §2.2: "Eq at an Ω-classified carrier does not reduce; `refl u : Eq P u
      v` checks because `u ≡ v` at `P : Ω` (§8.2)." Add R2 and R3, and
      delete the Trunc→Top reduct.
    - §2.3: the UIP line `Eq (Eq A a b) e₁ e₂` is well-formed and neutral.
-   - §8.4: the R1 case is "neutral, level of the carrier", plus the
-     Architect's sentence for R2 and R3.
+   - §8.4: the R1 case is "neutral, level of the carrier". The R2 and R3
+     sentence and the pre-existing known-gap note are the Architect's text
+     in `evt_5hryk5pap4q78`: an inductive reduct sits at the max of its
+     field levels, which is below the Eq level when every field sits below
+     the family level.
 2. **Conformance** (Architect's revised list). Seed these in the corpus's
    form for a case the kernel does not yet satisfy; the kernel WP turns
    them green:
    1. Subset Σ: `(h, refl q) : Eq ((x:Nat)×P x) (a,p) (b,q)` checks, and
       the reduct's sort equals the Eq's sort.
-   2. An inductive with an Ω field and a later dependent Type field, with
-      two syntactically distinct Ω-field proofs: the same-constructor
-      reduct checks.
+   2. An inductive at `Type 0` with an Ω field and a later dependent
+      `Type 0` field, with two syntactically distinct Ω-field proofs: the
+      same-constructor reduct checks, and its sort equals the Eq's sort.
    3. Trunc at `A : Type 1`: `Eq ‖A‖ u v` is neutral, `refl u` checks, and
       the level is `Ω_1`.
    4. Conjunction and Π-into-Ω carriers: `whnf(Eq (P∧Q) u v)` and
@@ -71,7 +75,8 @@ stop and report the mismatch; do not build around it.
 ## Acceptance
 
 - **AC-1.** The Architect confirms the text states R1 (amended), R2, R3 and
-  the §8.4 case as ruled, with no rule for the cast-side siblings.
+  the §8.4 case and known-gap note as ruled, with no rule for the
+  cast-side siblings and no level lift.
 - **AC-2.** The conformance validator votes on the five rows. Each row is
   a non-degenerate pair against current main.
 
