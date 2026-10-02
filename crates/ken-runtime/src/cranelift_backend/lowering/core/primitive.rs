@@ -57,11 +57,10 @@ impl<'a> Lowering<'a> {
                 self.lower_expr(builder, arg, env)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        if lowered_args.iter().any(|arg| {
-            matches!(
-                arg,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            )
+        if lowered_args.iter().any(|arg| match arg {
+            LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+            LoweringOperand::Residual(_) => false,
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
         }) {
             return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
         }
