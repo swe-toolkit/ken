@@ -118,10 +118,32 @@ it. Five items, delivered in the two increments below:
      environment (`core.rs:8752-8756`). Each keeps the variant its
      disposition issues, and asserts at compile time that `residual.slot`
      is that specialization's slot key.
-2. **Residual bindings.** A recursive-position binder used both as a value
-   and as a transport source gets
-   `LoweringEnvironmentBinding::Residual(CarriedResidualWord)`. A value read
-   decodes it, and a transport read takes R.
+2. **The residual operand arm** (Architect `evt_3266hq42hc17h`).
+   `LoweringOperand` gains `Residual(CarriedResidualWord)`, and that arm is
+   the only channel for R. A binding that holds R is
+   `Value(LoweringOperand::Residual(r))`. There is no separate binding arm,
+   no routed-answer sum and no side table.
+   - `CheckedIhEnvironmentOperand::into_operand` maps `Residual` to
+     `LoweringOperand::Residual`, a pass-through that never re-mints, and
+     `Synthesized` to `Carried`.
+   - Site A (`source.rs:1699-1720`). The `any(matches!(.., Carried(_)))`
+     test counts `Residual` as a runtime word. In
+     `transfer_constructor_operands` (`core.rs:13575`), a `Residual`
+     argument stores its word as is, and only where
+     `residual_fields[position]` is `None`. If it is `Some`, the store would
+     wrap an R as a Child, and that is a compile-time planner error.
+   - Site B (`source.rs:4906-4913`). `RoutedAnswer::checked` carries the R
+     typed, and G355 decodes it before the edge.
+   - Each of the 95 refutable patterns on `LoweringOperand` in production
+     lowering, measured at `d9b8d81a8`, gets one disposition:
+     - F: R falls into a branch that already fails closed; cite the error;
+     - W: R is a runtime word there, and the site becomes an exhaustive
+       `match` with a `Residual` arm;
+     - D: R is decoded with `decode_residual_child`;
+     - E: an ABI copy, through the counted escape.
+
+     The compiler forces a `Residual` arm at the 58 `match` arms. No boolean
+     helper groups R with K.
 3. **The ABI slot kind.** The planner issues a residual slot kind for any
    capture or frame slot that must carry R across a generated-context or
    declared-call boundary. Any other boundary carries the decoded Child.
@@ -204,10 +226,12 @@ ABI change.
     transitional escape, and no `From`, `Into`, `Deref` or public field.
     This replaces a compile-fail control, since the types are crate-private.
   - The escape's call sites are pinned by count and list.
-  - `value_at` stays builder-free, and its `Residual` arm is an error, with
-    no wildcard. The handoff gives a disposition table for its 12 callers:
-    value-only by construction, decoded through a builder-taking read, or
-    the escape.
+  - The 95-row disposition table is in the handoff. A source-scan pin
+    shows that the refutable-pattern population on `LoweringOperand`
+    equals the dispositioned set.
+  - Mutation M-A: treat site A's `Residual` as `Carried`, so that it is
+    wrapped as a Child. Either the compile-time refusal fires, or, with
+    that refusal also removed, id41 does not pass.
   - Mutation: removing the R→K decode on the G355 checked-answer edge
     reddens `outer_carried`, with the D0-k raw -1.
   - Label mutations: the default arm falling through to arm 0 stays green
@@ -228,6 +252,13 @@ ABI change.
   - Full parity is unchanged, and the handoff gives the fan-in table: each
     site, its operand type and the increment that changed it.
 
+## Symptom inventory (§1b, Architect)
+
+1. R is forwarded untyped through `LoweringOperand` containers: constructor
+   arguments and `RoutedAnswer.value`. Keyed on the operand container type
+   (`evt_3266hq42hc17h`, recut §1a 1). The next re-trigger is the 3rd,
+   which is a hold plus research.
+
 ## Stop conditions
 
 - One use site needs both R and K without a transport read. Stop with the
@@ -235,5 +266,5 @@ ABI change.
 - A boundary whose slot kind cannot be decided statically by the planner.
 - Any change to the kernel, the spec or a verdict outside the runtime rows
   named here. A currently passing `rt_parity_native` row that is newly
-  refused is a stop to the Architect.
-- The 3rd advancing stop is a hold plus research (§1a starts at 0).
+  refused, including through an F disposition, is a stop to the Architect.
+- The 3rd advancing stop is a hold plus research (§1a is at 1).
