@@ -93,8 +93,12 @@ Three increments, each a straight-ancestor cut that may land alone.
    check-mode split entry becomes `Some`. Inference-mode entries stay
    `None`, and increment 2 serves them. The handoff reports arrivals by
    population and mode (Steward `evt_vj9sdpww9tfe`). The 24-entry figure is
-   superseded, since increment 0 refuses one historical entry. With the
-   seeding disabled, the check-mode entries return to `None`.
+   superseded, since increment 0 refuses one historical entry.
+   - With the seeding disabled, 18 of the 19 current check-mode entries
+     return to `None`. The 19th gets R from an earlier root leaf, the
+     slot's second producer, so it is not evidence for the seed.
+   - A first-bucket unit pin, where no earlier leaf can supply R, reddens
+     on seed-off (`evt_6ez9sxdhdkb8a`).
 2. **Open each nested bucket in the derived telescope before its leaves.**
    - Δ comes from reverting the context and the constructor. Woven binders
      are real `cx.ctx` pushes.
