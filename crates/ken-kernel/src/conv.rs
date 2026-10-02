@@ -1522,16 +1522,15 @@ fn conv_struct_deferred(
             conv_struct_path_memo(env, ctx, m1, m2, child_path, retry_memo)
                 && conv_struct_path_memo(env, ctx, p1, p2, child_path, retry_memo)
         }
-        // `Eq` congruence (Gap-conv, `conv-eq-congruence`, re-landing here per
-        // `obs-eq-termination`) — the missing congruence closure for the `Eq`
-        // type-former: two `Eq` *types* convert iff their three components do,
-        // recursively. Restores the invariant every other former above
-        // already carries; not a loosening (fail-closed direction only —
-        // recognises strictly more true equalities, never a false one).
+        // `Eq` congruence (`17 §3.3`): compare carriers structurally first,
+        // then endpoints positionally at the converted left carrier. Typed
+        // conversion restores Ω-PI (`16 §8.2`) and Π/Σ-η (`13 §6.2`), as in
+        // the App arm's Ω-argument skip, with the same path and retry memo.
+        // `ty1` governs both endpoint comparisons only after `ty1 ≡ ty2`.
         (Term::Eq(ty1, a1, b1), Term::Eq(ty2, a2, b2)) => {
             conv_struct_path_memo(env, ctx, ty1, ty2, child_path, retry_memo)
-                && conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
-                && conv_struct_path_memo(env, ctx, b1, b2, child_path, retry_memo)
+                && convert_path(env, ctx, ty1, a1, a2, child_path, retry_memo)
+                && convert_path(env, ctx, ty1, b1, b2, child_path, retry_memo)
         }
         // `IntLit` definitional equality: by `BigInt` value, matching the
         // observational `Eq`-at-registered-literal reduction (`obs.rs`).
