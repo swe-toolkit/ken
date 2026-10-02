@@ -331,12 +331,18 @@ triggers hold-and-research.
    checked-IH force child (524, the K8 minted by the (S1, 730)
    `CheckedIhCapturedEnvironment` record) has no arm. Keyed on minting
    population (`evt_3evd30345myh2`, §1a 4).
+5. Response-owner coverage: owner 4 / context 4 requires a verified selected
+   incoming call `Spec(S5) → S6` (producer Construct 528). Since the
+   residual integration (`9214b25fc`), none is recorded (14 verified calls,
+   none to S6). Keyed on the call graph's direct-call record after the
+   residual took over that continuation (`evt_a4ph004eayw0`, §1a 5; D0
+   owed, dispositions A/B/C pre-stated).
 
 Predicate (corrected, `evt_7tg07nnz0656z`): Child classification consulted
 only the lexical-closure and `ConstructEmission` populations, and missed the
 checked-IH force records that mint every K word. The Child at (S1, 526, 1)
 is statically S1's variant; it is not run-time dynamic. The predicate
-question is next due at entry 6.
+question is next due at entry 6, the research hold.
 
 ## Stop conditions
 
