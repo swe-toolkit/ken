@@ -61,11 +61,12 @@ Three increments, each a straight-ancestor cut that may land alone.
    Both take the non-reverting path, where the in-matrix kernel check is
    gated off. One measured cause is `finalize_refined_body` (`elab.rs:7804`)
    shifting alias sentinels by `premise_count`. R1 has a second, unisolated
-   mis-shift. The Architect rules at AC-0 whether this increment repairs
-   both rows or refuses them. Either way, each row gives 3 or is refused,
-   never a wrong value. Every M1, M2, two-deep and middle-frame value pin,
-   and the tuple and `List` alias controls the finding reports correct, stay
-   green.
+   mis-shift. **Ruled: refuse** (Architect `evt_4439x6wvc0m8v`, which
+   carries the code). Both alias-frame pops (`finish_pattern_alias_frame`,
+   `finish_pattern_alias_term_frame`) refuse with
+   `PatternVariableAcrossDependentSplit` when an enclosing frame's sentinel
+   survives in a match whose scrutinee family refines indices. Every caller
+   passes the truth for its own scrutinee; a constant `None` says why.
 1. **Seed `ret_ty_slot` from the check-mode expected type.** Report how many
    of the 24 entries become `Some`.
 2. **Open each nested bucket in the derived telescope before its leaves.**
@@ -88,13 +89,26 @@ Three increments, each a straight-ancestor cut that may land alone.
 
 ## Acceptance
 
-- **AC-0a (increment 0).** The R1 and R2 rows, inferred and checked, with
-  `let` and without, are committed as value-or-refusal pins over an indexed
-  inner match. All four existing alias pins use non-indexed `NatBox`, so
-  they cannot observe this path. Under increment 2 the refusal, if ruled,
-  becomes a value pin.
+- **AC-0a (increment 0, lands alone on `7450a0b17`).**
+  - All 11 indexed-family rows of `evt_1bspdnet7a87s` refuse with
+    `PatternVariableAcrossDependentSplit`, each a refusal pin that names
+    increment 2 as its flip to 3.
+  - The finding's seven correct rows are pinned as values: outer alias in a
+    tuple split, in a `List` nested-head split and in a flat `List` match;
+    an outer nested-pattern variable; a plain outer variable in an indexed
+    inner match. The FIELD-DEP value pins and AC-3's suites stay green. A
+    committed test that newly refuses is a stop to the Architect.
+  - Fan-in: every caller of the two pops and the flag it passes, and the
+    path the checked R1 and R2 variants take. A check-mode alias frame
+    closed elsewhere is a stop.
+  - Census rows c1 (an indexed match's own alias) and c2 (an alias across a
+    nested indexed-column split) are reported, not asserted. A wrong value
+    is a stop to the Architect.
+  - Forcing the flag to `None` in `infer_match` restores R1 ⇝ 1 and R2 ⇝ 2.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
+  The R1 and R2 rows flip from refusal to 3, built from occurrence terms in
+  the derived telescope.
 - **AC-2 (controls).**
   - Every value pin of `LANG-NESTED-SPLIT-FIELD-DEPENDENCE` stays green.
     That includes the collision control and M1, M2 and M3.
