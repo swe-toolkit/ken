@@ -17,7 +17,7 @@ use ken_kernel::{
         RecursiveArgumentShape,
     },
     infer as kernel_infer_raw,
-    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
+    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, subst_var, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
 };
@@ -15701,6 +15701,73 @@ fn pattern_alias_sentinel(id: usize) -> Term {
     Term::var(PATTERN_ALIAS_SENTINEL_BASE + id * PATTERN_ALIAS_SENTINEL_STRIDE)
 }
 
+/// Weaken under a binder woven by the current pattern matrix. Enclosing
+/// matches own their sentinels in another frame, below whose leaf this binder
+/// is inserted; their synthetic depth must not count it a second time.
+fn weaken_woven(cx: &ElabCtx<'_>, term: &Term, amount: usize) -> Result<Term, ElabError> {
+    fn go(cx: &ElabCtx<'_>, term: &Term, amount: usize, cutoff: usize) -> Result<Term, ElabError> {
+        let visit = |child: &Term, depth| go(cx, child, amount, depth);
+        Ok(match term {
+            Term::Var(index) if *index >= PATTERN_ALIAS_SENTINEL_BASE => {
+                let encoded = *index - PATTERN_ALIAS_SENTINEL_BASE;
+                let id = encoded / PATTERN_ALIAS_SENTINEL_STRIDE;
+                let synthetic = encoded % PATTERN_ALIAS_SENTINEL_STRIDE;
+                if cx.pattern_alias_replacement_frames.last().is_some_and(|frame| frame.contains_key(&id)) {
+                    let next = synthetic.checked_add(amount).filter(|v| *v < PATTERN_ALIAS_SENTINEL_STRIDE)
+                        .ok_or_else(|| ElabError::Internal(format!("alias sentinel {id} synthetic depth overflow")))?;
+                    Term::var(PATTERN_ALIAS_SENTINEL_BASE + id * PATTERN_ALIAS_SENTINEL_STRIDE + next)
+                } else if cx.pattern_alias_replacement_frames.iter().rev().skip(1)
+                    .any(|frame| frame.contains_key(&id)) {
+                    term.clone()
+                } else {
+                    return Err(ElabError::Internal(format!(
+                        "alias sentinel {id} is registered in no active frame"
+                    )));
+                }
+            }
+            Term::Var(index) if *index >= cutoff => Term::var(index.checked_add(amount)
+                .ok_or_else(|| ElabError::Internal("woven variable shift overflow".into()))?),
+            Term::Var(_) => term.clone(),
+            Term::Pi(domain, codomain) => Term::pi(visit(domain, cutoff)?, visit(codomain, cutoff + 1)?),
+            Term::Lam(domain, body) => Term::lam(visit(domain, cutoff)?, visit(body, cutoff + 1)?),
+            Term::Sigma(domain, codomain) => Term::sigma(visit(domain, cutoff)?, visit(codomain, cutoff + 1)?),
+            Term::Let { ty, val, body } => Term::Let {
+                ty: Box::new(visit(ty, cutoff)?), val: Box::new(visit(val, cutoff)?),
+                body: Box::new(visit(body, cutoff + 1)?),
+            },
+            Term::App(f, a) => Term::app(visit(f, cutoff)?, visit(a, cutoff)?),
+            Term::Pair(a, b) => Term::pair(visit(a, cutoff)?, visit(b, cutoff)?),
+            Term::Proj1(p) => Term::proj1(visit(p, cutoff)?),
+            Term::Proj2(p) => Term::proj2(visit(p, cutoff)?),
+            Term::Ascript(value, ty) => Term::Ascript(Box::new(visit(value, cutoff)?), Box::new(visit(ty, cutoff)?)),
+            Term::Eq(ty, l, r) => Term::Eq(Box::new(visit(ty, cutoff)?), Box::new(visit(l, cutoff)?), Box::new(visit(r, cutoff)?)),
+            Term::Cast(a, b, e, t) => Term::Cast(Box::new(visit(a, cutoff)?), Box::new(visit(b, cutoff)?), Box::new(visit(e, cutoff)?), Box::new(visit(t, cutoff)?)),
+            Term::J(m, b, e) => Term::J(Box::new(visit(m, cutoff)?), Box::new(visit(b, cutoff)?), Box::new(visit(e, cutoff)?)),
+            Term::Quot(a, r) => Term::Quot(Box::new(visit(a, cutoff)?), Box::new(visit(r, cutoff)?)),
+            Term::QuotClass(t) => Term::QuotClass(Box::new(visit(t, cutoff)?)),
+            Term::Trunc(t) => Term::Trunc(Box::new(visit(t, cutoff)?)),
+            Term::TruncProj(t) => Term::TruncProj(Box::new(visit(t, cutoff)?)),
+            Term::Refl(t) => Term::Refl(Box::new(visit(t, cutoff)?)),
+            Term::QuotElim { motive, method, respect, scrut } => Term::QuotElim {
+                motive: Box::new(visit(motive, cutoff)?), method: Box::new(visit(method, cutoff)?),
+                respect: Box::new(visit(respect, cutoff)?), scrut: Box::new(visit(scrut, cutoff)?),
+            },
+            Term::Elim { fam, level_args, params, motive, methods, indices, scrut } => Term::Elim {
+                fam: *fam, level_args: level_args.clone(),
+                params: params.iter().map(|t| visit(t, cutoff)).collect::<Result<_,_>>()?,
+                motive: Box::new(visit(motive, cutoff)?),
+                methods: methods.iter().map(|t| visit(t, cutoff)).collect::<Result<_,_>>()?,
+                indices: indices.iter().map(|t| visit(t, cutoff)).collect::<Result<_,_>>()?,
+                scrut: Box::new(visit(scrut, cutoff)?),
+            },
+            Term::Absurd(m, proof) => Term::Absurd(Box::new(visit(m, cutoff)?), Box::new(visit(proof, cutoff)?)),
+            Term::Type(_) | Term::Omega(_) | Term::Const { .. } | Term::IndFormer { .. }
+            | Term::Constructor { .. } | Term::IntLit(_) => term.clone(),
+        })
+    }
+    go(cx, term, amount, 0)
+}
+
 #[inline(never)]
 fn infer_active_pattern_alias(
     cx: &mut ElabCtx,
@@ -15764,8 +15831,9 @@ fn infer_virtual_pattern_alias(
         .ok_or_else(|| ElabError::TypeMismatch {
             span: span.clone(),
             reason: format!(
-                "split-column binder '{name}' has no available matrix occurrence; \
-                 annotate the match result or use a separate match"
+                "split-column binder '{name}' is bound by a variable row while another field \
+                 of the same constructor is also split; bind it by its constructor pattern \
+                 in each arm or split it in a separate match"
             ),
         })?;
     materialize_pattern_alias(cx, alias, name).map(Some)
@@ -15788,13 +15856,17 @@ fn finish_pattern_alias_frame(
         return Err(or_binder_type_error(mismatch));
     }
     let raw_methods = raw_methods_result?;
-    if replacements.is_empty() {
-        return Ok(raw_methods);
-    }
-    Ok(raw_methods
-        .into_iter()
-        .map(|method| method.map(|term| finalize_pattern_aliases(&term, 0, &replacements)))
-        .collect())
+    raw_methods.into_iter().map(|method| {
+        let term = method.map(|term| finalize_pattern_aliases(&term, 0, &replacements)).transpose()?;
+        if cx.pattern_alias_replacement_frames.is_empty() {
+            if let Some(id) = term.as_ref().and_then(first_alias_sentinel) {
+                return Err(ElabError::Internal(format!(
+                    "alias sentinel {id} remained after the outermost match frame"
+                )));
+            }
+        }
+        Ok(term)
+    }).collect()
 }
 
 #[inline(never)]
@@ -15813,11 +15885,15 @@ fn finish_pattern_alias_term_frame(
     if let Some(mismatch) = type_frame.type_mismatch {
         return Err(or_binder_type_error(mismatch));
     }
-    let body = body_result?;
-    if replacements.is_empty() {
-        return Ok(body);
+    let body = finalize_pattern_aliases(&body_result?, 0, &replacements)?;
+    if cx.pattern_alias_replacement_frames.is_empty() {
+        if let Some(id) = first_alias_sentinel(&body) {
+            return Err(ElabError::Internal(format!(
+                "alias sentinel {id} remained after the outermost match frame"
+            )));
+        }
     }
-    Ok(finalize_pattern_aliases(&body, 0, &replacements))
+    Ok(body)
 }
 
 #[inline(never)]
@@ -15825,100 +15901,80 @@ fn finalize_pattern_aliases(
     term: &Term,
     depth: usize,
     replacements: &HashMap<usize, PatternAliasReplacement>,
-) -> Term {
+) -> Result<Term, ElabError> {
     let go =
         |term: &Term, next_depth: usize| finalize_pattern_aliases(term, next_depth, replacements);
-    match term {
+    Ok(match term {
         Term::Var(index) if *index >= PATTERN_ALIAS_SENTINEL_BASE => {
             let encoded = *index - PATTERN_ALIAS_SENTINEL_BASE;
             let sentinel = encoded / PATTERN_ALIAS_SENTINEL_STRIDE;
             let synthetic_depth = encoded % PATTERN_ALIAS_SENTINEL_STRIDE;
             if let Some(replacement) = replacements.get(&sentinel) {
                 let base_depth = replacement.real_depth + synthetic_depth;
-                let local_depth = depth
-                    .checked_sub(base_depth)
-                    .expect("as-pattern sentinel appeared above its matrix-leaf binder depth");
+                let local_depth = depth.checked_sub(base_depth).ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "alias sentinel {sentinel} appeared above its matrix-leaf binder depth"
+                    ))
+                })?;
                 weaken(&replacement.occurrence, local_depth as i64)
             } else {
                 term.clone()
             }
         }
         Term::Var(_) => term.clone(),
-        Term::Pi(domain, codomain) => Term::pi(go(domain, depth), go(codomain, depth + 1)),
-        Term::Lam(domain, body) => Term::lam(go(domain, depth), go(body, depth + 1)),
-        Term::Sigma(domain, codomain) => Term::sigma(go(domain, depth), go(codomain, depth + 1)),
+        Term::Pi(domain, codomain) => Term::pi(go(domain, depth)?, go(codomain, depth + 1)?),
+        Term::Lam(domain, body) => Term::lam(go(domain, depth)?, go(body, depth + 1)?),
+        Term::Sigma(domain, codomain) => Term::sigma(go(domain, depth)?, go(codomain, depth + 1)?),
         Term::Let { ty, val, body } => Term::Let {
-            ty: Box::new(go(ty, depth)),
-            val: Box::new(go(val, depth)),
-            body: Box::new(go(body, depth + 1)),
+            ty: Box::new(go(ty, depth)?),
+            val: Box::new(go(val, depth)?),
+            body: Box::new(go(body, depth + 1)?),
         },
-        Term::App(function, argument) => Term::app(go(function, depth), go(argument, depth)),
-        Term::Pair(first, second) => Term::pair(go(first, depth), go(second, depth)),
-        Term::Proj1(pair) => Term::proj1(go(pair, depth)),
-        Term::Proj2(pair) => Term::proj2(go(pair, depth)),
-        Term::Ascript(value, ty) => {
-            Term::Ascript(Box::new(go(value, depth)), Box::new(go(ty, depth)))
-        }
+        Term::App(function, argument) => Term::app(go(function, depth)?, go(argument, depth)?),
+        Term::Pair(first, second) => Term::pair(go(first, depth)?, go(second, depth)?),
+        Term::Proj1(pair) => Term::proj1(go(pair, depth)?),
+        Term::Proj2(pair) => Term::proj2(go(pair, depth)?),
+        Term::Ascript(value, ty) => Term::Ascript(Box::new(go(value, depth)?), Box::new(go(ty, depth)?)),
         Term::Eq(ty, left, right) => Term::Eq(
-            Box::new(go(ty, depth)),
-            Box::new(go(left, depth)),
-            Box::new(go(right, depth)),
+            Box::new(go(ty, depth)?), Box::new(go(left, depth)?), Box::new(go(right, depth)?),
         ),
         Term::Cast(from, to, evidence, value) => Term::Cast(
-            Box::new(go(from, depth)),
-            Box::new(go(to, depth)),
-            Box::new(go(evidence, depth)),
-            Box::new(go(value, depth)),
+            Box::new(go(from, depth)?), Box::new(go(to, depth)?),
+            Box::new(go(evidence, depth)?), Box::new(go(value, depth)?),
         ),
         Term::J(motive, base, evidence) => Term::J(
-            Box::new(go(motive, depth)),
-            Box::new(go(base, depth)),
-            Box::new(go(evidence, depth)),
+            Box::new(go(motive, depth)?), Box::new(go(base, depth)?), Box::new(go(evidence, depth)?),
         ),
-        Term::Quot(ty, relation) => {
-            Term::Quot(Box::new(go(ty, depth)), Box::new(go(relation, depth)))
-        }
-        Term::QuotClass(value) => Term::QuotClass(Box::new(go(value, depth))),
-        Term::Trunc(ty) => Term::Trunc(Box::new(go(ty, depth))),
-        Term::TruncProj(value) => Term::TruncProj(Box::new(go(value, depth))),
-        Term::Refl(value) => Term::Refl(Box::new(go(value, depth))),
-        Term::QuotElim {
-            motive,
-            method,
-            respect,
-            scrut,
-        } => Term::QuotElim {
-            motive: Box::new(go(motive, depth)),
-            method: Box::new(go(method, depth)),
-            respect: Box::new(go(respect, depth)),
-            scrut: Box::new(go(scrut, depth)),
+        Term::Quot(ty, relation) => Term::Quot(Box::new(go(ty, depth)?), Box::new(go(relation, depth)?)),
+        Term::QuotClass(value) => Term::QuotClass(Box::new(go(value, depth)?)),
+        Term::Trunc(ty) => Term::Trunc(Box::new(go(ty, depth)?)),
+        Term::TruncProj(value) => Term::TruncProj(Box::new(go(value, depth)?)),
+        Term::Refl(value) => Term::Refl(Box::new(go(value, depth)?)),
+        Term::QuotElim { motive, method, respect, scrut } => Term::QuotElim {
+            motive: Box::new(go(motive, depth)?), method: Box::new(go(method, depth)?),
+            respect: Box::new(go(respect, depth)?), scrut: Box::new(go(scrut, depth)?),
         },
-        Term::Elim {
-            fam,
-            level_args,
-            params,
-            motive,
-            methods,
-            indices,
-            scrut,
-        } => Term::Elim {
+        Term::Elim { fam, level_args, params, motive, methods, indices, scrut } => Term::Elim {
             fam: *fam,
             level_args: level_args.clone(),
-            params: params.iter().map(|term| go(term, depth)).collect(),
-            motive: Box::new(go(motive, depth)),
-            methods: methods.iter().map(|term| go(term, depth)).collect(),
-            indices: indices.iter().map(|term| go(term, depth)).collect(),
-            scrut: Box::new(go(scrut, depth)),
+            params: params.iter().map(|t| go(t, depth)).collect::<Result<_,_>>()?,
+            motive: Box::new(go(motive, depth)?),
+            methods: methods.iter().map(|t| go(t, depth)).collect::<Result<_,_>>()?,
+            indices: indices.iter().map(|t| go(t, depth)).collect::<Result<_,_>>()?,
+            scrut: Box::new(go(scrut, depth)?),
         },
-        Term::Absurd(motive, proof) => {
-            Term::Absurd(Box::new(go(motive, depth)), Box::new(go(proof, depth)))
+        Term::Absurd(motive, proof) => Term::Absurd(Box::new(go(motive, depth)?), Box::new(go(proof, depth)?)),
+        Term::Type(_) | Term::Omega(_) | Term::Const { .. } | Term::IndFormer { .. }
+        | Term::Constructor { .. } | Term::IntLit(_) => term.clone(),
+    })
+}
+
+fn first_alias_sentinel(term: &Term) -> Option<usize> {
+    match term {
+        Term::Var(index) if *index >= PATTERN_ALIAS_SENTINEL_BASE => {
+            Some((*index - PATTERN_ALIAS_SENTINEL_BASE) / PATTERN_ALIAS_SENTINEL_STRIDE)
         }
-        Term::Type(_)
-        | Term::Omega(_)
-        | Term::Const { .. }
-        | Term::IndFormer { .. }
-        | Term::Constructor { .. }
-        | Term::IntLit(_) => term.clone(),
+        _ => term.children().into_iter().find_map(first_alias_sentinel),
     }
 }
 
@@ -16061,33 +16117,50 @@ impl RowState {
     /// Enter one emitted-core binder. Occurrences that already denote live
     /// values move under it; future constructor-field binders do not exist yet
     /// and therefore remain pending at `Var(0)`.
-    fn under_core_binder(mut self) -> Self {
+    fn under_binder_with(
+        mut self,
+        shift_term: impl Fn(&Term) -> Result<Term, ElabError>,
+    ) -> Result<Self, ElabError> {
         self.assert_occurrence_alignment();
         for occurrence in &mut self.real_occurrences {
             if occurrence.live {
-                occurrence.term = weaken(&occurrence.term, 1);
+                occurrence.term = shift_term(&occurrence.term)?;
             }
         }
         for occurrence in self.binding_occurrences.iter_mut().flatten() {
-            *occurrence = weaken(occurrence, 1);
+            *occurrence = shift_term(occurrence)?;
         }
         for alias in &mut self.virtual_aliases {
-            alias.occurrence = weaken(&alias.occurrence, 1);
+            alias.occurrence = shift_term(&alias.occurrence)?;
         }
-        self
+        Ok(self)
     }
 
-    /// Enter the existing method binder for the current real column and make
-    /// that column's value the fresh `Var(0)` occurrence at this depth.
-    fn enter_current_real_binder(mut self) -> Self {
-        self = self.under_core_binder();
-        let current = self
-            .real_occurrences
-            .first_mut()
+    fn under_core_binder(self) -> Self {
+        self.under_binder_with(|term| Ok(weaken(term, 1)))
+            .expect("ordinary weakening cannot fail")
+    }
+
+    fn under_woven_binder(self, cx: &ElabCtx<'_>) -> Result<Self, ElabError> {
+        self.under_binder_with(|term| weaken_woven(cx, term, 1))
+    }
+
+    fn mark_current_real(mut self) -> Self {
+        let current = self.real_occurrences.first_mut()
             .expect("a real matrix column has an aligned occurrence");
         current.term = Term::var(0);
         current.live = true;
         self
+    }
+
+    /// Enter an existing method binder for this real column.
+    fn enter_current_real_binder(self) -> Self {
+        self.under_core_binder().mark_current_real()
+    }
+
+    /// A matrix split's fresh binder is woven, not pushed into `cx.ctx`.
+    fn enter_woven_real_binder(self, cx: &ElabCtx<'_>) -> Result<Self, ElabError> {
+        Ok(self.under_woven_binder(cx)?.mark_current_real())
     }
 
     /// Supply the current value to a source binding position. Generated
@@ -16808,7 +16881,7 @@ fn tail_codomain(
                 ret_ty_base,
                 depth_before_tail,
             )?;
-            Ok(Term::pi(ih_ty, weaken(&rest, 1)))
+            Ok(Term::pi(ih_ty, weaken_woven(cx, &rest, 1)?))
         }
         ColKind::Real => {
             let rest = tail_codomain(
@@ -17597,8 +17670,8 @@ fn compile_tuple_column(
         Term::Ascript(Box::new(continuation), Box::new(continuation_ty))
     } else {
         Term::Ascript(
-            Box::new(weaken(&continuation, 1)),
-            Box::new(weaken(&continuation_ty, 1)),
+            Box::new(weaken_woven(cx, &continuation, 1)?),
+            Box::new(weaken_woven(cx, &continuation_ty, 1)?),
         )
     };
     let projected = Term::app(
@@ -17816,8 +17889,8 @@ fn compile_record_column(
         Term::Ascript(Box::new(continuation), Box::new(continuation_ty))
     } else {
         Term::Ascript(
-            Box::new(weaken(&continuation, 1)),
-            Box::new(weaken(&continuation_ty, 1)),
+            Box::new(weaken_woven(cx, &continuation, 1)?),
+            Box::new(weaken_woven(cx, &continuation_ty, 1)?),
         )
     };
     let projected =
@@ -18076,7 +18149,9 @@ fn compile_match_matrix(
             // one recursive field deep), the enclosing split's own pending
             // continuation (its constant motive's codomain) is genuinely
             // owed and must be folded in.
-            let rows = rows.into_iter().map(RowState::under_core_binder).collect();
+            let rows = rows.into_iter()
+                .map(|row| row.under_woven_binder(cx))
+                .collect::<Result<Vec<_>,_>>()?;
             let inner = compile_match_matrix(
                 cx,
                 arms,
@@ -18107,7 +18182,7 @@ fn compile_match_matrix(
                     real_depth_so_far,
                 )?
             };
-            Ok(Term::lam(ih_ty, weaken(&inner, 1)))
+            Ok(Term::lam(ih_ty, weaken_woven(cx, &inner, 1)?))
         }
         ColKind::Real => {
             // An or-pattern duplicates only its residual row. Every duplicate
@@ -18271,7 +18346,7 @@ fn compile_match_matrix(
                     } else {
                         None
                     };
-                    row = row.enter_current_real_binder();
+                    row = row.enter_woven_real_binder(cx)?;
                     if let (Some(slot), Some(name)) = (virtual_slot, split_name) {
                         row.virtual_aliases.push(MatrixVirtualAlias {
                             slot,
@@ -18281,8 +18356,10 @@ fn compile_match_matrix(
                             install_depth: split_depth,
                         });
                     }
-                    row
+                    Ok(row)
                 })
+                .collect::<Result<Vec<_>, ElabError>>()?
+                .into_iter()
                 .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
                 .collect();
             let raw_methods_result = build_ctor_buckets(
@@ -18302,6 +18379,11 @@ fn compile_match_matrix(
                 subsumed_by,
                 false,
                 false,
+                true,
+                match &head {
+                    Term::IndFormer { level_args, .. } => level_args,
+                    _ => unreachable!("nested split head is an inductive former"),
+                },
             );
             let raw_methods: Vec<Term> = raw_methods_result?
                 .into_iter()
@@ -18377,7 +18459,8 @@ fn compile_match_matrix(
                     })
                 }
             };
-            let methods: Vec<Term> = raw_methods.iter().map(|m| weaken(m, 1)).collect();
+            let methods: Vec<Term> = raw_methods.iter()
+                .map(|m| weaken_woven(cx, m, 1)).collect::<Result<_,_>>()?;
             let args: Vec<Term> = params0.iter().map(|p| weaken(p, 1)).collect();
             let Term::IndFormer { level_args, .. } = head else {
                 unreachable!("nested split has an inductive scrutinee")
@@ -18385,24 +18468,21 @@ fn compile_match_matrix(
             // The dependent motive is built inside the enclosing split
             // lambda. The codomain was formed under x' alone; move its
             // outer variables past that lambda, leaving x' at Var(0).
-            let motive_body = if needs_reverting {
-                shift(&codomain, 1, 1)
-            } else {
-                codomain
-            };
+            let motive_body = shift(&codomain, 1, 1);
+            let scrut_ty_under_split = weaken(&col_types[0], 1);
             let mut elim = matrix_family_elim(
                 &ind0,
                 d_id0,
                 &level_args,
                 &args,
-                &col_types[0],
+                &scrut_ty_under_split,
                 motive_body,
                 ret_level,
                 methods,
                 Term::var(0),
                 needs_reverting,
             );
-            if needs_reverting {
+            {
                 let Term::Elim { motive, methods, .. } = &mut elim else {
                     unreachable!("shared matrix constructor returns an eliminator")
                 };
@@ -18426,23 +18506,47 @@ fn compile_match_matrix(
                             span: split_span.clone(),
                         })?
                         .len();
+                    let binder_count = ctor.args.len() + ih_count + col_types.len() - 1;
+                    let ih_positions = nested_method_ih_positions(&expected, motive, binder_count);
+                    assert_nested_method_alignment(
+                        &ind0,
+                        ordinal,
+                        &ih_positions,
+                        ctor.args.len(),
+                        ih_count,
+                        col_types.len() - 1,
+                        binder_count,
+                    )?;
+                    // The matrix weaves binders absent from nested_ctx. A
+                    // virtual alias or as-pattern sentinel in a reverting
+                    // method cannot be assigned an index here: a wrong
+                    // same-typed binder would pass the kernel check. Keep the
+                    // landed base's fail-closed boundary until L2 builds in
+                    // the derived telescope.
+                    if needs_reverting && first_alias_sentinel(method).is_some() {
+                        return Err(ElabError::PatternVariableAcrossDependentSplit {
+                            span: split_span.clone(),
+                        });
+                    }
                     let closed = close_nested_matrix_method(
                         cx,
                         &nested_ctx,
                         method.clone(),
                         expected.clone(),
-                        ctor.args.len() + ih_count + col_types.len() - 1,
+                        binder_count,
                     )?;
-                    let checked = cx.metas.zonk_term(&closed);
-                    let expected_checked = cx.metas.zonk_term(&expected);
-                    kernel_check_in_context_current(cx, &nested_ctx, &checked, &expected_checked)
-                        .map_err(|error| match error {
-                            CurrentKernelQueryError::View(error) => error,
-                            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                                error,
-                                span: split_span.clone(),
-                            },
-                        })?;
+                    if needs_reverting {
+                        let checked = cx.metas.zonk_term(&closed);
+                        let expected_checked = cx.metas.zonk_term(&expected);
+                        kernel_check_in_context_current(cx, &nested_ctx, &checked, &expected_checked)
+                            .map_err(|error| match error {
+                                CurrentKernelQueryError::View(error) => error,
+                                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                                    error,
+                                    span: split_span.clone(),
+                                },
+                            })?;
+                    }
                     *method = closed;
                 }
             }
@@ -18478,6 +18582,8 @@ fn build_ctor_buckets(
     subsumed_by: &mut [Vec<usize>],
     allow_index_omission: bool,
     indexed_root: bool,
+    tail_under_split: bool,
+    split_level_args: &[Level],
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
 
@@ -18552,7 +18658,41 @@ fn build_ctor_buckets(
         // existing nested/non-indexed continuation when `root` is absent.
         let mut new_col_types = field_types0;
         new_col_types.extend(std::iter::repeat(Term::ty(Level::Zero)).take(p_ihs0));
-        new_col_types.extend_from_slice(tail_col_types);
+        if tail_under_split {
+            // Each tail domain is relative to x' and its earlier real tail
+            // binders. In this bucket the n_args0 constructor fields replace
+            // x'; synthetic IH columns add no de Bruijn binder here.
+            let ctor_fields = (0..n_args0).map(|i| Term::var(n_args0 - 1 - i));
+            let ctor_value = params0[..m0]
+                .iter()
+                .map(|param| weaken(param, n_args0 as i64))
+                .chain(ctor_fields)
+                .fold(
+                    Term::Constructor {
+                        id: c0.id,
+                        level_args: split_level_args.to_vec(),
+                    },
+                    Term::app,
+                );
+            let mut real_tail_binders = 0;
+            for (ty, kind) in tail_col_types.iter().zip(tail_col_kinds) {
+                if matches!(kind, ColKind::Ih { .. }) {
+                    // IH slots are woven later, not part of the raw tail
+                    // type's real telescope.
+                    new_col_types.push(ty.clone());
+                    continue;
+                }
+                let above_split = shift(ty, n_args0 as i64, real_tail_binders + 1);
+                new_col_types.push(subst_var(
+                    &above_split,
+                    real_tail_binders,
+                    &weaken(&ctor_value, real_tail_binders as i64),
+                ));
+                real_tail_binders += 1;
+            }
+        } else {
+            new_col_types.extend_from_slice(tail_col_types);
+        }
         let mut new_col_kinds: Vec<ColKind> = vec![ColKind::Real; n_args0];
         new_col_kinds.extend((0..p_ihs0).map(|i| ColKind::Ih {
             remaining: p_ihs0 - 1 - i,
@@ -18640,10 +18780,71 @@ fn matrix_family_elim(
     }
 }
 
+/// Locate the IH domains in method_type's binder spine by the motive
+/// application they contain. W-style and nested-positive lifts may carry
+/// that application under Π or Σ binders; their containing outer binder is
+/// still the IH position in the method's telescope.
+fn nested_method_ih_positions(expected: &Term, motive: &Term, binder_count: usize) -> Vec<usize> {
+    fn contains_motive(term: &Term, motive: &Term, depth: usize) -> bool {
+        let (head, args) = peel_app(term);
+        if !args.is_empty() && head == weaken(motive, depth as i64) {
+            return true;
+        }
+        match term {
+            Term::Pi(domain, body) | Term::Sigma(domain, body) | Term::Lam(domain, body) => {
+                contains_motive(domain, motive, depth)
+                    || contains_motive(body, motive, depth + 1)
+            }
+            Term::Let { ty, val, body } => {
+                contains_motive(ty, motive, depth)
+                    || contains_motive(val, motive, depth)
+                    || contains_motive(body, motive, depth + 1)
+            }
+            _ => term.children().into_iter().any(|child| contains_motive(child, motive, depth)),
+        }
+    }
+
+    let mut positions = Vec::new();
+    let mut cursor = expected;
+    for position in 0..binder_count {
+        let Term::Pi(domain, rest) = cursor else { break };
+        if contains_motive(domain, motive, position) {
+            positions.push(position);
+        }
+        cursor = rest;
+    }
+    positions
+}
+
+fn assert_nested_method_alignment(
+    ind: &InductiveDecl,
+    ordinal: usize,
+    ih_positions_in_method_type: &[usize],
+    n_args0: usize,
+    p_ihs0: usize,
+    tail_len: usize,
+    binder_count: usize,
+) -> Result<(), ElabError> {
+    let ctor = &ind.constructors[ordinal];
+    let grouped: Vec<usize> = (ctor.args.len()..ctor.args.len() + p_ihs0).collect();
+    if n_args0 != ctor.args.len()
+        || p_ihs0 != ih_positions_in_method_type.len()
+        || ih_positions_in_method_type != grouped.as_slice()
+        || n_args0 + p_ihs0 + tail_len != binder_count
+    {
+        return Err(ElabError::Internal(format!(
+            "nested method telescope misaligned for constructor {ordinal}: raw \
+             fields/IHs/tail {n_args0}/{p_ihs0}/{tail_len}, method_type IH positions \
+             {ih_positions_in_method_type:?}"
+        )));
+    }
+    Ok(())
+}
+
 /// A nested method's complete telescope is supplied by the very Elim it
 /// feeds. Its raw matrix body may end in another eliminator instead of an
 /// explicit lambda; η-apply the remaining expected binders before wrapping
-/// the kernel-derived domains. No raw domain becomes a checked method domain.
+/// kernel-derived domains. No raw domain becomes a checked method domain.
 fn close_nested_matrix_method(
     cx: &ElabCtx<'_>,
     context: &Context,
@@ -18670,7 +18871,7 @@ fn close_nested_matrix_method(
         peeled += 1;
     }
     let missing = binder_count - peeled;
-    let mut body = (0..missing).rev().fold(weaken(&raw, missing as i64), |f, i| {
+    let mut body = (0..missing).rev().fold(weaken_woven(cx, &raw, missing)?, |f, i| {
         Term::app(f, Term::var(i))
     });
     for domain in domains.into_iter().rev() {
@@ -19371,6 +19572,11 @@ fn infer_match(
         &mut subsumed_by,
         indexed,
         indexed,
+        false,
+        match &head {
+            Term::IndFormer { level_args, .. } => level_args,
+            _ => unreachable!("match head is an inductive former"),
+        },
     );
     let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result)?;
 
@@ -21729,6 +21935,82 @@ mod nested_lift_association_tests {
                 error: KernelError::VarOutOfScope { index: 100, depth: 3 },
                 span,
             }) if span == *recursive.span()
+        ));
+    }
+}
+
+/// Grouped-IH alignment and the surviving frame-finish fail-closed boundary.
+/// Source-level value and refusal controls live in the field-dependence suite.
+#[cfg(test)]
+mod nested_method_alias_frame_tests {
+    use super::{
+        assert_nested_method_alignment, finish_pattern_alias_term_frame,
+        nested_method_ih_positions, pattern_alias_sentinel, weaken_woven, ElabCtx,
+        PatternAliasReplacement, PatternAliasTypeFrame,
+    };
+    use crate::{ElabEnv, ElabError};
+    use ken_kernel::{inductive::method_type, Level, Term};
+    use std::collections::{HashMap, HashSet};
+
+    fn push_frame(cx: &mut ElabCtx<'_>, id: usize) {
+        cx.pattern_alias_replacement_frames.push(HashMap::from([(
+            id,
+            PatternAliasReplacement {
+                occurrence: Term::var(0),
+                real_depth: 0,
+            },
+        )]));
+        cx.pattern_alias_type_frames.push(PatternAliasTypeFrame {
+            aliases: HashMap::new(),
+            or_slots: HashSet::new(),
+            or_common_depths: HashMap::new(),
+            type_mismatch: None,
+            hidden_slots: HashSet::new(),
+        });
+    }
+
+    #[test]
+    fn grouped_recursive_ih_domains_match_nested_method_telescope() {
+        // Durable invariant: the kernel's grouped IH positions, not field
+        // arithmetic alone, determine which method domains are IHs.
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_file(
+            "data Branch : Type where { Leaf : Branch; Node : Branch → Nat → Branch → Branch }",
+        )
+        .expect("binary constructor");
+        let branch = env.globals["Branch"];
+        let ind = env.env.inductive(branch).expect("checked inductive");
+        let motive = Term::lam(Term::indformer(branch, vec![]), Term::ty(Level::Zero));
+        let method = method_type(&env.env, ind, 1, &motive, &[], &[])
+            .expect("checked method type");
+        let positions = nested_method_ih_positions(&method, &motive, 5);
+        assert_eq!(positions, [3, 4]);
+        assert!(assert_nested_method_alignment(ind, 1, &positions, 3, 2, 0, 5).is_ok());
+        assert!(matches!(
+            assert_nested_method_alignment(ind, 1, &[2, 4], 3, 2, 0, 5),
+            Err(ElabError::Internal(reason)) if reason.contains("misaligned")
+        ));
+    }
+
+    #[test]
+    fn unregistered_alias_fails_at_woven_shift_and_outermost_pop() {
+        let mut env = ElabEnv::new().expect("prelude");
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "unknown-alias-test",
+        );
+        push_frame(&mut cx, 0);
+        let unknown = pattern_alias_sentinel(7);
+        assert!(matches!(
+            weaken_woven(&cx, &unknown, 1),
+            Err(ElabError::Internal(reason)) if reason.contains("registered in no active frame")
+        ));
+        assert!(matches!(
+            finish_pattern_alias_term_frame(&mut cx, Ok(unknown)),
+            Err(ElabError::Internal(reason)) if reason.contains("remained after the outermost match frame")
         ));
     }
 }

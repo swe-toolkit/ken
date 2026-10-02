@@ -266,7 +266,7 @@ fn record_fields_compose_with_tuple_constructor_and_as_patterns() {
     elaborate(
         &mut env,
         "const envelope : Envelope = { \
-         payload = (Suc Zero, Zero), enabled = True }",
+         payload = (Suc (Suc Zero), Suc (Suc (Suc (Suc Zero)))), enabled = True }",
     );
     let selected = elaborate(
         &mut env,
@@ -278,7 +278,7 @@ fn record_fields_compose_with_tuple_constructor_and_as_patterns() {
     elaborate(&mut env, "data RecordBox = MkRecordBox Nat Envelope");
     elaborate(
         &mut env,
-        "const boxed_envelope : RecordBox = MkRecordBox (Suc (Suc Zero)) envelope",
+        "const boxed_envelope : RecordBox = MkRecordBox (Suc (Suc (Suc Zero))) envelope",
     );
     let nested = elaborate(
         &mut env,
@@ -295,12 +295,13 @@ fn record_fields_compose_with_tuple_constructor_and_as_patterns() {
     let zero = constructor(env.globals["Zero"], []);
     let one = constructor(env.globals["Suc"], [zero.clone()]);
     let two = constructor(env.globals["Suc"], [one.clone()]);
-    assert_eq!(whnf(&env.env, &Context::new(), &body(&env, selected)), one);
+    let three = constructor(env.globals["Suc"], [two.clone()]);
+    assert_eq!(whnf(&env.env, &Context::new(), &body(&env, selected)), two);
     assert_eq!(
         whnf(&env.env, &Context::new(), &body(&env, nested)),
         whnf(&env.env, &Context::new(), &body(&env, selected))
     );
-    assert_eq!(whnf(&env.env, &Context::new(), &body(&env, carried)), two);
+    assert_eq!(whnf(&env.env, &Context::new(), &body(&env, carried)), three);
 }
 
 #[test]
