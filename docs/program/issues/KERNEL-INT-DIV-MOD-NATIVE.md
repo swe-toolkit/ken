@@ -117,7 +117,8 @@ stop and report the mismatch.
   - `trusted_base()` grows by exactly `div_int` and `mod_int`. Name both in
     the handoff.
   - `NonZeroDivisor` is a definition, not a postulate.
-  - The 57-package census shows no verdict change, and the `l1_acceptance`
+  - The census over every tracked package card (55 at `710458002`) shows
+    no verdict change, and the `l1_acceptance`
     rows that pass today stay green.
 - **Gates.** Kernel QA, the Architect, and the conformance-validator for
   the NATIVE oracle (18a: the two gates are a conjunction) and the spec

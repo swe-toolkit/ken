@@ -21,7 +21,7 @@ reduce, and is inhabited by `refl`. Its Σ and inductive rules discard an
 Ω-classified component instead of transporting it. Conformance carries the
 five rows below.
 
-## Fixed inputs (Architect `evt_7tnycbxzgp75x`, amended `evt_sbv31qypx3j7` and `evt_5hryk5pap4q78`, measured at `948864d3e`)
+## Fixed inputs (Architect `evt_7tnycbxzgp75x`, amended `evt_sbv31qypx3j7`, `evt_5hryk5pap4q78` and `evt_6s74556468q9y`, measured at `948864d3e`)
 
 - **R1 (amended).** Eq at an Ω-classified carrier is neutral at every head,
   Π and Σ included. `refl u : Eq P u v` checks because `u ≡ v` at `P : Ω`
@@ -51,11 +51,12 @@ stop and report the mismatch; do not build around it.
      v` checks because `u ≡ v` at `P : Ω` (§8.2)." Add R2 and R3, and
      delete the Trunc→Top reduct.
    - §2.3: the UIP line `Eq (Eq A a b) e₁ e₂` is well-formed and neutral.
-   - §8.4: the R1 case is "neutral, level of the carrier". The R2 and R3
-     sentence and the pre-existing known-gap note are the Architect's text
-     in `evt_5hryk5pap4q78`: an inductive reduct sits at the max of its
-     field levels, which is below the Eq level when every field sits below
-     the family level.
+   - §8.4: the R1 case is "neutral, level of the carrier", plus the
+     Architect's R2 and R3 sentence (`evt_5hryk5pap4q78`). The known-gap
+     note is the class text in `evt_6s74556468q9y`: every `eq_reduce` arm
+     whose reduct is built from `Top`/`Bottom : Ω_0` or from component
+     propositions at their own level, propext included. Do not change
+     propext and do not add a lift.
 2. **Conformance** (Architect's revised list). Seed these in the corpus's
    form for a case the kernel does not yet satisfy; the kernel WP turns
    them green:
