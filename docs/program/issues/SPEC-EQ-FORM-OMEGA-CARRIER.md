@@ -1,7 +1,7 @@
 ---
 id: SPEC-EQ-FORM-OMEGA-CARRIER
 title: "Spec 16 forms Eq only at a Type carrier, so equality between two proofs of a proposition is ill-formed and the Trunc reduct to Top breaks subject reduction once it is reachable. Admit an Omega-classified carrier, make Eq there neutral at every head, and discard Omega components in the Sigma and inductive rules"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -89,3 +89,12 @@ stop and report the mismatch; do not build around it.
 - The text needs a rule the ruling does not give, such as a cast-side Ω
   transport: stop to the Architect.
 - A row cannot be stated so that main and the ruled kernel differ on it.
+
+## Closeout
+
+Merged as `49eafce90` from exact `179c6a679` (PR #4456). Gates: conformance
+validator `evt_1qf853xa0my2h`, Architect `evt_6jpzc3y96etmh`, Decision
+`dec_6m7hsbrw91p3d`. Both routed blobs match main. Conformance carries six
+rows, not five: the Architect added a proof-irrelevance row. This unblocks
+`KERNEL-EQ-OMEGA-CARRIER-REDUCTION`, which stays behind
+`KERNEL-OBS-PI-CAST-GATE` on the kernel ring.
