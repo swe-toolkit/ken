@@ -158,6 +158,39 @@ fn nonindexed_splits_and_plain_indexed_variable_preserve_values() {
 }
 
 #[test]
+fn zero_premise_indexed_inner_alias_refuses_at_finisher() {
+    // MEASURED: index j=0 is omitted by method_index_premise_pairs because
+    // the index domain's Pi codomain mentions its bound k. Thus the indexed
+    // inner method reaches its alias-frame finisher with no premise wrap.
+    // CLAIMED: only the indexed finisher blocks its enclosing alias sentinel.
+    // THE GAP: with only the finisher flag disabled, this *same* checked
+    // definition returns j=2 instead of saved/x=3; the wrap guard stays on.
+    // Independently assignable Nat binders saved/x=3, j=2, m=0 are distinct.
+    // Transition sentinel: increment 2 flips this refusal to the value 3.
+    // A Vec-function-index sibling was measured identically, not added here.
+    let source = "data Ix : ((k : Nat) → Equal Nat k k) → Type where { \
+        Mk : (m : Nat) → (p : (k : Nat) → Equal Nat k k) → Ix p }\n\
+        theorem eq_refl : (k : Nat) → Equal Nat k k = \\k. Refl\n\
+        fn f (p : (k : Nat) → Equal Nat k k) (v : Ix p) (x : Nat) : Nat = match x { \
+          Zero ↦ Zero; (Suc j) as saved ↦ let q = match v { \
+            Mk Zero w ↦ saved; Mk (Suc m) w ↦ saved \
+          } in q \
+        }\n\
+        const observed : Nat = f eq_refl (Mk (Suc Zero) eq_refl) (Suc (Suc (Suc Zero)))";
+    let mut env = ElabEnv::new().expect("prelude");
+    let trusted = env.env.trusted_base();
+    let error = env
+        .elaborate_file(source)
+        .expect_err("zero-premise alias refuses");
+    assert!(
+        matches!(error, ElabError::PatternVariableAcrossDependentSplit { ref span }
+            if span.start == source.find("match v").expect("inner match")),
+        "indexed infer finisher must refuse at the inner match: {error:?}"
+    );
+    assert_eq!(env.env.trusted_base(), trusted);
+}
+
+#[test]
 fn checked_indexed_inner_alias_refuses_before_premise_shift() {
     // MEASURED: a checked single-arm inner match reaches a nonempty premise
     // wrap and refuses a foreign alias. CLAIMED: it cannot return a wrong Nat.
