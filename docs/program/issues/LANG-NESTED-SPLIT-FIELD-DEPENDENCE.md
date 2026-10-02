@@ -113,10 +113,13 @@ The Dep repro is refused with a surface diagnostic rather than checked
     `PatternVariableAcrossDependentSplit` at the split span. It is added to
     every exhaustive `ElabError` consumer with no `_ =>` arm, and those
     consumers are listed in the handoff.
-  - The P5 record fixture, the Dep row and the deferred wrong-method fixture
-    are refusal pins: transition sentinels that the successor flips.
-  - M1, M2, M3, two-deep and middle-frame assert values. Reverting to
-    `weaken` returns M2 to `Zero`.
+  - The P5 record fixture, the Dep row, the deferred wrong-method fixture
+    and M3 (`outer_alias_inside_reverting_nested_split_refused`, the
+    reverting outer-`as` row) are refusal pins: each asserts
+    `PatternVariableAcrossDependentSplit` at the split span, and is a
+    transition sentinel that the successor flips (`evt_1radqthqtqkyv`).
+  - M1, M2, two-deep and middle-frame assert values, each measured to take
+    `needs_reverting=false`. Reverting to `weaken` returns M2 to `Zero`.
   - The fan-in list and the consumer sweep go in the handoff.
 - **AC-N6 (discriminating pins, Rule 2).**
   - A census of every program rejected on `5d5e7bf02` and accepted on the
