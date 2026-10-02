@@ -126,6 +126,14 @@ The Dep repro is refused with a surface diagnostic rather than checked
     binders it does not return. Report a table of the test, the binders, the
     values given and the value observed.
   - A base-rejected program that cannot be pinned this way is refused.
+  - Exempt from distinctness: same-typed binders that a named index
+    equation forces equal (`m = n` from the Vec index equation). List each
+    forced-equality group with its equation. The group's value differs from
+    every other same-typed binder.
+  - The exact F1 stays the kernel-check repro. An adjacent variant gives the
+    discriminating observation: distinct arm results, distinct independent
+    binder values, the same probed path, rejection on base with F1's error
+    class, and red under the P3 mutation.
 - **AC-N3 (F3).** The diagnostic text ruled in `evt_hepczebkww5c`, or a
   statement that F2 made the program check.
 - **AC-N4 (M-deep carve-out).** Measure the Zero fixture and its two-field
