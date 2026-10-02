@@ -1,7 +1,7 @@
 ---
 id: KERNEL-REFL-ENDPOINT-TYPED-CONVERSION
 title: "Since Refl checks by conversion, its endpoints are compared by the type-agnostic Eq/Eq congruence, so Ω proof irrelevance no longer applies there and a well-typed refl between two proofs of a proposition is rejected (accepted before 884f493fe). Compare the endpoints by typed conversion at the carried type"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -81,3 +81,24 @@ answer. This WP touches no `conformance/` path.
 
 - The fix would equate two non-proof terms: stop to the Architect.
 - A spec change.
+
+## Closeout
+
+Merged `cc19ed853` (PR #4445), exact `ad5a2589e`: Kernel QA
+`evt_154a3tp9vc5z4`, Architect `evt_53dc055m2mfc`, Decision
+`dec_4mc3q59sx9j62` (single gate). The first candidate, `d0ae7c2a8`, was
+rejected under `dec_3qwsee14arhgz` for its ζ conformance case and never
+routed.
+
+- The `Eq`/`Eq` congruence compares the carriers structurally, then both
+  endpoints by typed conversion at the carried type, so Ω proof irrelevance
+  applies again at `Refl`'s endpoints.
+- Committed rows: the surface `Pos` repro, the Σ and Π-route kernel repros,
+  the Σ-eta and Π-eta controls, the distinct-variable rejection and the
+  Ω-carrier classification rejection.
+- Carried:
+  - The ζ conformance case waits on the operator's core-`Let` typing
+    question, and its spelling must be fixed when it returns.
+  - The Eq-Form Ω-carrier spec question is with the operator.
+  - The kernel test file's now-unused `whnf` import is removed at the next
+    touch.

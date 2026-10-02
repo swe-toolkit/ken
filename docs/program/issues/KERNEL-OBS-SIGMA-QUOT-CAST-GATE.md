@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-SIGMA-QUOT-CAST-GATE
 title: "The Σ and quotient casts fire when their Eq Type stays neutral and project e.1 and e.2 from a neutral e, so their reducts do not check (NotASigma, TypeMismatch). Gate them as cast_at_pi is gated, so they stay neutral, as spec 16 §3.2 requires"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
