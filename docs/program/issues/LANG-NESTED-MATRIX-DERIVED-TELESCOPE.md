@@ -69,8 +69,9 @@ Three increments, each a straight-ancestor cut that may land alone.
    passes the truth for its own scrutinee; a constant `None` says why.
 
    **The check path** (Architect `evt_6n6r4r5shx05f`, `evt_1220jbxcj19zq`,
-   corrected by `evt_40f42ed7ayqq5`, which carries the code). A checked method body opens no alias frame. It
-   reaches the same shift through `wrap_premise_lams_finalized` and
+   corrected by `evt_40f42ed7ayqq5`, which carries the code). A checked
+   method body opens no alias frame. It reaches the same shift through
+   `wrap_premise_lams_finalized` and
    `wrap_premise_pis_finalized` at `check_dependent_branch_body` `:6318` and
    `check_match_dependent_mode` `:6590`. A checked single-arm `Vec Nat (Suc
    n)` sibling normalizes to `Zero` where 3 is expected. That is measured on
@@ -127,13 +128,25 @@ Three increments, each a straight-ancestor cut that may land alone.
     is a stop to the Architect.
   - Forcing the flag to `None` in `infer_match` restores R1 ⇝ 1 and R2 ⇝ 2.
   - **Check path.**
-    - The exact checked R2 (`let r : Nat = match xs { … } in r`) refuses with
-      `PatternVariableAcrossDependentSplit`.
-    - So does the checked single-arm sibling. Its test comment keeps the
-      same-typed census (saved=3, j=2, e=5, {n,m}=0).
-    - Base census: run the sibling on `origin/main`. If main gives `Zero`,
-      the handoff reports a live base miscompile that this increment turns
-      into a refusal. If main refuses or gives 3, stop to the Architect.
+    - The exact checked R2 (`xs : Vec Nat n`, the Adversary's shape) never
+      reaches a non-empty wrap. Its pin is `ElabError::KernelRejected`
+      carrying `VarOutOfScope { index, .. }` with `index ==
+      PATTERN_ALIAS_SENTINEL_BASE`, asserted through the constant, at the
+      VNil span (Architect `evt_3cqccrymnd3n0`). The test comment says the
+      kernel is refusing an unresolved sentinel, and that a typed diagnostic
+      is an increment-2 residual. Do not retype the elaborator's
+      `KernelRejected` sites.
+    - The checked single-arm sibling (`Vec Nat (Suc n)`) refuses with
+      `PatternVariableAcrossDependentSplit` at the wrap. Its test comment
+      keeps the same-typed census (saved=3, j=2, e=5, {n,m}=0).
+    - Base census on `origin/main`:
+      - the sibling: `Zero` is the live base miscompile this increment
+        turns into a refusal. If main refuses or gives 3, stop to the
+        Architect.
+      - the exact R2: if main gives a value, report it and the binder it
+        selected. If main gives the same raw rejection, record "unchanged".
+    - The fan-in table also names the elaborator function, as file:line,
+      that issues the VNil-span kernel check. Nothing is built there.
     - Unit rows call both wraps directly. A sentinel with one premise gives
       `Err`. The same sentinel with zero premises gives `Ok`. A
       sentinel-free body with premises gives `Ok`, byte-identical to the
@@ -160,6 +173,13 @@ Three increments, each a straight-ancestor cut that may land alone.
 - **AC-3.** `lang_infer_match_indexed_complete` and the as-pattern,
   nested-split and tuple-pattern suites stay green. The catalog census is
   byte-identical, and `trusted_base()` is unchanged.
+
+## Symptom inventory (§1b, Architect)
+
+1. An enclosing alias sentinel reaches an elaborator-to-kernel call
+   unresolved, before its frame finishes. Keyed on kernel-call reachability
+   of an unresolved sentinel (`evt_4416jtap9bj62`, increment 0 §1a 1;
+   Architect `evt_3cqccrymnd3n0`). The next re-trigger is the 3rd.
 
 ## Stop conditions
 
