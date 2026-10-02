@@ -3166,6 +3166,28 @@ impl StaticTransitionPlan<'_> {
         Ok(())
     }
 
+    /// Preselect phase-B callers from phase-A demands and the ownership-free
+    /// transport-source stratum. This does not install owners or count test
+    /// instrumentation for the later installation path.
+    pub(in crate::cranelift_backend) fn preselect_static_response_callers(
+        &self,
+        transport_sources: &BTreeSet<ContinuationCallIdentity>,
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        if self.static_response_infeasible.is_some() {
+            return Ok(BTreeSet::new());
+        }
+        let phase_a = self.static_response_phase_a.as_ref().ok_or_else(|| {
+            planner_error("response caller preselection ran before phase A installed the demands")
+        })?;
+        let (specialized, _) = self.static_response_phase_b_split_over(
+            phase_a.demands.clone(),
+            !phase_a.deferred.is_empty(),
+            transport_sources,
+            false,
+        )?;
+        Ok(specialized.into_iter().map(|demand| demand.k_identity).collect())
+    }
+
     /// The phase-B Deferred/Specialized split. In an eligible response plane, a
     /// transport-source K's existing checked-IH transport emission is the real
     /// selected incoming owner call:
@@ -3178,7 +3200,24 @@ impl StaticTransitionPlan<'_> {
         has_unitless_response: bool,
     ) -> Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), CraneliftBackendError>
     {
-        let transport_sources = self.checked_ih_environment_transport_source_identities();
+        self.static_response_phase_b_split_over(
+            demands,
+            has_unitless_response,
+            &self.checked_ih_environment_transport_source_identities(),
+            true,
+        )
+    }
+
+    fn static_response_phase_b_split_over(
+        &self,
+        demands: Vec<StaticResponseContextDemand>,
+        has_unitless_response: bool,
+        transport_sources: &BTreeSet<ContinuationCallIdentity>,
+        count_install_applications: bool,
+    ) -> Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), CraneliftBackendError>
+    {
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let _ = count_install_applications;
         // Execute-then-resume serves a composed response plane: at least two
         // producer groups have exclusively predeclared transport sources.
         // A producer that also has a specialization/fusion-owned source is a
@@ -3223,7 +3262,8 @@ impl StaticTransitionPlan<'_> {
                 .get(&demand.producer_call_origin)
                 .is_some_and(|owners| *owners == (true, false));
             #[cfg(feature = "px8-ds-test-support")]
-            if overpromote_mixed
+            if count_install_applications
+                && overpromote_mixed
                 && has_unitless_response
                 && requires_execute_then_resume
                 && transport_source

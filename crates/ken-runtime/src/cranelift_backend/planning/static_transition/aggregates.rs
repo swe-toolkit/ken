@@ -5351,6 +5351,61 @@ fn checked_ih_escape_subtree_contains(
 /// position in that emitted body. The two containment checks are the existing
 /// closed producer/escape certificate; neither lowering phase nor a reached
 /// value participates.
+/// Compute transport-source call identities before residual issuance. Only the
+/// continuation/source plane decides membership; ownership records are checked
+/// separately by the post-ownership transport builder.
+pub(in crate::cranelift_backend::planning::static_transition) fn derive_checked_ih_transport_source_population(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+    let units = plan.continuation_units()?;
+    let mut population = BTreeSet::new();
+    for source in &units {
+        if checked_ih_coordinate_run(source)?.is_none() {
+            continue;
+        }
+        let parent = source.producer_construct_origin();
+        let mut has_destination = false;
+        for destination in &units {
+            if destination.id() == source.id() {
+                continue;
+            }
+            let body = destination.worker_body_origin();
+            if checked_ih_escape_subtree_contains(plan, body, parent)?
+                && checked_ih_escape_subtree_contains(
+                    plan,
+                    body,
+                    source.producer_result_origin(),
+                )?
+            {
+                has_destination = true;
+                break;
+            }
+        }
+        if !has_destination {
+            continue;
+        }
+        let identity = plan
+            .continuation_call_binding_for(
+                parent,
+                source.continuation_origin(),
+                source.producer_alternative(),
+                source.recursive_position(),
+            )?
+            .ok_or_else(|| {
+                planner_error(
+                    "a checked-IH transport source has no causal call identity for its own producer edge",
+                )
+            })?;
+        if identity.target() != source.id() {
+            return Err(planner_error(
+                "a checked-IH transport's causal identity targets a different specialization than its force materialization",
+            ));
+        }
+        population.insert(identity);
+    }
+    Ok(population)
+}
+
 pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_environment_transports(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<CheckedIhEnvironmentTransport>, CraneliftBackendError> {

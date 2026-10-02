@@ -830,6 +830,57 @@ fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
     });
 }
 
+/// Promise class: transition sentinel for the selected-call fixture shape.
+/// MEASURED: the pre-schema transport source and response selection both name
+/// the r2 S5→S6 call selected by the installed owner-4 plan.
+/// CLAIMED: the representation-independent source stratum retains the exact
+/// call whose loss the subsequent residual-issuance increment must repair.
+/// THE GAP: this does not show the call is emitted; the existing r2 execution
+/// test is the separate emission gate, still expected to refuse until I-2.
+#[test]
+fn r2_pre_schema_response_selection_retains_selected_transport() {
+    in_large_stack_thread("rt-escape-r2-pre-schema", || {
+        let root = output_dir("r2-pre-schema");
+        let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            ken_cli::build_native_program(
+                R2_CROSS_BUFFER_FREEZE, ken_cli::SourceFormat::Ken,
+                "rt_escape_r2_pre_schema", root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        });
+        // I-1 does not change lowering. The existing object-emission refusal
+        // remains lawful until I-2; no unrelated failure can pass this pin.
+        if let Err(error) = compiled {
+            assert!(format!("{error:?}").contains("no verified selected incoming call"),
+                "an unrelated failure cannot prove pre-schema selection: {error:?}");
+        }
+        assert_eq!(diagnostics.len(), 1, "one planner must publish one stratum");
+        let plan = &diagnostics[0];
+        let owner = plan.static_response_owners.iter()
+            .find(|owner| owner.owner == 4 && owner.k_context == 4)
+            .expect("the installed plan retains r2's selected response owner");
+        let selected = &owner.selected_caller;
+        for component in [
+            "emission_owner: Specialization(ContinuationSpecializationId(5))",
+            "producer_construct_origin: StaticOriginId(528)",
+            "producer_alternative: 1",
+            "target: ContinuationSpecializationId(6)",
+            "recursive_position: 1",
+        ] {
+            assert!(selected.contains(component), "the selected caller changed: {component}");
+        }
+        assert!(plan.pre_schema_transport_sources.contains(selected),
+            "the pre-schema transport-source set lost the selected edge");
+        assert!(plan.preselected_response_callers.contains(selected),
+            "response preselection lost the selected transport call");
+        let installed = plan.static_response_owners.iter().map(|owner| &owner.selected_caller)
+            .collect::<std::collections::BTreeSet<_>>();
+        let preselected = plan.preselected_response_callers.iter()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(preselected, installed, "preselection must match installed owners by identity");
+    });
+}
+
 #[test]
 #[ignore = "RT-SOURCE-IH-RELAY-K-VALUE: BufferFreeze carried-seat repair passes its earlier refusal; owner 1298 still reaches the unchanged Ret-tag trap (-1). Its Vis577 relay K is RecursiveBackedge, not a transferable value; this row stays ignored under the successor after RT-OWNER-VIS-RETURN-PROTOCOL descoped it."]
 fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds() {

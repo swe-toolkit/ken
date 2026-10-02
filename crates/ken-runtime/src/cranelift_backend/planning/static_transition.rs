@@ -690,6 +690,11 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// HAS a lowering accessor — the allocation lane is unreadable at the
     /// producer without it.
     aggregate_ownership: Vec<PlannedAggregateOwnership>,
+    /// Ownership-independent transport sources, fixed before carrier schema.
+    pre_schema_transport_sources: BTreeSet<ContinuationCallIdentity>,
+    /// Phase-A demands selected against that fixed population. Nothing consumes
+    /// this set for emission until the subsequent carrier-schema increment.
+    preselected_response_callers: BTreeSet<ContinuationCallIdentity>,
     /// The exact two-endpoint transports that carry a force-materialized
     /// checked-IH environment to an escaping closure crossing. These reference
     /// `aggregate_ownership`; they never issue a second record.
@@ -1098,6 +1103,9 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
+    /// Test-only projections for exact early/late identity comparison.
+    pub pre_schema_transport_sources: Vec<String>,
+    pub preselected_response_callers: Vec<String>,
     /// The complete Deferred residual: P1 plus ineligible or test-suppressed
     /// P2. Together with the Specialized rows this is the full response-Vis
     /// classification.
@@ -1320,6 +1328,10 @@ fn record_static_response_feasibility_diagnostic(
                 all_static_response_rows,
                 all_static_response_infeasible,
                 static_response_owners,
+                pre_schema_transport_sources: plan.pre_schema_transport_sources.iter()
+                    .map(|identity| format!("{identity:?}")).collect(),
+                preselected_response_callers: plan.preselected_response_callers.iter()
+                    .map(|identity| format!("{identity:?}")).collect(),
                 static_response_deferred,
             });
         }
