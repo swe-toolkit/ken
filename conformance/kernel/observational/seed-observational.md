@@ -88,7 +88,7 @@ build time by the Spec enclave.
 
 ## Acceptance criterion: Eq at Omega carriers and components
 
-These five cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
+These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ### observational/eq-subset-sigma-omega-field (soundness)
 - spec: `spec/10-kernel/16-observational.md` §§2.1, 2.2, 8.4;
