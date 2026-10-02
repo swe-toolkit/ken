@@ -88,6 +88,17 @@ stop and report the mismatch.
      - Otherwise one `PartialPrim` obligation, closed over the context with
        each assumption inserted at its depth, through one telescope builder.
      - Introducing a refinement keeps its spec 34 §5 use-site obligation.
+     - **One obligation sequence per declaration** (Architect
+       `evt_5ma7hzg4a0e6`). Today both Phase 1 branches and
+       `elab_in_ctx_at_omega` drop their `ElabCtx` obligations, so every
+       body obligation under `requires` is lost (the fixed-width `+` one
+       too, `:10067`). `elaborate_view_with_spec` absorbs every `ElabCtx`'s
+       obligations in elaboration order (requires, body, ensures),
+       renumbering ids on absorption; ensures ids follow from the sequence
+       length. Anything reading an `Obligation.id` before absorption is a
+       stop to the Architect, never a second counter.
+     - A refined parameter's φ is now elaborated, and must check at Ω
+       (21 §6.3).
    - Declaring `fn /` or `fn %` is refused with the diagnostic class
      `fn +` gets. Measure that diagnostic first.
    - **Spec piece**, on the same branch and Decision (COORDINATION §14 (4)):
@@ -103,9 +114,9 @@ stop and report the mismatch.
        generic names and states the fixed-token observation for them, with
        `<` and `>` still generic; `seed-numbers.md` §3.1 covers `%`'s
        `PartialPrim` obligation beside `/` (spec 35 §3.1).
-     - `seed-obligations.md` gains the non-direct row: `requires d > 0`
-       gives one obligation whose Γ carries the hypothesis (the CV writes it
-       in the corpus's form).
+     - `seed-obligations.md` gains the non-direct row: `requires Equal Int
+       d 5` gives one obligation whose Γ carries the hypothesis (the CV
+       writes it in the corpus's form).
      - Sweep `spec/` and `conformance/` for any other place that lists the
        fixed or generic operator spellings, and fold each one here. Report
        the sweep as a list with the gate handoff.
@@ -121,9 +132,13 @@ stop and report the mismatch.
 
 - **AC-0 (measure; no build).** Record what `a / b` and `a % b` on `Int` do
   on base, and the delivered names for `⊥` and the obligation kind. Write
-  `NonZeroDivisor` in those names before any edit. Record what `requires
-  d ≠ 0` and `{d | d ≠ 0}` elaborate to, and whether each converts with
-  `NonZeroDivisor d` (`Eq Int d 0 → Bottom`, `numbers.rs:443`).
+  `NonZeroDivisor` in those names before any edit. `≠` is Bool (33 §6.1),
+  so the direct proposition is `Not (Equal Int d 0)`, which reaches
+  `NonZeroDivisor d` by δβ (`evt_5ma7hzg4a0e6`).
+  - Census every refined-parameter position over `catalog/`,
+    `crates/*/tests`, r_layer, `examples/` and `conformance/` (known:
+    `Derived.ken.md:1712`, `v2_acceptance.rs:266`), with each φ under the
+    new elaboration.
 - **AC-1 (behavior).**
   - `7 / 2 = 3`, `(-7) / 2 = -3`, `7 % 3 = 1` and `(-7) % 3 = -1`.
   - The div-mod identity holds on operands across 2¹²⁷ and on every sign
@@ -134,10 +149,14 @@ stop and report the mismatch.
   - Dispatch: the same `a / b` (and `a % b`) at `Int` gives `div_int a b`.
     At `Nat` it gives `TypeMismatch` naming `/`, not `UnboundName`.
   - Obligations, for both `/` and `%` on one body: a possibly-zero divisor
-    gives exactly 1 `NonZeroDivisor` obligation; a refined-param divisor
-    gives 0; `requires d ≠ 0` gives 0; `requires d > 0` gives 1, whose
-    closed goal's leading Π telescope holds the `d > 0` prop at its depth;
-    `requires e ≠ 0` with divisor `d` gives 1.
+    gives exactly 1 `NonZeroDivisor` obligation; `(d : {z : Int | Not
+    (Equal Int z 0)})` gives 0; `requires Not (Equal Int d 0)` gives 0;
+    `requires Equal Int d 5` gives 1, whose closed goal's leading Π
+    telescope holds `Eq Int d 5` at param depth; `requires Not (Equal Int
+    e 0)` with divisor `d` gives 1.
+  - Consumer sweep: run every suite that elaborates a `requires` (about 82
+    lines in `crates/*/tests`; the catalog has none). Each changed
+    obligation count is a census row with its cause, not a silent pin edit.
   - Reservation: `fn / (x : Nat) (y : Nat) : Nat = x` is refused with the
     `fn +` diagnostic class. In `generic_and_fixed_operator_paths_remain_distinct`
     (`lang_reserved_infix_names.rs:536`), `/` and `%` move to the fixed-token
@@ -148,7 +167,7 @@ stop and report the mismatch.
 - **AC-2 (falsifiers).**
   - Removing the obligation emission reddens the row.
   - Restoring the unconditional push reddens both zero rows. Dropping the
-    assumptions from the closure reddens the `d > 0` goal-shape pin.
+    assumptions from the closure reddens the `Equal Int d 5` goal-shape pin.
     Recognizing any assumption of shape `_ ≠ 0` reddens the `e ≠ 0` row.
   - Replacing the zero-divisor fault with `0` reddens AC-1.
   - Swapping truncated `mod` for floored `mod` reddens `(-7) % 3`.
@@ -165,8 +184,10 @@ stop and report the mismatch.
 
 ## Stop conditions
 
-- `≠` in a `requires` or refinement does not convert with `NonZeroDivisor
-  d`: stop to the Architect; do not add a spelling match.
+- The `Not (Equal Int d 0)` rows do not give 0 once obligations are
+  absorbed: stop to the Architect; do not add a spelling match.
+- A census φ fails at Ω, or a changed obligation count has no explained
+  cause: stop to the Architect, never a skip.
 
 - A third trusted entry, such as an opaque `NonZeroDivisor` postulate or a
   conversion rule for either Op: an operator question.
@@ -176,5 +197,6 @@ stop and report the mismatch.
 - A surface name beyond `/` and `%`, which would grow the fixed prelude.
 - Any change to what the kernel accepts beyond the two Ops: stop to the
   Architect.
-- Not this WP: the fixed-width `+`/`-`/`*` no-overflow template has the
-  same wrong-Γ closure under `requires` (Architect carry).
+- Not this WP (Architect carries): the fixed-width `+`/`-`/`*` obligation's
+  Γ; the other declaration aggregators that return `obligations: vec![]`;
+  the spec 21 examples and seeds that write a Bool `≠` in an Ω position.
