@@ -321,6 +321,14 @@ The ruling carries the code and is authoritative where this summary differs.
         change.
       - Lifting the refusal needs a source with graph-derived call
         authority, on which those two execution mutations redden.
+      - On merge-base `10daa9242`, the synthetic mixed source returns a
+        value outside its range (`Option::None`, where the Leaf body is
+        total into Exit). This WP's choke point refuses it, and the
+        handoff carries the claim worded in `evt_75s5cr96knfde`. The bad
+        value needs the nested Option match inside the recursive Leaf
+        body: neither alone produces it (probe `evt_34v8scs9n0j08`). No
+        source program or parity row reaches it, so there is no separate
+        node (operator 2026-08-29).
   - One full `rt_parity_native` run on the candidate itself (186/186), with
     verdicts unchanged and `boxed_member_compile_refusals` 0. The pre-D0
     186/186 does not transfer.

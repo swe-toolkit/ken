@@ -60,7 +60,8 @@ stop and report the mismatch.
    `Int → Int → Int`, with no conversion rule, so both stay neutral in the
    kernel. `trusted_base()` grows by exactly these two.
 2. **The surface: `/` and `%` become fixed arithmetic tokens, like `+`**
-   (Architect `evt_3jj0h45bmcdp6`, which carries the design). Today they are
+   (Architect `evt_3jj0h45bmcdp6`, which carries the design; operator
+   2026-10-02: "approve / and % as built-ins"). Today they are
    generic user operators. A fallback is rejected, because the meaning of
    one spelling would depend on declaration order.
    - The lexer claims exactly `/` and `%`, so `<`, `>`, `<+>` and `/\` stay
@@ -68,16 +69,57 @@ stop and report the mismatch.
    - Add `BinOp::Div` and `BinOp::Mod` at `infixl 7`, in `builtin_fixity`,
      `parser.rs:5498` and `layout.rs:1823`, with no `_ =>` arm.
    - `elab_binop` dispatches them through a new `NumericEnv::classify_div`,
-     whose only entry is Int. On Int it builds `div_int`/`mod_int` and emits
-     one `PartialPrim` obligation, `NonZeroDivisor` of the divisor, from the
-     `:10046` template. Any other type gives `TypeMismatch` naming the
-     operator.
+     whose only entry is Int. On Int it builds `div_int`/`mod_int`. Any
+     other type gives `TypeMismatch` naming the operator.
+   - **The obligation, only on a possibly-zero divisor** (spec 35 §3.1,
+     22 §2.4; Architect `evt_20wykc13b8916`). At `3aca62b5d` the body
+     elaborates before `requires` (`elab.rs:14952` vs `:15020`), and
+     `RRefine` erases φ (`:989`), so `cx.ctx` holds neither, and an
+     unconditional push closed over `cx.ctx` is unprovable under `requires`.
+     - `ElabCtx` gains elaborator-only `assumptions` (prop, depth); they
+       never enter a kernel term. `elaborate_view_with_spec` elaborates each
+       `requires` before the body and pushes it at the parameter depth. Each
+       refined parameter pushes its φ at its binder depth, on both the V0
+       and V1 paths. Params and `requires` only.
+     - At the `/` or `%` site, a direct assumption that the kernel's
+       conversion finds `≡ NonZeroDivisor rhs` gives no hole, no obligation
+       and no counter bump. No spelling match and no search beyond a direct
+       assumption.
+     - Otherwise one `PartialPrim` obligation, closed over the context with
+       each assumption inserted at its depth, through one telescope builder.
+     - Introducing a refinement keeps its spec 34 §5 use-site obligation.
+     - **One obligation sequence per declaration** (Architect
+       `evt_5ma7hzg4a0e6`). Today both Phase 1 branches and
+       `elab_in_ctx_at_omega` drop their `ElabCtx` obligations, so every
+       body obligation under `requires` is lost (the fixed-width `+` one
+       too, `:10067`). `elaborate_view_with_spec` absorbs every `ElabCtx`'s
+       obligations in elaboration order (requires, body, ensures),
+       renumbering ids on absorption; ensures ids follow from the sequence
+       length. Anything reading an `Obligation.id` before absorption is a
+       stop to the Architect, never a second counter.
+     - A refined parameter's φ is now elaborated, and must check at Ω
+       (21 §6.3).
    - Declaring `fn /` or `fn %` is refused with the diagnostic class
      `fn +` gets. Measure that diagnostic first.
    - **Spec piece**, on the same branch and Decision (COORDINATION §14 (4)):
      - spec 31 §2 adds `/` and `%` to the fixed set and drops them from the
        generic list;
      - spec 32 §6's level-7 row becomes "`*`, `/`, `%`".
+     - spec 31 §4's post-freeze fixed-token list adds `/` and `%`, so it
+       agrees with §2 (spec-leader `evt_1v7fmwtpvbn0w`).
+     - spec 32 §3's `fixed_binop` grammar route adds `/` and `%`, so it
+       agrees with §31 §§2, 4 and §32 §6 (CV block `evt_6f3jfs4j5q2tx`).
+     - Conformance, by the CV: `surface/operators/generic-symbolic-names-remain-live`
+       in `seed-reserved-infix-names.md` stops expecting `/` and `%` as
+       generic names and states the fixed-token observation for them, with
+       `<` and `>` still generic; `seed-numbers.md` §3.1 covers `%`'s
+       `PartialPrim` obligation beside `/` (spec 35 §3.1).
+     - `seed-obligations.md` gains the non-direct row: `requires Equal Int
+       d 5` gives one obligation whose Γ carries the hypothesis (the CV
+       writes it in the corpus's form).
+     - Sweep `spec/` and `conformance/` for any other place that lists the
+       fixed or generic operator spellings, and fold each one here. Report
+       the sweep as a list with the gate handoff.
 
      The spec ring authors it, and the conformance validator votes.
 3. **Evaluation.** The interpreter reduces both truncated on nonzero
@@ -90,7 +132,13 @@ stop and report the mismatch.
 
 - **AC-0 (measure; no build).** Record what `a / b` and `a % b` on `Int` do
   on base, and the delivered names for `⊥` and the obligation kind. Write
-  `NonZeroDivisor` in those names before any edit.
+  `NonZeroDivisor` in those names before any edit. `≠` is Bool (33 §6.1),
+  so the direct proposition is `Not (Equal Int d 0)`, which reaches
+  `NonZeroDivisor d` by δβ (`evt_5ma7hzg4a0e6`).
+  - Census every refined-parameter position over `catalog/`,
+    `crates/*/tests`, r_layer, `examples/` and `conformance/` (known:
+    `Derived.ken.md:1712`, `v2_acceptance.rs:266`), with each φ under the
+    new elaboration.
 - **AC-1 (behavior).**
   - `7 / 2 = 3`, `(-7) / 2 = -3`, `7 % 3 = 1` and `(-7) % 3 = -1`.
   - The div-mod identity holds on operands across 2¹²⁷ and on every sign
@@ -98,9 +146,17 @@ stop and report the mismatch.
   - `x / 0` and `x % 0` fault at runtime. A test that returns any value
     there is red.
 - **AC-1b (surface; each pair on a shared input).**
-  - Dispatch: the same `a / b` (and `a % b`) at `Int` gives `div_int a b`
-    with exactly one `PartialPrim` obligation of goal `NonZeroDivisor b`. At
-    `Nat` it gives `TypeMismatch` naming `/`, not `UnboundName`.
+  - Dispatch: the same `a / b` (and `a % b`) at `Int` gives `div_int a b`.
+    At `Nat` it gives `TypeMismatch` naming `/`, not `UnboundName`.
+  - Obligations, for both `/` and `%` on one body: a possibly-zero divisor
+    gives exactly 1 `NonZeroDivisor` obligation; `(d : {z : Int | Not
+    (Equal Int z 0)})` gives 0; `requires Not (Equal Int d 0)` gives 0;
+    `requires Equal Int d 5` gives 1, whose closed goal's leading Π
+    telescope holds `Eq Int d 5` at param depth; `requires Not (Equal Int
+    e 0)` with divisor `d` gives 1.
+  - Consumer sweep: run every suite that elaborates a `requires` (about 82
+    lines in `crates/*/tests`; the catalog has none). Each changed
+    obligation count is a census row with its cause, not a silent pin edit.
   - Reservation: `fn / (x : Nat) (y : Nat) : Nat = x` is refused with the
     `fn +` diagnostic class. In `generic_and_fixed_operator_paths_remain_distinct`
     (`lang_reserved_infix_names.rs:536`), `/` and `%` move to the fixed-token
@@ -110,19 +166,28 @@ stop and report the mismatch.
   - Restoring `/` to the generic path reddens the reservation pair.
 - **AC-2 (falsifiers).**
   - Removing the obligation emission reddens the row.
+  - Restoring the unconditional push reddens both zero rows. Dropping the
+    assumptions from the closure reddens the `Equal Int d 5` goal-shape pin.
+    Recognizing any assumption of shape `_ ≠ 0` reddens the `e ≠ 0` row.
   - Replacing the zero-divisor fault with `0` reddens AC-1.
   - Swapping truncated `mod` for floored `mod` reddens `(-7) % 3`.
 - **AC-3.**
   - `trusted_base()` grows by exactly `div_int` and `mod_int`. Name both in
     the handoff.
   - `NonZeroDivisor` is a definition, not a postulate.
-  - The 57-package census shows no verdict change, and the `l1_acceptance`
+  - The census over every tracked package card (55 at `710458002`) shows
+    no verdict change, and the `l1_acceptance`
     rows that pass today stay green.
 - **Gates.** Kernel QA, the Architect, and the conformance-validator for
   the NATIVE oracle (18a: the two gates are a conjunction) and the spec
   piece.
 
 ## Stop conditions
+
+- The `Not (Equal Int d 0)` rows do not give 0 once obligations are
+  absorbed: stop to the Architect; do not add a spelling match.
+- A census φ fails at Ω, or a changed obligation count has no explained
+  cause: stop to the Architect, never a skip.
 
 - A third trusted entry, such as an opaque `NonZeroDivisor` postulate or a
   conversion rule for either Op: an operator question.
@@ -132,3 +197,6 @@ stop and report the mismatch.
 - A surface name beyond `/` and `%`, which would grow the fixed prelude.
 - Any change to what the kernel accepts beyond the two Ops: stop to the
   Architect.
+- Not this WP (Architect carries): the fixed-width `+`/`-`/`*` obligation's
+  Γ; the other declaration aggregators that return `obligations: vec![]`;
+  the spec 21 examples and seeds that write a Bool `≠` in an Ω position.

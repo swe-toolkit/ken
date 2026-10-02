@@ -1,7 +1,7 @@
 ---
 id: CAT-INSERTIONSORT-DERIVED-SORT-IMPORT
 title: "InsertionSort re-derives, lemma for lemma, the generic insertion-sort development Derived §4.3 already proves. Publish Derived's sort development and make InsertionSort's public surface instantiations of it, retiring 11 duplicated locals"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -140,3 +140,18 @@ stop and report the mismatch.
 - S4: a verdict changes in any consumer named in AC-1.
 - S5: a retired name has a consumer outside InsertionSort and its
   acceptance test.
+
+## Closeout
+
+Merged `69f4fdb33` from exact `2d162703b`; all 7 path blobs match. Gates on
+the exact SHA: Foundation QA `evt_14qwt7mpm1jxj`, Architect
+`evt_24mj29qb16hax`, Decision `dec_75jr83meb8f48`. The earlier `5e41d676a`
+went red in CI (PR #4453, the seal2 source-root certificate) and was
+withdrawn; its gates did not carry.
+
+- InsertionSort's seven public names are direct instantiations of Derived
+  §4.3, and its 11 duplicated locals are retired.
+- The non-selective `import ... as DC` made InsertionSort a non-exempt
+  catalog root, so the seal2 producer-closure certificate now enumerates
+  it.
+- Next on L3: `CAT-NAT-STRICT-ORDER-OWNER`.

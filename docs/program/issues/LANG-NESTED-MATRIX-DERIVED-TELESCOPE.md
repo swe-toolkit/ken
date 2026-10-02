@@ -1,6 +1,6 @@
 ---
 id: LANG-NESTED-MATRIX-DERIVED-TELESCOPE
-title: "The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or a metavariable"
+title: "The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or discovered first"
 status: active
 owner: language
 size: L
@@ -117,15 +117,34 @@ alone.
      returns `None` when zonking defaulted a level, so the first leaf
      discovers R as before increment 1. The Architect's ruling carries the
      code.
-   - An independent increment off current main, ahead of I-2a. Once it
-     lands, I-2a `d3a522dd3` rebases (`elab.rs` intersects, so inspect the
-     `infer_match` entry seed and memo call) and is re-QAed at the rebased
-     SHA.
 2. **Open each nested bucket in the derived telescope before its leaves.**
    - Δ comes from reverting the context and the constructor. Woven binders
      are real `cx.ctx` pushes.
-   - R is the seeded type, or else a fresh result metavariable solved by the
-     first leaf. Constant results keep first-leaf discovery.
+   - **R: infer, then check** (Architect `evt_9s1tts2m0xjk`; the earlier
+     "fresh result metavariable" is withdrawn, and no term-meta layer is
+     added). R is the seeded type. In inference mode, when the construction
+     needs R first at an `Ih` column (`:18240-18255`) or a root IH domain, a
+     discovery pass runs the same matrix code, with an `Ih` column pushing
+     no binder. The first reachable leaf computes R as today (`zonk_term`,
+     `lower_by`, `InferredMatchResultEscapesPattern`). The owning entry
+     (keyed on `root_frame_depth`) then aborts with `ResultDiscovered` and
+     reruns once with `ret_ty_slot = Some(R)`; a second discovery on the
+     rerun is `Internal`. A first leaf reached before any IH keeps
+     first-leaf discovery, with no rerun.
+     - Reuse, not rollback (`evt_1bg60xdd88p6v` supersedes the restore
+       set). `MetaCtx` and `GlobalEnv` are not restored or cloned. The
+       discovery leaf is elaborated once through `compile_match_leaf`; its
+       body, lowered R, arm, context length and skipped IH depths are
+       cached, and the rerun's first leaf reuses the body through one
+       checked thinning that inserts only the recorded IH binders. A
+       mismatch is `Internal`. Assert the scoped stacks balanced at abort.
+     - Descent writes before the first leaf (`evt_64e2sz53dmzrx`): only
+       literal comparator plans, memoized by `root_frame_depth` and
+       (pattern span, request ordinal). Any other descent write is a stop
+       to the Architect.
+     - Propagation: census every handler from `compile_match_leaf` to the
+       owning entry. A catch-all on that path, or a leaf that adds an `env`
+       declaration, is a stop to the Architect.
    - In pure inference mode, an annotation is required only when the solved
      R would mention a derived-telescope binder. The precise diagnostic is
      raised there; "the split reverts" is not the test.
@@ -134,7 +153,9 @@ alone.
    - The in-matrix alias finalize and per-method kernel check run in the
      derived telescope on every path. Both `needs_reverting` gates are
      removed (`evt_4c4tgkc2gvypk`, `evt_qh7m7erbc5f6`, input f).
-   - **Root-frame ownership** (Architect carry `evt_5ezxyycetagrw`). Today
+   - **Root-frame ownership** (increment I-2a, merged `d7676f128`, exact
+     `7effbe9a4`; Architect carry `evt_5ezxyycetagrw`, approval
+     `evt_7904vfyy22b57`). Today
      `memoize_indexed_root_motive` writes `indexed_match_roots.last()`, so an
      inner match in an indexed root's first leaf can write the outer root's
      motive. Both writers, the entry seed and the first-leaf producer, take
@@ -142,6 +163,21 @@ alone.
      depth + 1`. Fixtures p1 (inner inference match) and p2 (inner checked
      match) give `Suc Zero` from `f Zero (VNil Nat)`. Both fail closed on
      main with `KernelRejected TypeMismatch`.
+   - **Alias occurrences and the checked path** (Architect
+     `evt_635vc9mxvmnq2`, on the checked-sibling stop). The sentinel's only
+     producer is `materialize_pattern_alias`'s sentinel arm; the flat
+     checked path only consumes it.
+     - INV-1: an alias use materializes as an occurrence term, in the same
+       representation as a plain reference to its binders.
+     - INV-2: the checked path gets no design change. Its edits are the
+       mechanical fallout of deleting the sentinel type, which is in scope:
+       the `wrap_premise_*_finalized` pair returns `Term` again, and the ten
+       `AliasAcrossPremiseWrap` `map_err` arms go. The index-refinement
+       sentinels stay byte-identical. Any other edit in the checked or
+       convoy builders is a stop to the Architect.
+     - Migration: every sentinel constant, finalizer, guard and
+       `PatternVariableAcrossDependentSplit` goes in the same commit that
+       deletes the producer arm, never earlier.
    - Representation (input g, `evt_71d3p2fwxtqj1`): locally nameless. Matrix
      binders are elaborator-only fresh free variables, refused at the kernel
      boundary, so the kernel `Term` is unchanged. One `abstract` function
@@ -228,6 +264,17 @@ alone.
     woven-column fixture (FIELD-DEPENDENCE P5), the Dep row and the deferred
     wrong-method fixture are discriminating value pins, checked in-matrix.
   - `PatternVariableAcrossDependentSplit` is removed (input h).
+  - The checked single-arm sibling (`let r : Nat = match xs { VCons m e tl
+    ↦ ... }`) stays green with arm bodies `Suc j` ⇒ 3, `j` ⇒ 2 and `e` ⇒ 5,
+    and the nested-woven `BoxNat (Suc saved)` row ⇒ 3; AC-1's `saved` row ⇒
+    3 is the flip (`evt_635vc9mxvmnq2`).
+- **AC-2b (inference-mode R, `evt_9s1tts2m0xjk`).**
+  - `lang_nested_split_field_dependence.rs:36-52` (VCons first) checks with
+    both values. Leaving the slot `None` at the `Ih` column reddens it.
+  - R identity census: for every inference-mode entry in the named suites,
+    report the rerun count. Discovered R is byte-identical to the R that
+    `d7676f128`'s first-leaf code computes.
+  - Report the maximum nested-rerun depth across the suites and the catalog.
 - **AC-3.** `lang_infer_match_indexed_complete` and the as-pattern,
   nested-split and tuple-pattern suites stay green. The catalog census is
   byte-identical, and `trusted_base()` is unchanged.
@@ -237,7 +284,12 @@ alone.
 1. An enclosing alias sentinel reaches an elaborator-to-kernel call
    unresolved, before its frame finishes. Keyed on kernel-call reachability
    of an unresolved sentinel (`evt_4416jtap9bj62`, increment 0 §1a 1;
-   Architect `evt_3cqccrymnd3n0`). The next re-trigger is the 3rd.
+   Architect `evt_3cqccrymnd3n0`).
+2. Inference-mode R is needed before the first leaf under an IH column; the
+   frame named a term metavariable the elaborator lacks. Keyed on an enabler
+   absent from the delivered vocabulary (`MetaCtx` is level-only;
+   `evt_44yy0cg0qb448`, §1a 1, `evt_9s1tts2m0xjk`). The §1b test is due at
+   entry 3.
 
 Check-mode result seed (a separate count, §1a 1, `evt_6jqa2y7rft3tr`):
 

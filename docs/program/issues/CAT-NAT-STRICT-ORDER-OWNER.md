@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-STRICT-ORDER-OWNER
 title: "Nat's strict order is defined twice, as Cursor's public cursor_nat_lt and Property's private property_nat_lt, and its laws are re-derived package by package across Cursor, Parsing, Decoder and Json. Make Data.Numeric.Nat.Order the owner of lt_nat and its laws, and retire Property's re-derived byte equality"
-status: ready
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -62,7 +62,7 @@ renamed only.
 
 1. **Order.**
    - Widen the Transport import to `(cong, sym, trans)`.
-   - Add `pub fn lt_nat` beside `compare`, with its 13 attached laws after
+   - Add `pub fn lt_nat` beside `compare`, with its 12 attached laws after
      `compare`'s.
    - Add `pub theorem leq_nat_suc_add_right` with the other `leq_nat_*`
      bounds.
@@ -107,8 +107,9 @@ renamed only.
   - M1: restoring `pub fn cursor_nat_lt` reddens the Cursor inventory pin.
   - M2: a local `decoder_lt_self_suc` used in Decoder reddens the Order-owned
     identity set and the absence pin.
-  - M3: a left-first `lt_nat` stops Order from loading (`TypeMismatch` in
-    `leq_suc`).
+  - M3: a left-first `lt_nat` makes Order fail with
+    `KernelRejected(TypeMismatch)` inside an `lt_nat` law. The observed first
+    failure is `trans`, span `7360..7657` (Architect `evt_s70x9xdg7hy9`).
   - M4: withdrawing `pub` from `proof self_suc for lt_nat` stops Decoder and
     Json from loading.
   - M5: restoring `property_bytes_eq` in a witness reddens the Property
@@ -122,3 +123,13 @@ renamed only.
 - S2: a moved body needs more than the renames.
 - S3: a catalog verdict changes.
 - S4: the population is not 15, or the sweep finds a consumer not listed.
+
+## Closeout
+
+Merged as `ade3f905d` from exact `2c7d7c0a1`. Gates: Foundation QA
+`evt_3fnpg8t1ah5rx`, Architect `evt_6bcw8n0jf041d`, Decision
+`dec_223dmf4r0c9t2`. All 15 routed blobs match main. Order owns `lt_nat`,
+its 12 attached laws and `leq_nat_suc_add_right`; catalog card verdict
+parity 57/57 and no trust delta. Carried to the next touch of these cards:
+three added prose lines exceed 85 columns (`Cursor.ken.md:214`,
+`Order.ken.md:619`, `Order.ken.md:655`).
