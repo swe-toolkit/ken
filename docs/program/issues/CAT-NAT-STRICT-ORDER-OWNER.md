@@ -107,8 +107,9 @@ renamed only.
   - M1: restoring `pub fn cursor_nat_lt` reddens the Cursor inventory pin.
   - M2: a local `decoder_lt_self_suc` used in Decoder reddens the Order-owned
     identity set and the absence pin.
-  - M3: a left-first `lt_nat` stops Order from loading (`TypeMismatch` in
-    `leq_suc`).
+  - M3: a left-first `lt_nat` makes Order fail with
+    `KernelRejected(TypeMismatch)` inside an `lt_nat` law. The observed first
+    failure is `trans`, span `7360..7657` (Architect `evt_s70x9xdg7hy9`).
   - M4: withdrawing `pub` from `proof self_suc for lt_nat` stops Decoder and
     Json from loading.
   - M5: restoring `property_bytes_eq` in a witness reddens the Property
