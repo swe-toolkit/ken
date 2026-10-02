@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-NESTED-CAST-LINEAR
 title: "Reducing a nested Cast in public whnf repeats conversion work at each level, because cast_reduce's regularity test converts the two type endpoints before any structural step. Make public whnf of a Cast nested k deep cost work linear in k"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -89,3 +89,16 @@ the depth. The Architect rules the repair.
 - Any fuel, or a depth cutoff.
 - Any change to what the kernel accepts: stop to the Architect.
 - A `trusted_base()` or spec change: an operator question.
+
+## Closeout
+
+Merged `90ca730f6`, exact `35c138329`: Kernel QA `evt_57jh7ekwg76yt`,
+Architect `evt_2mdc6tp27ac2s`, Decision `dec_3ta7bd54d438f`.
+
+- N0–N2 skip one idempotent `whnf_defer_head_delta` at three
+  default-progress entries. Public `whnf` of T1 and T2 is linear in k.
+- Committed pins: T1 ≤ 4k and T2 ≤ 8k at k = 8, 16 and 20; the N1 and N2
+  reverts redden them; cast regularity and a stuck neutral cast hold.
+- The 57-package census is unchanged, and `trusted_base()` is equal.
+- Carried: the source-derived S fixture is a verdict pin at k=4. Its J
+  endpoint re-reduction goes to `KERNEL-J-NONREFL-ENDPOINT-SHARING`.

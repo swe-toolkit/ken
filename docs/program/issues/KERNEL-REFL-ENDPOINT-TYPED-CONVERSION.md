@@ -1,7 +1,7 @@
 ---
 id: KERNEL-REFL-ENDPOINT-TYPED-CONVERSION
 title: "Since Refl checks by conversion, its endpoints are compared by the type-agnostic Eq/Eq congruence, so Ω proof irrelevance no longer applies there and a well-typed refl between two proofs of a proposition is rejected (accepted before 884f493fe). Compare the endpoints by typed conversion at the carried type"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
