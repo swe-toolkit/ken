@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [RT-PLANNER-PER-EMITTER-AVAILABILITY]
+depends_on: [RT-PLANNER-PER-EMITTER-AVAILABILITY, RT-CARRIER-RESIDUAL-TYPED-OPERAND]
 blocks: [RT-NATIVE-SEQUENTIAL-BRACKETS]
 github: null
 origin: "Architect recut ruling evt_4x84ykwjtmbsh on RT-NATIVE-SEQUENTIAL-BRACKETS (§1a 2), on the research advisory evt_7rqnbfnw80fe: an escaping continuation's environment must travel in the value (closure conversion). Size is provisional and is re-set at AC-0. Steward-filed per COORDINATION section 2."
@@ -218,7 +218,8 @@ code text; build from it. Two straight-ancestor increments, each landable
 alone. Retained from WIP `48fdf550c`: the minting-record Child classifier,
 M-c and M-d, the plane split, and issuance over the source Construct walk.
 
-- **I-1, the pre-schema stratum; nothing consumes it.**
+- **I-1, the pre-schema stratum; nothing consumes it.** Merged `e893ecb7a`
+  (exact `b3fcfd064`).
   - `derive_checked_ih_transport_source_population` (aggregates.rs) and
     `preselect_static_response_callers` over
     `static_response_phase_b_split_over` (responses.rs) both run just before
@@ -237,32 +238,41 @@ M-c and M-d, the plane split, and issuance over the source Construct walk.
     - dropping `has_destination` reddens (a) on a named fixture or a new
       planner unit test;
     - `validate_continuation_specialization_plan` is unchanged and green.
-- **I-2, (B) at issuance over the fixed stratum.**
-  - `build_recursive_residual_dispositions` skips a LexicalClosure
-    disposition when the eliminator's whole subtree holds a preselected
-    caller. Over-blocking is fail-safe.
-  - `recursive_position_unit_body` gains the all-unissued arm `Ok(None)`.
-  - A fail-closed lowering assert stops a residual from replacing a
-    selected descent.
+- **I-2, a residual only under a trivial continuation** (Architect
+  `evt_744gjznjr64x6`, on Research `evt_54vkrxapf12qg` and D0
+  `evt_2pwxwtktqwhta`; the ruling carries the code text). Main is the
+  reference. Issuance stays exactly as on `80bcfb4`. Every static-containment
+  guard, including `active_descent_emits_selected_call`, is withdrawn.
+  - **The guard.** At residual selection in `recursive_position_unit_body`,
+    any pending outer frame on the source machine takes Active (`Ok(None)`).
+    Labelled or Exact residuals are admitted only with no pending frame.
+  - **The invariant.** Every residual consumption site (the Labelled switch,
+    `source.rs:4579` → `calls.rs:861`, and the Exact attach, `core.rs:15225`)
+    refuses under a pending frame with `unsupported("RecursiveResidual",
+    ...)`. The handoff enumerates the sites.
+  - **First step (passed, `evt_61rw1srg4d3at`):** the combined probe gives
+    r2 1/1 with S5/528 at main's 2, read 1/1 with G12's residual, and write
+    1/1 with S5/528 at 12. The residual stays at exactly the three
+    no-pending rows (r2 and write P10/G25, read P5/G12).
   - Acceptance:
-    - **M2 first:** for r2 and the named fallback-needing `BoundaryCarrier`
-      fixture, each gate's eliminator, its candidates and the preselected
-      callers in its subtree. 533 holds 528, and the BoundaryCarrier gate
-      holds none.
-    - r2 passes, with `u0:58` called twice from S5 context 1.
-    - The BoundaryCarrier fixture still passes through the residual.
-    - Dropping the guard reddens r2 with exactly "no verified selected
-      incoming call".
-    - A before/after issuance census shows dispositions lost only at gates
-      whose subtree holds a preselected caller.
-    - The rt_escape rows stay green, and the lowering assert has a unit
-      test.
-- **Stops (the 7th returns the sizing to the Steward):**
-  - (a) or (b) fails on a gated suite;
-  - preselection needs a fact outside phase A;
-  - M2 puts a preselected caller under the BoundaryCarrier gate;
-  - r2 still lacks the call;
-  - a non-r2 verdict changes.
+    - the combined result on the committed code, with a per-row verdict log;
+    - deleting the guard fires the consumption assertion at r2 G533 with
+      its exact message;
+    - deleting both reddens r2 with exactly "no verified selected incoming
+      call";
+    - the `dec_3tvethnshr68y` carry: compare installed owners only on
+      `Ok(owners)`, and propagate `Err(infeasible)` with its own reason;
+    - rt_escape*, rt_span_prov_native and the two parity rows stay green.
+    - **Label readers** (`evt_65natwv18ep26`): `generated_entry_capsule_
+      outer_carried` gives the typed `ResourceBodyResult` (identity 41);
+      restoring the node accessors at `assert_recursive_carrier_variant`
+      reddens it with raw -1. Each reader's runtime witness is reported.
+      One full `rt_parity_native` run completes.
+  - Dispositions left issued and unconsumed are not pruned here.
+- **Stops (the 9th is hold plus research):**
+  - a consumption-site assertion fires on any fixture;
+  - a non-r2 verdict or selected-caller count changes;
+  - a residual consumption site cannot see the pending-frame state.
 
 ## Acceptance
 
@@ -397,6 +407,43 @@ triggers hold-and-research.
    → checked-IH transports → response phase B → selected callers, all of
    which it feeds. Keyed on plan-construction order (`evt_k50enr3zpmp8`,
    §1a 6).
+7. The issuance guard skipped a disposition whenever the eliminator's whole
+   subtree held a preselected caller. That over-blocks read G12, whose
+   residual is needed (forced Active gives `BoundaryCarrier`), and 528 lies
+   under G25, not G533. Keyed on whole-subtree containment at issuance
+   (`evt_4hg93gfaf76y4`, §1a 7).
+8. The preservation guard was keyed on a static body at the residual
+   selection point: first the own case body, then the immediately pending
+   frame. Rows of the same static shape disagree on displacement:
+   - at G533 under S5, the residual drops S5/528 (main 2, residual 0);
+   - at G751 and G755 under S3, it keeps S3/746 at 3/3 and S3/750 at 40/40,
+     although each caller sits in the pending frame exactly as 528 does.
+
+   Keyed on static containment at the selection point (`evt_30etv9z3ddq4t`,
+   §1a 8; Architect `evt_62fpkx7marckq`). Entries 7 and 8 share entry 6's
+   predicate. Entry 9 is the next predicate checkpoint.
+9. The residual carrier's label readers use the node-only `tag`/`scalar`
+   accessors on an `ImmediateInt` label word, so a well-formed label gets a
+   false shape refusal (raw -1). It is exposed on the P2 Deferred route by
+   `rt_parity_native generated_entry_capsule_outer_carried`. Keyed on the
+   accessor plane (`evt_7stv16qbf6vt5`, §1a 9; Architect `evt_65natwv18ep26`).
+   The repair stays: all three label readers (`calls.rs:909`,
+   `core.rs:14273`, `mod.rs:8865`) take one immediate-plane accessor.
+
+   Carry, not on this WP: give carrier-schema assertions a typed root-trap
+   catalog entry in place of the raw -1 status abort.
+10. A private residual R1075 reaches an ordinary match raw. It goes through
+    the G533 field binding, the G355 checked-answer fallback, lexical
+    capture, continuation assembly and two frame copies, and no step carries
+    its plane (`evt_3qh1c0eyn78j1`, §1a 10; D0-i to D0-k, last
+    `evt_4x2a3b4g5fbzh`).
+
+**Predicate test, fired early at entry 10** (Architect `evt_1j8rqab3xjryd`):
+recut entries 1 to 4 and entries 9 and 10 share one predicate. A word's
+carrier plane is not part of the lowering operand that carries it. The
+earlier ruling that entry 9 was independent is withdrawn. I-2 is held at
+`d9b8d81a8` and resumes as `RT-CARRIER-RESIDUAL-TYPED-OPERAND`, whose
+landing carries it.
 
 Predicate (Architect `evt_2bq826gvr9cvz`, held for the Research advisory):
 the carrier schema is decided upstream of the checked-IH

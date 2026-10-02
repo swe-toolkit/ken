@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-MATRIX-DERIVED-TELESCOPE
 title: "The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or a metavariable"
-status: ready
+status: active
 owner: language
 size: L
 tier: T1
@@ -38,13 +38,57 @@ occurrence is computed by depth arithmetic on a term from another frame.
   `indexed_root_ih_domain`, the `close_nested_matrix_method` re-wrap, and
   the enclosing-frame sentinel deferral.
 
+- **Carry from the landed parent** (`7450a0b17`). The Architect's approval
+  `evt_618n96gqvzeza` (`dec_1s48xec2d7m1x`) left a non-blocking census note
+  on the guard direct-occurrence path. Read it at kickoff. The census here
+  covers that path.
+
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
 
 ## Deliverable
 
-Two increments, each a straight-ancestor cut that may land alone.
+Three increments, each a straight-ancestor cut that may land alone.
 
+0. **Fail closed on an outer alias inside an indexed inner match** (Adversary
+   M8 on `7450a0b17`, `evt_1bspdnet7a87s`). Main gives silent wrong values
+   when an outer `as` alias is read inside a match on an indexed family:
+   - **R1**, a regression: base-rejected at `90ca730f6`, and now accepted
+     with `f 1 (VCons Nat 1 5 (VCons Nat Zero 7 (VNil Nat))) 3 ⇝ 1`, where
+     3 is expected;
+   - **R2**, wrong on base too: `f Zero (VNil Nat) 3 ⇝ 2`, which is `j`.
+
+   Both take the non-reverting path, where the in-matrix kernel check is
+   gated off. One measured cause is `finalize_refined_body` (`elab.rs:7804`)
+   shifting alias sentinels by `premise_count`. R1 has a second, unisolated
+   mis-shift. **Ruled: refuse** (Architect `evt_4439x6wvc0m8v`, which
+   carries the code). Both alias-frame pops (`finish_pattern_alias_frame`,
+   `finish_pattern_alias_term_frame`) refuse with
+   `PatternVariableAcrossDependentSplit` when an enclosing frame's sentinel
+   survives in a match whose scrutinee family refines indices. Every caller
+   passes the truth for its own scrutinee; a constant `None` says why.
+
+   **The check path** (Architect `evt_6n6r4r5shx05f`, `evt_1220jbxcj19zq`,
+   corrected by `evt_40f42ed7ayqq5`, which carries the code). A checked
+   method body opens no alias frame. It reaches the same shift through
+   `wrap_premise_lams_finalized` and
+   `wrap_premise_pis_finalized` at `check_dependent_branch_body` `:6318` and
+   `check_match_dependent_mode` `:6590`. A checked single-arm `Vec Nat (Suc
+   n)` sibling normalizes to `Zero` where 3 is expected. That is measured on
+   `a252de8d8` and on `origin/main` `e893ecb7a`, so it is a live miscompile on
+   main, and increment 0 turns it into a refusal (`evt_4wqqh74aat58j`).
+   - Both wraps return `Result<Term, AliasAcrossPremiseWrap>` and refuse
+     whenever premises are non-empty and the body or a premise holds an alias
+     sentinel. No wrap runs inside a live own frame: a finishing frame
+     resolves its own sentinels before any wrap, so c1 is unaffected.
+   - All ten call sites map the error to `PatternVariableAcrossDependentSplit`
+     at the split's span, with no `.ok()`, `unwrap`, `expect` or `_` arm.
+   - `wrap_premise_lams_from_full` (`:13536`) is excluded because it never
+     calls `finalize_refined_body`.
+   - The infer-finisher guards stay.
+
+   `Internal(g0)` from `project_generated_index_equality_leaves` is not the
+   refusal.
 1. **Seed `ret_ty_slot` from the check-mode expected type.** Report how many
    of the 24 entries become `Some`.
 2. **Open each nested bucket in the derived telescope before its leaves.**
@@ -67,8 +111,59 @@ Two increments, each a straight-ancestor cut that may land alone.
 
 ## Acceptance
 
+- **AC-0a (increment 0, lands alone on `7450a0b17`).**
+  - All 11 indexed-family rows of `evt_1bspdnet7a87s` refuse with
+    `PatternVariableAcrossDependentSplit`, each a refusal pin that names
+    increment 2 as its flip to 3.
+  - The finding's seven correct rows are pinned as values: outer alias in a
+    tuple split, in a `List` nested-head split and in a flat `List` match;
+    an outer nested-pattern variable; a plain outer variable in an indexed
+    inner match. The FIELD-DEP value pins and AC-3's suites stay green. A
+    committed test that newly refuses is a stop to the Architect.
+  - Fan-in: every caller of the two pops and the flag it passes, and the
+    path the checked R1 and R2 variants take. A check-mode alias frame
+    closed elsewhere is a stop.
+  - Census rows c1 (an indexed match's own alias) and c2 (an alias across a
+    nested indexed-column split) are reported, not asserted. A wrong value
+    is a stop to the Architect.
+  - Forcing the flag to `None` in `infer_match` restores R1 ⇝ 1 and R2 ⇝ 2.
+  - **Check path.**
+    - The exact checked R2 (`xs : Vec Nat n`, the Adversary's shape) never
+      reaches a non-empty wrap. Its pin is `ElabError::KernelRejected`
+      carrying `VarOutOfScope { index, .. }` with `index ==
+      PATTERN_ALIAS_SENTINEL_BASE`, asserted through the constant, at the
+      VNil span (Architect `evt_3cqccrymnd3n0`). The test comment says the
+      kernel is refusing an unresolved sentinel, and that a typed diagnostic
+      is an increment-2 residual. Do not retype the elaborator's
+      `KernelRejected` sites.
+    - The checked single-arm sibling (`Vec Nat (Suc n)`) refuses with
+      `PatternVariableAcrossDependentSplit` at the wrap. Its test comment
+      keeps the same-typed census (saved=3, j=2, e=5, {n,m}=0).
+    - Base census on `origin/main`:
+      - the sibling: `Zero` is the live base miscompile this increment
+        turns into a refusal. If main refuses or gives 3, stop to the
+        Architect.
+      - the exact R2: if main gives a value, report it and the binder it
+        selected. If main gives the same raw rejection, record "unchanged".
+    - The fan-in table also names the elaborator function, as file:line,
+      that issues the VNil-span kernel check. Nothing is built there.
+    - Unit rows call both wraps directly. A sentinel with one premise gives
+      `Err`. The same sentinel with zero premises gives `Ok`. A
+      sentinel-free body with premises gives `Ok`, byte-identical to the
+      output before the change.
+    - c1 and the seven controls keep their values. A control that now
+      refuses is a stop to the Architect.
+    - Mutation: an always-`Ok` guard reddens the unit rows and the checked
+      sibling. The exact R2 pin stays green, since it refuses before any
+      wrap. The infer rows still refuse through the finisher guards.
+    - The fan-in table lists all ten wrap call sites with their span source,
+      plus the `from_full` exclusion.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
+  The R1 and R2 rows, the checked R2, the checked single-arm sibling and the
+  Eq-index `Ix/Mk` row (increment 0's infer-finisher discriminator,
+  Architect `evt_57fd0ncxh81v8`) flip from refusal to 3, built from
+  occurrence terms in the derived telescope.
 - **AC-2 (controls).**
   - Every value pin of `LANG-NESTED-SPLIT-FIELD-DEPENDENCE` stays green.
     That includes the collision control and M1, M2 and M3.
@@ -81,6 +176,13 @@ Two increments, each a straight-ancestor cut that may land alone.
 - **AC-3.** `lang_infer_match_indexed_complete` and the as-pattern,
   nested-split and tuple-pattern suites stay green. The catalog census is
   byte-identical, and `trusted_base()` is unchanged.
+
+## Symptom inventory (§1b, Architect)
+
+1. An enclosing alias sentinel reaches an elaborator-to-kernel call
+   unresolved, before its frame finishes. Keyed on kernel-call reachability
+   of an unresolved sentinel (`evt_4416jtap9bj62`, increment 0 §1a 1;
+   Architect `evt_3cqccrymnd3n0`). The next re-trigger is the 3rd.
 
 ## Stop conditions
 
