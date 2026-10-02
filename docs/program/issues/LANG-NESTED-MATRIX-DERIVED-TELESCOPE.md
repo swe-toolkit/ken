@@ -117,10 +117,6 @@ alone.
      returns `None` when zonking defaulted a level, so the first leaf
      discovers R as before increment 1. The Architect's ruling carries the
      code.
-   - An independent increment off current main, ahead of I-2a. Once it
-     lands, I-2a `d3a522dd3` rebases (`elab.rs` intersects, so inspect the
-     `infer_match` entry seed and memo call) and is re-QAed at the rebased
-     SHA.
 2. **Open each nested bucket in the derived telescope before its leaves.**
    - Δ comes from reverting the context and the constructor. Woven binders
      are real `cx.ctx` pushes.
@@ -134,7 +130,9 @@ alone.
    - The in-matrix alias finalize and per-method kernel check run in the
      derived telescope on every path. Both `needs_reverting` gates are
      removed (`evt_4c4tgkc2gvypk`, `evt_qh7m7erbc5f6`, input f).
-   - **Root-frame ownership** (Architect carry `evt_5ezxyycetagrw`). Today
+   - **Root-frame ownership** (increment I-2a, merged `d7676f128`, exact
+     `7effbe9a4`; Architect carry `evt_5ezxyycetagrw`, approval
+     `evt_7904vfyy22b57`). Today
      `memoize_indexed_root_motive` writes `indexed_match_roots.last()`, so an
      inner match in an indexed root's first leaf can write the outer root's
      motive. Both writers, the entry seed and the first-leaf producer, take
