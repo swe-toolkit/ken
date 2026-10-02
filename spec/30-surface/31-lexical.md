@@ -593,11 +593,11 @@ token.
 - **`operator`** — after comment recognition, the lexer takes a maximal
   non-empty run over the fixed ASCII character set
   `+ - * / % = < > | \ :`. An exact spelling already claimed by punctuation,
-  a §1b notation token, or the §4 fixed operator-token set `+`, `-`, `*`, `+%`,
-  `-%`, `*%`, and `==` keeps that dedicated token kind; the separately retired
-  `=>` spelling rejects. Every other run is a generic symbolic `operator`.
-  Consequently `<`, `>`, `/`, `%`,
-  and `<+>` are generic operators, while `!` is outside the character set and
+  a §1b notation token, or the fixed operator-token set `+`, `-`, `*`, `/`,
+  `%`, `+%`, `-%`, `*%`, and `==` keeps that dedicated token kind; the
+  separately retired `=>` spelling rejects. Every other run is a generic
+  symbolic `operator`. Consequently `<`, `>`, and `<+>` are generic
+  operators, while `!` is outside the character set and
   `!=` rejects lexically at `!` rather than becoming an operator. Together with
   §1c's six dedicated notation tokens, the generic kind feeds `32`'s
   `operator_name` production. Fixity and precedence are declared

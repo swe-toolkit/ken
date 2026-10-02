@@ -603,7 +603,7 @@ c)` and `a - b - c` as `(a - b) - c`:
 
 | Level | Operators | Assoc | Notes |
 |---|---|---|---|
-| `7` | `*` (and any future `/`) | `infixl` | multiplicative — binds **tighter** |
+| `7` | `*`, `/`, `%` | `infixl` | multiplicative — binds **tighter** |
 | `6` | `+`, `-` | `infixl` | additive |
 
 The wrapping variants (`+%`/`-%`/`*%`, `35 §3`) share their base operator's
