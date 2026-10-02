@@ -325,6 +325,13 @@ fn effectful_classes_surface() -> ElabEnv {
     env
 }
 
+fn insertion_sort_surface() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("InsertionSort dependency environment");
+    env.elaborate_module_from_roots(&[catalog_packages_dir()], "Algorithm.Sorting.InsertionSort")
+        .expect("InsertionSort must load with its known dependency environment");
+    env
+}
+
 fn decoder_surface() -> ElabEnv {
     let mut env = ElabEnv::new().expect("Decoder dependency environment");
     for provider in [
@@ -370,6 +377,11 @@ const ENUMERATED_CARRIER_ENVIRONMENTS: &[EnumeratedCarrierEnvironment] = &[
         roots: &["Core/Classes/EffectfulClasses.ken.md"],
         load: effectful_classes_surface,
         loaded_witnesses: &["Core.Classes.EffectfulClasses.list_ap"],
+    },
+    EnumeratedCarrierEnvironment {
+        roots: &["Algorithm/Sorting/InsertionSort.ken.md"],
+        load: insertion_sort_surface,
+        loaded_witnesses: &["Algorithm.Sorting.InsertionSort.sort"],
     },
 ];
 

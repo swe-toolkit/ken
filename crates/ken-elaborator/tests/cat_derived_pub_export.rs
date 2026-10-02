@@ -1,12 +1,14 @@
 //! CAT-DERIVED-PUB-EXPORT acceptance controls.
 //!
-//! Promise class: durable invariants. The ten public collection operations
-//! retain their `Data.Collections.Derived` identities. The two `nth` bound
+//! Promise class: durable invariants. The ten structural collection operations
+//! and three generic sort operations retain their `Data.Collections.Derived`
+//! identities. The two `nth` bound
 //! proofs, four `list_append` attached proofs (the three monoid laws and
 //! `list_append::length`), the `map::{id, fusion, append}`
 //! proofs, and the checked `reverse::involutive` proof are published beside
 //! their subjects.
-//! The helper `reverse_snoc` and verified-sort carrier remain private.
+//! The generic `Perm`, `insert`, `sort` and their four checked laws are
+//! exported; their proof helpers and the `List Bool` sort carrier remain private.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -58,12 +60,12 @@ fn assert_transparent_body_mentions(env: &ElabEnv, wrapper: &str, provider: Glob
     );
 }
 
-/// MEASURED: one real selective import accepts all ten public operations, and
+/// MEASURED: real selective imports accept the public collection operations, and
 /// each consumer wrapper retains the corresponding fully-qualified provider
 /// identity. CLAIMED: visibility changes only the interface, never identity or
 /// computation. THE GAP: existing package tests own the operations' behavior.
 #[test]
-fn derived_exports_all_ten_operation_identities() {
+fn derived_exports_all_authorized_operation_identities() {
     let mut env = load_derived();
     let providers = [
         ("map", "cat_derived_pub_map"),
@@ -78,6 +80,9 @@ fn derived_exports_all_ten_operation_identities() {
         ("concat_map", "cat_derived_pub_concat_map"),
         ("eq_from_ord", "cat_derived_pub_eq_from_ord"),
         ("count", "cat_derived_pub_count"),
+        ("Perm", "cat_derived_pub_perm"),
+        ("insert", "cat_derived_pub_insert"),
+        ("sort", "cat_derived_pub_sort"),
         ("bytes_nat_length", "cat_derived_pub_bytes_nat_length"),
     ]
     .map(|(name, wrapper)| {
@@ -92,7 +97,7 @@ fn derived_exports_all_ten_operation_identities() {
 
     env.elaborate_file(
         "import Data.Collections.Derived \
-           (map, filter, list_append, nth, length, reverse, concat_map, eq_from_ord, count, bytes_nat_length)\n\
+           (map, filter, list_append, nth, length, reverse, concat_map, eq_from_ord, count, Perm, insert, sort, bytes_nat_length)\n\
          import Core.Function.Combinators (comp, idf)\n\
          fn cat_derived_pub_map (xs : List Bool) : List Bool = \
            map Bool Bool (\\x. x) xs\n\
@@ -124,9 +129,15 @@ fn derived_exports_all_ten_operation_identities() {
            eq_from_ord Bool cat_derived_pub_leq x y\n\
          fn cat_derived_pub_count (x : Bool) (xs : List Bool) : Nat = \
            count Bool cat_derived_pub_eq x xs\n\
+         fn cat_derived_pub_perm (xs : List Bool) (ys : List Bool) : Prop = \
+           Perm Bool cat_derived_pub_eq xs ys\n\
+         fn cat_derived_pub_insert (xs : List Bool) : List Bool = \
+           insert Bool cat_derived_pub_leq True xs\n\
+         fn cat_derived_pub_sort (xs : List Bool) : List Bool = \
+           sort Bool cat_derived_pub_leq xs\n\
          fn cat_derived_pub_bytes_nat_length (bs : Bytes) : Nat = bytes_nat_length bs",
     )
-    .expect("all ten Derived operations must be selectively importable together");
+    .expect("all authorized Derived operations must be selectively importable together");
 
     for (provider, wrapper) in providers {
         assert_transparent_body_mentions(&env, wrapper, provider);
@@ -212,11 +223,15 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
         let theorem = theorem_and_separator[..separator].trim_end();
         let probe = format!("cat_derived_export_probe_{}", queries.len());
         let attached = format!("{subject}::{proof_name}");
-        let signature_imports = if attached == "list_append::length" {
-            "import Data.Collections.Derived (length)\n\
-             import Data.Numeric.Nat.Arithmetic (add)\n"
-        } else {
-            ""
+        let signature_imports = match attached.as_str() {
+            "list_append::length" => {
+                "import Data.Collections.Derived (length)\n\
+                 import Data.Numeric.Nat.Arithmetic (add)\n"
+            }
+            "insert::count" => "import Data.Collections.Derived (count)\n",
+            "sort::perm" => "import Data.Collections.Derived (Perm)\n",
+            "insert::sorted" | "sort::sorted" => "import Core.Classes.LawfulClasses (bool_or)\n",
+            _ => "",
         };
         queries.push(PublicationQuery {
             surface: attached.clone(),
@@ -239,10 +254,10 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// publishable top-level definition and every `export` re-export item is visible,
 /// including attached proofs via their imported subjects; the successful set is
 /// compared with an independent literal contract set. CLAIMED: Derived's
-/// complete loader-visible export surface is exactly the ten authorized
-/// operations, two `nth` bound proofs, four `list_append` attached proofs
-/// (the three monoid laws and `length`), three `map` proofs (`id`, `fusion`,
-/// `append`), and the `reverse::involutive` attached proof.
+/// complete loader-visible export surface is exactly the authorized
+/// collection operations, two `nth` bound proofs, four `list_append` attached
+/// proofs, three `map` proofs, `reverse::involutive`, three generic sort
+/// operations (`Perm`, `insert`, `sort`), and their four attached sort proofs.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
@@ -298,10 +313,17 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "nth".to_owned(),
             "nth::at_or_beyond_is_none".to_owned(),
             "nth::some_below_length".to_owned(),
+            "Perm".to_owned(),
+            "insert".to_owned(),
+            "insert::count".to_owned(),
+            "insert::sorted".to_owned(),
+            "sort".to_owned(),
+            "sort::perm".to_owned(),
+            "sort::sorted".to_owned(),
             "reverse".to_owned(),
             "reverse::involutive".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         ten operations, three map proofs, two nth proofs, four list_append proofs and reverse::involutive"
+         collection operations, their existing attached proofs and four generic sort proofs"
     );
 }
