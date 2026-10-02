@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [RT-PLANNER-PER-EMITTER-AVAILABILITY]
+depends_on: [RT-PLANNER-PER-EMITTER-AVAILABILITY, RT-CARRIER-RESIDUAL-TYPED-OPERAND]
 blocks: [RT-NATIVE-SEQUENTIAL-BRACKETS]
 github: null
 origin: "Architect recut ruling evt_4x84ykwjtmbsh on RT-NATIVE-SEQUENTIAL-BRACKETS (§1a 2), on the research advisory evt_7rqnbfnw80fe: an escaping continuation's environment must travel in the value (closure conversion). Size is provisional and is re-set at AC-0. Steward-filed per COORDINATION section 2."
@@ -427,17 +427,23 @@ triggers hold-and-research.
    false shape refusal (raw -1). It is exposed on the P2 Deferred route by
    `rt_parity_native generated_entry_capsule_outer_carried`. Keyed on the
    accessor plane (`evt_7stv16qbf6vt5`, §1a 9; Architect `evt_65natwv18ep26`).
-   Entry 9 is independent of entries 7 and 8. The repair is local: all three
-   label readers (`calls.rs:909`, `core.rs:14273`, `mod.rs:8865`) take one
-   immediate-plane accessor.
+   The repair stays: all three label readers (`calls.rs:909`,
+   `core.rs:14273`, `mod.rs:8865`) take one immediate-plane accessor.
 
    Carry, not on this WP: give carrier-schema assertions a typed root-trap
    catalog entry in place of the raw -1 status abort.
-10. The immediate-plane label-reader repair compiles on `d9b8d81a8`, but
-    `outer_carried` still ends in raw -1. The failing instruction is not yet
-    located (`evt_3qh1c0eyn78j1`, §1a 10; Architect `evt_6ddce313fwhaf`).
-    D0-i, which is non-advancing, locates it before any repair is ruled.
-    Entry 12 is the next predicate checkpoint.
+10. A private residual R1075 reaches an ordinary match raw. It goes through
+    the G533 field binding, the G355 checked-answer fallback, lexical
+    capture, continuation assembly and two frame copies, and no step carries
+    its plane (`evt_3qh1c0eyn78j1`, §1a 10; D0-i to D0-k, last
+    `evt_4x2a3b4g5fbzh`).
+
+**Predicate test, fired early at entry 10** (Architect `evt_1j8rqab3xjryd`):
+recut entries 1 to 4 and entries 9 and 10 share one predicate. A word's
+carrier plane is not part of the lowering operand that carries it. The
+earlier ruling that entry 9 was independent is withdrawn. I-2 is held at
+`d9b8d81a8` and resumes as `RT-CARRIER-RESIDUAL-TYPED-OPERAND`, whose
+landing carries it.
 
 Predicate (Architect `evt_2bq826gvr9cvz`, held for the Research advisory):
 the carrier schema is decided upstream of the checked-IH
