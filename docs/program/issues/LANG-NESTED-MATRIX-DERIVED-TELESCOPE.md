@@ -153,8 +153,9 @@ Three increments, each a straight-ancestor cut that may land alone.
       output before the change.
     - c1 and the seven controls keep their values. A control that now
       refuses is a stop to the Architect.
-    - Mutation: an always-`Ok` guard reddens the unit rows and both checked
-      rows. The infer rows still refuse through the finisher guards.
+    - Mutation: an always-`Ok` guard reddens the unit rows and the checked
+      sibling. The exact R2 pin stays green, since it refuses before any
+      wrap. The infer rows still refuse through the finisher guards.
     - The fan-in table lists all ten wrap call sites with their span source,
       plus the `from_full` exclusion.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
