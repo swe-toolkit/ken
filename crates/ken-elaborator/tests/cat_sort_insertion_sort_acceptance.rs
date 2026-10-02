@@ -142,37 +142,15 @@ fn evaluate_nat(env: &ElabEnv, id: GlobalId) -> usize {
 }
 
 /// MEASURED: the seven InsertionSort globals added to a flat fixture over
-/// roots-loaded providers are exactly its public surface; their checked bodies
-/// directly call the preloaded, owned Derived provider identities after their
-/// declaration binders, and contain zero Bool eliminations of their own.
-/// CLAIMED: InsertionSort publishes only its dictionary-specialized surface,
-/// reuses the canonical generic operations and laws, and re-derives no Boolean
-/// decisions. THE GAP: the fixture is flat, not a standalone module closure;
-/// `ken check` on the real catalog path tests its import boundary separately.
-/// Promise classes: normative compatibility vector for the seven public names;
-/// durable exact provider-identity and no-local-decision invariants.
+/// roots-loaded providers are exactly its public surface, and the eleven
+/// retired private artifacts are absent. CLAIMED: the Ord package publishes
+/// only its seven dictionary-specialized names. THE GAP: the fixture is flat,
+/// not a standalone module closure; `ken check` on the real catalog path tests
+/// its import boundary separately. Promise class: normative compatibility
+/// vector for the seven public names and durable retirement invariant.
 #[test]
-fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
-    let (mut env, _, derived_owned) = base_env_with_lawful_owned();
-    let providers = [
-        ("sort", "sort", 3),
-        ("sort::sorted", "sort::sorted", 3),
-        ("sort::permutation", "sort::perm", 3),
-        ("permutation", "Perm", 4),
-        ("insert", "insert", 4),
-        ("insert::sorted", "insert::sorted", 4),
-        ("insert::permutation", "insert::count", 5),
-    ]
-    .map(|(client, provider, binders)| {
-        let id = catalog_or::provider_owned_id(
-            &env,
-            &derived_owned,
-            "Data.Collections.Derived",
-            provider,
-        )
-        .unwrap_or_else(|error| panic!("sort provider {provider}: {error}"));
-        (client, provider, binders, id)
-    });
+fn entry_elaborates_with_exact_public_inventory() {
+    let mut env = base_env();
     let before = env.globals.keys().cloned().collect::<BTreeSet<_>>();
     elaborate_insertion_sort(&mut env);
     let after = env.globals.keys().cloned().collect::<BTreeSet<_>>();
@@ -212,6 +190,38 @@ fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
         added, expected,
         "the only client globals are the seven public wrappers"
     );
+}
+
+/// Promise class: durable provider-identity and no-local-decision invariants.
+///
+/// MEASURED: seven preloaded, owned provider identities head the seven checked
+/// client bodies after their declared binders; no client body eliminates Bool.
+/// CLAIMED: the consumer does not re-derive the generic sort computation or
+/// proofs. THE GAP: a different indirect helper can itself cite Derived, but
+/// the direct-head requirement rejects that indirection at the client boundary.
+#[test]
+fn entry_wrapper_bodies_directly_use_derived_without_boolean_decisions() {
+    let (mut env, _, derived_owned) = base_env_with_lawful_owned();
+    let providers = [
+        ("sort", "sort", 3),
+        ("sort::sorted", "sort::sorted", 3),
+        ("sort::permutation", "sort::perm", 3),
+        ("permutation", "Perm", 4),
+        ("insert", "insert", 4),
+        ("insert::sorted", "insert::sorted", 4),
+        ("insert::permutation", "insert::count", 5),
+    ]
+    .map(|(client, provider, binders)| {
+        let id = catalog_or::provider_owned_id(
+            &env,
+            &derived_owned,
+            "Data.Collections.Derived",
+            provider,
+        )
+        .unwrap_or_else(|error| panic!("sort provider {provider}: {error}"));
+        (client, provider, binders, id)
+    });
+    elaborate_insertion_sort(&mut env);
     for (client, provider, binders, provider_id) in providers {
         let client_id = env.globals[client];
         assert_ne!(
