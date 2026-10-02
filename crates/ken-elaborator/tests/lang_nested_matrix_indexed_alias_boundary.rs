@@ -20,8 +20,9 @@ fn nat(n: usize) -> String {
 fn enclosing_alias_through_indexed_inner_match_is_refused() {
     // MEASURED: eleven indexed inner matches refuse at their own match span.
     // CLAIMED: enclosing aliases cannot silently choose a wrong Nat binder.
-    // THE GAP: the matching compiler may shift a same-typed alias after this
-    // check; disabling the flag restores R1=1/R2=2 in the mutation probe.
+    // THE GAP: these eleven are doubly covered: disabling only the indexed
+    // finisher flag leaves them refused by the nonempty premise-wrap guard.
+    // The separate zero-premise Eq-index row isolates the finisher guard.
     // Transition sentinel: increment 2 flips every row to the value 3.
     // R1 and R2 separate saved=3, outer n=0 or 1, and j=2. The
     // annotated R1 RHS actually checks the nested match against Nat;
@@ -163,8 +164,9 @@ fn zero_premise_indexed_inner_alias_refuses_at_finisher() {
     // the index domain's Pi codomain mentions its bound k. Thus the indexed
     // inner method reaches its alias-frame finisher with no premise wrap.
     // CLAIMED: only the indexed finisher blocks its enclosing alias sentinel.
-    // THE GAP: with only the finisher flag disabled, this *same* checked
-    // definition returns j=2 instead of saved/x=3; the wrap guard stays on.
+    // THE GAP: with only the finisher flag disabled, this same declaration
+    // passes final kernel admission but returns j=2 instead of saved/x=3;
+    // the wrap guard stays on. Its inner `let q = match v` is inference-mode.
     // Independently assignable Nat binders saved/x=3, j=2, m=0 are distinct.
     // Transition sentinel: increment 2 flips this refusal to the value 3.
     // A Vec-function-index sibling was measured identically, not added here.
