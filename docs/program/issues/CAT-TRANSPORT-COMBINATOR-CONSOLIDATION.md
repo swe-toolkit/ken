@@ -92,6 +92,18 @@ Out of scope, deliberately:
     `cat_bsearch_acceptance.rs`, `cc7_argparse_acceptance.rs`,
     `cc8_env_config_decoder_acceptance.rs`, the five
     `cat_tier_{d,e}_*_import` r-layer rows and the Gcd acceptance target.
+- **AC-4 (readability).** The migrated packages follow
+  `docs/program/07-catalog-style-guide.md` and
+  `agent/playbooks/tools/write-ken.md`.
+  - Each rewritten call site reads at least as clearly with Transport's name
+    as with the retired local one. Where a retired name carried domain
+    vocabulary the bare combinator loses, the proof says so in prose or with
+    a named intermediate, not with a new wrapper.
+  - Branch placement and effect order are unchanged.
+  - The plan reserves a final exposition pass after the proofs close.
+  - Foundation QA reviews local naming and formatter layout independently,
+    with a positive layout check of each touched form. `ken fmt --check`
+    alone does not count as that review.
 
 ## Stop conditions
 
