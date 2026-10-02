@@ -1072,7 +1072,57 @@ theorem range_from_length
   }
 
 theorem range_length (n : Nat) : Equal Nat (length Nat (range n)) n = range_from_length Zero n
+```
 
+The length laws count the generated elements. The content laws identify each
+in-bounds element: the first element is `start`, and advancing the index
+advances the threaded starting value. Specializing to `Zero` gives the
+index as the value of each element of `range n`.
+
+```ken
+theorem range_from_nth
+      (start : Nat) (n : Nat)
+    : (i : Nat)
+      → IsTrue (leq_nat (Suc i) n)
+      → Equal (Option Nat) (nth Nat i (range_from start n)) (Some Nat (add start i)) =
+  match n {
+    Zero ↦ λi. λbelow. absurd below;
+    Suc m ↦
+      λi.
+        match i {
+          Zero ↦ λbelow. Refl;
+          Suc i2 ↦
+            λbelow.
+              trans
+                (Option Nat)
+                (nth Nat i2 (range_from (Suc start) m))
+                (Some Nat (add (Suc start) i2))
+                (Some Nat (add start (Suc i2)))
+                (range_from_nth (Suc start) m i2 below)
+                (cong
+                  Nat
+                  (Option Nat)
+                  (add (Suc start) i2)
+                  (Suc (add start i2))
+                  (Some Nat)
+                  ((proof suc_l for add) start i2))
+        }
+  }
+
+theorem range_nth
+      (n : Nat) (i : Nat)
+    : IsTrue (leq_nat (Suc i) n) → Equal (Option Nat) (nth Nat i (range n)) (Some Nat i) =
+  λbelow.
+    trans
+      (Option Nat)
+      (nth Nat i (range n))
+      (Some Nat (add Zero i))
+      (Some Nat i)
+      (range_from_nth Zero n i below)
+      (cong Nat (Option Nat) (add Zero i) i (Some Nat) ((proof zero_l for add) i))
+```
+
+```ken
 fn foldl (a : Type) (b : Type) (f : b → a → b) (z : b) (xs : List a) : b =
   match xs {
     Nil ↦ z;
