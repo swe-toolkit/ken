@@ -61,7 +61,9 @@ An unregistered sentinel fails closed. The third either checks or gives a
 diagnostic whose advice applies.
 
 **Folded in: the cross-frame alias miscompilation** (Architect
-`evt_kzkfxd4aenqq`, measured `evt_358pbpsezs8`). On `5d5e7bf02`, an outer
+`evt_kzkfxd4aenqq`, measured `evt_358pbpsezs8`; live defect on main, census
+`evt_1nvnh7n587636`: base accepts M2 and the two-deep row and returns `Zero`
+for `Suc Zero`; this WP is its repair). On `5d5e7bf02`, an outer
 as-pattern alias used inside an inner match that splits a nested field
 reads the next variable in, which is a silent wrong value. The inner
 split's woven binder is counted twice. The repair is one frame-aware
@@ -217,7 +219,12 @@ pushes, framed on the stop-6 advisory and the M-deep base measurement.
   scope: stop to the Architect to merge the frames.
 - Each of these is an advancing stop (the 10th after `evt_71d3p2fwxtqj1`):
   - a discriminating pin gives a wrong value;
-  - a program accepted on base changes verdict or value;
+  - a program accepted on base changes verdict or value, unless all three
+    hold (`evt_1nvnh7n587636`): a discriminating pin shows the base value
+    wrong and the candidate right; it is listed in census class (a′) "base
+    miscompile corrected" with base, candidate and expected values; and it
+    passes on a mechanism a ruling already named (`weaken_woven` for M2 and
+    two-deep);
   - an AC-N6 census program can be neither value-pinned nor refused;
   - a regression in `lang_infer_match_indexed_complete` (20/20), the
     record-pattern suite, or the 21 targeted suites.
