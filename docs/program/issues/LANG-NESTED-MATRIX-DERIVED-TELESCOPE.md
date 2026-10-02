@@ -101,8 +101,9 @@ alone.
      slot's second producer, so it is not evidence for the seed.
    - A first-bucket unit pin, where no earlier leaf can supply R, reddens
      on seed-off (`evt_6ez9sxdhdkb8a`).
-1b. **Seed only a goal whose levels are solved** (Architect
-   `evt_6jqa2y7rft3tr`, on Adversary `evt_22n4tn23eqwjn`). On `2d6b64aca`, a
+1b. **Seed only a goal whose levels are solved** (merged `710458002`, exact
+   `7c57aac8d`; Architect `evt_6jqa2y7rft3tr`, on Adversary
+   `evt_22n4tn23eqwjn`). On `2d6b64aca`, a
    check-mode `: Type` match whose arms are `Type` is `KernelRejected
    TypeMismatch` on the tuple, or-pattern and nested paths. All three were Ok
    at `a246ede23`. `zonk_level` (`elab.rs:137-140`) reads the unsolved `?u`

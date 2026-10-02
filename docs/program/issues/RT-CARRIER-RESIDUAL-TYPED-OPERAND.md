@@ -302,14 +302,28 @@ The ruling carries the code and is authoritative where this summary differs.
     - Planner census over the parity corpus: issued slots, mixed slots and
       boxed stores. A Boxed member with a checked-IH force store is a stop
       to the Architect.
-    - Mutations:
-      - dropping Boxed variant issuance refuses at `:10671`;
-      - a writer storing bare K for a Boxed member fails closed at the
-        decoder's `class == Record` check, with -1;
-      - reverting the decoder arity to the `WorkerCapture` count reddens
-        the row.
+    - **Boxed lowering is refused at compile time** (Architect
+      `evt_3pfe4zm2mrxs4`). All 299 parity plans have 0 mixed slots. The
+      only live mixed-slot source lacks P3→P1 call authority for S1's
+      worker body, so Boxed write and decode have no executed consumer.
+      - A choke point in the full-compilation driver, before the first
+        unit is lowered: any issued Boxed variant gives
+        `unsupported("RecursiveResidual", ..)`, counted in
+        `boxed_member_compile_refusals`. It does not go in `Lowering`
+        construction, and the exact planning row stays green and unchanged.
+      - The planner and the three Boxed lowering arms stay as built.
+      - Pin `mixed_recursive_carrier_boxed_member_is_refused_before_lowering`:
+        `Err`, refusals 1, `boxed_decode_arms_emitted` 0. Report the
+        source's observation on the merge-base too.
+      - Mutations: deleting the choke point (M-choke) and dropping Boxed
+        issuance (M-issue) each redden. The arity and bare-K execution
+        mutations are retired: there is no green execution for them to
+        change.
+      - Lifting the refusal needs a source with graph-derived call
+        authority, on which those two execution mutations redden.
   - One full `rt_parity_native` run on the candidate itself (186/186), with
-    verdicts unchanged. The pre-D0 186/186 does not transfer.
+    verdicts unchanged and `boxed_member_compile_refusals` 0. The pre-D0
+    186/186 does not transfer.
   - Every I-2 acceptance row of `RT-NATIVE-CONTINUATION-ENV-CARRIAGE`
     holds, as do the 13-row log, mutations 1-3 and the class guard at
     `joins.rs:1109-1124`.
