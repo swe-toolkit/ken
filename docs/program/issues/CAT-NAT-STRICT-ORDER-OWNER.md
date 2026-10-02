@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-STRICT-ORDER-OWNER
 title: "Nat's strict order is defined twice, as Cursor's public cursor_nat_lt and Property's private property_nat_lt, and its laws are re-derived package by package across Cursor, Parsing, Decoder and Json. Make Data.Numeric.Nat.Order the owner of lt_nat and its laws, and retire Property's re-derived byte equality"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2
