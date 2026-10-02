@@ -1,7 +1,7 @@
 ---
 id: CAT-TRANSPORT-COMBINATOR-CONSOLIDATION
 title: "Transport's header lists subst as public API but declares it private, and eleven body-identical private copies of Transport's combinators sit in seven packages. Publish subst at zero TCB, correct the header for cast, and retire the eleven copies to Transport"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -118,3 +118,23 @@ Out of scope, deliberately:
 - A copy that is not body-identical, or whose argument order differs.
 - Any new primitive, postulate or axiom, or an import cycle.
 - A consumer of a retired name that was not counted: stop and name it.
+
+## Closeout
+
+Merged `e0a91e007` (PR #4444), exact `40c54664e`: Foundation QA
+`evt_2yr1trw64cfgm`, Architect `evt_6z5j4cyzsrtd7`, Decision
+`dec_214j786pkq6e4`.
+
+- Transport's `subst` is public at zero TCB, and the header says `cast` is
+  package-local.
+- The eleven private copies in seven packages, and Posix's unused
+  `path_equal_cong0`, are retired to Transport.
+- Committed rows: `cat_transport_pub_export` (the open-family client, the
+  swapped-endpoint `TypeMismatch`, Transport global identities and the
+  whole-root absence pin) and the three exact provider inventories.
+- Carried:
+  - FoKripke's copies go to `CAT-FOKRIPKE-TRANSPORT-IMPORT`.
+  - Three orphaned short prose lines, in Gcd ("axiom,"), Parsing/Decoder
+    ("In particular,") and Configuration/Decoder ("It adds no parser,
+    renderer,"), are folded at the next touch of each package (Architect
+    `evt_6z5j4cyzsrtd7`).

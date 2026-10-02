@@ -1,7 +1,7 @@
 ---
 id: CAT-FOKRIPKE-TRANSPORT-IMPORT
 title: "FoKripke keeps three private, alpha-identical copies of Transport's cong, sym and trans. Import Transport's and retire the copies, preloading Transport at the 20 flat-source test consumers"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
