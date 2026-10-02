@@ -4556,7 +4556,18 @@ impl<'a> Lowering<'a> {
         // below — otherwise a carried scrutinee reaching a real eliminator
         // would fail closed at `specialized_at` even though `§2g` gives it a
         // route. ⛔ The phase is classified with no wildcard.
-        if let LoweringOperand::Carried(word) = scrutinee {
+        let ordinary_word = match &scrutinee {
+            LoweringOperand::Carried(word) => Some(*word),
+            LoweringOperand::Residual(residual) => match eliminator {
+                EliminatorFrame::Ordinary(_) => {
+                    Some(self.decode_residual_child(builder, *residual)?)
+                }
+                EliminatorFrame::Computational(_) | EliminatorFrame::PendingLet(_)
+                | EliminatorFrame::InvocationReturn | EliminatorFrame::Active(_) => None,
+            },
+            LoweringOperand::Specialized(_) => None,
+        };
+        if let Some(word) = ordinary_word {
             return match eliminator {
                 EliminatorFrame::Computational(mut frame) => {
                     // `D6a` -- the predecessor's route RAISES the frame's, and
@@ -16531,10 +16542,21 @@ impl<'a> Lowering<'a> {
                     })));
                 }
                 if constructor == &self.process_symbols.nat_suc {
-                    if let [LoweringOperand::Specialized(Lowered::StructuralNat(predecessor))] = lowered_args.as_slice() {
-                        return Ok(LoweringOperand::Specialized(Lowered::StructuralNat(StructuralNatV1 {
-                            value: builder.ins().iadd_imm(predecessor.value, 1),
-                        })));
+                    if let [argument] = lowered_args.as_slice() {
+                        let predecessor = match argument {
+                            LoweringOperand::Specialized(Lowered::StructuralNat(predecessor)) => {
+                                Some(predecessor)
+                            }
+                            LoweringOperand::Residual(_) => None,
+                            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
+                        };
+                        if let Some(predecessor) = predecessor {
+                            return Ok(LoweringOperand::Specialized(Lowered::StructuralNat(
+                                StructuralNatV1 {
+                                    value: builder.ins().iadd_imm(predecessor.value, 1),
+                                },
+                            )));
+                        }
                     }
                 }
                 self.record_pending_vis_construct(

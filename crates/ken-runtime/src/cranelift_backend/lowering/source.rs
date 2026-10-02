@@ -4623,8 +4623,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 let (activation, invocation) = boundary.ok_or_else(|| unsupported(
                                     "RecursiveResidual", "a labelled force lost its invocation segment",
                                 ))?;
-                                let LoweringOperand::Residual(word) = base else {
-                                    return Err(unsupported("RecursiveResidual", "a labelled force has no issued R slot word"));
+                                let word = match base {
+                                    LoweringOperand::Residual(word) => word,
+                                    LoweringOperand::Carried(_) | LoweringOperand::Specialized(_) => {
+                                        return Err(unsupported("RecursiveResidual", "a labelled force has no issued R slot word"));
+                                    }
                                 };
                                 if source_active_cursor(&control.selected, &control.selected_lineage,
                                     invocation.resume_cursor).is_none()
