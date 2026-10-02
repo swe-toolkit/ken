@@ -1,8 +1,8 @@
-//! Increment-0 transition pins: an enclosing alias cannot cross an indexed
-//! inner match until the derived telescope replaces coordinate arithmetic.
+//! Derived-telescope value pins: enclosing aliases remain in the same
+//! coordinates as the plain binders beneath indexed inner matches.
 //! Spec: spec/30-surface/34-data-match.md §3.1–3.2, §4.4.
 
-use ken_elaborator::{ElabEnv, ElabError};
+use ken_elaborator::ElabEnv;
 use ken_kernel::{normalize, Context};
 
 const VEC: &str = r#"
@@ -17,13 +17,9 @@ fn nat(n: usize) -> String {
 }
 
 #[test]
-fn enclosing_alias_through_indexed_inner_match_is_refused() {
-    // MEASURED: eleven indexed inner matches refuse at their own match span.
-    // CLAIMED: enclosing aliases cannot silently choose a wrong Nat binder.
-    // THE GAP: these eleven are doubly covered: disabling only the indexed
-    // finisher flag leaves them refused by the nonempty premise-wrap guard.
-    // The separate zero-premise Eq-index row isolates the finisher guard.
-    // Transition sentinel: increment 2 flips every row to the value 3.
+fn enclosing_alias_through_indexed_inner_match_returns_saved() {
+    // Durable invariant. Eleven indexed matches return the enclosing alias
+    // saved=3, not same-typed n=0/1, j=2 or inner e=5/7.
     // R1 and R2 separate saved=3, outer n=0 or 1, and j=2. The
     // annotated R1 RHS actually checks the nested match against Nat;
     // unannotated/direct first leaves discover their result by inference.
@@ -74,18 +70,11 @@ fn enclosing_alias_through_indexed_inner_match_is_refused() {
         let source = format!(
             "{VEC}\nfn f (n : Nat) (xs : Vec Nat {index}) (x : Nat) : Nat = \
              match x {{ Zero ↦ Zero; (Suc j) as saved ↦ {body} }}\n\
-             const observed : Nat = f ({}) ({vector}) (Suc (Suc (Suc Zero)))",
+             const observed : Nat = f ({}) ({vector}) (Suc (Suc (Suc Zero)))
+             const expected : Nat = Suc (Suc (Suc Zero))",
             nat(n)
         );
-        let mut env = ElabEnv::new().expect("prelude");
-        let trusted = env.env.trusted_base();
-        let error = env.elaborate_file(&source).expect_err(name);
-        assert_eq!(env.env.trusted_base(), trusted);
-        assert!(
-            matches!(error, ElabError::PatternVariableAcrossDependentSplit { ref span }
-                if span.start == source.find("match xs").expect("indexed match")),
-            "{name}: {error:?}"
-        );
+        assert_value(&source, "observed", "expected");
     }
 }
 
@@ -159,17 +148,10 @@ fn nonindexed_splits_and_plain_indexed_variable_preserve_values() {
 }
 
 #[test]
-fn zero_premise_indexed_inner_alias_refuses_at_finisher() {
-    // MEASURED: index j=0 is omitted by method_index_premise_pairs because
-    // the index domain's Pi codomain mentions its bound k. Thus the indexed
-    // inner method reaches its alias-frame finisher with no premise wrap.
-    // CLAIMED: only the indexed finisher blocks its enclosing alias sentinel.
-    // THE GAP: with only the finisher flag disabled, this same declaration
-    // passes final kernel admission but returns j=2 instead of saved/x=3;
-    // the wrap guard stays on. Its inner `let q = match v` is inference-mode.
-    // Independently assignable Nat binders saved/x=3, j=2, m=0 are distinct.
-    // Transition sentinel: increment 2 flips this refusal to the value 3.
-    // A Vec-function-index sibling was measured identically, not added here.
+fn zero_premise_indexed_inner_alias_returns_saved() {
+    // Durable invariant. A zero-premise Eq-index method returns the enclosing
+    // saved/x=3 instead of same-typed j=2 or inner m=1; no wrap guard can
+    // rescue wrong occurrence coordinates.
     let source = "data Ix : ((k : Nat) → Equal Nat k k) → Type where { \
         Mk : (m : Nat) → (p : (k : Nat) → Equal Nat k k) → Ix p }\n\
         theorem eq_refl : (k : Nat) → Equal Nat k k = \\k. Refl\n\
@@ -178,26 +160,15 @@ fn zero_premise_indexed_inner_alias_refuses_at_finisher() {
             Mk Zero w ↦ saved; Mk (Suc m) w ↦ saved \
           } in q \
         }\n\
-        const observed : Nat = f eq_refl (Mk (Suc Zero) eq_refl) (Suc (Suc (Suc Zero)))";
-    let mut env = ElabEnv::new().expect("prelude");
-    let trusted = env.env.trusted_base();
-    let error = env
-        .elaborate_file(source)
-        .expect_err("zero-premise alias refuses");
-    assert!(
-        matches!(error, ElabError::PatternVariableAcrossDependentSplit { ref span }
-            if span.start == source.find("match v").expect("inner match")),
-        "indexed infer finisher must refuse at the inner match: {error:?}"
-    );
-    assert_eq!(env.env.trusted_base(), trusted);
+        const observed : Nat = f eq_refl (Mk (Suc Zero) eq_refl) (Suc (Suc (Suc Zero)))
+        const expected : Nat = Suc (Suc (Suc Zero))";
+    assert_value(source, "observed", "expected");
 }
 
 #[test]
-fn checked_indexed_inner_alias_refuses_before_premise_shift() {
-    // MEASURED: a checked single-arm inner match reaches a nonempty premise
-    // wrap and refuses a foreign alias. CLAIMED: it cannot return a wrong Nat.
-    // THE GAP: an always-Ok wrap guard admits this row as Zero on both main
-    // and the pre-guard candidate. Increment 2 must flip it to value 3.
+fn checked_indexed_inner_alias_preserves_saved_across_premises() {
+    // Durable invariant. A checked inner method returns saved=3 despite its
+    // nonempty premise wrap; merely removing the old guard returned Zero.
     // Index-forced group {n,m}=0 follows Suc m = Suc n at xs. Independently
     // assignable same-typed binders are saved=3, j=2 and e=5; the result
     // must be 3, not the base's wrong Zero from {n,m}.
@@ -209,19 +180,10 @@ fn checked_indexed_inner_alias_refuses_before_premise_shift() {
          }}\n\
          const observed : Nat = f Zero \
            (VCons Nat Zero (Suc (Suc (Suc (Suc (Suc Zero))))) (VNil Nat)) \
-           (Suc (Suc (Suc Zero)))"
+           (Suc (Suc (Suc Zero)))
+         const expected : Nat = Suc (Suc (Suc Zero))"
     );
-    let mut env = ElabEnv::new().expect("prelude");
-    let trusted = env.env.trusted_base();
-    let error = env
-        .elaborate_file(&source)
-        .expect_err("checked sibling must refuse");
-    assert!(
-        matches!(error, ElabError::PatternVariableAcrossDependentSplit { ref span }
-            if span.start == source.find("match xs").expect("inner match")),
-        "checked sibling: {error:?}"
-    );
-    assert_eq!(env.env.trusted_base(), trusted);
+    assert_value(&source, "observed", "expected");
 }
 
 #[test]
@@ -232,7 +194,7 @@ fn checked_indexed_inner_match_preserves_plain_and_woven_binders() {
     // MEASURED: checked dependent matches return 3, 2, 5, and 3.
     // CLAIMED: checked matching still transports ordinary context occurrences.
     // THE GAP: these rows do not establish the alias representation on their
-    // own; the `saved` sibling above is the transition pin that must flip.
+    // own; the `saved` sibling above pins the distinct alias value.
     for (arm_body, expected) in [("Suc j", 3), ("j", 2), ("e", 5)] {
         let source = format!(
             "{VEC}\nfn f (n : Nat) (xs : Vec Nat (Suc n)) (x : Nat) : Nat = \

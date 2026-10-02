@@ -260,10 +260,6 @@ pub enum ElabError {
         missing: MissingPatternWitness,
         span: Span,
     },
-    /// A virtual nested-pattern variable or as-alias cannot be resolved
-    /// beneath a dependent nested split until its binders live in the
-    /// derived telescope. Refuse rather than select a same-typed wrong binder.
-    PatternVariableAcrossDependentSplit { span: Span },
     /// An inferred result type still mentions a pattern-local binder after
     /// leaving the arm; only an annotated, checked match can type that body.
     InferredMatchResultEscapesPattern {
@@ -271,6 +267,9 @@ pub enum ElabError {
         arm_span: Span,
         escaping_binder: Option<String>,
     },
+    /// Internal matrix-control signal, consumed only by its owning match entry.
+    /// It must never escape into a user-facing diagnostic.
+    MatrixResultDiscovered { owner: usize },
     /// A dead match arm (`34 §4.2`): `cause` says why (`ArmDeadCause`).
     ReachabilityError { span: Span, cause: ArmDeadCause },
     /// An instance declared outside the module of its class AND its head-type
@@ -766,10 +765,6 @@ impl fmt::Display for ElabError {
                     span.start, span.end, missing
                 )
             }
-            ElabError::PatternVariableAcrossDependentSplit { .. } => write!(
-                f,
-                "a variable bound inside a nested sub-pattern (or an `as`-alias) cannot be used beneath a dependent nested split yet; bind it at the top level of the arm"
-            ),
             ElabError::InferredMatchResultEscapesPattern {
                 match_span,
                 arm_span,
@@ -784,6 +779,9 @@ impl fmt::Display for ElabError {
                     write!(f, " through binder '{name}'")?;
                 }
                 write!(f, "; annotate the match's result type")
+            }
+            ElabError::MatrixResultDiscovered { owner } => {
+                write!(f, "internal error: match result discovery escaped owner {owner}")
             }
             ElabError::ReachabilityError { span, cause } => match cause {
                 ArmDeadCause::Subsumed { first, rest } => {
