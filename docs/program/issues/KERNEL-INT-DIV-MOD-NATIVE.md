@@ -60,7 +60,8 @@ stop and report the mismatch.
    `Int → Int → Int`, with no conversion rule, so both stay neutral in the
    kernel. `trusted_base()` grows by exactly these two.
 2. **The surface: `/` and `%` become fixed arithmetic tokens, like `+`**
-   (Architect `evt_3jj0h45bmcdp6`, which carries the design). Today they are
+   (Architect `evt_3jj0h45bmcdp6`, which carries the design; operator
+   2026-10-02: "approve / and % as built-ins"). Today they are
    generic user operators. A fallback is rejected, because the meaning of
    one spelling would depend on declaration order.
    - The lexer claims exactly `/` and `%`, so `<`, `>`, `<+>` and `/\` stay
