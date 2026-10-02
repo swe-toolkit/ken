@@ -136,6 +136,26 @@ These five cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
   transporting that field. The later dependent `T n` field still
   transports through the preceding-field equality evidence.
 
+### observational/eq-inductive-omega-field-irrelevant-dependency (soundness)
+- spec: `spec/10-kernel/16-observational.md` §§2.2, 8.2, 8.4;
+  `spec/10-kernel/14-inductive.md` §1
+- given: With declarations `P : Omega_0` and
+  `U : Nat -> P -> Type 0`, declare:
+  ```text
+  data E : Type 0 where
+    mk : (n : Nat) -> (p : P) -> U n p -> E
+  ```
+  In context `n : Nat`, distinct `p q : P`, `x : U n p`,
+  `y : U n q`, and `r : Eq (U n q) x y`, let `left := mk n p x`,
+  `right := mk n q y`. Query `infer(Eq E left right)` and
+  `check((refl n, (refl q, r)), Eq E left right)`.
+- expect: `infer(Eq E left right) = Omega_0`, and the check accepts.
+- why: The later field's types `U n p` and `U n q` are convertible
+  only by Omega proof irrelevance (§8.2). R3 discards the source
+  Omega proof; the later field is compared directly, with no
+  transport. Structural comparison of `p` and `q` would leave `r`
+  ill-typed and this check would not accept.
+
 ### observational/eq-trunc-omega-level-one (soundness)
 - spec: `spec/10-kernel/16-observational.md` §§2.1, 2.2, 6, 8.4
 - given: `A : Type 1`, `u v : ‖A‖`. Query `infer(Eq ‖A‖ u v)`,
