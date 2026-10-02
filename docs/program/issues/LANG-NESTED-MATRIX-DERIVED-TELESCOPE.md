@@ -112,6 +112,14 @@ Three increments, each a straight-ancestor cut that may land alone.
    - The in-matrix alias finalize and per-method kernel check run in the
      derived telescope on every path. Both `needs_reverting` gates are
      removed (`evt_4c4tgkc2gvypk`, `evt_qh7m7erbc5f6`, input f).
+   - **Root-frame ownership** (Architect carry `evt_5ezxyycetagrw`). Today
+     `memoize_indexed_root_motive` writes `indexed_match_roots.last()`, so an
+     inner match in an indexed root's first leaf can write the outer root's
+     motive. Both writers, the entry seed and the first-leaf producer, take
+     `root_frame_depth`, and write only when `indexed_match_roots.len() ==
+     depth + 1`. Fixtures p1 (inner inference match) and p2 (inner checked
+     match) give `Suc Zero` from `f Zero (VNil Nat)`. Both fail closed on
+     main with `KernelRejected TypeMismatch`.
    - Representation (input g, `evt_71d3p2fwxtqj1`): locally nameless. Matrix
      binders are elaborator-only fresh free variables, refused at the kernel
      boundary, so the kernel `Term` is unchanged. One `abstract` function
