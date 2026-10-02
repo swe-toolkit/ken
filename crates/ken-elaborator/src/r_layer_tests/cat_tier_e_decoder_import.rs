@@ -14,6 +14,7 @@ const DECODER: &str = "Application.Configuration.Decoder";
 const DECODER_SOURCE: &str =
     include_str!("../../../../catalog/packages/Application/Configuration/Decoder.ken.md");
 const SCHEMA: &str = "Application.Input.Schema";
+const TRANSPORT: &str = "Core.Logic.Transport";
 const SCHEMA_SOURCE: &str =
     include_str!("../../../../catalog/packages/Application/Input/Schema.ken.md");
 
@@ -96,6 +97,7 @@ fn load_decoder() -> (ElabEnv, BTreeSet<GlobalId>, BTreeSet<GlobalId>) {
         "Capability.Formatting.Doc",
         "Capability.Process.Environment",
         "Core.Classes.LawfulClasses",
+        TRANSPORT,
         "Data.Collections.NonEmpty",
         "Data.Sums.Validation",
     ] {
@@ -190,7 +192,7 @@ fn collect_decl_globals(declaration: &Decl, out: &mut BTreeSet<GlobalId>) {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the real parser returns exactly the seven D0-ledger module/name
+/// MEASURED: the real parser returns exactly eight selective module/name
 /// sets, and each non-base checked provider identity has a qualified owner in
 /// Decoder's declared imports. CLAIMED: checked provider modules have explicit
 /// Decoder import edges. THE GAP: the exact ledger separately pins source
@@ -245,6 +247,7 @@ fn decoder_selective_import_ledger_is_exact() {
             "Core.Classes.LawfulClasses".to_owned(),
             names(&["bytes_deceq_eq"]),
         ),
+        (TRANSPORT.to_owned(), names(&["sym", "trans"])),
         (
             "Data.Collections.NonEmpty".to_owned(),
             names(&["NonEmpty", "nonempty_map"]),
@@ -397,10 +400,10 @@ fn decoder_loader_visible_inventory_is_exact_and_usable() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every non-prelude, non-owned identity in checked Decoder terms is
-/// exactly one of the 38 named provider identities. The original 15 direct
+/// exactly one of the 40 named provider identities. The original 15 direct
 /// Schema imports remain exact; eight additional Schema identities and `nth`
-/// are referenced by qualified public proof terms. Schema publication has 26
-/// direct names plus exactly two attached `schema_validate_fields` proofs.
+/// are referenced by qualified public proof terms. Schema publication has 28
+/// direct names plus exactly three attached `schema_validate_fields` proofs.
 /// CLAIMED: Decoder has no undeclared provider, mis-cut dependency, or
 /// unexpected Tier-E edge. THE GAP: unused source imports are covered by the
 /// exact parsed ledger, independently of qualified proof dependencies.
@@ -440,6 +443,8 @@ fn decoder_checked_provider_and_schema_closure_is_exact() {
         "Capability.Formatting.Doc.Doc",
         "Capability.Process.Environment.process_environment",
         "Core.Classes.LawfulClasses.bytes_deceq_eq",
+        "Core.Logic.Transport.sym",
+        "Core.Logic.Transport.trans",
         "Data.Collections.Derived.nth",
         "Data.Collections.NonEmpty.NonEmpty",
         "Data.Collections.NonEmpty.nonempty_map",

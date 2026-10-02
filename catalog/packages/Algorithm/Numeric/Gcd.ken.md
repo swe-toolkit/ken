@@ -11,7 +11,8 @@ The package reuses canonical addition, multiplication, and right
 multiplication distributivity from `Nat` arithmetic and imports the canonical
 `leq_nat` identity from its class-owning provider. Saturating subtraction, its
 cancellation and zero-left laws, and order bounds come from the `Nat` order
-facade. Equality transport comes from `Core.Logic.Transport`.
+facade. Equality transport comes from `Core.Logic.Transport`;
+`subst_divides` uses its public `subst` to move a quotient witness.
 The three data carriers come first in loader dependency order. `divides_gcd`
 is then the first function in the uninterrupted checked function/proof run,
 followed by its increasingly fundamental implementation support.
@@ -19,7 +20,7 @@ followed by its increasingly fundamental implementation support.
 ```ken
 import Core.Classes.LawfulClasses (leq_nat)
 
-import Core.Logic.Transport (cong, sym, trans)
+import Core.Logic.Transport (cong, subst, sym, trans)
 
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_r)
 
@@ -449,11 +450,6 @@ fn bool_view (value : Bool) : BoolView value =
     True ↦ BoolIsTrue True Proved;
     False ↦ BoolIsFalse False Proved
   }
-
-fn subst
-      (ty : Type) (x : ty) (y : ty) (fam : ty → Type) (p : Equal ty x y) (px : fam x)
-    : fam y =
-  J (λy2 _. fam y2) px p
 ```
 
 The shared order laws remain usable at open arguments outside their owner:
@@ -486,7 +482,8 @@ that sum. `Divides` is witness-bearing data, and the required laws are checked
 proof terms. `add`, its algebraic laws, `mul`, and `mul_add_distrib_r` retain
 their Arithmetic identities; `leq_nat` comes directly from LawfulClasses;
 `sub`, its cancellation and zero-left laws, right weakening, and the successor
-bound retain their Order identities. Equality transport uses `cong`, `sym`,
-and `trans` from their canonical provider. This package introduces no axiom,
+bound retain their Order identities. Equality transport uses `cong`, `subst`,
+`sym`, and `trans` from their canonical provider. This package introduces no
+axiom,
 postulate, primitive, foreign declaration, or local replacement for those
 providers.
