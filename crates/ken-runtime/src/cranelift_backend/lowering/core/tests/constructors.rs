@@ -6909,18 +6909,22 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
 /// graph-issued call authority for that member. Full compilation must refuse
 /// before emitting any unit, rather than run an untested native ABI path.
 ///
-/// MEASURED: on merge-base 10daa9242 this exact source compiles and returns
-/// `Option::None` (native word 1541). No binder reading can produce that
-/// value: the Leaf case returns only Exit constructors; the Node IH returns
-/// the Leaf result or a non-ground Node. The RuntimeIr evaluator refuses
-/// computational IH, so it cannot serve as an oracle for this source.
+/// MEASURED / GAP (Architect evt_75s5cr96knfde):
+/// On merge-base 10daa9242 the synthetic mixed source (the checked-IH mixed
+/// fixture with Node body `Call(Var(0), MkUnit)` and root
+/// `Call(source, Bool(false))`) compiles and returns `Returned(Option::None)`.
+/// The native word is 1541, a PersistentGround handle to image node 6; the
+/// label is the constructor stored in that node. No binder reading of the
+/// source produces that value, because the Leaf body's outer match is total
+/// into Exit. The RuntimeIr evaluator refuses computational IH, so no oracle
+/// exists. On the candidate the source is refused before lowering by the
+/// Boxed choke (refusals 1, Boxed arms 0). The parity population is unchanged:
+/// 186/186, 0 mixed slots in 299 plans, 0 choke firings.
 ///
-/// CLAIMED: on this candidate the issued Boxed member is refused before
-/// lowering (one refusal, zero emitted Boxed decoder arms).
-/// THE GAP: no graph-authorized executed Boxed consumer exists yet. Do not
-/// claim no regression for this source; the base silently returned an
-/// unproducible value. A future source must exercise the Boxed path and red
-/// both arity and bare-K mutations before this refusal can be removed.
+/// CLAIMED: this Boxed member is refused before native lowering. A future
+/// graph-authorized source must execute Boxed and red both the arity and bare-K
+/// mutations before this refusal can be lifted. The base's wrong value is not
+/// a no-regression claim for the refused shape.
 ///
 /// Promise class: transition sentinel, retired by that executed witness.
 #[test]
