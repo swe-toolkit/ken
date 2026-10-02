@@ -315,6 +315,15 @@ fn level_from_nat(n: u32) -> Level {
 
 // ----- elaboration context -----
 
+/// A proposition available at a binder depth, but not inserted into the
+/// kernel's context while elaborating a declaration body. Recognition uses
+/// kernel conversion; goal closure inserts each proposition into the telescope.
+#[derive(Clone)]
+struct Assumption {
+    prop: Term,
+    depth: usize,
+}
+
 struct ElabCtx<'e> {
     env: &'e mut GlobalEnv,
     /// Required semantic-owner label for every checking-mode `Axiom` minted
@@ -326,6 +335,7 @@ struct ElabCtx<'e> {
     /// exposing the generated recursion/refinement encoding at the surface.
     recursive_group: HashSet<GlobalId>,
     ctx: Context,
+    assumptions: Vec<Assumption>,
     metas: MetaCtx,
     globals: &'e HashMap<String, GlobalId>,
     num_values: &'e mut HashMap<GlobalId, NumericLitVal>,
@@ -462,6 +472,7 @@ impl<'e> ElabCtx<'e> {
             owner_label: owner_label.into(),
             recursive_group: HashSet::new(),
             ctx: Context::new(),
+            assumptions: Vec::new(),
             metas: MetaCtx::default(),
             globals,
             num_values,
@@ -10055,7 +10066,7 @@ fn elab_binop(
                         Term::app(Term::const_(novf_id, vec![]), lhs_core.clone()),
                         rhs_core.clone(),
                     );
-                    let closed = close_goal(&cx.ctx, phi);
+                    let closed = close_goal(&cx.ctx, &[], phi);
                     let hole_id =
                         declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
                             .map_err(|e| ElabError::KernelRejected {
@@ -10124,25 +10135,36 @@ fn elab_binop(
                 rhs_core.clone(),
             );
 
-            // A raw Int division/remainder creates one proof obligation at its
-            // operation site. The predicate is a transparent definition, never
-            // a new trusted primitive or a conversion rule for either Op.
+            // Recognition is by kernel conversion of a DIRECT assumption,
+            // never by spelling or by reasoning from a stronger proposition.
             let goal = Term::app(Term::const_(entry.nonzero_id, vec![]), rhs_core);
-            let closed = close_goal(&cx.ctx, goal);
-            let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
-                .map_err(|error| ElabError::KernelRejected {
-                    error,
-                    span: span.clone(),
-                })?;
-            let obl_id = cx.obl_counter;
-            cx.obl_counter += 1;
-            cx.obligations.push(Obligation {
-                id: obl_id,
-                hole_id,
-                goal_closed: closed,
-                span: span.clone(),
-                kind: ObligationKind::PartialPrim,
+            let known = cx.assumptions.iter().rev().any(|assumption| {
+                assumption.depth <= cx.ctx.len()
+                    && convert_type(
+                        cx.env,
+                        &cx.ctx,
+                        &weaken(&assumption.prop, (cx.ctx.len() - assumption.depth) as i64),
+                        &goal,
+                    )
             });
+            if !known {
+                let closed = close_goal(&cx.ctx, &cx.assumptions, goal);
+                let hole_id =
+                    declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
+                        .map_err(|error| ElabError::KernelRejected {
+                            error,
+                            span: span.clone(),
+                        })?;
+                let obl_id = cx.obl_counter;
+                cx.obl_counter += 1;
+                cx.obligations.push(Obligation {
+                    id: obl_id,
+                    hole_id,
+                    goal_closed: closed,
+                    span: span.clone(),
+                    kind: ObligationKind::PartialPrim,
+                });
+            }
             Ok((applied, result_ty))
         }
 
@@ -10165,24 +10187,121 @@ fn elab_binop(
 
 // ----- goal closing -----
 
-/// Close an open goal over the local context.
-///
-/// Given `goal` valid in `ctx` (depth = n), builds `Pi(T_{n-1}, ..., Pi(T_0, goal))`
-/// — the universally quantified form suitable for `declare_postulate`.
-///
-/// Limitation (V1): works correctly for independent parameter types (no mutual
-/// de Bruijn references between stored types). Sufficient for all V1 conformance
-/// cases.
-fn close_goal(ctx: &Context, goal: Term) -> Term {
-    let n = ctx.types.len();
+/// Close a goal over its context, inserting every available proposition at
+/// its recorded binder depth. The kernel's actual body context is unchanged.
+/// When an assumption is inserted, shift the still-free outer variables in
+/// the inner telescope by one so they continue to refer to their binders.
+fn close_goal(ctx: &Context, assumptions: &[Assumption], goal: Term) -> Term {
     let mut result = goal;
-    // Wrap from innermost (Var(0)) to outermost (Var(n-1))
-    for i in 0..n {
-        // types[n-1-i] = stored type of Var(i) (innermost-first indexing)
-        let stored_ty = ctx.types[n - 1 - i].clone();
-        result = Term::pi(stored_ty, result);
+    for depth in (0..=ctx.len()).rev() {
+        // Reverse at equal depth so discovery order remains the outer-to-inner
+        // order of assumptions in the closed Pi telescope.
+        for assumption in assumptions.iter().rev().filter(|a| a.depth == depth) {
+            result = Term::pi(assumption.prop.clone(), weaken(&result, 1));
+        }
+        if depth > 0 {
+            result = Term::pi(ctx.types[depth - 1].clone(), result);
+        }
     }
     result
+}
+
+/// Type-check a proposition in the current context. Unlike a refinement's
+/// carrier-only lowering, its φ is checked at Ω before it becomes evidence.
+fn elab_prop_at_omega(cx: &mut ElabCtx<'_>, expr: &RExpr, span: &Span) -> Result<Term, ElabError> {
+    let (raw, inferred) = infer(cx, expr)?;
+    let prop = cx.metas.zonk_term(&raw);
+    let ty = cx.metas.zonk_term(&inferred);
+    let omega = Term::omega(Level::Zero);
+    if !matches!(ty, Term::Omega(_))
+        || kernel_check_raw(cx.env, &cx.ctx, &prop, &omega).is_err()
+    {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "spec proposition must have type Ω, found non-proposition".into(),
+        });
+    }
+    Ok(prop)
+}
+
+/// Read the declaration's leading parameter telescope from its annotated
+/// type. A refinement domain has already lowered to its carrier; elaborate
+/// its predicate with that parameter bound, at its actual binder depth.
+fn install_refined_param_assumptions(
+    cx: &mut ElabCtx<'_>,
+    source_ty: &RType,
+    carrier_ty: &Term,
+    param_count: usize,
+) -> Result<(), ElabError> {
+    let start_depth = cx.ctx.len();
+    let mut source = source_ty;
+    let mut carrier = carrier_ty;
+    let result = (|| {
+        for _ in 0..param_count {
+            let (RType::RPi(_, domain, codomain, _), Term::Pi(carrier_domain, carrier_codomain)) =
+                (source, carrier)
+            else {
+                return Err(ElabError::Internal("parameter telescope shape changed".into()));
+            };
+            cx.ctx.push(*carrier_domain.clone());
+            if let RType::RRefine(_, _, predicate, span) = domain.as_ref() {
+                let prop = elab_prop_at_omega(cx, predicate, span)?;
+                cx.assumptions.push(Assumption {
+                    prop,
+                    depth: cx.ctx.len(),
+                });
+            }
+            source = codomain;
+            carrier = carrier_codomain;
+        }
+        Ok(())
+    })();
+    while cx.ctx.len() > start_depth {
+        cx.ctx.pop();
+    }
+    result
+}
+
+/// A spec'd declaration's `requires` are checked before its body and become
+/// elaborator-only assumptions at parameter depth. They are not hole sites.
+fn install_requires_assumptions(
+    cx: &mut ElabCtx<'_>,
+    carrier_ty: &Term,
+    param_count: usize,
+    requires: &[RExpr],
+) -> Result<Vec<Term>, ElabError> {
+    let start_depth = cx.ctx.len();
+    let param_types = unwrap_pi_chain(carrier_ty);
+    if param_types.len() < param_count {
+        return Err(ElabError::Internal("requires parameter telescope is too short".into()));
+    }
+    for ty in param_types.into_iter().take(param_count) {
+        cx.ctx.push(ty);
+    }
+    let result = (|| {
+        let mut cores = Vec::with_capacity(requires.len());
+        for req in requires {
+            let prop = elab_prop_at_omega(cx, req, req.span())?;
+            cx.assumptions.push(Assumption {
+                prop: prop.clone(),
+                depth: cx.ctx.len(),
+            });
+            cores.push(prop);
+        }
+        Ok(cores)
+    })();
+    while cx.ctx.len() > start_depth {
+        cx.ctx.pop();
+    }
+    result
+}
+
+/// Renumber only at aggregation: no elaboration-site consumer reads an id.
+fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
+    for mut obligation in src {
+        obligation.id = dst.len() as u32;
+        dst.push(obligation);
+    }
 }
 
 // ----- declaration elaboration -----
@@ -14310,7 +14429,7 @@ pub(crate) fn elaborate_space_decl(
                 debug_assert_eq!(cx.ctx.len() - 1, result_position);
                 cx.ctx.pop();
 
-                let closed = close_goal(&cx.ctx, goal);
+                let closed = close_goal(&cx.ctx, &[], goal);
                 let hole_id =
                     declare_postulate(cx.env, qualified_name.clone(), vec![], closed.clone())
                         .map_err(|error| ElabError::KernelRejected {
@@ -14418,6 +14537,12 @@ fn elaborate_v0(
             .with_local_dicts(local_dicts);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
+            install_refined_param_assumptions(
+                &mut cx,
+                ty,
+                &ty_c,
+                leading_lambda_count(&rdecl.body),
+            )?;
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
             (body_c, ty_c)
         } else {
@@ -14530,13 +14655,24 @@ fn elaborate_recursive_view(
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     // 1. Elaborate the declared type (recursive views are annotated).
-    let ty_core = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+    let (ty_core, param_assumptions, type_obligations) = {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+            .with_classes(class_env, provenance, standard_operators);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("recursive declaration requires a type annotation".into())
         })?;
         let ty_c = elab_type(&mut cx, ty)?;
-        cx.metas.zonk_term(&ty_c)
+        install_refined_param_assumptions(
+            &mut cx,
+            ty,
+            &ty_c,
+            leading_lambda_count(&rdecl.body),
+        )?;
+        (
+            cx.metas.zonk_term(&ty_c),
+            std::mem::take(&mut cx.assumptions),
+            std::mem::take(&mut cx.obligations),
+        )
     };
 
     // 2. Stage a checked opaque placeholder so the body can self-reference.
@@ -14574,6 +14710,7 @@ fn elaborate_recursive_view(
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators);
+        cx.assumptions = param_assumptions;
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
@@ -14594,14 +14731,18 @@ fn elaborate_recursive_view(
     let admit_result = ken_kernel::admit_pending(env, pending, vec![body_core]);
 
     match admit_result {
-        Ok(_) => Ok(ElabResult {
-            name: rdecl.name.clone(),
-            def_id: id,
-            obligations: body_obligations,
-            foreign_binding: None,
-            temporal_obligations: vec![],
-            effect_row_type: None,
-        }),
+        Ok(_) => {
+            let mut obligations = type_obligations;
+            absorb_obligations(&mut obligations, body_obligations);
+            Ok(ElabResult {
+                name: rdecl.name.clone(),
+                def_id: id,
+                obligations,
+                foreign_binding: None,
+                temporal_obligations: vec![],
+                effect_row_type: None,
+            })
+        }
         Err((error, removed)) => {
             forget_rolled_back_decls(removed, globals, num_values);
             if fixity_inserted {
@@ -14767,6 +14908,14 @@ pub(crate) fn elaborate_mutual_group(
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
                 .with_recursive_group(&recursive_group);
+            if let Some(source_ty) = &rdecl.ty {
+                install_refined_param_assumptions(
+                    &mut cx,
+                    source_ty,
+                    ty_core,
+                    leading_lambda_count(&rdecl.body),
+                )?;
+            }
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
             bodies.push(cx.metas.zonk_term(&body_c));
@@ -14947,67 +15096,83 @@ fn elaborate_view_with_spec(
 ) -> Result<ElabResult, ElabError> {
     let mut pending: Option<ken_kernel::PendingAdmission> = None;
     let result = (|| -> Result<ElabResult, ElabError> {
-        let omega = Term::omega(Level::Zero);
-
-        // Phase 1: elaborate the declared type (carrier) and body.
-        //
-        // A self-recursive spec'd view (e.g. `sort`) must have its name pre-admitted
-        // as Opaque before the body is elaborated, so the body's self-call resolves
-        // (Approach A; see `elaborate_recursive_view`). The non-recursive path keeps
-        // type+body in one context so their level metas unify.
+        // Phase 1: elaborate parameter refinements and requires before the body.
+        // A recursive name is staged only after the annotated type and these
+        // param-only propositions have been elaborated. Keep one cx for the
+        // non-recursive type + body so level metas continue to unify together.
         let is_recursive = rexpr_mentions_name(&rdecl.body, &rdecl.name);
-
-        let (body_raw, carrier_ty_raw, pre_admit_id): (Term, Term, Option<GlobalId>) =
-            if is_recursive {
-                // Recursive: elab the carrier type, pre-admit, then elab the body.
-                let carrier_ty = {
-                    let mut cx =
-                        ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                            .with_classes(class_env, provenance, standard_operators)
-                            .with_local_dicts(local_dicts);
-                    let ty = rdecl.ty.as_ref().ok_or_else(|| {
-                        ElabError::Internal(
-                            "recursive const with spec clauses requires a type annotation".into(),
-                        )
-                    })?;
-                    let ty_c = elab_type(&mut cx, ty)?;
-                    cx.metas.zonk_term(&ty_c)
-                };
-                let staged = ken_kernel::stage_placeholders(
-                    env,
-                    vec![(rdecl.name.clone(), vec![], carrier_ty.clone())],
-                )
-                .map_err(|error| ElabError::KernelRejected {
-                    error,
-                    span: rdecl.span.clone(),
+        let param_count = leading_lambda_count(&rdecl.body);
+        let mut decl_obligations = Vec::new();
+        let (body_raw, carrier_ty_raw, pre_admit_id, req_cores) = if is_recursive {
+            let (carrier_ty, assumptions, req_cores) = {
+                let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                    .with_classes(class_env, provenance, standard_operators)
+                    .with_local_dicts(local_dicts);
+                let ty = rdecl.ty.as_ref().ok_or_else(|| {
+                    ElabError::Internal(
+                        "recursive const with spec clauses requires a type annotation".into(),
+                    )
                 })?;
-                let id = staged.ids()[0];
-                pending = Some(staged);
-                globals.insert(rdecl.name.clone(), id);
-                let body = {
-                    let mut cx =
-                        ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                            .with_classes(class_env, provenance, standard_operators)
-                            .with_local_dicts(local_dicts);
-                    let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
-                    cx.metas.zonk_term(&body_c)
-                };
-                (body, carrier_ty, Some(id))
-            } else {
-                // Non-recursive: original one-context flow.
-                let mut cx =
-                    ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                        .with_classes(class_env, provenance, standard_operators)
-                        .with_local_dicts(local_dicts);
-                if let Some(ty) = &rdecl.ty {
-                    let ty_c = elab_type(&mut cx, ty)?;
-                    let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
-                    (cx.metas.zonk_term(&body_c), cx.metas.zonk_term(&ty_c), None)
-                } else {
-                    let (body_c, ty_c) = infer(&mut cx, &rdecl.body)?;
-                    (cx.metas.zonk_term(&body_c), cx.metas.zonk_term(&ty_c), None)
-                }
+                let ty_c = elab_type(&mut cx, ty)?;
+                install_refined_param_assumptions(&mut cx, ty, &ty_c, param_count)?;
+                let req_cores =
+                    install_requires_assumptions(&mut cx, &ty_c, param_count, &rdecl.requires)?;
+                absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
+                (
+                    cx.metas.zonk_term(&ty_c),
+                    std::mem::take(&mut cx.assumptions),
+                    req_cores,
+                )
             };
+            let staged = ken_kernel::stage_placeholders(
+                env,
+                vec![(rdecl.name.clone(), vec![], carrier_ty.clone())],
+            )
+            .map_err(|error| ElabError::KernelRejected {
+                error,
+                span: rdecl.span.clone(),
+            })?;
+            let id = staged.ids()[0];
+            pending = Some(staged);
+            globals.insert(rdecl.name.clone(), id);
+            let body = {
+                let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                    .with_classes(class_env, provenance, standard_operators)
+                    .with_local_dicts(local_dicts);
+                cx.assumptions = assumptions;
+                let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
+                absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
+                cx.metas.zonk_term(&body_c)
+            };
+            (body, carrier_ty, Some(id), req_cores)
+        } else {
+            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                .with_classes(class_env, provenance, standard_operators)
+                .with_local_dicts(local_dicts);
+            let (body_c, ty_c, req_cores) = if let Some(ty) = &rdecl.ty {
+                let ty_c = elab_type(&mut cx, ty)?;
+                install_refined_param_assumptions(&mut cx, ty, &ty_c, param_count)?;
+                let req_cores =
+                    install_requires_assumptions(&mut cx, &ty_c, param_count, &rdecl.requires)?;
+                let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
+                (body_c, ty_c, req_cores)
+            } else {
+                // An unannotated const has no parameter telescope. Its
+                // requires can still be checked before inferring the body.
+                let req_cores = install_requires_assumptions(
+                    &mut cx, &Term::ty(Level::Zero), 0, &rdecl.requires,
+                )?;
+                let (body_c, ty_c) = infer(&mut cx, &rdecl.body)?;
+                (body_c, ty_c, req_cores)
+            };
+            absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
+            (
+                cx.metas.zonk_term(&body_c),
+                cx.metas.zonk_term(&ty_c),
+                None,
+                req_cores,
+            )
+        };
 
         // Build the param context from the Pi-chain of the carrier type.
         let param_types = unwrap_pi_chain(&carrier_ty_raw);
@@ -15017,28 +15182,7 @@ fn elaborate_view_with_spec(
             param_ctx.push(pt.clone());
         }
 
-        // Phase 2: process `requires` clauses.
-        let mut req_cores: Vec<Term> = Vec::new();
-        for req in &rdecl.requires {
-            let phi_core = elab_in_ctx_at_omega(
-                env,
-                globals,
-                num_values,
-                numeric_env,
-                class_env,
-                provenance,
-                standard_operators,
-                local_dicts,
-                &param_ctx,
-                req,
-                &omega,
-                &rdecl.span,
-                &rdecl.name,
-            )?;
-            req_cores.push(phi_core);
-        }
-
-        // Phase 3: process `ensures` clauses.
+        // Phase 2: process `ensures` clauses.
         // ensures context = param_ctx + [result : carrier_b]
         let mut ens_ctx = param_ctx.clone();
         ens_ctx.push(carrier_b.clone());
@@ -15054,10 +15198,8 @@ fn elaborate_view_with_spec(
             all_ensures.push(phi);
         }
 
-        let mut ens_obligations: Vec<Obligation> = Vec::new();
-        let mut obl_counter = 0u32;
         for ens in &all_ensures {
-            let psi_core = elab_in_ctx_at_omega(
+            let (psi_core, psi_obligations) = elab_in_ctx_at_omega(
                 env,
                 globals,
                 num_values,
@@ -15068,26 +15210,25 @@ fn elaborate_view_with_spec(
                 local_dicts,
                 &ens_ctx,
                 ens,
-                &omega,
                 &rdecl.span,
                 &rdecl.name,
             )?;
+            absorb_obligations(&mut decl_obligations, psi_obligations);
             // goal = ψ[body_inner/result]: result = Var(0) in ens_ctx, substitute body
             let goal_open = subst0(&psi_core, &body_inner);
-            let closed = close_goal(&param_ctx, goal_open);
+            let closed = close_goal(&param_ctx, &[], goal_open);
             let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
                 .map_err(|e| ElabError::KernelRejected {
                     error: e,
                     span: rdecl.span.clone(),
                 })?;
-            ens_obligations.push(Obligation {
-                id: obl_counter,
+            decl_obligations.push(Obligation {
+                id: decl_obligations.len() as u32,
                 hole_id,
                 goal_closed: closed,
                 span: rdecl.span.clone(),
                 kind: ObligationKind::Ensures,
             });
-            obl_counter += 1;
         }
 
         // Phase 4: build the full type and body.
@@ -15144,7 +15285,7 @@ fn elaborate_view_with_spec(
         Ok(ElabResult {
             name: rdecl.name.clone(),
             def_id: id,
-            obligations: ens_obligations,
+            obligations: decl_obligations,
             foreign_binding: None,
             temporal_obligations: vec![],
             effect_row_type: None,
@@ -15697,10 +15838,9 @@ fn elab_in_ctx_at_omega(
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     ctx: &Context,
     expr: &RExpr,
-    omega: &Term,
     span: &Span,
     owner_label: &str,
-) -> Result<Term, ElabError> {
+) -> Result<(Term, Vec<Obligation>), ElabError> {
     let mut cx = ElabCtx::new(
         env,
         globals,
@@ -15714,25 +15854,8 @@ fn elab_in_ctx_at_omega(
     for ty in &ctx.types {
         cx.ctx.push(ty.clone());
     }
-    let (core_raw, ty_raw) = infer(&mut cx, expr)?;
-    // Unify inferred type with Ω — if the proposition is non-Ω, this will
-    // be caught by the kernel on the next kernel_check call.
-    // For the surface error, check that ty is Ω-shaped.
-    let ty_zonked = cx.metas.zonk_term(&ty_raw);
-    let core_zonked = cx.metas.zonk_term(&core_raw);
-    // Surface-level Ω check: if the type is not Omega(_), error
-    match &ty_zonked {
-        Term::Omega(_) => {}
-        _ => {
-            // Check if the kernel will accept it as Ω — check core at omega
-            // If not, surface error
-            kernel_check_raw(env, ctx, &core_zonked, omega).map_err(|_| ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: format!("spec proposition must have type Ω, found non-proposition"),
-            })?;
-        }
-    }
-    Ok(core_zonked)
+    let core = elab_prop_at_omega(&mut cx, expr, span)?;
+    Ok((core, std::mem::take(&mut cx.obligations)))
 }
 
 /// Unwrap the outermost `n` Pi binders, collecting domain types.
