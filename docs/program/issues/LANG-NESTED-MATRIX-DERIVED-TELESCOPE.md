@@ -1,6 +1,6 @@
 ---
 id: LANG-NESTED-MATRIX-DERIVED-TELESCOPE
-title: "The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or a metavariable"
+title: "The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or discovered first"
 status: active
 owner: language
 size: L
@@ -120,8 +120,24 @@ alone.
 2. **Open each nested bucket in the derived telescope before its leaves.**
    - Δ comes from reverting the context and the constructor. Woven binders
      are real `cx.ctx` pushes.
-   - R is the seeded type, or else a fresh result metavariable solved by the
-     first leaf. Constant results keep first-leaf discovery.
+   - **R: infer, then check** (Architect `evt_9s1tts2m0xjk`; the earlier
+     "fresh result metavariable" is withdrawn, and no term-meta layer is
+     added). R is the seeded type. In inference mode, when the construction
+     needs R first at an `Ih` column (`:18240-18255`) or a root IH domain, a
+     discovery pass runs the same matrix code, with an `Ih` column pushing
+     no binder. The first reachable leaf computes R as today (`zonk_term`,
+     `lower_by`, `InferredMatchResultEscapesPattern`). The owning entry
+     (keyed on `root_frame_depth`) then aborts with `ResultDiscovered` and
+     reruns once with `ret_ty_slot = Some(R)`; a second discovery on the
+     rerun is `Internal`. A first leaf reached before any IH keeps
+     first-leaf discovery, with no rerun.
+     - Rollback: `MetaCtx` is not restored. `obligations`, `obl_counter`,
+       `provenance`, `num_values` and `space_state`/`space_pre_state` are.
+       Census every non-scoped `ElabCtx` write reachable from a leaf, and
+       assert that the scoped stacks are balanced at the abort.
+     - Propagation: census every handler from `compile_match_leaf` to the
+       owning entry. A catch-all on that path, or a leaf that adds an `env`
+       declaration, is a stop to the Architect.
    - In pure inference mode, an annotation is required only when the solved
      R would mention a derived-telescope binder. The precise diagnostic is
      raised there; "the split reverts" is not the test.
@@ -245,6 +261,13 @@ alone.
     ↦ ... }`) stays green with arm bodies `Suc j` ⇒ 3, `j` ⇒ 2 and `e` ⇒ 5,
     and the nested-woven `BoxNat (Suc saved)` row ⇒ 3; AC-1's `saved` row ⇒
     3 is the flip (`evt_635vc9mxvmnq2`).
+- **AC-2b (inference-mode R, `evt_9s1tts2m0xjk`).**
+  - `lang_nested_split_field_dependence.rs:36-52` (VCons first) checks with
+    both values. Leaving the slot `None` at the `Ih` column reddens it.
+  - R identity census: for every inference-mode entry in the named suites,
+    report the rerun count. Discovered R is byte-identical to the R that
+    `d7676f128`'s first-leaf code computes.
+  - Report the maximum nested-rerun depth across the suites and the catalog.
 - **AC-3.** `lang_infer_match_indexed_complete` and the as-pattern,
   nested-split and tuple-pattern suites stay green. The catalog census is
   byte-identical, and `trusted_base()` is unchanged.
@@ -254,7 +277,12 @@ alone.
 1. An enclosing alias sentinel reaches an elaborator-to-kernel call
    unresolved, before its frame finishes. Keyed on kernel-call reachability
    of an unresolved sentinel (`evt_4416jtap9bj62`, increment 0 §1a 1;
-   Architect `evt_3cqccrymnd3n0`). The next re-trigger is the 3rd.
+   Architect `evt_3cqccrymnd3n0`).
+2. Inference-mode R is needed before the first leaf under an IH column; the
+   frame named a term metavariable the elaborator lacks. Keyed on an enabler
+   absent from the delivered vocabulary (`MetaCtx` is level-only;
+   `evt_44yy0cg0qb448`, §1a 1, `evt_9s1tts2m0xjk`). The §1b test is due at
+   entry 3.
 
 Check-mode result seed (a separate count, §1a 1, `evt_6jqa2y7rft3tr`):
 
