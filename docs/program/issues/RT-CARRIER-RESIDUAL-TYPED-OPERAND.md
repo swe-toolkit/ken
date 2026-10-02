@@ -221,14 +221,18 @@ ABI change.
 - **AC-1 (I-0).**
   - `generated_entry_capsule_outer_carried` passes 1/1 with the typed
     identity-41 trap.
-  - Exit census: a source-scan test shows that `CarriedResidualWord`'s
-    module has exactly two exits, `decode_residual_child` and the
-    transitional escape, and no `From`, `Into`, `Deref` or public field.
-    This replaces a compile-fail control, since the types are crate-private.
-  - The escape's call sites are pinned by count and list.
-  - The 95-row disposition table is in the handoff. A source-scan pin
-    shows that the refutable-pattern population on `LoweringOperand`
-    equals the dispositioned set.
+  - The exits are enforced by module privacy. `CarriedResidualWord`'s word
+    and slot are private to its module, and it has no `From`, `Into`,
+    `Deref` or public constructor. `decode_residual_variant_child` is a
+    private item of that module.
+  - Every W row is an exhaustive `match`, so the compiler forces its
+    `Residual` arm.
+  - Review evidence in the handoff, measured at the exact SHA and not
+    committed as tests (operator rule quoted in `build/qa-test-design.md`;
+    Steward `evt_63ay1bp9bncyw`):
+    - the 95-row disposition table;
+    - the module's exit list;
+    - the escape's call sites, with their count.
   - Mutation M-A: treat site A's `Residual` as `Carried`, so that it is
     wrapped as a Child. Either the compile-time refusal fires, or, with
     that refusal also removed, id41 does not pass.
@@ -245,9 +249,9 @@ ABI change.
     `construction.rs:1442`, and `Ok(Err(infeasible))` propagation.
 - **AC-2 (I-1).**
   - The escape count is 0, and the function is deleted.
-  - A grep pin shows no raw `append_block_param` on a carried value
-    outside the helper. Each scalar, control or pointer site among the 54
-    is listed as excluded, with its reason.
+  - Review evidence in the handoff: no raw `append_block_param` on a
+    carried value outside the helper. Each scalar, control or pointer site
+    among the 54 is listed as excluded, with its reason.
   - A K→R refusal control fixture.
   - Full parity is unchanged, and the handoff gives the fan-in table: each
     site, its operand type and the increment that changed it.
