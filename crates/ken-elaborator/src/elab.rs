@@ -22373,7 +22373,8 @@ mod match_matrix_result_seed_tests {
         // nested split in inference mode. CLAIMED: check-mode R is available before
         // building nested buckets without inventing an inference-mode result.
         // THE GAP: this trace witnesses entry state, not the future derived
-        // telescope; both declarations also kernel-check and return LZero.
+        // telescope; both declarations kernel-check: checked NatL returns
+        // LZero, while inference-mode NatBox returns Zero : Nat.
         let mut env = ElabEnv::new().expect("prelude");
         // Put the nested constructor first: no earlier root method may infer
         // R before the split whose entry state this test measures.
