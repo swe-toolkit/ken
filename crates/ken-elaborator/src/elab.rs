@@ -16750,10 +16750,14 @@ fn memoize_indexed_root_motive(
     cx: &mut ElabCtx,
     ret_ty: &Term,
     span: &Span,
+    root_frame_depth: usize,
 ) -> Result<(), ElabError> {
-    let Some(root) = cx.indexed_match_roots.last() else {
+    // An arm may contain its own match while the enclosing indexed root is
+    // installed. Only the match that pushed this frame may determine its R.
+    if cx.indexed_match_roots.len() != root_frame_depth + 1 {
         return Ok(());
-    };
+    }
+    let root = cx.indexed_match_roots.last().expect("owned root frame is installed");
     if root.motive.is_some() {
         return Ok(());
     }
@@ -17460,6 +17464,7 @@ fn compile_literal_column(
     rows: Vec<RowState>,
     real_depth_so_far: usize,
     top_span: &Span,
+    root_frame_depth: usize,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
@@ -17555,6 +17560,7 @@ fn compile_literal_column(
                 branch_rows,
                 real_depth_so_far + 1,
                 top_span,
+                root_frame_depth,
                 ret_ty_slot,
                 arm_used,
                 subsumed_by,
@@ -17569,6 +17575,7 @@ fn compile_literal_column(
             residual_rows,
             real_depth_so_far + 1,
             top_span,
+            root_frame_depth,
             ret_ty_slot,
             arm_used,
             subsumed_by,
@@ -17624,6 +17631,7 @@ fn compile_tuple_column(
     mut rows: Vec<RowState>,
     real_depth_so_far: usize,
     top_span: &Span,
+    root_frame_depth: usize,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
@@ -17711,6 +17719,7 @@ fn compile_tuple_column(
         component_rows,
         real_depth_so_far,
         top_span,
+        root_frame_depth,
         ret_ty_slot,
         arm_used,
         subsumed_by,
@@ -17863,6 +17872,7 @@ fn compile_record_column(
     mut rows: Vec<RowState>,
     real_depth_so_far: usize,
     top_span: &Span,
+    root_frame_depth: usize,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
@@ -17936,6 +17946,7 @@ fn compile_record_column(
         field_rows,
         real_depth_so_far,
         top_span,
+        root_frame_depth,
         ret_ty_slot,
         arm_used,
         subsumed_by,
@@ -18050,6 +18061,7 @@ fn compile_match_leaf(
     rows: &[RowState],
     real_depth_so_far: usize,
     top_span: &Span,
+    root_frame_depth: usize,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
@@ -18144,7 +18156,7 @@ fn compile_match_leaf(
                 ),
             }
         })?;
-        memoize_indexed_root_motive(cx, &lowered, top_span)?;
+        memoize_indexed_root_motive(cx, &lowered, top_span, root_frame_depth)?;
         *ret_ty_slot = Some(lowered);
     }
     Ok(body_core)
@@ -18170,6 +18182,7 @@ fn compile_match_matrix(
     rows: Vec<RowState>,
     real_depth_so_far: usize,
     top_span: &Span,
+    root_frame_depth: usize,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
@@ -18181,6 +18194,7 @@ fn compile_match_matrix(
             &rows,
             real_depth_so_far,
             top_span,
+            root_frame_depth,
             ret_ty_slot,
             arm_used,
             subsumed_by,
@@ -18220,6 +18234,7 @@ fn compile_match_matrix(
                 rows,
                 real_depth_so_far,
                 top_span,
+                root_frame_depth,
                 ret_ty_slot,
                 arm_used,
                 subsumed_by,
@@ -18265,6 +18280,7 @@ fn compile_match_matrix(
                     rows,
                     real_depth_so_far,
                     top_span,
+                    root_frame_depth,
                     ret_ty_slot,
                     arm_used,
                     subsumed_by,
@@ -18286,6 +18302,7 @@ fn compile_match_matrix(
                     rows,
                     real_depth_so_far,
                     top_span,
+                    root_frame_depth,
                     ret_ty_slot,
                     arm_used,
                     subsumed_by,
@@ -18307,6 +18324,7 @@ fn compile_match_matrix(
                     rows,
                     real_depth_so_far,
                     top_span,
+                    root_frame_depth,
                     ret_ty_slot,
                     arm_used,
                     subsumed_by,
@@ -18352,6 +18370,7 @@ fn compile_match_matrix(
                     new_rows,
                     real_depth_so_far + 1,
                     top_span,
+                    root_frame_depth,
                     ret_ty_slot,
                     arm_used,
                     subsumed_by,
@@ -18440,6 +18459,7 @@ fn compile_match_matrix(
                 &col_kinds[1..],
                 real_depth_so_far,
                 top_span,
+                root_frame_depth,
                 ret_ty_slot,
                 arm_used,
                 subsumed_by,
@@ -18643,6 +18663,7 @@ fn build_ctor_buckets(
     tail_col_kinds: &[ColKind],
     real_depth_so_far: usize,
     top_span: &Span,
+    root_frame_depth: usize,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
@@ -18778,6 +18799,7 @@ fn build_ctor_buckets(
             bucket,
             real_depth_so_far,
             top_span,
+            root_frame_depth,
             ret_ty_slot,
             arm_used,
             subsumed_by,
@@ -19152,6 +19174,7 @@ fn infer_tuple_match(
         }
     });
 
+    let root_frame_depth = cx.indexed_match_roots.len();
     let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
@@ -19163,6 +19186,7 @@ fn infer_tuple_match(
         rows,
         0,
         span,
+        root_frame_depth,
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
@@ -19235,6 +19259,7 @@ fn infer_record_match(
         }
     });
 
+    let root_frame_depth = cx.indexed_match_roots.len();
     let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
@@ -19246,6 +19271,7 @@ fn infer_record_match(
         rows,
         0,
         span,
+        root_frame_depth,
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
@@ -19382,6 +19408,7 @@ fn infer_or_match(
     };
 
     let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
+    let root_frame_depth = cx.indexed_match_roots.len();
     let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
@@ -19393,6 +19420,7 @@ fn infer_or_match(
         rows,
         0,
         span,
+        root_frame_depth,
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
@@ -19492,6 +19520,7 @@ fn infer_literal_match(
 
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
     let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
+    let root_frame_depth = cx.indexed_match_roots.len();
     let mut ret_ty_slot = check_mode_result_seed(cx, expected);
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
@@ -19503,6 +19532,7 @@ fn infer_literal_match(
         rows,
         0,
         span,
+        root_frame_depth,
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
@@ -19657,7 +19687,7 @@ fn infer_match(
     // The indexed root needs the checked motive and IH domains before it can
     // descend into any bucket. Keep this inside the frame-restoring closure.
     if let Some(ret_ty) = ret_ty_slot.as_ref() {
-        memoize_indexed_root_motive(cx, ret_ty, span)?;
+        memoize_indexed_root_motive(cx, ret_ty, span, root_frame_depth)?;
     }
     let raw_methods_result = build_ctor_buckets(
         cx,
@@ -19671,6 +19701,7 @@ fn infer_match(
         &[],
         0,
         span,
+        root_frame_depth,
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
