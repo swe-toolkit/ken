@@ -1005,7 +1005,12 @@ impl<'a> Lowering<'a> {
                         );
                     }
                     for capture in captures {
-                        if let LoweringOperand::Specialized(value) = capture {
+                        let specialized = match capture {
+                            LoweringOperand::Specialized(value) => Some(value),
+                            LoweringOperand::Residual(_) => None,
+                            LoweringOperand::Carried(_) => None,
+                        };
+                        if let Some(value) = specialized {
                             self.represented_boundary_admissibility(value)?;
                             self.source_aggregate_preflight(value)?;
                         }
@@ -1089,7 +1094,12 @@ impl<'a> Lowering<'a> {
                     }
                     self.represented_boundary_admissibility(value)?;
                     for capture in captures {
-                        if let LoweringOperand::Specialized(value) = capture {
+                        let specialized = match capture {
+                            LoweringOperand::Specialized(value) => Some(value),
+                            LoweringOperand::Residual(_) => None,
+                            LoweringOperand::Carried(_) => None,
+                        };
+                        if let Some(value) = specialized {
                             self.bind_continuation_boundary_admissibility(value)?;
                         }
                     }
@@ -4012,7 +4022,12 @@ impl<'a> Lowering<'a> {
                 let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
                     unreachable!("this emitter constructs only worker-capture arguments")
                 };
-                if let LoweringOperand::Specialized(value) = value {
+                let specialized = match value {
+                    LoweringOperand::Specialized(value) => Some(value),
+                    LoweringOperand::Residual(_) => None,
+                    LoweringOperand::Carried(_) => None,
+                };
+                if let Some(value) = specialized {
                     value.boundary_transfer_admissibility()?;
                     self.source_aggregate_preflight(value)?;
                 }
@@ -4154,7 +4169,12 @@ impl<'a> Lowering<'a> {
                 let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
                     unreachable!("this emitter constructs only positional capture arguments")
                 };
-                if let LoweringOperand::Specialized(value) = value {
+                let specialized = match value {
+                    LoweringOperand::Specialized(value) => Some(value),
+                    LoweringOperand::Residual(_) => None,
+                    LoweringOperand::Carried(_) => None,
+                };
+                if let Some(value) = specialized {
                     value.boundary_transfer_admissibility()?;
                     self.source_aggregate_preflight(value)?;
                 }

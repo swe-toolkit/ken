@@ -7736,18 +7736,18 @@ impl<'a> Lowering<'a> {
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
         #[cfg(not(feature = "px8-ds-test-support"))]
         let _ = (member, closure, position);
-        if let LoweringOperand::Specialized(value) = &input {
-            let admission = value.boundary_transfer_admissibility();
-            #[cfg(feature = "px8-ds-test-support")]
-            self.record_pending_vis_capture_observation(
-                member, closure, origin, position, &input, admission.is_ok(),
-            );
+        let admission = match &input {
+            LoweringOperand::Specialized(value) => Some(value.boundary_transfer_admissibility()),
+            LoweringOperand::Residual(_) => None,
+            LoweringOperand::Carried(_) => None,
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        self.record_pending_vis_capture_observation(
+            member, closure, origin, position, &input,
+            admission.as_ref().map_or(true, Result::is_ok),
+        );
+        if let Some(admission) = admission {
             admission?;
-        } else {
-            #[cfg(feature = "px8-ds-test-support")]
-            self.record_pending_vis_capture_observation(
-                member, closure, origin, position, &input, true,
-            );
         }
         match self.carry_call_input(
             builder, origin, input,

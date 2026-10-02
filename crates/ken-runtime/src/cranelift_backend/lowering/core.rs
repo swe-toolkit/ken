@@ -3205,10 +3205,11 @@ impl<'a> Lowering<'a> {
         // `Carried`, not any ordinary specialized variant. A pending active
         // continuation over an ordinary value still consumes its next
         // eliminator.
-        if matches!(
-            &value,
-            LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-        ) {
+        if match &value {
+            LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+            LoweringOperand::Residual(_) => false,
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+        } {
             #[cfg(test)]
             record_rt_d2_backedge_propagation();
             return Ok(value);
@@ -3749,12 +3750,21 @@ impl<'a> Lowering<'a> {
                     if let RuntimeExpr::Call { callee, args } = body.as_ref() {
                         if let RuntimeExpr::Var(index) = callee.as_ref() {
                             if let Some(index) = (*index as usize).checked_sub(1) {
-                                if let Some(LoweringEnvironmentBinding::Value(
-                                    LoweringOperand::Specialized(
-                                        callee @ Lowered::ComputationalRecursorClosure { .. },
-                                    ),
-                                )) = producer_env.get(index)
-                                {
+                                let recursor = match producer_env.get(index) {
+                                    Some(LoweringEnvironmentBinding::Value(
+                                        LoweringOperand::Specialized(
+                                            callee @ Lowered::ComputationalRecursorClosure { .. },
+                                        ),
+                                    )) => Some(callee),
+                                    Some(LoweringEnvironmentBinding::Value(
+                                        LoweringOperand::Residual(_),
+                                    )) => None,
+                                    Some(LoweringEnvironmentBinding::Value(
+                                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_),
+                                    )) => None,
+                                    Some(LoweringEnvironmentBinding::StaticWorker(_)) | None => None,
+                                };
+                                if let Some(callee) = recursor {
                                     let (residual, boundary) = decompose_computational_recursor(
                                         LoweringOperand::Specialized(callee.clone()),
                                     );
@@ -3827,11 +3837,15 @@ impl<'a> Lowering<'a> {
                     static_origin: body_origin,
                 };
                 let value = self.lower_expr(builder, value_occurrence, producer_env)?;
-                if let LoweringOperand::Specialized(Lowered::Trap(trap)) = value {
-                    return Ok(ProducerTrampolineStep::ordinary(
-                        LoweringOperand::Specialized(Lowered::Trap(trap)),
-                    ));
-                }
+                let value = match value {
+                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                        return Ok(ProducerTrampolineStep::ordinary(
+                            LoweringOperand::Specialized(Lowered::Trap(trap)),
+                        ));
+                    }
+                    residual @ LoweringOperand::Residual(_) => residual,
+                    other @ (LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)) => other,
+                };
                 let mut body_env = vec![LoweringEnvironmentBinding::Value(value)];
                 body_env.extend_from_slice(producer_env);
                 self.lower_computational_producer_expr(
@@ -3962,8 +3976,12 @@ impl<'a> Lowering<'a> {
                         producer_env,
                         eliminators,
                     )?;
-                    if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    match &lowered {
+                        LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                            terminal_trap.get_or_insert_with(|| trap.clone());
+                        }
+                        LoweringOperand::Residual(_) => {}
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                     }
                     if self.seal_source_trap_branch(builder, &lowered)? {
                         continue;
@@ -6499,7 +6517,14 @@ impl<'a> Lowering<'a> {
             }
         }
         let selected = self.lower_expr(builder, scrutinee, producer_env)?;
-        if let LoweringOperand::Carried(word) = selected {
+        let carried = match &selected {
+            LoweringOperand::Carried(word) => Some(*word),
+            LoweringOperand::Residual(residual) => {
+                Some(self.decode_residual_child(builder, *residual)?)
+            }
+            LoweringOperand::Specialized(_) => None,
+        };
+        if let Some(word) = carried {
             return self.lower_carried_match(
                 builder,
                 word,
@@ -7077,10 +7102,12 @@ impl<'a> Lowering<'a> {
                     self.lower_expr(builder, arg, producer_env)
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            if let Some(LoweringOperand::Specialized(Lowered::Trap(trap))) = lowered_prefix
-                .iter()
-                .find(|value| matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))))
-            {
+            let prefix_trap = lowered_prefix.iter().find_map(|value| match value {
+                LoweringOperand::Specialized(Lowered::Trap(trap)) => Some(trap),
+                LoweringOperand::Residual(_) => None,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
+            });
+            if let Some(trap) = prefix_trap {
                 return Ok(ProducerTrampolineStep::ordinary(
                     LoweringOperand::Specialized(Lowered::Trap(trap.clone())),
                 ));
@@ -9689,7 +9716,11 @@ impl<'a> Lowering<'a> {
             .map(LoweringEnvironmentBinding::Value)
             .collect();
         let answer = self.lower_expr(builder, payload, &frame_env)?;
-        if matches!(answer, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+        if match &answer {
+            LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+            LoweringOperand::Residual(_) => false,
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+        } {
             return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
         }
         let answer = self.carried_join_arm(
@@ -12476,7 +12507,11 @@ impl<'a> Lowering<'a> {
         // `call_declared_unit_target`, which owns that check; restating it here
         // would be a second ABI authority.
         for (position, operand) in inputs.iter().enumerate() {
-            if matches!(operand, LoweringOperand::Specialized(Lowered::Closure { .. })) {
+            if match operand {
+                LoweringOperand::Specialized(Lowered::Closure { .. }) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "StaticContinuationFusion",
                     format!(
@@ -13433,7 +13468,12 @@ impl<'a> Lowering<'a> {
             operands.push((role, value));
         }
         for (_, operand) in &operands {
-            if let LoweringOperand::Specialized(value) = operand {
+            let specialized = match operand {
+                LoweringOperand::Specialized(value) => Some(value),
+                LoweringOperand::Residual(_) => None,
+                LoweringOperand::Carried(_) => None,
+            };
+            if let Some(value) = specialized {
                 if value.contains_boundary_closure_environment()? {
                     self.represented_boundary_admissibility(value)?;
                 } else {
@@ -13598,7 +13638,12 @@ impl<'a> Lowering<'a> {
         // is emitted, so a late non-transferable alias cannot partially build
         // an otherwise publishable private record.
         for (_, operand) in &operands {
-            if let LoweringOperand::Specialized(value) = operand {
+            let specialized = match operand {
+                LoweringOperand::Specialized(value) => Some(value),
+                LoweringOperand::Residual(_) => None,
+                LoweringOperand::Carried(_) => None,
+            };
+            if let Some(value) = specialized {
                 if value.contains_boundary_closure_environment()? {
                     self.represented_boundary_admissibility(value)?;
                 } else {
@@ -13636,8 +13681,17 @@ impl<'a> Lowering<'a> {
         emission_env: Option<&[LoweringEnvironmentBinding]>,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
         if constructor == self.process_symbols.exit_failure {
-            if let [LoweringOperand::Carried(code)] = args {
-                return self.transfer_carried_failure_exit_status(builder, *code);
+            if let [code] = args {
+                match code {
+                    LoweringOperand::Carried(code) => {
+                        return self.transfer_carried_failure_exit_status(builder, *code);
+                    }
+                    LoweringOperand::Residual(residual) => {
+                        let decoded = self.decode_residual_child(builder, *residual)?;
+                        return self.transfer_carried_failure_exit_status(builder, decoded);
+                    }
+                    LoweringOperand::Specialized(_) => {}
+                }
             }
         }
         let constructor_identity = self.static_transition_plan.constructor_symbol_identity(origin)?;
@@ -13674,7 +13728,12 @@ impl<'a> Lowering<'a> {
         // `transfer_into_carrier` runs on the same value one step later. What
         // moves is *when*, and nothing else.
         for (position, argument) in args.iter().enumerate() {
-            if let LoweringOperand::Specialized(value) = argument {
+            let specialized = match argument {
+                LoweringOperand::Specialized(value) => Some(value),
+                LoweringOperand::Residual(_) => None,
+                LoweringOperand::Carried(_) => None,
+            };
+            if let Some(value) = specialized {
                 // A specialized Vis with a raw lexical K has escaped its
                 // response owner. Its K is a closure, but reporting only the
                 // generic closure-transfer error hides the earlier ownership
@@ -15297,10 +15356,13 @@ impl<'a> Lowering<'a> {
                                     .recursive_residual_for_context(context, identity, position as u32)?
                                     .filter(|entry| entry.wrapped()).cloned()
                                 {
-                                    let LoweringOperand::Residual(residual) = children[position] else {
-                                        return Err(unsupported(
-                                            "RecursiveResidual", "the bound gate child has no issued residual",
-                                        ));
+                                    let residual = match children[position] {
+                                        LoweringOperand::Residual(residual) => residual,
+                                        LoweringOperand::Carried(_) | LoweringOperand::Specialized(_) => {
+                                            return Err(unsupported(
+                                                "RecursiveResidual", "the bound gate child has no issued residual",
+                                            ));
+                                        }
                                     };
                                     let slot = self.static_transition_plan.recursive_carrier_for_specialization(
                                         disposition.specialization,
@@ -15321,10 +15383,13 @@ impl<'a> Lowering<'a> {
                             if selected as usize != position {
                                 return Err(unsupported("RecursiveResidual", "the selected label names a different recursive field"));
                             }
-                            let LoweringOperand::Residual(residual) = children[position] else {
-                                return Err(unsupported(
-                                    "RecursiveResidual", "the labelled gate child has no issued residual",
-                                ));
+                            let residual = match children[position] {
+                                LoweringOperand::Residual(residual) => residual,
+                                LoweringOperand::Carried(_) | LoweringOperand::Specialized(_) => {
+                                    return Err(unsupported(
+                                        "RecursiveResidual", "the labelled gate child has no issued residual",
+                                    ));
+                                }
                             };
                             self.guard_labelled_recursive_residual(builder, residual, eliminator, constructor, selected)?;
                         }
@@ -15826,8 +15891,12 @@ impl<'a> Lowering<'a> {
                 builder.switch_to_block(block);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 let lowered = self.lower_expr(builder, body, env)?;
-                if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                    terminal_trap.get_or_insert_with(|| trap.clone());
+                match &lowered {
+                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    }
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
                 if self.seal_source_trap_branch(builder, &lowered)? {
                     continue;
@@ -16018,11 +16087,11 @@ impl<'a> Lowering<'a> {
                             .take(args.len())
                             .zip(&matched_field_words)
                             .all(|(input, expected)| {
-                                matches!(
-                                    input,
-                                    LoweringOperand::Carried(word)
-                                        if word.word == *expected
-                                )
+                                match input {
+                                    LoweringOperand::Carried(word) if word.word == *expected => true,
+                                    LoweringOperand::Residual(_) => false,
+                                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                                }
                             }),
                     },
                 );
@@ -16232,14 +16301,19 @@ impl<'a> Lowering<'a> {
                 // binding is neither a backedge nor a trap, so it falls
                 // through to the ordinary installation.
                 if let LoweringEnvironmentBinding::Value(lowered_value) = &bound {
-                    if matches!(
-                        lowered_value,
-                        LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                    ) {
+                    if match &lowered_value {
+                        LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                        LoweringOperand::Residual(_) => false,
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                    } {
                         return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
                     }
-                    if let LoweringOperand::Specialized(Lowered::Trap(trap)) = lowered_value {
-                        return Ok(LoweringOperand::Specialized(Lowered::Trap(trap.clone())));
+                    match lowered_value {
+                        LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                            return Ok(LoweringOperand::Specialized(Lowered::Trap(trap.clone())));
+                        }
+                        LoweringOperand::Residual(_) => {}
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                     }
                 }
                 let mut body_env = vec![bound];
@@ -16256,7 +16330,11 @@ impl<'a> Lowering<'a> {
                 let then_expr = self.child_occurrence(static_origin, 1, then_expr)?;
                 let else_expr = self.child_occurrence(static_origin, 2, else_expr)?;
                 let lowered_scrutinee = self.lower_expr(builder, scrutinee, env)?;
-                if matches!(lowered_scrutinee, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+                if match &lowered_scrutinee {
+                    LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                    LoweringOperand::Residual(_) => false,
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                } {
                     return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
                 }
                 let LoweringOperand::Specialized(Lowered::Bool { value, known }) = lowered_scrutinee else {
@@ -16291,8 +16369,12 @@ impl<'a> Lowering<'a> {
                 for (block, arm) in [(then_block, then_expr), (else_block, else_expr)] {
                     builder.switch_to_block(block);
                     let lowered = self.lower_expr(builder, arm, env)?;
-                    if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    match &lowered {
+                        LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                            terminal_trap.get_or_insert_with(|| trap.clone());
+                        }
+                        LoweringOperand::Residual(_) => {}
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                     }
                     if self.seal_source_trap_branch(builder, &lowered)? {
                         continue;
@@ -16404,7 +16486,11 @@ impl<'a> Lowering<'a> {
                     .collect::<Result<Vec<_>, _>>()?;
                 if lowered_args
                     .iter()
-                    .any(|arg| matches!(arg, LoweringOperand::Specialized(Lowered::RecursiveBackedge)))
+                    .any(|arg| match &arg {
+                        LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                        LoweringOperand::Residual(_) => false,
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                    })
                 {
                     return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
                 }

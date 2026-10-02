@@ -555,11 +555,16 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
         | Mutation::RetainedAccessWrongLocatorDomain
         | Mutation::RetainedAccessWrongLocatorIndex => {}
         Mutation::OuterCarried => {
-            if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-                Lowered::ComputationalRecursorClosure { residual, .. },
-            )) = &binding
-            {
-                binding = LoweringEnvironmentBinding::Value(residual.as_ref().clone());
+            if let LoweringEnvironmentBinding::Value(value) = &binding {
+                match value {
+                    LoweringOperand::Specialized(Lowered::ComputationalRecursorClosure {
+                        residual, ..
+                    }) => {
+                        binding = LoweringEnvironmentBinding::Value(residual.as_ref().clone());
+                    }
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
+                }
             }
         }
         Mutation::SpecializedSibling => {
@@ -585,15 +590,11 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
         }
         Mutation::WrongFrame | Mutation::WrongSlot | Mutation::WrongInvocation
         | Mutation::NonCarriedResidual => {
-            if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-                Lowered::ComputationalRecursorClosure {
-                    residual,
-                    invocation,
-                    ..
-                },
-            )) = &mut binding
-            {
-                match mutation {
+            if let LoweringEnvironmentBinding::Value(value) = &mut binding {
+                match value {
+                    LoweringOperand::Specialized(Lowered::ComputationalRecursorClosure {
+                        residual, invocation, ..
+                    }) => match mutation {
                     Mutation::WrongFrame => {
                         invocation.selection.checked_frame_id =
                             Some(call.parent_frame_template_id.unwrap_or(0).wrapping_add(1));
@@ -611,6 +612,9 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
                         ));
                     }
                     _ => unreachable!(),
+                    },
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
             }
         }
@@ -1319,7 +1323,11 @@ impl<'a> Lowering<'a> {
                                     "producer-hole terminal cursor mismatch",
                                 ));
                             }
-                            if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 return Ok(value);
                             }
                             source_active_cursor(
@@ -1362,7 +1370,11 @@ impl<'a> Lowering<'a> {
                                 ));
                             }
                             self.restore_root_terminal_authority(root_authority, expected)?;
-                            if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 return Ok(value);
                             }
                             return self.resume_active_continuation(builder, value, *active);
@@ -1370,7 +1382,11 @@ impl<'a> Lowering<'a> {
                         SourceContinuation::Terminal(SourceContinuationTerminal::JumpToJoin(
                             edge,
                         )) => {
-                            if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 let failure = builder.ins().iconst(types::I64, -4);
                                 builder.ins().return_(&[failure]);
                                 self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
@@ -1441,7 +1457,11 @@ impl<'a> Lowering<'a> {
                                     LoweringOperand::Specialized(Lowered::RecursiveBackedge)
                                 ),
                             );
-                            if matches!(value, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 // ⭐⭐ `RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — THE
                                 // ABANDONED LET BODY IS DISPOSITIONED, NOT
                                 // CONSUMED.
@@ -1493,7 +1513,11 @@ impl<'a> Lowering<'a> {
                                     body.static_origin,
                                 )?;
                                 SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
-                            } else if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            } else if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else {
                                 let body_env = env_with_operands([value], &env);
@@ -1657,10 +1681,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             env,
                             next,
                         } => {
-                            if matches!(
-                                &value,
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                            ) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 control.continuation = *next;
                                 SourceMachineState::Value {
                                     value: RoutedAnswer {
@@ -1771,10 +1796,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             // forwards it without entering the Match occurrence or selecting a
                             // case. Preserve the exact predecessor route and role: resetting
                             // either would silently turn propagation into a new value.
-                            if matches!(
-                                &value,
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                            ) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 let forwarded = RoutedAnswer::forward(
                                     value,
                                     incoming_route,
@@ -2113,10 +2139,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             // selection below and is still refused; only the
                             // marker, which was never a scrutinee value, is
                             // routed past it.
-                            if matches!(
-                                &value,
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                            ) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 #[cfg(test)]
                                 LRC_D2A_BACKEDGE_ARRIVALS.with(|count| {
                                     count.set(count.get().saturating_add(1))
@@ -2892,10 +2919,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 let detail = match &lowered {
                     LoweringOperand::Specialized(Lowered::Trap(trap)) => {
                         format!("Trap({}: {:?})", trap.message, trap.code)
@@ -3051,10 +3079,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     format!(
@@ -3192,10 +3221,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             };
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     format!(
@@ -3325,10 +3355,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             // A trap terminates this mutually exclusive predecessor.
             return Ok(());
         }
-        if !matches!(
-            lowered,
-            LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-        ) {
+        if !match &lowered {
+            LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+            LoweringOperand::Residual(_) => false,
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+        } {
             return Err(unsupported(
                 "NativeJoinPlanV1",
                 format!("carried-match leaf {index} did not seal its distinct affine join edge"),
@@ -3816,10 +3847,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             default_control,
         )?;
         if !self.seal_source_trap_branch(builder, &lowered)?
-            && !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            )
+            && !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            }
         {
             return Err(unsupported(
                 "NativeJoinPlanV1",
@@ -3963,10 +3995,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     "nested dynamic constructor predecessor did not seal its edge",
@@ -4075,10 +4108,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     format!(

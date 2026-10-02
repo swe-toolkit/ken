@@ -1465,8 +1465,12 @@ impl<'a> Lowering<'a> {
                 let arm_env = env_with(fields, env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 let lowered = self.lower_expr(builder, body, &arm_env)?;
-                if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                    terminal_trap.get_or_insert_with(|| trap.clone());
+                match &lowered {
+                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    }
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
                 if self.seal_source_trap_branch(builder, &lowered)? {
                     continue;
@@ -1696,8 +1700,12 @@ impl<'a> Lowering<'a> {
                 arm_env.extend_from_slice(env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 let lowered = self.lower_expr(builder, body, &arm_env)?;
-                if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                    terminal_trap.get_or_insert_with(|| trap.clone());
+                match &lowered {
+                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    }
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
                 if self.seal_source_trap_branch(builder, &lowered)? {
                     continue;
