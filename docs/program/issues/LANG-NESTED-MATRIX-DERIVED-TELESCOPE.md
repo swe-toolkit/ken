@@ -73,8 +73,9 @@ Three increments, each a straight-ancestor cut that may land alone.
    reaches the same shift through `wrap_premise_lams_finalized` and
    `wrap_premise_pis_finalized` at `check_dependent_branch_body` `:6318` and
    `check_match_dependent_mode` `:6590`. A checked single-arm `Vec Nat (Suc
-   n)` sibling normalizes to `Zero` where 3 is expected (measured on
-   `a252de8d8`).
+   n)` sibling normalizes to `Zero` where 3 is expected. That is measured on
+   `a252de8d8` and on `origin/main` `e893ecb7a`, so it is a live miscompile on
+   main, and increment 0 turns it into a refusal (`evt_4wqqh74aat58j`).
    - Both wraps run `reject_foreign_alias_sentinels` over body and premises
      whenever premises are non-empty. They return
      `Result<Term, ForeignAliasAcrossPremiseWrap>`.
@@ -146,8 +147,8 @@ Three increments, each a straight-ancestor cut that may land alone.
       argument and span source, plus the `from_full` exclusion.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
-  The R1 and R2 rows flip from refusal to 3, built from occurrence terms in
-  the derived telescope.
+  The R1 and R2 rows, the checked R2 and the checked single-arm sibling flip
+  from refusal to 3, built from occurrence terms in the derived telescope.
 - **AC-2 (controls).**
   - Every value pin of `LANG-NESTED-SPLIT-FIELD-DEPENDENCE` stays green.
     That includes the collision control and M1, M2 and M3.
