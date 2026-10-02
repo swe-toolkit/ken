@@ -70,8 +70,10 @@ stop and report the mismatch; do not build around it.
    4. Conjunction and Π-into-Ω carriers: `whnf(Eq (P∧Q) u v)` and
       `whnf(Eq ((x:A)→Q) f g)` are `Eq`, `refl u` and `refl f` check, and
       the level equals the carrier's.
-   5. Rejections: Cast between two props and Eq-Form at a non-type are
-      still refused.
+   5. Boundary pair on one Ω carrier `P`: `Eq P u v` is admitted (refused
+      on main), while `cast P P e u` stays refused. Eq-Form at a non-type
+      carrier stays refused. The refusals are controls: they hold on main
+      too, and the pair, not each refusal, carries AC-2.
 
 ## Acceptance
 
@@ -79,7 +81,8 @@ stop and report the mismatch; do not build around it.
   the §8.4 case and known-gap note as ruled, with no rule for the
   cast-side siblings and no level lift.
 - **AC-2.** The conformance validator votes on the five rows. Each row is
-  a non-degenerate pair against current main.
+  a non-degenerate pair against current main; in row 5 the admitted Eq is
+  the side that flips.
 
 ## Stop conditions
 
