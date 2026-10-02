@@ -59,9 +59,27 @@ stop and report the mismatch.
 1. **The Ops.** Register `div_int` and `mod_int` as primitive Ops of type
    `Int → Int → Int`, with no conversion rule, so both stay neutral in the
    kernel. `trusted_base()` grows by exactly these two.
-2. **The surface.** Raw `/` and `%` on `Int` elaborate to them. Each emits
-   one `PartialPrim` obligation whose goal is `NonZeroDivisor` of the
-   divisor.
+2. **The surface: `/` and `%` become fixed arithmetic tokens, like `+`**
+   (Architect `evt_3jj0h45bmcdp6`, which carries the design). Today they are
+   generic user operators. A fallback is rejected, because the meaning of
+   one spelling would depend on declaration order.
+   - The lexer claims exactly `/` and `%`, so `<`, `>`, `<+>` and `/\` stay
+     generic.
+   - Add `BinOp::Div` and `BinOp::Mod` at `infixl 7`, in `builtin_fixity`,
+     `parser.rs:5498` and `layout.rs:1823`, with no `_ =>` arm.
+   - `elab_binop` dispatches them through a new `NumericEnv::classify_div`,
+     whose only entry is Int. On Int it builds `div_int`/`mod_int` and emits
+     one `PartialPrim` obligation, `NonZeroDivisor` of the divisor, from the
+     `:10046` template. Any other type gives `TypeMismatch` naming the
+     operator.
+   - Declaring `fn /` or `fn %` is refused with the diagnostic class
+     `fn +` gets. Measure that diagnostic first.
+   - **Spec piece**, on the same branch and Decision (COORDINATION §14 (4)):
+     - spec 31 §2 adds `/` and `%` to the fixed set and drops them from the
+       generic list;
+     - spec 32 §6's level-7 row becomes "`*`, `/`, `%`".
+
+     The spec ring authors it, and the conformance validator votes.
 3. **Evaluation.** The interpreter reduces both truncated on nonzero
    divisors. A zero divisor faults, never yields a value.
 4. **The row.** Un-ignore `sec31_int_div_zero_emits_obligation`. It asserts
@@ -79,6 +97,17 @@ stop and report the mismatch.
     pairing. The oracle is independent of the interpreter path (18a §3).
   - `x / 0` and `x % 0` fault at runtime. A test that returns any value
     there is red.
+- **AC-1b (surface; each pair on a shared input).**
+  - Dispatch: the same `a / b` (and `a % b`) at `Int` gives `div_int a b`
+    with exactly one `PartialPrim` obligation of goal `NonZeroDivisor b`. At
+    `Nat` it gives `TypeMismatch` naming `/`, not `UnboundName`.
+  - Reservation: `fn / (x : Nat) (y : Nat) : Nat = x` is refused with the
+    `fn +` diagnostic class. In `generic_and_fixed_operator_paths_remain_distinct`
+    (`lang_reserved_infix_names.rs:536`), `/` and `%` move to the fixed-token
+    assertions, and `<` and `>` stay generic.
+  - Precedence: `a + b / c` is `a + (b / c)`, and `a / b * c` is
+    `(a / b) * c`.
+  - Restoring `/` to the generic path reddens the reservation pair.
 - **AC-2 (falsifiers).**
   - Removing the obligation emission reddens the row.
   - Replacing the zero-divisor fault with `0` reddens AC-1.
@@ -90,7 +119,8 @@ stop and report the mismatch.
   - The 57-package census shows no verdict change, and the `l1_acceptance`
     rows that pass today stay green.
 - **Gates.** Kernel QA, the Architect, and the conformance-validator for
-  the NATIVE oracle (18a: the two gates are a conjunction).
+  the NATIVE oracle (18a: the two gates are a conjunction) and the spec
+  piece.
 
 ## Stop conditions
 
