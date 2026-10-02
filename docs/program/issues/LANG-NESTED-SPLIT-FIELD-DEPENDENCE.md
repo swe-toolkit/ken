@@ -150,9 +150,11 @@ The Dep repro is refused with a surface diagnostic rather than checked
   - `lang_match_record_pattern` is 9/9 with its value pins.
   - On the constant path, finalize and check are both gated off and the
     close runs over the raw method (`evt_qh7m7erbc5f6`).
-  - Dropping `&& needs_reverting` from the check reddens the record row with
-    `VarOutOfScope {4,3}`; ungating finalize (`39cb0195b`) gives `{7,6}` at
-    `declare_def`.
+  - Dropping `&& needs_reverting` from the check reddens the record-pattern
+    suite. With F2 removed (Rule 1), the first failure is the unfinalized
+    alias sentinel, `VarOutOfScope { index: 18014398509481985, depth: 2 }`
+    at span 86–90, measured by QA on `11f13ae27` (`evt_qesdergfa5j9`). There
+    is no in-matrix finalize left to ungate.
   - Gating the whole block, close included, still reddens the F1 repro.
   - Every verdict, value or diagnostic moved by the gate is reported.
   - A reverting nested split under a woven Var column (P5) is measured on
