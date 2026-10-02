@@ -53,10 +53,11 @@ typed conversion at the carried type, so the Ω-PI shortcut applies. The
 Architect rules at AC-0 whether the fix belongs in the `Refl` arm or in the
 `Eq` congruence itself (check 7: every other caller of that congruence).
 
-Also owed, carried from `KERNEL-LEQ-INT-LITERAL-REDUCTION` (CV
-`evt_3jb6z15rak6ay`, Steward `evt_4f1evy7egy04z`): one discriminating
-kernel-conversion case for spec 17 §1's ζ row (non-recursive `let`) in
-`conformance/kernel/conversion/seed-conversion.md`.
+The ζ conformance carry from `KERNEL-LEQ-INT-LITERAL-REDUCTION` is removed
+from this WP (Steward, on CV's block of `d0ae7c2a8`). Core `Let` has no
+typing rule in spec 18, so a ζ seed has no spec-grounded typed premise.
+That gap is an operator spec question, and the ζ case waits on its
+answer. This WP touches no `conformance/` path.
 
 ## Acceptance
 
