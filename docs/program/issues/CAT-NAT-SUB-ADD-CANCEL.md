@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-SUB-ADD-CANCEL
 title: "Gcd re-proves ten laws privately, including that sub cancels add under leq_nat, because Order does not publish the cancel law and Arithmetic keeps mul_add_distrib_r private. Publish add_cancel for sub in Order and mul_add_distrib_r in Arithmetic at zero TCB, and retire Gcd's ten private copies"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -95,3 +95,17 @@ Scope:
 
 - Any new primitive, postulate or axiom, or an import cycle.
 - A consumer of a retired name that was not counted: stop and name it.
+
+## Closeout
+
+Merged `c9f931538` (PR #4440), exact `381961a37`: Foundation QA
+`evt_1mdpqzta9rrg3`, Architect `evt_20nes7xf5x1xy`, Decision
+`dec_cj27ejft0j62`.
+
+- Order publishes `add_cancel for sub`, and Arithmetic publishes
+  `mul_add_distrib_r`, at zero TCB.
+- Gcd's ten private copies are retired to Order, Arithmetic and Transport.
+- Committed rows: the clean-environment client, the `TypeMismatch` mutant,
+  `trusted_base()` equality across the Order load, and Gcd's absence row.
+- Carried: Transport's private `subst` goes to
+  `CAT-TRANSPORT-COMBINATOR-CONSOLIDATION`.

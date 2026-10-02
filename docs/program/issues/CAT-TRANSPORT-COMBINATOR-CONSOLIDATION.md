@@ -1,7 +1,7 @@
 ---
 id: CAT-TRANSPORT-COMBINATOR-CONSOLIDATION
 title: "Transport's header lists subst as public API but declares it private, and eleven body-identical private copies of Transport's combinators sit in seven packages. Publish subst at zero TCB, correct the header for cast, and retire the eleven copies to Transport"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2
