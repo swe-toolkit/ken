@@ -37,7 +37,7 @@ fn int_dispatch_emits_one_nonzero_divisor_obligation_per_site() {
             Term::var(0),
         );
         assert_eq!(
-            peel_function_body(body),
+            peel_function_body(&body),
             &expected,
             "the infix Int operation must lower to the matching registered Op"
         );
