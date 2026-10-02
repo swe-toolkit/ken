@@ -88,10 +88,12 @@ fn run_plain_recursive_match_census() {
         "empty S must emit zero ordinary match guards: {guards:?}");
     // Promise class: transition sentinel for this exact-base WP. The fixture
     // records the emitted checked unit bodies on c91, not repository prose.
-    // Future intentional codegen changes must replace the c91 baseline in a
-    // newly framed criterion; this WP cannot charge zero-S programs extra IR.
-    assert_eq!(emitted_ir.as_bytes(), PLAIN_MATCH_C91_IR.as_bytes(),
-        "the measured zero-S native unit IR differs byte-for-byte from c91");
+    // Cranelift's display appends a blank separator; line breaks after the
+    // final brace are display whitespace, not unit IR. Compare the body
+    // byte-for-byte so intentional codegen changes still require review.
+    assert_eq!(emitted_ir.trim_end_matches('\n').as_bytes(),
+        PLAIN_MATCH_C91_IR.trim_end_matches('\n').as_bytes(),
+        "the measured zero-S native unit IR differs from c91");
 }
 
 #[cfg(target_os = "linux")]

@@ -997,4 +997,3 @@ block95(v200: i64):
     v218 = iconst.i64 0
     return v218  ; v218 = 0
 }
-
