@@ -79,6 +79,8 @@ stop and report the mismatch.
      - spec 31 §2 adds `/` and `%` to the fixed set and drops them from the
        generic list;
      - spec 32 §6's level-7 row becomes "`*`, `/`, `%`".
+     - spec 31 §4's post-freeze fixed-token list adds `/` and `%`, so it
+       agrees with §2 (spec-leader `evt_1v7fmwtpvbn0w`).
 
      The spec ring authors it, and the conformance validator votes.
 3. **Evaluation.** The interpreter reduces both truncated on nonzero
