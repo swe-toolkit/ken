@@ -237,32 +237,43 @@ M-c and M-d, the plane split, and issuance over the source Construct walk.
     - dropping `has_destination` reddens (a) on a named fixture or a new
       planner unit test;
     - `validate_continuation_specialization_plan` is unchanged and green.
-- **I-2, (B) at issuance over the fixed stratum.**
-  - `build_recursive_residual_dispositions` skips a LexicalClosure
-    disposition when the eliminator's whole subtree holds a preselected
-    caller. Over-blocking is fail-safe.
-  - `recursive_position_unit_body` gains the all-unissued arm `Ok(None)`.
-  - A fail-closed lowering assert stops a residual from replacing a
-    selected descent.
+- **I-2, selection-only preservation over the fixed stratum** (Architect
+  `evt_691t5yw79pyws` on D0 `evt_6rt58tdd5xd62`; the ruling carries the code
+  text). Issuance stays exactly as on `80bcfb4`. The issuance guard, the
+  all-unissued `Ok(None)` arm and whole-subtree containment are withdrawn.
+  - **Q.** When `recursive_position_unit_body` would select the residual
+    fallback at (context C, eliminator G, pos), let `B` be the body the
+    Active path (`Ok(None)`) would lower there. Q forbids the fallback iff a
+    preselected caller is emitted by C and its producer construct lies in
+    `B`. The check is `active_descent_emits_selected_call`, and it keeps the
+    owner equality.
+  - If Q forbids where no Active path exists, return
+    `unsupported("RecursiveResidual", ...)`. Never fall back silently.
+  - **First step, before product edits:** log `B` and the guard's verdict
+    for all 13 D0-a selection rows. It forbids at exactly r2 and write ctx1
+    S5/G533 and admits the other 11.
   - Acceptance:
-    - **M2 first:** for r2 and the named fallback-needing `BoundaryCarrier`
-      fixture, each gate's eliminator, its candidates and the preselected
-      callers in its subtree. 533 holds 528, and the BoundaryCarrier gate
-      holds none.
-    - r2 passes, with `u0:58` called twice from S5 context 1.
-    - The BoundaryCarrier fixture still passes through the residual.
-    - Dropping the guard reddens r2 with exactly "no verified selected
-      incoming call".
-    - A before/after issuance census shows dispositions lost only at gates
-      whose subtree holds a preselected caller.
-    - The rt_escape rows stay green, and the lowering assert has a unit
-      test.
-- **Stops (the 7th returns the sizing to the Steward):**
-  - (a) or (b) fails on a gated suite;
-  - preselection needs a fact outside phase A;
-  - M2 puts a preselected caller under the BoundaryCarrier gate;
+    - the guard's logged verdicts equal the D0-a Q column on all 13 rows;
+    - r2 executes `u0:58` twice from S5 ctx1, and the handoff names r2's
+      next refusal if one remains;
+    - read is 1/1 with G12's residual consumed, and write is 1/1 with S5/528
+      at main's count;
+    - deleting the guard call reddens r2 with exactly "no verified selected
+      incoming call";
+    - dropping the owner equality is reported row by row (it records the
+      axis and is not a pass condition);
+    - a unit test covers owner match with containment, owner mismatch, and
+      no containment;
+    - the `dec_3tvethnshr68y` carry: compare installed owners only on
+      `Ok(owners)`, and propagate `Err(infeasible)` with its own reason;
+    - rt_escape*, rt_span_prov_native and the two parity rows stay green.
+- **Stops (the 8th returns the sizing to the Steward; the 9th calls
+  research):**
+  - the first-step table disagrees with Q, or `B` is not a single static
+    body;
+  - a non-r2 verdict changes;
   - r2 still lacks the call;
-  - a non-r2 verdict changes.
+  - the fail-closed assertion fires on any fixture.
 
 ## Acceptance
 
