@@ -232,7 +232,7 @@ fn entry_wrapper_bodies_directly_use_derived_without_boolean_decisions() {
             .env
             .transparent_body(client_id)
             .unwrap_or_else(|| panic!("{client} must be a checked transparent wrapper"));
-        let mut term = body;
+        let mut term = &body;
         for _ in 0..binders {
             let Term::Lam(_, inner) = term else {
                 panic!("{client} must keep exactly {binders} declared binders: {term:?}");
@@ -244,7 +244,7 @@ fn entry_wrapper_bodies_directly_use_derived_without_boolean_decisions() {
             "{client} must directly call Derived.{provider} through its preloaded GlobalId; got {term:?}"
         );
         assert_eq!(
-            boolean_decisions(body, env.numeric_env.bool_id),
+            boolean_decisions(&body, env.numeric_env.bool_id),
             0,
             "{client} must not make its own Boolean branching decision"
         );

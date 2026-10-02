@@ -322,37 +322,69 @@ fn real_derived_consumer_reuses_canonical_logic_providers() {
 
 /// Promise class: durable export identity invariant.
 ///
-/// MEASURED: selective imports of the generic sort surface bind all seven
-/// requested names to transparent GlobalIds owned by the real Derived roots
-/// load. CLAIMED: publishing the proofs preserves their canonical owner.
-/// THE GAP: the separate sort-law suite checks each complete theorem type.
+/// MEASURED: seven checked clients selectively import the generic sort
+/// surface, and each body cites the owned transparent Derived GlobalId.
+/// CLAIMED: publishing the operations and proofs preserves their provider
+/// identities. THE GAP: the separate sort-law suite checks full theorem types.
 #[test]
 fn derived_generic_sort_exports_are_roots_owned_and_selectively_importable() {
     let mut env = ElabEnv::new().expect("base environment");
     let owned = env
         .elaborate_module_from_roots(&[catalog_root()], DERIVED_MODULE)
         .expect("Derived provider closure must roots-load");
-    env.elaborate_file("import Data.Collections.Derived (Perm, insert, sort)")
-        .expect("generic sort operations and attached proofs must be importable");
+    env.elaborate_file(
+        r#"import Data.Collections.Derived (Perm, insert, sort, count)
+import Core.Classes.LawfulClasses (bool_or)
+fn cat_generic_perm (a : Type) (eqf : a → a → Bool) (xs : List a) (ys : List a) : Prop =
+  Perm a eqf xs ys
+fn cat_generic_insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
+  insert a le x xs
+fn cat_generic_sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
+  sort a le xs
+theorem cat_generic_insert_sorted
+    (a : Type) (le : a → a → Bool)
+    (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+    (x : a) (xs : List a) :
+    is_sorted a le xs → is_sorted a le (insert a le x xs) =
+  insert::sorted a le total x xs
+theorem cat_generic_insert_count
+    (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    (eqf : a → a → Bool) (q : a) :
+    Equal Nat (count a eqf q (Cons a x xs)) (count a eqf q (insert a le x xs)) =
+  insert::count a le x xs eqf q
+theorem cat_generic_sort_sorted
+    (a : Type) (le : a → a → Bool)
+    (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+    (xs : List a) : is_sorted a le (sort a le xs) =
+  sort::sorted a le total xs
+theorem cat_generic_sort_perm
+    (a : Type) (le : a → a → Bool) (xs : List a) (eqf : a → a → Bool) :
+    Perm a eqf xs (sort a le xs) =
+  sort::perm a le xs eqf"#,
+    )
+    .expect("generic sort operations and all four proofs must be importable");
 
-    for name in [
-        "Perm",
-        "insert",
-        "sort",
-        "insert::sorted",
-        "insert::count",
-        "sort::sorted",
-        "sort::perm",
+    // A flat prelude alias may share a spelling with a newly imported symbol;
+    // the checked clients, not that mutable table, establish resolution.
+    for (provider, client) in [
+        ("Perm", "cat_generic_perm"),
+        ("insert", "cat_generic_insert"),
+        ("sort", "cat_generic_sort"),
+        ("insert::sorted", "cat_generic_insert_sorted"),
+        ("insert::count", "cat_generic_insert_count"),
+        ("sort::sorted", "cat_generic_sort_sorted"),
+        ("sort::perm", "cat_generic_sort_perm"),
     ] {
-        let canonical = catalog_or::provider_owned_id(&env, &owned, DERIVED_MODULE, name)
-            .unwrap_or_else(|error| panic!("Derived sort owner {name}: {error}"));
+        let canonical = catalog_or::provider_owned_id(&env, &owned, DERIVED_MODULE, provider)
+            .unwrap_or_else(|error| panic!("Derived sort owner {provider}: {error}"));
+        let client_id = env.globals[client];
+        let (_, body) = env
+            .env
+            .transparent_body(client_id)
+            .unwrap_or_else(|| panic!("{client} must have a checked transparent body"));
         assert!(
-            env.env.transparent_body(canonical).is_some(),
-            "Derived {name} must remain checked and transparent"
-        );
-        assert_eq!(
-            env.globals[name], canonical,
-            "selectively imported {name} must use its exact Derived provider identity"
+            mentions_global(&body, canonical),
+            "{client} must cite Derived.{provider} by its provider GlobalId"
         );
     }
 }
