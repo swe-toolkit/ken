@@ -371,6 +371,24 @@ conversion must consume the obs WHNF rules and decide.
 
 ---
 
+## Non-recursive `let` ζ reduction (KERNEL-REFL-ENDPOINT-TYPED-CONVERSION)
+
+### conversion/nonrecursive-let-zeta-open (soundness)
+- spec: `17 §1` (ζ), `§3.2` (WHNF), `11 §1` (non-recursive `let`)
+- promise class: **durable invariant** — adding other reduction rules must
+  preserve ζ for this typed, open term
+- given: in an open context `x y : Nat` with distinct binders, form
+  `t := let z : Nat := x in z`. Query `infer(t)`, `whnf(t)`,
+  `convert(Nat, t, x)`, and `convert(Nat, t, y)`.
+- expect: `infer(t) = Nat`, `whnf(t) = x`, the conversion to `x` is
+  **true**, and the conversion to distinct `y` is **false**.
+- why: ζ substitutes the non-recursive bound value into the body. The
+  negative query rules out equating all neutral Nat variables or treating
+  an unreduced `let` as equal to arbitrary terms. The open value tests local
+  substitution directly rather than δ-unfolding a closed global alias.
+
+---
+
 ## Registered primitive kernel-WHNF conversion (KERNEL-LEQ-INT-LITERAL-REDUCTION)
 
 These cases exercise `convert`/kernel WHNF directly, **not** the interpreter's
