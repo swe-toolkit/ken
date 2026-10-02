@@ -160,8 +160,10 @@ Three increments, each a straight-ancestor cut that may land alone.
       plus the `from_full` exclusion.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
-  The R1 and R2 rows, the checked R2 and the checked single-arm sibling flip
-  from refusal to 3, built from occurrence terms in the derived telescope.
+  The R1 and R2 rows, the checked R2, the checked single-arm sibling and the
+  Eq-index `Ix/Mk` row (increment 0's infer-finisher discriminator,
+  Architect `evt_57fd0ncxh81v8`) flip from refusal to 3, built from
+  occurrence terms in the derived telescope.
 - **AC-2 (controls).**
   - Every value pin of `LANG-NESTED-SPLIT-FIELD-DEPENDENCE` stays green.
     That includes the collision control and M1, M2 and M3.
