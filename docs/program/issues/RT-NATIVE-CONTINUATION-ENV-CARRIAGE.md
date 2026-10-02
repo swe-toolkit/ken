@@ -262,6 +262,11 @@ M-c and M-d, the plane split, and issuance over the source Construct walk.
     - the `dec_3tvethnshr68y` carry: compare installed owners only on
       `Ok(owners)`, and propagate `Err(infeasible)` with its own reason;
     - rt_escape*, rt_span_prov_native and the two parity rows stay green.
+    - **Label readers** (`evt_65natwv18ep26`): `generated_entry_capsule_
+      outer_carried` gives the typed `ResourceBodyResult` (identity 41);
+      restoring the node accessors at `assert_recursive_carrier_variant`
+      reddens it with raw -1. Each reader's runtime witness is reported.
+      One full `rt_parity_native` run completes.
   - Dispositions left issued and unconsumed are not pruned here.
 - **Stops (the 9th is hold plus research):**
   - a consumption-site assertion fires on any fixture;
@@ -416,16 +421,14 @@ triggers hold-and-research.
    Keyed on static containment at the selection point (`evt_30etv9z3ddq4t`,
    §1a 8; Architect `evt_62fpkx7marckq`). Entries 7 and 8 share entry 6's
    predicate. Entry 9 is the next predicate checkpoint.
-9. With the execute-then-resume response suppressed on write, and the
-   P10/G25 Labelled residual selected, S5's context (fn56) fails the
-   carrier-schema assertion on the R15 label word
-   (`assert_recursive_carrier_variant` `mod.rs:8860` → `require_i64`, raw
-   -1) on the P2 Deferred route. There, I-1 reaches the typed identity-41
-   `ResourceBodyResult` pattern-match trap. The writer of the bad label
-   word is not yet identified (`evt_7stv16qbf6vt5`, §1a 9; Architect
-   `evt_284zc4290m42k`). The predicate is suspended until D0-h names that
-   writer: the deferred transport's store rejoins entries 7 and 8, and an
-   unrecorded producer recurs entries 1 to 6.
+9. The residual carrier's label readers use the node-only `tag`/`scalar`
+   accessors on an `ImmediateInt` label word, so a well-formed label gets a
+   false shape refusal (raw -1). It is exposed on the P2 Deferred route by
+   `rt_parity_native generated_entry_capsule_outer_carried`. Keyed on the
+   accessor plane (`evt_7stv16qbf6vt5`, §1a 9; Architect `evt_65natwv18ep26`).
+   Entry 9 is independent of entries 7 and 8. The repair is local: all three
+   label readers (`calls.rs:909`, `core.rs:14273`, `mod.rs:8865`) take one
+   immediate-plane accessor.
 
    Carry, not on this WP: give carrier-schema assertions a typed root-trap
    catalog entry in place of the raw -1 status abort.
