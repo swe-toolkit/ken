@@ -4012,6 +4012,7 @@ pub struct ResidualLoweringCounters {
     pub site_a_none_arrivals: usize,
     /// Counted while emitting the labelled arm, not when native execution selects it.
     pub boxed_decode_arms_emitted: usize,
+    pub boxed_member_compile_refusals: usize,
     pub transitional_escapes: usize,
     pub synthesized_checked_ih_capture_escapes: usize,
 }
@@ -4022,6 +4023,7 @@ thread_local! {
         const { std::cell::Cell::new(ResidualLoweringCounters {
             site_a_none_arrivals: 0,
             boxed_decode_arms_emitted: 0,
+            boxed_member_compile_refusals: 0,
             transitional_escapes: 0,
             synthesized_checked_ih_capture_escapes: 0,
         }) };
@@ -4071,6 +4073,16 @@ fn record_boxed_decode_arm_emitted() {
         counter.set(measured);
     });
     record_residual_counter_event("boxed_decode_arm_emitted");
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_boxed_member_compile_refusal() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.boxed_member_compile_refusals += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("boxed_member_compile_refusal");
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]

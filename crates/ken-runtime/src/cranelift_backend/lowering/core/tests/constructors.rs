@@ -6905,6 +6905,74 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
     );
 }
 
+/// The source plan admits a Boxed member, but its labelled selector lacks
+/// graph-issued call authority for that member. Full compilation must refuse
+/// before emitting any unit, rather than run an untested native ABI path.
+///
+/// Promise class: transition sentinel. Remove this compile refusal only with
+/// a graph-authorized executed source and red arity and bare-K mutations.
+#[test]
+fn mixed_recursive_carrier_boxed_member_is_refused_before_lowering() {
+    let mut source = checked_transport_mixed_invocation_return_fixture();
+    let RuntimeExpr::LexicalClosure { body, .. } = &mut source else {
+        panic!("mixed source has its lexical root")
+    };
+    let RuntimeExpr::ComputationalMatch { cases, .. } = body.as_mut() else {
+        panic!("mixed source has its recursive eliminator")
+    };
+    let node = cases.iter_mut().find(|case| case.constructor.ends_with("::Contspec::Node"))
+        .expect("mixed source has its Node case");
+    node.body = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::Var(0)),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(), args: Vec::new(),
+        }],
+    };
+    let call = RuntimeExpr::Call {
+        callee: Box::new(source),
+        args: vec![RuntimeExpr::Value(RuntimeValue::Bool(false))],
+    };
+    let plan = plan_static_transition_graph_with_symbols(
+        &call, &BTreeMap::new(), &crate::NativeProcessSymbols::legacy_prelude(),
+        AbiRootIngress::Process, true,
+    ).expect("live fixture plans");
+    let mixed = plan.recursive_carrier_slots().iter().filter(|slot|
+        slot.variants.iter().any(|variant| variant.schema == RecursiveCarrierMemberSchema::Residual)
+            && slot.variants.iter().any(|variant| variant.schema == RecursiveCarrierMemberSchema::Boxed)
+    ).count();
+    let boxed_stores = plan.recursive_carrier_slots().iter().map(|slot|
+        slot.edges.iter().filter(|edge|
+            edge.kind == RecursiveCarrierStoreKind::ConstructEmission
+                && slot.variant(edge.specialization).is_ok_and(|variant|
+                    variant.schema == RecursiveCarrierMemberSchema::Boxed)
+        ).count()
+    ).sum::<usize>();
+    let boxed_force = plan.recursive_carrier_slots().iter().map(|slot|
+        slot.edges.iter().filter(|edge|
+            edge.kind == RecursiveCarrierStoreKind::CheckedIhForce
+                && slot.variant(edge.specialization).is_ok_and(|variant|
+                    variant.schema == RecursiveCarrierMemberSchema::Boxed)
+        ).count()
+    ).sum::<usize>();
+    assert!(mixed >= 1, "the fixture must plan an issued mixed slot");
+    assert!(boxed_stores >= 1, "the fixture must plan a boxed construct store");
+    assert_eq!(boxed_force, 0, "Boxed members cannot mint checked-IH force stores");
+
+    let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let (result, counters) = with_residual_lowering_counters(|| compile_expr(&call, &env));
+    match result {
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "RecursiveResidual", reason,
+        })) => assert_eq!(reason, "a Boxed carrier member has no executed consumer"),
+        Err(error) => panic!("the Boxed member reached another refusal: {error:?}"),
+        Ok(_) => panic!("the Boxed member compiled without an executed consumer"),
+    }
+    assert_eq!(counters.boxed_member_compile_refusals, 1,
+        "this compile must reach the pre-lowering Boxed choke exactly once");
+    assert_eq!(counters.boxed_decode_arms_emitted, 0,
+        "a Boxed decoder arm must not be emitted before the refusal");
+}
+
 // ─── RT-WORKER-BIND `D2` — the construction route's pre-installation facts ───
 
 /// A planned `Let` whose bound value is a lexical closure with one capture.

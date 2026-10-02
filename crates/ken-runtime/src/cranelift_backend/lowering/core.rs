@@ -2313,6 +2313,19 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         },
         true,
     )?;
+    // No full compilation may execute Boxed R until a graph-authorized
+    // consumer and a discriminating execution witness exist. The planner
+    // still issues its complete slot schema; this boundary is before every
+    // lowered unit, so no Boxed writer or decoder can emit native code.
+    if static_transition_plan.recursive_carrier_slots().iter().any(|slot|
+        slot.variants.iter().any(|variant|
+            variant.schema == RecursiveCarrierMemberSchema::Boxed)) {
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        record_boxed_member_compile_refusal();
+        return Err(unsupported(
+            "RecursiveResidual", "a Boxed carrier member has no executed consumer",
+        ));
+    }
     // The static source walk issues provisional zero-argument IH-force slot
     // children. Cross-check their exact oriented templates at the earliest
     // join of the two plans, before fusion or any other install can refuse:

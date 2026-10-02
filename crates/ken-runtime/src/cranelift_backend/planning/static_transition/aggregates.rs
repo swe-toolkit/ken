@@ -11049,6 +11049,12 @@ impl<'src> StaticTransitionPlan<'src> {
         Ok(Some(store))
     }
 
+    pub(in crate::cranelift_backend) fn recursive_carrier_slots(
+        &self,
+    ) -> &[RecursiveCarrierSlot] {
+        &self.recursive_carrier_slots
+    }
+
     pub(in crate::cranelift_backend) fn recursive_carrier_slot(
         &self, eliminator: StaticOriginId, constructor: super::ConstructorIdentity, position: u32,
     ) -> Result<Option<&RecursiveCarrierSlot>, CraneliftBackendError> {
