@@ -67,6 +67,28 @@ Three increments, each a straight-ancestor cut that may land alone.
    `PatternVariableAcrossDependentSplit` when an enclosing frame's sentinel
    survives in a match whose scrutinee family refines indices. Every caller
    passes the truth for its own scrutinee; a constant `None` says why.
+
+   **The check path** (Architect `evt_6n6r4r5shx05f`, `evt_1220jbxcj19zq`,
+   which carry the code). A checked method body opens no alias frame. It
+   reaches the same shift through `wrap_premise_lams_finalized` and
+   `wrap_premise_pis_finalized` at `check_dependent_branch_body` `:6318` and
+   `check_match_dependent_mode` `:6590`. A checked single-arm `Vec Nat (Suc
+   n)` sibling normalizes to `Zero` where 3 is expected (measured on
+   `a252de8d8`).
+   - Both wraps run `reject_foreign_alias_sentinels` over body and premises
+     whenever premises are non-empty. They return
+     `Result<Term, ForeignAliasAcrossPremiseWrap>`.
+   - `own_frame` is the last replacement frame only at
+     `close_inferred_index_method` `:18935`. The other nine call sites pass
+     `None`.
+   - Each site maps the error to `PatternVariableAcrossDependentSplit` at the
+     split's span, with no `.ok()`, `unwrap`, `expect` or `_` arm.
+   - `wrap_premise_lams_from_full` (`:13536`) is excluded because it never
+     calls `finalize_refined_body`.
+   - The infer-finisher guards stay.
+
+   `Internal(g0)` from `project_generated_index_equality_leaves` is not the
+   refusal.
 1. **Seed `ret_ty_slot` from the check-mode expected type.** Report how many
    of the 24 entries become `Some`.
 2. **Open each nested bucket in the derived telescope before its leaves.**
@@ -105,6 +127,23 @@ Three increments, each a straight-ancestor cut that may land alone.
     nested indexed-column split) are reported, not asserted. A wrong value
     is a stop to the Architect.
   - Forcing the flag to `None` in `infer_match` restores R1 ⇝ 1 and R2 ⇝ 2.
+  - **Check path.**
+    - The exact checked R2 (`let r : Nat = match xs { … } in r`) refuses with
+      `PatternVariableAcrossDependentSplit`.
+    - So does the checked single-arm sibling. Its test comment keeps the
+      same-typed census (saved=3, j=2, e=5, {n,m}=0).
+    - Base census: run the sibling on `origin/main`. If main gives `Zero`,
+      the handoff reports a live base miscompile that this increment turns
+      into a refusal. If main refuses or gives 3, stop to the Architect.
+    - Unit rows call both wraps directly. A foreign sentinel with one
+      premise and `own_frame: None` gives `Err`. The same sentinel listed in
+      `own_frame` gives `Ok`, shifted exactly as before. With zero premises
+      it gives `Ok`.
+    - Mutation: an always-`Ok` `reject_foreign_alias_sentinels` reddens the
+      unit rows and both checked rows. The infer rows still refuse through
+      the finisher guards.
+    - The fan-in table lists all ten wrap call sites with their `own_frame`
+      argument and span source, plus the `from_full` exclusion.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
   The R1 and R2 rows flip from refusal to 3, built from occurrence terms in
