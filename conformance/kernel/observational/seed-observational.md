@@ -86,6 +86,116 @@ build time by the Spec enclave.
 
 ---
 
+## Acceptance criterion: Eq at Omega carriers and components
+
+These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
+
+### observational/eq-subset-sigma-omega-field (soundness)
+- spec: `spec/10-kernel/16-observational.md` §§2.1, 2.2, 8.4;
+  `spec/10-kernel/13-pi-sigma.md` §4
+- given: In context `P : Nat -> Omega_0`, `a b : Nat`, `p : P a`,
+  `q : P b`, `h : Eq Nat a b`, let `S := (x : Nat) × P x`,
+  `s := (a, p)`, and `t := (b, q)`. Query `infer(Eq S s t)`,
+  `whnf(Eq S s t)`, `infer(whnf(Eq S s t))`, and
+  `check((h, refl q), Eq S s t)`.
+- expect: `infer(Eq S s t) = Omega_0`; its WHNF is
+  `Eq Nat a b and Eq (P b) q q`, with inferred sort `Omega_0`;
+  the witness check accepts.
+- why: A subset Sigma stays Type-classified. Its reduct keeps the
+  relevant base equality and forms the second conjunct at the
+  target-side Omega type, with no transport.
+
+### observational/eq-inductive-omega-field-dependent-type (soundness)
+- spec: `spec/10-kernel/16-observational.md` §§2.1, 2.2, 8.4;
+  `spec/10-kernel/14-inductive.md` §1; `spec/10-kernel/13-pi-sigma.md`
+  §§3-4
+- given: With declarations `P : Omega_0` and `T : Nat -> Type 0`,
+  let `prefix := (k : Nat) × P` and declare:
+  ```text
+  data D : Type 0 where
+    node : (n : Nat) -> P -> T n -> D
+  ```
+  In context `n m : Nat`, `h : Eq Nat n m`, distinct `p q : P`,
+  `x : T n`, `y : T m`, and `e_prefix : Eq prefix (n, p) (m, q)`, set
+  `e_T := cong (λ (z : prefix). T z.1) e_prefix`, and assume
+  `r : Eq (T m) (cast (T n) (T m) e_T x) y`. Let
+  `left := node n p x`, `right := node m q y`. Query
+  `infer(Eq D left right)`, `whnf(Eq D left right)`,
+  `infer(whnf(Eq D left right))`, and
+  `check((h, (refl q, r)), Eq D left right)`.
+- expect: `infer(Eq D left right) = Omega_0`; its WHNF is:
+  ```text
+  (e_n : Eq Nat n m) ×
+    (e_p : Eq P q q) ×
+    Eq (T m) (cast (T n) (T m) eq_earlier' x) y
+  ```
+  Here `eq_earlier'` is the §2.2 prefix-transport evidence from
+  `(e_n, e_p)`. The witness supplies `h` and `refl q`; the reduct
+  infers `Omega_0`, and the check accepts.
+- why: R3 forms the Omega-field conjunct at target proof `q`, without
+  transporting that field. The later dependent `T n` field still
+  transports through the preceding-field equality evidence.
+
+### observational/eq-inductive-omega-field-irrelevant-dependency (soundness)
+- spec: `spec/10-kernel/16-observational.md` §§2.2, 8.2, 8.4;
+  `spec/10-kernel/14-inductive.md` §1
+- given: With declarations `P : Omega_0` and
+  `U : Nat -> P -> Type 0`, declare:
+  ```text
+  data E : Type 0 where
+    mk : (n : Nat) -> (p : P) -> U n p -> E
+  ```
+  In context `n : Nat`, distinct `p q : P`, `x : U n p`,
+  `y : U n q`, and `r : Eq (U n q) x y`, let `left := mk n p x`,
+  `right := mk n q y`. Query `infer(Eq E left right)` and
+  `check((refl n, (refl q, r)), Eq E left right)`.
+- expect: `infer(Eq E left right) = Omega_0`, and the check accepts.
+- why: The later field's types `U n p` and `U n q` are convertible
+  only by Omega proof irrelevance (§8.2). R3 discards the source
+  Omega proof; the later field is compared directly, with no
+  transport. Structural comparison of `p` and `q` would leave `r`
+  ill-typed and this check would not accept.
+
+### observational/eq-trunc-omega-level-one (soundness)
+- spec: `spec/10-kernel/16-observational.md` §§2.1, 2.2, 6, 8.4
+- given: `A : Type 1`, `u v : ‖A‖`. Query `infer(Eq ‖A‖ u v)`,
+  `whnf(Eq ‖A‖ u v)`, and `check(refl u, Eq ‖A‖ u v)`.
+- expect: inference returns `Omega_1`; WHNF remains `Eq ‖A‖ u v`;
+  the Refl check accepts.
+- why: Eq at an Omega carrier is neutral even at Trunc. No
+  `Trunc`-to-`Top` reduction can lower `Omega_1` to `Omega_0`.
+
+### observational/eq-canonical-omega-carriers-neutral (soundness)
+- spec: `spec/10-kernel/16-observational.md` §§1.1, 1.3, 2.1, 2.2,
+  8.2; `spec/10-kernel/13-pi-sigma.md` §4
+- given: In context `P Q : Omega_0`, let
+  `C := (p : P) × Q` (the conjunction `P and Q`), with `u v : C`.
+  Also let `A : Type 0`, `F := (x : A) -> Q`, and `f g : F`. Query
+  `infer(Eq C u v)`, `whnf(Eq C u v)`, `check(refl u, Eq C u v)`,
+  `infer(Eq F f g)`, `whnf(Eq F f g)`, and
+  `check(refl f, Eq F f g)`.
+- expect: both Eq inference results are `Omega_0`; each WHNF is its
+  unchanged `Eq` term; both Refl checks accept.
+- why: canonical Sigma and Pi heads do not trigger Type-carrier Eq
+  reduction when the carrier is Omega-classified. Omega-PI admits
+  both Refl terms.
+
+### observational/eq-omega-carrier-boundary-pair (soundness)
+- spec: `spec/10-kernel/16-observational.md` §§2.1, 2.2, 3.1, 8.2
+- given: In context `P : Omega_0`, `u v : P`, `e : Eq Omega_0 P P`,
+  and `n : Nat`, query `infer(Eq P u v)`, `whnf(Eq P u v)`,
+  `check(refl u, Eq P u v)`, `infer(cast P P e u)`, and
+  `infer(Eq n n n)`.
+- expect: Eq inference returns `Omega_0`, its WHNF is unchanged, and
+  Refl accepts. Eq-Form at `P` is admitted; the proposition-to-
+  proposition Cast and non-type-carrier Eq remain refused.
+- why: Eq-Form at `P` is refused on the framed main, so its admitted
+  side carries the pair's flip. Cast admission stays Type-only, and
+  `n : Nat` is not a type or proposition carrier; both refusals are
+  controls.
+
+---
+
 ## Acceptance criterion: cast regularity and computation (frame par. 2 items 2-3, README #12)
 
 ### observational/cast-refl (soundness)

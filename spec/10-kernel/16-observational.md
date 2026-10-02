@@ -234,21 +234,37 @@ on the structure of the type `A`* -- equality "observes" the type.
 
 ```
   Gamma |- A : Type l     Gamma |- a : A     Gamma |- b : A
-  ───────────────────────────────────────────────────────────  (Eq-Form)
+  ───────────────────────────────────────────────────────────  (Eq-Form-Type)
   Gamma |- Eq A a b : Omega_l
+
+  Gamma |- P : Omega_l    Gamma |- u : P     Gamma |- v : P
+  ───────────────────────────────────────────────────────────  (Eq-Form-Omega)
+  Gamma |- Eq P u v : Omega_l
 ```
 
-Equality is a proposition at the level of `A`. For `A : Type l`, `Eq A a b`
-lands in `Omega_l : Type (suc l)` — predicative, matching the formation rule
-for Omega (§1.1).
+Equality is a proposition at the level of its carrier's sort: both
+`A : Type l` and `P : Omega_l` give an `Eq` in `Omega_l : Type (suc l)`.
+In particular, `Eq Omega_l P Q` compares **propositions as elements** of
+the universe `Omega_l : Type (suc l)`; its carrier is Type-classified, so
+its level and propext reduction differ from `Eq P u v` between proofs of
+`P : Omega_l`. Ken remains non-cumulative (§1.1, `12 §3`).
 
 ### 2.2 Reduction rules (by type structure)
 
-The defining computations -- the heart of OTT. For each type former, `Eq A
-a b` reduces by case analysis on the **weak-head normal form** of `A`.
-When `A` is **neutral** (a variable, an eliminator applied to a neutral
-scrutinee, or a stuck cast), `Eq A a b` is itself neutral -- no reduction
-applies.
+For a **Type-classified** carrier `A`, `Eq A a b` reduces by case
+analysis on the **weak-head normal form** of `A`. When that carrier is
+neutral (a variable, an eliminator applied to a neutral scrutinee, or a
+stuck cast), `Eq A a b` is itself neutral.
+
+For an **Omega-classified** carrier `P : Omega_l`, `Eq P u v` does **not**
+reduce at any head, including Pi, Sigma, `Trunc`, `Eq`, `Top`, `Bottom`,
+and neutral propositions. Its WHNF remains `Eq P u v : Omega_l`; there is
+no `Trunc`-to-`Top` rule at an Omega carrier (`Top : Omega_0` only). Even
+when `u` and `v` are distinct terms, `refl u : Eq P u v` checks because
+`u ≡ v` at `P` by proof irrelevance (§1.2, §8.2). This is equality
+**between proofs of** `P`, not propext for `Eq Omega_l P Q` below. The
+following structural reductions apply only after the carrier classifies
+as `Type`.
 
 In the rules below, `⇝` is the kernel's reduction relation (weak-head
 reduction; `whnf`). Each rule is a **WHNF reduction rule**: when `Eq A a
@@ -288,7 +304,9 @@ this is fine; the outer Pi is canonical.
 
 ---
 
-**Sigma-type.** `A` reduces to `(x : A1) x B1`.
+**Sigma-type.** A Type-classified `A` reduces to `(x : A1) x B1`.
+If the codomain `B1` is Type-classified, its dependent second-component
+rule uses the existing transport:
 
 ```
 Eq ((x : A1) x B1) p q
@@ -301,18 +319,33 @@ Eq ((x : A1) x B1) p q
   where eq-fst : Eq A1 p.1 q.1
 ```
 
-The `cast` on `p.2` is required because `p.2 : B1[p.1/x]` and we need to
-compare it with `q.2 : B1[q.1/x]` at the **same** type `B1[q.1/x]`, so we
-transport `p.2` from `B1[p.1/x]` to `B1[q.1/x]` along the equality of the
-first components.
+The `cast` transports `p.2 : B1[p.1/x]` to `B1[q.1/x]`, so it can be
+compared with `q.2` at the same Type-classified target. The `cong` is
+the existing equality of these Type-classified endpoints (par. 4).
 
-The `cong (x. B1 x) eq-fst` is the proof that `B1[p.1/x] = B1[q.1/x]` in
-`Type` -- it is obtained by applying `cong` (par. 4) to the family `B1`
-and the first-component equality.
+If `B1` is instead Omega-classified under `x : A1`, the outer Sigma is
+Type-classified only when `A1` is Type-classified: this is a subset, not
+an Omega-classified conjunction. Discard the proof component rather than
+transport it:
+
+```
+Eq ((x : A1) x B1) p q
+  ⇝ Eq A1 p.1 q.1 and Eq (B1 q.1) q.2 q.2
+```
+
+The second conjunct is at the **target-side** proposition `B1[q.1/x]`,
+at its own Omega level. It is well-formed and inhabited by `refl q.2`.
+No `cast`, `cong`, or J witness is formed at an Omega-classified field.
+For `A1 : Type l1` and `B1 x : Omega_l2`, the subset and its Eq are at
+`Type (max l1 l2)` and `Omega_(max l1 l2)` respectively. The reduct is
+also at `Omega_(max l1 l2)` by the Sigma formation rule (§1.3). An
+Omega-classified **outer** Sigma is neutral by the rule above, regardless
+of its canonical head.
 
 **Neutral case.** When `p` or `q` is neutral, `Eq` is neutral. When `p.1`
 and `q.1` are canonical but `p.2` or `q.2` is neutral, the `Eq` reduces to
-a conjunction with neutral components.
+a conjunction with neutral components only for a Type-classified outer
+Sigma.
 
 ---
 
@@ -320,30 +353,36 @@ a conjunction with neutral components.
 inductive family (`14-inductive.md`) with parameters `Delta_p` and indices
 `i-bar`. `a` and `b` are constructor applications.
 
-*Same constructor* (both `c_k`):
-```
-Eq (D Delta_p i-bar) (c_k a-bar) (c_k b-bar)
-  ⇝ Eq A_1 a_1 b_1
-      and Eq (A_2[b_1/x_1]) (cast (A_2[a_1/x_1]) (A_2[b_1/x_1]) eq_1' a_2) b_2
-      and ...
-      and Eq (A_n[b_1/x_1 ... b_{n-1}/x_{n-1}])
-            (cast (A_n[a_1/x_1 ... a_{n-1}/x_{n-1}])
-                  (A_n[b_1/x_1 ... b_{n-1}/x_{n-1}])
-                  eq_{n-1}' a_n)
-            b_n
-```
-where the constructor telescope is `(x_1 : A_1) ... (x_n : A_n)`. For each
-argument position `j > 1`, the type `A_j` may depend on earlier arguments
-`x_1 … x_{j-1}`. When comparing `a_j` at type `A_j[a_1/x_1 … a_{j-1}/x_{j-1}]`
-and `b_j` at type `A_j[b_1/x_1 … b_{j-1}/x_{j-1}]`, the latter argument must
-be transported to the former's type along the equalities of all earlier
-arguments — the same `cast`-on-dependent-component pattern as the Σ rule.
-Each `eq_j'` is the `cong` of the family `A_{j+1}` along the accumulated
-equalities of arguments `1…j`.
+*Same constructor* (both `c_k`): let the constructor telescope be
+`(x_1 : A_1) ... (x_n : A_n)`. At field `j`, instantiate the source and
+target types at their respective preceding arguments:
 
-This is the **dependent telescope** treatment the `cast`-at-inductive rule
-(`§3.2`) already applies, mirrored here for `Eq`-at-inductive. For a
-concrete example see the Vec instance below.
+```
+S_j := A_j[a_1/x_1 ... a_{j-1}/x_{j-1}]
+T_j := A_j[b_1/x_1 ... b_{j-1}/x_{j-1}]
+
+Eq (D Delta_p i-bar) (c_k a-bar) (c_k b-bar)
+  ⇝ C_1 and ... and C_n
+
+C_j := Eq T_j b_j b_j                             if T_j : Omega_m
+     | Eq A_1 a_1 b_1                             if j = 1, A_1 : Type m
+     | Eq T_j (cast S_j T_j eq_earlier' a_j) b_j   if j > 1, T_j : Type m
+```
+
+For a Type-classified field after the first, `eq_earlier'` is the
+existing `cong`/J evidence from the preceding argument equalities.
+It transports `a_j : S_j` **to** the target-side `T_j`, where `b_j`
+lives. For an Omega-classified target-side field, discard its source
+proof: its conjunct is `Eq T_j b_j b_j` at that field's own level,
+with no `cast`, `cong`, or J witness. The trivial conjunct remains
+available as prefix equality evidence for later dependent fields; those
+fields still use the existing Type-field transport when needed.
+
+This is the **dependent telescope** treatment the `cast`-at-inductive
+rule (§3.2) already applies, with only the Omega-field equality
+comparison discarded here. For a concrete Type-field example see Vec
+below. The reduct's level is the max of its field levels, which may be
+below the inductive family's level (§8.4).
 
 **Example (Vec).** For `Vec A : Nat → Type`:
 ```
@@ -409,18 +448,22 @@ decomposition, mutual with `Eq`-by-type).
 
 ---
 
-**Omega.** `A` reduces to `Omega`.
+**Omega universe.** The carrier `Omega_l : Type (suc l)` is
+Type-classified, so it is **not** an Omega-classified proposition carrier:
 
 ```
-Eq Omega P Q
+Eq Omega_l P Q
   ⇝ (P -> Q) and (Q -> P)
 ```
 
-This is **propext definitional**: two propositions are equal exactly when
-they imply each other. No axiom needed. Since `Eq Omega P Q : Omega`
-itself (Omega is a universe, `Omega : Type 1`, `Eq Omega P Q : Omega`),
-this is definitionally equivalent to `(P <-> Q)`, expressed via the
-connectives of par. 1.3.
+This is **propext definitional** for propositions `P, Q : Omega_l`:
+they are equal when they mutually imply each other. The equality
+`Eq Omega_l P Q` lives in `Omega_(suc l)`, not `Omega_l`. No axiom
+or identification of distinct propositions by proof irrelevance is
+introduced. By contrast, `Eq P u v : Omega_l` for `u, v : P` stays
+neutral, even when `P` itself has a canonical head (§2.1, §8.2).
+The propext reduct lies at `Omega_l`, below the equality's
+`Omega_(suc l)`; §8.4 records this pre-existing level gap.
 
 ---
 
@@ -457,17 +500,23 @@ checked-literal `string_to_list_char` view (`17 §1`) remain K3-deferred.
 
 ### 2.3 General properties
 
-- **Neutral head.** If `A` is neutral (a variable, an eliminator on a
-  neutral scrutinee, or a stuck cast), `Eq A a b` is a **neutral
-  proposition** -- no reduction applies. The conversion checker treats it
-  as stuck (K2c's NbE will handle incomplete `Eq` forms).
-- **Proof irrelevance.** `Eq A a b : Omega_l`, so any two proofs of equality
-  are definitionally equal (par. 1.2). There is no "equality of
-  equalities."
-- **UIP.** `Eq (Eq A a b) p q` is definitionally trivial: the type is in
-  `Omega_l`, so `p ≡ q` by Omega-PI. Ken is set-level.
-- **refl.** `refl a : Eq A a a` is the canonical proof; it is neutral when
-  `a` is neutral, and reduces (by the rules above) when `A` is canonical.
+- **Neutral head.** A Type-classified neutral `A` (a variable, an
+  eliminator on a neutral scrutinee, or a stuck cast) leaves `Eq A a b`
+  neutral. An Omega-classified carrier leaves `Eq` neutral at **every**
+  head, including canonical Pi and Sigma (§2.2).
+- **Proof irrelevance.** `Eq A a b : Omega_l`, so any two proofs of that
+  equality are definitionally equal (par. 1.2). An equality *between*
+  such proofs may itself be formed, but has no relevant content.
+- **UIP.** Given `e1, e2 : Eq A a b : Omega_l`, the proposition
+  `Eq (Eq A a b) e1 e2 : Omega_l` is well-formed and **neutral** by
+  §2.2's Omega-carrier rule. Since `e1 ≡ e2` by Omega-PI, `refl e1`
+  checks at this type. Ken remains set-level; no higher path data is
+  introduced.
+- **refl.** `refl a : Eq A a a` is the canonical proof. For an
+  Omega-classified carrier, `refl u : Eq P u v` also checks when
+  `u, v : P`, because `u ≡ v` by Omega-PI (§8.2), while the `Eq`
+  proposition stays neutral. Type-classified carriers retain their
+  structural reductions (§2.2).
 
 ## 3. Type equality and `cast` (transport)
 
@@ -1090,12 +1139,51 @@ comparison with WHNF reduction. The K2 extension:
 
 ### 8.4 Subject reduction across K2 rules
 
-Subject reduction must hold for the extended reduction system:
-if `Gamma |- t : A` and `whnf(t) = t'`, then `Gamma |- t' : A`. The
-critical cases:
+Exact-level subject reduction is the intended invariant of the
+extended reduction system: if `Gamma |- t : A` and `whnf(t) = t'`, then
+`Gamma |- t' : A`. The known pre-existing exceptions are stated below.
+The critical cases for this amendment are:
 
-- Eq reduction (par. 2.2): `Eq A a b : Omega`, the reduct is also in
-  Omega by the corresponding Omega formation rules.
+- Eq at `P : Omega_l` (par. 2.2) is neutral at **every** head, so no
+  reduction changes its type `Omega_l`. In particular `Eq ‖A‖ u v`
+  stays neutral even at levels above 0; the bare `Top : Omega_0` cannot
+  be its reduct in non-cumulative Ken.
+- Eq at a Type-classified Sigma or inductive with an Omega-classified
+  component (par. 2.2): the component's conjunct is `Eq T b b` at that
+  component's own level, and no transport is formed. For the Sigma
+  subset, the reduct's level is the max of the component levels, which
+  equals the Eq level. For an inductive, the reduct's level is the max
+  of its field levels, as for Type fields; it equals the Eq level when
+  some field sits at the family level, and is lower otherwise (see the
+  known gap below). Cast admission remains Type-only (§3.1); this rule
+  does not add cast-side Omega transport.
+
+**Known gaps (pre-existing; not introduced by the Omega-carrier
+amendment).**
+
+(1) Downward reducts. Reducts built from `Top`/`Bottom : Omega_0`, or
+from component propositions at their own level, can sit *below* the
+Eq's level `Omega_l`. This applies to: Eq at `Omega_l` (propext, one
+level lower); Eq at `Type l` with universe heads or distinct rigid
+formers (`Top`/`Bottom`); Eq at `Type l` between applications of the
+same inductive former whose parameter and index types sit below the
+family; Eq at an inductive value (the field conjunction, `Top`,
+`Bottom`); and Eq at quotient classes when R's level is below A's.
+Exact-level subject reduction does not hold for these arms. Kernel
+checking infers an Eq's sort from Eq-Form, not from its reduct, so
+these mismatches are refused rather than accepted wrongly.
+
+(2) Upward reducts (a predicativity defect, pending a kernel fix).
+Quot-Form does not pin R's level, and inductive admission does not
+bound parameter or index levels. So Eq at quotient classes, Eq at
+`Type l` between quotients, and Eq at `Type l` between applications
+of a family with a parameter or index type two or more levels above
+it can reduce to a proposition *above* the Eq's level. This
+contradicts §1.1 and is to be closed at formation and admission (a
+separate kernel item).
+
+Other critical cases retain their previous obligations:
+
 - cast reduction (par. 3.2): `cast A B e a : B`, and each recursive
   `cast` in the reduct has its target type preserved by the structural
   decomposition.
@@ -1117,9 +1205,9 @@ critical cases:
   is well-defined on classes; the i-reduction is unchanged.
 - Truncation elim: `elim_trunc P f |a| ⇝ f a : P`, preserved.
 
-The subject-reduction argument for the full OTT system is proved in the
-references (`TTobs`/`CICobs`, ADR 0005); the kernel encodes the reduction
-rules such that this holds operationally.
+The other K2 reductions retain their stated preservation obligations.
+The known level gaps above prevent claiming full exact-level subject
+reduction for Ken's current `Eq` reductions.
 
 ## 9. What the kernel checks here
 
