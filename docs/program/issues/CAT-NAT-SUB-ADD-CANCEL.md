@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-SUB-ADD-CANCEL
 title: "Gcd re-proves ten laws privately, including that sub cancels add under leq_nat, because Order does not publish the cancel law and Arithmetic keeps mul_add_distrib_r private. Publish add_cancel for sub in Order and mul_add_distrib_r in Arithmetic at zero TCB, and retire Gcd's ten private copies"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T1

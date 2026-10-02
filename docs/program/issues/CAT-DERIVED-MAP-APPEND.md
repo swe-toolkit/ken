@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-MAP-APPEND
 title: "Derived owns map and list_append but does not publish that map distributes over list_append, so Parsing and EffectfulClasses each re-prove it privately. Publish proof append for map in Derived at zero TCB and retire both private copies"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -102,3 +102,20 @@ Scope:
 
 - Any new import, primitive, postulate or axiom.
 - A consumer of either deleted name that was not counted: stop and name it.
+
+## Closeout
+
+Merged `eb7218df5` (PR #4437), exact `7e55d152e`: Foundation QA
+`evt_1pfc7npge4vd2`, Architect `evt_w838vag2mq7k`, Decision
+`dec_44ygmp1z73rnp`.
+
+- `pub proof append for map` is published in Derived, directly after
+  `proof fusion for map`, at zero TCB.
+- Parsing's `map_appends` and EffectfulClasses' `list_map_append_distrib`
+  are deleted. Their three call sites use the Derived law, and no consumer
+  of either name remains.
+- Both exact inventories gain `map::append`. A clean-environment client
+  closes the law at free `a b f xs ys` with `trusted_base()` unchanged.
+- The swapped-operand `TypeMismatch` falsifier was run by QA, not committed
+  as a test row. `CAT-NAT-SUB-ADD-CANCEL` requires its mutant as a committed
+  row.
