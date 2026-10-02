@@ -223,3 +223,42 @@ fn checked_indexed_inner_alias_refuses_before_premise_shift() {
     );
     assert_eq!(env.env.trusted_base(), trusted);
 }
+
+#[test]
+fn checked_indexed_inner_match_preserves_plain_and_woven_binders() {
+    // Durable value controls for the checked route. The four distinct inputs
+    // isolate the enclosing alias from plain references; a guard-only removal
+    // selects the wrong Zero on the sibling's `saved` row instead.
+    // MEASURED: checked dependent matches return 3, 2, 5, and 3.
+    // CLAIMED: checked matching still transports ordinary context occurrences.
+    // THE GAP: these rows do not establish the alias representation on their
+    // own; the `saved` sibling above is the transition pin that must flip.
+    for (arm_body, expected) in [("Suc j", 3), ("j", 2), ("e", 5)] {
+        let source = format!(
+            "{VEC}\nfn f (n : Nat) (xs : Vec Nat (Suc n)) (x : Nat) : Nat = \
+             match x {{ Zero ↦ Zero; (Suc j) as saved ↦ let r : Nat = \
+             match xs {{ VCons m e tl ↦ {arm_body} }} in r }}\n\
+             const observed : Nat = f Zero \
+               (VCons Nat Zero ({}) (VNil Nat)) ({})\n\
+             const expected : Nat = {}",
+            nat(5),
+            nat(3),
+            nat(expected)
+        );
+        assert_value(&source, "observed", "expected");
+    }
+
+    let nested_woven = format!(
+        "{VEC}\ndata NatBox : Type where {{ BoxNat : Nat → NatBox }}\n\
+         fn f (n : Nat) (xs : Vec Nat (Suc n)) (h : NatBox) : Nat = \
+         match h {{ BoxNat Zero ↦ Zero; BoxNat (Suc saved) ↦ let r : Nat = \
+           match xs {{ VCons m e tl ↦ saved }} in r }}\n\
+         const observed : Nat = f Zero \
+           (VCons Nat Zero ({}) (VNil Nat)) (BoxNat (Suc ({})))\n\
+         const expected : Nat = {}",
+        nat(5),
+        nat(3),
+        nat(3)
+    );
+    assert_value(&nested_woven, "observed", "expected");
+}
