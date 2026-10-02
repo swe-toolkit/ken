@@ -1,6 +1,6 @@
-//! Consumer-view acceptance of the four private generic Derived sort laws.
-//! The real roots-loaded package owns the checked proof terms; aliases in this
-//! test environment alone let a generic consumer inspect their entire types.
+//! Consumer-view acceptance of the four public generic Derived sort laws.
+//! The real roots-loaded package owns the checked proof terms; selective
+//! imports let a generic consumer inspect their entire types.
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
@@ -21,29 +21,11 @@ fn load() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
         .expect("roots-load real Derived and its providers");
-    for (module, names) in [
-        (
-            "Data.Collections.Derived",
-            &[
-                "count",
-                "Perm",
-                "insert",
-                "sort",
-                "insert::count",
-                "sort::perm",
-                "insert::sorted",
-                "sort::sorted",
-            ][..],
-        ),
-        (
-            "Core.Classes.LawfulClasses",
-            &["IsTrue", "bool_or", "leq_nat"][..],
-        ),
-    ] {
-        for name in names {
-            let id = env.globals[&format!("{module}.{name}")];
-            env.globals.insert((*name).to_owned(), id);
-        }
+    env.elaborate_file("import Data.Collections.Derived (count, Perm, insert, sort)")
+        .expect("all four generic sort proofs must be importable with their owners");
+    for name in ["IsTrue", "bool_or", "leq_nat"] {
+        let id = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
+        env.globals.insert(name.to_owned(), id);
     }
     env
 }

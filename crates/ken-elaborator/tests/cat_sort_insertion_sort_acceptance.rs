@@ -11,22 +11,23 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::{convert_type, subst::subst0, Context, Decl, GlobalId, Term};
+use ken_kernel::{Decl, GlobalId, Term};
 const INSERTION_SORT_KEN_MD: &str =
     include_str!("../../../catalog/packages/Algorithm/Sorting/InsertionSort.ken.md");
 
-fn base_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
+fn base_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>, Vec<GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
     let lawful_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the class owner must roots-load in this environment");
-    catalog_or::load_derived_importing_fixture_many(&mut env, &[]);
-    // The sequential harness has no module namespace. Hide Derived's private
-    // operations and attached proofs so this package's names are inventoried
-    // independently, as they are under the real module loader.
+    let (_, derived_owned) = catalog_or::load_derived_importing_fixture_many(&mut env, &[]);
+    // The sequential harness has no module namespace. Hide Derived's generic
+    // sort operation aliases while keeping their canonical qualified IDs, so
+    // this package's names are inventoried as under the real module loader.
     for name in [
+        "Perm",
         "insert",
         "sort",
         "insert::count",
@@ -36,7 +37,7 @@ fn base_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
     ] {
         env.globals.remove(name);
     }
-    (env, lawful_owned)
+    (env, lawful_owned, derived_owned)
 }
 
 fn base_env() -> ElabEnv {
@@ -51,7 +52,7 @@ fn elaborate_insertion_sort(env: &mut ElabEnv) {
 }
 
 fn loaded_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
-    let (mut env, lawful_owned) = base_env_with_lawful_owned();
+    let (mut env, lawful_owned, _) = base_env_with_lawful_owned();
     elaborate_insertion_sort(&mut env);
     (env, lawful_owned)
 }
@@ -70,106 +71,17 @@ fn application_head_and_arguments(mut term: &Term) -> (&Term, Vec<&Term>) {
     (term, arguments)
 }
 
-fn declaration_type(declaration: &Decl) -> Option<&Term> {
-    match declaration {
-        Decl::Transparent { ty, .. } | Decl::Opaque { ty, .. } | Decl::Primitive { ty, .. } => {
-            Some(ty)
-        }
-        Decl::Inductive(_) => None,
-    }
+fn provider_application_head(body: &Term) -> &Term {
+    application_head_and_arguments(body).0
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
-struct OrderingDecisionHeads {
-    canonical_ordering: usize,
-    direct_first_field: Vec<String>,
-    canonical_equality: usize,
-    variable: usize,
-    constructor: usize,
-    computed: usize,
-    unclassified: Vec<String>,
-}
-
-fn collect_ordering_decision_heads(
-    term: &Term,
-    bool_id: GlobalId,
-    ordering_provider: GlobalId,
-    equality_provider: GlobalId,
-    heads: &mut OrderingDecisionHeads,
-) {
-    if let Term::Let { val, body, .. } = term {
-        // Follow the let-bound value to each use before classifying decisions.
-        // An unused value is intentionally absent: computing and discarding a
-        // comparison cannot pay for the branch decision that governs `insert`.
-        let body_with_value = subst0(body, val);
-        collect_ordering_decision_heads(
-            &body_with_value,
-            bool_id,
-            ordering_provider,
-            equality_provider,
-            heads,
-        );
-        return;
-    }
-
-    if let Term::Elim { fam, scrut, .. } = term {
-        if *fam == bool_id {
-            let (head, arguments) = application_head_and_arguments(scrut);
-            match head {
-                Term::Const { id, .. } if *id == ordering_provider && !arguments.is_empty() => {
-                    heads.canonical_ordering += 1;
-                }
-                Term::Proj1(record)
-                    if !arguments.is_empty() && !matches!(record.as_ref(), Term::Proj2(_)) =>
-                {
-                    heads.direct_first_field.push(format!("{scrut:?}"));
-                }
-                Term::Const { id, .. } if *id == equality_provider && !arguments.is_empty() => {
-                    heads.canonical_equality += 1;
-                }
-                Term::Var(_) => heads.variable += 1,
-                Term::Constructor { .. } => heads.constructor += 1,
-                Term::Elim { .. } => heads.computed += 1,
-                _ => heads.unclassified.push(format!("{scrut:?}")),
-            }
-        }
-    }
-    for child in term.children() {
-        collect_ordering_decision_heads(
-            child,
-            bool_id,
-            ordering_provider,
-            equality_provider,
-            heads,
-        );
-    }
-}
-
-fn collect_provider_typed_calls(
-    env: &ElabEnv,
-    term: &Term,
-    provider_type: &Term,
-    providers: &mut Vec<GlobalId>,
-) {
-    let (head, arguments) = application_head_and_arguments(term);
-    if !arguments.is_empty() {
-        if let Term::Const { id, .. } = head {
-            if let Some(candidate_type) = env.env.lookup(*id).and_then(declaration_type) {
-                if convert_type(&env.env, &Context::new(), candidate_type, provider_type) {
-                    providers.push(*id);
-                }
-            }
-        } else {
-            collect_provider_typed_calls(env, head, provider_type, providers);
-        }
-        for argument in arguments {
-            collect_provider_typed_calls(env, argument, provider_type, providers);
-        }
-    } else {
-        for child in term.children() {
-            collect_provider_typed_calls(env, child, provider_type, providers);
-        }
-    }
+fn boolean_decisions(term: &Term, bool_id: GlobalId) -> usize {
+    usize::from(matches!(term, Term::Elim { fam, .. } if *fam == bool_id))
+        + term
+            .children()
+            .into_iter()
+            .map(|child| boolean_decisions(child, bool_id))
+            .sum::<usize>()
 }
 
 fn boolean_list(env: &ElabEnv, value: EvalVal) -> Vec<bool> {
@@ -229,204 +141,104 @@ fn evaluate_nat(env: &ElabEnv, id: GlobalId) -> usize {
     nat_value(env, eval(&[], body, &env.env, &mut store))
 }
 
-/// Promise classes: durable provider-identity and exact-removal invariants;
-/// transition sentinels for the candidate declaration and provider-call counts.
-/// An authorized InsertionSort declaration/body change must rederive the counts
-/// before retiring the red.
-///
-/// MEASURED: the fixture loads the real providers through catalog roots, then
-/// elaborates the real consumer in a synthetic flat scope after removing
-/// exactly its three current declared import lines. Relative to that provider
-/// environment, the candidate adds exactly the base
-/// declaration population minus the three retired locals. Across every added
-/// transparent body, every applied global convertible to each imported
-/// operation's type has that operation's exact qualified provider `GlobalId`.
-/// The complete Boolean-elimination decision population is also classified per
-/// declaration after zeta-substituting every let-bound value at its uses. Every
-/// head is assigned to an explicit canonical-ordering, direct-projection,
-/// canonical-equality, variable, constructor, or computed category; the
-/// unclassified population must stay empty. An unused canonical comparison is
-/// removed with its unused let, so it cannot pay for a different operative
-/// decision. CLAIMED: no renamed, mixed, direct, hidden-let, unclassified, or
-/// count-balanced bypass survives. THE GAP: this synthetic flat fixture does
-/// not prove raw standalone import closure. Fresh roots-loader checks plus
-/// compile-preserving import-withdrawal and wrong-alias mutations own the
-/// standalone-closure and load-bearing evidence.
-/// Promise class: normative compatibility vector for the exact public sort
-/// surface; provider identities and checked law reach are durable invariants.
+/// MEASURED: the seven InsertionSort globals added to a flat fixture over
+/// roots-loaded providers are exactly its public surface; their checked bodies
+/// directly call the preloaded, owned Derived provider identities after their
+/// declaration binders, and contain zero Bool eliminations of their own.
+/// CLAIMED: InsertionSort publishes only its dictionary-specialized surface,
+/// reuses the canonical generic operations and laws, and re-derives no Boolean
+/// decisions. THE GAP: the fixture is flat, not a standalone module closure;
+/// `ken check` on the real catalog path tests its import boundary separately.
+/// Promise classes: normative compatibility vector for the seven public names;
+/// durable exact provider-identity and no-local-decision invariants.
 #[test]
 fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
-    let mut env = base_env();
+    let (mut env, _, derived_owned) = base_env_with_lawful_owned();
+    let providers = [
+        ("sort", "sort", 3),
+        ("sort::sorted", "sort::sorted", 3),
+        ("sort::permutation", "sort::perm", 3),
+        ("permutation", "Perm", 4),
+        ("insert", "insert", 4),
+        ("insert::sorted", "insert::sorted", 4),
+        ("insert::permutation", "insert::count", 5),
+    ]
+    .map(|(client, provider, binders)| {
+        let id = catalog_or::provider_owned_id(
+            &env,
+            &derived_owned,
+            "Data.Collections.Derived",
+            provider,
+        )
+        .unwrap_or_else(|error| panic!("sort provider {provider}: {error}"));
+        (client, provider, binders, id)
+    });
     let before = env.globals.keys().cloned().collect::<BTreeSet<_>>();
     elaborate_insertion_sort(&mut env);
     let after = env.globals.keys().cloned().collect::<BTreeSet<_>>();
     let added = after.difference(&before).cloned().collect::<BTreeSet<_>>();
     let expected = BTreeSet::from([
-        "count_after_two".to_owned(),
-        "count_cons_cong".to_owned(),
-        "count_cons_swap".to_owned(),
-        "count_swap_decisions".to_owned(),
-        "head_ordered".to_owned(),
-        "head_ordered_after_insert".to_owned(),
-        "insert".to_owned(),
-        "insert::count".to_owned(),
-        "insert::permutation".to_owned(),
-        "insert::sorted".to_owned(),
-        "leq_right_of_left_false".to_owned(),
-        "permutation".to_owned(),
         "sort".to_owned(),
-        "sort::permutation".to_owned(),
         "sort::sorted".to_owned(),
-        "sorted_cons".to_owned(),
-        "sorted_head".to_owned(),
-        "sorted_tail".to_owned(),
+        "sort::permutation".to_owned(),
+        "permutation".to_owned(),
+        "insert".to_owned(),
+        "insert::sorted".to_owned(),
+        "insert::permutation".to_owned(),
     ]);
-    for retired in ["ordered_leq", "order_eq", "element_count"] {
+    for retired in [
+        "ordered_leq",
+        "order_eq",
+        "element_count",
+        "head_ordered",
+        "sorted_cons",
+        "sorted_tail",
+        "sorted_head",
+        "leq_right_of_left_false",
+        "head_ordered_after_insert",
+        "count_cons_cong",
+        "count_after_two",
+        "count_swap_decisions",
+        "count_cons_swap",
+        "insert::count",
+    ] {
         assert!(
             !env.globals.contains_key(retired),
             "retired local `{retired}` must remain absent"
         );
     }
 
-    let ord_leq_at = env.globals["Core.Classes.LawfulClasses.ord_leq_at"];
-    let eq_from_ord = env.globals["Data.Collections.Derived.eq_from_ord"];
-    let mut ordering_decisions = Vec::new();
-    for name in &added {
-        let id = env.globals[name];
-        if let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) {
-            let mut heads = OrderingDecisionHeads::default();
-            collect_ordering_decision_heads(
-                body,
-                env.numeric_env.bool_id,
-                ord_leq_at,
-                eq_from_ord,
-                &mut heads,
-            );
-            if heads != OrderingDecisionHeads::default() {
-                ordering_decisions.push((name.clone(), heads));
-            }
-        }
-    }
-    let expected_ordering_decisions = vec![
-        (
-            "count_after_two".to_owned(),
-            OrderingDecisionHeads {
-                variable: 3,
-                ..OrderingDecisionHeads::default()
-            },
-        ),
-        (
-            "count_cons_cong".to_owned(),
-            OrderingDecisionHeads {
-                canonical_equality: 1,
-                variable: 4,
-                ..OrderingDecisionHeads::default()
-            },
-        ),
-        (
-            "count_swap_decisions".to_owned(),
-            OrderingDecisionHeads {
-                variable: 7,
-                constructor: 4,
-                ..OrderingDecisionHeads::default()
-            },
-        ),
-        (
-            "head_ordered_after_insert".to_owned(),
-            OrderingDecisionHeads {
-                canonical_ordering: 1,
-                direct_first_field: vec!["((@10.1 @8) @6)".to_owned()],
-                variable: 2,
-                ..OrderingDecisionHeads::default()
-            },
-        ),
-        (
-            "insert".to_owned(),
-            OrderingDecisionHeads {
-                canonical_ordering: 1,
-                ..OrderingDecisionHeads::default()
-            },
-        ),
-        (
-            "insert::count".to_owned(),
-            OrderingDecisionHeads {
-                canonical_ordering: 1,
-                direct_first_field: vec![
-                    "((@3.1 @0) @2)".to_owned(),
-                    "((@8.1 @5) @7)".to_owned(),
-                    "((@8.1 @7) @4)".to_owned(),
-                ],
-                canonical_equality: 1,
-                variable: 2,
-                computed: 2,
-                ..OrderingDecisionHeads::default()
-            },
-        ),
-        (
-            "insert::sorted".to_owned(),
-            OrderingDecisionHeads {
-                canonical_ordering: 1,
-                direct_first_field: vec!["((@8.1 @7) @5)".to_owned()],
-                variable: 2,
-                ..OrderingDecisionHeads::default()
-            },
-        ),
-    ];
-    assert_eq!(
-        ordering_decisions, expected_ordering_decisions,
-        "every Boolean decision site must retain its exact exhaustive classification after let provenance is substituted"
-    );
-
-    // Measured against 65af5c7cd: each old body-call count survives when
-    // only a J equality argument's recorded ascription type is excluded.
-    // The checked Eq endpoint copies (evt_143zpap46cmfr) contribute:
-    // ord_leq_at 145 = 136 body + 9 recordings;
-    // eq_from_ord 62 = 60 body + 2 recordings;
-    // count 50 = 50 body + 0 recordings.
-    let mut provider_populations = Vec::new();
-    for (provider_name, expected_calls) in [
-        ("Core.Classes.LawfulClasses.ord_leq_at", 145),
-        ("Data.Collections.Derived.eq_from_ord", 62),
-        ("Data.Collections.Derived.count", 50),
-    ] {
-        let provider = env.globals[provider_name];
-        let provider_type = declaration_type(
-            env.env
-                .lookup(provider)
-                .unwrap_or_else(|| panic!("missing provider `{provider_name}`")),
-        )
-        .unwrap_or_else(|| panic!("provider `{provider_name}` must have a global type"));
-        let mut call_providers = Vec::new();
-        for name in &added {
-            let id = env.globals[name];
-            if let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) {
-                collect_provider_typed_calls(&env, body, provider_type, &mut call_providers);
-            }
-        }
-        // Measure every provider before any count assertion can short-circuit
-        // a sibling's population; the identity assertion is retained below.
-        provider_populations.push((provider_name, provider, expected_calls, call_providers));
-    }
-    let measured_counts = provider_populations
-        .iter()
-        .map(|(name, _, _, calls)| format!("{name}={}", calls.len()))
-        .collect::<Vec<_>>()
-        .join(", ");
-    for (provider_name, provider, expected_calls, call_providers) in provider_populations {
-        assert!(
-            call_providers.iter().all(|id| *id == provider),
-            "every call convertible to `{provider_name}` must use its exact GlobalId; got {call_providers:?}; all populations: {measured_counts}"
-        );
-        assert_eq!(
-            call_providers.len(),
-            expected_calls,
-            "provider `{provider_name}` must retain its complete elaborated call population; all populations: {measured_counts}"
-        );
-    }
     assert_eq!(
         added, expected,
-        "candidate inventory must equal the base population minus ordered_leq, order_eq, and element_count"
+        "the only client globals are the seven public wrappers"
     );
+    for (client, provider, binders, provider_id) in providers {
+        let client_id = env.globals[client];
+        assert_ne!(
+            client_id, provider_id,
+            "{client} must remain a distinct Ord wrapper"
+        );
+        let (_, body) = env
+            .env
+            .transparent_body(client_id)
+            .unwrap_or_else(|| panic!("{client} must be a checked transparent wrapper"));
+        let mut term = body;
+        for _ in 0..binders {
+            let Term::Lam(_, inner) = term else {
+                panic!("{client} must keep exactly {binders} declared binders: {term:?}");
+            };
+            term = inner;
+        }
+        assert!(
+            matches!(provider_application_head(term), Term::Const { id, .. } if *id == provider_id),
+            "{client} must directly call Derived.{provider} through its preloaded GlobalId; got {term:?}"
+        );
+        assert_eq!(
+            boolean_decisions(body, env.numeric_env.bool_id),
+            0,
+            "{client} must not make its own Boolean branching decision"
+        );
+    }
 }
 
 /// Promise class: durable invariant. Checked sort imports add no trust.

@@ -320,6 +320,43 @@ fn real_derived_consumer_reuses_canonical_logic_providers() {
     );
 }
 
+/// Promise class: durable export identity invariant.
+///
+/// MEASURED: selective imports of the generic sort surface bind all seven
+/// requested names to transparent GlobalIds owned by the real Derived roots
+/// load. CLAIMED: publishing the proofs preserves their canonical owner.
+/// THE GAP: the separate sort-law suite checks each complete theorem type.
+#[test]
+fn derived_generic_sort_exports_are_roots_owned_and_selectively_importable() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_root()], DERIVED_MODULE)
+        .expect("Derived provider closure must roots-load");
+    env.elaborate_file("import Data.Collections.Derived (Perm, insert, sort)")
+        .expect("generic sort operations and attached proofs must be importable");
+
+    for name in [
+        "Perm",
+        "insert",
+        "sort",
+        "insert::sorted",
+        "insert::count",
+        "sort::sorted",
+        "sort::perm",
+    ] {
+        let canonical = catalog_or::provider_owned_id(&env, &owned, DERIVED_MODULE, name)
+            .unwrap_or_else(|error| panic!("Derived sort owner {name}: {error}"));
+        assert!(
+            env.env.transparent_body(canonical).is_some(),
+            "Derived {name} must remain checked and transparent"
+        );
+        assert_eq!(
+            env.globals[name], canonical,
+            "selectively imported {name} must use its exact Derived provider identity"
+        );
+    }
+}
+
 /// Promise class: durable invariant.
 ///
 /// MEASURED: real LawfulClasses terms use canonical comparison and its two local

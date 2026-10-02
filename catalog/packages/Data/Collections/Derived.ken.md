@@ -1082,7 +1082,7 @@ fn foldl (a : Type) (b : Type) (f : b → a → b) (z : b) (xs : List a) : b =
 
 ### 4.3 CAT-3 D2 — generic insertion sort and `List Bool` laws
 
-`Perm` is intentionally the package-local count/multiset equality surface —
+`Perm` is the public comparator-indexed count/multiset equality surface —
 an ordinary `Prop`-valued function over an explicit comparator, never a raw
 proof-relevant inductive family — not the older prelude truncation
 relation; a consumer that loads this package gets the executable
@@ -1110,10 +1110,10 @@ pub fn count (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Nat =
       }
   }
 
-fn Perm (a : Type) (eqf : a → a → Bool) (xs : List a) (ys : List a) : Prop =
+pub fn Perm (a : Type) (eqf : a → a → Bool) (xs : List a) (ys : List a) : Prop =
   (x : a) → Equal Nat (count a eqf x xs) (count a eqf x ys)
 
-fn insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
+pub fn insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
   match xs {
     Nil ↦ Cons a x (Nil a);
     Cons h t ↦
@@ -1123,13 +1123,13 @@ fn insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
       }
   }
 
-fn sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
+pub fn sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
   match xs {
     Nil ↦ Nil a;
     Cons h t ↦ insert a le h (sort a le t)
   }
 
-proof sorted for insert
+pub proof sorted for insert
       (a : Type)
       (le : a → a → Bool)
       (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
@@ -1151,7 +1151,7 @@ proof sorted for insert
         Refl
   }
 
-proof sorted for sort
+pub proof sorted for sort
       (a : Type)
       (le : a → a → Bool)
       (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
@@ -1162,7 +1162,7 @@ proof sorted for sort
     Cons h t ↦ insert::sorted a le total h (sort a le t) (sort::sorted a le total t)
   }
 
-proof count for insert
+pub proof count for insert
       (a : Type) (le : a → a → Bool) (x : a) (xs : List a) (eqf : a → a → Bool) (q : a)
     : Equal Nat (count a eqf q (Cons a x xs)) (count a eqf q (insert a le x xs)) =
   match xs {
@@ -1181,7 +1181,7 @@ proof count for insert
         Refl
   }
 
-proof perm for sort
+pub proof perm for sort
       (a : Type) (le : a → a → Bool) (xs : List a) (eqf : a → a → Bool)
     : Perm a eqf xs (sort a le xs) =
   match xs {
@@ -2504,7 +2504,7 @@ const derived_example_zip3v2_length_value : Nat =
       (Cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))))
 ```
 
-These checked obligation shapes use the package-local comparator-indexed `Perm`.
+These checked obligation shapes use the public comparator-indexed `Perm`.
 The constrained form takes the comparator from the imported lawful `Ord Int`
 dictionary; the explicit form receives it as an argument.
 
@@ -2587,7 +2587,9 @@ reference implementation.
    `list_append::right_unit`, `list_append::length`, `map::append`,
    `map::fusion`, `map::id`, `nth::at_or_beyond_is_none`,
    `nth::some_below_length`,
-   `reverse::involutive`. All other definitions in this package are
+   `reverse::involutive`. Generic sorting adds the operations `Perm`, `insert`,
+   and `sort`, with attached proofs `insert::sorted`, `insert::count`,
+   `sort::sorted`, and `sort::perm`. All other definitions in this package are
    package-local; `cat_derived_pub_export.rs` is the authoritative inventory,
    and publishing another name is a separate change to both.
 3. **Source map.**
@@ -2671,7 +2673,7 @@ reference implementation.
    pins both private checked contracts to this module's `filter`
    and distinguishes incompatible from compatible concrete equations.
    `crates/ken-elaborator/tests/cat_derived_sort_laws.rs` — pins four
-   attached private raw contracts to Derived's own `insert`/`sort`, checks
+   attached public raw contracts to Derived's own `insert`/`sort`, checks
    generic consumers and a total versus non-total comparator on one fixture.
    `crates/ken-elaborator/tests/cat3_collections_package.rs` — confirms the
    CAT-3 D1/D2/D3 surface elaborates with zero `trusted_base()` delta, that
