@@ -218,7 +218,8 @@ code text; build from it. Two straight-ancestor increments, each landable
 alone. Retained from WIP `48fdf550c`: the minting-record Child classifier,
 M-c and M-d, the plane split, and issuance over the source Construct walk.
 
-- **I-1, the pre-schema stratum; nothing consumes it.**
+- **I-1, the pre-schema stratum; nothing consumes it.** Merged `e893ecb7a`
+  (exact `b3fcfd064`).
   - `derive_checked_ih_transport_source_population` (aggregates.rs) and
     `preselect_static_response_callers` over
     `static_response_phase_b_split_over` (responses.rs) both run just before
@@ -432,6 +433,11 @@ triggers hold-and-research.
 
    Carry, not on this WP: give carrier-schema assertions a typed root-trap
    catalog entry in place of the raw -1 status abort.
+10. The immediate-plane label-reader repair compiles on `d9b8d81a8`, but
+    `outer_carried` still ends in raw -1. The failing instruction is not yet
+    located (`evt_3qh1c0eyn78j1`, §1a 10; Architect `evt_6ddce313fwhaf`).
+    D0-i, which is non-advancing, locates it before any repair is ruled.
+    Entry 12 is the next predicate checkpoint.
 
 Predicate (Architect `evt_2bq826gvr9cvz`, held for the Research advisory):
 the carrier schema is decided upstream of the checked-IH
