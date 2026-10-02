@@ -77,7 +77,7 @@ and report the mismatch.
 
 The work resumes on the held I-2 WIP `d9b8d81a8`, on branch
 `wp/RT-NATIVE-CONTINUATION-ENV-CARRIAGE-I2`. Its landing carries I-2 with
-it. Five items, cut into straight-ancestor increments at AC-0:
+it. Five items, delivered in the two increments below:
 
 1. **The residual operand.** Add `CarriedResidualWord`, distinct from
    `CarriedBoundaryWord`. It is produced only by the issued slot stores of
@@ -128,35 +128,85 @@ it. Five items, cut into straight-ancestor increments at AC-0:
    the matching newtype. No lowering code builds a carried block parameter
    any other way.
 
+## Increments (Architect `evt_5mvs2wxjebfr7`, on the AC-0 tables)
+
+The tables are `evt_5k5tjg65b7xhq` and `evt_2pxpa880p4ws9`. I-0 comes first,
+then I-1, each a separate exact-SHA review with the Architect as single gate.
+
+- **The two-origin checked-IH environment** is a sum,
+  `CheckedIhEnvironmentOperand::{Residual(CarriedResidualWord),
+  Synthesized(CarriedBoundaryWord)}`. `Residual` is the existing R at
+  `source.rs:1699-1704`, and `Synthesized` the fresh K built by
+  `checked_ih_captured_environment_from_case_environment`
+  (`source.rs:4906-4913`). A W/C consumer that gets `Synthesized` is a K→R
+  refusal, never a coercion.
+- **The Tail result** is `TailAnswer::{PassThrough(CarriedResidualWord),
+  Routed(CarriedBoundaryWord)}`. The Child request after the Tail
+  (`core.rs:9531-9580`) is legal only on `PassThrough`, by type. A `Routed`
+  arm that reaches a Child or W/C request gets the compile-time
+  `CraneliftBackendError::ResidualRepresentationRequired { site }`.
+
+**I-0: typed operand, producers and consumers, and the proven route.** No
+ABI change.
+- Items 1, 2 and 5, with the helper
+  `append_carried_block_param(builder, block, representation) ->
+  CarriedBlockParam` at every join I-0 touches. `decode_residual_child`
+  combines two existing checks: `decode_recursive_residual`'s record assert,
+  and `checked_ih_transport_child`'s assert that Child is the expected
+  constructor (read at `mod.rs:8897`).
+- All 19 `emit_carrier_field` sites are typed as in the AC-0 table. At
+  `core.rs:15114` the decoded Child is no longer discarded.
+- G355 `return_body` (`:15030`, `:15142`, `:15497`), its header carrier
+  parameter (`:14867`, `:14928`) and the result merge (`:15000`) are declared
+  K. R→K is decoded on the checked-answer edge before the join.
+- The downstream ABI classes keep their untyped ABI until I-1:
+  - lexical capture;
+  - continuation fields and inputs;
+  - the context gather;
+  - the frame store;
+  - the generated-context load.
+
+  An R reaches them only through
+  `residual_across_untyped_abi_transitional`. Each call names its site.
+  Nothing else may use it.
+
+**I-1: planner-issued representation, and the escape removed.**
+- `AbiSlot` (`abi.rs:448-462`) gets a planner-issued `representation`. It
+  is R only where a transport or W/C consumer is proven downstream, and K
+  otherwise.
+- The five ABI classes read and write through it. A K slot decodes R
+  before the store.
+- `JoinResultRepresentation` gains R and K. The labelled invocation merge
+  (`calls.rs:912-942`) and the planned source join (`joins.rs:353-445`)
+  declare one, with R decoded or K→R refused.
+
 ## Acceptance
 
-- **AC-0 (measure; no edit).** At `d9b8d81a8`, list each site in the D0-k
-  fan-in, with its planned operand type: residual, decoded, or unchanged
-  ordinary. Name every boundary and join that needs a declared
-  representation. The Architect confirms the increment cut before any edit.
-- **AC-1.**
-  - `generated_entry_capsule_outer_carried` gives the typed
-    `ResourceBodyResult` (identity 41).
-  - Every I-2 acceptance row of `RT-NATIVE-CONTINUATION-ENV-CARRIAGE` holds:
-    - the pending-frame guard and its consumption assertions;
-    - r2 1/1, read 1/1 and write 1/1;
-    - the label readers;
-    - the `dec_3tvethnshr68y` carry.
-  - rt_escape*, rt_span_prov_native and the parity rows stay green.
-  - One full `rt_parity_native` run completes.
-- **AC-2 (falsifiers).**
-  - Removing `decode_residual_child` at the G533 field-binding site reddens
-    `outer_carried` again.
-  - Compile-fail control: passing a `CarriedResidualWord` to an ordinary
-    binding API fails to compile. Report the error.
-  - K→R refusal control: a fixture whose join would need K→R gets the
-    typed lowering refusal, not a runtime abort.
-  - Apart from `decode_residual_child`, no function converts a residual
-    into a boundary word, and no raw `append_block_param` on a carried
-    value exists outside the helper. Both are pinned by grep.
-- **AC-3.** The handoff gives the fan-in table: each D0-k site, with the
-  operand type it now takes and the increment that changed it.
-  Selected-caller counts and the non-r2 verdicts are unchanged.
+- **AC-0 (done).** The fan-in tables above, and the cut confirmed.
+- **AC-1 (I-0).**
+  - `generated_entry_capsule_outer_carried` passes 1/1 with the typed
+    identity-41 trap.
+  - Exit census: a source-scan test shows that `CarriedResidualWord`'s
+    module has exactly two exits, `decode_residual_child` and the
+    transitional escape, and no `From`, `Into`, `Deref` or public field.
+    This replaces a compile-fail control, since the types are crate-private.
+  - The escape's call sites are pinned by count and list.
+  - Mutation: removing the R→K decode on the G355 checked-answer edge
+    reddens `outer_carried`, with the D0-k raw -1.
+  - One full `rt_parity_native` run, with verdicts unchanged.
+  - Every I-2 acceptance row of `RT-NATIVE-CONTINUATION-ENV-CARRIAGE`
+    holds, as do the 13-row log, mutations 1-3 and the class guard at
+    `joins.rs:1109-1124`.
+  - The handoff names the I-1 carries: the issuance insert point after
+    `construction.rs:1442`, and `Ok(Err(infeasible))` propagation.
+- **AC-2 (I-1).**
+  - The escape count is 0, and the function is deleted.
+  - A grep pin shows no raw `append_block_param` on a carried value
+    outside the helper. Each scalar, control or pointer site among the 54
+    is listed as excluded, with its reason.
+  - A K→R refusal control fixture.
+  - Full parity is unchanged, and the handoff gives the fan-in table: each
+    site, its operand type and the increment that changed it.
 
 ## Stop conditions
 
@@ -164,5 +214,6 @@ it. Five items, cut into straight-ancestor increments at AC-0:
   site named.
 - A boundary whose slot kind cannot be decided statically by the planner.
 - Any change to the kernel, the spec or a verdict outside the runtime rows
-  named here.
+  named here. A currently passing `rt_parity_native` row that is newly
+  refused is a stop to the Architect.
 - The 3rd advancing stop is a hold plus research (§1a starts at 0).
