@@ -61,7 +61,9 @@ An unregistered sentinel fails closed. The third either checks or gives a
 diagnostic whose advice applies.
 
 **Folded in: the cross-frame alias miscompilation** (Architect
-`evt_kzkfxd4aenqq`, measured `evt_358pbpsezs8`). On `5d5e7bf02`, an outer
+`evt_kzkfxd4aenqq`, measured `evt_358pbpsezs8`; live defect on main, census
+`evt_1nvnh7n587636`: base accepts M2 and the two-deep row and returns `Zero`
+for `Suc Zero`; this WP is its repair). On `5d5e7bf02`, an outer
 as-pattern alias used inside an inner match that splits a nested field
 reads the next variable in, which is a silent wrong value. The inner
 split's woven binder is counted twice. The repair is one frame-aware
@@ -94,6 +96,8 @@ It is F1, F2, F3, `weaken_woven` and the unconditional `method_type` close.
 The structural closure goes to `LANG-NESTED-MATRIX-DERIVED-TELESCOPE`. The
 Architect's Part 1 list in `evt_5eahknef2gfbm` is the pin set. Every value
 pin asserts the normalized constructor, not only that elaboration succeeds.
+The Dep repro is refused with a surface diagnostic rather than checked
+(`evt_71d3p2fwxtqj1`). The WP lands once AC-N1 to AC-N6 hold.
 
 - **AC-N1 (F1 and the close).**
   - The exact repro checks, and both calls normalize to the expected `Out`.
@@ -103,17 +107,36 @@ pin asserts the normalized constructor, not only that elaboration succeeds.
   - There is a unit test for `assert_nested_method_alignment`.
   - The two-`Nat` collision control returns the second binder's value,
     under Zero and under a two-field constructor.
-- **AC-N2 (F2 and `weaken_woven`).**
-  - The Dep row's value, which reddens when the in-matrix finalize is
-    removed.
-  - The unit test: own-frame gives `Ready`, enclosing-frame gives
-    `Deferred`.
-  - A deferred method with a type error is still rejected at `declare_def`.
-  - An unregistered sentinel at the helper and at the outermost pop is each
-    `Internal`.
-  - M1, M2, M3, two-deep and middle-frame assert values. Reverting to
-    `weaken` returns M2 to `Zero`.
+- **AC-N2 (`weaken_woven`; F2 removed, `evt_71d3p2fwxtqj1`).**
+  - F2's in-matrix finalize is deleted. A reverting split whose method still
+    carries an alias sentinel is refused with
+    `PatternVariableAcrossDependentSplit` at the split span. It is added to
+    every exhaustive `ElabError` consumer with no `_ =>` arm, and those
+    consumers are listed in the handoff.
+  - The P5 record fixture, the Dep row, the deferred wrong-method fixture
+    and M3 (`outer_alias_inside_reverting_nested_split_refused`, the
+    reverting outer-`as` row) are refusal pins: each asserts
+    `PatternVariableAcrossDependentSplit` at the split span, and is a
+    transition sentinel that the successor flips (`evt_1radqthqtqkyv`).
+  - M1, M2, two-deep and middle-frame assert values, each measured to take
+    `needs_reverting=false`. Reverting to `weaken` returns M2 to `Zero`.
   - The fan-in list and the consumer sweep go in the handoff.
+- **AC-N6 (discriminating pins, Rule 2).**
+  - A census of every program rejected on `5d5e7bf02` and accepted on the
+    candidate, with its base error.
+  - Each of those, and every value pin above, gives pairwise distinct values
+    to every same-typed binder in scope at the pinned leaf, including the
+    binders it does not return. Report a table of the test, the binders, the
+    values given and the value observed.
+  - A base-rejected program that cannot be pinned this way is refused.
+  - Exempt from distinctness: same-typed binders that a named index
+    equation forces equal (`m = n` from the Vec index equation). List each
+    forced-equality group with its equation. The group's value differs from
+    every other same-typed binder.
+  - The exact F1 stays the kernel-check repro. An adjacent variant gives the
+    discriminating observation: distinct arm results, distinct independent
+    binder values, the same probed path, rejection on base with F1's error
+    class, and red under the P3 mutation.
 - **AC-N3 (F3).** The diagnostic text ruled in `evt_hepczebkww5c`, or a
   statement that F2 made the program check.
 - **AC-N4 (M-deep carve-out).** Measure the Zero fixture and its two-field
@@ -127,11 +150,11 @@ pin asserts the normalized constructor, not only that elaboration succeeds.
   - `lang_match_record_pattern` is 9/9 with its value pins.
   - On the constant path, finalize and check are both gated off and the
     close runs over the raw method (`evt_qh7m7erbc5f6`).
-  - Dropping `&& needs_reverting` from the check reddens the record row with
-    `VarOutOfScope {4,3}`; ungating finalize (`39cb0195b`) gives `{7,6}` at
-    `declare_def`.
-  - F2's pins (Ready/Deferred, deferred type error, fail-closed) sit on
-    reverting rows.
+  - Dropping `&& needs_reverting` from the check reddens the record-pattern
+    suite. With F2 removed (Rule 1), the first failure is the unfinalized
+    alias sentinel, `VarOutOfScope { index: 18014398509481985, depth: 2 }`
+    at span 86–90, measured by QA on `11f13ae27` (`evt_qesdergfa5j9`). There
+    is no in-matrix finalize left to ungate.
   - Gating the whole block, close included, still reddens the F1 repro.
   - Every verdict, value or diagnostic moved by the gate is reported.
   - A reverting nested split under a woven Var column (P5) is measured on
@@ -190,8 +213,9 @@ pin asserts the normalized constructor, not only that elaboration succeeds.
    sub-pattern Var) kernel-checks, but its leaf selects a different
    same-typed binder (`prefix` for `seed`): wrong value, no rejection. Keyed
    on a woven binder's de Bruijn index computed without the woven binders in
-   context (`evt_63ycng1rt962f`, §1a 9, WIP `403089dc7`; research hold; base
-   measurement owed).
+   context (`evt_63ycng1rt962f`, §1a 9, WIP `403089dc7`). Base rejects it,
+   so F2 introduced it. Repair: F2 removed, refusal in its place
+   (`evt_71d3p2fwxtqj1`).
 
 Shared predicate (`evt_4yewspasn0fps`, restated `evt_7ve4bw9145c1x`): a term
 in one frame's coordinates is used in another frame's context through depth
@@ -206,12 +230,14 @@ pushes, framed on the stop-6 advisory and the M-deep base measurement.
 - The repair needs the kernel or a spec change.
 - A finding is the same defect as `LANG-NESTED-SPLIT-CONSTANT-MOTIVE-INDEX`
   scope: stop to the Architect to merge the frames.
-- Each of these is an advancing stop, the 9th being a research hold
-  (`evt_qh7m7erbc5f6`):
-  - any constant-path value change;
-  - the AC-N4 base-pass or wrong-value condition;
-  - a hardened value pin failing;
+- Each of these is an advancing stop (the 10th after `evt_71d3p2fwxtqj1`):
+  - a discriminating pin gives a wrong value;
+  - a program accepted on base changes verdict or value, unless all three
+    hold (`evt_1nvnh7n587636`): a discriminating pin shows the base value
+    wrong and the candidate right; it is listed in census class (a′) "base
+    miscompile corrected" with base, candidate and expected values; and it
+    passes on a mechanism a ruling already named (`weaken_woven` for M2 and
+    two-deep);
+  - an AC-N6 census program can be neither value-pinned nor refused;
   - a regression in `lang_infer_match_indexed_complete` (20/20), the
-    record-pattern suite, or the as-pattern, nested-split and tuple-pattern
-    suites;
-  - P5 green on base and red on the candidate, or a wrong value anywhere.
+    record-pattern suite, or the 21 targeted suites.

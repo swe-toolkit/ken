@@ -205,10 +205,64 @@ into it.
   `Some(body)` and the `source.rs:4515` guard; the gate refusals.
 - **Replaced.** Every consumer-side classification in I3, and any producer
   writing a form other than its slot's schema.
-- **Sequence.** D0 below, then the Architect rules each slot's schema and
-  coercion edges, then the build: the planner schema record, conforming
-  writers, consumers that read the record and assert, and role-addressed
-  reads.
+- **Sequence.** The stratified plan order below governs the build.
+
+## Stratified plan order (recut §1a 6, Architect `evt_4zwz0gmakzf51`)
+
+The carrier schema is decided upstream of the checked-IH transport plane
+whose facts it needs (§1b predicate). The ruling is stratification (Research
+`evt_4rsyvjpsra877`, option 1): the transport-source population and the
+selected response callers are a pre-schema plan stratum, and carrier schema,
+residual issuance and Child classification consume it. The ruling carries the
+code text; build from it. Two straight-ancestor increments, each landable
+alone. Retained from WIP `48fdf550c`: the minting-record Child classifier,
+M-c and M-d, the plane split, and issuance over the source Construct walk.
+
+- **I-1, the pre-schema stratum; nothing consumes it.**
+  - `derive_checked_ih_transport_source_population` (aggregates.rs) and
+    `preselect_static_response_callers` over
+    `static_response_phase_b_split_over` (responses.rs) both run just before
+    issuance (construction.rs `:1435`). Preselection must not bump the
+    `px8-ds-test-support` counters.
+  - **(a)** After each transport build, the transport-source identities equal
+    the pre-schema population. This subsumes the `:1487-1495` guard and keeps
+    its message.
+  - **(b)** After phase B, the preselected callers equal the installed
+    owners' selected callers, and they are empty under `Ok(Err(_))`.
+  - Acceptance:
+    - (a) and (b) hold on rt_escape*, the r2 relay row and
+      rt_span_prov_native, on base and candidate;
+    - r2's set contains the D0 identity, Spec(S5) → S6 (Construct 528,
+      alternative 1, position 1);
+    - dropping `has_destination` reddens (a) on a named fixture or a new
+      planner unit test;
+    - `validate_continuation_specialization_plan` is unchanged and green.
+- **I-2, (B) at issuance over the fixed stratum.**
+  - `build_recursive_residual_dispositions` skips a LexicalClosure
+    disposition when the eliminator's whole subtree holds a preselected
+    caller. Over-blocking is fail-safe.
+  - `recursive_position_unit_body` gains the all-unissued arm `Ok(None)`.
+  - A fail-closed lowering assert stops a residual from replacing a
+    selected descent.
+  - Acceptance:
+    - **M2 first:** for r2 and the named fallback-needing `BoundaryCarrier`
+      fixture, each gate's eliminator, its candidates and the preselected
+      callers in its subtree. 533 holds 528, and the BoundaryCarrier gate
+      holds none.
+    - r2 passes, with `u0:58` called twice from S5 context 1.
+    - The BoundaryCarrier fixture still passes through the residual.
+    - Dropping the guard reddens r2 with exactly "no verified selected
+      incoming call".
+    - A before/after issuance census shows dispositions lost only at gates
+      whose subtree holds a preselected caller.
+    - The rt_escape rows stay green, and the lowering assert has a unit
+      test.
+- **Stops (the 7th returns the sizing to the Steward):**
+  - (a) or (b) fails on a gated suite;
+  - preselection needs a fact outside phase A;
+  - M2 puts a preselected caller under the BoundaryCarrier gate;
+  - r2 still lacks the call;
+  - a non-r2 verdict changes.
 
 ## Acceptance
 
@@ -331,12 +385,24 @@ triggers hold-and-research.
    checked-IH force child (524, the K8 minted by the (S1, 730)
    `CheckedIhCapturedEnvironment` record) has no arm. Keyed on minting
    population (`evt_3evd30345myh2`, §1a 4).
+5. Response-owner coverage: owner 4 / context 4 requires a verified selected
+   incoming call `Spec(S5) → S6` (producer Construct 528). Since the
+   residual integration (`9214b25fc`), none is recorded (14 verified calls,
+   none to S6). Keyed on the call graph's direct-call record after the
+   residual took over that continuation (`evt_a4ph004eayw0`, §1a 5). D0
+   `evt_2a1sk8vwfsebr`: disposition B, main emits two selected transport
+   calls and the candidate none.
+6. Residual issuance cannot see which Active descents emit selected
+   response-owner calls: issuance (construction.rs:1435) precedes ownership
+   → checked-IH transports → response phase B → selected callers, all of
+   which it feeds. Keyed on plan-construction order (`evt_k50enr3zpmp8`,
+   §1a 6).
 
-Predicate (corrected, `evt_7tg07nnz0656z`): Child classification consulted
-only the lexical-closure and `ConstructEmission` populations, and missed the
-checked-IH force records that mint every K word. The Child at (S1, 526, 1)
-is statically S1's variant; it is not run-time dynamic. The predicate
-question is next due at entry 6.
+Predicate (Architect `evt_2bq826gvr9cvz`, held for the Research advisory):
+the carrier schema is decided upstream of the checked-IH
+environment-transport plane whose facts it needs. Entries 1 to 5 each
+reconstructed or missed a transport-plane fact locally, and entry 6 is the
+order itself.
 
 ## Stop conditions
 
