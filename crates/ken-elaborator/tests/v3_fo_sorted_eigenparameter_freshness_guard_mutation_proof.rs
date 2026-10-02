@@ -91,7 +91,7 @@ fn stale_cert_setup(prefix: &str, forall_ctor: &str, body: &str) -> Vec<String> 
 
 fn env_for(source: &str) -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(source)
         .expect("FoKripke.ken (possibly mutated freshness predicate) must still elaborate");
     env

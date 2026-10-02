@@ -19,7 +19,7 @@ const FOK_SOURCE: &str =
 #[test]
 fn fok_check_node_abstract_children_probe_is_convertible_by_refl() {
     let mut env = ElabEnv::new().expect("base environment");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke package must elaborate");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();

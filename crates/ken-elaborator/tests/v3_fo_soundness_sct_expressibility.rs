@@ -14,7 +14,7 @@ const FOK_SOURCE: &str =
 #[test]
 fn real_fok_checker_soundness_passes_full_admission_without_new_trust() {
     let mut env = ElabEnv::new().expect("base environment");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
 
     env.elaborate_file(FOK_SOURCE).expect(

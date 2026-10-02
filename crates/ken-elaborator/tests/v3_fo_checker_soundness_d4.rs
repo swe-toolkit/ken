@@ -18,7 +18,7 @@ const FOK_SOURCE: &str =
 
 fn elaborate_fok() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("the real FoKripke source must pass full admission");
     env

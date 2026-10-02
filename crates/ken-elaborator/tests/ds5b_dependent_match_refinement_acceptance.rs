@@ -81,7 +81,7 @@ fn expect_err_val(env: &mut ElabEnv, src: &str) -> ElabError {
 
 fn env_with_fok() -> ElabEnv {
     let mut env = mk_env();
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke including the landed derivation apparatus");
     env

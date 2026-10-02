@@ -96,6 +96,12 @@ pub fn load_core_logic_or(env: &mut ElabEnv) {
         .expect("Core.Logic.Or must load through strict catalog resolution");
 }
 
+pub fn load_fokripke_providers(env: &mut ElabEnv) {
+    load_core_logic_or(env);
+    env.elaborate_module_from_roots_strict(&[catalog_root()], "Core.Logic.Transport")
+        .expect("Core.Logic.Transport must load through strict catalog resolution");
+}
+
 pub fn load_core_logic_compare_with_or_owned(
     env: &mut ElabEnv,
 ) -> (Vec<GlobalId>, Vec<GlobalId>) {

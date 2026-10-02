@@ -109,7 +109,7 @@ fn corrected_search_finds_a_planted_comparable_witness() {
 
 fn fok_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken must elaborate");
     env

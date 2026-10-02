@@ -43,7 +43,7 @@ fn mk_env() -> ElabEnv {
 
 fn env_for(source: &str) -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(source)
         .expect("FoKripke.ken (possibly with a collapsed sort check) must elaborate");
     env

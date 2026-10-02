@@ -2,7 +2,7 @@
 //!
 //! Promise class: durable invariants. Checked transport is publicly selectable,
 //! a reverse-direction use is rejected at the typed equality boundary, and
-//! the seven consumers retain the provider's identities without local copies.
+//! the eight consumers retain the provider's identities without local copies.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -70,12 +70,12 @@ fn public_subst_rejects_swapped_endpoints_at_the_typed_boundary() {
 }
 
 /// MEASURED: after the real roots loader closes each package, none of the
-/// eleven retired combinator copies or Posix's unused cong0 has an owned
+/// fourteen retired combinator copies or Posix's unused cong0 has an owned
 /// kernel artifact. CLAIMED: no migrated package retains those private names.
 /// THE GAP: provider-GlobalId occurrence controls separately check that
 /// retained consumers use Transport rather than merely dropping local names.
 #[test]
-fn all_seven_packages_retire_the_twelve_local_combinator_artifacts() {
+fn all_eight_packages_retire_the_fifteen_local_combinator_artifacts() {
     let mut env = ElabEnv::new().expect("fresh environment");
     for (module, retired) in [
         ("Algorithm.Numeric.Gcd", &["subst"][..]),
@@ -99,6 +99,10 @@ fn all_seven_packages_retire_the_twelve_local_combinator_artifacts() {
         ("Application.Input.Schema", &["schema_sym"]),
         ("Capability.Parsing.Decoder", &["decoder_equal_chain"]),
         ("Data.Collections.Deque", &["deque_cong"]),
+        (
+            "Tooling.Verification.FoKripke",
+            &["fok_cong", "fok_eq_sym", "fok_eq_trans"],
+        ),
     ] {
         env.elaborate_module_from_roots(&[catalog_root()], module)
             .unwrap_or_else(|err| panic!("{module} must roots-load: {err:?}"));
@@ -126,7 +130,7 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
     }
 }
 
-/// MEASURED: preloaded Transport `GlobalId`s remain fixed after seven real
+/// MEASURED: preloaded Transport `GlobalId`s remain fixed after eight real
 /// roots loads, and a retained checked consumer in each package refers to
 /// each newly selected combinator's exact `GlobalId` in its transparent body.
 /// CLAIMED: the surviving proofs reuse Transport, not renamed private copies.
@@ -177,6 +181,14 @@ fn migrated_proof_bodies_use_preloaded_transport_global_identities() {
         (
             "Data.Collections.Deque",
             &[("deque_append_snoc_assoc", "cong")],
+        ),
+        (
+            "Tooling.Verification.FoKripke",
+            &[
+                ("fok_nat_eq_sound", "cong"),
+                ("fok_absurd_right_intro", "sym"),
+                ("fok_absurd_right_intro", "trans"),
+            ],
         ),
     ] {
         env.elaborate_module_from_roots(&[catalog_root()], module)

@@ -11,7 +11,7 @@ const FOK_SOURCE: &str =
 
 fn env_with_fok() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke including the kernel-checked adequacy proof");
     env
@@ -112,7 +112,7 @@ fn add_bool_model(env: &mut ElabEnv) {
 #[test]
 fn intrinsic_apparatus_passes_full_admission_with_zero_trust_delta() {
     let mut env = ElabEnv::new().expect("base environment");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke must elaborate, kernel-check, and pass SCT");
