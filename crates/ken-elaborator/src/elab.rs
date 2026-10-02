@@ -15843,6 +15843,7 @@ fn infer_virtual_pattern_alias(
 fn finish_pattern_alias_frame(
     cx: &mut ElabCtx,
     raw_methods_result: Result<Vec<Option<Term>>, ElabError>,
+    index_refining: Option<&Span>,
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let replacements = cx
         .pattern_alias_replacement_frames
@@ -15858,6 +15859,11 @@ fn finish_pattern_alias_frame(
     let raw_methods = raw_methods_result?;
     raw_methods.into_iter().map(|method| {
         let term = method.map(|term| finalize_pattern_aliases(&term, 0, &replacements)).transpose()?;
+        // Own-frame aliases are resolved. A surviving sentinel belongs to an
+        // enclosing frame; index-premise wraps can shift it to a wrong binder.
+        if let (Some(span), Some(_)) = (index_refining, term.as_ref().and_then(first_alias_sentinel)) {
+            return Err(ElabError::PatternVariableAcrossDependentSplit { span: span.clone() });
+        }
         if cx.pattern_alias_replacement_frames.is_empty() {
             if let Some(id) = term.as_ref().and_then(first_alias_sentinel) {
                 return Err(ElabError::Internal(format!(
@@ -15873,6 +15879,7 @@ fn finish_pattern_alias_frame(
 fn finish_pattern_alias_term_frame(
     cx: &mut ElabCtx,
     body_result: Result<Term, ElabError>,
+    index_refining: Option<&Span>,
 ) -> Result<Term, ElabError> {
     let replacements = cx
         .pattern_alias_replacement_frames
@@ -15886,6 +15893,9 @@ fn finish_pattern_alias_term_frame(
         return Err(or_binder_type_error(mismatch));
     }
     let body = finalize_pattern_aliases(&body_result?, 0, &replacements)?;
+    if let (Some(span), Some(_)) = (index_refining, first_alias_sentinel(&body)) {
+        return Err(ElabError::PatternVariableAcrossDependentSplit { span: span.clone() });
+    }
     if cx.pattern_alias_replacement_frames.is_empty() {
         if let Some(id) = first_alias_sentinel(&body) {
             return Err(ElabError::Internal(format!(
@@ -19085,7 +19095,8 @@ fn infer_tuple_match(
         &mut arm_used,
         &mut subsumed_by,
     );
-    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+    // Tuple matches require a Sigma scrutinee, which has no indexed family.
+    let body_core = finish_pattern_alias_term_frame(cx, body_result, None)?;
 
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
@@ -19166,7 +19177,8 @@ fn infer_record_match(
         &mut arm_used,
         &mut subsumed_by,
     );
-    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+    // Record patterns require a named projection owner, not an indexed family.
+    let body_core = finish_pattern_alias_term_frame(cx, body_result, None)?;
 
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
@@ -19311,7 +19323,10 @@ fn infer_or_match(
         &mut arm_used,
         &mut subsumed_by,
     );
-    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+    let index_refining = inductive
+        .and_then(|id| cx.env.inductive(id))
+        .is_some_and(|ind| !ind.indices.is_empty());
+    let body_core = finish_pattern_alias_term_frame(cx, body_result, index_refining.then_some(span))?;
 
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
@@ -19417,7 +19432,13 @@ fn infer_literal_match(
         &mut arm_used,
         &mut subsumed_by,
     );
-    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+    // Literal comparators can be used on an inductive scrutinee: inspect its
+    // actual family rather than assuming literals have no indexed type.
+    let index_refining = match peel_app(&whnf(cx.env, &cx.ctx, &scrut_ty)).0 {
+        Term::IndFormer { id, .. } => cx.env.inductive(id).is_some_and(|ind| !ind.indices.is_empty()),
+        _ => false,
+    };
+    let body_core = finish_pattern_alias_term_frame(cx, body_result, index_refining.then_some(span))?;
 
     for (index, used) in arm_used.iter().enumerate() {
         if !used {
@@ -19578,7 +19599,7 @@ fn infer_match(
             _ => unreachable!("match head is an inductive former"),
         },
     );
-    let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result)?;
+    let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result, indexed.then_some(span))?;
 
     // 6. AC4: reachability — an arm that never won at any leaf (including any
     //    it was expanded into via a wildcard row) is dead code.
@@ -22009,7 +22030,7 @@ mod nested_method_alias_frame_tests {
             Err(ElabError::Internal(reason)) if reason.contains("registered in no active frame")
         ));
         assert!(matches!(
-            finish_pattern_alias_term_frame(&mut cx, Ok(unknown)),
+            finish_pattern_alias_term_frame(&mut cx, Ok(unknown), None),
             Err(ElabError::Internal(reason)) if reason.contains("remained after the outermost match frame")
         ));
     }
