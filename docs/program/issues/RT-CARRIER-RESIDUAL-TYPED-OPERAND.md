@@ -94,17 +94,30 @@ it. Five items, delivered in the two increments below:
      - lexical capture;
      - continuation inputs;
      - declared-call frame copies.
-   - The one conversion asserts the record, reads Child and asserts
-     Child = Kq:
+   - The operand privately carries its issued slot key,
+     `RecursiveCarrierSlotKey { eliminator, constructor, position }`, never
+     a variant (Architect `evt_1tc9napwj4fjj`). Each producer mints the key
+     from the slot it already resolved. A producer that cannot name its slot
+     does not mint an R.
+   - The one conversion looks up the slot. A singleton slot decodes
+     directly. A labelled slot reads the label and switches over the slot's
+     flow, and each arm asserts that variant's record and count, then reads
+     Child and asserts Child = Kq. The arms join as K, and a label outside
+     the flow fails.
 
      ```rust
-     fn decode_residual_child(builder: &mut FunctionBuilder<'_>, residual: CarriedResidualWord, expected: AggregateOccurrenceId) -> Result<CarriedBoundaryWord, CraneliftBackendError>
+     fn decode_residual_child(&mut self, builder: &mut FunctionBuilder<'_>, residual: CarriedResidualWord) -> Result<CarriedBoundaryWord, CraneliftBackendError>
      ```
+
+     Its private per-variant helper, `decode_residual_variant_child`, has
+     exactly one call site, inside it.
 
    - The consumers that need W or C take `CarriedResidualWord` by type: the
      labelled call path (`calls.rs:1147-1163`), the Tail transport
      pass-through (`core.rs:9265-9277`) and the checked-IH captured
-     environment (`core.rs:8752-8756`).
+     environment (`core.rs:8752-8756`). Each keeps the variant its
+     disposition issues, and asserts at compile time that `residual.slot`
+     is that specialization's slot key.
 2. **Residual bindings.** A recursive-position binder used both as a value
    and as a transport source gets
    `LoweringEnvironmentBinding::Residual(CarriedResidualWord)`. A value read
@@ -191,8 +204,15 @@ ABI change.
     transitional escape, and no `From`, `Into`, `Deref` or public field.
     This replaces a compile-fail control, since the types are crate-private.
   - The escape's call sites are pinned by count and list.
+  - `value_at` stays builder-free, and its `Residual` arm is an error, with
+    no wildcard. The handoff gives a disposition table for its 12 callers:
+    value-only by construction, decoded through a builder-taking read, or
+    the escape.
   - Mutation: removing the R→K decode on the G355 checked-answer edge
     reddens `outer_carried`, with the D0-k raw -1.
+  - Label mutations: the default arm falling through to arm 0 stays green
+    on id41, which is S3 at arm 0. Swapping arms 0 and 1 fails id41's
+    record or count assert.
   - One full `rt_parity_native` run, with verdicts unchanged.
   - Every I-2 acceptance row of `RT-NATIVE-CONTINUATION-ENV-CARRIAGE`
     holds, as do the 13-row log, mutations 1-3 and the class guard at
