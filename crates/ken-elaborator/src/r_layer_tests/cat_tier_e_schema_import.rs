@@ -179,7 +179,7 @@ fn collect_decl_globals(declaration: &Decl, out: &mut BTreeSet<GlobalId>) {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the real parser returns exactly the four D0-ledger module/name
+/// MEASURED: the real parser returns exactly five selective module/name
 /// sets. CLAIMED: Schema declares every provider dependency and no unused edge.
 /// THE GAP: AST equality establishes the module interface; the checked-core
 /// identity test separately establishes that every imported name is consumed.
@@ -214,7 +214,7 @@ fn schema_selective_import_ledger_is_exact() {
         ),
         (
             "Core.Logic.Transport".to_string(),
-            names(&["cong", "trans"]),
+            names(&["cong", "sym", "trans"]),
         ),
         (
             "Data.Collections.Derived".to_string(),
@@ -379,6 +379,7 @@ fn schema_checked_provider_identity_closure_is_exact() {
         "Capability.Formatting.Doc.Doc",
         "Capability.Formatting.Doc.Text",
         "Core.Logic.Transport.cong",
+        "Core.Logic.Transport.sym",
         "Core.Logic.Transport.trans",
         "Data.Collections.Derived.list_append",
         "Data.Collections.Derived.nth",

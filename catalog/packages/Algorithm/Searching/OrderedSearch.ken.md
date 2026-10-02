@@ -28,6 +28,8 @@ import Core.Classes.Membership (Membership)
 
 import Core.Logic.EmptyDec (Empty, Dec, Yes, No)
 
+import Core.Logic.Transport (sym, trans)
+
 fn elem_step (tail_member : Bool) (x_before_head : Bool) (head_before_x : Bool) : Bool =
   match x_before_head {
     True ↦
@@ -92,19 +94,15 @@ sortedness evidence. That produces `head <= query`, contradicting the branch's
 checked `head <= query = False` observation. Both negative paths therefore
 construct real functions from membership evidence to `Empty`.
 
+The search contradiction reverses its head-order witness with Transport's
+`sym` and composes it with the opposing witness using `trans`. These
+checked combinators also orient the `elem_step` branch equalities.
+
 ```ken
-theorem search_sym (ty : Type) (x : ty) (y : ty) (p : Equal ty x y) : Equal ty y x =
-  J (λy2 _. Equal ty y2 x) Refl p
-
-theorem search_trans
-      (ty : Type) (x : ty) (y : ty) (z : ty) (p : Equal ty x y) (q : Equal ty y z)
-    : Equal ty x z =
-  J (λz2 _. Equal ty x z2) p q
-
 fn boolean_contradiction
       (value : Bool) (is_true : Equal Bool value True) (is_false : Equal Bool value False)
     : Empty =
-  absurd (search_trans Bool True value False (search_sym Bool value True is_true) is_false)
+  absurd (trans Bool True value False (sym Bool value True is_true) is_false)
 
 theorem elem_step_both_true
       (tail_member : Bool)
@@ -118,8 +116,8 @@ theorem elem_step_both_true
     (J
       (λhead_decision _. Equal Bool (elem_step tail_member True head_decision) True)
       Proved
-      (search_sym Bool head_before_x True head_before))
-    (search_sym Bool x_before_head True x_before)
+      (sym Bool head_before_x True head_before))
+    (sym Bool x_before_head True x_before)
 
 theorem elem_step_from_tail_after_head
       (tail_member : Bool)
@@ -131,7 +129,7 @@ theorem elem_step_from_tail_after_head
   J
     (λx_decision _. Equal Bool (elem_step tail_member x_decision head_before_x) True)
     tail_present
-    (search_sym Bool x_before_head False x_after)
+    (sym Bool x_before_head False x_after)
 
 theorem elem_step_to_tail_after_head
       (tail_member : Bool)
@@ -145,7 +143,7 @@ theorem elem_step_to_tail_after_head
       Equal Bool (elem_step tail_member x_decision head_before_x) True
       → Equal Bool tail_member True)
     (λmember_at_false. member_at_false)
-    (search_sym Bool x_before_head False x_after)
+    (sym Bool x_before_head False x_after)
     member
 
 theorem elem_step_to_tail_before_head
@@ -165,8 +163,8 @@ theorem elem_step_to_tail_before_head
         Equal Bool (elem_step tail_member True head_decision) True
         → Equal Bool tail_member True)
       (λmember_at_false. member_at_false)
-      (search_sym Bool head_before_x False head_after))
-    (search_sym Bool x_before_head True x_before)
+      (sym Bool head_before_x False head_after))
+    (sym Bool x_before_head True x_before)
     member
 
 pub fn search
@@ -268,9 +266,10 @@ ordinary inductive view, and its instance is a transparent adapter to `elem`.
 Membership evidence is the checked proposition that the transparent membership
 observation reduces to `True`; the `Yes` constructor carries that proof, while
 `No` carries its refutation into `Empty`. The ordering dictionary supplies only
-its checked `refl`, `antisym`, and comparison fields. The package introduces no
-axiom, postulate, primitive, foreign declaration, or unresolved hole, so its
-`trusted_base()` delta is zero.
+its checked `refl`, `antisym`, and comparison fields. Equality orientation
+and composition reuse `Core.Logic.Transport`'s checked `sym` and `trans`.
+The package introduces no axiom, postulate, primitive, foreign declaration,
+or unresolved hole, so its `trusted_base()` delta is zero.
 
 ## References
 

@@ -11,7 +11,7 @@ the clients.
 ```ken
 import Capability.Formatting.Doc (Doc, Text)
 
-import Core.Logic.Transport (cong, trans)
+import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Collections.Derived (list_append, nth)
 
@@ -72,7 +72,9 @@ list: `schema_expected_issue_list` folds the field specifications and the
 client's inspection result independently of validation, while
 `schema_observed_issue_list` reads the returned `Validation`. The attached
 `invalid_issue_sequence` proof equates these lists, retaining every rejection
-in field order even when earlier fields fail.
+in field order even when earlier fields fail. For an accepted head and invalid
+tail, its proof reverses the field and tail equations with Transport's `sym`
+before transporting the validation result; no schema-local reversal is needed.
 
 ```ken
 data SchemaIssue origin = MkSchemaIssue origin String
@@ -428,14 +430,14 @@ pub proof accepted_tail_invalid for schema_validate_fields
     value
     (SchemaFieldAccepted origin value accepted)
     (inspect field)
-    (schema_sym
+    (sym
       (SchemaFieldCheck origin value)
       (inspect field)
       (SchemaFieldAccepted origin value accepted)
       hfield)
     (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
     (schema_validate_fields origin value inspect rest)
-    (schema_sym
+    (sym
       (SchemaValidation origin value)
       (schema_validate_fields origin value inspect rest)
       (Invalid (NonEmpty (SchemaIssue origin)) (List value) issues)
@@ -456,11 +458,6 @@ theorem schema_valid_injective
       (same : Equal (Validation e a) (Valid e a left) (Valid e a right))
     : Equal a left right =
   same
-
-theorem schema_sym
-      (a : Type) (left : a) (right : a) (same : Equal a left right)
-    : Equal a right left =
-  J (λactual _. Equal a actual left) Refl same
 
 theorem schema_field_check_cases
       (origin : Type) (value : Type) (outcome : SchemaFieldCheck origin value)
@@ -982,4 +979,5 @@ export SchemaPresence,
 trusted-base entry. Its result and issue carriers are parameterized over client
 origin and value types. The two proof observers and the checked
 `invalid_issue_sequence` proof add no production-validation behavior or trust;
-the proof uses `NonEmpty`'s public list-view append law.
+the proof uses `NonEmpty`'s public list-view append law and the canonical
+`cong`/`sym`/`trans` from `Core.Logic.Transport`.

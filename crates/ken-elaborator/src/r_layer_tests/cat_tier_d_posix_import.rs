@@ -13,6 +13,7 @@ use ken_kernel::{Decl as KernelDecl, GlobalId, Term};
 const COMPARE: &str = "Core.Logic.Compare";
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const DERIVED: &str = "Data.Collections.Derived";
+const TRANSPORT: &str = "Core.Logic.Transport";
 const POSIX: &str = "Capability.Filesystem.Path.Posix";
 const POSIX_SOURCE: &str =
     include_str!("../../../../catalog/packages/Capability/Filesystem/Path/Posix.ken.md");
@@ -23,7 +24,7 @@ fn names(items: &[&str]) -> BTreeSet<String> {
 
 fn provider_modules(module: &str) -> &'static [&'static str] {
     match module {
-        POSIX => &[COMPARE, LAWFUL, DERIVED],
+        POSIX => &[COMPARE, LAWFUL, DERIVED, TRANSPORT],
         _ => &[],
     }
 }
@@ -41,6 +42,7 @@ struct LoadedPosix {
     compare: BTreeSet<GlobalId>,
     lawful: BTreeSet<GlobalId>,
     derived: BTreeSet<GlobalId>,
+    transport: BTreeSet<GlobalId>,
     posix: BTreeSet<GlobalId>,
 }
 
@@ -54,6 +56,7 @@ fn load_posix() -> LoadedPosix {
     let compare = module_ids(&env, COMPARE);
     let lawful = module_ids(&env, LAWFUL);
     let derived = module_ids(&env, DERIVED);
+    let transport = module_ids(&env, TRANSPORT);
     let before_trust = env.env.trusted_base();
     let before_classes = env.class_env.class_entries().count();
     let before_instances = env.class_env.instances.len();
@@ -82,6 +85,7 @@ fn load_posix() -> LoadedPosix {
         compare,
         lawful,
         derived,
+        transport,
         posix,
     }
 }
@@ -267,11 +271,11 @@ fn filesystem_path_posix_loader_visible_inventory_is_exact_and_usable() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: Posix roots-loads after exactly three providers with zero
-/// trust/class/instance growth; its parsed imports equal the D0 selective
-/// closure; its checked terms intersect each provider at the exact canonical
+/// MEASURED: Posix roots-loads after exactly four providers with zero
+/// trust/class/instance growth; its parsed imports equal the exact selective
+/// closure; its checked terms intersect each provider at the canonical
 /// identities below; and representative interior names reject at their fully
-/// qualified import names. CLAIMED: the three-provider boundary is exact,
+/// qualified import names. CLAIMED: the four-provider boundary is exact,
 /// visibility-only, and excludes the three loader-forced non-contract names.
 /// THE GAP: DecEq is consumed during instance resolution and pattern constructors
 /// disappear during lowering, so per-import necessity is established by the
@@ -287,6 +291,7 @@ fn filesystem_path_posix_imports_are_exact_canonical_and_internals_private() {
                 names(&["DecEq", "bool_and", "uint8_deceq_eq"]),
             ),
             (DERIVED.to_owned(), names(&["list_append", "map"])),
+            (TRANSPORT.to_owned(), names(&["cong", "sym", "trans"])),
         ])
     );
 
@@ -314,6 +319,11 @@ fn filesystem_path_posix_imports_are_exact_canonical_and_internals_private() {
             "list_append::right_unit",
             "map",
         ])
+    );
+
+    assert_eq!(
+        provider_names(&loaded, TRANSPORT, &loaded.transport, &referenced),
+        names(&["cong", "sym", "trans"])
     );
 
     for surface in [

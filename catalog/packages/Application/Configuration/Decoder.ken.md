@@ -36,6 +36,8 @@ import Capability.Process.Environment (process_environment)
 
 import Core.Classes.LawfulClasses (bytes_deceq_eq)
 
+import Core.Logic.Transport (sym, trans)
+
 import Data.Collections.Derived
 
 import Data.Collections.NonEmpty (NonEmpty, nonempty_map)
@@ -195,7 +197,10 @@ export decode_process_environment, decode_config_entries, env_config_help
 The required-field laws instantiate the schema traversal's checked coverage.
 They then connect each accepted required field to the exact `env_config_lookup`
 result and to the second traversal's aligned output. The value is the selected
-raw `Bytes`; no text conversion or re-encoding occurs.
+raw `Bytes`; no text conversion or re-encoding occurs. The lookup bridge reverses
+its selected-value equality before passing it to `J`, while the tail step
+composes the aligned-index equality with recursive lookup evidence. Transport's
+`sym` and `trans` carry these two steps without configuration-local copies.
 
 The optional-absence laws separately characterize the predecessor
 representation. A valid decode whose optional lookup is `None` carries an empty
@@ -549,21 +554,6 @@ theorem env_config_lookup_field_transport
     same
     hlookup
 
-theorem env_config_sym
-      (a : Type) (left : a) (right : a) (same : Equal a left right)
-    : Equal a right left =
-  J (λactual _. Equal a actual left) Refl same
-
-theorem env_config_trans
-      (a : Type)
-      (left : a)
-      (middle : a)
-      (right : a)
-      (first : Equal a left middle)
-      (second : Equal a middle right)
-    : Equal a left right =
-  J (λright2 _. Equal a left right2) first second
-
 theorem env_config_lookup_cases
       (key : Bytes) (entries : List (Prod Bytes Bytes))
     : (goal : Prop)
@@ -620,7 +610,7 @@ theorem env_config_head_lookup_some
           (Cons Bytes (env_config_value_or_empty choice) (env_config_values rest entries)))
         (Some Bytes value))
     Refl
-    (env_config_sym
+    (sym
       (Option Bytes)
       (env_config_lookup (bytes_encode (schema_field_name head)) entries)
       (Some Bytes value)
@@ -651,7 +641,7 @@ theorem env_config_head_lookup_none
           (Cons Bytes (env_config_value_or_empty choice) (env_config_values rest entries)))
         (Some Bytes (list_to_bytes (Nil UInt8))))
     Refl
-    (env_config_sym
+    (sym
       (Option Bytes)
       (env_config_lookup (bytes_encode (schema_field_name head)) entries)
       (None Bytes)
@@ -764,7 +754,7 @@ proof lookup_some for env_config_values
               λvalue.
                 λhfield.
                   λhlookup.
-                    env_config_trans
+                    trans
                       (Option Bytes)
                       (Data.Collections.Derived.nth
                         Bytes
@@ -999,7 +989,7 @@ proof lookup_none for env_config_values
             λfield.
               λhfield.
                 λhlookup.
-                  env_config_trans
+                  trans
                     (Option Bytes)
                     (Data.Collections.Derived.nth
                       Bytes
@@ -1062,7 +1052,7 @@ theorem env_config_decode_invalid_impossible
         (Valid (NonEmpty Diagnostic) (List Bytes) values)
       → Bottom)
     (λhdecode2. absurd hdecode2)
-    (env_config_sym
+    (sym
       (SchemaValidation EnvConfigOrigin Bool)
       checked
       (Invalid (NonEmpty (SchemaIssue EnvConfigOrigin)) (List Bool) issues)
@@ -1098,7 +1088,7 @@ theorem env_config_decode_valid_values
         (env_config_values fields entries)
         values
         hdecode2)
-    (env_config_sym
+    (sym
       (SchemaValidation EnvConfigOrigin Bool)
       checked
       (Valid (NonEmpty (SchemaIssue EnvConfigOrigin)) (List Bool) checked_values)
@@ -1147,6 +1137,7 @@ behavior is the single authority used by both the validation and value
 traversals; its three implementation helpers remain private.
 
 The decoder consumes `process_environment`, shared `Schema`, `Validation`,
-`Diagnostic`, and the landed lawful `DecEq Bytes`. It adds no parser, renderer,
+`Diagnostic`, the landed lawful `DecEq Bytes`, and Transport's checked `sym`
+and `trans`. It adds no parser, renderer,
 location carrier, cached length, primitive, postulate, `Axiom`, or trusted-base
 entry. Raw values—including invalid UTF-8—are returned without a `String` hop.

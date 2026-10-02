@@ -19,6 +19,7 @@ mod cat_tier_e_argparse_import;
 mod cat_tier_e_decoder_import;
 mod cat_tier_e_json_import;
 mod cat_tier_e_schema_import;
+mod cat_transport_pub_export;
 mod cc6b_path_posix_acceptance;
 mod constrained_instance_elaboration;
 mod ds1_empty_dec_acceptance;

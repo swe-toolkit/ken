@@ -10,6 +10,8 @@ renders back to `Bytes` only at the boundary. It never decodes through
 ```ken
 import Core.Logic.Compare (list_eq)
 
+import Core.Logic.Transport (cong, sym, trans)
+
 import Core.Classes.LawfulClasses (DecEq, bool_and, uint8_deceq_eq)
 
 import Data.Collections.Derived (list_append, map)
@@ -72,6 +74,13 @@ pub fn path_parse (raw : Bytes) : Path =
 ```
 
 ## 2. Rendering and ordinary views
+
+The path-splitting and rendering proofs orient path-result equalities with
+Transport's `sym`, compose their intermediate representations with `trans`,
+and lift segment equalities through list constructors and rendering functions
+with `cong`. The path-specific theorem names retain the endpoints and their
+domain meaning;
+the generic equality steps need no path-local copies.
 
 ```ken
 fn path_render_segments (segments : List (List UInt8)) : List UInt8 =
@@ -149,19 +158,6 @@ pub fn path_valid (path : Path) : Bool =
     MkPath absolute segments ↦ path_segments_valid segments
   }
 
-theorem path_equal_sym (a : Type) (x : a) (y : a) (p : Eq a x y) : Eq a y x =
-  J (λy' _. Eq a y' x) Refl p
-
-theorem path_equal_trans
-      (a : Type) (x : a) (y : a) (z : a) (p : Eq a x y) (q : Eq a y z)
-    : Eq a x z =
-  J (λz' _. Eq a x z') p q
-
-theorem path_equal_cong
-      (a : Type) (b : Type) (x : a) (y : a) (f : a → b) (p : Eq a x y)
-    : Eq b (f x) (f y) =
-  J (λy' _. Eq b (f x) (f y')) Refl p
-
 theorem path_cons_no_slash_tail
       (byte : UInt8) (rest : List UInt8)
     : Eq Bool
@@ -227,11 +223,11 @@ theorem path_split_no_slash_end
   match segment {
     Nil ↦
       λno_slash.
-        path_equal_sym
+        sym
           (List (List UInt8))
           (path_finish_segment (list_append UInt8 current (Nil UInt8)) segments)
           (path_finish_segment current segments)
-          (path_equal_cong
+          (cong
             (List UInt8)
             (List (List UInt8))
             (list_append UInt8 current (Nil UInt8))
@@ -240,7 +236,7 @@ theorem path_split_no_slash_end
             ((proof right_unit for list_append) UInt8 current));
     Cons byte rest ↦
       λno_slash.
-        path_equal_trans
+        trans
           (List (List UInt8))
           (path_split (Cons UInt8 byte rest) current segments)
           (path_finish_segment
@@ -257,7 +253,7 @@ theorem path_split_no_slash_end
               (list_append UInt8 current (Cons UInt8 byte (Nil UInt8)))
               segments)
             no_slash)
-          (path_equal_cong
+          (cong
             (List UInt8)
             (List (List UInt8))
             (list_append UInt8 (list_append UInt8 current (Cons UInt8 byte (Nil UInt8))) rest)
@@ -346,11 +342,11 @@ theorem path_split_no_slash_prefix
   match segment {
     Nil ↦
       λno_slash.
-        path_equal_sym
+        sym
           (List (List UInt8))
           (path_split suffix (list_append UInt8 current (Nil UInt8)) segments)
           (path_split suffix current segments)
-          (path_equal_cong
+          (cong
             (List UInt8)
             (List (List UInt8))
             (list_append UInt8 current (Nil UInt8))
@@ -359,7 +355,7 @@ theorem path_split_no_slash_prefix
             ((proof right_unit for list_append) UInt8 current));
     Cons byte rest ↦
       λno_slash.
-        path_equal_trans
+        trans
           (List (List UInt8))
           (path_split (list_append UInt8 (Cons UInt8 byte rest) suffix) current segments)
           (path_split_cons_result
@@ -374,7 +370,7 @@ theorem path_split_no_slash_prefix
             (path_byte_is_slash byte))
           (path_split suffix (list_append UInt8 current (Cons UInt8 byte rest)) segments)
           (path_split_append_cons_unfold byte rest suffix current segments)
-          (path_equal_trans
+          (trans
             (List (List UInt8))
             (path_split_cons_result
               (path_split
@@ -403,7 +399,7 @@ theorem path_split_no_slash_prefix
                 (list_append UInt8 current (Cons UInt8 byte (Nil UInt8)))
                 segments)
               no_slash)
-            (path_equal_cong
+            (cong
               (List UInt8)
               (List (List UInt8))
               (list_append UInt8 (list_append UInt8 current (Cons UInt8 byte (Nil UInt8))) rest)
@@ -456,7 +452,7 @@ theorem path_split_leading_slash
         (List (List UInt8))
         (path_split (Cons UInt8 path_slash_byte rest) current segments)
         (path_split rest (Nil UInt8) (path_finish_segment current segments)) =
-  path_equal_cong
+  cong
     Bool
     (List (List UInt8))
     (path_byte_is_slash path_slash_byte)
@@ -477,7 +473,7 @@ theorem path_append_nil_sym
   match items {
     Nil ↦ Proved;
     Cons item rest ↦
-      path_equal_cong
+      cong
         (List a)
         (List a)
         rest
@@ -495,7 +491,7 @@ theorem path_append_assoc
   match left {
     Nil ↦ Refl;
     Cons item rest ↦
-      path_equal_cong
+      cong
         (List a)
         (List a)
         (list_append a (list_append a rest middle) right)
@@ -512,7 +508,7 @@ theorem path_split_render_single
         (path_split segment (Nil UInt8) segments)
         (list_append (List UInt8) segments (Cons (List UInt8) segment (Nil (List UInt8)))) =
   λvalid.
-    path_equal_trans
+    trans
       (List (List UInt8))
       (path_split segment (Nil UInt8) segments)
       (path_finish_segment segment segments)
@@ -530,7 +526,7 @@ theorem path_split_render_nil
         (List (List UInt8))
         (path_split (path_render_segments (Nil (List UInt8))) (Nil UInt8) segments)
         (list_append (List UInt8) segments (Nil (List UInt8))) =
-  path_equal_trans
+  trans
     (List (List UInt8))
     (path_split (path_render_segments (Nil (List UInt8))) (Nil UInt8) segments)
     segments
@@ -549,7 +545,7 @@ theorem path_split_render_single_case
           segments)
         (list_append (List UInt8) segments (Cons (List UInt8) segment (Nil (List UInt8)))) =
   λvalid.
-    path_equal_trans
+    trans
       (List (List UInt8))
       (path_split
         (path_render_segments (Cons (List UInt8) segment (Nil (List UInt8))))
@@ -593,7 +589,7 @@ theorem path_split_render_cons_case
           segments
           (Cons (List UInt8) segment (Cons (List UInt8) next tail))) =
   λvalid.
-    path_equal_trans
+    trans
       (List (List UInt8))
       (path_split
         (path_render_segments (Cons (List UInt8) segment (Cons (List UInt8) next tail)))
@@ -615,7 +611,7 @@ theorem path_split_render_cons_case
         (path_segment_valid_no_slash
           segment
           (path_segments_valid_head segment (Cons (List UInt8) next tail) valid)))
-      (path_equal_trans
+      (trans
         (List (List UInt8))
         (path_split
           (Cons UInt8 path_slash_byte (path_render_segments (Cons (List UInt8) next tail)))
@@ -633,7 +629,7 @@ theorem path_split_render_cons_case
           (path_render_segments (Cons (List UInt8) next tail))
           segment
           segments)
-        (path_equal_trans
+        (trans
           (List (List UInt8))
           (path_split
             (path_render_segments (Cons (List UInt8) next tail))
@@ -648,7 +644,7 @@ theorem path_split_render_cons_case
             segments
             (Cons (List UInt8) segment (Cons (List UInt8) next tail)))
           (ih (path_segments_valid_tail segment (Cons (List UInt8) next tail) valid))
-          (path_equal_trans
+          (trans
             (List (List UInt8))
             (list_append
               (List UInt8)
@@ -662,7 +658,7 @@ theorem path_split_render_cons_case
               (List UInt8)
               segments
               (Cons (List UInt8) segment (Cons (List UInt8) next tail)))
-            (path_equal_cong
+            (cong
               (List (List UInt8))
               (List (List UInt8))
               (path_finish_segment segment segments)
@@ -752,7 +748,7 @@ theorem path_render_cons_head_nil
         (List UInt8)
         (path_render_segments (Cons (List UInt8) (Cons UInt8 byte tail) (Nil (List UInt8))))
         (Cons UInt8 byte tail) =
-  path_equal_cong (List UInt8) (List UInt8) tail tail (Cons UInt8 byte) Refl
+  cong (List UInt8) (List UInt8) tail tail (Cons UInt8 byte) Refl
 
 theorem path_render_cons_head_more
       (byte : UInt8) (tail : List UInt8) (next : List UInt8) (remaining : List (List UInt8))
@@ -770,7 +766,7 @@ theorem path_render_cons_head_more
               UInt8
               path_slash_byte
               (path_render_segments (Cons (List UInt8) next remaining))))) =
-  path_equal_cong
+  cong
     (List UInt8)
     (List UInt8)
     (list_append
@@ -794,14 +790,14 @@ theorem path_render_cons_is_relative
   match rest {
     Nil ↦
       λhead_not_slash.
-        path_equal_trans
+        trans
           Bool
           (path_input_is_absolute
             (path_render_segments
               (Cons (List UInt8) (Cons UInt8 byte tail) (Nil (List UInt8)))))
           (path_byte_is_slash byte)
           False
-          (path_equal_cong
+          (cong
             (List UInt8)
             Bool
             (path_render_segments (Cons (List UInt8) (Cons UInt8 byte tail) (Nil (List UInt8))))
@@ -811,14 +807,14 @@ theorem path_render_cons_is_relative
           head_not_slash;
     Cons next remaining ↦
       λhead_not_slash.
-        path_equal_trans
+        trans
           Bool
           (path_input_is_absolute
             (path_render_segments
               (Cons (List UInt8) (Cons UInt8 byte tail) (Cons (List UInt8) next remaining))))
           (path_byte_is_slash byte)
           False
-          (path_equal_cong
+          (cong
             (List UInt8)
             Bool
             (path_render_segments
@@ -873,7 +869,7 @@ theorem path_split_render_absolute
           (Nil (List UInt8)))
         segments =
   λvalid.
-    path_equal_trans
+    trans
       (List (List UInt8))
       (path_split
         (Cons UInt8 path_slash_byte (path_render_segments segments))
@@ -891,7 +887,7 @@ theorem path_parse_list_to_bytes
         (MkPath
           (path_input_is_absolute input)
           (path_split input (Nil UInt8) (Nil (List UInt8)))) =
-  path_equal_cong
+  cong
     (List UInt8)
     Path
     (bytes_to_list (list_to_bytes input))
@@ -905,7 +901,7 @@ theorem path_parse_render_relative
     : Eq Bool (path_segments_valid segments) True
       → Eq Path (path_parse (path_render (MkPath False segments))) (MkPath False segments) =
   λvalid.
-    path_equal_trans
+    trans
       Path
       (path_parse (path_render (MkPath False segments)))
       (MkPath
@@ -913,7 +909,7 @@ theorem path_parse_render_relative
         (path_split (path_render_segments segments) (Nil UInt8) (Nil (List UInt8))))
       (MkPath False segments)
       (path_parse_list_to_bytes (path_render_segments segments))
-      (path_equal_trans
+      (trans
         Path
         (MkPath
           (path_input_is_absolute (path_render_segments segments))
@@ -922,7 +918,7 @@ theorem path_parse_render_relative
           False
           (path_split (path_render_segments segments) (Nil UInt8) (Nil (List UInt8))))
         (MkPath False segments)
-        (path_equal_cong
+        (cong
           Bool
           Path
           (path_input_is_absolute (path_render_segments segments))
@@ -932,7 +928,7 @@ theorem path_parse_render_relative
               absolute
               (path_split (path_render_segments segments) (Nil UInt8) (Nil (List UInt8))))
           (path_render_relative_is_relative segments valid))
-        (path_equal_cong
+        (cong
           (List (List UInt8))
           Path
           (path_split (path_render_segments segments) (Nil UInt8) (Nil (List UInt8)))
@@ -945,7 +941,7 @@ theorem path_parse_render_absolute
     : Eq Bool (path_segments_valid segments) True
       → Eq Path (path_parse (path_render (MkPath True segments))) (MkPath True segments) =
   λvalid.
-    path_equal_trans
+    trans
       Path
       (path_parse (path_render (MkPath True segments)))
       (MkPath
@@ -956,7 +952,7 @@ theorem path_parse_render_absolute
           (Nil (List UInt8))))
       (MkPath True segments)
       (path_parse_list_to_bytes (Cons UInt8 path_slash_byte (path_render_segments segments)))
-      (path_equal_trans
+      (trans
         Path
         (MkPath
           (path_input_is_absolute (Cons UInt8 path_slash_byte (path_render_segments segments)))
@@ -971,7 +967,7 @@ theorem path_parse_render_absolute
             (Nil UInt8)
             (Nil (List UInt8))))
         (MkPath True segments)
-        (path_equal_cong
+        (cong
           Bool
           Path
           (path_input_is_absolute (Cons UInt8 path_slash_byte (path_render_segments segments)))
@@ -984,7 +980,7 @@ theorem path_parse_render_absolute
                 (Nil UInt8)
                 (Nil (List UInt8))))
           path_slash_is_slash)
-        (path_equal_cong
+        (cong
           (List (List UInt8))
           Path
           (path_split
@@ -1110,7 +1106,7 @@ theorem path_non_slash_singleton
     True ↦ λnot_slash. absurd not_slash;
     False ↦
       λnot_slash.
-        path_equal_cong
+        cong
           Bool
           Bool
           (path_byte_is_slash byte)
@@ -1495,11 +1491,6 @@ theorem path_no_dot_append
               right_clean)
   }
 
-theorem path_equal_cong0
-      (a : Type) (b : Type) (left : a) (right : a) (f : a → b) (same : Equal a left right)
-    : Equal b (f left) (f right) =
-  J (λright' _. Equal b (f left) (f right')) Refl same
-
 fn path_list_tail (items : List UInt8) : List UInt8 =
   match items {
     Nil ↦ Nil UInt8;
@@ -1797,5 +1788,7 @@ pub theorem path_normalize_absolute_has_no_dotdot
 ## 4. Trust and boundary
 
 Every operation is an ordinary transparent definition over `List UInt8` and
-the existing lawful `DecEq` instances. This package declares no primitive,
+the existing lawful `DecEq` instances. Equality steps reuse the checked
+`cong`, `sym`, and `trans` from `Core.Logic.Transport`. This package declares
+no primitive,
 postulate, opaque constant, or `Axiom`; its `trusted_base()` delta is zero.

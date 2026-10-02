@@ -20,6 +20,8 @@ explicit conversion chosen by the caller.
 import Capability.Parsing.Cursor
   (CursorOps, cursor_advance, cursor_locate, cursor_nat_lt, cursor_peek, cursor_remaining)
 
+import Core.Logic.Transport (trans)
+
 export DecoderError, DecoderRejected
 
 data DecoderError loc = DecoderRejected loc | DecoderZeroProgress loc | DecoderFuelExhausted loc
@@ -250,6 +252,11 @@ cursor. At successor fuel, ordinary rejection uses
 `DecoderProgress`, and a decreasing success recurses on the smaller fuel.
 Failure branches cannot inhabit the successful-result premise. No step proves
 that the derived fuel is sufficient, and callers never supply a bound.
+
+The decoded-result comparison changes its Boolean decision and recursive
+outcome in separate steps; Transport's `trans` joins those decoder-result
+equalities. `decoder_equal_after_left_replacement` remains the distinct
+replacement-and-reversal composite, not another copy of `trans`.
 
 ```ken
 fn DecoderProgress
@@ -724,16 +731,6 @@ theorem decoder_many_zero_success
     (decoder_many_zero_result_matches c el loc a ops step cur remaining remaining_is_actual)
     succeeded
 
-theorem decoder_equal_chain
-      (ty : Type)
-      (first : ty)
-      (middle : ty)
-      (last : ty)
-      (first_is_middle : Equal ty first middle)
-      (middle_is_last : Equal ty middle last)
-    : Equal ty first last =
-  J (λlast2 _. Equal ty first last2) first_is_middle middle_is_last
-
 theorem decoder_many_decoded_result_matches
       (c : Type)
       (el : Type)
@@ -893,7 +890,7 @@ theorem decoder_many_decoded_result_matches
         Refl
         recursive_is_actual
   in
-    decoder_equal_chain
+    trans
       (DecoderResult c loc (List a))
       (decoder_many_decoded_result
         c
@@ -1893,7 +1890,7 @@ pub theorem decoder_alt_propagates_nonbacktrackable
         (DecoderResult c loc a)
         (decoder_alt c loc a first second cur)
         (DecoderFailed c loc a err) =
-  decoder_equal_chain
+  trans
     (DecoderResult c loc a)
     (decoder_alt_result c loc a second cur (first cur))
     (decoder_alt_result c loc a second cur (DecoderFailed c loc a err))
@@ -2795,8 +2792,9 @@ None.
 Every combinator is transparent, structurally recursive on `Nat` fuel, and
 uses only checked cursor operations. The semantic equations, repetition law,
 and parametric preservation laws are ordinary transparent terms using `J`,
-structural eliminators, and the prelude
-conjunction projections; they import no proof assumption. In particular,
+structural eliminators, the checked `trans` from `Core.Logic.Transport`,
+and the prelude conjunction projections; they import no proof assumption. In
+particular,
 `decoder_many_preserves` inducts over its private fuel and keeps zero-progress
 and fuel-exhaustion locations valid; `decoder_recursive_preserves` inducts over
 its private fuel and uses a layer-preservation premise. The success-only

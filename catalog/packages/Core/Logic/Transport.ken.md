@@ -18,13 +18,14 @@ algebra (`sym`/`trans`) every later proof leans on.
 ## 1. Motivation
 
 Ken has a single surface equality eliminator, `J`, but every proof that
-actually needs to transport a value,
-flip a hypothesis, or compose two equalities has to hand-write its own `J`
-application and pick the right motive — easy to get subtly wrong (the wrong
-motive shape is a common source of stuck proofs) and repetitive across the
-catalog. This package names the five recurring shapes once, as ordinary
-checked Ken, so later entries call `subst`/`cong`/`cast`/`sym`/`trans`
-instead of re-deriving them.
+actually needs to transport a value, flip a hypothesis, or compose two
+equalities has to hand-write its own `J` application and pick the right
+motive — easy to get subtly wrong (the wrong motive shape is a common
+source of stuck proofs) and repetitive across the catalog. This package
+names the five recurring shapes once as ordinary checked Ken. Other entries
+import `subst`, `cong`, `sym`, and `trans`
+instead of re-deriving them; `cast` stays package-local because raw
+transport between types has no catalog consumer.
 
 ## 2. Definition
 
@@ -41,7 +42,9 @@ five combinators follow that convention.
 (`53 §2`). The `J` motive names the family at the transported endpoint.
 
 ```ken
-fn subst (ty : Type) (x : ty) (y : ty) (fam : ty → Type) (p : Eq ty x y) (px : fam x) : fam y =
+pub fn subst
+      (ty : Type) (x : ty) (y : ty) (fam : ty → Type) (p : Eq ty x y) (px : fam x)
+    : fam y =
   J (λy' _. fam y') px p
 ```
 
@@ -149,7 +152,8 @@ values, one level up, so it must spell the kernel's native `Eq` directly.
 
 ## 7. Trust  derivation
 
-1. **Public API.** `subst`, `cong`, `cast`, `sym`, `trans`.
+1. **Public API.** `subst`, `cong`, `sym`, `trans`; `cast` stays
+   package-local.
 2. **Source map.**
 
    | Task | Section |

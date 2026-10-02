@@ -13,7 +13,7 @@ reverses the other list once and continues from there.
 ```ken
 import Data.Collections.Derived (list_append, reverse)
 
-import Core.Logic.Transport (sym, trans)
+import Core.Logic.Transport (cong, sym, trans)
 
 data Deque a = MkDeque (List a) (List a)
 
@@ -67,15 +67,12 @@ fn popBack (a : Type) (q : Deque a) : Option (Pair a (Deque a)) =
 
 The abstraction function is a homomorphism for insertion at both ends. The
 back law uses the one associativity direction needed to expose the appended
-singleton. `PopPreserves` carries the residual deque together with the checked
-fact that its abstract sequence is unchanged.
+singleton. Transport's `cong` lifts the tail equality under `Cons` and the
+rebalanced reverse-view equality under `reverse`; `sym` and `trans` orient
+and compose the remaining sequence views. `PopPreserves` carries the residual
+deque together with the checked fact that its abstract sequence is unchanged.
 
 ```ken
-theorem deque_cong
-      (a : Type) (b : Type) (x : a) (y : a) (f : a → b) (p : Equal a x y)
-    : Equal b (f x) (f y) =
-  J (λy2 _. Equal b (f x) (f y2)) Refl p
-
 theorem deque_append_snoc_assoc
       (a : Type) (front : List a) (tail : List a) (x : a)
     : Equal
@@ -85,7 +82,7 @@ theorem deque_append_snoc_assoc
   match front {
     Nil ↦ Refl;
     Cons h rest ↦
-      deque_cong
+      cong
         (List a)
         (List a)
         (list_append a rest (list_append a tail (Cons a x (Nil a))))
@@ -99,7 +96,7 @@ theorem toList_pushFront
     : Equal (List a) (toList a (pushFront a x q)) (Cons a x (toList a q)) =
   match q {
     MkDeque front back ↦
-      deque_cong
+      cong
         (List a)
         (List a)
         (list_append a front (reverse a back))
@@ -215,7 +212,7 @@ fn deque_pop_back_nil_view
                 reverse_round_trip
                 (Nil a)
                 front_is_reverse_round_trip
-                (deque_cong (List a) (List a) (reverse a front) (Nil a) (reverse a) same)));
+                (cong (List a) (List a) (reverse a front) (Nil a) (reverse a) same)));
       Cons x rest ↦
         λsame.
           MkPopBackSome
@@ -235,13 +232,7 @@ fn deque_pop_back_nil_view
                 reverse_round_trip
                 (list_append a (reverse a rest) (Cons a x (Nil a)))
                 front_is_reverse_round_trip
-                (deque_cong
-                  (List a)
-                  (List a)
-                  (reverse a front)
-                  (Cons a x rest)
-                  (reverse a)
-                  same)))
+                (cong (List a) (List a) (reverse a front) (Cons a x rest) (reverse a) same)))
     }
 
 fn popBack_list_view (a : Type) (q : Deque a) : PopBackListView a q (popBack a q) =
@@ -376,7 +367,7 @@ theorem deque_example_back_rebalance_order
 transparent `list_append` and `reverse` definitions from
 `Data.Collections.Derived`, its checked `reverse::involutive` and
 `list_append::right_unit` proofs, and the canonical `Core.Logic.Transport`
-`sym` and `trans` proofs. Every law is a checked proof term. Relative to
+`cong`, `sym`, and `trans` proofs. Every law is a checked proof term. Relative to
 those provider closures, the package adds no axiom, postulate, primitive,
 foreign declaration, unresolved hole, or consumer-local `trusted_base()`
 entry. Loading the full closure inherits the provider's existing audited
