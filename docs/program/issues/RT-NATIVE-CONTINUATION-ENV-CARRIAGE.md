@@ -335,14 +335,20 @@ triggers hold-and-research.
    incoming call `Spec(S5) → S6` (producer Construct 528). Since the
    residual integration (`9214b25fc`), none is recorded (14 verified calls,
    none to S6). Keyed on the call graph's direct-call record after the
-   residual took over that continuation (`evt_a4ph004eayw0`, §1a 5; D0
-   owed, dispositions A/B/C pre-stated).
+   residual took over that continuation (`evt_a4ph004eayw0`, §1a 5). D0
+   `evt_2a1sk8vwfsebr`: disposition B, main emits two selected transport
+   calls and the candidate none.
+6. Residual issuance cannot see which Active descents emit selected
+   response-owner calls: issuance (construction.rs:1435) precedes ownership
+   → checked-IH transports → response phase B → selected callers, all of
+   which it feeds. Keyed on plan-construction order (`evt_k50enr3zpmp8`,
+   §1a 6).
 
-Predicate (corrected, `evt_7tg07nnz0656z`): Child classification consulted
-only the lexical-closure and `ConstructEmission` populations, and missed the
-checked-IH force records that mint every K word. The Child at (S1, 526, 1)
-is statically S1's variant; it is not run-time dynamic. The predicate
-question is next due at entry 6, the research hold.
+Predicate (Architect `evt_2bq826gvr9cvz`, held for the Research advisory):
+the carrier schema is decided upstream of the checked-IH
+environment-transport plane whose facts it needs. Entries 1 to 5 each
+reconstructed or missed a transport-plane fact locally, and entry 6 is the
+order itself.
 
 ## Stop conditions
 
