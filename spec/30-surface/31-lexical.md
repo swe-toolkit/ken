@@ -736,8 +736,8 @@ phrases fixed below):
   parentheses may disambiguate an ordinary application using the same
   identifier spellings. The formatter treats each whole phrase as one primary
   expression and preserves the spaces between its words;
-- the fixed operator tokens `+`, `-`, `*`, `+%`, `-%`, `*%`, and `==`
-  (`32 §3`; wrapping forms `35 §3`, OQ-1a). They keep dedicated token kinds
+- the fixed operator tokens `+`, `-`, `*`, `/`, `%`, `+%`, `-%`, `*%`, and
+  `==` (`32 §3`; wrapping forms `35 §3`, OQ-1a). They keep dedicated token kinds
   rather than entering generic `operator`;
 - the type-level identifiers `Lazy` (OQ-eval-order) and `Wrapping` (OQ-1a,
   `Wrapping[T]`);
