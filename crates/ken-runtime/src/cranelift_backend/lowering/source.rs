@@ -1288,7 +1288,12 @@ impl<'a> Lowering<'a> {
                         route: incoming_route,
                         role: incoming_role,
                     } = value;
-                    if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                    let discards_prefix = match &value {
+                        LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                        LoweringOperand::Residual(_) => false,
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                    };
+                    if discards_prefix {
                         control.continuation = Self::discard_source_prefix(control.continuation);
                     }
                     match control.continuation {

@@ -3519,19 +3519,24 @@ impl<'a> Lowering<'a> {
         }
         if let EliminatorFrame::PendingLet(continuation) = eliminators[0] {
             let value = self.lower_expr(builder, occurrence, producer_env)?;
-            if matches!(
-                value,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
-                return Ok(ProducerTrampolineStep::ordinary(
-                    LoweringOperand::Specialized(Lowered::RecursiveBackedge),
-                ));
-            }
-            if let LoweringOperand::Specialized(Lowered::Trap(trap)) = value {
-                return Ok(ProducerTrampolineStep::ordinary(
-                    LoweringOperand::Specialized(Lowered::Trap(trap)),
-                ));
-            }
+            let value = match value {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => {
+                    return Ok(ProducerTrampolineStep::ordinary(
+                        LoweringOperand::Specialized(Lowered::RecursiveBackedge),
+                    ));
+                }
+                residual @ LoweringOperand::Residual(_) => residual,
+                other @ (LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)) => other,
+            };
+            let value = match value {
+                LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                    return Ok(ProducerTrampolineStep::ordinary(
+                        LoweringOperand::Specialized(Lowered::Trap(trap)),
+                    ));
+                }
+                residual @ LoweringOperand::Residual(_) => residual,
+                other @ (LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)) => other,
+            };
             let mut continuation_env = vec![LoweringEnvironmentBinding::Value(value)];
             continuation_env.extend_from_slice(continuation.env);
             return self
