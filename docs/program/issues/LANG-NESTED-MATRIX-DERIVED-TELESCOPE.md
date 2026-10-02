@@ -89,8 +89,12 @@ Three increments, each a straight-ancestor cut that may land alone.
 
    `Internal(g0)` from `project_generated_index_equality_leaves` is not the
    refusal.
-1. **Seed `ret_ty_slot` from the check-mode expected type.** Report how many
-   of the 24 entries become `Some`.
+1. **Seed `ret_ty_slot` from the check-mode expected type.** Every
+   check-mode split entry becomes `Some`. Inference-mode entries stay
+   `None`, and increment 2 serves them. The handoff reports arrivals by
+   population and mode (Steward `evt_vj9sdpww9tfe`). The 24-entry figure is
+   superseded, since increment 0 refuses one historical entry. With the
+   seeding disabled, the check-mode entries return to `None`.
 2. **Open each nested bucket in the derived telescope before its leaves.**
    - Δ comes from reverting the context and the constructor. Woven binders
      are real `cx.ctx` pushes.
