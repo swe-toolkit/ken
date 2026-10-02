@@ -61,10 +61,32 @@ chapters and are the typing relation's clauses:
 | Inductives `D`, `cₖ`, `elim_D` | `14` |
 | `Eq`, `refl`, `J` | `15`, `16 §2` |
 | `cast`, Ω + proof irrelevance, quotients `A/R`, truncation `‖A‖` | `16` |
+| Local `let` | here (§2); binder `11 §1`, ζ `17 §1` |
 | Primitives | `14 §5` |
 
-One rule lives here because it ties typing to conversion (`17`) — the
-**switch**:
+**Core `let` (non-recursive).** The annotation `A` must classify as an
+ordinary type or a proposition; the RHS checks at `A`. Both modes then type
+the capture-avoiding substitution of the RHS for the bound variable in the
+body, in the **original** `Γ` (not under an added variable assumption):
+
+```
+Γ ⊢ A : Type ℓ or Γ ⊢ A : Ω_ℓ   Γ ⊢ val ⇐ A   Γ ⊢ body[val/0] ⇒ B
+───────────────────────────────────────────────────────────────────  (Let-Inf)
+Γ ⊢ let x := val : A in body ⇒ B
+
+Γ ⊢ A : Type ℓ or Γ ⊢ A : Ω_ℓ   Γ ⊢ val ⇐ A   Γ ⊢ body[val/0] ⇐ C
+───────────────────────────────────────────────────────────────────  (Let-Check)
+Γ ⊢ let x := val : A in body ⇐ C
+```
+
+The result type of `Let-Inf` is exactly the substituted body's inferred type
+`B`; `let` adds no universe level. `Let-Check` checks that body directly at
+`C`, so a checking-only introduction form need not be inferable. These rules
+specify the landed kernel's `infer` and `check` arms
+(`crates/ken-kernel/src/check.rs:307–311,473–482`); they do not alter the ζ
+reduction in `17 §1`.
+
+Alongside core `let`, the conversion **switch** also lives here (`17`):
 
 ```
   Γ ⊢ t : A      Γ ⊢ A ≡ B : Type ℓ
@@ -98,7 +120,9 @@ chapters (`12`–`16`) and are not restated here.
 **Notation.** `whnf`, `conv`, `convType`, `convLevel` are the conversion
 primitives of `17 §3` (the public names are `whnf`, `convert`, `convert_type`,
 `level_eq` — §4). `ctx, A` extends the context with a fresh variable of type `A`
-(de Bruijn index 0). `B[u/0]` substitutes `u` for index 0. `inferUniv(t)` is the
+(de Bruijn index 0). `B[u/0]` substitutes `u` for index 0, avoiding capture.
+`classify(A)` infers `A` in the current context and requires the WHNF of its
+type to be `Type ℓ` or `Ω_ℓ` (`check.rs:160–173`). `inferUniv(t)` is the
 helper `A := infer(t); A' := whnf(A); require A' = Type ℓ or Ω_ℓ; return ℓ`
 (used wherever a position must be a type), failing `UniverseInconsistency`
 otherwise.
@@ -135,6 +159,9 @@ function infer(env, ctx, t):                       // Γ ⊢ t ⇒ A
     Proj2(p):         P := whnf(infer(p)); require P = Sigma(A,B)
                       return B[Proj1(p) / 0]
     Ascript(t', A):   inferUniv(A); check(t', A); return A
+    Let(x, A, val, body):                       // 11 §1; check.rs:307–311
+                      classify(A); check(val, A)
+                      return infer(body[val/0]) // original ctx; may fail
     IndFormer/Constructor/Eq/Cast/Quot/Trunc:
                       // formation/intro/elim typing of the cited chapter:
                       // 14 (D, applied cₖ), 15/16 §2 (Eq formation),
@@ -153,16 +180,21 @@ function infer(env, ctx, t):                       // Γ ⊢ t ⇒ A
 
 `infer` returns the **unique** type up to conversion (Ken has no subtyping, so
 there is no choice to make). Every `require` that fails returns a `KernelError`
-(§4) naming the offending subterm.
+(§4) naming the offending subterm. A `Let` infers only when its substituted
+body infers; a checking-only body still has the separate checking route.
 
 ### 3.2 `check` — the type-driven heads and the mode switch
 
-`check` dispatches on the **type** for the heads that need one (this is where η
-enters and where the non-inferable intro forms are handled); everything else
-falls through to the **mode switch**.
+`check` handles `Let` directly to preserve checking mode, dispatches on the
+**type** for the introduction heads that need one (this is where η enters),
+and sends remaining heads to the **mode switch**.
 
 ```
 function check(env, ctx, t, A):                    // Γ ⊢ t ⇐ A
+  if t = Let(x, L, val, body):                    // 11 §1; check.rs:473–482
+      classify(L); check(val, L)
+      check(body[val/0], A)                       // original ctx, not infer
+      return Ok
   W := whnf(A)
   case (t, W) of
     (Lam(_, b), Pi(A₁, B)):                        // 13 §1; domain from the type
@@ -183,10 +215,12 @@ function check(env, ctx, t, A):                    // Γ ⊢ t ⇐ A
         else fail TypeMismatch{ expected: A, found: A' }
 ```
 
-The `_otherwise` arm is the **single place conversion is invoked during
-checking** — the algorithmic form of (Conv) (§2). It infers the term's type and
-asks `convType` (= `convert_type`, `17 §3.3`) whether the expected and inferred
-types are definitionally equal. Because conversion is **total and decidable**
+The `_otherwise` arm is the **generic infer-then-convert mode switch** — the
+algorithmic form of (Conv) (§2). The `Let` arm instead directly checks its
+substituted body against the expected type; conversion may occur within that
+recursive check. For the generic switch, `convType` (`convert_type`)
+compares the expected and inferred types for definitional equality (`17 §3.3`).
+Because conversion is **total and decidable**
 (`17 §5`, via the SCT admission gate `17 §4` plus the finite δ-retry boundary
 `17 §3.5`), the switch always halts with a definite yes/no — there is **no third
 "unknown"** outcome in the kernel. A checking-mode
@@ -285,8 +319,8 @@ entry may return.
 | `declare_inductive` | `build(id)` yields a well-formed host `InductiveSpec` self-referencing `id`; callers cannot mark a spec as terminal support | the host signatures, universes, **strict positivity** (`14 §8`), **W-style boundary** (`14 §8.4`), and **nested-positive boundary** (`14 §8.5`) check. If the host has `p` checked positive carriers, exactly `2p` first-order `All^Type` / `All^Omega` families then pass ordinary indexed-inductive checks (`14 §1`/`§3.2`). Kernel provenance classifies them as terminal support: each stored `InductiveDecl` carries its constructor records, its generic `Term::Elim { fam, … }` form checks ordinarily, and it triggers neither support generation nor general enclosing-former registration. Success atomically appends the host and fixed support set as `Decl::Inductive` entries; no eliminator declaration or `GlobalId` is created. Nested method types and ι use those same family applications (`14 §7.8`). Any failure rolls the entire transaction back, so `Σ` is unchanged. The admission subset is landed; only the independently marked nested completeness residuals remain gated on `KERNEL-NESTED-IND` | `PositivityViolation`, `IllFormedDecl`, `ConstructorUniverseViolation`, `LevelArityMismatch` |
 | `declare_postulate` | `name` is a non-positional audit label; `ty` raw-well-formed over `·` | `· ⊢ ty type`; `id` admitted **opaque** with `name`; **recorded in the trusted base** (appears as a named entry in `trusted_base()`). A postulate of an empty type is admitted but **visible** as an assumption | `TypeMismatch`, `UniverseInconsistency` |
 | `declare_primitive` | `ty` raw-well-formed; `reduction` the registered operation descriptor | `· ⊢ ty type`; `id` admitted opaque + descriptor **registered in the trusted-base ledger**. `Literal` records a value class; `Op` names interpreter dispatch (§5). Kernel WHNF additionally reduces registered `leq_int` on two WHNF `IntLit` operands (`16 §2.2`) and the registered `string_to_list_char` view on a checked `String` literal (`17 §1`); other Ops remain opaque to conversion | `TypeMismatch`, `UniverseInconsistency` |
-| `infer` | `ctx` well-formed; `t` raw-well-formed | returns the **unique** `A` with `ctx ⊢ t ⇒ A` (§3.1) | `VarOutOfScope`, `NotAFunction`, `NotASigma`, `LevelArityMismatch`, `TypeMismatch`; a non-inferable head ⇒ error |
-| `check` | `ctx` well-formed; `t` raw-well-formed; **`ty` a well-formed type** | `ctx ⊢ t ⇐ ty` (§3.2); the single conversion call is the mode switch | `TypeMismatch` (the two non-converting types), plus any from `infer` |
+| `infer` | `ctx` well-formed; `t` raw-well-formed | returns the **unique** `A` with `ctx ⊢ t ⇒ A` (§3.1); for `Let`, classifies its annotation, checks its RHS, and infers the substituted body | `VarOutOfScope`, `NotAFunction`, `NotASigma`, `LevelArityMismatch`, `TypeMismatch`; a non-inferable head (including a substituted `Let` body) ⇒ error |
+| `check` | `ctx` well-formed; `t` raw-well-formed; **`ty` a well-formed type** | `ctx ⊢ t ⇐ ty` (§3.2); `Let` checks its substituted body at `ty` directly; unmatched heads use the infer-then-convert mode switch | `TypeMismatch` (including wrong `Let` RHS or result), plus errors from recursive checks or `infer` |
 | `convert` | `a`, `b` both check at `ty` | `true` ⇔ `ctx ⊢ a ≡ b : ty` (`17`); **total + decidable**. Threads `ty` for η + the Ω-PI shortcut (`16 §8.2`) | none — returns `bool`; the caller manufactures the error |
 | `convert_type` | `a`, `b` are types | `true` ⇔ `ctx ⊢ a ≡ b type` (`17 §3.3`; types take no η). **This is the entry the (Conv) mode switch calls** | none — `bool` |
 | `level_eq` | — | `true` ⇔ `a ≡ b` as levels (`12 §1`/`§6.1` semilattice normal form; `17 §3.6`). Total | none — `bool` |
