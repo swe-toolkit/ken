@@ -133,7 +133,6 @@ fn fixed_division_spellings_refuse_user_declarations_like_plus() {
     };
     assert!(plus_msg.starts_with("expected global name, found "));
     for (spelling, expected) in [("/", Token::Slash), ("%", Token::Percent)] {
-        assert_eq!(Lexer::lex(spelling).expect("lex")[0].0, expected);
         let error = parse_decls(&source(spelling))
             .expect_err("a fixed arithmetic spelling cannot be declared as a user function");
         match error {
@@ -144,6 +143,7 @@ fn fixed_division_spellings_refuse_user_declarations_like_plus() {
             }
             other => panic!("fn {spelling} must have the fn + diagnostic class: {other:?}"),
         }
+        assert_eq!(Lexer::lex(spelling).expect("lex")[0].0, expected);
     }
     // Only exact glyphs are fixed; compound spellings remain user operators.
     for spelling in ["<", ">", "<+>"] {
