@@ -9,7 +9,7 @@ gate: architect
 depends_on: [KERNEL-INT-DIV-MOD-NATIVE]
 blocks: []
 github: null
-origin: "Adversary M8 evt_77xwvz1n3age0 on ed112ae4f (KERNEL-OBS-SIGMA-QUOT-CAST-GATE): pre-existing, fails closed. Architect evt_5kvvbn4ajxt1n: reachable from surface J, fix shape confirmed. Kernel change, placed after KERNEL-INT-DIV-MOD-NATIVE and ahead of KERNEL-J-NONREFL-ENDPOINT-SHARING, pending operator approval. Steward-filed per COORDINATION section 2."
+origin: "Adversary M8 evt_77xwvz1n3age0 on ed112ae4f (KERNEL-OBS-SIGMA-QUOT-CAST-GATE): pre-existing, fails closed. Architect evt_5kvvbn4ajxt1n: reachable from surface J, fix shape confirmed. Kernel change, placed after KERNEL-INT-DIV-MOD-NATIVE and ahead of KERNEL-J-NONREFL-ENDPOINT-SHARING; operator 2026-10-02: 'approve function-type cast fix'. Steward-filed per COORDINATION section 2."
 ---
 
 # The Π cast fires only on a decomposing equality
