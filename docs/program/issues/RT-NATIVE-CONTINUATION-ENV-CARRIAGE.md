@@ -237,43 +237,36 @@ M-c and M-d, the plane split, and issuance over the source Construct walk.
     - dropping `has_destination` reddens (a) on a named fixture or a new
       planner unit test;
     - `validate_continuation_specialization_plan` is unchanged and green.
-- **I-2, selection-only preservation over the fixed stratum** (Architect
-  `evt_691t5yw79pyws` on D0 `evt_6rt58tdd5xd62`; the ruling carries the code
-  text). Issuance stays exactly as on `80bcfb4`. The issuance guard, the
-  all-unissued `Ok(None)` arm and whole-subtree containment are withdrawn.
-  - **Q.** When `recursive_position_unit_body` would select the residual
-    fallback at (context C, eliminator G, pos), let `B` be the body the
-    Active path (`Ok(None)`) would lower there. Q forbids the fallback iff a
-    preselected caller is emitted by C and its producer construct lies in
-    `B`. The check is `active_descent_emits_selected_call`, and it keeps the
-    owner equality.
-  - If Q forbids where no Active path exists, return
-    `unsupported("RecursiveResidual", ...)`. Never fall back silently.
-  - **First step, before product edits:** log `B` and the guard's verdict
-    for all 13 D0-a selection rows. It forbids at exactly r2 and write ctx1
-    S5/G533 and admits the other 11.
+- **I-2, a residual only under a trivial continuation** (Architect
+  `evt_744gjznjr64x6`, on Research `evt_54vkrxapf12qg` and D0
+  `evt_2pwxwtktqwhta`; the ruling carries the code text). Main is the
+  reference. Issuance stays exactly as on `80bcfb4`. Every static-containment
+  guard, including `active_descent_emits_selected_call`, is withdrawn.
+  - **The guard.** At residual selection in `recursive_position_unit_body`,
+    any pending outer frame on the source machine takes Active (`Ok(None)`).
+    Labelled or Exact residuals are admitted only with no pending frame.
+  - **The invariant.** Every residual consumption site (the Labelled switch,
+    `source.rs:4579` → `calls.rs:861`, and the Exact attach, `core.rs:15225`)
+    refuses under a pending frame with `unsupported("RecursiveResidual",
+    ...)`. The handoff enumerates the sites.
+  - **First step (passed, `evt_61rw1srg4d3at`):** the combined probe gives
+    r2 1/1 with S5/528 at main's 2, read 1/1 with G12's residual, and write
+    1/1 with S5/528 at 12. The residual stays at exactly the three
+    no-pending rows (r2 and write P10/G25, read P5/G12).
   - Acceptance:
-    - the guard's logged verdicts equal the D0-a Q column on all 13 rows;
-    - r2 executes `u0:58` twice from S5 ctx1, and the handoff names r2's
-      next refusal if one remains;
-    - read is 1/1 with G12's residual consumed, and write is 1/1 with S5/528
-      at main's count;
-    - deleting the guard call reddens r2 with exactly "no verified selected
-      incoming call";
-    - dropping the owner equality is reported row by row (it records the
-      axis and is not a pass condition);
-    - a unit test covers owner match with containment, owner mismatch, and
-      no containment;
+    - the combined result on the committed code, with a per-row verdict log;
+    - deleting the guard fires the consumption assertion at r2 G533 with
+      its exact message;
+    - deleting both reddens r2 with exactly "no verified selected incoming
+      call";
     - the `dec_3tvethnshr68y` carry: compare installed owners only on
       `Ok(owners)`, and propagate `Err(infeasible)` with its own reason;
     - rt_escape*, rt_span_prov_native and the two parity rows stay green.
-- **Stops (the 8th returns the sizing to the Steward; the 9th calls
-  research):**
-  - the first-step table disagrees with Q, or `B` is not a single static
-    body;
-  - a non-r2 verdict changes;
-  - r2 still lacks the call;
-  - the fail-closed assertion fires on any fixture.
+  - Dispositions left issued and unconsumed are not pruned here.
+- **Stops (the 9th is hold plus research):**
+  - a consumption-site assertion fires on any fixture;
+  - a non-r2 verdict or selected-caller count changes;
+  - a residual consumption site cannot see the pending-frame state.
 
 ## Acceptance
 
