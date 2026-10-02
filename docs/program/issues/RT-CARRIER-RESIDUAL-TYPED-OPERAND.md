@@ -128,10 +128,17 @@ it. Five items, delivered in the two increments below:
      `Synthesized` to `Carried`.
    - Site A (`source.rs:1699-1720`). The `any(matches!(.., Carried(_)))`
      test counts `Residual` as a runtime word. In
-     `transfer_constructor_operands` (`core.rs:13575`), a `Residual`
-     argument stores its word as is, and only where
-     `residual_fields[position]` is `None`. If it is `Some`, the store would
-     wrap an R as a Child, and that is a compile-time planner error.
+     `transfer_constructor_operands` (`core.rs:13575`), the destination's
+     declared representation decides (Architect `evt_2gq38tz4qy735`). Where
+     `residual_fields[position]` is `None`, the field is an ordinary K
+     destination, and an arriving R is decoded before the parent is
+     allocated. Where it is `Some`, an arriving R would be re-wrapped as a
+     Child, and the preflight refuses it as a planner error.
+   - Every store into an aggregate word follows the same rule. Declared R,
+     an issued disposition or a checked-IH environment role, takes R only
+     with a matching slot key. An ordinary field or capture decodes R
+     first. `emit_boundary_closure_environment` (`aggregates.rs:4177`) is
+     the open sibling, and decodes residual captures before allocation.
    - Site B (`source.rs:4906-4913`). `RoutedAnswer::checked` carries the R
      typed, and G355 decodes it before the edge.
    - Each of the 95 refutable patterns on `LoweringOperand` in production
@@ -236,6 +243,11 @@ ABI change.
   - Mutation M-A: treat site A's `Residual` as `Carried`, so that it is
     wrapped as a Child. Either the compile-time refusal fires, or, with
     that refusal also removed, id41 does not pass.
+  - Mutation M-A2: replace only Site A's pre-allocation decode with the
+    raw R word, and `outer_carried` returns to `UnclassifiedRuntimeTrap(-1)`.
+  - A `cfg(test)` counter of Site-A R arrivals at ordinary fields during
+    full parity is reported with the escape counter, as a population, not
+    an oracle.
   - Mutation: removing the R→K decode on the G355 checked-answer edge
     reddens `outer_carried`, with the D0-k raw -1.
   - Label mutations: the default arm falling through to arm 0 stays green
@@ -260,8 +272,11 @@ ABI change.
 
 1. R is forwarded untyped through `LoweringOperand` containers: constructor
    arguments and `RoutedAnswer.value`. Keyed on the operand container type
-   (`evt_3266hq42hc17h`, recut §1a 1). The next re-trigger is the 3rd,
-   which is a hold plus research.
+   (`evt_3266hq42hc17h`, recut §1a 1).
+2. R is stored as is into an ordinary constructor field, because
+   `residual_fields[pos] == None` was read as a pass-through instead of as a
+   K destination (`evt_2gq38tz4qy735`, recut §1a 2). The next re-trigger is
+   the 3rd, which is a hold plus research.
 
 ## Stop conditions
 
@@ -271,4 +286,4 @@ ABI change.
 - Any change to the kernel, the spec or a verdict outside the runtime rows
   named here. A currently passing `rt_parity_native` row that is newly
   refused, including through an F disposition, is a stop to the Architect.
-- The 3rd advancing stop is a hold plus research (§1a is at 1).
+- The 3rd advancing stop is a hold plus research (§1a is at 2).
