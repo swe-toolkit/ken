@@ -451,6 +451,7 @@ fn d2_elim_trunc_surface_sugar_refuses_a_type_classified_target() {
 #[test]
 fn ac5_derives_exact_shape_elaborates_and_kernel_checks() {
     let mut env = mk_env();
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken must still elaborate/kernel-check unmodified");
 

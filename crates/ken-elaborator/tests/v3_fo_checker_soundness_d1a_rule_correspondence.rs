@@ -41,7 +41,7 @@ const FOK_SOURCE: &str =
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken with FokDerivation must elaborate and kernel-check");

@@ -28,7 +28,7 @@ const ORDINARY_LABEL: &str = "prover unknown goal";
 
 fn env_with_fok() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke catalog unit must elaborate");
     env

@@ -27,7 +27,7 @@ const FOK_SOURCE: &str =
 
 fn load_fok() -> (ElabEnv, BTreeSet<ken_kernel::GlobalId>) {
     let mut env = ElabEnv::new().expect("base env construction failed");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     let before = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(FOK_SOURCE)
         .expect("FoKripke.ken with D1b reflection must elaborate and kernel-check");

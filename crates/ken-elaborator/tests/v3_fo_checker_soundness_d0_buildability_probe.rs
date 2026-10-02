@@ -35,7 +35,7 @@ const FOK_SOURCE: &str =
 
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
-    catalog_or::load_core_logic_or(&mut env);
+    catalog_or::load_fokripke_providers(&mut env);
     env
 }
 

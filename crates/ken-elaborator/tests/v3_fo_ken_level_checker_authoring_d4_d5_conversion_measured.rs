@@ -366,7 +366,7 @@ fn measure_one(env: &mut ElabEnv, label: &str, source: &str, formula_depth: usiz
 fn measure_kernel_conversion_load_on_real_source_programs() {
     run_with_big_stack(|| {
         let mut env = ElabEnv::new().expect("base env");
-        catalog_or::load_core_logic_or(&mut env);
+        catalog_or::load_fokripke_providers(&mut env);
         env.elaborate_file(FOK_SOURCE)
             .expect("FoKripke.ken failed to elaborate/kernel-check");
         declare_fo_vocabulary(&mut env, "A", "P");
