@@ -416,6 +416,19 @@ triggers hold-and-research.
    Keyed on static containment at the selection point (`evt_30etv9z3ddq4t`,
    §1a 8; Architect `evt_62fpkx7marckq`). Entries 7 and 8 share entry 6's
    predicate. Entry 9 is the next predicate checkpoint.
+9. With the execute-then-resume response suppressed on write, and the
+   P10/G25 Labelled residual selected, S5's context (fn56) fails the
+   carrier-schema assertion on the R15 label word
+   (`assert_recursive_carrier_variant` `mod.rs:8860` → `require_i64`, raw
+   -1) on the P2 Deferred route. There, I-1 reaches the typed identity-41
+   `ResourceBodyResult` pattern-match trap. The writer of the bad label
+   word is not yet identified (`evt_7stv16qbf6vt5`, §1a 9; Architect
+   `evt_284zc4290m42k`). The predicate is suspended until D0-h names that
+   writer: the deferred transport's store rejoins entries 7 and 8, and an
+   unrecorded producer recurs entries 1 to 6.
+
+   Carry, not on this WP: give carrier-schema assertions a typed root-trap
+   catalog entry in place of the raw -1 status abort.
 
 Predicate (Architect `evt_2bq826gvr9cvz`, held for the Research advisory):
 the carrier schema is decided upstream of the checked-IH
