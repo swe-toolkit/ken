@@ -2781,8 +2781,10 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             lowered: &LoweringOperand,
         ) -> Result<bool, CraneliftBackendError> {
-            let LoweringOperand::Specialized(Lowered::Trap(trap)) = lowered else {
-                return Ok(false);
+            let trap = match lowered {
+                LoweringOperand::Specialized(Lowered::Trap(trap)) => trap,
+                LoweringOperand::Residual(_) => return Ok(false),
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => return Ok(false),
             };
             let status = self.emit_current_trap(builder, trap)?;
             builder.ins().return_(&[status]);
