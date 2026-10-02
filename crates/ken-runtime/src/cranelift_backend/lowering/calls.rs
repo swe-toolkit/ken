@@ -813,6 +813,18 @@ impl<'a> Lowering<'a> {
                             ));
                         }
                     }
+                    LoweringOperand::Residual(_) => {
+                        if slot.storage_owner != AbiStorageOwner::ActivationFrame {
+                            return Err(unsupported(
+                                "RetainedCallableCaptureContract",
+                                format!(
+                                    "capture {position} of the retained callable at \
+                                     {closure_origin:?} arrived as R, but its slot storage belongs to {:?}",
+                                    slot.storage_owner,
+                                ),
+                            ));
+                        }
+                    }
                 }
                 let expected = expected_capture_slot(provenance, ordinal);
                 if **slot != expected {
@@ -839,7 +851,7 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             selection: RecursiveUnitBodySelection,
             coordinates: Option<CarriedInvocationCoordinates>,
-            carried_base: Option<CarriedBoundaryWord>,
+            carried_base: Option<CarriedResidualWord>,
             mut build_inputs: F,
         ) -> Result<LoweringOperand, CraneliftBackendError>
         where
@@ -863,12 +875,12 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             selection: RecursiveUnitBodySelection,
             coordinates: Option<CarriedInvocationCoordinates>,
-            carried_base: Option<CarriedBoundaryWord>,
+            carried_base: Option<CarriedResidualWord>,
             mut arm: F,
         ) -> Result<LoweringOperand, CraneliftBackendError>
         where
             F: FnMut(&mut Self, &mut FunctionBuilder<'_>, StaticOriginId,
-                     Option<CarriedBoundaryWord>) -> Result<LoweringOperand, CraneliftBackendError>,
+                     Option<CarriedResidualWord>) -> Result<LoweringOperand, CraneliftBackendError>,
         {
             // Every caller of this shared selector, including source-machine
             // forces and direct/composed call routes, must check the K observed
@@ -890,26 +902,15 @@ impl<'a> Lowering<'a> {
             let word = carried_base.ok_or_else(|| unsupported(
                 "RecursiveResidual", "a labelled recursive invocation has no carried residual base",
             ))?;
-            let (candidates, label_index) = {
-                let slot = self.static_transition_plan.recursive_carrier_slot(
-                    eliminator, constructor, position,
-                )?.ok_or_else(|| unsupported("RecursiveResidual", "a labelled invocation has no planner slot"))?;
-                let first = *slot.flow.first().ok_or_else(|| unsupported(
-                    "RecursiveResidual", "a labelled slot has no flow",
-                ))?;
-                (slot.flow.clone(), slot.variant(first)?.role_index(RecursiveCarrierRole::Label)?)
-            };
-            if candidates.len() < 2 {
-                return Err(unsupported("RecursiveResidual", "a labelled invocation has fewer than two interned candidates"));
-            }
-            let class = self.emit_carrier_class(builder, word)?;
-            Self::require_i64(builder, class, BoundaryClass::Record as i64);
-            let tag = self.emit_carrier_tag(builder, word)?;
-            Self::require_i64(builder, tag, 1);
-            let label = self.emit_carrier_field(builder, word, label_index)?;
-            let ordinal = Self::emit_carrier_label_ordinal(builder, label);
+            let slot = self.static_transition_plan.recursive_carrier_slot(
+                eliminator, constructor, position,
+            )?.ok_or_else(|| unsupported("RecursiveResidual", "a labelled invocation has no planner slot"))?.clone();
+            let candidates = slot.flow.clone();
+            let ordinal = self.residual_label_ordinal(builder, word, &slot)?;
             let join = builder.create_block();
-            builder.append_block_param(join, types::I64);
+            let CarriedBlockParam::Value(joined) = append_carried_block_param(
+                builder, join, Representation::Value,
+            ) else { unreachable!("labelled answer joins in the value plane") };
             for (index, candidate) in candidates.iter().enumerate() {
                 let disposition = self.static_transition_plan
                     .recursive_residual_for_specialization(*candidate)?
@@ -933,18 +934,22 @@ impl<'a> Lowering<'a> {
                 builder.switch_to_block(selected);
                 let _ = self.assert_recursive_carrier_variant(builder, word, &disposition)?;
                 let returned = arm(self, builder, body, Some(word))?;
-                let LoweringOperand::Carried(result) = returned else {
-                    return Err(unsupported("RecursiveResidual", "a labelled unit returned a specialized value across its ABI"));
+                let answer = match returned {
+                    LoweringOperand::Carried(k) => k,
+                    // A Tail pass-through contributes its Child K, not the R.
+                    LoweringOperand::Residual(residual) =>
+                        self.decode_residual_child(builder, residual)?,
+                    LoweringOperand::Specialized(_) => return Err(unsupported(
+                        "RecursiveResidual", "a labelled unit returned a specialized value across its ABI",
+                    )),
                 };
-                builder.ins().jump(join, &[result.word.into()]);
+                builder.ins().jump(join, &[answer.word.into()]);
                 builder.switch_to_block(next);
             }
             let refused = builder.ins().iconst(types::I64, -1);
             builder.ins().return_(&[refused]);
             builder.switch_to_block(join);
-            Ok(LoweringOperand::Carried(CarriedBoundaryWord {
-                word: builder.block_params(join)[0],
-            }))
+            Ok(LoweringOperand::Carried(joined))
         }
 
         pub(super) fn call_declared_recursive_position_unit(
@@ -953,7 +958,7 @@ impl<'a> Lowering<'a> {
             body_origin: StaticOriginId,
             inputs: &[LoweringOperand],
             coordinates: Option<CarriedInvocationCoordinates>,
-            carried_base: Option<CarriedBoundaryWord>,
+            carried_base: Option<CarriedResidualWord>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1 — THE CARRIED
             // INVOCATION BINDING.
@@ -1079,7 +1084,7 @@ impl<'a> Lowering<'a> {
             context: ContinuationContextId,
             body_origin: StaticOriginId,
             inputs: &[LoweringOperand],
-            carried_base: Option<CarriedBoundaryWord>,
+            carried_base: Option<CarriedResidualWord>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             let target = self
                 .function_local
@@ -2136,6 +2141,9 @@ impl<'a> Lowering<'a> {
                         })?;
                         let word = match value {
                             LoweringOperand::Carried(word) => word.word,
+                            // I-0 transitional declared-call Parameter/Capture ABI.
+                            LoweringOperand::Residual(residual) => residual
+                                .residual_across_untyped_abi_transitional().word,
                             LoweringOperand::Specialized(Lowered::StaticResponseDeferred { site }) => {
                                 let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
                                     backend_module("a deferred host response reached a call outside a defined function scope".to_string())

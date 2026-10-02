@@ -183,33 +183,6 @@ pub(in crate::cranelift_backend) enum RecursiveResidualChildKind {
 }
 
 impl RecursiveResidualDisposition {
-    /// Isolated decoder fault fixture: no producer may treat this as issuance.
-    #[cfg(test)]
-    pub(in crate::cranelift_backend) fn synthetic_for_decoder_test(
-        constructor: super::ConstructorIdentity,
-        worker_captures: u32,
-        missing_context_ordinals: Vec<u32>,
-    ) -> Self {
-        Self {
-            child: RecursiveResidualChildKind::LexicalClosure,
-            owner: ContinuationEmissionOwner::Predeclared(
-                super::PredeclaredFunctionId::for_test(0),
-            ),
-            parent: StaticOriginId::for_test(0),
-            position: 1,
-            constructor,
-            context: super::ContinuationContextId::from_position(0)
-                .expect("test context is representable"),
-            specialization: ContinuationSpecializationId(0),
-            label: None,
-            worker_body_origin: StaticOriginId::for_test(0),
-            worker_captures,
-            context_captures: missing_context_ordinals.len() as u32,
-            missing_context_ordinals,
-            record: Some(AggregateOccurrenceId(0)),
-        }
-    }
-
     pub(in crate::cranelift_backend) fn wrapped(&self) -> bool {
         self.worker_captures != 0 || !self.missing_context_ordinals.is_empty()
     }
@@ -10628,11 +10601,18 @@ impl<'src> StaticTransitionPlan<'src> {
                         && edge.origin == point.emission_origin
                         && edge.kind == RecursiveCarrierStoreKind::ConstructEmission
                 ).count();
-                if count != 1 {
-                    return Err(planner_error(format!(
-                        "lexical source constructor ({:?}, {:?}, {}) has {count} issued slot-store edges",
+                let owes_edge = self.recursive_residual_for_specialization(point.specialization)?
+                    .is_some();
+                match (owes_edge, count) {
+                    (true, 1) | (false, 0) => {}
+                    (true, n) => return Err(planner_error(format!(
+                        "wrapped lexical source constructor ({:?}, {:?}, {}) has {n} issued slot-store edges",
                         point.owner, point.emission_origin, slot.position,
-                    )));
+                    ))),
+                    (false, n) => return Err(planner_error(format!(
+                        "unwrapped lexical source constructor ({:?}, {:?}, {}) has {n} issued slot-store edges",
+                        point.owner, point.emission_origin, slot.position,
+                    ))),
                 }
             }
             for unit in units.iter().filter(|unit| slot.flow.contains(&unit.id())) {
@@ -10751,30 +10731,45 @@ impl<'src> StaticTransitionPlan<'src> {
         let mut expected = None;
         for slot in &self.recursive_carrier_slots {
             if slot.constructor != constructor || slot.position != position { continue; }
-            let member = match owner {
-                ContinuationEmissionOwner::Specialization(id) => {
-                    let is_transport = self.per_emitter_materializations.iter().any(|point|
-                        point.owner == owner && point.emission_origin == origin
-                            && point.recursive_position == position
-                            && point.kind != super::MaterializationKind::ConstructEmission);
-                    if is_transport { None } else {
-                        let unit = units.iter().find(|unit| unit.id() == id);
-                        if let Some(unit) = unit.filter(|unit|
-                            slot.flow.contains(&id) && unit.continuation_origin() == slot.eliminator) {
-                            let body = self.semantic.child_origin(unit.continuation_origin(),
-                                1 + unit.producer_alternative() as usize)?;
-                            super::occurrences::occurrence_subtree_contains(self, body, origin)?
-                                .then_some(id)
-                        } else { None }
+            // The materialization's specialization, not its enclosing
+            // emission owner's specialization, owns the R/K decision. A
+            // source constructor can be emitted inside another unit's body.
+            let mut member = None;
+            let mut saw_construct_point = false;
+            for point in self.per_emitter_materializations.iter().filter(|point|
+                point.owner == owner && point.emission_origin == origin
+                    && point.recursive_position == position
+                    && point.kind == super::MaterializationKind::ConstructEmission
+                    && slot.flow.contains(&point.specialization)
+            ) {
+                saw_construct_point = true;
+                if self.recursive_residual_for_specialization(point.specialization)?.is_some()
+                    && member.replace(point.specialization).is_some() {
+                    return Err(planner_error("one source constructor field matches two wrapped members"));
+                }
+            }
+            // Checked-IH force is a source child, not a ConstructEmission
+            // materialization point. Its selected unit supplies the same
+            // per-specialization decision and its child establishes the site.
+            if !saw_construct_point {
+                if let ContinuationEmissionOwner::Specialization(id) = owner {
+                    if let Some(unit) = units.iter().find(|unit| unit.id() == id)
+                        .filter(|unit| slot.flow.contains(&id)
+                            && unit.continuation_origin() == slot.eliminator)
+                    {
+                        let body = self.semantic.child_origin(unit.continuation_origin(),
+                            1 + unit.producer_alternative() as usize)?;
+                        let child = self.child_static_origin(origin, position as usize)?;
+                        if matches!(self.planned_occurrence_expr(child)?,
+                            RuntimeExpr::CheckedComputationalIHInvocation { .. })
+                            && super::occurrences::occurrence_subtree_contains(self, body, origin)?
+                            && self.recursive_residual_for_specialization(id)?.is_some()
+                        {
+                            member = Some(id);
+                        }
                     }
                 }
-                _ => self.per_emitter_materializations.iter().find(|point|
-                    point.owner == owner && point.emission_origin == origin
-                        && point.recursive_position == position
-                        && point.kind == super::MaterializationKind::ConstructEmission
-                        && slot.flow.contains(&point.specialization)
-                ).map(|point| point.specialization),
-            };
+            }
             if let Some(id) = member {
                 if expected.replace((slot, id)).is_some() {
                     return Err(planner_error("one source constructor field matches two recursive slots"));

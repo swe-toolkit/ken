@@ -16,6 +16,9 @@
 //! escape `crate::cranelift_backend`.
 
 pub(in crate::cranelift_backend) mod core;
+mod residual;
+use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
+    RecursiveCarrierSlotKey, Representation};
 mod frame_validation;
 use frame_validation::{FrameEventKind, FrameEvents, FrameTerminalKind};
 
@@ -447,7 +450,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
     RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
-    RecursiveCarrierStoreKind, RecursiveCarrierVariant, RecursiveResidualChildKind,
+    RecursiveCarrierStoreKind, RecursiveCarrierSlot, RecursiveCarrierVariant, RecursiveResidualChildKind,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
@@ -669,6 +672,8 @@ enum Px8jProducerPath {
 enum Px8jResidualPhase {
     /// The carried phase, together with the exact boundary word held.
     Carried(cranelift_codegen::ir::Value),
+    /// The issued residual carries a slot key, not an ordinary K word.
+    Residual(RecursiveCarrierSlotKey),
     /// The specialized phase. ⛔ Recorded as a phase only: `§2g-i`'s clause
     /// constrains the **carried** arm, and a specialized residual is a
     /// different route entirely.
@@ -910,6 +915,7 @@ fn px8j_record_recursor_carrier(path: Px8jProducerPath, value: &LoweringOperand)
     // silent hole in exactly the edge this field exists to expose.
     let residual = match residual.as_ref() {
         LoweringOperand::Carried(word) => Px8jResidualPhase::Carried(word.word),
+        LoweringOperand::Residual(residual) => Px8jResidualPhase::Residual(residual.slot()),
         LoweringOperand::Specialized(_) => Px8jResidualPhase::Specialized,
     };
     px8j_record_source_event(Px8jSourceTraceEvent::Carrier {
@@ -2036,6 +2042,9 @@ pub(in crate::cranelift_backend) fn d4a_describe_binding(
         Some(LoweringEnvironmentBinding::StaticWorker(..)) => "worker".to_string(),
         Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
             format!("carried({:?})", word.word)
+        }
+        Some(LoweringEnvironmentBinding::Value(LoweringOperand::Residual(residual))) => {
+            format!("residual({:?})", residual.slot())
         }
         Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(lowered))) => {
             match lowered {
@@ -3995,6 +4004,77 @@ struct CarriedBoundaryWord {
     word: cranelift_codegen::ir::Value,
 }
 
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ResidualLoweringCounters {
+    pub site_a_none_arrivals: usize,
+    pub transitional_escapes: usize,
+    pub synthesized_checked_ih_capture_escapes: usize,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static RESIDUAL_LOWERING_COUNTERS: std::cell::Cell<ResidualLoweringCounters> =
+        const { std::cell::Cell::new(ResidualLoweringCounters {
+            site_a_none_arrivals: 0,
+            transitional_escapes: 0,
+            synthesized_checked_ih_capture_escapes: 0,
+        }) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+pub fn with_residual_lowering_counters<T>(body: impl FnOnce() -> T) -> (T, ResidualLoweringCounters) {
+    let old = RESIDUAL_LOWERING_COUNTERS.with(|counter| counter.replace(ResidualLoweringCounters::default()));
+    let result = body();
+    let measured = RESIDUAL_LOWERING_COUNTERS.with(|counter| counter.replace(old));
+    (result, measured)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_residual_counter_event(site: &'static str) {
+    // The optional diagnostic file collects counts across the parity suite's
+    // separate test processes. The thread-local counter is the CI subject;
+    // this file is only exact-run review evidence, never a test oracle.
+    if let Some(path) = std::env::var_os("KEN_RT_RESIDUAL_COUNT_LOG") {
+        use std::io::Write;
+        writeln!(
+            std::fs::OpenOptions::new().create(true).append(true).open(path)
+                .expect("residual diagnostic log is writable"),
+            "{site}"
+        ).expect("residual diagnostic event is written");
+    }
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_site_a_residual_none_arrival() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.site_a_none_arrivals += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("site_a_none");
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_residual_transitional_escape() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.transitional_escapes += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("transitional_escape");
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_synthesized_checked_ih_capture_escape() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.synthesized_checked_ih_capture_escapes += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("synthesized_checked_ih_capture_escape");
+}
+
 /// The capture-only runtime aggregate produced for a checked-IH application.
 ///
 /// This private role type deliberately has no conversion to
@@ -4002,13 +4082,43 @@ struct CarriedBoundaryWord {
 /// only the Direct application emitter may turn the captured fields into a
 /// result by issuing the planner-selected continuation call.
 #[derive(Clone, Copy, Debug)]
+enum CheckedIhEnvironmentOperand {
+    Residual(CarriedResidualWord),
+    Synthesized(CarriedBoundaryWord),
+}
+
+impl CheckedIhEnvironmentOperand {
+    fn into_operand(self) -> LoweringOperand {
+        match self {
+            Self::Residual(residual) => LoweringOperand::Residual(residual),
+            Self::Synthesized(word) => LoweringOperand::Carried(word),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct CheckedIhCapturedEnvironment {
-    word: CarriedBoundaryWord,
+    word: CheckedIhEnvironmentOperand,
 }
 
 impl CheckedIhCapturedEnvironment {
     fn into_operand(self) -> LoweringOperand {
-        LoweringOperand::Carried(self.word)
+        self.word.into_operand()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum TailAnswer {
+    PassThrough(CarriedResidualWord),
+    Routed(CarriedBoundaryWord),
+}
+
+impl TailAnswer {
+    fn into_operand(self) -> LoweringOperand {
+        match self {
+            Self::PassThrough(residual) => LoweringOperand::Residual(residual),
+            Self::Routed(word) => LoweringOperand::Carried(word),
+        }
     }
 }
 
@@ -4026,6 +4136,11 @@ impl CheckedIhApplicationResult {
     fn from_declared_call(result: LoweringOperand) -> Result<Self, CraneliftBackendError> {
         match result {
             LoweringOperand::Carried(word) => Ok(Self { word }),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a fresh checked-IH declared-call answer",
+                },
+            ),
             LoweringOperand::Specialized(_) => Err(unsupported(
                 "CheckedIhApplicationResult",
                 "a governed checked-IH continuation call returned a specialized template instead of its Trap-checked runtime Result",
@@ -4307,8 +4422,10 @@ enum LoweringOperand {
     /// before this node. ⛔ Kept as an **explicit** arm, never a fallback:
     /// a fallback arm is a wildcard with better manners.
     Specialized(Lowered),
-    /// A runtime boundary word, eliminated only by emitted helpers.
+    /// An ordinary runtime boundary value; never a private residual record.
     Carried(CarriedBoundaryWord),
+    /// An issued recursive-position record with its producer's slot key.
+    Residual(CarriedResidualWord),
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -4326,6 +4443,7 @@ fn record_returned_vis_lexical_captures(
         let capture_origin = plan.child_static_origin(closure_origin, 1 + capture_position)?;
         let (variant, disposition, forbidden) = match capture {
             LoweringOperand::Carried(_) => ("Carried".to_owned(), None, false),
+            LoweringOperand::Residual(_) => ("Residual".to_owned(), None, false),
             LoweringOperand::Specialized(value) => {
                 let variant = value.variant();
                 let disposition = variant.boundary_disposition();
@@ -4361,8 +4479,8 @@ fn record_returned_vis_lexical_captures(
 /// de-Bruijn side map. Either would create a second binding authority, and then
 /// the question *"what is bound here"* would have two answers.
 ///
-/// This sum is compiler-only. It is **not** a [`Lowered`] variant, not a third
-/// [`LoweringOperand`] arm, and it never becomes a runtime value.
+/// This sum is compiler-only. The residual plane is an explicit
+/// [`LoweringOperand`] arm inside `Value`, not a parallel binding authority.
 #[derive(Clone)]
 enum LoweringEnvironmentBinding {
     /// An ordinary bound value. Every binder that existed before this node
@@ -4966,6 +5084,8 @@ impl LoweringOperand {
         match self {
             LoweringOperand::Specialized(_) => EffectSeatPhase::SpecializedTemplate,
             LoweringOperand::Carried(_) => EffectSeatPhase::CarriedWord,
+            // Phase does not assert the value-vs-residual representation.
+            LoweringOperand::Residual(_) => EffectSeatPhase::CarriedWord,
         }
     }
 
@@ -4980,6 +5100,9 @@ impl LoweringOperand {
                      emitted helper call"
                 ),
             )),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired { site: edge },
+            ),
         }
     }
 
@@ -4997,6 +5120,9 @@ impl LoweringOperand {
                      emitted helper call"
                 ),
             )),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired { site: edge },
+            ),
         }
     }
 }
@@ -6420,6 +6546,7 @@ pub(in crate::cranelift_backend) fn d9_role_key(
 pub(in crate::cranelift_backend) enum D9OperandPhase {
     Specialized,
     Carried,
+    Residual,
 }
 
 /// **The exact, comparison-only identity of one lowering operand.**
@@ -6449,7 +6576,8 @@ pub(in crate::cranelift_backend) struct D9OperandIdentity {
     /// word gains **no** [`LoweredVariant`], so asking for one would be the
     /// inverse conversion the phase sum exists to forbid.
     pub(in crate::cranelift_backend) variant: Option<LoweredVariant>,
-    /// Every SSA word the operand holds, in structural order.
+    /// SSA words visible outside the private residual module, in structural order.
+    /// An R is represented by its phase alone; its word remains private.
     pub(in crate::cranelift_backend) words: Vec<cranelift_codegen::ir::Value>,
     /// Every planner-issued static origin it names, in structural order.
     pub(in crate::cranelift_backend) origins: Vec<StaticOriginId>,
@@ -6466,6 +6594,7 @@ pub(in crate::cranelift_backend) fn d9_operand_identity(
             words.push(word.word);
             (D9OperandPhase::Carried, None)
         }
+        LoweringOperand::Residual(_) => (D9OperandPhase::Residual, None),
         LoweringOperand::Specialized(lowered) => {
             d9_collect(lowered, &mut words, &mut origins);
             (D9OperandPhase::Specialized, Some(lowered.variant()))
@@ -7540,6 +7669,7 @@ impl<'a> Lowering<'a> {
             let Some(observations) = window.as_mut() else { return };
             let (variant, disposition) = match input {
                 LoweringOperand::Carried(_) => ("Carried".to_owned(), None),
+                LoweringOperand::Residual(_) => ("Residual".to_owned(), None),
                 LoweringOperand::Specialized(value) => {
                     let variant = value.variant();
                     (format!("{variant:?}"), Some(format!("{:?}", variant.boundary_disposition())))
@@ -7597,6 +7727,9 @@ impl<'a> Lowering<'a> {
             GeneratedUnitCallInputCallee::Entry(origin),
         )? {
             LoweringOperand::Carried(word) => Ok(word),
+            // Pending-Vis capture frame: counted I-0 untyped ABI copy.
+            LoweringOperand::Residual(residual) => Ok(residual
+                .residual_across_untyped_abi_transitional()),
             LoweringOperand::Specialized(_) => Err(backend_module(
                 "a pending-Vis capture did not become a carried word".to_string(),
             )),
@@ -7750,6 +7883,8 @@ impl<'a> Lowering<'a> {
         );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
+            // Retain R until the actual declared-call frame-copy seat.
+            LoweringOperand::Residual(residual) => Ok(LoweringOperand::Residual(residual)),
             deferred @ LoweringOperand::Specialized(Lowered::StaticResponseDeferred { .. }) => {
                 // Keep the source site until the declared target and its slot
                 // are known. This crossing must never mint a carried zero.
@@ -8843,94 +8978,42 @@ impl<'a> Lowering<'a> {
         Ok(())
     }
 
-    /// The slot record determines the R variant before a field is addressed.
-    /// Runtime class, tag, arity and label only assert that issued variant;
-    /// none of them discover an operand schema from a received word.
-    fn assert_recursive_carrier_variant(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        word: CarriedBoundaryWord,
-        disposition: &RecursiveResidualDisposition,
-    ) -> Result<RecursiveCarrierVariant, CraneliftBackendError> {
-        if !disposition.wrapped() {
-            return Err(unsupported("RecursiveResidual", "the bound residual has no issued sum schema"));
-        }
-        let slot = self.static_transition_plan
-            .recursive_carrier_for_specialization(disposition.specialization)?
-            .ok_or_else(|| unsupported("RecursiveResidual", "the bound residual has no planner slot"))?;
-        let variant = slot.variant(disposition.specialization)?.clone();
-        if disposition.record != Some(variant.record)
-            || disposition.label != variant.label
-            || disposition.position != slot.position
-            || disposition.constructor != slot.constructor
-            || variant.roles.len() != disposition.field_count()
-        {
-            return Err(unsupported("RecursiveResidual", "the bound residual differs from its issued slot variant"));
-        }
-        // A bare K fails here, before a field is read.
-        let class = self.emit_carrier_class(builder, word)?;
-        Self::require_i64(builder, class, BoundaryClass::Record as i64);
-        let tag = self.emit_carrier_tag(builder, word)?;
-        Self::require_i64(builder, tag, 1);
-        let count = self.emit_carrier_field_count(builder, word)?;
-        Self::require_i64(builder, count, variant.roles.len() as i64);
-        if let Some(expected_label) = variant.label {
-            let label = self.emit_carrier_field(
-                builder, word, variant.role_index(RecursiveCarrierRole::Label)?,
-            )?;
-            let ordinal = Self::emit_carrier_label_ordinal(builder, label);
-            Self::require_i64(builder, ordinal, i64::from(expected_label));
-        }
-        Ok(variant)
-    }
-
-    /// Decode only the exact record schema issued for the bound generated
-    /// context. Keep the residual base separate from invocation call inputs.
-    fn decode_recursive_residual(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        word: CarriedBoundaryWord,
-        disposition: &RecursiveResidualDisposition,
-    ) -> Result<(CarriedBoundaryWord, Vec<LoweringOperand>, Vec<LoweringOperand>), CraneliftBackendError> {
-        let variant = self.assert_recursive_carrier_variant(builder, word, disposition)?;
-        let forwarded = self.emit_carrier_field(
-            builder, word, variant.role_index(RecursiveCarrierRole::Child)?,
-        )?;
-        let seat = variant.roles.iter().find_map(|role| match role {
-            RecursiveCarrierRole::WorkerCapture { seat, .. } => Some(*seat),
-            _ => None,
-        });
-        let mut worker = Vec::with_capacity(disposition.worker_captures as usize);
-        for ordinal in 0..disposition.worker_captures {
-            let seat = seat.ok_or_else(|| unsupported(
-                "RecursiveResidual", "a residual worker role has no issued capture seat",
-            ))?;
-            let index = variant.role_index(RecursiveCarrierRole::WorkerCapture { seat, ordinal })?;
-            worker.push(LoweringOperand::Carried(self.emit_carrier_field(builder, word, index)?));
-        }
-        let mut context = Vec::with_capacity(disposition.context_captures as usize);
-        for ordinal in 0..disposition.context_captures {
-            let index = variant.role_index(RecursiveCarrierRole::ContinuationInput { ordinal })?;
-            context.push(LoweringOperand::Carried(self.emit_carrier_field(builder, word, index)?));
-        }
-        Ok((forwarded, worker, context))
-    }
-
     /// Read a carried recursive field using its construction-time Child.
     /// The transport identifies the reader; only the construct store issues
     /// the residual and its Child schema. A call answer is not a slot writer.
     fn checked_ih_transport_child(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        word: CarriedBoundaryWord,
+        operand: LoweringOperand,
         transport: &CheckedIhEnvironmentTransport,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
         let source = transport.source_specialization();
         let Some(disposition) = self.static_transition_plan
             .recursive_residual_for_specialization(source)?
             .filter(|disposition| disposition.wrapped()).cloned() else {
-            self.refuse_private_recursive_residual(builder, word)?;
-            return Ok(word);
+            return match operand {
+                LoweringOperand::Carried(word) => {
+                    self.refuse_private_recursive_residual(builder, word)?;
+                    Ok(word)
+                }
+                LoweringOperand::Residual(_) => Err(unsupported(
+                    "RecursiveResidual", "an unwrapped transport received a private residual",
+                )),
+                LoweringOperand::Specialized(_) => Err(unsupported(
+                    "RecursiveResidual", "a transport Child reader has no carried word",
+                )),
+            };
+        };
+        let residual = match operand {
+            LoweringOperand::Residual(residual) => residual,
+            LoweringOperand::Carried(_) => return Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a wrapped checked-IH transport Child reader",
+                },
+            ),
+            LoweringOperand::Specialized(_) => return Err(unsupported(
+                "RecursiveResidual", "a wrapped transport Child reader has no residual",
+            )),
         };
         let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
             "RecursiveResidual", "a transport Child reader has no emission owner",
@@ -8944,6 +9027,9 @@ impl<'a> Lowering<'a> {
         let slot = self.static_transition_plan
             .recursive_carrier_for_specialization(source)?
             .ok_or_else(|| unsupported("RecursiveResidual", "the transport Child has no planner slot"))?;
+        if residual.slot() != RecursiveCarrierSlotKey::of(slot) {
+            return Err(unsupported("RecursiveResidual", "the transport Child has a foreign issued slot"));
+        }
         let unit = self.static_transition_plan.continuation_units()?.into_iter()
             .find(|unit| unit.id() == source)
             .ok_or_else(|| unsupported("RecursiveResidual", "the transport Child has no interned constructor"))?;
@@ -8962,15 +9048,8 @@ impl<'a> Lowering<'a> {
         {
             return Err(unsupported("RecursiveResidual", "the construct Child schema disagrees with its W roles"));
         }
-        let variant = self.assert_recursive_carrier_variant(builder, word, &disposition)?;
-        let child = self.emit_carrier_field(
-            builder, word, variant.role_index(RecursiveCarrierRole::Child)?,
-        )?;
-        let class = self.emit_carrier_class(builder, child)?;
-        Self::require_i64(builder, class, BoundaryClass::Constructor as i64);
-        let fields = self.emit_carrier_field_count(builder, child)?;
-        Self::require_i64(builder, fields, disposition.worker_captures as i64);
-        Ok(child)
+        slot.variant(source)?;
+        self.decode_residual_child(builder, residual)
     }
 
     fn checked_post_call_consumer_frame(
@@ -9488,6 +9567,11 @@ impl<'a> ClaimedEffectSeats<'a> {
                     record.slot, record.operation, record.need
                 ),
             )),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a specialized host-effect seat",
+                },
+            ),
         }
     }
 }
@@ -10186,6 +10270,7 @@ fn decompose_computational_recursor(
         // set stays visibly closed.
         LoweringOperand::Specialized(value) => (LoweringOperand::Specialized(value), None),
         LoweringOperand::Carried(word) => (LoweringOperand::Carried(word), None),
+        LoweringOperand::Residual(residual) => (LoweringOperand::Residual(residual), None),
     }
 }
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` — the checked sequence a dynamic invocation
@@ -13413,7 +13498,8 @@ impl<'a> Lowering<'a> {
             LoweringOperand::Specialized(Lowered::Closure { body, .. }) => {
                 Some(RecursiveUnitBodySelection::Exact(*body))
             },
-            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)
+            | LoweringOperand::Residual(_) => None,
         });
         let (residual, payload) = decompose_computational_recursor(recursive);
         let active_instance = self.active_recursive_invocations.last().copied();

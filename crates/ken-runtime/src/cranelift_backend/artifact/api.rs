@@ -1076,6 +1076,11 @@ fn differential_error_report(
             stage: NativeDifferentialStage::BoundaryPreflight,
             reason: format!("process epoch profile mismatch: {mismatch:?}"),
         },
+        CraneliftBackendError::ResidualRepresentationRequired { site } => NativeDifferentialVerdict::Unsupported {
+            stage: NativeDifferentialStage::NativeLoweringOrExecution,
+            construct: "RecursiveResidual",
+            reason: format!("residual representation required at {site}: K cannot be coerced to R"),
+        },
         CraneliftBackendError::Unsupported(err) => NativeDifferentialVerdict::Unsupported {
             stage: if preflight {
                 NativeDifferentialStage::BoundaryPreflight
@@ -1118,6 +1123,11 @@ fn runtime_ir_comparison_error_report(
                 reason: format!("process epoch profile mismatch: {mismatch:?}"),
             }
         }
+        CraneliftBackendError::ResidualRepresentationRequired { site } => NativeRuntimeIrComparisonVerdict::Unsupported {
+            stage,
+            construct: "RecursiveResidual",
+            reason: format!("residual representation required at {site}: K cannot be coerced to R"),
+        },
         CraneliftBackendError::Unsupported(err) => NativeRuntimeIrComparisonVerdict::Unsupported {
             stage,
             construct: err.construct,

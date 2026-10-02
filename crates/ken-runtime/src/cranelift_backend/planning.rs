@@ -144,7 +144,7 @@ pub(super) use static_transition::{
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
     RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
-    RecursiveCarrierStoreKind, RecursiveCarrierVariant,
+    RecursiveCarrierStoreKind, RecursiveCarrierSlot, RecursiveCarrierVariant,
     RecursiveResidualChildKind, PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRoot,
 };

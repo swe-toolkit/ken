@@ -94,6 +94,7 @@ pub use lowering::units::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::{
+    with_residual_lowering_counters, ResidualLoweringCounters,
     with_recursive_residual_match_guard_observations,
     with_plain_native_unit_ir_observations,
     RecursiveResidualMatchGuardMutation, RecursiveResidualMatchGuardObservation,

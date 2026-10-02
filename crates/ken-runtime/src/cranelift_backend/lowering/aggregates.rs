@@ -729,6 +729,7 @@ impl SynthesizedArgument {
             Self::WorkerCaptureOperand { value, .. } => match value {
                 LoweringOperand::Specialized(value) => lowered_value_kind(value),
                 LoweringOperand::Carried(_) => "carried boundary word",
+                LoweringOperand::Residual(_) => "private recursive residual",
             },
         }
     }
@@ -991,6 +992,7 @@ impl<'a> Lowering<'a> {
                                     .iter()
                                     .map(|capture| match capture {
                                         LoweringOperand::Carried(_) => "Carried",
+                                        LoweringOperand::Residual(_) => "Residual",
                                         LoweringOperand::Specialized(_) => {
                                             "Specialized"
                                         }
@@ -3333,6 +3335,11 @@ impl<'a> Lowering<'a> {
             let (record, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
             let (mut value, source) = match operand {
                 LoweringOperand::Specialized(value) => (value.clone(), SiteOperandSource::Specialized),
+                LoweringOperand::Residual(_) => return Err(
+                    CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "a host-effect site operand",
+                    },
+                ),
                 LoweringOperand::Carried(word) => {
                     // **`RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` `D1` -- the
                     // carried branch is NEED-DIRECTED.**
@@ -4040,13 +4047,23 @@ impl<'a> Lowering<'a> {
                 };
                 let child = match value {
                     LoweringOperand::Carried(word) => word,
+                    // Synthesized checked-IH capture fields have positional
+                    // identities but no R/K kind until I-1. Count this
+                    // distinct transitional crossing; do not infer K here.
+                    LoweringOperand::Residual(residual) => {
+                        #[cfg(any(test, feature = "px8-ds-test-support"))]
+                        record_synthesized_checked_ih_capture_escape();
+                        residual.residual_across_untyped_abi_transitional()
+                    },
                     LoweringOperand::Specialized(value) => {
                         self.transfer_into_carrier(builder, origin, &value)?
                     }
                 };
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
-            Ok(CheckedIhCapturedEnvironment { word })
+            Ok(CheckedIhCapturedEnvironment {
+                word: CheckedIhEnvironmentOperand::Synthesized(word),
+            })
         }
 
         /// Materialize only the positional environment of one statically
@@ -4154,6 +4171,17 @@ impl<'a> Lowering<'a> {
                 &template,
                 PlannedAggregateShape::Constructor,
             )?;
+            // A boundary closure's positional captures have no issued R
+            // slot. Decode R at this K destination before parent allocation.
+            let mut decoded = vec![None; arguments.len()];
+            for (position, argument) in arguments.iter().enumerate() {
+                let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
+                    unreachable!("this emitter constructs only positional capture arguments")
+                };
+                if let LoweringOperand::Residual(residual) = value {
+                    decoded[position] = Some(self.decode_residual_child(builder, *residual)?);
+                }
+            }
             // A planner-synthesized closure positional environment has no
             // source Construct identity; R2's source-store predicate excludes it.
             let word = self.emit_checked_aggregate_alloc(
@@ -4170,6 +4198,8 @@ impl<'a> Lowering<'a> {
                 };
                 let child = match value {
                     LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Residual(_) => decoded[position]
+                        .expect("boundary closure residual was decoded before allocation"),
                     LoweringOperand::Specialized(value) => {
                         self.transfer_into_carrier(builder, origin, &value)?
                     }

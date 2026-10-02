@@ -102,6 +102,11 @@ impl<'a> Lowering<'a> {
                 [LoweringOperand::Specialized(_)] => {
                     specialized_operands_at(&lowered_args, "the bytes_length operand")?
                 }
+                [LoweringOperand::Residual(_)] => return Err(
+                    CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "bytes_length requires an ordinary bytes value",
+                    },
+                ),
                 [LoweringOperand::Carried(word)] => {
                     let class = self.emit_carrier_class(builder, *word)?;
                     Self::require_i64(builder, class, BoundaryClass::BorrowedOpaque as i64);
@@ -143,6 +148,11 @@ impl<'a> Lowering<'a> {
                         "PrimitiveCall",
                         "bytes_at received more operands than its closed static signature",
                     )),
+                    (_, LoweringOperand::Residual(_)) => Err(
+                        CraneliftBackendError::ResidualRepresentationRequired {
+                            site: "bytes_at requires an ordinary bytes or index value",
+                        },
+                    ),
                 })
                 .collect::<Result<Vec<_>, CraneliftBackendError>>()?
         } else if let Some(kind) = scalar_kind {
@@ -175,6 +185,11 @@ impl<'a> Lowering<'a> {
                             _ => unreachable!("closed primitive scalar kind"),
                         })
                     }
+                    LoweringOperand::Residual(_) => Err(
+                        CraneliftBackendError::ResidualRepresentationRequired {
+                            site: "a scalar primitive requires an ordinary value",
+                        },
+                    ),
                 })
                 .collect::<Result<Vec<_>, CraneliftBackendError>>()?
         } else {

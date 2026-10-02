@@ -352,6 +352,9 @@ fn rt_continuation_kinds(continuation: &SourceContinuation<'_>) -> Vec<&'static 
 fn rt_operand_desc(operand: &LoweringOperand) -> String {
     match operand {
         LoweringOperand::Carried(_) => "phase=Carried kind=<carried word>".to_string(),
+        LoweringOperand::Residual(residual) => {
+            format!("phase=Residual slot={:?}", residual.slot())
+        }
         LoweringOperand::Specialized(lowered) => {
             format!("phase=Specialized kind={}", lowered_value_kind(lowered))
         }
@@ -1813,6 +1816,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                                 lowered_value_kind(value)
                                             }
                                             LoweringOperand::Carried(_) => "Carried",
+                                            LoweringOperand::Residual(_) => "Residual",
                                         },
                                     },
                             );
@@ -1825,6 +1829,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             let refusal_operand_kind = match &value {
                                 LoweringOperand::Specialized(value) => lowered_value_kind(value),
                                 LoweringOperand::Carried(_) => "Carried",
+                                LoweringOperand::Residual(_) => "Residual",
                             };
                             match value {
                                 LoweringOperand::Specialized(Lowered::BoundedNat(nat)) => {
@@ -2014,6 +2019,13 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 // `LoweringOperand` and a third variant is a
                                 // compile error here rather than a silent
                                 // refusal.
+                                LoweringOperand::Residual(residual) => {
+                                    let child = self.decode_residual_child(builder, residual)?;
+                                    return self.lower_source_carried_match(
+                                        builder, child, &cases, &default, static_origin,
+                                        &env, control,
+                                    );
+                                }
                                 LoweringOperand::Carried(word) => {
                                     // Family 5 control seam. The operand is
                                     // already classified `Carried` here, so a
@@ -2264,9 +2276,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     constructor,
                                     ..
                                 }) => Some(constructor.clone()),
-                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
-                                    None
-                                }
+                                LoweringOperand::Specialized(_)
+                                | LoweringOperand::Carried(_)
+                                | LoweringOperand::Residual(_) => None,
                             };
                             let selected = match &value {
                                 LoweringOperand::Specialized(Lowered::Constructor { constructor, .. }) => cases
@@ -2885,6 +2897,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     // ⛔ No wildcard: a carried operand reaching a join
                     // diagnostic must name itself, not fall into `other`.
                     LoweringOperand::Carried(_) => "BoundaryCarrier".to_string(),
+                    LoweringOperand::Residual(_) => "RecursiveResidual".to_string(),
                 };
                 return Err(unsupported(
                     "NativeJoinPlanV1",
@@ -4219,9 +4232,16 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 "the governed callee Var disagrees with the immediate K locator index",
             ));
         }
+        let residual_phase_valid = match residual.as_ref() {
+            // The issued record remains R in the checked recursor capsule.
+            LoweringOperand::Residual(_) => true,
+            // Unwrapped source positions still have an ordinary carried K.
+            LoweringOperand::Carried(_) => true,
+            LoweringOperand::Specialized(_) => false,
+        };
         if invocation.selection.checked_frame_id != call.parent_frame_template_id
             || invocation.computational_ih_slot_template_id != Some(call.slot_template_id)
-            || !matches!(residual.as_ref(), LoweringOperand::Carried(_))
+            || !residual_phase_valid
         {
             return Err(unsupported(
                 "CheckedIhGeneratedEntryAccess",
@@ -4562,8 +4582,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 let (activation, invocation) = boundary.ok_or_else(|| unsupported(
                                     "RecursiveResidual", "a labelled force lost its invocation segment",
                                 ))?;
-                                let LoweringOperand::Carried(word) = base else {
-                                    return Err(unsupported("RecursiveResidual", "a labelled force has no carried slot word"));
+                                let LoweringOperand::Residual(word) = base else {
+                                    return Err(unsupported("RecursiveResidual", "a labelled force has no issued R slot word"));
                                 };
                                 if source_active_cursor(&control.selected, &control.selected_lineage,
                                     invocation.resume_cursor).is_none()
@@ -4599,7 +4619,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             // Child against its independent K7
                                             // source record before taking its route.
                                             let _ = this.checked_ih_transport_child(
-                                                builder, word, &transport,
+                                                builder, LoweringOperand::Residual(word), &transport,
                                             )?;
                                             let authority = match this.function_local
                                                 .checked_ih_generated_entry_access.as_ref() {
@@ -5173,7 +5193,14 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 // invocation segment" is literal: the refusal below runs
                 // **before** `install_recursor_invocation`, which is exactly the
                 // ordering control 5 measures.
-                if let LoweringOperand::Carried(word) = base {
+                let runtime_base = match &base {
+                    LoweringOperand::Carried(word) => Some((LoweringOperand::Carried(*word), None)),
+                    LoweringOperand::Residual(residual) => {
+                        Some((LoweringOperand::Residual(*residual), Some(*residual)))
+                    }
+                    LoweringOperand::Specialized(_) => None,
+                };
+                if let Some((runtime_value, residual_base)) = runtime_base {
                     let mut suspended = armed.suspended;
                     suspended.continuation = self.install_recursor_invocation(
                         suspended.continuation,
@@ -5194,7 +5221,7 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                     if let Some(body) = recursive_unit_body {
                         let coordinates = carried_coordinates;
                         let value = self.call_selected_recursive_position_unit(
-                            builder, body, Some(coordinates), Some(word),
+                            builder, body, Some(coordinates), residual_base,
                             |this, builder, body| {
                                 this.carry_source_call_inputs(builder, body, args.clone())
                             },
@@ -5220,7 +5247,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     }
                     Self::reject_carried_residual_arguments(args.len())?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                        value: RoutedAnswer::direct(LoweringOperand::Carried(word)),
+                        value: RoutedAnswer::direct(runtime_value),
                         control: suspended,
                     }));
                 }

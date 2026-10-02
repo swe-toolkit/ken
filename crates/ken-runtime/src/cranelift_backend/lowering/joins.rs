@@ -264,6 +264,11 @@ impl<'a> Lowering<'a> {
                     D8_CARRIED_JOIN_UNCHANGED.with(|count| count.set(count.get() + 1));
                     Ok(word)
                 }
+                LoweringOperand::Residual(_) => Err(
+                    CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "a source join without a declared residual result plane",
+                    },
+                ),
                 // ── ⛔ DEFERRED, said plainly ──────────────────────────────────
                 //
                 // ⚠ A deferral is honest; a deferral that reads as delivery is not.
@@ -2747,6 +2752,11 @@ impl LoweringOperand {
                          cannot cross it until that join carries the phase"
                     ),
                 )),
+                LoweringOperand::Residual(_) => Err(
+                    CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "a native scalar join",
+                    },
+                ),
             }
         }
 }

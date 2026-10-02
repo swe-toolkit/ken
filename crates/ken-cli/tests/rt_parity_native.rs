@@ -4188,12 +4188,20 @@ fn assert_execute_then_resume_rekey_child() {
     let mode = std::env::var(EXECUTE_THEN_RESUME_REKEY_CHILD)
         .expect("execute-then-resume rekey child mode");
     if mode == "outer-carried" {
-        let Differential {
-            interpreted,
-            native,
-        } = ken_runtime::with_suppressed_execute_then_resume_response(|| {
-            differential("fs-write-at-offset-single", "rt_write_writable_stage")
-        });
+        let (Differential { interpreted, native }, residual_counters) =
+            ken_runtime::with_residual_lowering_counters(|| {
+                ken_runtime::with_suppressed_execute_then_resume_response(|| {
+                    differential("fs-write-at-offset-single", "rt_write_writable_stage")
+                })
+            });
+        eprintln!("RT_RESIDUAL_LOWERING_COUNTERS {residual_counters:?}");
+        // Promise class: transition sentinel. Three source-constructor R
+        // arrivals currently require K fields. A changed count reopens the
+        // G533-to-G355 Ret, closure523 capture and S6 Match514 review; the
+        // I-1 ABI-kind issuance review retires or revalidates this sentinel.
+        // It does not prove every constructor store has this representation.
+        assert_eq!(residual_counters.site_a_none_arrivals, 3,
+            "id41's issued R arrivals must decode at ordinary constructor fields");
         assert_eq!(interpreted.exit_status, 0);
         let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
             native.terminal_error.as_ref()

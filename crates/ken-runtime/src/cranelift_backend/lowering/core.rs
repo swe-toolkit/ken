@@ -3283,7 +3283,7 @@ impl<'a> Lowering<'a> {
                 // fails closed if this body has a generated context.
                 let returned = self.with_grafted_spine_call_source(call_origin, |this| {
                     this.call_selected_recursive_position_unit(
-                        builder, body, None, Some(*word), |_, _, _| Ok(inputs.clone()),
+                        builder, body, None, None, |_, _, _| Ok(inputs.clone()),
                     )
                 })?;
                 return self.lower_computational_match_value_composed(
@@ -5939,6 +5939,11 @@ impl<'a> Lowering<'a> {
                     "a handler-owned response operation is neither carried nor a specialized constructor",
                 ));
             }
+            LoweringOperand::Residual(_) => return Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a handler-owned response operation",
+                },
+            ),
         };
 
         let k_origin = self
@@ -6109,6 +6114,7 @@ impl<'a> Lowering<'a> {
                         let lowered = self.lower_expr(builder, arg, producer_env)?;
                         Ok(match lowered {
                             LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                            LoweringOperand::Residual(residual) => LoweringOperand::Residual(residual),
                             LoweringOperand::Specialized(value) => LoweringOperand::Carried(
                                 self.transfer_into_carrier(builder, arg.static_origin, &value)?,
                             ),
@@ -6265,7 +6271,7 @@ impl<'a> Lowering<'a> {
                         let returned = self
                             .with_grafted_spine_call_source(static_origin, |this| {
                                 this.call_selected_recursive_position_unit(
-                                    builder, body, Some(coordinates), Some(word),
+                                    builder, body, Some(coordinates), None,
                                     |_, _, _| Ok(inputs.clone()),
                                 )
                             })
@@ -6352,6 +6358,7 @@ impl<'a> Lowering<'a> {
                         let lowered = self.lower_expr(builder, arg, producer_env)?;
                         Ok(match lowered {
                             LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                            LoweringOperand::Residual(residual) => LoweringOperand::Residual(residual),
                             LoweringOperand::Specialized(value) => LoweringOperand::Carried(
                                 self.transfer_into_carrier(builder, arg.static_origin, &value)?,
                             ),
@@ -8749,11 +8756,22 @@ impl<'a> Lowering<'a> {
             ));
         }
         match env.get(selected_index) {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Residual(residual))) => {
+                // Assert Child Kq; the existing R stays typed for transport.
+                let _ = self.checked_ih_transport_child(
+                    builder, LoweringOperand::Residual(*residual), transport,
+                )?;
+                Ok(CheckedIhCapturedEnvironment {
+                    word: CheckedIhEnvironmentOperand::Residual(*residual),
+                })
+            }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
-                // Assert the source Kq in R's Child role, but forward the R
-                // itself: this is a pass-through, not a new slot writer.
-                let _ = self.checked_ih_transport_child(builder, *word, transport)?;
-                Ok(CheckedIhCapturedEnvironment { word: *word })
+                let _ = self.checked_ih_transport_child(
+                    builder, LoweringOperand::Carried(*word), transport,
+                )?;
+                Ok(CheckedIhCapturedEnvironment {
+                    word: CheckedIhEnvironmentOperand::Synthesized(*word),
+                })
             }
             Some(LoweringEnvironmentBinding::StaticWorker(worker)) => {
                 if worker.closure_origin != transport.seat()
@@ -8869,8 +8887,11 @@ impl<'a> Lowering<'a> {
                 )
             })?;
         let environment = match env.get(selected_index) {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Residual(residual))) => {
+                CheckedIhEnvironmentOperand::Residual(*residual)
+            }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
-                CheckedIhCapturedEnvironment { word: *word }
+                CheckedIhEnvironmentOperand::Synthesized(*word)
             }
             Some(LoweringEnvironmentBinding::StaticWorker(_)) => {
                 return Err(unsupported(
@@ -8901,9 +8922,9 @@ impl<'a> Lowering<'a> {
             ));
         }
 
-        let environment = CheckedIhCapturedEnvironment {
-            word: self.checked_ih_transport_child(builder, environment.word, transport)?,
-        };
+        let environment = self.checked_ih_transport_child(
+            builder, environment.into_operand(), transport,
+        )?;
         let mut captures = Vec::with_capacity(worker_capture_count);
         for role in &envelope {
             if let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
@@ -8917,7 +8938,7 @@ impl<'a> Lowering<'a> {
                     ));
                 };
                 let operand =
-                    self.emit_carrier_field(builder, environment.word, *ordinal as usize)?;
+                    self.emit_carrier_field(builder, environment, *ordinal as usize)?;
                 captures.push((*ordinal, *origin, operand));
             }
         }
@@ -9155,7 +9176,7 @@ impl<'a> Lowering<'a> {
         #[cfg(feature = "px8-ds-test-support")]
         if mutation == CheckedIhDirectApplicationMutation::EnvironmentForResult {
             let _substituted = CheckedIhApplicationResult {
-                word: environment.word,
+                word: environment,
             };
             record_checked_ih_direct_application(CheckedIhDirectApplicationObservation {
                 defining_function: self.defining_function_id.map(FuncId::as_u32),
@@ -9263,18 +9284,17 @@ impl<'a> Lowering<'a> {
             })?;
         let selected_worker = match env.get(selected_index) {
             Some(LoweringEnvironmentBinding::StaticWorker(worker)) => worker,
-            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
-                // This path forwards an existing R without writing another.
-                // Validate its Kq Child before trusting it as this transport's
-                // captured environment; the forwarded word remains R.
-                let _ = self.checked_ih_transport_child(builder, *word, transport)?;
+            Some(LoweringEnvironmentBinding::Value(operand @ (LoweringOperand::Residual(_)
+                | LoweringOperand::Carried(_)))) => {
+                // A pass-through retains R; an unwrapped ordinary K stays K.
+                let _ = self.checked_ih_transport_child(builder, operand.clone(), transport)?;
                 if !self.continuation_candidate_is_consumed(&identity) {
                     self.settle_continuation_candidate(
                         &identity,
                         super::units::CandidateDisposition::InlineNoCall,
                     )?;
                 }
-                return Ok(LoweringOperand::Carried(*word));
+                return Ok(operand.clone());
             }
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
 
@@ -9522,13 +9542,16 @@ impl<'a> Lowering<'a> {
         let captured = self.call_tail_checked_ih_transport_from_case_environment(
             builder, transport, env,
         )?;
-        let LoweringOperand::Carried(captured_word) = captured else {
-            return Err(unsupported(
+        let captured_word = match captured {
+            LoweringOperand::Residual(residual) => self.checked_ih_transport_child(
+                builder, LoweringOperand::Residual(residual), transport,
+            )?,
+            LoweringOperand::Carried(word) => word,
+            LoweringOperand::Specialized(_) => return Err(unsupported(
                 "ComposedReturnRetKMatch",
-                "the InlineNoCall continuation return is not the carried captured-environment word",
-            ));
+                "the InlineNoCall continuation return is not a captured-environment word",
+            )),
         };
-        let captured_word = self.checked_ih_transport_child(builder, captured_word, transport)?;
         // The context body's Parameter-0 (`outcome`) is the continuation's bound
         // result, held in the captured-environment carrier at the descriptor-derived
         // ordinal the planner recorded on the Tail route (R3 Case-B, Architect
@@ -12722,6 +12745,9 @@ impl<'a> Lowering<'a> {
         for capture in &lowered_captures {
             match capture {
                 LoweringOperand::Carried(_) => carried += 1,
+                // The closure retains R; this count only distinguishes a
+                // runtime capture from a compiler-specialized template.
+                LoweringOperand::Residual(_) => carried += 1,
                 LoweringOperand::Specialized(_) => specialized += 1,
             }
         }
@@ -13151,7 +13177,6 @@ impl<'a> Lowering<'a> {
                         Some(binding.clone())
                     }
                     Some(LoweringEnvironmentBinding::Value(_))
-
                     | None => None,
                 }
             })
@@ -13251,6 +13276,10 @@ impl<'a> Lowering<'a> {
                          of any allocation",
                     ));
                 }
+                LoweringOperand::Residual(_) => return Err(unsupported(
+                    "StaticWorkerBinding",
+                    "a private residual cannot be stored beside a static worker template",
+                )),
             }
         }
         Ok(Lowered::Constructor {
@@ -13396,6 +13425,9 @@ impl<'a> Lowering<'a> {
         operands.into_iter().map(|(role, operand)| {
             let word = match operand {
                 LoweringOperand::Carried(word) => word,
+                // W/C fields are ordinary values in I-0, not nested R slots.
+                LoweringOperand::Residual(residual) =>
+                    self.decode_residual_child(builder, residual)?,
                 LoweringOperand::Specialized(value) =>
                     self.transfer_into_carrier(builder, child_origin, &value)?,
             };
@@ -13559,6 +13591,9 @@ impl<'a> Lowering<'a> {
         operands.into_iter().map(|(role, operand)| {
             let word = match operand {
                 LoweringOperand::Carried(word) => word,
+                // Creation-site W/C roles hold the decoded ordinary Child.
+                LoweringOperand::Residual(residual) =>
+                    self.decode_residual_child(builder, residual)?,
                 LoweringOperand::Specialized(value) => self.transfer_into_carrier(builder, origin, &value)?,
             };
             Ok((role, word))
@@ -13654,6 +13689,11 @@ impl<'a> Lowering<'a> {
             let disposition = self.static_transition_plan.slot_store_obligation(
                 owner, occurrence, constructor_identity, position as u32,
             )?.cloned();
+            if disposition.is_some() && matches!(args[position], LoweringOperand::Residual(_)) {
+                return Err(unsupported(
+                    "RecursiveResidual", "an issued residual slot received an already-residual operand",
+                ));
+            }
             if let Some(disposition) = disposition {
                 let record = disposition.record.ok_or_else(|| unsupported(
                     "RecursiveResidual", "the creation-site residual has no governed private Record",
@@ -13667,6 +13707,18 @@ impl<'a> Lowering<'a> {
                 residual_fields.push(Some((record, fields)));
             } else {
                 residual_fields.push(None);
+            }
+        }
+        // An unissued constructor field is an ordinary K destination. Decode
+        // every arriving R before the parent exists, preserving whole-tree
+        // preflight even when the last argument requires the conversion.
+        let mut decoded = vec![None; args.len()];
+        for (position, argument) in args.iter().enumerate() {
+            if let LoweringOperand::Residual(residual) = argument {
+                debug_assert!(residual_fields[position].is_none());
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                record_site_a_residual_none_arrival();
+                decoded[position] = Some(self.decode_residual_child(builder, *residual)?);
             }
         }
         let word = self.emit_checked_aggregate_alloc(
@@ -13691,8 +13743,10 @@ impl<'a> Lowering<'a> {
                         self.transfer_into_carrier(builder, child_origin, value)?
                     }
                 }
+                LoweringOperand::Residual(_) => decoded[position]
+                    .expect("residual operands were decoded before allocation"),
             };
-            let child = if let Some((record, fields)) = &residual_fields[position] {
+            if let Some((record, fields)) = &residual_fields[position] {
                 let disposition = self.static_transition_plan
                     .recursive_residual_for_store(owner.ok_or_else(|| unsupported(
                         "RecursiveResidual", "a construct carrier writer lost its emission owner",
@@ -13708,6 +13762,7 @@ impl<'a> Lowering<'a> {
                 {
                     return Err(unsupported("RecursiveResidual", "a construct carrier writer changed its issued variant"));
                 }
+                let slot_key = RecursiveCarrierSlotKey::of(slot);
                 let mut assigned = vec![None; variant.roles.len()];
                 assigned[variant.role_index(RecursiveCarrierRole::Child)?] = Some(child);
                 for (role, word) in fields {
@@ -13729,11 +13784,11 @@ impl<'a> Lowering<'a> {
                     self.emit_carrier_store_field(builder, wrapped, index,
                         word.expect("construct carrier roles were checked complete"))?;
                 }
-                wrapped
+                let residual = CarriedResidualWord::issue(wrapped.word, slot_key);
+                self.store_residual_field_passthrough(builder, word, position, residual)?;
             } else {
-                child
-            };
-            self.emit_carrier_store_field(builder, word, position, child)?;
+                self.emit_carrier_store_field(builder, word, position, child)?;
+            }
         }
         Ok(word)
     }
@@ -14137,6 +14192,11 @@ impl<'a> Lowering<'a> {
                 result: match result {
                     LoweringOperand::Carried(word) => Some(word.word),
                     LoweringOperand::Specialized(_) => None,
+                    LoweringOperand::Residual(_) => return Err(
+                        CraneliftBackendError::ResidualRepresentationRequired {
+                            site: "a composed discharge result without a declared R result slot",
+                        },
+                    ),
                 },
                 source_control: (source_control_before, self.live_source_continuations),
             });
@@ -14248,54 +14308,20 @@ impl<'a> Lowering<'a> {
     fn guard_labelled_recursive_residual(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        word: CarriedBoundaryWord,
+        residual: CarriedResidualWord,
         eliminator: StaticOriginId,
         constructor: ConstructorIdentity,
         position: u32,
     ) -> Result<(), CraneliftBackendError> {
-        let (candidates, label_index) = {
-            let slot = self.static_transition_plan.recursive_carrier_slot(
-                eliminator, constructor, position,
-            )?.ok_or_else(|| unsupported("RecursiveResidual", "a labelled gate has no planner slot"))?;
-            let first = *slot.flow.first().ok_or_else(|| unsupported(
-                "RecursiveResidual", "a labelled gate has an empty flow",
-            ))?;
-            (slot.flow.clone(), slot.variant(first)?.role_index(RecursiveCarrierRole::Label)?)
-        };
-        if candidates.len() < 2 {
-            return Err(unsupported("RecursiveResidual", "a labelled gate has fewer than two interned candidates"));
+        let slot = self.static_transition_plan.recursive_carrier_slot(
+            eliminator, constructor, position,
+        )?.ok_or_else(|| unsupported("RecursiveResidual", "a labelled gate has no planner slot"))?;
+        if slot.flow.len() < 2 || residual.slot() != RecursiveCarrierSlotKey::of(slot) {
+            return Err(unsupported(
+                "RecursiveResidual", "the labelled gate has no matching issued slot",
+            ));
         }
-        let class = self.emit_carrier_class(builder, word)?;
-        Self::require_i64(builder, class, BoundaryClass::Record as i64);
-        let tag = self.emit_carrier_tag(builder, word)?;
-        Self::require_i64(builder, tag, 1);
-        let label = self.emit_carrier_field(builder, word, label_index)?;
-        let ordinal = Self::emit_carrier_label_ordinal(builder, label);
-        let done = builder.create_block();
-        for (index, candidate) in candidates.iter().enumerate() {
-            let disposition = self.static_transition_plan
-                .recursive_residual_for_specialization(*candidate)?
-                .filter(|entry| entry.wrapped() && entry.label == Some(index as u32))
-                .cloned().ok_or_else(|| unsupported(
-                    "RecursiveResidual", "the gate's labelled candidate has no matching issued schema",
-                ))?;
-            let selected = builder.create_block();
-            let next = builder.create_block();
-            let matched = builder.ins().icmp_imm(
-                cranelift_codegen::ir::condcodes::IntCC::Equal, ordinal,
-                i64::try_from(index).map_err(|_| unsupported(
-                    "RecursiveResidual", "the gate's label index exceeds the carrier ABI",
-                ))?,
-            );
-            builder.ins().brif(matched, selected, &[], next, &[]);
-            builder.switch_to_block(selected);
-            let _ = self.decode_recursive_residual(builder, word, &disposition)?;
-            builder.ins().jump(done, &[]);
-            builder.switch_to_block(next);
-        }
-        let refused = builder.ins().iconst(types::I64, -1);
-        builder.ins().return_(&[refused]);
-        builder.switch_to_block(done);
+        let _ = self.decode_residual_child(builder, residual)?;
         Ok(())
     }
 
@@ -15109,15 +15135,23 @@ impl<'a> Lowering<'a> {
             Self::require_i64(builder, field_count, binders);
 
             let mut children = Vec::with_capacity(case.argument_binders);
+            let case_identity = self.static_transition_plan
+                .case_constructor_identity(eliminator.static_origin, index)?;
             for position in 0..case.argument_binders {
-                // ⭐ `§2g` — the projected child stays `Carried` into `case_env`.
                 let child = self.emit_carrier_field(builder, scrutinee, position)?;
-                // ⭐ The residual edge's oracle, written here and keyed on THIS
-                // loop's own counter — before any selection among the children
-                // happens. ⛔ Not derived from `recursive_positions`.
                 #[cfg(test)]
                 px8j_record_carrier_field_projection(Px8jProducerPath::Composed, position, child);
-                children.push(LoweringOperand::Carried(child));
+                let residual = if case.recursive_positions.contains(&position) {
+                    self.static_transition_plan.recursive_carrier_slot(
+                        eliminator.static_origin, case_identity, position as u32,
+                    )?.map(|slot| CarriedResidualWord::issue(child.word, RecursiveCarrierSlotKey::of(slot)))
+                } else {
+                    None
+                };
+                children.push(match residual {
+                    Some(residual) => LoweringOperand::Residual(residual),
+                    None => LoweringOperand::Carried(child),
+                });
             }
 
             // The strict Ret continuation is lowered once. Its ordinary
@@ -15139,9 +15173,10 @@ impl<'a> Lowering<'a> {
                 };
                 builder.ins().jump(return_body, &[returned.word.into()]);
                 builder.switch_to_block(return_body);
-                children = vec![LoweringOperand::Carried(CarriedBoundaryWord {
+                let returned = CarriedBoundaryWord {
                     word: builder.block_params(return_body)[0],
-                })];
+                };
+                children = vec![LoweringOperand::Carried(returned)];
             }
 
             // ── ⭐⭐ `AC-C4` — the induction hypotheses over carried children ──
@@ -15203,10 +15238,20 @@ impl<'a> Lowering<'a> {
                                     .recursive_residual_for_context(context, identity, position as u32)?
                                     .filter(|entry| entry.wrapped()).cloned()
                                 {
-                                    let LoweringOperand::Carried(word) = &children[position] else {
-                                        return Err(unsupported("RecursiveResidual", "the bound gate child is not carried"));
+                                    let LoweringOperand::Residual(residual) = children[position] else {
+                                        return Err(unsupported(
+                                            "RecursiveResidual", "the bound gate child has no issued residual",
+                                        ));
                                     };
-                                    let _ = self.decode_recursive_residual(builder, *word, &disposition)?;
+                                    let slot = self.static_transition_plan.recursive_carrier_for_specialization(
+                                        disposition.specialization,
+                                    )?.ok_or_else(|| unsupported(
+                                        "RecursiveResidual", "the bound gate has no issued slot",
+                                    ))?;
+                                    if residual.slot() != RecursiveCarrierSlotKey::of(slot) {
+                                        return Err(unsupported("RecursiveResidual", "the bound gate names a foreign slot"));
+                                    }
+                                    let _ = self.decode_residual_child(builder, residual)?;
                                 }
                             }
                         }
@@ -15217,10 +15262,12 @@ impl<'a> Lowering<'a> {
                             if selected as usize != position {
                                 return Err(unsupported("RecursiveResidual", "the selected label names a different recursive field"));
                             }
-                            let LoweringOperand::Carried(word) = &children[position] else {
-                                return Err(unsupported("RecursiveResidual", "the labelled gate child is not carried"));
+                            let LoweringOperand::Residual(residual) = children[position] else {
+                                return Err(unsupported(
+                                    "RecursiveResidual", "the labelled gate child has no issued residual",
+                                ));
                             };
-                            self.guard_labelled_recursive_residual(builder, *word, eliminator, constructor, selected)?;
+                            self.guard_labelled_recursive_residual(builder, residual, eliminator, constructor, selected)?;
                         }
                         None => {}
                     }
@@ -15576,16 +15623,17 @@ impl<'a> Lowering<'a> {
         // which is worse than an error, because it names a cause that
         // is not the cause. Classifying the phase first is what makes
         // the rest of the chain a statement about `Lowered` only.
-        if let LoweringOperand::Carried(word) = lowered_scrutinee {
-            return self.lower_carried_match(
-                builder,
-                word,
-                cases,
-                default,
-                static_origin,
-                env,
-                None,
-            );
+        match &lowered_scrutinee {
+            LoweringOperand::Carried(word) => return self.lower_carried_match(
+                builder, *word, cases, default, static_origin, env, None,
+            ),
+            LoweringOperand::Residual(residual) => {
+                let child = self.decode_residual_child(builder, *residual)?;
+                return self.lower_carried_match(
+                    builder, child, cases, default, static_origin, env, None,
+                );
+            }
+            LoweringOperand::Specialized(_) => {}
         }
         if let LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) = lowered_scrutinee {
             let join_plan = self.consumed_join_plan_token(static_origin)?;
@@ -15768,6 +15816,9 @@ impl<'a> Lowering<'a> {
             LoweringOperand::Carried(_) => {
                 unreachable!("the carried Match arm returned above")
             }
+            LoweringOperand::Residual(_) => {
+                unreachable!("the residual Match arm decoded above")
+            }
         };
         let LoweringOperand::Specialized(Lowered::Constructor {
             constructor,
@@ -15864,6 +15915,11 @@ impl<'a> Lowering<'a> {
                     .iter()
                     .map(|input| match input {
                         LoweringOperand::Carried(word) => Ok(word.word),
+                        LoweringOperand::Residual(_) => Err(
+                            CraneliftBackendError::ResidualRepresentationRequired {
+                                site: "a static Match case parameter observation",
+                            },
+                        ),
                         LoweringOperand::Specialized(_) => Err(backend_module(
                             "a static Match case parameter reached the observation as a compile-time operand"
                                 .to_string(),
@@ -16084,12 +16140,15 @@ impl<'a> Lowering<'a> {
                         },
                     );
                 }
-                env.get(*index as usize)
-                    .ok_or_else(|| {
-                        unsupported("Var", format!("no runtime binding for index {index}"))
-                    })?
-                    .value_at("a Var in value position")
-                    .cloned()
+                let binding = env.get(*index as usize).ok_or_else(|| {
+                    unsupported("Var", format!("no runtime binding for index {index}"))
+                })?;
+                match binding.value_at("a Var in value position")? {
+                    LoweringOperand::Residual(residual) => Ok(LoweringOperand::Carried(
+                        self.decode_residual_child(builder, *residual)?,
+                    )),
+                    operand => Ok(operand.clone()),
+                }
             }
             RuntimeExpr::PrimitiveCall { primitive, args } => {
                 self.lower_primitive_call(builder, primitive, args, static_origin, env)
@@ -16458,6 +16517,11 @@ impl<'a> Lowering<'a> {
                         // template — that is the wall itself.
                         Ok(LoweringOperand::Carried(selected))
                     }
+                    LoweringOperand::Residual(_) => return Err(
+                        CraneliftBackendError::ResidualRepresentationRequired {
+                            site: "ordinary source Record projection",
+                        },
+                    ),
                     // ── the pre-existing SPECIALIZED route, unchanged ──────
                     LoweringOperand::Specialized(lowered) => {
                         let Lowered::Record { fields, .. } = lowered else {
@@ -16899,6 +16963,7 @@ impl<'a> Lowering<'a> {
                                 let lowered = self.lower_expr(builder, arg, env)?;
                                 Ok(match lowered {
                                     LoweringOperand::Carried(word) => LoweringOperand::Carried(word),
+                                    LoweringOperand::Residual(residual) => LoweringOperand::Residual(residual),
                                     LoweringOperand::Specialized(value) => {
                                         LoweringOperand::Carried(self.transfer_into_carrier(
                                             builder,
@@ -16999,7 +17064,7 @@ impl<'a> Lowering<'a> {
                                 let result = self
                                     .with_grafted_spine_call_source(static_origin, |this| {
                                         this.call_selected_recursive_position_unit(
-                                            builder, body, Some(coordinates), Some(word),
+                                            builder, body, Some(coordinates), None,
                                             |_, _, _| Ok(inputs.clone()),
                                         )
                                     })

@@ -5276,6 +5276,9 @@ fn d6c_the_sealed_binder_run_refuses_a_miscounted_or_permuted_run_at_its_produce
             Err(CraneliftBackendError::SelectedCallIntegrity(fault)) => panic!(
                 "{mutation:?} on the governed witness hit selected-call integrity, not its compile-time run guard: {fault:?}"
             ),
+            Err(CraneliftBackendError::ResidualRepresentationRequired { site }) => panic!(
+                "{mutation:?} on the governed witness hit a residual type refusal at {site}, not its compile-time run guard"
+            ),
             Err(CraneliftBackendError::ProfileMismatch(mismatch)) => panic!(
                 "{mutation:?} on the governed witness hit process profile mismatch, not its compile-time run guard: {mismatch:?}"
             ),
