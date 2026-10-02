@@ -798,6 +798,8 @@ mod delta_probe {
         static TRACKED_HEAD: Cell<Option<super::GlobalId>> = const { Cell::new(None) };
         static TRACKED_HEAD_NONEMPTY: Cell<u64> = const { Cell::new(0) };
         static TRACKED_HEAD_HARD: Cell<u64> = const { Cell::new(0) };
+        static ASSERT_DEFERRED_FIXED_POINTS: Cell<bool> = const { Cell::new(true) };
+        static CHECKING_DEFERRED_FIXED_POINT: Cell<bool> = const { Cell::new(false) };
     }
     pub(super) fn reset() {
         UNFOLDS.with(|c| c.set(0));
@@ -870,6 +872,37 @@ mod delta_probe {
     }
     pub(super) fn hard_continues() -> u64 {
         HARD_CONTINUES.with(|c| c.get())
+    }
+    pub(super) fn deferred_fixed_point_assertions_enabled() -> bool {
+        ASSERT_DEFERRED_FIXED_POINTS.with(|c| c.get())
+    }
+    pub(super) struct DeferredFixedPointAssertionsGuard(bool);
+    impl DeferredFixedPointAssertionsGuard {
+        pub(super) fn suppress() -> Self {
+            let previous = ASSERT_DEFERRED_FIXED_POINTS.with(|c| c.replace(false));
+            Self(previous)
+        }
+    }
+    impl Drop for DeferredFixedPointAssertionsGuard {
+        fn drop(&mut self) {
+            ASSERT_DEFERRED_FIXED_POINTS.with(|c| c.set(self.0));
+        }
+    }
+    pub(super) struct DeferredFixedPointCheckGuard;
+    pub(super) fn begin_deferred_fixed_point_check() -> Option<DeferredFixedPointCheckGuard> {
+        CHECKING_DEFERRED_FIXED_POINT.with(|c| {
+            if c.get() {
+                None
+            } else {
+                c.set(true);
+                Some(DeferredFixedPointCheckGuard)
+            }
+        })
+    }
+    impl Drop for DeferredFixedPointCheckGuard {
+        fn drop(&mut self) {
+            CHECKING_DEFERRED_FIXED_POINT.with(|c| c.set(false));
+        }
     }
 }
 
@@ -1039,6 +1072,28 @@ pub fn convert_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> bool 
     conv_struct_path(env, ctx, a, b, &[])
 }
 
+/// Type conversion for operands already at deferred-head fixed points.
+/// `cast_reduce` receives its endpoint operands after the caller's WHNF step.
+pub(crate) fn convert_type_deferred_operands(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a_w: &Term,
+    b_w: &Term,
+) -> bool {
+    probe_struct_entry(&[], a_w, b_w);
+    a_w == b_w
+        || conv_struct_deferred(
+            env,
+            ctx,
+            a_w.clone(),
+            WhnfProgress::default(),
+            b_w.clone(),
+            WhnfProgress::default(),
+            &[],
+            None,
+        )
+}
+
 /// Structural congruence (no type-directed η): whnf both sides, then compare
 /// structurally, recursing. Used when the type is not Π/Σ (`13 §6.2` step 4
 /// and the congruence closure).
@@ -1080,6 +1135,27 @@ fn conv_struct_path_memo(
 
     let (a_deferred, ad) = whnf_defer_head_delta(env, ctx, a);
     let (b_deferred, bd) = whnf_defer_head_delta(env, ctx, b);
+    conv_struct_deferred(env, ctx, a_deferred, ad, b_deferred, bd, path, memo)
+}
+
+/// Structural conversion after deferred-head reduction. A caller that already
+/// holds deferred fixed points may enter with default progress and avoid doing
+/// that reduction again.
+fn conv_struct_deferred(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a_deferred: Term,
+    ad: WhnfProgress,
+    b_deferred: Term,
+    bd: WhnfProgress,
+    path: &[DeltaPathEntry],
+    memo: Option<&SpineFailure<'_>>,
+) -> bool {
+    #[cfg(test)]
+    {
+        debug_assert_deferred_fixed_point(env, ctx, &a_deferred, ad);
+        debug_assert_deferred_fixed_point(env, ctx, &b_deferred, bd);
+    }
     if a_deferred == b_deferred {
         return true;
     }
@@ -1335,9 +1411,25 @@ fn conv_struct_path_memo(
         // structural. In particular `e` is deliberately not skipped by proof
         // irrelevance because this type-agnostic path has no trusted field type.
         (Term::Cast(a1, b1, e1, t1), Term::Cast(a2, b2, e2, t2)) => {
-            conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
-                && conv_struct_path_memo(env, ctx, b1, b2, child_path, retry_memo)
-                && conv_struct_path_memo(env, ctx, e1, e2, child_path, retry_memo)
+            conv_struct_deferred(
+                env,
+                ctx,
+                (**a1).clone(),
+                WhnfProgress::default(),
+                (**a2).clone(),
+                WhnfProgress::default(),
+                child_path,
+                retry_memo,
+            ) && conv_struct_deferred(
+                env,
+                ctx,
+                (**b1).clone(),
+                WhnfProgress::default(),
+                (**b2).clone(),
+                WhnfProgress::default(),
+                child_path,
+                retry_memo,
+            ) && conv_struct_path_memo(env, ctx, e1, e2, child_path, retry_memo)
                 && conv_struct_path_memo(env, ctx, t1, t2, child_path, retry_memo)
         }
         // Quotient congruence (`16 §5`, `17 §3.3`): quotient types compare
@@ -1450,6 +1542,30 @@ fn conv_struct_path_memo(
         (Term::IntLit(m), Term::IntLit(n)) => m == n,
         _ => false,
     }
+}
+
+#[cfg(test)]
+fn debug_assert_deferred_fixed_point(
+    env: &GlobalEnv,
+    ctx: &Context,
+    term: &Term,
+    progress: WhnfProgress,
+) {
+    if progress.iota || !delta_probe::deferred_fixed_point_assertions_enabled() {
+        return;
+    }
+    let Some(_guard) = delta_probe::begin_deferred_fixed_point_check() else {
+        return;
+    };
+    let (again, again_progress) = whnf_defer_head_delta(env, ctx, term);
+    assert_eq!(
+        again, *term,
+        "a deferred-head WHNF fixed point changed when reduced again"
+    );
+    assert_eq!(
+        again_progress.iota, progress.iota,
+        "re-reducing a deferred-head WHNF fixed point introduced iota progress"
+    );
 }
 
 #[cfg(test)]
