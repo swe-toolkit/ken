@@ -131,10 +131,17 @@ alone.
      reruns once with `ret_ty_slot = Some(R)`; a second discovery on the
      rerun is `Internal`. A first leaf reached before any IH keeps
      first-leaf discovery, with no rerun.
-     - Rollback: `MetaCtx` is not restored. `obligations`, `obl_counter`,
-       `provenance`, `num_values` and `space_state`/`space_pre_state` are.
-       Census every non-scoped `ElabCtx` write reachable from a leaf, and
-       assert that the scoped stacks are balanced at the abort.
+     - Reuse, not rollback (`evt_1bg60xdd88p6v` supersedes the restore
+       set). `MetaCtx` and `GlobalEnv` are not restored or cloned. The
+       discovery leaf is elaborated once through `compile_match_leaf`; its
+       body, lowered R, arm, context length and skipped IH depths are
+       cached, and the rerun's first leaf reuses the body through one
+       checked thinning that inserts only the recorded IH binders. A
+       mismatch is `Internal`. Assert the scoped stacks balanced at abort.
+     - Descent writes before the first leaf (`evt_64e2sz53dmzrx`): only
+       literal comparator plans, memoized by `root_frame_depth` and
+       (pattern span, request ordinal). Any other descent write is a stop
+       to the Architect.
      - Propagation: census every handler from `compile_match_leaf` to the
        owning entry. A catch-all on that path, or a leaf that adds an `env`
        declaration, is a stop to the Architect.
