@@ -53,8 +53,11 @@ or K, and incoming edges coerce into it before a join.
     generated-context raw load (`units.rs:5763-5805`).
 - **Retained, already proved.** These stay as they are on the held I-2 WIP
   `d9b8d81a8`:
-  - the recut slot-schema table, with its 11 construct and 9 transport
-    writer edges, and the CheckedIhForce edges;
+  - the recut slot-schema table, with its two issued store kinds
+    (`RecursiveCarrierStoreKind::{ConstructEmission, CheckedIhForce}`,
+    `aggregates.rs:264-267`), and the transport sources and claims as they
+    stand. A transport call's routed answer is not a slot store
+    (`:255-256`; Architect `evt_6hzfhbfzwrmkg`);
   - `emit_carrier_label_ordinal` at the three label readers;
   - the class guard at `joins.rs:1109-1124`, unchanged;
   - the I-1 landing `e893ecb7a`.
@@ -77,10 +80,12 @@ The work resumes on the held I-2 WIP `d9b8d81a8`, on branch
 it. Five items, cut into straight-ancestor increments at AC-0:
 
 1. **The residual operand.** Add `CarriedResidualWord`, distinct from
-   `CarriedBoundaryWord`. Only two things produce it: the issued slot
-   writers (construct edges, transport writers, CheckedIhForce), and
-   projection of a recursive-position field whose issued slot schema is an
-   R.
+   `CarriedBoundaryWord`. It is produced only by the issued slot stores of
+   the two `RecursiveCarrierStoreKind` kinds, and by projection of a
+   recursive-position field whose issued slot schema is an R. A transport
+   routed answer is not a producer. A consumer that needs R from one is a
+   K→R site under item 4: it is refused at compile time and reported to the
+   Architect.
    - Every ordinary API accepts `CarriedBoundaryWord` only:
      - environment `Value` bindings;
      - constructor field stores;
