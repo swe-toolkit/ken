@@ -81,6 +81,16 @@ stop and report the mismatch.
      - spec 32 §6's level-7 row becomes "`*`, `/`, `%`".
      - spec 31 §4's post-freeze fixed-token list adds `/` and `%`, so it
        agrees with §2 (spec-leader `evt_1v7fmwtpvbn0w`).
+     - spec 32 §3's `fixed_binop` grammar route adds `/` and `%`, so it
+       agrees with §31 §§2, 4 and §32 §6 (CV block `evt_6f3jfs4j5q2tx`).
+     - Conformance, by the CV: `surface/operators/generic-symbolic-names-remain-live`
+       in `seed-reserved-infix-names.md` stops expecting `/` and `%` as
+       generic names and states the fixed-token observation for them, with
+       `<` and `>` still generic; `seed-numbers.md` §3.1 covers `%`'s
+       `PartialPrim` obligation beside `/` (spec 35 §3.1).
+     - Sweep `spec/` and `conformance/` for any other place that lists the
+       fixed or generic operator spellings, and fold each one here. Report
+       the sweep as a list with the gate handoff.
 
      The spec ring authors it, and the conformance validator votes.
 3. **Evaluation.** The interpreter reduces both truncated on nonzero
