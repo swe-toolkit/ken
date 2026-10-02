@@ -2922,6 +2922,7 @@ fn build_index_equation_convoy_body(
     motive_base_depth: usize,
     context_convoy: &[ConvoyEntry],
     sentinel_region: usize,
+    split_span: &Span,
 ) -> Result<Option<Term>, ElabError> {
     let env: &GlobalEnv = &*cx.env;
     if ind.indices.len() != 1 || scrut_indices.len() != 1 {
@@ -3168,7 +3169,10 @@ fn build_index_equation_convoy_body(
                     for index in (0..context_convoy.len()).rev() {
                         premises.push(types_inner_first[index].clone());
                     }
-                    goal = wrap_premise_pis_finalized(goal, &premises, sentinel_region);
+                    goal = wrap_premise_pis_finalized(goal, &premises, sentinel_region)
+                        .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+                            span: split_span.clone(),
+                        })?;
                 }
                 goal
             } else {
@@ -3538,6 +3542,7 @@ fn plan_coherent_frame_motive(
             motive_base_depth,
             &probe_context_convoy,
             sentinel_region,
+            span,
         )? {
             return Ok(Box::new(CoherentFrameMotivePlan {
                 expected: original_expected.clone(),
@@ -5561,9 +5566,14 @@ fn check_large_convoy_recursive_arm(
     let checked_base = (|| {
         let (core, inferred) = infer(cx, &arm.body)?;
         unify_types(&mut cx.metas, &base_goal, &inferred);
-        let base = wrap_premise_lams_finalized(core, &source_domains, sentinel_region);
-        let base_ty =
-            wrap_premise_pis_finalized(base_goal.clone(), &source_domains, sentinel_region);
+        let base = wrap_premise_lams_finalized(core, &source_domains, sentinel_region)
+            .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+                span: arm.span.clone(),
+            })?;
+        let base_ty = wrap_premise_pis_finalized(base_goal.clone(), &source_domains, sentinel_region)
+            .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+                span: arm.span.clone(),
+            })?;
         validate_large_convoy_base(cx, &base, &base_ty, &arm.span)
     })();
     cx.var_refinements = refinement_snapshot;
@@ -5607,7 +5617,10 @@ fn check_large_convoy_recursive_arm(
         ));
     }
     let motive_goal = subst_term_generalize_many(&weaken(expected_here, 2), &motive_substitutions);
-    let motive_result = wrap_premise_pis_finalized(motive_goal, &motive_domains, sentinel_region);
+    let motive_result = wrap_premise_pis_finalized(motive_goal, &motive_domains, sentinel_region)
+        .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+            span: arm.span.clone(),
+        })?;
 
     let Term::Eq(goal_carrier, _, _) = whnf(cx.env, &cx.ctx, expected_here) else {
         return Ok(None);
@@ -5933,11 +5946,10 @@ fn build_large_convoy_recursive_method(
             "large index convoy could not construct its recursive goal transport".into(),
         )
     })?;
-    Ok(wrap_premise_lams_finalized(
-        goal_j,
-        premise_domains,
-        sentinel_region,
-    ))
+    wrap_premise_lams_finalized(goal_j, premise_domains, sentinel_region)
+        .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+            span: arm.span.clone(),
+        })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -6175,6 +6187,7 @@ fn install_plain_declared_index_aliases(
 fn check_dependent_branch_body(
     cx: &mut ElabCtx,
     arm: &RMatchArm,
+    match_span: &Span,
     ind: &InductiveDecl,
     params: &[Term],
     level_args: &[Level],
@@ -6315,11 +6328,10 @@ fn check_dependent_branch_body(
                 )?
             }
         };
-        Ok(wrap_premise_lams_finalized(
-            checked,
-            premise_domains,
-            sentinel_region,
-        ))
+        wrap_premise_lams_finalized(checked, premise_domains, sentinel_region)
+            .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+                span: match_span.clone(),
+            })
     })();
 
     cx.active_index_premise_frames
@@ -6586,8 +6598,10 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 entry.motive_ty.clone(),
             ));
         }
-        motive_user_body =
-            wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region);
+        motive_user_body = wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region)
+            .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+                span: span.clone(),
+            })?;
     }
     let hidden_group_result_refinement = MAY_REFINE_GROUP_RESULT
         && ind.indices.is_empty()
@@ -6783,6 +6797,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 frame_try!(check_dependent_branch_body(
                     cx,
                     arm,
+                    span,
                     &ind,
                     &params_terms,
                     &family_level_args,
@@ -8537,7 +8552,27 @@ fn wrap_premise_lams_from_full(body: Term, premises: &[Term]) -> Term {
 /// binders and shifts its field references by `i` — exactly the shift
 /// `weaken(_, i)` performs for the sentinel-free premises, so this degenerates
 /// to `wrap_premise_{pis,lams}_from_full` when no premise carries a sentinel.
-fn wrap_premise_lams_finalized(body: Term, premises: &[Term], sentinel_region: usize) -> Term {
+/// A premise wrap shifts every free variable by its premise count. A surviving
+/// alias sentinel belongs to an enclosing frame (the finishing frame resolves
+/// its own aliases before this wrap), whose synthetic depth does not count
+/// those binders. Increment 2 replaces this refusal with derived coordinates.
+#[derive(Debug)]
+struct AliasAcrossPremiseWrap;
+
+fn alias_crosses_premise_wrap(body: &Term, premises: &[Term]) -> bool {
+    !premises.is_empty()
+        && (first_alias_sentinel(body).is_some()
+            || premises.iter().any(|premise| first_alias_sentinel(premise).is_some()))
+}
+
+fn wrap_premise_lams_finalized(
+    body: Term,
+    premises: &[Term],
+    sentinel_region: usize,
+) -> Result<Term, AliasAcrossPremiseWrap> {
+    if alias_crosses_premise_wrap(&body, premises) {
+        return Err(AliasAcrossPremiseWrap);
+    }
     let total = premises.len();
     let mut term = finalize_refined_body(&body, 0, total, sentinel_region);
     for i in (0..total).rev() {
@@ -8546,10 +8581,17 @@ fn wrap_premise_lams_finalized(body: Term, premises: &[Term], sentinel_region: u
             term,
         );
     }
-    term
+    Ok(term)
 }
 
-fn wrap_premise_pis_finalized(body: Term, premises: &[Term], sentinel_region: usize) -> Term {
+fn wrap_premise_pis_finalized(
+    body: Term,
+    premises: &[Term],
+    sentinel_region: usize,
+) -> Result<Term, AliasAcrossPremiseWrap> {
+    if alias_crosses_premise_wrap(&body, premises) {
+        return Err(AliasAcrossPremiseWrap);
+    }
     let total = premises.len();
     let mut term = finalize_refined_body(&body, 0, total, sentinel_region);
     for i in (0..total).rev() {
@@ -8558,7 +8600,7 @@ fn wrap_premise_pis_finalized(body: Term, premises: &[Term], sentinel_region: us
             term,
         );
     }
-    term
+    Ok(term)
 }
 
 /// Build the constructor-refined motive-application type
@@ -8700,7 +8742,10 @@ fn build_convoy_refined_type(
             ));
         }
     }
-    Ok(wrap_premise_pis_finalized(body, &premises, sentinel_region))
+    wrap_premise_pis_finalized(body, &premises, sentinel_region)
+        .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+            span: span.clone(),
+        })
 }
 
 fn synthesize_omitted_index_method(
@@ -8731,11 +8776,10 @@ fn synthesize_omitted_index_method(
     })?;
     let proof = index_refinement_sentinel(sentinel_region, impossible_idx);
     let body = Term::Absurd(Box::new(expected_here.clone()), Box::new(proof));
-    Ok(wrap_premise_lams_finalized(
-        body,
-        premise_domains,
-        sentinel_region,
-    ))
+    wrap_premise_lams_finalized(body, premise_domains, sentinel_region)
+        .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+            span: span.clone(),
+        })
 }
 
 fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
@@ -18901,6 +18945,7 @@ fn close_inferred_index_method(
     field_count: usize,
     ih_count: usize,
     sentinel_region: usize,
+    split_span: &Span,
 ) -> Result<(Option<Term>, Vec<Term>), ElabError> {
     let mut domains = Vec::with_capacity(field_count + ih_count);
     let mut tail_ty = method_ty;
@@ -18932,7 +18977,10 @@ fn close_inferred_index_method(
             .iter()
             .map(|premise| weaken(premise, ih_count as i64))
             .collect();
-        let mut closed = wrap_premise_lams_finalized(body, &premises_under_ih, sentinel_region);
+        let mut closed = wrap_premise_lams_finalized(body, &premises_under_ih, sentinel_region)
+            .map_err(|AliasAcrossPremiseWrap| ElabError::PatternVariableAcrossDependentSplit {
+                span: split_span.clone(),
+            })?;
         for domain in domains.iter().rev() {
             closed = Term::lam(domain.clone(), closed);
         }
@@ -18990,6 +19038,7 @@ fn finish_inferred_indexed_match(
             field_count,
             ih_count,
             sentinel_region,
+            span,
         )?;
         if let Some(method) = method {
             methods.push(method);
@@ -21966,11 +22015,12 @@ mod nested_lift_association_tests {
 mod nested_method_alias_frame_tests {
     use super::{
         assert_nested_method_alignment, finish_pattern_alias_term_frame,
-        nested_method_ih_positions, pattern_alias_sentinel, weaken_woven, ElabCtx,
-        PatternAliasReplacement, PatternAliasTypeFrame,
+        nested_method_ih_positions, pattern_alias_sentinel, weaken_woven,
+        wrap_premise_lams_finalized, wrap_premise_pis_finalized, ElabCtx,
+        PatternAliasReplacement, PatternAliasTypeFrame, PATTERN_ALIAS_SENTINEL_BASE,
     };
     use crate::{ElabEnv, ElabError};
-    use ken_kernel::{inductive::method_type, Level, Term};
+    use ken_kernel::{inductive::method_type, KernelError, Level, Term};
     use std::collections::{HashMap, HashSet};
 
     fn push_frame(cx: &mut ElabCtx<'_>, id: usize) {
@@ -22011,6 +22061,63 @@ mod nested_method_alias_frame_tests {
             assert_nested_method_alignment(ind, 1, &[2, 4], 3, 2, 0, 5),
             Err(ElabError::Internal(reason)) if reason.contains("misaligned")
         ));
+    }
+
+    #[test]
+    fn finalized_premise_wrap_refuses_alias_only_when_it_shifts() {
+        // MEASURED: both wraps reject an unresolved alias with one premise,
+        // whether it occurs in the body or premise domain. CLAIMED: every
+        // path into finalize_refined_body has the same sentinel boundary.
+        // THE GAP: this does not prove that every call site supplies its real
+        // split span; the checked sibling pins that separate path.
+        let alias = pattern_alias_sentinel(7);
+        let premise = Term::ty(Level::Zero);
+        for wrap in [wrap_premise_lams_finalized, wrap_premise_pis_finalized] {
+            assert!(wrap(alias.clone(), std::slice::from_ref(&premise), 0).is_err());
+            assert!(wrap(premise.clone(), std::slice::from_ref(&alias), 0).is_err());
+            assert_eq!(wrap(alias.clone(), &[], 0).expect("no binder to shift"), alias);
+        }
+        let body = Term::var(0);
+        let expected_lam = Term::lam(premise.clone(), Term::var(1));
+        let expected_pi = Term::pi(premise.clone(), Term::var(1));
+        assert_eq!(
+            wrap_premise_lams_finalized(body.clone(), std::slice::from_ref(&premise), 0)
+                .expect("sentinel-free lambda wrap"),
+            expected_lam,
+        );
+        assert_eq!(
+            wrap_premise_pis_finalized(body, std::slice::from_ref(&premise), 0)
+                .expect("sentinel-free pi wrap"),
+            expected_pi,
+        );
+    }
+
+    #[test]
+    fn checked_parameterized_index_refuses_unresolved_alias_at_kernel_boundary() {
+        // The exact R2 checked shape (xs : Vec Nat n) never reaches a
+        // nonempty premise wrap. The kernel refuses its still-unresolved
+        // enclosing sentinel at the VNil arm: this is not the typed alias
+        // diagnostic, which remains an increment-2 residual.
+        let source = "data Vec (a : Type) : Nat → Type where { \
+            VNil : Vec a Zero; VCons : (n : Nat) → a → Vec a n → Vec a (Suc n) }\n\
+            fn f (n : Nat) (xs : Vec Nat n) (x : Nat) : Nat = match x { \
+              Zero ↦ Zero; (Suc j) as saved ↦ let r : Nat = match xs { \
+                VNil ↦ saved; VCons m e tl ↦ saved \
+              } in r \
+            }\n\
+            const observed : Nat = f Zero (VNil Nat) (Suc (Suc (Suc Zero)))";
+        let mut env = ElabEnv::new().expect("prelude");
+        let trusted = env.env.trusted_base();
+        let error = env.elaborate_file(source).expect_err("exact checked R2 refuses");
+        assert!(
+            matches!(error, ElabError::KernelRejected {
+                error: KernelError::VarOutOfScope { index, .. }, ref span
+            } if index == PATTERN_ALIAS_SENTINEL_BASE
+                && span.start == source.find("VNil ↦ saved").expect("VNil arm")
+                && span.end == span.start + "VNil ↦ saved".len()),
+            "expected unresolved alias sentinel at VNil, got {error:?}"
+        );
+        assert_eq!(env.env.trusted_base(), trusted);
     }
 
     #[test]

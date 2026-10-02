@@ -23,7 +23,9 @@ fn enclosing_alias_through_indexed_inner_match_is_refused() {
     // THE GAP: the matching compiler may shift a same-typed alias after this
     // check; disabling the flag restores R1=1/R2=2 in the mutation probe.
     // Transition sentinel: increment 2 flips every row to the value 3.
-    // R1 and R2 separate saved=3, outer n=0 or 1, and j=2.
+    // R1 and R2 separate saved=3, outer n=0 or 1, and j=2. The
+    // annotated R1 RHS actually checks the nested match against Nat;
+    // unannotated/direct first leaves discover their result by inference.
     let cases = [
         ("r2_check_n0", false, false, 0, false),
         ("r1_let_n1", true, true, 1, false),
@@ -31,7 +33,7 @@ fn enclosing_alias_through_indexed_inner_match_is_refused() {
         ("r1_let_n0", true, true, 0, false),
         ("r1_check_n0", true, false, 0, false),
         ("single_let_n0", false, true, 0, true),
-        ("r2_let_n0_wrapped", false, true, 0, false),
+        ("r1_annotated_check_n1", true, false, 1, false),
         ("r2_let_n0", false, true, 0, false),
         ("single_let_n1", false, true, 1, true),
         ("single_check_n1", false, false, 1, true),
@@ -61,8 +63,8 @@ fn enclosing_alias_through_indexed_inner_match_is_refused() {
         } else {
             "match xs { VNil ↦ saved; VCons m e tl ↦ saved }"
         };
-        let body = if name == "r2_let_n0_wrapped" {
-            format!("let q = Zero in let r = {inner} in r")
+        let body = if name == "r1_annotated_check_n1" {
+            format!("let r : Nat = {inner} in r")
         } else if via_let {
             format!("let r = {inner} in r")
         } else {
@@ -153,4 +155,36 @@ fn nonindexed_splits_and_plain_indexed_variable_preserve_values() {
          const expected : Nat = Suc (Suc (Suc Zero))"
     );
     assert_value(&plain_variable, "observed", "expected");
+}
+
+#[test]
+fn checked_indexed_inner_alias_refuses_before_premise_shift() {
+    // MEASURED: a checked single-arm inner match reaches a nonempty premise
+    // wrap and refuses a foreign alias. CLAIMED: it cannot return a wrong Nat.
+    // THE GAP: an always-Ok wrap guard admits this row as Zero on both main
+    // and the pre-guard candidate. Increment 2 must flip it to value 3.
+    // Index-forced group {n,m}=0 follows Suc m = Suc n at xs. Independently
+    // assignable same-typed binders are saved=3, j=2 and e=5; the result
+    // must be 3, not the base's wrong Zero from {n,m}.
+    let source = format!(
+        "{VEC}\nfn f (n : Nat) (xs : Vec Nat (Suc n)) (x : Nat) : Nat = match x {{ \
+           Zero ↦ Zero; (Suc j) as saved ↦ let r : Nat = match xs {{ \
+             VCons m e tl ↦ saved \
+           }} in r \
+         }}\n\
+         const observed : Nat = f Zero \
+           (VCons Nat Zero (Suc (Suc (Suc (Suc (Suc Zero))))) (VNil Nat)) \
+           (Suc (Suc (Suc Zero)))"
+    );
+    let mut env = ElabEnv::new().expect("prelude");
+    let trusted = env.env.trusted_base();
+    let error = env
+        .elaborate_file(&source)
+        .expect_err("checked sibling must refuse");
+    assert!(
+        matches!(error, ElabError::PatternVariableAcrossDependentSplit { ref span }
+            if span.start == source.find("match xs").expect("inner match")),
+        "checked sibling: {error:?}"
+    );
+    assert_eq!(env.env.trusted_base(), trusted);
 }
