@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-SIGMA-QUOT-CAST-GATE
 title: "The Σ and quotient casts fire when their Eq Type stays neutral and project e.1 and e.2 from a neutral e, so their reducts do not check (NotASigma, TypeMismatch). Gate them as cast_at_pi is gated, so they stay neutral, as spec 16 §3.2 requires"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -57,3 +57,19 @@ cast is stuck.
 - A cast that fires today on a decomposing equality would be stuck: stop to
   the Architect.
 - A spec change.
+
+## Closeout
+
+Merged `ed112ae4f`, exact `7acd5154f`: Kernel QA `evt_3msq06y40g8by`,
+Architect `evt_7fqerz71wpp0a`, Decision `dec_63s4q3rcj7t5d` (single gate).
+The first candidate, `968c8f4c9`, was red in CI at
+`k2_cast_computes_sigma_to_pair` (`acceptance.rs:1817`) and its route was
+withdrawn. The Architect ruled that raw row ill-typed, and the respin is
+test-only (`evt_wjxdnqrcktdq`).
+
+- `cast_at_sigma` and `cast_at_quot` project components only when the
+  `Eq Type` arm yields their decomposition, by the same gate as
+  `cast_at_pi`. Otherwise the cast is stuck.
+- The ill-typed raw Σ acceptance row now pins neutrality. The gate suite
+  `obs_sigma_quot_cast_gate.rs` holds the stuck repros, the decomposing
+  controls and the gate-removal mutations.

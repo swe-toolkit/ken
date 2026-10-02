@@ -48,7 +48,8 @@ stop and report the mismatch.
 
 ## Deliverable
 
-Three increments, each a straight-ancestor cut that may land alone.
+Four increments (0, 1, 1b, 2), each a straight-ancestor cut that may land
+alone.
 
 0. **Fail closed on an outer alias inside an indexed inner match** (Adversary
    M8 on `7450a0b17`, `evt_1bspdnet7a87s`). Main gives silent wrong values
@@ -89,8 +90,37 @@ Three increments, each a straight-ancestor cut that may land alone.
 
    `Internal(g0)` from `project_generated_index_equality_leaves` is not the
    refusal.
-1. **Seed `ret_ty_slot` from the check-mode expected type.** Report how many
-   of the 24 entries become `Some`.
+1. **Seed `ret_ty_slot` from the check-mode expected type** (merged
+   `2d6b64aca`, exact `b16a22f1a`). Every
+   check-mode split entry becomes `Some`. Inference-mode entries stay
+   `None`, and increment 2 serves them. The handoff reports arrivals by
+   population and mode (Steward `evt_vj9sdpww9tfe`). The 24-entry figure is
+   superseded, since increment 0 refuses one historical entry.
+   - With the seeding disabled, 18 of the 19 current check-mode entries
+     return to `None`. The 19th gets R from an earlier root leaf, the
+     slot's second producer, so it is not evidence for the seed.
+   - A first-bucket unit pin, where no earlier leaf can supply R, reddens
+     on seed-off (`evt_6ez9sxdhdkb8a`).
+1b. **Seed only a goal whose levels are solved** (merged `710458002`, exact
+   `7c57aac8d`; Architect `evt_6jqa2y7rft3tr`, on Adversary
+   `evt_22n4tn23eqwjn`). On `2d6b64aca`, a
+   check-mode `: Type` match whose arms are `Type` is `KernelRejected
+   TypeMismatch` on the tuple, or-pattern and nested paths. All three were Ok
+   at `a246ede23`. `zonk_level` (`elab.rs:137-140`) reads the unsolved `?u`
+   as Zero, so the seed is `Type 0`. No leaf unifies against the slot, and
+   the final `unify_types` solves `?u := 0`.
+   - `MetaCtx` gains a `defaulted: Cell<bool>` witness, which the unsolved
+     arm of `zonk_level` sets.
+   - One helper, `check_mode_result_seed`, replaces all five seed sites:
+     infer_tuple_match `:19140`, infer_record_match `:19223`, infer_or_match
+     `:19370`, infer_literal_match `:19480` and infer_match `:19616`. It
+     returns `None` when zonking defaulted a level, so the first leaf
+     discovers R as before increment 1. The Architect's ruling carries the
+     code.
+   - An independent increment off current main, ahead of I-2a. Once it
+     lands, I-2a `d3a522dd3` rebases (`elab.rs` intersects, so inspect the
+     `infer_match` entry seed and memo call) and is re-QAed at the rebased
+     SHA.
 2. **Open each nested bucket in the derived telescope before its leaves.**
    - Δ comes from reverting the context and the constructor. Woven binders
      are real `cx.ctx` pushes.
@@ -104,6 +134,14 @@ Three increments, each a straight-ancestor cut that may land alone.
    - The in-matrix alias finalize and per-method kernel check run in the
      derived telescope on every path. Both `needs_reverting` gates are
      removed (`evt_4c4tgkc2gvypk`, `evt_qh7m7erbc5f6`, input f).
+   - **Root-frame ownership** (Architect carry `evt_5ezxyycetagrw`). Today
+     `memoize_indexed_root_motive` writes `indexed_match_roots.last()`, so an
+     inner match in an indexed root's first leaf can write the outer root's
+     motive. Both writers, the entry seed and the first-leaf producer, take
+     `root_frame_depth`, and write only when `indexed_match_roots.len() ==
+     depth + 1`. Fixtures p1 (inner inference match) and p2 (inner checked
+     match) give `Suc Zero` from `f Zero (VNil Nat)`. Both fail closed on
+     main with `KernelRejected TypeMismatch`.
    - Representation (input g, `evt_71d3p2fwxtqj1`): locally nameless. Matrix
      binders are elaborator-only fresh free variables, refused at the kernel
      boundary, so the kernel `Term` is unchanged. One `abstract` function
@@ -111,7 +149,7 @@ Three increments, each a straight-ancestor cut that may land alone.
 
 ## Acceptance
 
-- **AC-0a (increment 0, lands alone on `7450a0b17`).**
+- **AC-0a (increment 0; merged `457898bcb`, exact `2bdafdc29`).**
   - All 11 indexed-family rows of `evt_1bspdnet7a87s` refuse with
     `PatternVariableAcrossDependentSplit`, each a refusal pin that names
     increment 2 as its flip to 3.
@@ -158,12 +196,29 @@ Three increments, each a straight-ancestor cut that may land alone.
       wrap. The infer rows still refuse through the finisher guards.
     - The fan-in table lists all ten wrap call sites with their span source,
       plus the `from_full` exclusion.
+- **AC-1b (increment 1b).**
+  - The three Adversary rows (tuple, or-pattern, nested `Nat`), elaborated
+    and normalized, are Ok. Each is `KernelRejected` on `2d6b64aca`.
+  - A record-path row with the same `: Type` result. Probe it first. If it
+    is refused at both `a246ede23` and `2d6b64aca`, report it and do not pin
+    it: it is LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE's.
+  - The increment-1 first-bucket unit pin still observes `[true]`. Re-run
+    the increment-1 census: a check-mode entry that was `Some` and turns
+    `None` is a stop to the Architect.
+  - Mutation: an always-seed helper returns all three rows to
+    `KernelRejected`.
+  - Controls stay Ok: an explicit `: Type 1`, `Type 0` arms, inference
+    mode. The plain `match b { True ↦ Type; False ↦ Type }` stays refused
+    at both SHAs.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
-  The R1 and R2 rows, the checked R2, the checked single-arm sibling and the
-  Eq-index `Ix/Mk` row (increment 0's infer-finisher discriminator,
-  Architect `evt_57fd0ncxh81v8`) flip from refusal to 3, built from
-  occurrence terms in the derived telescope.
+  Increment 0's refusal pins flip from refusal to 3, built from occurrence
+  terms in the derived telescope (Architect `evt_1f0xnnv11654x`): all 11
+  adversary rows including R1 and R2, the exact checked R2, the checked
+  single-arm sibling, and the Eq-index `Ix/Mk` row (the infer-finisher
+  discriminator, `evt_57fd0ncxh81v8`). The exact R2's raw sentinel-base
+  `VarOutOfScope` gives way to a value; if it still refuses, its diagnostic
+  is typed, not a raw kernel rejection.
 - **AC-2 (controls).**
   - Every value pin of `LANG-NESTED-SPLIT-FIELD-DEPENDENCE` stays green.
     That includes the collision control and M1, M2 and M3.
@@ -183,6 +238,11 @@ Three increments, each a straight-ancestor cut that may land alone.
    unresolved, before its frame finishes. Keyed on kernel-call reachability
    of an unresolved sentinel (`evt_4416jtap9bj62`, increment 0 §1a 1;
    Architect `evt_3cqccrymnd3n0`). The next re-trigger is the 3rd.
+
+Check-mode result seed (a separate count, §1a 1, `evt_6jqa2y7rft3tr`):
+
+1. The check-mode seed read an unsolved level meta as Zero. Keyed on the
+   goal's levels being solved.
 
 ## Stop conditions
 
