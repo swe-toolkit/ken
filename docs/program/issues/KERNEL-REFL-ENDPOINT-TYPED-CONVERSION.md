@@ -33,9 +33,15 @@ rows that TYPE-EQ-STRUCTURAL enabled stay accepted.
   n n -> Pos }` with `theorem pos_eq (n : Nat) (a b : Equal Nat n n) : Equal
   Pos (MkPos n a) (MkPos n b) = Refl` is `KernelRejected TypeMismatch` at
   `884f493fe`, and accepted at `5d139f422`.
-- **Kernel repros.** `refl x : Eq P x y` with `P : Ω`, and `refl v : Eq (Σ
-  n:Nat. P n) v (v.1, k)` with `P : Nat → Ω`, are rejected at head and
-  accepted at the parent. `convert(B, w, (w.1, h))` is true at both.
+- **Kernel repros.** `refl v : Eq (Σ n:Nat. P n) v (v.1, k)` with
+  `P : Nat → Ω` is rejected at head and accepted at the parent.
+  `convert(B, w, (w.1, h))` is true at both. The raw `Eq P x y` with
+  `P : Ω₀` is ill-formed (spec 16 §2.1 Eq-Form needs `A : Type l`), so it
+  is not a positive (Architect `evt_11x8e36f0m0h7`).
+- **The Π route.** With `P : Nat → Ω₀` and `p q : (n : Nat) → P n`, `refl f
+  : Eq ((n:Nat) → Σ m. P m) (λn.(n, p n)) (λn.(n, q n))` reaches an
+  Ω-carrier `Eq` through `eq_at_pi` then `eq_at_sigma`, and compares
+  `p n` with `q n` at `P n : Ω₀`.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
@@ -54,11 +60,17 @@ kernel-conversion case for spec 17 §1's ζ row (non-recursive `let`) in
 
 ## Acceptance
 
-- **AC-1.** The surface repro and both kernel repros are accepted.
+- **AC-1.** The surface repro is accepted, and so are the Σ kernel repro
+  and the Π-route kernel repro (`refl f : Eq ((n:Nat) → Σ m. P m)
+  (λn.(n, p n)) (λn.(n, q n))`). The Π-route row must be red on base
+  `90ca730f6`; if it is not, stop and report, with no substitute row.
 - **AC-2 (controls).**
   - The Σ-eta and Π-eta `refl` rows stay accepted.
   - `refl x : Eq Nat x y` with distinct variables is still rejected with
     the ds6a/sec4 `TypeMismatch` payload.
+  - A postulate or theorem declared at `Eq P x y` with `P : Ω₀` is
+    rejected at classification with `TypeMismatch { expected: Type u0,
+    found: Ω0 }`, on base and candidate alike.
   - Reverting the fix reddens the AC-1 rows.
 - **AC-3.** `trusted_base()` is unchanged, the 57-package catalog census has
   no verdict change, and kernel lib, ds6a, sec4 and the TYPE-EQ rows stay
