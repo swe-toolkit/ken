@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-STRICT-ORDER-OWNER
 title: "Nat's strict order is defined twice, as Cursor's public cursor_nat_lt and Property's private property_nat_lt, and its laws are re-derived package by package across Cursor, Parsing, Decoder and Json. Make Data.Numeric.Nat.Order the owner of lt_nat and its laws, and retire Property's re-derived byte equality"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -123,3 +123,13 @@ renamed only.
 - S2: a moved body needs more than the renames.
 - S3: a catalog verdict changes.
 - S4: the population is not 15, or the sweep finds a consumer not listed.
+
+## Closeout
+
+Merged as `ade3f905d` from exact `2c7d7c0a1`. Gates: Foundation QA
+`evt_3fnpg8t1ah5rx`, Architect `evt_6bcw8n0jf041d`, Decision
+`dec_223dmf4r0c9t2`. All 15 routed blobs match main. Order owns `lt_nat`,
+its 12 attached laws and `leq_nat_suc_add_right`; catalog card verdict
+parity 57/57 and no trust delta. Carried to the next touch of these cards:
+three added prose lines exceed 85 columns (`Cursor.ken.md:214`,
+`Order.ken.md:619`, `Order.ken.md:655`).

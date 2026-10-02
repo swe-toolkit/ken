@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-RANGE-NTH-LAW
 title: "Derived proves only the length of range, so nothing states that range n holds 0..n-1 in order. Prove range_from_nth and range_nth beside range_length"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
