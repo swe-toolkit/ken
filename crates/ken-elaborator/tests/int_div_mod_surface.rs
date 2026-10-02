@@ -106,75 +106,92 @@ fn int_dispatch_emits_one_nonzero_divisor_obligation_per_site() {
     }
 }
 
+fn assert_operation_obligations(spelling: &str, case: &str, source: &str, expected: usize) {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let before = env.env.trusted_base();
+    let result = env
+        .elaborate_decl_v1(source)
+        .unwrap_or_else(|error| panic!("{spelling} {case} must elaborate: {error:?}"));
+    assert_eq!(
+        result.obligations.len(),
+        expected,
+        "{spelling} {case}: operation-site obligation count"
+    );
+    let new_trust = env
+        .env
+        .trusted_base()
+        .into_iter()
+        .filter(|id| !before.contains(id))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        new_trust.len(),
+        expected,
+        "{spelling} {case}: an unreported postulate is not zero obligations"
+    );
+    if expected == 1 {
+        let obligation = &result.obligations[0];
+        assert!(matches!(obligation.kind, ObligationKind::PartialPrim));
+        assert_eq!(new_trust[0], obligation.hole_id);
+        assert!(env.is_open_hole(obligation.hole_id));
+        let extracted = v2_extract(&result);
+        assert_eq!(extracted.obligations.len(), 1);
+        assert!(matches!(
+            extracted.obligations[0].provenance.kind,
+            ProvKind::PartialPrim
+        ));
+    }
+}
+
 #[test]
-fn assumption_discharge_distinguishes_matching_nonmatching_and_refined_divisors() {
+fn refined_divisor_needs_no_new_operation_obligation_or_hole() {
     for spelling in ["/", "%"] {
-        for (case, source, expected) in [
+        assert_operation_obligations(
+            spelling,
+            "refined divisor",
+            &format!(
+                "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = n {spelling} d"
+            ),
+            0,
+        );
+    }
+}
+
+#[test]
+fn directly_required_nonzero_divisor_needs_no_new_operation_obligation_or_hole() {
+    for spelling in ["/", "%"] {
+        assert_operation_obligations(
+            spelling,
+            "direct requires",
+            &format!(
+                "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n {spelling} d"
+            ),
+            0,
+        );
+    }
+}
+
+#[test]
+fn possibly_zero_non_direct_and_unrelated_cases_each_emit_one_obligation() {
+    for spelling in ["/", "%"] {
+        for (case, source) in [
             (
                 "possibly zero",
                 format!("fn f (n : Int) (d : Int) : Int = n {spelling} d"),
-                1,
-            ),
-            (
-                "refined divisor",
-                format!(
-                    "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = n {spelling} d"
-                ),
-                0,
-            ),
-            (
-                "direct requires",
-                format!(
-                    "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n {spelling} d"
-                ),
-                0,
             ),
             (
                 "non-direct requires",
                 format!(
                     "fn f (n : Int) (d : Int) : Int requires Equal Int d 5 = n {spelling} d"
                 ),
-                1,
             ),
             (
                 "unrelated requires",
                 format!(
                     "fn f (n : Int) (d : Int) (e : Int) : Int requires Not (Equal Int e 0) = n {spelling} d"
                 ),
-                1,
             ),
         ] {
-            let mut env = ElabEnv::new().expect("numeric prelude");
-            let before = env.env.trusted_base();
-            let result = env.elaborate_decl_v1(&source).unwrap_or_else(|error| {
-                panic!("{spelling} {case} must elaborate: {error:?}")
-            });
-            assert_eq!(
-                result.obligations.len(), expected,
-                "{spelling} {case}: operation-site obligation count"
-            );
-            let new_trust = env
-                .env
-                .trusted_base()
-                .into_iter()
-                .filter(|id| !before.contains(id))
-                .collect::<Vec<_>>();
-            assert_eq!(
-                new_trust.len(), expected,
-                "{spelling} {case}: an unreported postulate is not zero obligations"
-            );
-            if expected == 1 {
-                let obligation = &result.obligations[0];
-                assert!(matches!(obligation.kind, ObligationKind::PartialPrim));
-                assert_eq!(new_trust[0], obligation.hole_id);
-                assert!(env.is_open_hole(obligation.hole_id));
-                let extracted = v2_extract(&result);
-                assert_eq!(extracted.obligations.len(), 1);
-                assert!(matches!(
-                    extracted.obligations[0].provenance.kind,
-                    ProvKind::PartialPrim
-                ));
-            }
+            assert_operation_obligations(spelling, case, &source, 1);
         }
     }
 }
