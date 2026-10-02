@@ -69,21 +69,19 @@ Three increments, each a straight-ancestor cut that may land alone.
    passes the truth for its own scrutinee; a constant `None` says why.
 
    **The check path** (Architect `evt_6n6r4r5shx05f`, `evt_1220jbxcj19zq`,
-   which carry the code). A checked method body opens no alias frame. It
+   corrected by `evt_40f42ed7ayqq5`, which carries the code). A checked method body opens no alias frame. It
    reaches the same shift through `wrap_premise_lams_finalized` and
    `wrap_premise_pis_finalized` at `check_dependent_branch_body` `:6318` and
    `check_match_dependent_mode` `:6590`. A checked single-arm `Vec Nat (Suc
    n)` sibling normalizes to `Zero` where 3 is expected. That is measured on
    `a252de8d8` and on `origin/main` `e893ecb7a`, so it is a live miscompile on
    main, and increment 0 turns it into a refusal (`evt_4wqqh74aat58j`).
-   - Both wraps run `reject_foreign_alias_sentinels` over body and premises
-     whenever premises are non-empty. They return
-     `Result<Term, ForeignAliasAcrossPremiseWrap>`.
-   - `own_frame` is the last replacement frame only at
-     `close_inferred_index_method` `:18935`. The other nine call sites pass
-     `None`.
-   - Each site maps the error to `PatternVariableAcrossDependentSplit` at the
-     split's span, with no `.ok()`, `unwrap`, `expect` or `_` arm.
+   - Both wraps return `Result<Term, AliasAcrossPremiseWrap>` and refuse
+     whenever premises are non-empty and the body or a premise holds an alias
+     sentinel. No wrap runs inside a live own frame: a finishing frame
+     resolves its own sentinels before any wrap, so c1 is unaffected.
+   - All ten call sites map the error to `PatternVariableAcrossDependentSplit`
+     at the split's span, with no `.ok()`, `unwrap`, `expect` or `_` arm.
    - `wrap_premise_lams_from_full` (`:13536`) is excluded because it never
      calls `finalize_refined_body`.
    - The infer-finisher guards stay.
@@ -136,15 +134,16 @@ Three increments, each a straight-ancestor cut that may land alone.
     - Base census: run the sibling on `origin/main`. If main gives `Zero`,
       the handoff reports a live base miscompile that this increment turns
       into a refusal. If main refuses or gives 3, stop to the Architect.
-    - Unit rows call both wraps directly. A foreign sentinel with one
-      premise and `own_frame: None` gives `Err`. The same sentinel listed in
-      `own_frame` gives `Ok`, shifted exactly as before. With zero premises
-      it gives `Ok`.
-    - Mutation: an always-`Ok` `reject_foreign_alias_sentinels` reddens the
-      unit rows and both checked rows. The infer rows still refuse through
-      the finisher guards.
-    - The fan-in table lists all ten wrap call sites with their `own_frame`
-      argument and span source, plus the `from_full` exclusion.
+    - Unit rows call both wraps directly. A sentinel with one premise gives
+      `Err`. The same sentinel with zero premises gives `Ok`. A
+      sentinel-free body with premises gives `Ok`, byte-identical to the
+      output before the change.
+    - c1 and the seven controls keep their values. A control that now
+      refuses is a stop to the Architect.
+    - Mutation: an always-`Ok` guard reddens the unit rows and both checked
+      rows. The infer rows still refuse through the finisher guards.
+    - The fan-in table lists all ten wrap call sites with their span source,
+      plus the `from_full` exclusion.
 - **AC-1.** The M-deep Zero fixture and its two-field sibling flip from
   transition sentinel to their normalized values.
   The R1 and R2 rows, the checked R2 and the checked single-arm sibling flip
