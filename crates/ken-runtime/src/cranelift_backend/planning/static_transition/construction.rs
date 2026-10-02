@@ -48,7 +48,8 @@ use super::aggregates::{
 };
 #[allow(unused_imports)]
 use super::aggregates::{
-    build_aggregate_ownership_plan, build_recursive_residual_dispositions,
+    build_aggregate_ownership_plan, build_recursive_carrier_boxed_stores,
+    build_recursive_residual_dispositions,
     derive_checked_ih_transport_source_population,
     build_checked_ih_continuation_inheritances,
     build_checked_ih_environment_transports, build_checked_ih_generated_entry_accesses,
@@ -296,6 +297,7 @@ impl<'src> Planner<'src> {
                 pre_schema_transport_sources: BTreeSet::new(),
                 preselected_response_callers: BTreeSet::new(),
                 recursive_residual_dispositions: Vec::new(),
+                recursive_carrier_boxed_stores: Vec::new(),
                 recursive_carrier_slots: Vec::new(),
                 checked_ih_environment_transports: Vec::new(),
                 per_emitter_materializations: Vec::new(),
@@ -1440,6 +1442,7 @@ impl<'src> Planner<'src> {
         self.plan.preselected_response_callers =
             self.plan.preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
         self.plan.recursive_residual_dispositions = build_recursive_residual_dispositions(&self.plan)?;
+        self.plan.recursive_carrier_boxed_stores = build_recursive_carrier_boxed_stores(&self.plan)?;
         // `D7` — the aggregate occurrence population is built HERE, last, and
         // deliberately not beside the occurrence authorities it also reads.
         //

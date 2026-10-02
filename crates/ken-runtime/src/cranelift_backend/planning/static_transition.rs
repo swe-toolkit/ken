@@ -229,8 +229,9 @@ pub(in crate::cranelift_backend) use aggregates::{
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
     PlannedAggregateAllocation, PlannedAggregateOwnership, RecursiveResidualDisposition,
-    PlannedAggregateShape, RecursiveCarrierChild, RecursiveCarrierEdge,
-    RecursiveCarrierRole, RecursiveCarrierSlot, RecursiveCarrierStoreKind,
+    PlannedAggregateShape, RecursiveCarrierBoxedStore, RecursiveCarrierChild, RecursiveCarrierEdge,
+    RecursiveCarrierMemberSchema, RecursiveCarrierRole, RecursiveCarrierSlot,
+    RecursiveCarrierStore, RecursiveCarrierStoreKind,
     RecursiveResidualChildKind,
     RecursiveCarrierVariant,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
@@ -707,6 +708,7 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     preselected_response_callers: BTreeSet<ContinuationCallIdentity>,
     /// Exact parent-field/owner dispositions, installed before ownership.
     recursive_residual_dispositions: Vec<RecursiveResidualDisposition>,
+    recursive_carrier_boxed_stores: Vec<RecursiveCarrierBoxedStore>,
     /// Issued sum schema and exact writer edges for each wrapped recursive slot.
     recursive_carrier_slots: Vec<RecursiveCarrierSlot>,
     /// The exact two-endpoint transports that carry a force-materialized

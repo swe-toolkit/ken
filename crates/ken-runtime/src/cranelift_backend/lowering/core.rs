@@ -13681,33 +13681,84 @@ impl<'a> Lowering<'a> {
         // Preflight the complete residual suffix before allocating the parent.
         // The planner has already included its lane in the parent's meet.
         let owner = self.defining_emission_owner;
+        enum IssuedCarrierStore {
+            Residual(RecursiveResidualDisposition),
+            Boxed(RecursiveCarrierBoxedStore),
+        }
         let mut residual_fields = Vec::with_capacity(args.len());
         for position in 0..args.len() {
-            // R2: derive the obligation from this source allocation and
-            // owner, not from the presence of a disposition. If issuance
-            // omitted a slot, fail before writing a bare Child.
-            let disposition = self.static_transition_plan.slot_store_obligation(
+            // Every member of an issued slot must write R. Resolve its exact
+            // sealed writer before parent allocation, not from the operand's
+            // apparent class or the presence of a capture disposition.
+            let store = self.static_transition_plan.slot_store_obligation(
                 owner, occurrence, constructor_identity, position as u32,
-            )?.cloned();
-            if disposition.is_some() && matches!(args[position], LoweringOperand::Residual(_)) {
+            )?.map(|store| match store {
+                RecursiveCarrierStore::Residual(disposition) =>
+                    IssuedCarrierStore::Residual(disposition.clone()),
+                RecursiveCarrierStore::Boxed(boxed) => IssuedCarrierStore::Boxed(boxed.clone()),
+            });
+            if store.is_some() && matches!(args[position], LoweringOperand::Residual(_)) {
                 return Err(unsupported(
                     "RecursiveResidual", "an issued residual slot received an already-residual operand",
                 ));
             }
-            if let Some(disposition) = disposition {
-                let record = disposition.record.ok_or_else(|| unsupported(
-                    "RecursiveResidual", "the creation-site residual has no governed private Record",
-                ))?;
-                let fields = self.recursive_residual_creation_fields(
-                    builder, origin, position, &args[position], emission_env, &disposition,
-                )?;
-                if fields.len() + 1 != disposition.field_count() {
-                    return Err(unsupported("RecursiveResidual", "the creation-site record field count changed after issuance"));
+            let issued = match store {
+                Some(IssuedCarrierStore::Residual(disposition)) => {
+                    let record = disposition.record.ok_or_else(|| unsupported(
+                        "RecursiveResidual", "the creation-site residual has no governed private Record",
+                    ))?;
+                    let fields = self.recursive_residual_creation_fields(
+                        builder, origin, position, &args[position], emission_env, &disposition,
+                    )?;
+                    let slot = self.static_transition_plan
+                        .recursive_carrier_for_specialization(disposition.specialization)?
+                        .ok_or_else(|| unsupported("RecursiveResidual", "a residual writer lost its issued slot"))?;
+                    let variant = slot.variant(disposition.specialization)?.clone();
+                    if variant.schema != RecursiveCarrierMemberSchema::Residual
+                        || (disposition.child == RecursiveResidualChildKind::LexicalClosure
+                            && variant.record != record)
+                        || fields.len() + 1 != variant.roles.len()
+                        || fields.len() + 1 != disposition.field_count() {
+                        return Err(unsupported("RecursiveResidual", "the creation-site record changed after issuance"));
+                    }
+                    Some((record, fields, variant, RecursiveCarrierSlotKey::of(slot)))
                 }
-                residual_fields.push(Some((record, fields)));
-            } else {
-                residual_fields.push(None);
-            }
+                Some(IssuedCarrierStore::Boxed(boxed)) => {
+                    let record = boxed.record.ok_or_else(|| unsupported(
+                        "RecursiveResidual", "the boxed creation site has no governed private Record",
+                    ))?;
+                    let slot = self.static_transition_plan
+                        .recursive_carrier_for_specialization(boxed.specialization)?
+                        .ok_or_else(|| unsupported("RecursiveResidual", "a boxed writer lost its issued slot"))?;
+                    let variant = slot.variant(boxed.specialization)?.clone();
+                    let edge = slot.edge(boxed.specialization, RecursiveCarrierStoreKind::ConstructEmission,
+                        origin, owner.ok_or_else(|| unsupported(
+                            "RecursiveResidual", "a boxed writer lost its emission owner",
+                        ))?)?;
+                    let child_origin = self.static_transition_plan.child_static_origin(origin, position)?;
+                    let LoweringOperand::Specialized(Lowered::Closure {
+                        boundary_environment: Some(child_record), ..
+                    }) = &args[position] else {
+                        return Err(unsupported("RecursiveResidual", "a boxed writer has no ordinary constructor Child"));
+                    };
+                    if variant.schema != RecursiveCarrierMemberSchema::Boxed
+                        || variant.record != record || variant.label != Some(boxed.label)
+                        || variant.roles != [RecursiveCarrierRole::Child, RecursiveCarrierRole::Label]
+                        || !matches!(edge.child, RecursiveCarrierChild::ConstructChild { origin, record }
+                            if origin == child_origin && record == *child_record) {
+                        return Err(unsupported("RecursiveResidual", "a boxed writer changed its issued Child or variant"));
+                    }
+                    let slot_key = RecursiveCarrierSlotKey::of(slot);
+                    let label = i64::from(boxed.label);
+                    let label_value = builder.ins().iconst(types::I64, label);
+                    let label_word = self.transfer_into_carrier(builder, child_origin,
+                        &Lowered::Int { value: label_value, known: Some(label) })?;
+                    Some((record, vec![(RecursiveCarrierRole::Label, label_word)],
+                        variant, slot_key))
+                }
+                None => None,
+            };
+            residual_fields.push(issued);
         }
         // An unissued constructor field is an ordinary K destination. Decode
         // every arriving R before the parent exists, preserving whole-tree
@@ -13746,23 +13797,10 @@ impl<'a> Lowering<'a> {
                 LoweringOperand::Residual(_) => decoded[position]
                     .expect("residual operands were decoded before allocation"),
             };
-            if let Some((record, fields)) = &residual_fields[position] {
-                let disposition = self.static_transition_plan
-                    .recursive_residual_for_store(owner.ok_or_else(|| unsupported(
-                        "RecursiveResidual", "a construct carrier writer lost its emission owner",
-                    ))?, origin, position as u32)
-                    .ok_or_else(|| unsupported("RecursiveResidual", "a construct carrier writer lost its disposition"))?;
-                let slot = self.static_transition_plan
-                    .recursive_carrier_for_specialization(disposition.specialization)?
-                    .ok_or_else(|| unsupported("RecursiveResidual", "a construct carrier writer lost its slot"))?;
-                let variant = slot.variant(disposition.specialization)?;
-                if (disposition.child == RecursiveResidualChildKind::LexicalClosure
-                    && variant.record != *record)
-                    || fields.len() + 1 != variant.roles.len()
-                {
+            if let Some((record, fields, variant, slot_key)) = &residual_fields[position] {
+                if fields.len() + 1 != variant.roles.len() {
                     return Err(unsupported("RecursiveResidual", "a construct carrier writer changed its issued variant"));
                 }
-                let slot_key = RecursiveCarrierSlotKey::of(slot);
                 let mut assigned = vec![None; variant.roles.len()];
                 assigned[variant.role_index(RecursiveCarrierRole::Child)?] = Some(child);
                 for (role, word) in fields {
@@ -13784,7 +13822,7 @@ impl<'a> Lowering<'a> {
                     self.emit_carrier_store_field(builder, wrapped, index,
                         word.expect("construct carrier roles were checked complete"))?;
                 }
-                let residual = CarriedResidualWord::issue(wrapped.word, slot_key);
+                let residual = CarriedResidualWord::issue(wrapped.word, *slot_key);
                 self.store_residual_field_passthrough(builder, word, position, residual)?;
             } else {
                 self.emit_carrier_store_field(builder, word, position, child)?;

@@ -203,12 +203,41 @@ pub(in crate::cranelift_backend) enum RecursiveCarrierRole {
     ContinuationInput { ordinal: u32 },
 }
 
+/// One issued slot has one R representation; members differ only in how
+/// their writer supplies its Child to that representation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum RecursiveCarrierMemberSchema {
+    Residual,
+    Boxed,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct RecursiveCarrierVariant {
     pub(in crate::cranelift_backend) specialization: ContinuationSpecializationId,
+    pub(in crate::cranelift_backend) schema: RecursiveCarrierMemberSchema,
     pub(in crate::cranelift_backend) label: Option<u32>,
     pub(in crate::cranelift_backend) record: AggregateOccurrenceId,
     pub(in crate::cranelift_backend) roles: Vec<RecursiveCarrierRole>,
+    /// The Child constructor's declared arity, independent of this Record's roles.
+    pub(in crate::cranelift_backend) child_arity: u32,
+}
+
+/// An exact ConstructEmission site whose unwrapped Child needs a K→R box.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RecursiveCarrierBoxedStore {
+    pub(in crate::cranelift_backend) owner: ContinuationEmissionOwner,
+    pub(in crate::cranelift_backend) parent: StaticOriginId,
+    pub(in crate::cranelift_backend) position: u32,
+    pub(in crate::cranelift_backend) constructor: super::ConstructorIdentity,
+    pub(in crate::cranelift_backend) specialization: ContinuationSpecializationId,
+    pub(in crate::cranelift_backend) label: u32,
+    pub(in crate::cranelift_backend) record: Option<AggregateOccurrenceId>,
+}
+
+/// Exactly one declared writer is selected at a source constructor field.
+pub(in crate::cranelift_backend) enum RecursiveCarrierStore<'plan> {
+    Residual(&'plan RecursiveResidualDisposition),
+    Boxed(&'plan RecursiveCarrierBoxedStore),
 }
 
 impl RecursiveCarrierVariant {
@@ -5279,6 +5308,74 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_recursive
     Ok(dispositions)
 }
 
+/// Issue ConstructEmission box sites before ownership. The same call tokens
+/// mint the ConstructEmission points of the later per-emitter census; transport
+/// destinations are not writers. The final point rewalk checks their equality.
+pub(in crate::cranelift_backend::planning::static_transition) fn build_recursive_carrier_boxed_stores(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<RecursiveCarrierBoxedStore>, CraneliftBackendError> {
+    let units = plan.continuation_units()?;
+    let mut stores = Vec::new();
+    let mut seen = BTreeSet::new();
+    for call in &plan.continuation_specialization_calls {
+        let token = &call.token;
+        let unit = units.iter().find(|unit| unit.id() == token.target)
+            .ok_or_else(|| planner_error("a boxed carrier call has no interned specialization"))?;
+        let parent = token.producer_construct_origin;
+        let position = unit.recursive_position();
+        let constructor = plan.constructor_symbol_identity(parent)?;
+        let candidates = plan.recursive_residual_candidates(
+            unit.continuation_origin(), constructor, position,
+        )?;
+        if !candidates.contains(&unit.id())
+            || !candidates.iter().any(|candidate| plan.recursive_residual_dispositions
+                .iter().any(|entry| entry.specialization == *candidate
+                    && entry.child == RecursiveResidualChildKind::LexicalClosure && entry.wrapped()))
+            || plan.recursive_residual_for_specialization(unit.id())?
+                .is_some_and(RecursiveResidualDisposition::wrapped)
+        {
+            continue;
+        }
+        if candidates.len() < 2 {
+            return Err(planner_error("a boxed recursive carrier has no label"));
+        }
+        let label = u32::try_from(candidates.iter().position(|candidate| *candidate == unit.id())
+            .ok_or_else(|| planner_error("a boxed recursive carrier is outside its slot flow"))?)
+            .map_err(|_| planner_capacity_error("recursive carrier box label exhausted"))?;
+        let key = (token.target, token.emission_owner, parent, position);
+        if !seen.insert(key) { continue; }
+        stores.push(RecursiveCarrierBoxedStore {
+            owner: token.emission_owner, parent, position, constructor,
+            specialization: token.target, label, record: None,
+        });
+    }
+    Ok(stores)
+}
+
+/// The ordinary Child and an immediate label make a two-field governed Record.
+fn recursive_carrier_boxed_children(
+    plan: &StaticTransitionPlan<'_>, store: &RecursiveCarrierBoxedStore,
+) -> Result<Vec<PlannedAggregateChild>, CraneliftBackendError> {
+    let parent = occurrence_authority(plan, store.parent)?;
+    let original = parent.children.iter().find(|child| child.position == store.position)
+        .ok_or_else(|| planner_error("boxed carrier source parent has no recursive field"))?;
+    let owners = aggregate_child_referent_owners(plan, original)?;
+    if owners.is_empty() {
+        return Err(planner_error("boxed carrier Child has no referent owner"));
+    }
+    Ok(vec![
+        PlannedAggregateChild {
+            position: 0, origin: Some(original.origin), field_identity: None,
+            lifetime: original.lifetime, owners,
+        },
+        PlannedAggregateChild {
+            position: 1, origin: None, field_identity: None,
+            lifetime: PlannedReferentLifetime::Persistent,
+            owners: lifetime_referent_affinity(PlannedReferentLifetime::Persistent),
+        },
+    ])
+}
+
 /// Derive the *actual residual's* children before choosing the enclosing
 /// constructor lane. Field zero is the already-carried child; no closure
 /// template or independently allocated HostResult supplies these fields.
@@ -5378,14 +5475,27 @@ fn source_child_residual_owner(
             let authority = occurrence_authority(plan, origin)?;
             let mut invocation = false;
             for child in &authority.children {
-                if let Some(entry) = plan.recursive_residual_dispositions.iter().find(|entry| {
+                let dispositions = plan.recursive_residual_dispositions.iter().filter(|entry| {
                     entry.wrapped() && entry.parent == origin && entry.position == child.position
-                }) {
+                }).collect::<Vec<_>>();
+                let boxes = plan.recursive_carrier_boxed_stores.iter().filter(|store| {
+                    store.parent == origin && store.position == child.position
+                }).collect::<Vec<_>>();
+                if dispositions.is_empty() && boxes.is_empty()
+                    && matches!(plan.planned_occurrence_expr(child.origin)?,
+                        RuntimeExpr::Construct { .. } | RuntimeExpr::Record { .. })
+                {
+                    invocation |= source_child_residual_owner(plan, child.origin, visiting)?;
+                }
+                for entry in dispositions {
                     invocation |= recursive_residual_children(plan, entry)?.iter().any(|field| {
                         field.owners.contains(&BoundaryReferentOwner::InvocationArena)
                     });
-                } else if matches!(plan.planned_occurrence_expr(child.origin)?, RuntimeExpr::Construct { .. } | RuntimeExpr::Record { .. }) {
-                    invocation |= source_child_residual_owner(plan, child.origin, visiting)?;
+                }
+                for boxed in boxes {
+                    invocation |= recursive_carrier_boxed_children(plan, boxed)?.iter().any(|field| {
+                        field.owners.contains(&BoundaryReferentOwner::InvocationArena)
+                    });
                 }
             }
             invocation
@@ -5438,6 +5548,16 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             }) {
                 let residual_children = recursive_residual_children(plan, disposition)?;
                 if residual_children.iter().any(|field| field.owners.contains(&BoundaryReferentOwner::InvocationArena)) {
+                    owners = vec![BoundaryReferentOwner::InvocationArena];
+                } else if !owners.contains(&BoundaryReferentOwner::InvocationArena) {
+                    owners = vec![BoundaryReferentOwner::PersistentStore];
+                }
+            }
+            for store in plan.recursive_carrier_boxed_stores.iter().filter(|store| {
+                store.parent == origin && store.position == child.position
+            }) {
+                let boxed_children = recursive_carrier_boxed_children(plan, store)?;
+                if boxed_children.iter().any(|field| field.owners.contains(&BoundaryReferentOwner::InvocationArena)) {
                     owners = vec![BoundaryReferentOwner::InvocationArena];
                 } else if !owners.contains(&BoundaryReferentOwner::InvocationArena) {
                     owners = vec![BoundaryReferentOwner::PersistentStore];
@@ -5796,6 +5916,29 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             owner: plan.semantic.function_owner(disposition.parent)?,
             shape: PlannedAggregateShape::Record,
             declared_children: Some(declared_children),
+            children, meet, allocation,
+        });
+    }
+    for store in &plan.recursive_carrier_boxed_stores {
+        let children = recursive_carrier_boxed_children(plan, store)?;
+        let escapes = children.iter().any(|field| field.owners.contains(&BoundaryReferentOwner::InvocationArena));
+        let (meet, allocation) = if escapes {
+            (PlannedReferentLifetime::ActivationOwned, PlannedAggregateAllocation::InvocationAggregate)
+        } else {
+            (PlannedReferentLifetime::Persistent, PlannedAggregateAllocation::PersistentGround)
+        };
+        records.push(PlannedAggregateOwnership {
+            id: AggregateOccurrenceId(0),
+            producer: AggregateOccurrenceProducer::SynthesizedUse {
+                owner: store.owner,
+                seat: store.parent,
+                path: SynthesizedAggregatePath::root(SynthesizedAggregateRoot::RecursivePositionResidual)
+                    .field(store.position),
+                role: SynthesizedAggregateRole::RecursivePositionResidual,
+            },
+            owner: plan.semantic.function_owner(store.parent)?,
+            shape: PlannedAggregateShape::Record,
+            declared_children: Some(positional_capture_declared_children(2)?),
             children, meet, allocation,
         });
     }
@@ -10501,8 +10644,77 @@ impl<'src> StaticTransitionPlan<'src> {
                 return Err(planner_error("recursive carrier has an invalid or repeated member schema"));
             }
             slot.variants.push(RecursiveCarrierVariant {
-                specialization: unit.id(), label: expected_label, record, roles,
+                specialization: unit.id(), schema: RecursiveCarrierMemberSchema::Residual,
+                label: expected_label, record, roles,
+                child_arity: disposition.worker_captures,
             });
+        }
+        // Once any member wraps, the slot declares R for every member.
+        // The unwrapped writer boxes its ordinary constructor Child under the
+        // same flow ordinal; no transport point can issue this variant.
+        for slot in &mut slots {
+            for (index, specialization) in slot.flow.iter().copied().enumerate() {
+                if slot.variants.iter().any(|variant| variant.specialization == specialization) {
+                    continue;
+                }
+                let expected_label = u32::try_from(index)
+                    .map_err(|_| planner_capacity_error("recursive carrier box label exhausted"))?;
+                if slot.flow.len() < 2 {
+                    return Err(planner_error("a boxed recursive carrier has no label"));
+                }
+                let stores = self.recursive_carrier_boxed_stores.iter().filter(|store|
+                    store.specialization == specialization && store.constructor == slot.constructor
+                        && store.position == slot.position).collect::<Vec<_>>();
+                if stores.is_empty() {
+                    return Err(planner_error("a boxed recursive carrier member has no construct store"));
+                }
+                let mut issued = None;
+                for store in stores {
+                    if store.label != expected_label {
+                        return Err(planner_error("boxed recursive carrier label disagrees with its slot flow"));
+                    }
+                    let record = store.record.ok_or_else(|| planner_error(
+                        "boxed recursive carrier has no governed Record allocation",
+                    ))?;
+                    let child = self.child_static_origin(store.parent, store.position as usize)?;
+                    let environment = self.boundary_closure_crossing_environment(store.owner, child)?
+                        .ok_or_else(|| planner_error("boxed recursive carrier Child has no governed lexical environment"))?;
+                    let child_record = self.aggregate_record_view(environment.record())?;
+                    if child_record.shape() != PlannedAggregateShape::Constructor {
+                        return Err(planner_error("boxed recursive carrier Child is not Constructor-class"));
+                    }
+                    let child_arity = u32::try_from(child_record.declared_children()
+                        .ok_or_else(|| planner_error("boxed recursive carrier Child has no declared arity"))?.len())
+                        .map_err(|_| planner_capacity_error("boxed recursive carrier Child arity exhausted"))?;
+                    if environment.capture_origins().len() != child_arity as usize {
+                        return Err(planner_error("boxed recursive carrier Child capture run changed since issuance"));
+                    }
+                    match issued {
+                        None => issued = Some((record, child_arity)),
+                        Some((prior_record, prior_arity)) if prior_record == record && prior_arity == child_arity => {}
+                        Some(_) => return Err(planner_error("boxed recursive carrier stores disagree on record or Child arity")),
+                    }
+                    if slot.edges.iter().any(|edge| edge.specialization == specialization
+                        && edge.kind == RecursiveCarrierStoreKind::ConstructEmission
+                        && edge.origin == store.parent && edge.owner == store.owner) {
+                        return Err(planner_error("recursive carrier duplicates an issued boxed writer edge"));
+                    }
+                    slot.edges.push(RecursiveCarrierEdge {
+                        specialization, kind: RecursiveCarrierStoreKind::ConstructEmission,
+                        origin: store.parent, owner: store.owner,
+                        child: RecursiveCarrierChild::ConstructChild {
+                            origin: child, record: environment.record(),
+                        },
+                    });
+                }
+                let (record, child_arity) = issued.expect("boxed stores were checked nonempty");
+                slot.variants.push(RecursiveCarrierVariant {
+                    specialization, schema: RecursiveCarrierMemberSchema::Boxed,
+                    label: Some(expected_label), record,
+                    roles: vec![RecursiveCarrierRole::Child, RecursiveCarrierRole::Label],
+                    child_arity,
+                });
+            }
         }
         // The disposition issuer enumerated source Construct occurrences,
         // including checked-IH force sites which are not per-emitter
@@ -10512,7 +10724,8 @@ impl<'src> StaticTransitionPlan<'src> {
             let Some(slot) = slots.iter_mut().find(|slot|
                 slot.flow.contains(&disposition.specialization)) else { continue; };
             let variant = slot.variant(disposition.specialization)?;
-            if disposition.position != slot.position || disposition.constructor != slot.constructor {
+            if variant.schema != RecursiveCarrierMemberSchema::Residual
+                || disposition.position != slot.position || disposition.constructor != slot.constructor {
                 return Err(planner_error("recursive carrier writer has a foreign slot shape"));
             }
             self.source_aggregate_occurrence(disposition.parent, PlannedAggregateShape::Constructor)?;
@@ -10601,18 +10814,11 @@ impl<'src> StaticTransitionPlan<'src> {
                         && edge.origin == point.emission_origin
                         && edge.kind == RecursiveCarrierStoreKind::ConstructEmission
                 ).count();
-                let owes_edge = self.recursive_residual_for_specialization(point.specialization)?
-                    .is_some();
-                match (owes_edge, count) {
-                    (true, 1) | (false, 0) => {}
-                    (true, n) => return Err(planner_error(format!(
-                        "wrapped lexical source constructor ({:?}, {:?}, {}) has {n} issued slot-store edges",
+                if count != 1 {
+                    return Err(planner_error(format!(
+                        "recursive carrier source constructor ({:?}, {:?}, {}) has {count} issued slot-store edges",
                         point.owner, point.emission_origin, slot.position,
-                    ))),
-                    (false, n) => return Err(planner_error(format!(
-                        "unwrapped lexical source constructor ({:?}, {:?}, {}) has {n} issued slot-store edges",
-                        point.owner, point.emission_origin, slot.position,
-                    ))),
+                    )));
                 }
             }
             for unit in units.iter().filter(|unit| slot.flow.contains(&unit.id())) {
@@ -10641,6 +10847,9 @@ impl<'src> StaticTransitionPlan<'src> {
                     if binding.frame_origin() != slot.eliminator
                         || binding.recursive_position() != slot.position {
                         continue;
+                    }
+                    if slot.variant(unit.id())?.schema == RecursiveCarrierMemberSchema::Boxed {
+                        return Err(planner_error("a boxed recursive carrier member has a checked-IH force store"));
                     }
                     let owner = ContinuationEmissionOwner::Specialization(unit.id());
                     let edges = slot.edges.iter().filter(|edge|
@@ -10716,7 +10925,7 @@ impl<'src> StaticTransitionPlan<'src> {
         occurrence: AggregateOccurrenceId,
         constructor: super::ConstructorIdentity,
         position: u32,
-    ) -> Result<Option<&RecursiveResidualDisposition>, CraneliftBackendError> {
+    ) -> Result<Option<RecursiveCarrierStore<'_>>, CraneliftBackendError> {
         let record = self.aggregate_record_view(occurrence)?;
         if record.shape() != PlannedAggregateShape::Constructor {
             return Err(planner_error("a constructor slot store has a non-constructor record"));
@@ -10743,9 +10952,8 @@ impl<'src> StaticTransitionPlan<'src> {
                     && slot.flow.contains(&point.specialization)
             ) {
                 saw_construct_point = true;
-                if self.recursive_residual_for_specialization(point.specialization)?.is_some()
-                    && member.replace(point.specialization).is_some() {
-                    return Err(planner_error("one source constructor field matches two wrapped members"));
+                if member.replace(point.specialization).is_some() {
+                    return Err(planner_error("one source constructor field matches two recursive carrier members"));
                 }
             }
             // Checked-IH force is a source child, not a ConstructEmission
@@ -10763,8 +10971,10 @@ impl<'src> StaticTransitionPlan<'src> {
                         if matches!(self.planned_occurrence_expr(child)?,
                             RuntimeExpr::CheckedComputationalIHInvocation { .. })
                             && super::occurrences::occurrence_subtree_contains(self, body, origin)?
-                            && self.recursive_residual_for_specialization(id)?.is_some()
                         {
+                            if slot.variant(id)?.schema == RecursiveCarrierMemberSchema::Boxed {
+                                return Err(planner_error("a boxed recursive carrier member has a checked-IH force store"));
+                            }
                             member = Some(id);
                         }
                     }
@@ -10777,21 +10987,41 @@ impl<'src> StaticTransitionPlan<'src> {
             }
         }
         let Some((slot, specialization)) = expected else { return Ok(None); };
-        let disposition = self.recursive_residual_for_store(owner, origin, position)
-            .filter(|entry| entry.wrapped() && entry.specialization == specialization)
-            .ok_or_else(|| planner_error(format!(
-                "source constructor slot store ({owner:?}, {origin:?}, {position}) has no issued residual",
-            )))?;
-        let kind = match disposition.child {
-            RecursiveResidualChildKind::LexicalClosure => RecursiveCarrierStoreKind::ConstructEmission,
-            RecursiveResidualChildKind::CheckedIhForce { .. } => RecursiveCarrierStoreKind::CheckedIhForce,
+        let variant = slot.variant(specialization)?;
+        let store = match variant.schema {
+            RecursiveCarrierMemberSchema::Residual => {
+                let disposition = self.recursive_residual_for_store(owner, origin, position)
+                    .filter(|entry| entry.wrapped() && entry.specialization == specialization)
+                    .ok_or_else(|| planner_error(format!(
+                        "source constructor slot store ({owner:?}, {origin:?}, {position}) has no issued residual",
+                    )))?;
+                let kind = match disposition.child {
+                    RecursiveResidualChildKind::LexicalClosure => RecursiveCarrierStoreKind::ConstructEmission,
+                    RecursiveResidualChildKind::CheckedIhForce { .. } => RecursiveCarrierStoreKind::CheckedIhForce,
+                };
+                slot.edge(specialization, kind, origin, owner)?;
+                if disposition.constructor != constructor || disposition.position != position
+                    || disposition.record.is_none() {
+                    return Err(planner_error("source constructor slot store changed its issued disposition"));
+                }
+                RecursiveCarrierStore::Residual(disposition)
+            }
+            RecursiveCarrierMemberSchema::Boxed => {
+                let mut matching = self.recursive_carrier_boxed_stores.iter().filter(|store|
+                    store.owner == owner && store.parent == origin && store.position == position
+                        && store.constructor == constructor && store.specialization == specialization);
+                let boxed = matching.next().ok_or_else(|| planner_error(
+                    "source constructor slot store has no issued boxed store",
+                ))?;
+                if matching.next().is_some() || boxed.record != Some(variant.record)
+                    || variant.label != Some(boxed.label) {
+                    return Err(planner_error("source constructor slot store disagrees with its boxed variant"));
+                }
+                slot.edge(specialization, RecursiveCarrierStoreKind::ConstructEmission, origin, owner)?;
+                RecursiveCarrierStore::Boxed(boxed)
+            }
         };
-        slot.edge(specialization, kind, origin, owner)?;
-        if disposition.constructor != constructor || disposition.position != position
-            || disposition.record.is_none() {
-            return Err(planner_error("source constructor slot store changed its issued disposition"));
-        }
-        Ok(Some(disposition))
+        Ok(Some(store))
     }
 
     pub(in crate::cranelift_backend) fn recursive_carrier_slot(
@@ -10839,6 +11069,13 @@ impl<'src> StaticTransitionPlan<'src> {
                 .field(entry.position);
             entry.record = Some(*issued.get(&(entry.owner, entry.parent, path)).ok_or_else(|| {
                 planner_error("wrapped recursive residual has no governed ownership record")
+            })?);
+        }
+        for store in &mut self.recursive_carrier_boxed_stores {
+            let path = SynthesizedAggregatePath::root(SynthesizedAggregateRoot::RecursivePositionResidual)
+                .field(store.position);
+            store.record = Some(*issued.get(&(store.owner, store.parent, path)).ok_or_else(|| {
+                planner_error("boxed recursive carrier store has no governed ownership record")
             })?);
         }
         Ok(())

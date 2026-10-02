@@ -287,10 +287,8 @@ impl<'a> Lowering<'a> {
         )?;
         let class = self.emit_carrier_class(builder, child)?;
         Self::require_i64(builder, class, BoundaryClass::Constructor as i64);
-        let worker_captures = variant.roles.iter().filter(|role|
-            matches!(role, RecursiveCarrierRole::WorkerCapture { .. })).count();
         let child_count = self.emit_carrier_field_count(builder, child)?;
-        Self::require_i64(builder, child_count, worker_captures as i64);
+        Self::require_i64(builder, child_count, i64::from(variant.child_arity));
         Ok(child)
     }
 }
