@@ -150,7 +150,7 @@ proof comm for mul (a : Nat) (b : Nat) : Equal Nat (mul a b) (mul b a) =
         (sym Nat (mul (Suc b2) a) (add (mul b2 a) a) ((proof suc_l for mul) b2 a))
   }
 
-theorem mul_add_distrib_r
+pub theorem mul_add_distrib_r
       (a : Nat) (b : Nat) (c : Nat)
     : Equal Nat (mul a (add b c)) (add (mul a b) (mul a c)) =
   match c {
@@ -225,6 +225,9 @@ proof assoc for mul
 `add` and `mul` recurse on their second argument and remain the only
 value-producing definitions. Their checked laws carry exactly the structural
 recursion they need and are discoverable as members of `add::…` or `mul::…`.
+The public `mul_add_distrib_r` theorem distributes multiplication over the
+sum in its right argument; its structural proof remains with the arithmetic
+operations that determine its reduction.
 
 ## Using it
 
