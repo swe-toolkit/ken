@@ -6869,10 +6869,11 @@ impl<'a> Lowering<'a> {
                 }
                 return Ok(ProducerTrampolineStep::ordinary(claimed.answer.value));
             }
-            return if lowered_args
-                .iter()
-                .any(|argument| matches!(argument, LoweringOperand::Carried(_)))
-            {
+            return if lowered_args.iter().any(|argument| match argument {
+                LoweringOperand::Carried(_) => true,
+                LoweringOperand::Residual(_) => true,
+                LoweringOperand::Specialized(_) => false,
+            }) {
                 Ok(ProducerTrampolineStep::ordinary(LoweringOperand::Carried(
                     self.transfer_constructor_operands(
                         builder,
@@ -7506,10 +7507,11 @@ impl<'a> Lowering<'a> {
             return Ok(self.continue_composed_value(claimed.answer, eliminators));
         }
 
-        let produced = if lowered_args
-            .iter()
-            .any(|argument| matches!(argument, LoweringOperand::Carried(_)))
-        {
+        let produced = if lowered_args.iter().any(|argument| match argument {
+            LoweringOperand::Carried(_) => true,
+            LoweringOperand::Residual(_) => true,
+            LoweringOperand::Specialized(_) => false,
+        }) {
             LoweringOperand::Carried(self.transfer_constructor_operands(
                 builder,
                 static_origin,
@@ -16447,10 +16449,11 @@ impl<'a> Lowering<'a> {
                 self.record_pending_vis_construct(
                     builder, static_origin, constructor, &lowered_args,
                 )?;
-                if lowered_args
-                    .iter()
-                    .any(|argument| matches!(argument, LoweringOperand::Carried(_)))
-                {
+                if lowered_args.iter().any(|argument| match argument {
+                    LoweringOperand::Carried(_) => true,
+                    LoweringOperand::Residual(_) => true,
+                    LoweringOperand::Specialized(_) => false,
+                }) {
                     return Ok(LoweringOperand::Carried(
                         self.transfer_constructor_operands(
                             builder,
@@ -16668,13 +16671,14 @@ impl<'a> Lowering<'a> {
                 // deliberate. An all-specialized lexical closure is the
                 // pre-existing shape and does not require a planner-issued
                 // worker template to exist at all; demanding one would reject
-                // programs this node never touched. A carried capture is what
-                // creates the obligation, because it is what commits the callee
+                // programs this node never touched. A runtime-word capture,
+                // whether K or R, creates the obligation by committing the callee
                 // to loading an exact activation-frame slot.
-                if captures
-                    .iter()
-                    .any(|capture| matches!(capture, LoweringOperand::Carried(_)))
-                {
+                if captures.iter().any(|capture| match capture {
+                    LoweringOperand::Carried(_) => true,
+                    LoweringOperand::Residual(_) => true,
+                    LoweringOperand::Specialized(_) => false,
+                }) {
                     self.validate_retained_callable_capture_contract(
                         static_origin,
                         body.static_origin,

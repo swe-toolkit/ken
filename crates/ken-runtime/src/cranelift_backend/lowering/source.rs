@@ -1709,8 +1709,10 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 self.record_pending_vis_construct(
                                     builder, static_origin, &constructor, &lowered,
                                 )?;
-                                let constructed = if lowered.iter().any(|field| {
-                                    matches!(field, LoweringOperand::Carried(_))
+                                let constructed = if lowered.iter().any(|field| match field {
+                                    LoweringOperand::Carried(_) => true,
+                                    LoweringOperand::Residual(_) => true,
+                                    LoweringOperand::Specialized(_) => false,
                                 }) {
                                     LoweringOperand::Carried(self.transfer_constructor_operands(
                                         builder,
