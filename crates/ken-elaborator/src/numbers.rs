@@ -379,11 +379,16 @@ pub fn register_numeric_env(
     let decimalpair_id = GlobalId(0);
     let char_id    = GlobalId(0);
 
-    // ---- Int ops (total, no obligation) ----
+    // ---- Total Int ops ----
     let add_int_id = reg_binop!("add_int", int_id);
     let sub_int_id = reg_binop!("sub_int", int_id);
     let mul_int_id = reg_binop!("mul_int", int_id);
     let eq_int_id  = reg_cmpop!("eq_int", int_id, bool_id);
+
+    // Partial Int ops: the kernel admits their types but never computes them.
+    // Their runtime reductions fault on zero; surface use owes an obligation.
+    reg_binop!("div_int", int_id);
+    reg_binop!("mod_int", int_id);
 
     // Register `Int`'s decidable-equality certificate
     // (`docs/adr/0013-int-decidable-equality-kernel-posture.md` Layer 1):

@@ -1720,6 +1720,23 @@ fn exact_int_binop(a: &EvalVal, b: &EvalVal, op: impl Fn(BigInt, BigInt) -> BigI
     }
 }
 
+/// Truncated Int division/remainder over arbitrary-precision operands. A zero
+/// divisor is a runtime fault, never a neutral or fabricated numeric result.
+fn exact_int_divmod(
+    symbol: &'static str,
+    a: &EvalVal,
+    b: &EvalVal,
+    op: impl FnOnce(BigInt, BigInt) -> BigInt,
+) -> EvalVal {
+    match (eval_to_bigint(a), eval_to_bigint(b)) {
+        (Some(_), Some(bv)) if bv == BigInt::from(0u8) => {
+            panic!("{symbol} has zero divisor")
+        }
+        (Some(av), Some(bv)) => bigint_to_int_val(op(av, bv)),
+        _ => EvalVal::Neutral,
+    }
+}
+
 /// Convert an evaluator `BigInt` to its store representation
 /// (`Value::BigInt { sign, limbs }`) — the forward half of the F1 store
 /// round-trip (`18a §5.2.1(3)`). `to_u64_digits` is minimal by construction
@@ -1972,7 +1989,8 @@ pub fn eval_vals_eq(a: &EvalVal, b: &EvalVal) -> bool {
 /// retired (`18a §5 F3`); those symbols now fall through to the catch-all
 /// stuck arm.
 /// `L6` Bytes ops and encode/decode (`38 §1.2`, `38 §1.4`) are also grounded.
-/// Division and fault-triggering operations are out of scope (`43 §2.2`).
+/// `div_int` and `mod_int` fault on a zero divisor (`18a §5.2`); other
+/// fault-triggering operations remain outside this registry (`43 §2.2`).
 /// Exposed `pub` for conformance tests in `ken-elaborator`.
 pub fn prim_reduce(symbol: &str, args: &[EvalVal]) -> EvalVal {
     // Unknown operand: propagate strictly.
@@ -1989,6 +2007,8 @@ pub fn prim_reduce(symbol: &str, args: &[EvalVal]) -> EvalVal {
         ("add_int", [a, b]) => exact_int_binop(a, b, |x, y| x + y),
         ("sub_int", [a, b]) => exact_int_binop(a, b, |x, y| x - y),
         ("mul_int", [a, b]) => exact_int_binop(a, b, |x, y| x * y),
+        ("div_int", [a, b]) => exact_int_divmod("div_int", a, b, |x, y| x / y),
+        ("mod_int", [a, b]) => exact_int_divmod("mod_int", a, b, |x, y| x % y),
         ("eq_int", [a, b]) => match (eval_to_bigint(a), eval_to_bigint(b)) {
             (Some(av), Some(bv)) => EvalVal::Bool(av == bv),
             _ => EvalVal::Neutral,
@@ -6894,7 +6914,7 @@ fn prim_arity(symbol: &str) -> usize {
     match symbol {
         "not_bool" => 1,
         "and_bool" | "or_bool" => 2,
-        "add_int" | "sub_int" | "mul_int" | "eq_int" | "leq_int" => 2,
+        "add_int" | "sub_int" | "mul_int" | "div_int" | "mod_int" | "eq_int" | "leq_int" => 2,
         "add_float" | "sub_float" | "mul_float" | "div_float" | "eq_float" => 2,
         "add_float32" | "eq_float32" => 2,
         s if s.starts_with("add_int") || s.starts_with("sub_int") || s.starts_with("mul_int") => 2,
