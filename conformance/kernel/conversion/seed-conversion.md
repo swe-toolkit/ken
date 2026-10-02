@@ -371,6 +371,50 @@ conversion must consume the obs WHNF rules and decide.
 
 ---
 
+## Core `let` typing and ζ (SPEC-CORE-LET-TYPING)
+
+Core `let` typing substitutes the RHS before typing the body; ζ reduces the
+same non-recursive binding.
+
+### conversion/nonrecursive-let-zeta-open (soundness)
+- spec: `11 §1`, `17 §1`/`§3.2`, `18 §2`/`§3.1`
+- promise class: **durable invariant** — unrelated extensions preserving the
+  contract must preserve this typed, open substitution and its result type.
+- given: In context `P : Nat → Type 0`, `f : (n : Nat) → P n`, and distinct
+  `x y : Nat`, form `u := let z := x : Nat in z` and
+  `t := let z := x : Nat in f z`. Query `infer(t)`, `infer(u)`, `whnf(u)`,
+  `convert(Nat, u, x)`, and `convert(Nat, u, y)`.
+- expect: `infer(t) = P x`, `infer(u) = Nat`, and `whnf(u) = x`; conversion
+  of `u` to `x` is **true**, and to distinct `y` is **false**.
+- why: `Let-Inf` infers the substituted body `f x` in the original context,
+  giving `P x`. ζ reduces `u` to `x`, while distinct neutral Nat variables
+  remain unequal.
+
+### conversion/nonrecursive-let-checks-introduction (soundness)
+- spec: `11 §1`, `18 §2`/`§3.2`
+- given: In context `x : Nat`, check
+  `let z := x : Nat in λ (w : Nat). z` at `(w : Nat) → Nat`.
+- expect: accepted.
+- why: after substitution, the body is a λ-introduction, which is not
+  inferable alone. `Let-Check` must check it directly against the supplied Π
+  type.
+
+### conversion/nonrecursive-let-wrong-result-type (soundness)
+- spec: `11 §1`, `18 §2`/`§3.2`/`§4`
+- given: In context `x : Nat`, check `let z := x : Nat in z` at `Bool`.
+- expect: rejected with `TypeMismatch { expected: Bool, found: Nat }`.
+- why: the RHS checks at `Nat`, but the substituted body `x` has type `Nat`,
+  which is not convertible to `Bool`.
+
+### conversion/nonrecursive-let-rejects-wrong-rhs (soundness)
+- spec: `11 §1`, `18 §2`/`§3.1`/`§4`
+- given: In context `b : Bool`, infer `let z := b : Nat in z`.
+- expect: rejected with `TypeMismatch { expected: Nat, found: Bool }`.
+- why: `Let-Inf` checks the RHS against its `Nat` annotation before inferring
+  the substituted body; `Bool` does not convert to `Nat`.
+
+---
+
 ## Registered primitive kernel-WHNF conversion (KERNEL-LEQ-INT-LITERAL-REDUCTION)
 
 These cases exercise `convert`/kernel WHNF directly, **not** the interpreter's
