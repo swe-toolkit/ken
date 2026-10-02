@@ -1775,7 +1775,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                         .into(),
                 })
             } else {
-                let (core, inferred_ty) = infer_match(cx, scrut, arms, span)?;
+                let (core, inferred_ty) = infer_match(cx, scrut, arms, span, Some(expected))?;
                 unify_types(&mut cx.metas, expected, &inferred_ty);
                 Ok(core)
             }
@@ -9234,7 +9234,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             equation: None,
             arms,
             span,
-        } => infer_match(cx, scrut, arms, span),
+        } => infer_match(cx, scrut, arms, span, None),
 
         RExpr::RProj(base, field, span) => infer_proj(cx, base, field, span),
 
@@ -16122,6 +16122,7 @@ impl MatrixOccurrence {
 struct MatchOccurrenceTrace {
     seeds: Vec<Term>,
     leaves: Vec<Vec<Option<Term>>>,
+    nested_return_types: Vec<bool>,
 }
 
 #[cfg(test)]
@@ -18416,6 +18417,12 @@ fn compile_match_matrix(
                 .into_iter()
                 .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
                 .collect();
+            #[cfg(test)]
+            MATCH_OCCURRENCE_TRACE.with(|trace| {
+                if let Some(trace) = trace.borrow_mut().as_mut() {
+                    trace.nested_return_types.push(ret_ty_slot.is_some());
+                }
+            });
             let raw_methods_result = build_ctor_buckets(
                 cx,
                 arms,
@@ -19090,6 +19097,7 @@ fn infer_tuple_match(
     scrut: &RExpr,
     arms: &[RMatchArm],
     span: &Span,
+    expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if matches!(
@@ -19129,7 +19137,7 @@ fn infer_tuple_match(
         }
     });
 
-    let mut ret_ty_slot = None;
+    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19178,6 +19186,7 @@ fn infer_record_match(
     scrut: &RExpr,
     arms: &[RMatchArm],
     span: &Span,
+    expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if matches!(
@@ -19211,7 +19220,7 @@ fn infer_record_match(
         }
     });
 
-    let mut ret_ty_slot = None;
+    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19328,6 +19337,7 @@ fn infer_or_match(
     scrut: &RExpr,
     arms: &[RMatchArm],
     span: &Span,
+    expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if top_pattern_is_catchall(&arm.pat) {
@@ -19357,7 +19367,7 @@ fn infer_or_match(
     };
 
     let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
-    let mut ret_ty_slot = None;
+    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19453,6 +19463,7 @@ fn infer_literal_match(
     scrut: &RExpr,
     arms: &[RMatchArm],
     span: &Span,
+    expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if !top_pattern_is_literal_form(&arm.pat) {
@@ -19466,7 +19477,7 @@ fn infer_literal_match(
 
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
     let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
-    let mut ret_ty_slot = None;
+    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
     let body_result = compile_match_matrix(
@@ -19519,27 +19530,28 @@ fn infer_match(
     scrut: &RExpr,
     arms: &[RMatchArm],
     span: &Span,
+    expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
     }
     if arms.iter().any(|arm| top_pattern_contains_literal(&arm.pat)) {
-        return infer_literal_match(cx, scrut, arms, span);
+        return infer_literal_match(cx, scrut, arms, span, expected);
     }
     if arms_have_top_or(arms) {
-        return infer_or_match(cx, scrut, arms, span);
+        return infer_or_match(cx, scrut, arms, span, expected);
     }
     if arms
         .iter()
         .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Record(_)))
     {
-        return infer_record_match(cx, scrut, arms, span);
+        return infer_record_match(cx, scrut, arms, span, expected);
     }
     if arms
         .iter()
         .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Tuple(_)))
     {
-        return infer_tuple_match(cx, scrut, arms, span);
+        return infer_tuple_match(cx, scrut, arms, span, expected);
     }
 
     // 1. Infer scrutinee.
@@ -19599,7 +19611,9 @@ fn infer_match(
         }
     });
 
-    let mut ret_ty_slot: Option<Term> = None;
+    // In check mode the goal is known before any bucket is compiled. Pure
+    // inference still lets the first reachable leaf discover the result type.
+    let mut ret_ty_slot = expected.map(|ty| cx.metas.zonk_term(ty));
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by: Vec<Vec<usize>> = vec![Vec::new(); arms.len()];
 
@@ -19625,6 +19639,11 @@ fn infer_match(
         });
     }
     let result = (|| {
+    // The indexed root needs the checked motive and IH domains before it can
+    // descend into any bucket. Keep this inside the frame-restoring closure.
+    if let Some(ret_ty) = ret_ty_slot.as_ref() {
+        memoize_indexed_root_motive(cx, ret_ty, span)?;
+    }
     let raw_methods_result = build_ctor_buckets(
         cx,
         arms,
@@ -22336,6 +22355,72 @@ mod match_matrix_occurrence_tests {
         assert_eq!(state.binding_occurrences, vec![Some(Term::var(2))]);
         assert_eq!(state.real_occurrences[1].term, Term::var(0));
         assert!(!state.real_occurrences[1].live);
+    }
+}
+
+/// The known check-mode goal must reach the nested matrix before its first
+/// leaf, while inference mode still discovers that goal from a leaf.
+#[cfg(test)]
+mod match_matrix_result_seed_tests {
+    use super::{begin_match_occurrence_trace, take_match_occurrence_trace};
+    use crate::ElabEnv;
+    use ken_kernel::{normalize, Context, Term};
+
+    #[test]
+    fn checked_nested_split_is_seeded_before_bucket_but_inference_is_not() {
+        // Promise class: durable invariant. MEASURED: the production matrix
+        // sees Some before a nested split in check mode and None on another
+        // nested split in inference mode. CLAIMED: check-mode R is available before
+        // building nested buckets without inventing an inference-mode result.
+        // THE GAP: this trace witnesses entry state, not the future derived
+        // telescope; both declarations kernel-check: checked NatL returns
+        // LZero, while inference-mode NatBox returns Zero : Nat.
+        let mut env = ElabEnv::new().expect("prelude");
+        // Put the nested constructor first: no earlier root method may infer
+        // R before the split whose entry state this test measures.
+        env.elaborate_decl("data NatL = LSucc NatL | LZero")
+            .expect("recursive family");
+        let trusted = env.env.trusted_base();
+        let matrix = "match LSucc (LSucc LZero) { \
+                      LZero |-> LZero; LSucc LZero |-> LZero; \
+                      LSucc (LSucc m) |-> m }";
+
+        begin_match_occurrence_trace();
+        env.elaborate_decl(&format!("let checked_slot : NatL = {matrix}"))
+            .expect("checked nested match");
+        let checked = take_match_occurrence_trace();
+        assert_eq!(checked.nested_return_types, [true]);
+
+        begin_match_occurrence_trace();
+        env.elaborate_file(
+            "data NatBox : Type where { BoxNat : Nat → NatBox }\n\
+             fn inferred_slot (b : NatBox) : Nat = let r = match b { \
+               BoxNat Zero ↦ Zero; BoxNat (Suc n) ↦ n \
+             } in r",
+        )
+        .expect("inferred nested match");
+        let inferred = take_match_occurrence_trace();
+        assert_eq!(inferred.nested_return_types, [false]);
+
+        env.elaborate_decl("const inferred_value : Nat = inferred_slot (BoxNat (Suc Zero))")
+            .expect("apply inferred match");
+        let normal = |name: &str| {
+            let body = env.env.transparent_body(env.globals[name]).expect("body").1;
+            normalize(&env.env, &Context::new(), &body)
+        };
+        let nat_zero = Term::Constructor {
+            id: env.globals["Zero"],
+            level_args: Vec::new(),
+        };
+        assert_eq!(normal("inferred_value"), nat_zero);
+        assert_eq!(
+            normal("checked_slot"),
+            Term::Constructor {
+                id: env.globals["LZero"],
+                level_args: Vec::new(),
+            }
+        );
+        assert_eq!(env.env.trusted_base(), trusted);
     }
 }
 
