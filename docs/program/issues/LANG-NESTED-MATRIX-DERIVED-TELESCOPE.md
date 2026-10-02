@@ -89,7 +89,8 @@ Three increments, each a straight-ancestor cut that may land alone.
 
    `Internal(g0)` from `project_generated_index_equality_leaves` is not the
    refusal.
-1. **Seed `ret_ty_slot` from the check-mode expected type.** Every
+1. **Seed `ret_ty_slot` from the check-mode expected type** (merged
+   `2d6b64aca`, exact `b16a22f1a`). Every
    check-mode split entry becomes `Some`. Inference-mode entries stay
    `None`, and increment 2 serves them. The handoff reports arrivals by
    population and mode (Steward `evt_vj9sdpww9tfe`). The 24-entry figure is
