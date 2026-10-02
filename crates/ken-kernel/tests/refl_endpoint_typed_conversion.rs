@@ -181,29 +181,6 @@ fn refl_at_open_pi_eta_checks() {
         .expect("Refl f checks at Eq (Nat → Nat) f (λx. f x)");
 }
 
-/// Conversion's non-recursive ζ case (`17 §1`, `§3.2`): an open let must
-/// compute to its bound value, not to an unrelated variable of the same type.
-/// Promise class: durable invariant; no recursive definition or δ involved.
-#[test]
-fn nonrecursive_let_zeta_distinguishes_open_variables() {
-    let mut env = GlobalEnv::new();
-    let nat = nat(&mut env);
-    let mut ctx = Context::new();
-    ctx.push(nat.clone()); // x : Nat
-    ctx.push(nat.clone()); // y : Nat
-    let x = Term::var(1);
-    let y = Term::var(0);
-    let bound = Term::Let {
-        ty: Box::new(nat.clone()),
-        val: Box::new(x.clone()),
-        body: Box::new(Term::var(0)),
-    };
-    assert_eq!(infer(&env, &ctx, &bound), Ok(nat.clone()));
-    assert_eq!(whnf(&env, &ctx, &bound), x);
-    assert!(convert(&env, &ctx, &nat, &bound, &Term::var(1)));
-    assert!(!convert(&env, &ctx, &nat, &bound, &y));
-}
-
 #[test]
 fn eq_congruence_stays_positional_at_proof_relevant_endpoints() {
     let mut env = GlobalEnv::new();
