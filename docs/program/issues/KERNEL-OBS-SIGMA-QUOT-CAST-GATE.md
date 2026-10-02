@@ -9,7 +9,7 @@ gate: architect
 depends_on: []
 blocks: []
 github: null
-origin: "Adversary M8 finding 2 evt_1rnwn0jc09jw9 on 884f493fe (KERNEL-OBS-TYPE-EQ-STRUCTURAL): pre-existing, fails closed. The Π sibling was gated by that WP. Steward-filed per COORDINATION section 2."
+origin: "Adversary M8 finding 2 evt_1rnwn0jc09jw9 on 884f493fe (KERNEL-OBS-TYPE-EQ-STRUCTURAL): pre-existing, fails closed. The Π sibling was gated by that WP. Operator approved 2026-10-02 ('approve 1 and 2 as recommended'): next on the kernel ring after KERNEL-OBS-NESTED-CAST-LINEAR, ahead of KERNEL-J-NONREFL-ENDPOINT-SHARING. Steward-filed per COORDINATION section 2."
 ---
 
 # Σ and quotient casts stay neutral on a neutral equality
