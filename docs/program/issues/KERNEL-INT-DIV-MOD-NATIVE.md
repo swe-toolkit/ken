@@ -209,6 +209,8 @@ stop and report the mismatch.
 - Not this WP (Architect carries): the fixed-width `+`/`-`/`*` obligation's
   Γ; the other declaration aggregators that return `obligations: vec![]`;
   the spec 21 examples and seeds that write a Bool `≠` in an Ω position;
-  ensures goals closing without the `requires` premises; refined-argument
-  introduction obligations (21 §6.3, 22 §2.1), after which refined
-  recognition can return.
+  ensures goals closing without the `requires` premises; the refined-argument
+  introduction obligation (an AC row in
+  `LANG-REFINEMENT-INTRODUCTION-OBLIGATION`, `evt_1ytv0fc4j1c1j`). Refined
+  recognition in the callee needs a proof-carrying parameter encoding, a
+  spec-lane decision.
