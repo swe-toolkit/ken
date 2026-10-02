@@ -119,7 +119,7 @@ Three increments, each a straight-ancestor cut that may land alone.
 
 ## Acceptance
 
-- **AC-0a (increment 0, lands alone on `7450a0b17`).**
+- **AC-0a (increment 0; merged `457898bcb`, exact `2bdafdc29`).**
   - All 11 indexed-family rows of `evt_1bspdnet7a87s` refuse with
     `PatternVariableAcrossDependentSplit`, each a refusal pin that names
     increment 2 as its flip to 3.
