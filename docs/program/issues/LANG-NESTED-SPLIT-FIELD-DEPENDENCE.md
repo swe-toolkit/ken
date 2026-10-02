@@ -186,10 +186,17 @@ pin asserts the normalized constructor, not only that elaboration succeeds.
    (`evt_qh7m7erbc5f6`, §1a 8). Repair: on the constant path the block is
    close-only over the raw method, so the constant path is base plus the
    kernel-derived close.
+9. A reverting split under woven Var-column binders (a record/tuple
+   sub-pattern Var) kernel-checks, but its leaf selects a different
+   same-typed binder (`prefix` for `seed`): wrong value, no rejection. Keyed
+   on a woven binder's de Bruijn index computed without the woven binders in
+   context (`evt_63ycng1rt962f`, §1a 9, WIP `403089dc7`; research hold; base
+   measurement owed).
 
 Shared predicate (`evt_4yewspasn0fps`, restated `evt_7ve4bw9145c1x`): a term
 in one frame's coordinates is used in another frame's context through depth
-arithmetic. Entries 1, 2, 3, 5, 6, 7 and 8 are this predicate; entry 4 is a
+arithmetic. Entries 1, 2, 3, 5, 6, 7, 8 and 9 are this predicate
+(checkpoint `evt_63ycng1rt962f`); entry 4 is a
 consequence of the closure. The closure is the successor WP, nested matrix
 construction in the derived telescope with woven binders as real context
 pushes, framed on the stop-6 advisory and the M-deep base measurement.
