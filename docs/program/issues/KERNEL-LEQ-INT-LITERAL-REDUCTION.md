@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LEQ-INT-LITERAL-REDUCTION
-title: "The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as isScalar 55295 or PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs"
-status: active
+title: "The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs"
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -34,9 +34,10 @@ to `Equal Bool True True` or `Equal Bool False True`.
 - **The runtime decider.** `ken-interp/src/eval.rs:1999`
   (`("leq_int", [a, b])` over `eval_to_bigint`).
 - **The consumers it unblocks.**
-  - `isScalar 55295` δ-unfolds to four `leq_int` literal tests and closes
-    with `tt`. `55296` stays `Equal Bool False True`, which is open, as the
-    seed-numbers row requires.
+  - `isScalar 55295` closes once `inRangeBool` is respelled by transparent
+    Bool elimination, which `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` carries.
+    Today it composes the tests with `and_bool`/`or_bool`, also stuck Ops
+    (Architect `evt_pawgvbeevyg2`, after stop `evt_n6w1rkyqkhw2`).
   - The guide's `PosInt` (`library/guide/surface-reference.ken.md:108`)
     closes `const five : PosInt = 5`.
 - **Scope.** Only `leq_int`. The other Int ops stay K3.
@@ -53,12 +54,95 @@ stop and report the mismatch.
   application on literals stays neutral under conversion (K3-deferred), so
   this is a spec change and needs the Spec vote (Architect
   `evt_4r2mqaavb9gbh`).
+- Companion corrections so the spec states both kernel-WHNF `Op` rules:
+  this `leq_int` arm and the landed `string_to_list_char` view on a checked
+  `String` literal (`conv.rs:216`, bfdbb9789). Every other registered `Op`
+  stays K3-deferred. Wording only; no code, test or other rule change (CV
+  `evt_7sa4v62w5xqkj`, `evt_44a12zma9rzdn`; Architect `evt_4j4109frj9gq6`).
+  - `spec/10-kernel/17-conversion.md` §1 (a **prim** row, a **ζ** row for
+    non-recursive `let` per `evt_70g6a5hps6x08`, the `Op` bullet, the
+    neutral list) and the `whnf` pseudocode, per the Architect's text.
+    Also the termination rationale: the §3.2 Termination bullet, §5
+    obligation 1, the first sentence of §5 obligation 2, and the opening
+    sentence of §3.5 ("δ is the only reduction that can *grow* a term"). These take the
+    Architect's replacement text verbatim: `evt_24p37f1kftvnf` for §3.5
+    and obligation 2, and `evt_70g6a5hps6x08` for the §3.2 bullet and
+    obligation 1, which classify `let` substitution in the core (QA
+    `evt_2dea4ky2dnxkv`), so no
+    rule is claimed to contract term size. Any other wording, or any other
+    §17 sentence, needs the Architect's re-read. The
+    termination claim itself is unchanged (CV `evt_4j6eg9eeh1pvt`).
+  - `spec/10-kernel/18-judgments.md` §4.2, §5, and the §6 "Strong
+    normalization of the core" row, which names `let` and the prim rules per
+    the Architect's text, and
+    `spec/10-kernel/18a-primitive-registry.md` introduction, §5 and
+    §5.2.2(3): name the pair, never "sole", and keep the interpreter's
+    tested-not-trusted arm separate from the kernel arm. Also §5.9.1(1)'s
+    "`string_to_list_char` is a `Neutral` stub" parenthetical (CV
+    `evt_2q435bncamhkm`): it distinguishes the installed-IDs interpreter
+    `apply`/`build_list_char` path and the checked-literal kernel view from
+    the direct `prim_reduce` `Neutral` fallback, with no other change to
+    §5.9.1.
+  - The general opacity sentences the Architect lists:
+    `spec/10-kernel/14-inductive.md` item 5,
+    `spec/30-surface/30-taxonomy.md:86`, `spec/30-surface/35-numbers.md`
+    (`:15-16`, §6.1), `spec/30-surface/37-strings-collections.md` (`:109`,
+    `:142`, `:154`, `:756`), `spec/30-surface/38-ffi-io.md:103-105` and
+    `spec/40-runtime/42-evaluation.md:268-270`. Their examples
+    stay; only the general claim is qualified.
+- Conformance for both kernel-WHNF `Op` rules (CV `evt_27q51k32zhqs`):
+  - in `conformance/kernel/conversion/seed-conversion.md`, one discriminating
+    kernel-conversion case per rule. `leq_int` on two literals converts to the
+    `Bool` its `BigInt <=` gives, with a false-side fence and a
+    variable-operand neutral control. `string_to_list_char` on a checked
+    `String` literal converts to its `List Char`, with a non-literal operand
+    neutral control;
+  - in `conformance/surface/numbers/seed-decimal-char-demote.md`,
+    `char-extraction-computes-scalar-proof` no longer calls
+    `string_to_list_char` a `Neutral` stub. It distinguishes the
+    installed-IDs `apply` path from the direct `prim_reduce` fallback, as
+    §42 now states. Its deferred runtime face is otherwise unchanged.
+  - the CV's whole sweep at `32103f017` (`evt_2p6ar1p3jz0cp`), the closing
+    list. Each change names the two kernel-WHNF rules as the exceptions and
+    keeps every other `Op` runtime-only or K3-deferred:
+    - `conformance/README.md:183-186`: limit the collections seed's K3
+      deferral to the still-neutral operations;
+    - `conformance/surface/taxonomy/minimality.md:42`: separate interpreter
+      dispatch from kernel conversion;
+    - `conformance/surface/collections/seed-collections.md:72-79`: narrow
+      the general wording to `byte_length`/`char_length`, whose neutrality
+      expectations stay;
+    - `seed-decimal-char-demote.md:21-23`: qualify "only `eq_int` reduces"
+      as the pre-demote baseline, and separate the interpreter `leq_int` arm
+      from the kernel rule. The AC-L "no kernel backstop" text stays,
+      explicitly scoped to the runtime face.
+
+- Two runtime pins move with the arm (Architect `evt_531qbtbnf8y1d`). The
+  arm reduces always-true window guards in the prelude, so the dead branches
+  go and planner origins renumber, monotonically. Every protocol's shape and
+  every transparent declaration are unchanged.
+  - `crates/ken-cli/tests/rt_parity_native.rs` `:2712` sentinel: re-record
+    `rt_per_emitter_read_keys` from the candidate. The new recording's note
+    says identity is unchanged up to origin numbering and cites
+    `evt_531qbtbnf8y1d`. Only the `include_str!` line, its note and the
+    recording file change.
+  - `crates/ken-cli/tests/rt_escape_second_resource_native.rs` `:783-802`:
+    select the owner by its shape rather than the literal `1298`. That shape
+    is the relay-excluded protocol with exactly one relay member without a
+    successor and one non-relay member with a successor. Exactly two
+    protocols have that shape. The count is the gate, and the kept
+    assertions run over both matches, so nothing depends on order (Architect
+    `evt_1jnjtntg7wej`). The `:817` ignored row is untouched; its reason's
+    stale "owner 1298" goes to that row's successor.
 
 ## Acceptance
 
 - **AC-1.**
   - `Equal Bool (leq_int 0 5) True` checks by `Proved`.
-  - `isScalar 55295` closes.
+  - `leq_int 55295 55295` reduces to `True`.
+  - Kernel-local row: the closed term `match (leq_int 0 55295) { True |->
+    leq_int 55295 55295 ; False |-> False }` whnfs to `True`. No prelude
+    edit (`evt_pawgvbeevyg2`).
   - A cross-layer test pins agreement between the kernel and
     `ken-interp` on a boundary set that includes negatives, equality and
     values beyond `i64`.
@@ -79,3 +163,27 @@ stop and report the mismatch.
   to the Architect.
 - A comparison that is not the interpreter's operator: stop to the
   Architect.
+
+## Closeout
+
+Merged `2df33a695` (PR #4435), exact `e697809a4`: Kernel QA
+`evt_2e0xcfwh3hmew`, Architect `evt_4kq827gbrv50e`, CV Spec/conformance
+`evt_3jb6z15rak6ay`, Decision `dec_2ewtf3e00eeve`.
+
+- Kernel whnf reduces `leq_int` on two `IntLit` values to `True` or `False`
+  by the interpreter's `BigInt <=`. A non-literal operand stays neutral, and
+  every other `Op` stays K3-deferred.
+- ADR 0013 Layer 2 and spec 16, 17, 18 and 18a name the two kernel-WHNF `Op`
+  rules. Spec 17's termination rationale classifies β, ζ and the String view
+  in the typed core. The general opacity sentences are qualified.
+- One conformance case per rule. A cross-layer test pins kernel and
+  interpreter agreement on negatives, equality and values beyond `i64`.
+- The runtime pins moved with the arm: the read-key sentinel is re-recorded,
+  and the owner is selected by shape.
+- Carried:
+  - the `:817` ignored reason's stale "owner 1298" goes to
+    `RT-SOURCE-IH-RELAY-K-VALUE`;
+  - the ζ-row conformance case goes to
+    `KERNEL-REFL-ENDPOINT-TYPED-CONVERSION`.
+- `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` is unblocked. It resumes on L2
+  after `LANG-NESTED-SPLIT-FIELD-DEPENDENCE`.

@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-COMBINATOR-LAWS
 title: "parser_from_decoder_laws needs DecoderPreservesBounded, but that premise is private and duplicates Decoder's public DecoderPreserves, so no client can discharge it for any combinator decoder. Export the byte-cursor bound as DecoderPreserves, export the existing cursor locate and advance proofs, and instance satisfy and many, at zero TCB"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -115,3 +115,19 @@ Scope:
 - Any new import, primitive, postulate or axiom.
 - A `Decoder.ken.md` or `Derived.ken.md` change.
 - Item 1 needs two public spellings of the bound: stop to the Architect.
+
+## Closeout
+
+Merged `a559a6e2b` (PR #4432), exact `abe38b1b9`: Foundation QA
+`evt_4m4s097q89bs`, Architect `evt_6w5s72w7axyaf`, Decision
+`dec_4dp5g3axy1t99`.
+
+- `DecoderPreservesBounded` is public over Decoder's `DecoderPreserves`, and
+  `ByteCursorBounded`, `byte_cursor_bounded_locate` and
+  `byte_cursor_bounded_after_peek` are public. The two λ-identity bridges
+  are deleted.
+- `byte_satisfy_parser_laws` and `byte_many_parser_laws` are public
+  compositions that the CAT5 client applies.
+- The PARSER-LAWS false-twin fence closes by `refl` with an accepted true
+  twin, pinned structurally.
+- Zero TCB; only `Parsing.ken.md` changed in the catalog census.

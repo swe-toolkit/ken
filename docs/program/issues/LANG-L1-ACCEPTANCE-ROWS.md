@@ -1,27 +1,31 @@
 ---
 id: LANG-L1-ACCEPTANCE-ROWS
-title: "Un-ignore the three l1_acceptance rows (explicit Int.toInt64 conversion, the Int division-by-zero obligation, and Char literals excluding surrogates) as real assertions of the behaviour /spec already settles"
-status: ready
+title: "Un-ignore two l1_acceptance rows as real assertions of settled behaviour: the explicit Int to Int64 conversion (delivered as intToInt64) and Char literals excluding surrogates. The Int division row stays ignored until the operator rules on registering div_int and mod_int"
+status: merged
 owner: language
-size: M
+size: S
 gate: architect
 tier: T1
-depends_on: [LANG-SESSION-SCOPE]
+depends_on: []
 blocks: []
 github: null
-origin: "Operator 2026-09-26 ('concur with rec.'): the three l1_acceptance ignored rows go to L2. Operator 2026-09-27 ('concur with l1_acceptance disposition'): sequenced right after LANG-SESSION-SCOPE, ahead of LANG-EXPRESSION-SIGMA. Operator 2026-09-17 L1 directive (clear the ignored tests; top priority). Steward-filed per COORDINATION section 2."
+origin: "Operator 2026-09-26 ('concur with rec.'): the three l1_acceptance ignored rows go to L2. Operator 2026-09-27 ('concur with l1_acceptance disposition'): sequenced right after LANG-SESSION-SCOPE, ahead of LANG-EXPRESSION-SIGMA. Operator 2026-10-01 ('concur with rec.'): next on L2 after LANG-MATCH-ARM-LEVEL-META-KERNEL-CHECK. Operator 2026-09-17 L1 directive (clear the ignored tests; top priority). Steward-filed per COORDINATION section 2."
 ---
 
 # The three l1_acceptance rows
 
 ## Objective
 
-The three ignored rows in `crates/ken-interp/tests/l1_acceptance.rs` run
-un-ignored, each asserting the behaviour its spec section settles.
+Two of the three ignored rows in `crates/ken-interp/tests/l1_acceptance.rs`
+run un-ignored, each asserting the behaviour its spec section settles. The
+third, `sec31_int_div_zero_emits_obligation`, stays `#[ignore]` with its
+reason updated to "needs operator-approved div_int/mod_int registration (18a
+GAP)" (Architect `evt_6bg0x6s5w300n`).
 
-## Settled inputs (measured on `077be5457`)
+## Settled inputs (AC-0 at `abc35cbcf`, `evt_6f5tzw0wxcf88`)
 
-- **The rows are stubs, not failing tests.** None asserts anything:
+- **The rows assert nothing.** Rows 1 and 2 fail when run; row 3 passes
+  vacuously:
   - `ac5_explicit_conversion_is_partial_option` (`:288`) only elaborates
     `Int.toInt64 x`;
   - `sec31_int_div_zero_emits_obligation` (`:331`) only elaborates `a / b`;
@@ -42,8 +46,25 @@ un-ignored, each asserting the behaviour its spec section settles.
 
 ## Deliverable
 
-For each row, an assertion that discriminates the settled behaviour, plus the
-smallest elaborator or lowering change that makes it hold.
+The assertions the Architect ruled in `evt_6bg0x6s5w300n`. No product change
+is expected; both behaviours are delivered at zero TCB.
+
+- **Row 1.** `fn f (x : Int) : Option Int64 = intToInt64 x` elaborates.
+  Evaluation gives `Some` at `2^63 - 1` and at `-2^63`, and `None` just
+  outside each. The head is compared by the env's `Option` constructor
+  identity and the payload as a value. The doc comment notes that spec 35 §5
+  spells it `Int.toInt64`; no alias is added.
+- **Row 3.** `'a'`, `'\u{D7FF}'` and `'\u{E000}'` elaborate. `'\u{D800}'` and
+  `'\u{DFFF}'` fail with `ElabError::InvalidEscape`, matched structurally.
+- **Exemption registry.** In `.github/ignored-test-exemptions.toml`, delete
+  exactly the `ac5_explicit_conversion_is_partial_option` and
+  `sec24_char_excludes_surrogates` `placeholder-no-assertions` blocks, which
+  the CI ignored-test sweep rejects once those rows run (PR #4433). The
+  `sec31_int_div_zero_emits_obligation` block stays. In `scripts/test-ci-ignored-sweep.py`, only
+  the assertions that hardcode a count derived from the live registry ("plus
+  6 registry exemptions is 52", "53 rows") move to the reduced counts. The pre-existing
+  `policy-cost: expected 1, actual 3` failure, which reproduces on the base,
+  is out of scope and is disclosed in the handoff.
 
 ## Acceptance
 
@@ -54,13 +75,13 @@ smallest elaborator or lowering change that makes it hold.
     `div_int` row is the likely one.
 
   The Architect rules on each before any build.
-- **AC-1.** Each row runs un-ignored and green, with a discriminating pair:
-  - `Int.toInt64` returns `Some` in range and `None` out of range;
-  - `div` by a non-zero value computes and satisfies the div-mod identity, and
-    by zero it yields the obligation and never a value;
-  - a valid `Char` literal is accepted and a surrogate escape is rejected.
-- **AC-2 (controls).** Removing each change re-reddens its row with the AC-0
-  observation.
+- **AC-1.** Rows 1 and 3 run un-ignored and green with the assertions above.
+  Row 2 stays ignored with the updated reason.
+- **AC-2 (controls).**
+  - The old row-1 text `Int.toInt64 x` reproduces the AC-0 `UnboundName`.
+  - Flipping one boundary expectation (`Some` at `2^63`) reddens row 1.
+  - Disabling the scalar screen in `lexer.rs` reddens row 3; restore it
+    byte-identically.
 - **AC-3.** Targeted suites only, through `scripts/ken-cargo`. Full CI is the
   breadth gate.
 
@@ -71,3 +92,19 @@ smallest elaborator or lowering change that makes it hold.
 - A row whose behaviour `/spec` does not settle: stop to the Spec leader.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Merged `ab476663a` (PR #4433), exact `a916fda42`: Language QA
+`evt_6dsnddvc26b6h`, Architect `evt_4a363dtqtaqzn`, Decision
+`dec_2586vsffx0h3x`.
+
+- Row 1 asserts `intToInt64` gives `Some` at the `i64` bounds and `None`
+  just outside, checked against the env's `Option` constructor ids.
+- Row 3 asserts `'\u{D800}'` and `'\u{DFFF}'` reject as
+  `ElabError::InvalidEscape`.
+- Row 2 stays ignored pending the operator's `div_int`/`mod_int` ruling.
+- The two rows' exemption blocks are deleted and the sweep unit's
+  registry counts follow. Its pre-existing `policy-cost` failure is
+  unchanged.
+- No production, kernel, spec or catalog change; zero TCB.

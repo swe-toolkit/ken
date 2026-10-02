@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-SPLIT-CONSTANT-MOTIVE-INDEX
 title: "A nested indexed split whose motive is constant is refused when its index is concrete or repeated, although a constant motive does not depend on the index. Run the distinct-variable-index check only when the split needs reverting"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1
@@ -47,9 +47,19 @@ omission check before it is unchanged, so an omitted constructor stays an
   needs distinct variable indices". If it is accepted, stop: the node is void.
 - **AC-1.** That program is accepted and evaluates to the expected value. A
   repeated-index twin with a constant result is accepted too.
-- **AC-2 (fence).** The same concrete-index and repeated-index splits with a
-  result that mentions the split value are still refused with today's
-  diagnostics. The pair differs only in the result type.
+- **AC-2 (fence, Architect `evt_6a1bennx1sc5s`).** The reachable reverting
+  trigger is a dependent tail: a result type never mentions the nested split
+  value (`ret_ty_slot` is set only through `lower_by`). The outer constructor
+  carries a second field, left `_` in the arm, whose type mentions the nested
+  field (`HoldD`/`HoldPairD`), and its twin has an unrelated second field
+  (`HoldN`/`HoldPairN`). The pair differs only in whether a pending sibling
+  field's type mentions the nested split field.
+  - The N twins are accepted.
+  - The concrete D twin is refused with a reason containing "nested indexed
+    split needs distinct variable indices". The repeated D twin's reason
+    contains "nested indexed split repeats an index".
+  - Assert the clause text. A D twin refused before the index clause is a
+    stop to the Architect.
 - **AC-3.** A nested omission at a concrete index is still an
   `ExhaustivenessError`. The targeted match and pattern suites stay green, and
   `trusted_base()` is unchanged.
@@ -59,3 +69,17 @@ omission check before it is unchanged, so an omitted constructor stays an
 - Lowering or the kernel rejects the accepted program: the constant path
   assumes variable indices somewhere else. Stop to the Architect.
 - Any kernel or spec change.
+
+## Closeout
+
+Merged `5d5e7bf02` (PR #4436), exact `58fb37c26`: Language QA
+`evt_4cc5wqsde428a`, Architect `evt_3s4r31fa66k1p`, Decision
+`dec_6taphqt67vkn5`.
+
+- `check_nested_index_variables` runs only when `needs_reverting`. A
+  constant-motive nested split at a concrete or repeated index is accepted
+  and evaluates.
+- The dependent-tail fence pairs stay refused, with the exact clause text
+  asserted.
+- A nested omission at a concrete index is still an `ExhaustivenessError`.
+- `elab.rs` and one test file changed. No kernel or spec change; zero TCB.

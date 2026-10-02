@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-PER-EMITTER-AVAILABILITY
 title: "The continuation planner finalizes a specialization's capture availability claims only under its interning owner, but the same construct is materialized under other owners (Vis735 under Specialization(2) on all 15 measured emissions), so no lawful capture source exists there. Finalize the W and C claims per emitting owner at every materialization point, recording each unfinalizable ordinal"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -71,7 +71,11 @@ No residual layout, gate or lowering consumer changes.
   Per owner, the finalized and unfinalizable counts. Positional reads and
   record959 reads: 0.
 - **AC-3 (control).** Delete one owner's finalization: the census pin goes red.
-- **AC-4.** No native census verdict changes. `rt_parity_native` and the
+- **AC-4.** Every interned `ContinuationSpecializationKey`, including its
+  `continuation_inputs` and availability drafts, is identical before and
+  after on the native census (Architect `evt_ew3tp9b71yaa`: the frame comes
+  from a factored `emitter_frame_for_owner`, and interning is
+  behavior-identical). No native census verdict changes. `rt_parity_native` and the
   one-bracket and two-bracket native controls stay green, and
   `trusted_base()` is unchanged.
 
@@ -80,3 +84,20 @@ No residual layout, gate or lowering consumer changes.
 - Claim discovery is hard-keyed to the interned owner (D0): stop to the
   Architect, naming where.
 - The work needs a residual layout or gate change.
+
+## Closeout
+
+Merged `c95c6a556` (PR #4431), exact `d099701de`: Runtime QA
+`evt_7n8bfrbew5rw8`, Architect `evt_6ccq90vgyzbeb`, Decision
+`dec_1xh94n58cx7mg`.
+
+- The planner censuses each specialization's materialization points by
+  planner-owned owner relations and records, per W and C ordinal, a finalized
+  claim or `Unfinalizable { ordinal, owner, reason }`, read through
+  `per_emitter_materializations()`.
+- Spec 1 at Vis735 under `Specialization(2)` records 14 results (W8 + C6),
+  all NoClaim. Interned keys are byte-identical to the base.
+- **Carry to `RT-NATIVE-CONTINUATION-ENV-CARRIAGE`** (Architect
+  `evt_6ccq90vgyzbeb`): its residual builder consumes these results and owns
+  the fail-closed refusal; the 14/14 NoClaim at Vis735 needs its design
+  answer.

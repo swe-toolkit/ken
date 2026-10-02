@@ -89,14 +89,54 @@ reconstructed from term geometry.
   record, never from a frame. Each capture comes from the claims
   `RT-PLANNER-PER-EMITTER-AVAILABILITY` finalizes under the emitting owner
   (`evt_3yp3tea99hfta`).
-- **Transport** (rule 4, `evt_1myz2wkf66w8a`, capture source as corrected in
-  `evt_3yp3tea99hfta`). A checked-IH transport whose destination is the
-  field `(P, f)` of a disposition `(P, f, S)`, with S its source
-  specialization, is a materialization point. The residual is built there:
-  child `claimed.answer.value`, W and C from the destination owner's
-  finalized claims, and the label as at a construct emission. The child's own
-  construction (Ret721) is never wrapped, and no gate inspects the child's
-  constructor.
+- **Transport** (rule 4, `evt_1myz2wkf66w8a`; capture source and placement
+  as revised in `evt_64jeybga2y9fy` and `evt_5np6k589ze5na`). A checked-IH
+  transport whose destination is the field `(P, f)` of a disposition
+  `(P, f, S)`, with S its source specialization, is a materialization point.
+  - **Placement.** Each transport emission: the three
+    `checked_ih_transport_emissions.push` sites in lowering `core.rs`
+    (`call_checked_ih_environment_transport`, the Direct and the Tail case
+    transports). Immediately after `call_declared_unit_target`, each builds
+    its own residual `[child = returned, label, W, C]`, with the label as at a
+    construct emission. Vis735's 15 emissions build 15.
+  - **W and C** are the operands that site just passed to the call; never
+    re-read or re-derived. Sites 1 and Tail record
+    `worker_captures: Vec<(u32, LoweringOperand)>` in their `WorkerCapture`
+    arm; Direct already has `captures`. C is the continuation-input operands
+    in ordinal order, as resolved through the morphism.
+  - **Census.** At a transport-destination point every W and C is
+    `FinalizedTransport(TransportCarriedClaim)`: `WorkerCapture { seat,
+    ordinal }` or `ContinuationInput { ordinal, destination }`. Frame claims
+    are not consulted there. Construct-emission points keep the frame path.
+    Interning keys stay byte-identical to the d099 pin.
+  - The child's own construction (Ret721) is never wrapped, and no gate
+    inspects the child's constructor.
+  - **D0' before building** (`evt_5np6k589ze5na`), measure only:
+    1. `checked_ih_transport_emissions.push` has exactly the three sites on
+       the WIP, and every read and write transport point emits at least once
+       across them;
+    2. the read census after reclassification (predicted: S2 owner from
+       4/44 to 41/7);
+    3. whether the construct-emission point holding the 7 that stay
+       unfinalizable is emitted on the AC-1 read path, by static count. If
+       it is, stop and name the captures and the owner.
+  - **Mutation.** Swapping two W operands at site 1 (Vis735) reddens at the
+    residual.
+- **Labelled force** (`evt_550cpvt3p4qw5`). At a checked-IH force whose
+  arriving population is a labelled candidate set, the carried label selects
+  through the existing `call_selected_recursive_position_unit` switch
+  (`calls.rs:830`), generalized so each arm gets its candidate's exact worker
+  body; no second switch. Each arm looks up the transport with `Some(body)`:
+  a transport takes its Direct or Tail route, and `None` takes the existing
+  exact-body non-transport path. Every arm ends in a carried value at the
+  join; no forward-Ret collapse inside an arm. The `source.rs` guard against
+  `Labelled` with body `None` stays. The switch is a selection site, not a
+  materialization point.
+  - **D0'' before the full build:** (a) what the S3 arm's route reads at
+    `env[selected_index]` and its arity; if it is the labelled residual,
+    stop and report the shape; (b) dynamic per-arm reach in the write
+    fixture, saying explicitly whether the S4 arm is reached; (c) swapping
+    the arm order reddens the write test.
 - **Gate.** The candidate set is the specializations whose key names this
   eliminator, constructor and position, sorted by
   `ContinuationSpecializationId`. A set of size 1 behaves as today. A larger
@@ -111,8 +151,107 @@ reconstructed from term geometry.
   continuation specializations, which are creation sites recorded at
   interning.
 
+## Carrier-schema closure (recut, Architect `evt_v9p2kbzdccb0`)
+
+This governs the build; the deliverable bullets above are retained where they
+do not conflict. On Research `evt_9cn9mr73248`, the five §1b entries share one
+predicate: a recursive child's carrier slot has no planner-owned schema, so
+each consumer infers what a slot holds from local geometry. A slot's
+representation must be a static function of the set of values that can flow
+into it.
+
+- **I1. A planner record per slot.** Keyed `(eliminator, constructor
+  identity, recursive position)`, as `recursive_residual_candidates` keys it.
+  It holds the slot's flow set (the closed set of specializations or
+  producers that reach it) and its schema as a function of that set. A
+  singleton may elide the label, as a recorded choice; a larger set is the
+  labelled sum, the label being the interned candidate index.
+- **I2. One schema per slot.** Every producer writes the recorded schema. A
+  producer whose natural form differs is converted by an injection emitted
+  only on a planner-recorded coercion edge.
+- **I3. Consumers read the schema from the record, never from the word.**
+  Class, tag and arity checks stay only as fail-closed assertions that the
+  word matches. This covers Direct's `Constructor`/`declared_children` check,
+  the residual decoder, and the pass-through
+  `checked_ih_captured_environment_from_case_environment`.
+- **I4. Field reads are by role.** `Child`, `WorkerCapture{seat, ordinal}`
+  and `ContinuationInput{ordinal}`, never a raw offset in a consumer. The
+  transport W and C authorities are the role definitions.
+- **I5. Child classification is by the record that minted the child**
+  (Architect `evt_7tg07nnz0656z`). There are two populations.
+  - Lexical-closure environments: the existing
+    `boundary_closure_crossing_environment` arm, unchanged.
+  - Checked-IH force environments: a `CheckedComputationalIHInvocation`
+    child of arity 0, whose callee resolves to `InductionHypothesis(slot)`,
+    stored by a construct emitted under `Specialization(u)`. It classifies as
+    variant `u`, through `checked_ih_captured_environment_record
+    (Specialization(u), unit(u).worker_closure_origin())`. Plan-time
+    assertions: `u` is in the slot's flow, the variant's worker-capture seat
+    is that seat, and the record's children equal the variant's
+    `WorkerCapture` roles.
+  - Anything else, including an IH application on the non-functional
+    `call_static_worker` route, is `planner_error` naming the occurrence.
+- **I6. The store at (S1, 526, 1) writes R's S1 variant with K8 as `Child`,**
+  through the existing `slot_store_obligation`. The S1 reader arm is
+  unchanged, and the slot's sum gains no label.
+- **I7. Issuance ranges over source aggregate occurrences,** not per-emitter
+  `ConstructEmission` points. A plan-time assertion requires exactly one edge
+  per slot each slot-shaped occurrence matches. Lowering's refusal of an
+  unissued store is the independent second derivation of the same set.
+- **Retained.** Owner-independent labels keyed `(construct, pos, spec id)`
+  and the d099 interning-key pin; the `TransportCarriedClaim` census; the
+  three transport emission sites, which no longer wrap their answer; the
+  label-switch reuse with per-arm
+  `Some(body)` and the `source.rs:4515` guard; the gate refusals.
+- **Replaced.** Every consumer-side classification in I3, and any producer
+  writing a form other than its slot's schema.
+- **Sequence.** D0 below, then the Architect rules each slot's schema and
+  coercion edges, then the build: the planner schema record, conforming
+  writers, consumers that read the record and assert, and role-addressed
+  reads.
+
 ## Acceptance
 
+- **D0 (recut; measure only, on WIP `62060eea6`, read and write
+  fixtures).** A table of every carrier slot `(eliminator, constructor,
+  position)`: its flow set; each writer and the schema it writes today
+  (capture record, labelled residual or static worker); each reader (Direct
+  W read, Tail, the non-governed pass-through, the label switch, the gate
+  decode). Flag every slot whose writers disagree; S5 `(533, pos 1)` is
+  expected to be one. Count the population; do not infer it from shape.
+- **AC-S (carrier schema).**
+  - A writer emitting the other schema into a slot reddens at the
+    assertion, not at a later field read.
+  - Dropping a recorded coercion edge reddens.
+  - Each of the 8 slots asserts at its readers: a writer storing a bare K,
+    skipping the injection, reddens at the reader assertion.
+  - Swapping the S3 and S4 variants in the `(533, 1)` record reddens.
+  - The interning-key pin stays byte-identical.
+  - The write fixture compiles and runs.
+- **Slot schemas (`evt_69ktj8b1xe8tc`, `evt_6rtq4txgmrjpw`,
+  `evt_7tg07nnz0656z`).** Each slot's schema is its issued R sum, with the
+  label elided for a singleton flow set. K is never a slot schema.
+  - Edges exist only where a store exists: the construct stores over source
+    aggregate occurrences, including checked-IH force children. No transport
+    edge is recorded, and no routed answer is wrapped.
+  - Readers assert `Child` against its construct edge. A slot left with no
+    variant keeps main's plain representation and main's reader path.
+- **AC-F (IH-force classification, `evt_7tg07nnz0656z`).**
+  - Measure first. M-c: `unit(S1).worker_closure_origin()` and the S1
+    variant's `WorkerCapture` roles equal the (S1, 730) record's children,
+    729..722. M-d: every `CheckedComputationalIHInvocation` child stored into
+    a slot-shaped field across the read and write fixtures, with owner,
+    forced seat and route.
+  - Read parity `fs_read_at_malformed_offset_narrows_to_invalid_offset` is
+    green, and write parity stays green.
+  - A planner census of slot (520,1) lists every slot-shaped source
+    aggregate occurrence with its Child's minting record and variant. It
+    agrees one-to-one with lowering's lookups, and the variant set stays
+    {S0, S1, S3}.
+  - Removing the IH-force classifier arm refuses at plan time, naming 524 at
+    (S1, 526, 1), not the runtime `-1`.
+  - Classifying 524 as S3 refuses at the plan-time seat assertion.
+  - The Spec2 seven-capture accounting is stated.
 - **AC-0 (measure; no build).** Done so far: the suffix census, record
   coverage, the seat relation (a checked parent→child edge, not equality),
   and the disposable trace. Remaining (`evt_2wywq8pmjerv8`): a compile-time
@@ -162,13 +301,55 @@ reconstructed from term geometry.
   - **Census.** Per creation construct, its emitting owners; per label, the
     gate owners it is dispatched under.
 
+## Symptom inventory (§1b, Architect)
+
+1. Shape.
+2. Range containment.
+3. Positional index and `Var` syntax.
+4. Single emission owner.
+5. Transport target at a force site whose arriving population is a labelled
+   {S3, S4} set: there is no static body to key the planner lookup on, and
+   the WIP refuses rather than reconstructing it (`evt_550cpvt3p4qw5`, §1a
+   5).
+
+Predicate (Architect `evt_v9p2kbzdccb0`, on Research `evt_9cn9mr73248`): the
+carrier slot has no planner-owned schema. This chain closes at §1a 5; the
+carrier-schema recut's own count starts at 0, and its 3rd advancing stop
+triggers hold-and-research.
+
+### Carrier-schema recut (§1a 4, Architect `evt_3v81hg9te2te2`, `evt_7tg07nnz0656z`)
+
+1. R coercion keyed on the transport call site (the routed answer), not on
+   the slot store (`evt_3hm46evkpr9g`).
+2. Slot-store existence decided from lowering SSA def-use, not from a
+   planner fact (`evt_7ybjzpeaa5xff`).
+3. The Child's specialization at a slot store comes from the lexical-closure
+   classifier, so a transfer-path store whose Child is a checked-IH
+   invocation thunk (S1/526, child 524) has no classification
+   (`evt_69ge14q5acsta`).
+4. Child classification is keyed on the lexical-closure population only. A
+   checked-IH force child (524, the K8 minted by the (S1, 730)
+   `CheckedIhCapturedEnvironment` record) has no arm. Keyed on minting
+   population (`evt_3evd30345myh2`, §1a 4).
+
+Predicate (corrected, `evt_7tg07nnz0656z`): Child classification consulted
+only the lexical-closure and `ConstructEmission` populations, and missed the
+checked-IH force records that mint every K word. The Child at (S1, 526, 1)
+is statically S1's variant; it is not run-time dynamic. The predicate
+question is next due at entry 6.
+
 ## Stop conditions
 
-- A W or C capture with no finalized claim under its emitting owner: stop
-  with that capture and owner named, for the Architect to rule.
+- A W or C capture with no finalized claim (frame or transport) at its
+  materialization point: stop with that capture and owner named, for the
+  Architect to rule.
 - A suffix operand not in hand where the residual is materialized: the
   def-use rows name the carriage path, and the Architect sizes it. Do not
   add a second carriage mechanism.
+- IH-force classification (each is the 5th advancing stop): M-c disagrees,
+  meaning the variant's seat is not 730 or its roles differ from the record;
+  or M-d finds a stored IH child on the non-functional route, or a store
+  whose owner is not a specialization unit.
 - Any kernel, `trusted_base()` or spec change: an operator question.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.

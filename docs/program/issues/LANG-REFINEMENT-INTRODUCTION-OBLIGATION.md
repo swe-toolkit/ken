@@ -50,6 +50,15 @@ base, stop and report the mismatch.
   expected type whose head, after alias resolution, is a refinement. Syntax
   sites are not enumerated.
 - No kernel change.
+- `inRangeBool` (`decimal_char.rs:234-237`) is respelled by transparent Bool
+  elimination, as `inLowerScalarBool`, `inUpperScalarBool` and a `match`
+  over them, with the same value on all inputs (Architect
+  `evt_pawgvbeevyg2`). `isScalar 55295` and `57344` then close, and `55296`
+  stays `Equal Bool False True`. The conformance row
+  `conformance/surface/numbers/seed-decimal-char-demote.md` (`:361`,
+  `:420-422`) is amended to "value-level Bool composition inside `IsTrue`,
+  here by transparent Bool elimination", which takes the
+  conformance-validator's Spec vote.
 - The design is ruled at AC-0 (Architect `evt_y1v2wbnhx9ej`, R3 and R4):
   - a predicate table keyed on GlobalId;
   - a literal refinement becomes an anonymous named one;
