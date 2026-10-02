@@ -1,7 +1,7 @@
 ---
 id: CAT-FOKRIPKE-TRANSPORT-IMPORT
 title: "FoKripke keeps three private, alpha-identical copies of Transport's cong, sym and trans. Import Transport's and retire the copies, preloading Transport at the 20 flat-source test consumers"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -110,3 +110,20 @@ stop and report the mismatch.
 - A consumer that loads FoKripke by a route other than the 20 counted: stop
   and name it.
 - Any new primitive, postulate or axiom, or an import cycle.
+
+## Closeout
+
+Merged `a246ede23`, exact `b5e50380a`: Foundation QA `evt_6xrr8qjt5dnmn`,
+Architect `evt_6crg52g44qdr8`, Decision `dec_7kmtzc08j04my` (single gate).
+
+- `FoKripke.ken` imports Transport's `cong`, `sym` and `trans`, retires
+  its three alpha-identical copies and rewrites their 56 references. The
+  required `ken fmt` canonicalized the file.
+- `load_fokripke_providers` preloads Transport at 32 load sites in 19
+  suites. The truncation suite's shared Or loader is unchanged, and its
+  one FoKripke test calls the new helper.
+- `cat_transport_pub_export.rs` holds the retirement row and three
+  identity witnesses against the preloaded Transport `GlobalId`s.
+- Carried: the CAT-TRANSPORT prose nits (Gcd "axiom,", Parsing/Decoder
+  "In particular,", Config/Decoder "It adds no parser, renderer,") wait for
+  a slice that touches those files.

@@ -1,7 +1,7 @@
 ---
 id: CAT-INSERTIONSORT-DERIVED-SORT-IMPORT
 title: "InsertionSort re-derives, lemma for lemma, the generic insertion-sort development Derived §4.3 already proves. Publish Derived's sort development and make InsertionSort's public surface instantiations of it, retiring 11 duplicated locals"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
