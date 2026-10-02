@@ -494,8 +494,8 @@ impl<'e> ElabCtx<'e> {
     fn surface_binding_target(&self, index: usize) -> Option<SurfaceBindingTarget> {
         let mut remaining = index;
         for position in (0..self.ctx.len()).rev() {
-            // A split lives after `position`, before later real fields. It
-            // consumes a source slot although it has no `ctx` position.
+            // A split occupies a hidden `ctx` position at `split_depth`.
+            // Its virtual slot supplies the surface name at that position.
             for (slot, _) in self.matrix_virtual_surface_positions.iter().enumerate()
                 .filter(|(_, &split)| split == position + 1)
             {
@@ -15685,12 +15685,6 @@ fn unwrap_lam(term: &Term, n: usize) -> Term {
 
 // ----- match elaboration -----
 
-/// Once a matrix binder is installed in `cx.ctx`, an alias and a plain
-/// variable reference share ordinary de Bruijn coordinates.
-fn weaken_woven(_cx: &ElabCtx<'_>, term: &Term, amount: usize) -> Result<Term, ElabError> {
-    Ok(weaken(term, amount as i64))
-}
-
 #[inline(never)]
 fn infer_active_pattern_alias(
     cx: &mut ElabCtx,
@@ -15950,32 +15944,20 @@ impl RowState {
     /// Enter one emitted-core binder. Occurrences that already denote live
     /// values move under it; future constructor-field binders do not exist yet
     /// and therefore remain pending at `Var(0)`.
-    fn under_binder_with(
-        mut self,
-        shift_term: impl Fn(&Term) -> Result<Term, ElabError>,
-    ) -> Result<Self, ElabError> {
+    fn under_core_binder(mut self) -> Self {
         self.assert_occurrence_alignment();
         for occurrence in &mut self.real_occurrences {
             if occurrence.live {
-                occurrence.term = shift_term(&occurrence.term)?;
+                occurrence.term = weaken(&occurrence.term, 1);
             }
         }
         for occurrence in self.binding_occurrences.iter_mut().flatten() {
-            *occurrence = shift_term(occurrence)?;
+            *occurrence = weaken(occurrence, 1);
         }
         for alias in &mut self.virtual_aliases {
-            alias.occurrence = shift_term(&alias.occurrence)?;
+            alias.occurrence = weaken(&alias.occurrence, 1);
         }
-        Ok(self)
-    }
-
-    fn under_core_binder(self) -> Self {
-        self.under_binder_with(|term| Ok(weaken(term, 1)))
-            .expect("ordinary weakening cannot fail")
-    }
-
-    fn under_woven_binder(self, cx: &ElabCtx<'_>) -> Result<Self, ElabError> {
-        self.under_binder_with(|term| weaken_woven(cx, term, 1))
+        self
     }
 
     fn mark_current_real(mut self) -> Self {
@@ -15989,11 +15971,6 @@ impl RowState {
     /// Enter an existing method binder for this real column.
     fn enter_current_real_binder(self) -> Self {
         self.under_core_binder().mark_current_real()
-    }
-
-    /// A matrix split's fresh binder is woven, not pushed into `cx.ctx`.
-    fn enter_woven_real_binder(self, cx: &ElabCtx<'_>) -> Result<Self, ElabError> {
-        Ok(self.under_woven_binder(cx)?.mark_current_real())
     }
 
     /// Supply the current value to a source binding position. Generated
@@ -18042,13 +18019,10 @@ fn nested_matrix_motive(
 /// synthetic and never touch row patterns) down to a nested-`elim_D` method
 /// term, per the standard column-by-column algorithm.
 ///
-/// `real_depth_so_far` counts only genuine (`Real`, non-split) `cx.ctx`
-/// pushes made along the current path — it lines up with what `resolve.rs`
-/// counted when flattening pattern-bound names, so `infer`'s raw
-/// `Term::var(i)` passthrough resolves correctly. Columns that need
-/// splitting (a `Ctor` sub-pattern present) or `Ih` slots are *never* pushed
-/// onto `cx.ctx` — they are woven in afterward via `weaken`, exactly as the
-/// pre-existing single-level code already did for induction hypotheses.
+/// `real_depth_so_far` counts surface-bound flat `Real` columns, excluding
+/// split and IH binders. All emitted matrix binders are real `cx.ctx` pushes;
+/// split and IH entries are hidden from surface de Bruijn lookup. This count
+/// tracks the resolver's flat binding order independently of context depth.
 fn compile_match_matrix(
     cx: &mut ElabCtx,
     arms: &[RMatchArm],
@@ -18281,7 +18255,7 @@ fn compile_match_matrix(
                     } else {
                         None
                     };
-                    row = row.enter_woven_real_binder(cx)?;
+                    row = row.enter_current_real_binder();
                     if let (Some(slot), Some(name)) = (virtual_slot, split_name) {
                         row.virtual_aliases.push(MatrixVirtualAlias {
                             slot,
@@ -18291,10 +18265,8 @@ fn compile_match_matrix(
                             install_depth: split_depth,
                         });
                     }
-                    Ok(row)
+                    row
                 })
-                .collect::<Result<Vec<_>, ElabError>>()?
-                .into_iter()
                 .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
                 .collect();
             #[cfg(test)]
@@ -18404,10 +18376,8 @@ fn compile_match_matrix(
 /// constructor (it matches all of them) — and recurse to build each
 /// constructor's raw method term: `λ(fields). λ(IHs). <continuation>`,
 /// where `<continuation>` threads through `tail_col_types`/`tail_col_kinds`
-/// (the columns after this one). Each returned method is valid at
-/// `real_depth_so_far` — i.e. as if the split column's own binder does not
-/// yet exist; the caller (top-level `infer_match`, or a nested nested split
-/// in `compile_match_matrix`) wraps accordingly.
+/// (the columns after this one). Nested buckets elaborate under the real
+/// split binder, which their caller closes after checking the methods.
 #[allow(clippy::too_many_arguments)]
 fn build_ctor_buckets(
     cx: &mut ElabCtx,
