@@ -7,7 +7,7 @@ size: S
 tier: T2
 gate: architect
 depends_on: []
-blocks: [LANG-REFINED-PARAM-REQUIRES-DESUGAR]
+blocks: [LANG-REFINED-PARAM-REQUIRES-DESUGAR, VERIFY-CALL-SITE-PRECONDITION-DISCHARGE]
 github: null
 origin: "Adversary evt_433905phzqcxw (hunt of a9e16c3a1), fail-closed; the ensures-premise item is the Architect carry in KERNEL-INT-DIV-MOD-NATIVE's Not-this-WP list. Since a9e16c3a1, requires is the only discharge for a / or % divisor, and SPEC-REFINED-PARAM-REQUIRES-DESUGAR makes every refined parameter a requires. Steward-filed per COORDINATION section 2."
 ---
@@ -24,8 +24,9 @@ premises.
 Not this WP: a recursive declaration with `requires`
 (`fn recurse (n : Int) : Int requires Equal Int n n = recurse n` gives
 `NotAFunction`, Verify QA `evt_25tbd7ab2ytxt`). The name is staged at
-`carrier_ty`, and a recursive call's requires burden is a design question
-for the successor. That failure predates this WP and fails closed.
+`carrier_ty`, and no call site supplies premise proofs. That failure
+predates this WP and fails closed. It is VERIFY-CALL-SITE-PRECONDITION-DISCHARGE
+(Architect `evt_4qb4fh6bbnyhg`).
 
 ## Settled inputs (Adversary `evt_433905phzqcxw`, read on `775d721c3`)
 
