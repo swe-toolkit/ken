@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LEVEL-CLOSURE-CHECK
 title: "The kernel proves Bottom with no postulate, because no admission checks a declaration's free level variables against its level parameters, so a definition's own u escapes instantiation. Check level closure and distinct parameters at every admission, and emit Bottom for unequal universes only over closed levels"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1

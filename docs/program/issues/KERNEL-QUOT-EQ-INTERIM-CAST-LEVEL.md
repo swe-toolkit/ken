@@ -1,7 +1,7 @@
 ---
 id: KERNEL-QUOT-EQ-INTERIM-CAST-LEVEL
 title: "The kernel proves Eq Nat 0 1, because Quot-Form takes any relation and Eq at quotient classes reduces to it, and it admits a cross-level cast, because Cast never compares the two levels. Make Eq at quotient classes neutral until Quot-Form carries an equivalence proof, and refuse a cast whose types sit at different levels"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -121,3 +121,14 @@ stop and report the mismatch.
   changes for it. The spec prose is the only consumer, handled in
   deliverable 2.
 - A catalog or `examples/` program stops checking.
+
+## Closeout
+
+Merged `66d72ceb8` from exact `e70979026` (FULL CI green, run
+`37131808322`); the main tree equals the routed merge tree, and all 18
+blobs match. Gates: Kernel QA `evt_4ek2n27qgx2sv`, Architect
+`evt_5swbqc99ge95m`, CV `evt_283yt5v45jvnn`, Decision `dec_7rpfw1a7b0ehs`.
+Quotient-class `Eq` is neutral in the kernel and the interpreter, cast
+refuses unequal levels, and every spec and conformance statement of the
+old reduction carries the P0-gated interim. KERNEL-QUOT-FORM-EQUIVALENCE
+(P0) restores the reduction and flips them back (its D5).
