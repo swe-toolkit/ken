@@ -18224,8 +18224,19 @@ fn compile_match_matrix(
                 }
                 entry.discovery = true;
                 entry.skipped_ih.push(cx.ctx.len());
+                // The method telescope still includes this IH, but discovery
+                // never pushes it. Remove its coordinate from each later
+                // column relative to the columns preceding that column.
+                let tail = col_types[1..]
+                    .iter()
+                    .enumerate()
+                    .map(|(offset, ty)| lower_binders(ty, 1, offset))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| {
+                        ElabError::Internal("a later matrix column depends on a skipped IH".into())
+                    })?;
                 return compile_match_matrix(
-                    cx, arms, &col_types[1..], &col_kinds[1..], rows,
+                    cx, arms, &tail, &col_kinds[1..], rows,
                     real_depth_so_far, top_span, root_frame_depth,
                     ret_ty_slot, arm_used, subsumed_by,
                 );
@@ -18640,16 +18651,8 @@ fn build_ctor_buckets(
         // still needs the index-specialized domains. A domain-only motive
         // derives those domains; it is never emitted or saved. The real
         // motive is constructed as soon as R is known.
-        let index_terms = params0[m0..].iter().map(|index| weaken(index, 1)).collect::<Vec<_>>();
-        let dependent_tail = tail_col_types.iter().enumerate().any(|(position, ty)| {
-            scrut_occurs(ty, &Term::var(position)) || index_terms.iter().any(|index| {
-                scrut_occurs(ty, &weaken(index, position as i64))
-            })
-        });
         let mut domain_only_motive = None;
-        if tail_under_split && nested_motive.is_none()
-            && (ret_ty_slot.is_some() || dependent_tail)
-        {
+        if tail_under_split && nested_motive.is_none() {
             let split_ty = split_column_type.ok_or_else(|| {
                 ElabError::Internal("nested bucket has no split column".into())
             })?;
@@ -18731,50 +18734,14 @@ fn build_ctor_buckets(
             }
             domains
         } else {
-            let mut types = if tail_under_split {
-                field_types0.iter().map(|ty| weaken(ty, 1)).collect()
-            } else {
-                field_types0
-            };
+            if tail_under_split {
+                return Err(ElabError::Internal("split tail has no derived telescope".into()));
+            }
+            let mut types = field_types0;
             types.extend(std::iter::repeat(Term::ty(Level::Zero)).take(p_ihs0));
             types
         };
-        if tail_under_split && motive.is_none() {
-            // Each tail domain is relative to x' and its earlier real tail
-            // binders. In this bucket the n_args0 constructor fields replace
-            // x'; synthetic IH columns add no de Bruijn binder here.
-            let ctor_fields = (0..n_args0).map(|i| Term::var(n_args0 - 1 - i));
-            let ctor_value = params0[..m0]
-                .iter()
-                .map(|param| weaken(param, n_args0 as i64))
-                .chain(ctor_fields)
-                .fold(
-                    Term::Constructor {
-                        id: c0.id,
-                        level_args: split_level_args.to_vec(),
-                    },
-                    Term::app,
-                );
-            let mut real_tail_binders = 0;
-            for (ty, kind) in tail_col_types.iter().zip(tail_col_kinds) {
-                if matches!(kind, ColKind::Ih) {
-                    // IH domains come from `method_type`, not the pending
-                    // tail's Real-column specialization.
-                    new_col_types.push(ty.clone());
-                    continue;
-                }
-                let above_split = shift(ty, n_args0 as i64, real_tail_binders + 1);
-                let specialized = subst_var(
-                    &above_split,
-                    real_tail_binders,
-                    &weaken(&ctor_value, real_tail_binders as i64),
-                );
-                new_col_types.push(shift(
-                    &specialized, 1, n_args0 + real_tail_binders,
-                ));
-                real_tail_binders += 1;
-            }
-        } else if !tail_under_split {
+        if !tail_under_split {
             new_col_types.extend_from_slice(tail_col_types);
         }
         let mut new_col_kinds: Vec<ColKind> = vec![ColKind::Real; n_args0];
@@ -19984,52 +19951,23 @@ fn lower_pattern_type_to_common(term: &Term, k: usize) -> Option<Term> {
     }
 }
 
-/// Return the first escaping index when a leaf type cannot be projected to
-/// the match's outer scope. The index is relative to the matrix leaf; a local
-/// type binder is excluded from it by `cutoff`.
-fn lower_by(term: &Term, k: usize) -> Result<Term, usize> {
-    if k == 0 {
-        return Ok(term.clone());
+/// Remove `k` binders starting at `cutoff`. `Err(j)` names a removed binder
+/// (relative to `cutoff`) that `term` mentions. Use the kernel's total shift
+/// over every term former, rather than a partial elaborator-side traversal.
+fn lower_binders(term: &Term, k: usize, cutoff: usize) -> Result<Term, usize> {
+    for j in 0..k {
+        let at = cutoff + j;
+        if shift(&shift(term, -1, at), 1, at) != *term {
+            return Err(j);
+        }
     }
-    lower_by_inner(term, k, 0)
+    Ok(shift(term, -(k as i64), cutoff))
 }
 
-fn lower_by_inner(term: &Term, k: usize, cutoff: usize) -> Result<Term, usize> {
-    match term {
-        Term::Var(i) => {
-            if *i < cutoff {
-                Ok(Term::var(*i))
-            } else if *i < cutoff + k {
-                Err(*i - cutoff)
-            } else {
-                Ok(Term::var(*i - k))
-            }
-        }
-        Term::Type(l) => Ok(Term::ty(l.clone())),
-        Term::Omega(l) => Ok(Term::omega(l.clone())),
-        Term::Pi(a, b) => Ok(Term::pi(
-            lower_by_inner(a, k, cutoff)?,
-            lower_by_inner(b, k, cutoff + 1)?,
-        )),
-        Term::Lam(a, body) => Ok(Term::lam(
-            lower_by_inner(a, k, cutoff)?,
-            lower_by_inner(body, k, cutoff + 1)?,
-        )),
-        Term::App(f, a) => Ok(Term::app(
-            lower_by_inner(f, k, cutoff)?,
-            lower_by_inner(a, k, cutoff)?,
-        )),
-        Term::Const { id, level_args } => Ok(Term::const_(*id, level_args.clone())),
-        Term::IndFormer { id, level_args } => Ok(Term::IndFormer {
-            id: *id,
-            level_args: level_args.clone(),
-        }),
-        Term::Constructor { id, level_args } => Ok(Term::Constructor {
-            id: *id,
-            level_args: level_args.clone(),
-        }),
-        other => Ok(other.clone()),
-    }
+/// Project a leaf type to the match's outer scope, or name its first
+/// escaping matrix binder (smallest de Bruijn index).
+fn lower_by(term: &Term, k: usize) -> Result<Term, usize> {
+    lower_binders(term, k, 0)
 }
 
 /// Resolve a failing core variable to its original pattern name only where
