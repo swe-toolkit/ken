@@ -145,3 +145,7 @@ stop and report the mismatch.
 - The implicit refinement ensures under a function-valued return
   (`∀Δ.∀φ̄.∀ē. φ[(body ē)/x]`) stays refused until framed separately
   (Architect `evt_enahv9vv0f5r`).
+- A refined parameter's premise (`(d : {z : A | φ})` as carrier plus
+  `requires`, spec 21 §6.3). That desugar is LANG-REFINED-PARAM-REQUIRES-DESUGAR,
+  which flips the `int_div_mod_surface` refined-divisor rows. Here a refined
+  parameter keeps its as-built behaviour (Steward `evt_4jn0dq80tp3ng`).

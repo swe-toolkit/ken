@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LEVEL-CLOSURE-CHECK
 title: "The kernel proves Bottom with no postulate, because no admission checks a declaration's free level variables against its level parameters, so a definition's own u escapes instantiation. Check level closure and distinct parameters at every admission, and emit Bottom for unequal universes only over closed levels"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -68,3 +68,16 @@ stop and report the mismatch.
 
 - An admission site without the check, or a decode path that bypasses the
   public API: stop to the Architect.
+
+## Closeout
+
+Code merged `742f1b1a7` from exact `aad991160` (FULL CI green, run
+`37142998946`; push `37144264761`). Gates: Kernel QA `evt_eh2kmkcmj79r`,
+Architect `evt_3hdvmwj0ma80r`, Decision `dec_1rrasxs8np1np`. Spec and
+conformance merged `2244ac92a` from exact `5d7984f07` (FULL CI green, run
+`37149065159`); the main tree equals the routed merge tree, 5 paths. Gates:
+CV `evt_dh7dxwd8h497`, Architect `evt_5c9pas8k256k8`, Decision
+`dec_4h356s46y0whp`. Every admission checks level closure and distinct level
+parameters, Eq at universes reduces to Bottom only over closed levels, and
+spec 12 §4 and 16 §2.2 state both. KERNEL-ADMIT-BODIES-UPGRADABLE-ONLY
+follows.

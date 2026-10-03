@@ -310,6 +310,10 @@ The ruling carries the code and is authoritative where this summary differs.
   `JoinResultRepresentation` gains no R variant; `CarrierWord`'s doc
   comment says it means K. The dead `Representation::Residual` arm stays,
   carried to a K→R coercion design.
+- I-1: merged `6dcd95f29` from exact `454e72e74` (FULL CI green, run
+  `37145977399`); the main tree equals the routed merge tree, 7 paths.
+  Gates: runtime QA `evt_1n848wz9eppys`, Architect `evt_nw9r18fcbca2`,
+  Decision `dec_5r9srgwg8brzg`. I-2 stays held.
 
 ## Acceptance
 
