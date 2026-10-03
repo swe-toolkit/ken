@@ -55,9 +55,11 @@ stop and report the mismatch.
    refused. §9's numbered item 4 ("relation-as-equality") states neutral
    class Eq until P0 (spec-author `evt_1tkny60qttp4r`).
    Every other `spec/` statement that gives quotient-class `Eq` reducing
-   to `R a b` as current behavior states the interim too. Measured (CV via
-   kernel-leader `evt_5mrvncv2ejy82`): `17-conversion.md` `:471-473` and
-   `:811-813`, `spec/10-kernel/README.md` `:76` and `:160`.
+   to `R a b` as current behavior, or that depends on it, states the
+   interim too. Measured (CV via kernel-leader `evt_5mrvncv2ejy82`;
+   spec-author `evt_7d5b91ebqwn8w`): `17-conversion.md` `:471-473` and
+   `:811-813`, `spec/10-kernel/README.md` `:76`, `:160` and commitment 16,
+   and `15-identity.md` §4.3.
 3. Conformance: the `quotient-eq` rows (`seed-kernel.md`,
    `seed-observational.md`, `seed-conversion.md`
    `quotient-eq-through-conv`) state the interim verdict; a row pins the
