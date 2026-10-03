@@ -123,8 +123,11 @@ they do not promote any `Bytes` operation. Kernel conversion for these
   is negative, or when that span extends past `b`; its third argument is a
   **length**, not an end offset. Neither operation returns a neutral or a
   fabricated byte/empty slice for invalid bounds. For verified code, an
-  **obligation-generating** total form over a refinement (`at_pf : (b : Bytes)
-  → (i : Int) → { i ≥ 0 ∧ i < length b } → UInt8`, `34 §5`) is proven in-range
+  **obligation-generating** total form over a refinement
+  (`at_pf : (b : Bytes) → (i : Int) →
+  { And (IsTrue (leq_int 0 i))
+        (IsTrue (leq_int (i + 1) (length b))) } → UInt8`, `34 §5`)
+  is proven in-range
   ⇒ total and safe; unproven ⇒ a marked partial point that degrades to a runtime
   check (`unknown`/panic), **never** a silent out-of-bounds read. The two faces
   are the §`35 §3` "checked is the runtime face of an undischarged obligation,"
@@ -132,9 +135,9 @@ they do not promote any `Bytes` operation. Kernel conversion for these
 - **A byte is `UInt8`** (`35`); `length`/indices are `Int` (the default integer,
   arbitrary-precision, `35 §2`).
 - **Non-definitional laws are propositions** (`14 §5`), not assumed:
-  `length (concat a b) == length a + length b`, `concat`-associativity,
-  `concat a empty == a`, etc. — proved in the prelude (`50-stdlib/`,
-  `20-verification/`), not baked into the kernel.
+  `Equal Int (length (concat a b)) (length a + length b)`,
+  `concat`-associativity, `Equal Bytes (concat a empty) a`, etc. — proved in
+  the prelude (`50-stdlib/`, `20-verification/`), not baked into the kernel.
 - **Exact surface spellings.** The primitive names `bytes_at` and
   `bytes_slice`, their signatures, their total failure behavior, and their
   registered runtime semantics over values are fixed here. Spellings of the
@@ -314,7 +317,8 @@ Over the `bytes_encode`/`bytes_decode` boundary, the intended
 having been produced by `bytes_encode`:
 
 ```
-∀ (s : String). bytes_decode (bytes_encode s) == Ok s
+∀ (s : String). Equal (Result Utf8Error String)
+  (bytes_decode (bytes_encode s)) (Ok Utf8Error String s)
 ```
 
 The pre-existing `BytesRoundTripLaw : Ω₀` is an opaque oracle-tagged
@@ -336,9 +340,10 @@ clients requiring this equality consume F3 directly.
   obligation mechanism, not this semantic proof.
 - **The reverse is NOT a law — pin the silence so it is not over-claimed.**
   There is no unconditional inverse for arbitrary bytes: from
-  `bytes_decode b == Ok s`, it does **not** follow in general that
-  `bytes_encode s == b`. Invalid UTF-8 has no `String`, and even valid
-  **non-NFC** bytes normalize on `String` construction (`41 §3a`), so
+  `Equal (Result Utf8Error String) (bytes_decode b) (Ok Utf8Error String s)`,
+  it does **not** follow in general that `Equal Bytes (bytes_encode s) b`.
+  Invalid UTF-8 has no `String`, and even valid **non-NFC** bytes normalize on
+  `String` construction (`41 §3a`), so
   `bytes_encode` after a successful `bytes_decode` is not the identity on every
   `Bytes`. Conformance must assert only the conditional
   `String → Bytes → Result Utf8Error String` direction above; a general
@@ -380,8 +385,9 @@ rule** (`§1.1`); **no `foreign`** (that is L7, `§2`–`§3`).
   named `bytes_decode`; an implicit/hidden-charset path is **rejected** (or
   absent), and invalid input produces `Err`.
 - **AC5 — round-trip law.**
-  `bytes_decode (bytes_encode s) == Ok s` has the quantified F3 proof
-  inhabitant (`§1.4`), not merely a passing sample. The pre-existing opaque
+  `Equal (Result Utf8Error String)
+  (bytes_decode (bytes_encode s)) (Ok Utf8Error String s)` has the quantified
+  F3 proof inhabitant (`§1.4`), not merely a passing sample. The pre-existing opaque
   marker's discharge test proves only that an obligation can accept a
   certificate; it does not prove the decoder from Ken source. The reverse is
   **not** asserted (`§1.5`).
@@ -632,13 +638,16 @@ status. PX9 may refine error payloads but must not change this progress partitio
 or collapse the `Revoked` identity.
 
 The private positive-transfer contracts re-exposed by the checked wrappers
-include these propositions:
+include these propositions (`remaining` and `effective_request` denote the
+`Int` budgets fixed above):
 
 - **write positivity/bounds:** successful `writeAt` on positive remaining bytes
-  yields `Wrote n` with `0 < n ≤ remaining`;
+  yields `Wrote n` with `And (IsTrue (leq_int 1 n))
+  (IsTrue (leq_int n remaining))`;
 - **read positivity/bounds:** successful `readAt` on a positive effective
   request yields either `ReadEof` or `ReadSome span n` with
-  `0 < n ≤ effective request` and `length span = n`;
+  `And (IsTrue (leq_int 1 n)) (IsTrue (leq_int n effective_request))`
+  and `Equal Int (length span) n`;
 - **position and bounds:** every transfer uses the explicit nonnegative file
   offset and an overflow-checked effective range; and
 - **tail capping:** a request that starts in range but extends beyond the buffer
@@ -665,9 +674,11 @@ Let `N = n₁ + … + nₖ`. The required theorem is the conjunction of:
 1. **termination:** `writeAll` performs at most `L` primitive calls and always
    returns;
 2. **exact-prefix invariant:** after every successful-call prefix,
-   `0 ≤ N ≤ L`, the file offset and span start have both advanced by `N`, the
-   remaining length is `L - N`, and the bytes written are exactly `B[0..N)`;
-3. **success completeness:** `writeAll` returns success only when `N = L`, so
+   `And (IsTrue (leq_int 0 N)) (IsTrue (leq_int N L))` holds, the file offset
+   and span start have both advanced by `N`, the remaining length is `L - N`,
+   and the bytes written are exactly `B[0..N)`;
+3. **success completeness:** `writeAll` returns success only when
+   `Equal Int N L`, so
    the entire input span has been written;
 4. **first-error preservation:** if the next primitive call returns transfer
    error `e`, including `NoProgress`, `writeAll` returns that same first `e`

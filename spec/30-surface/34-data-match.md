@@ -1013,8 +1013,8 @@ holds (the comprehension subobject, `../20-verification/21 §2`; the predicate's
 universe `Ω` is `../10-kernel/12 §5`, `16 §1`). At the surface:
 
 ```
-def Nat        = { n : Int | n ≥ 0 }
-def NonEmpty a = { xs : List a | xs ≠ Nil }
+def Nat        = { n : Int | IsTrue (leq_int 0 n) }
+def NonEmpty a = { xs : List a | Not (Equal (List a) xs (Nil a)) }
 view head {a} (xs : NonEmpty a) : a = match xs { Cons x _ => x }
 ```
 

@@ -68,7 +68,8 @@ error** (`36 §1.6.3`). The single definition keyword `view` is **retired**
 
 ```
 record Point { x : Int, y : Int }
-record User  { name : String, age : { n : Int | n ≥ 0 } }   -- refined field
+record User  { name : String, age : { n : Int | IsTrue (leq_int 0 n) } }
+  -- refined field
 ```
 
 - Elaborates to right-nested Σ with definitional η (`../10-kernel/13 §3`), so
@@ -492,7 +493,7 @@ user typeclasses.
 ```
 class DecEq (A : Type) {              -- a record of operations + their laws
   eq    : A → A → Bool                 -- (the propositional equality is the
-  ok    : (x y : A) → eq x y == true → Eq A x y   --  kernel's Eq, 10-kernel/15)
+  ok    : (x y : A) → IsTrue (eq x y) → Eq A x y  -- kernel's Eq, 10-kernel/15)
 }
 instance DecEq Int { eq = int_eq, ok = … }
 
@@ -591,8 +592,9 @@ C A  ≡  (op₁ : T₁) × … × (opₙ : Tₙ) × (law₁ : P₁) × … × (
 
 - **Operation fields** are `Type`-valued (`eq : A → A → Bool`); **law fields**
   are **Ω-valued propositions** (`../20-verification/21 §3` `law`/`verify`;
-  e.g. `assoc : (x y z : A) → op x (op y z) == op (op x y) z`). A mixed record —
-  relevant ops beside Ω proofs — is well-formed and lands in `Type`
+  e.g. `assoc : (x y z : A) → Equal A (op x (op y z)) (op (op x y) z)`).
+  A mixed record — relevant ops beside Ω proofs — is well-formed and lands in
+  `Type`
   (`13 §4`); a record whose fields are *all* Ω is itself a proposition (the
   sound Σ-of-Ω-into-Ω case, `16 §1.3`) — that is exactly a **property class**.
 - **Definitional η (`13 §2`)** gives the record its expected behaviour: a
