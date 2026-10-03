@@ -213,4 +213,8 @@ stop and report the mismatch.
   introduction obligation (an AC row in
   `LANG-REFINEMENT-INTRODUCTION-OBLIGATION`, `evt_1ytv0fc4j1c1j`). Refined
   recognition in the callee needs a proof-carrying parameter encoding, a
-  spec-lane decision.
+  spec-lane decision. Until then, spec 21 §6.3 / 22 §3 and the seed
+  `refined-param-is-hypothesis-not-obligation` (refined φ enters Γ) diverge
+  from this WP's retained hole. That divergence is pre-existing and does not
+  block this WP's votes; it goes to the operator as a spec question
+  (Steward, on CV `evt_5sfpt076hm8r9`).
