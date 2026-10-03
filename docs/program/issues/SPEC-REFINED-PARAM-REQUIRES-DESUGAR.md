@@ -49,7 +49,8 @@ premise as a proposition.
    is unchanged for values.
 2. Spec 22 §3: the refined-parameter bullet becomes a pointer to the
    desugar and the Preconditions bullet; the dangling §2.5.1 citation goes.
-3. Spec 21 and 22 examples: every Bool-valued operator in a premise,
+3. Spec 21, 22, 33, 34 and 38 examples (the last three added on the
+   spec-leader's residual, `evt_2czwycgn39psm`): every Bool-valued operator in a premise,
    postcondition or refinement position becomes a proposition (`Not (Equal
    Int d 0)` for `d ≠ 0`, `Equal`, the ordering propositions).
 4. Conformance: `seed-obligations.md` (`:138` and the refined-parameter
@@ -61,7 +62,7 @@ premise as a proposition.
 
 - **AC-1.** The CV finds no remaining spec 21 or 22 text that assumes a
   refined parameter's predicate other than through the desugar, and no Bool
-  expression in a proposition position in either file's examples.
+  expression in a proposition position in the examples of the five files.
 - **AC-2.** The higher-order row's verdict is refusal, and its `requires`
   twin (same function written with an explicit `requires`) has the same
   verdict.
