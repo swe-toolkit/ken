@@ -1,7 +1,7 @@
 ---
 id: KERNEL-INT-DIV-MOD-NATIVE
 title: "Int has no division: spec 18a lists div_int and mod_int as a GAP with a NATIVE verdict, and the l1_acceptance division row stays ignored. Register both as neutral kernel Ops, give raw / and % on Int a non-zero-divisor obligation, and un-ignore the row"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -213,4 +213,23 @@ stop and report the mismatch.
   introduction obligation (an AC row in
   `LANG-REFINEMENT-INTRODUCTION-OBLIGATION`, `evt_1ytv0fc4j1c1j`). Refined
   recognition in the callee needs a proof-carrying parameter encoding, a
-  spec-lane decision.
+  spec-lane decision. Until then, spec 21 §6.3 / 22 §3 and the seed
+  `refined-param-is-hypothesis-not-obligation` (refined φ enters Γ) diverge
+  from this WP's retained hole. That divergence is pre-existing and does not
+  block this WP's votes; it goes to the operator as a spec question
+  (Steward, on CV `evt_5sfpt076hm8r9`).
+
+## Closeout
+
+Merged as `a9e16c3a1` from exact `ba7ce932d`, after two M5 reds cured by
+respins (the stale `.github/ignored-test-exemptions.toml` row, then the
+`lang_prelude_collections.rs` trusted-base pin). Gates: Kernel QA
+`evt_1mfam61vsv355` with respin checks `evt_7vn549bkn7790` and
+`evt_1rhy84rmn4aaw`, CV `evt_5akexcmqn08ny`, Architect
+`evt_6q2gw8kp9axh`, Decision `dec_1snmdmssscc24`. 19 of 20 routed blobs
+match main; `elab.rs` differs only by TELESCOPE's disjoint hunks, and
+main's tree equals the three-way merge of `db19a8d0c` and the candidate.
+`/` and `%` on Int are native, `trusted_base()` grew by exactly `div_int`
+and `mod_int`, and the `l1_acceptance` division row runs. The refined
+divisor's obligation flips to 0 in `LANG-REFINED-PARAM-REQUIRES-DESUGAR`
+(operator 2026-10-03, 3(a)).
