@@ -159,7 +159,11 @@ fn matching_caller_premise_supplies_the_proof() {
     let [_, g] = results.as_slice() else {
         panic!("the file contains the callee and caller")
     };
-    assert!(g.obligations.is_empty());
+    assert!(
+        g.obligations.is_empty(),
+        "matching caller premise left obligations: {:?}",
+        g.obligations
+    );
     assert_eq!(trusted(&env), before);
 }
 
@@ -263,12 +267,13 @@ fn explicit_proof_parameter_remains_explicit() {
     let mut env = ElabEnv::new().expect("numeric prelude");
     let results = env
         .elaborate_file_v1(
-            "fn h (n : Int) (p : Equal Int n n) : Int = n\n\
+            "fn contracted (n : Int) : Int requires Equal Int n n = n\n\
+             fn h (n : Int) (p : Equal Int n n) : Int = n\n\
              fn caller (m : Int) (p : Equal Int m m) : Int = h m p",
         )
         .expect("caller explicitly supplies the proof parameter");
-    let [_, caller] = results.as_slice() else {
-        panic!("the file contains the callee and caller")
+    let [_, _, caller] = results.as_slice() else {
+        panic!("the file contains an unrelated contracted callee, h, and caller")
     };
     assert!(caller.obligations.is_empty());
 }
