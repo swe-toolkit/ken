@@ -1,8 +1,8 @@
-//! Nested constructor-field splits preserve the motive's outer binders,
-//! and refuse unresolved virtual aliases on the reverting path.
+//! Nested constructor-field splits preserve motive binders and virtual
+//! alias occurrences inside the derived method telescope.
 //! Spec: `spec/30-surface/34-data-match.md §3.1–3.2, §4.4`.
-//! Promise classes: durable invariants except the two explicitly named
-//! transition sentinels for the derived-telescope successor. Every program
+//! Promise classes: durable value invariants, plus typed wrong-method
+//! refusals. Every program
 //! enters via `elaborate_file`.
 
 use ken_elaborator::{ElabEnv, ElabError};
@@ -229,10 +229,10 @@ fn two_field_nested_constructor_keeps_indexed_root_ih_tail() {
 }
 
 #[test]
-fn reverting_record_tuple_var_is_refused_before_wrong_binder_selection() {
-    // Base rejects a sentinel at the inner split. The removed in-matrix
-    // finalizer made this same source check while returning `prefix` instead
-    // of `seed`. Refusal must happen before either closed call gets a value.
+fn reverting_record_tuple_var_selects_seed_not_same_typed_binders() {
+    // Base refused an unresolved alias here; an earlier in-matrix finalizer
+    // silently returned `prefix`. Give every live Nat binder a distinct value
+    // so the returned `seed` detects a wrong-binder selection.
     let mut env = ElabEnv::new().expect("prelude");
     let source = "data Vec (a : Type) : Nat → Type where { \
         VNil : Vec a Zero; \
@@ -246,34 +246,25 @@ fn reverting_record_tuple_var_is_refused_before_wrong_binder_selection() {
           MkCarrier prefix { payload = (Suc i, seed), enabled = True } Zero _ ↦ seed; \
           MkCarrier prefix { payload = (Suc i, seed), enabled = True } (Suc k) _ ↦ seed; \
           MkCarrier prefix { enabled = False } _ _ ↦ Zero } \
-        const observed_zero : Nat = keep (MkCarrier Zero \
+        const observed_zero : Nat = keep (MkCarrier (Suc (Suc (Suc Zero))) \
           { payload = (Zero, Suc Zero), enabled = True } Zero (VNil Nat)) \
-        const observed_suc : Nat = keep (MkCarrier Zero \
-          { payload = (Suc Zero, Suc Zero), enabled = True } (Suc Zero) \
+        const observed_suc : Nat = keep (MkCarrier (Suc (Suc (Suc Zero))) \
+          { payload = (Suc (Suc (Suc Zero)), Suc Zero), enabled = True } (Suc Zero) \
           (VCons Nat Zero Zero (VNil Nat))) \
         const expected : Nat = Suc Zero";
-    let error = env
-        .elaborate_file(source)
-        .expect_err("woven Var column under reverting split cannot select a binder by depth");
-    assert!(
-        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
-        if span.start == source.find("enabled = True } Zero _").expect("reverting tag split")
-            + "enabled = True } ".len()
-            && span.end == span.start + "Zero".len()),
-        "reverting split must refuse before resolving `seed`: {error:?}"
-    );
-    assert_eq!(error.to_string(),
-        "a variable bound inside a nested sub-pattern (or an `as`-alias) cannot be used beneath a dependent nested split yet; bind it at the top level of the arm");
+    env.elaborate_file(source)
+        .expect("record-projected seed uses its own matrix occurrence");
+    assert_normalized_equal(&env, "observed_zero", "expected");
+    assert_normalized_equal(&env, "observed_suc", "expected");
 }
 
 #[test]
-fn transition_second_nested_split_inside_zero_bucket_is_kernel_rejected() {
-    // Transition sentinel: the base and candidate both kernel-reject this
-    // deeper split; LANG-NESTED-MATRIX-DERIVED-TELESCOPE must flip it to a
-    // normalized value. Rejection is not a successful evaluation.
+fn second_nested_split_inside_zero_bucket_returns_both_values() {
+    // Durable value invariant: a nested Zero-bucket split keeps its outer
+    // method, sibling and inner constructor coordinates distinct.
     let mut env = ElabEnv::new().expect("prelude");
     let trusted_before = env.env.trusted_base();
-    match env.elaborate_file(&format!(
+    env.elaborate_file(&format!(
         "{VEC}\ndata PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
          fn deeper (n : Nat) (xs : Vec Nat (Suc n)) : PairOut = \
          match xs {{ \
@@ -286,23 +277,20 @@ fn transition_second_nested_split_inside_zero_bucket_is_kernel_rejected() {
            (VCons Nat (Suc Zero) Zero (VCons Nat Zero Zero (VNil Nat)))\n\
          const expected_nil : PairOut = Out Zero Zero\n\
          const expected_cons : PairOut = Out (Suc Zero) Zero"
-    )) {
-        Err(ElabError::KernelRejected { .. }) => {}
-        other => panic!(
-            "deeper Zero-bucket split must be kernel-rejected until the successor: {other:?}"
-        ),
-    }
+    ))
+    .expect("deeper Zero-bucket split checks in its derived telescope");
+    assert_normalized_equal(&env, "nil", "expected_nil");
+    assert_normalized_equal(&env, "cons", "expected_cons");
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
 #[test]
-fn transition_second_nested_split_inside_two_field_bucket_is_kernel_rejected() {
-    // Transition sentinel: both base and candidate kernel-reject this
-    // two-field interior split. LANG-NESTED-MATRIX-DERIVED-TELESCOPE retires
-    // this rejection and must instead assert both normalized Out values.
+fn second_nested_split_inside_two_field_bucket_returns_both_values() {
+    // Durable value invariant: the second of two same-typed fields is read
+    // beneath a second split, not its preceding sibling or IH.
     let mut env = ElabEnv::new().expect("prelude");
     let trusted_before = env.env.trusted_base();
-    match env.elaborate_file(&format!(
+    env.elaborate_file(&format!(
         "{VEC}\ndata TwoTag : Type where {{ Two : Nat → Nat → TwoTag }}\n\
          data PairOut : Type where {{ Out : Nat → Nat → PairOut }}\n\
          fn deeper_two (n : Nat) (xs : Vec TwoTag (Suc n)) : PairOut = \
@@ -311,18 +299,16 @@ fn transition_second_nested_split_inside_two_field_bucket_is_kernel_rejected() {
            VCons m (Two a b) (VCons k _ _) ↦ Out (Suc Zero) b \
          }}\n\
          const nil : PairOut = deeper_two Zero \
-           (VCons TwoTag Zero (Two Zero (Suc Zero)) (VNil TwoTag))\n\
+           (VCons TwoTag Zero (Two (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))) (VNil TwoTag))\n\
          const cons : PairOut = deeper_two (Suc Zero) \
-           (VCons TwoTag (Suc Zero) (Two Zero (Suc Zero)) \
+           (VCons TwoTag (Suc Zero) (Two (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))) \
              (VCons TwoTag Zero (Two Zero Zero) (VNil TwoTag)))\n\
-         const expected_nil : PairOut = Out Zero (Suc Zero)\n\
-         const expected_cons : PairOut = Out (Suc Zero) (Suc Zero)"
-    )) {
-        Err(ElabError::KernelRejected { .. }) => {}
-        other => {
-            panic!("deeper two-field split must be kernel-rejected until the successor: {other:?}")
-        }
-    }
+         const expected_nil : PairOut = Out Zero (Suc (Suc (Suc Zero)))\n\
+         const expected_cons : PairOut = Out (Suc Zero) (Suc (Suc (Suc Zero)))"
+    ))
+    .expect("deeper two-field split checks in its derived telescope");
+    assert_normalized_equal(&env, "nil", "expected_nil");
+    assert_normalized_equal(&env, "cons", "expected_cons");
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
@@ -514,7 +500,7 @@ fn middle_frame_alias_is_finalized_by_its_owner_not_the_inner_or_outer_match() {
 }
 
 #[test]
-fn outer_alias_inside_reverting_nested_split_refused() {
+fn outer_alias_inside_reverting_nested_split_keeps_saved_value() {
     let mut env = ElabEnv::new().expect("prelude");
     let source = format!(
         "{VEC}\ndata Tag (n : Nat) : Vec Nat n → Type where {{ \
@@ -539,21 +525,15 @@ fn outer_alias_inside_reverting_nested_split_refused() {
            (Suc Zero)\n\
          const expected : Nat = Suc Zero"
     );
-    let error = env
-        .elaborate_file(&source)
-        .expect_err("an outer alias cannot cross a reverting nested split yet");
-    assert!(
-        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
-        if span.start == source.find("HoldD n VNil").expect("nested split") + "HoldD n ".len()
-            && span.end == span.start + "VNil".len()),
-        "the dependent split must refuse its unresolved alias: {error:?}"
-    );
+    env.elaborate_file(&source)
+        .expect("outer alias retains its value through a reverting nested split");
+    assert_normalized_equal(&env, "observed", "expected");
 }
 
 #[test]
 fn constant_inner_alias_does_not_skip_final_kernel_type_check() {
-    // The constant inner split retains base-style frame-finish finalization;
-    // the final definition still rejects a mistyped nested arm.
+    // The constant inner split kernel-checks every derived method; the final
+    // definition must still refuse this mistyped nested arm.
     let mut env = ElabEnv::new().expect("prelude");
     let source = "data NatBox : Type where { BoxNat : Nat → NatBox }\n\
                   fn ill_typed (h : NatBox) (x : Nat) : Nat = \
@@ -567,20 +547,17 @@ fn constant_inner_alias_does_not_skip_final_kernel_type_check() {
     let error = env
         .elaborate_file(source)
         .expect_err("a constant-path alias does not authorize the ill-typed arm");
-    // The declaration's span is attached by declare_def; no in-matrix query
-    // runs on the constant path.
     assert!(
-        matches!(error, ElabError::KernelRejected { span, .. }
-        if span.start == source.find("fn ill_typed").expect("fixture declaration")
-            && span.end == source.len()),
-        "the final declaration kernel gate must reject after in-matrix deferral"
+        matches!(error, ElabError::KernelRejected { ref span, .. }
+        if span.start != source.find("fn ill_typed").expect("fixture declaration")),
+        "the in-matrix method gate must reject before final declaration: {error:?}"
     );
 }
 
 #[test]
-fn reverting_outer_alias_in_mistyped_method_is_refused_before_kernel() {
-    // The nested Vec split reverts the Tag n v tail. Its enclosing alias
-    // sentinel is refused rather than resolved at a miscounted depth.
+fn reverting_outer_alias_in_mistyped_method_is_kernel_refused() {
+    // The nested Vec split reverts the Tag n v tail. The method with the
+    // wrong-valued body must be refused, independently of alias resolution.
     let mut env = ElabEnv::new().expect("prelude");
     let source = format!(
         "{VEC}\ndata Tag (n : Nat) : Vec Nat n → Type where {{ \
@@ -601,17 +578,15 @@ fn reverting_outer_alias_in_mistyped_method_is_refused_before_kernel() {
     );
     let error = env
         .elaborate_file(&source)
-        .expect_err("reverting alias cannot be resolved inside the matrix");
+        .expect_err("a wrong-valued method must remain kernel-refused");
     assert!(
-        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
-        if span.start == source.find("HoldD n VNil").expect("nested split") + "HoldD n ".len()
-            && span.end == span.start + "VNil".len()),
-        "the reverting method must be refused before kernel checking: {error:?}"
+        matches!(&error, ElabError::KernelRejected { .. }),
+        "mistyped method must reach the unconditional in-matrix check: {error:?}"
     );
 }
 
 #[test]
-fn dependent_later_field_variable_row_is_refused_until_derived_telescope() {
+fn dependent_later_field_variable_row_uses_derived_telescope() {
     let mut env = ElabEnv::new().expect("prelude");
     let trusted_before = env.env.trusted_base();
     let source = format!(
@@ -627,35 +602,33 @@ fn dependent_later_field_variable_row_is_refused_until_derived_telescope() {
          const expected_zero : PairOut = Out Zero Zero\n\
          const expected_one : PairOut = Out (Suc Zero) (Suc Zero)"
     );
-    let error = env
-        .elaborate_file(&source)
-        .expect_err("virtual nested-pattern variable cannot be guessed from cx.ctx");
-    assert!(
-        matches!(&error, ElabError::PatternVariableAcrossDependentSplit { span }
-        if span.start == source.find("MkDep Zero v").expect("nested split") + "MkDep ".len()
-            && span.end == span.start + "Zero".len()),
-        "the dependent row must refuse the sentinel before finalization: {error:?}"
-    );
+    env.elaborate_file(&source)
+        .expect("dependent sibling's variable row uses its own occurrence");
+    assert_normalized_equal(&env, "zero", "expected_zero");
+    assert_normalized_equal(&env, "one", "expected_one");
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
 #[test]
-fn two_split_columns_variable_row_reports_actionable_diagnostic() {
+fn two_split_columns_variable_row_returns_distinct_occurrences() {
     let mut env = ElabEnv::new().expect("prelude");
-    let error = env
-        .elaborate_file(
-            "data PairOut : Type where { Out : Nat → Nat → PairOut }\n\
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file(
+        "data PairOut : Type where { Out : Nat → Nat → PairOut }\n\
          data Tri : Type where { MkTri : Nat → Nat → Nat → Tri }\n\
          fn f (t : Tri) : PairOut = match t { \
            MkTri Zero Zero c ↦ Out c c; \
            MkTri a b c ↦ Out a b \
-         }",
-        )
-        .expect_err("two virtual split binders cannot yet select distinct occurrences");
-    assert!(matches!(error, ElabError::TypeMismatch { reason, .. }
-        if reason == "split-column binder 'a' is bound by a variable row while another field \
-            of the same constructor is also split; bind it by its constructor pattern \
-            in each arm or split it in a separate match"));
+         }\n\
+         const zero : PairOut = f (MkTri Zero Zero (Suc Zero))\n\
+         const distinct : PairOut = f (MkTri (Suc Zero) (Suc (Suc Zero)) Zero)\n\
+         const expected_zero : PairOut = Out (Suc Zero) (Suc Zero)\n\
+         const expected_distinct : PairOut = Out (Suc Zero) (Suc (Suc Zero))",
+    )
+    .expect("two split columns bind distinct occurrences");
+    assert_normalized_equal(&env, "zero", "expected_zero");
+    assert_normalized_equal(&env, "distinct", "expected_distinct");
+    assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
 #[test]
